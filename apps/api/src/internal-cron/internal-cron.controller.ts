@@ -61,6 +61,8 @@ export class InternalCronController {
       CronRunsService.claveDelDia(),
       async () => {
         await this.subscriptions.reconcileOverdueSubscriptions();
+        await this.subscriptions.processLifecycleNotices();
+        await this.subscriptions.processCancellationWindow();
         await this.subscriptions.cleanupExpiredPendingSignups();
         // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
         // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar

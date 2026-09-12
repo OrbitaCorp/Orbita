@@ -484,6 +484,24 @@ export class PlatformService {
     return { ok: true };
   }
 
+  // Cancelación voluntaria disparada por un superadmin (no por el dueño) —
+  // mismo efecto en la base que SubscriptionsController#cancel (reusa
+  // SubscriptionsService.cancelBusiness, no hay dos implementaciones), con
+  // el agregado de la traza en PlatformAdminLog que sí necesita un superadmin.
+  async cancelBusiness(adminId: string, businessId: string) {
+    const { scheduledDeletionAt } = await this.subscriptions.cancelBusiness(businessId);
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'cancel_business',
+        targetType: 'business',
+        targetId: businessId,
+        details: { scheduledDeletionAt: scheduledDeletionAt.toISOString() },
+      },
+    });
+    return { ok: true, scheduledDeletionAt };
+  }
+
   async grantComp(adminId: string, businessId: string, dto: GrantCompDto) {
     const business = await this.prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundException('Negocio no encontrado');

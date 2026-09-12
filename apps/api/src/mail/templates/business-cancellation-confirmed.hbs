@@ -1,0 +1,5 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Confirmamos la baja de tu tienda</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;"><strong style="color:#1a1f36;">{{businessName}}</strong> quedó dada de baja y ya no es visible para tus clientes. Vamos a guardar tus datos hasta el <strong style="color:#1a1f36;">{{deletionDate}}</strong> por si querés volver — después de esa fecha se eliminan de forma permanente.</p>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Podés reactivar tu tienda cuando quieras antes de esa fecha, tal como la dejaste.</p>
+{{> cta-button this url=undoUrl label="Reactivar mi tienda"}}

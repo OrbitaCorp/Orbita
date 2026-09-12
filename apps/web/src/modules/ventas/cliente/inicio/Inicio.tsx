@@ -10,7 +10,7 @@ import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { openWpp } from '@/lib/storefront/utils'
+import { openWpp, columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
@@ -235,13 +235,30 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
 
+    // "Grilla de productos" de Apariencia (gridLayout) — hasta acá esta
+    // página nunca la leía: los 5 estantes de abajo (Destacados/Nuevos
+    // ingresos/Más vendidos/Lanzamientos/Más para vos) quedaban siempre en 4
+    // columnas fijas, sin importar lo que el dueño eligiera en el panel
+    // (reportado: "solo funciona la de 4 columnas en el storefront para
+    // apariencia básica" — Catalogo.tsx/Categoria.tsx sí lo leían desde la
+    // sesión anterior, esta página no). Mismo helper compartido que esas dos.
+    const gridLayoutCfg = config?.appearance?.gridLayout
+    const columnasEstante = columnasDeGrilla(gridLayoutCfg)
+    const modoListaEstante = esGrillaDeLista(gridLayoutCfg)
+    // Cuántos productos entran por estante: en 3 columnas se corta de a 3 (no
+    // de a 4) para no dejar un 4to producto huérfano en su propia fila — ese
+    // era justo el bug real que llevó a fijar esto en 4 en primer lugar (ver
+    // comentario de .sf-g4 más abajo). En lista no hay columnas de por medio,
+    // así que se mantiene el corte de a 4 de siempre.
+    const porEstante = gridLayoutCfg === '3col' ? 3 : 4
+
     // Mismo criterio de "estantes" que tenía el mock (slices de una misma
     // lista) pero ahora sobre productos reales, ya ordenados por más nuevo
     // primero (así "nuevos ingresos" es directamente la primera tanda).
-    const nuevosIngresos = productos.slice(0, 4)
-    const masVendidos     = productos.slice(4, 8)
-    const lanzamientos    = productos.slice(8, 12)
-    const masParaVos      = productos.slice(12, 16)
+    const nuevosIngresos = productos.slice(0, porEstante)
+    const masVendidos     = productos.slice(porEstante, porEstante * 2)
+    const lanzamientos    = productos.slice(porEstante * 2, porEstante * 3)
+    const masParaVos      = productos.slice(porEstante * 3, porEstante * 4)
 
     // ── Plantilla de Home (paquete Avanzado) ────────────────────────────────
     // Sin plantilla elegida (`homeTemplate` null) todo lo de abajo queda igual
@@ -334,7 +351,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 @keyframes sfBadge    { 0%,100%{ transform:translateY(0)   } 50%{ transform:translateY(-8px) } }
                 @keyframes sfMarquee  { from { transform:translateX(0) } to { transform:translateX(-50%) } }
                 .sf-cat-scroll::-webkit-scrollbar { display:none }
-                .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 28s linear infinite; }
+                /* 28s -> 36s: pedido explícito, "un poquito más lenta" (con
+                   captura del carrusel de categorías de la home). */
+                .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 36s linear infinite; }
                 .sf-marquee-track:hover { animation-play-state:paused; }
                 .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
 
@@ -350,19 +369,23 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                    abajo para que no quede más angosto que el resto del
                    home. */
                 .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
-                /* Grillas de productos — 4 columnas en desktop. Se probó 3
-                   (pedido: cards más grandes), pero acá cada estante
-                   (nuevosIngresos/masVendidos/lanzamientos/masParaVos) corta
-                   la lista en fetas de EXACTAMENTE 4 productos (ver los
-                   .slice(n, n+4) más arriba) — con 3 columnas el 4to quedaba
-                   solo, huérfano, en una fila propia (bug real, reportado
-                   con captura). El catálogo y la categoría (Catalogo.tsx/
-                   Categoria.tsx) sí bajaron a 3: ahí la lista no viene en
-                   fetas de a 4, no hay ese problema, y son los que de verdad
-                   se sentían chicos (el catálogo encima tiene el sidebar de
-                   filtros achicando el ancho disponible, cosa que acá no
-                   pasa). */
-                .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                /* Grillas de productos — columnas según "Grilla de
+                   productos" de Apariencia (columnasEstante, arriba). Antes
+                   quedaban SIEMPRE en 4, fijo, sin leer esa config
+                   (reportado: "solo funciona la de 4 columnas... para
+                   apariencia básica"). El bug que había llevado a fijarlo en
+                   4 en primer lugar —con 3 columnas el 4to producto de cada
+                   estante quedaba huérfano, solo en su propia fila, porque
+                   los .slice(n, n+4) de arriba siempre cortaban de a 4— ya
+                   no aplica: porEstante corta de a 3 cuando la grilla
+                   elegida es de 3 columnas, así que no sobra ninguno. El
+                   catálogo y la categoría (Catalogo.tsx/Categoria.tsx) usan
+                   el mismo helper (columnasDeGrilla, lib/storefront/utils.ts). */
+                .sf-g4 { display:grid; grid-template-columns:${columnasEstante}; gap:16px }
+                /* Estantes en modo "Lista": una columna, tarjetas
+                   horizontales (mismo ProductCard layout="list" que ya usan
+                   Catalogo.tsx/Categoria.tsx). */
+                .sf-g4-lista { display:flex; flex-direction:column; gap:12px }
                 /* Vidriera: "fotos pegadas entre sí ocupando todo el ancho" —
                    sin gap entre cards (ver skill plantillas-home, descripción
                    de Vidriera). Las cards en sí no pierden su radio propio acá
@@ -558,11 +581,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {destacados.length > 0 && (
                 <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
-                        {destacados.map(p => (
-                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
-                        ))}
-                    </div>
+                    <EstanteProductos productos={destacados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -570,11 +589,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {nuevosIngresos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
-                        {nuevosIngresos.map(p => (
-                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
-                        ))}
-                    </div>
+                    <EstanteProductos productos={nuevosIngresos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -582,9 +597,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {masVendidos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
-                        {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
-                    </div>
+                    <EstanteProductos productos={masVendidos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -619,9 +632,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {lanzamientos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
-                        {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
-                    </div>
+                    <EstanteProductos productos={lanzamientos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -629,9 +640,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {masParaVos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
-                        {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
-                    </div>
+                    <EstanteProductos productos={masParaVos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -879,6 +888,29 @@ function SectionHead({ color, eyebrow, titulo, onVer }: { color: string; eyebrow
                 <h2 style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '5px 0 0' }}>{titulo}</h2>
             </div>
             <button className="ds-link" onClick={onVer} style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todos →</button>
+        </div>
+    )
+}
+
+// ─── Estante de productos (home clásico) ───────────────────────────────────────
+// Los 5 estantes de la portada (Destacados/Nuevos ingresos/Más vendidos/
+// Lanzamientos/Más para vos) comparten esta misma grilla — antes cada uno
+// tenía su propio `<div className="sf-g4">`, hardcodeado a 4 columnas y sin
+// soporte de lista. `modoLista` viene de esGrillaDeLista(gridLayout) en el
+// componente de arriba; en ese caso se reusa el mismo ProductCard
+// layout="list" que ya usan Catalogo.tsx/Categoria.tsx, apilado en una sola
+// columna en vez de la grilla de .sf-g4 (que ya lee columnasDeGrilla).
+function EstanteProductos({ productos, modoLista, mode, transferPct }: { productos: Producto[]; modoLista: boolean; mode: 'FULL' | 'SHOWCASE'; transferPct: number | null }) {
+    if (modoLista) {
+        return (
+            <div className="sf-g4-lista">
+                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={mode} transferPct={transferPct} />)}
+            </div>
+        )
+    }
+    return (
+        <div className="sf-g4">
+            {productos.map(p => <ProductCard key={p.id} producto={p} mode={mode} transferPct={transferPct} />)}
         </div>
     )
 }

@@ -12,6 +12,7 @@ import {
   toTiendaConfig, toCategoria, toProducto,
   type StorefrontConfigResponse, type StorefrontCategoryItem,
 } from '@/lib/storefront/api'
+import { columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
 
 export default function Categoria() {
   const router = useRouter()
@@ -60,6 +61,13 @@ export default function Categoria() {
 
   const hue = cat ? toCategoria(cat).hue : 220
   const otras = categorias.filter(c => c.id !== cat?.id)
+  // "Grilla de productos" de Apariencia — mismo criterio y mismo helper
+  // compartido que Catalogo.tsx (ver lib/storefront/utils.ts): se guardaba
+  // pero nunca se leía acá tampoco. Esta página no tiene selector propio de
+  // vista (a diferencia del catálogo general), así que gridLayout es lo
+  // ÚNICO que decide grilla vs. lista.
+  const columnas = columnasDeGrilla(config?.appearance?.gridLayout)
+  const modoLista = esGrillaDeLista(config?.appearance?.gridLayout)
 
   return (
     <StorefrontChrome tienda={tienda} config={config} anuncio>
@@ -69,8 +77,8 @@ export default function Categoria() {
            acá arriba — antes el skeleton (más abajo) pasaba un columns
            fijo por su cuenta, que no colapsaba en mobile como esta grilla sí
            (bug real, reportado). El contenido real de abajo sigue con su
-           propio inline (mismo valor, no cambia nada visualmente). */
-        .sf-catg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+           propio inline, usando la misma variable columnas de arriba. */
+        .sf-catg-grid { display: grid; grid-template-columns: ${columnas}; gap: 16px; }
         @media (max-width: 768px) {
           .sf-catg-wrap  { padding: 16px !important; }
           .sf-catg-hero  { grid-template-columns: minmax(0,1fr) !important; padding: 24px !important; }
@@ -108,14 +116,18 @@ export default function Categoria() {
 
         {cargando ? (
           <div style={{ marginBottom: 48 }}>
-            <SkeletonProductGrid cantidad={8} className="sf-catg-grid" />
+            <SkeletonProductGrid cantidad={8} layout={modoLista ? 'list' : 'grid'} className={modoLista ? undefined : 'sf-catg-grid'} />
           </div>
         ) : productos.length === 0 ? (
           <div style={{ padding: '40px 0 48px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
             No hay productos en esta categoría todavía.
           </div>
+        ) : modoLista ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 48 }}>
+            {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
+          </div>
         ) : (
-          <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 48 }}>
+          <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16, marginBottom: 48 }}>
             {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
           </div>
         )}

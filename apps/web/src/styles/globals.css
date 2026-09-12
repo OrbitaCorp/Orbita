@@ -320,6 +320,25 @@ html.light body { background: #eef4ff; color: #0f172a; }
   .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
 }
 
+/* Zoom lento de la foto al pasar el mouse por la card de catálogo (la
+   "por defecto", sin plantilla de Home — esa ya tenía su propio efecto vía
+   .pl-card/.pl-media, ver panel/avanzado/plantillas/piezas.tsx). Sin esto,
+   una card en modo Vidriera digital (sin carrito: los íconos flotantes de
+   arriba no se muestran, ver ProductCard.tsx `mode !== 'SHOWCASE'`) no
+   tenía NINGÚN feedback al hover — quedaba completamente estática incluso
+   con el mouse encima (reportado). Mismo criterio que ya usa .orb-pcard-accion
+   acá abajo: transition en la clase, no inline, para que este bloque la
+   pueda pisar; solo con hover de verdad (no deja una foto zoomeada pegada
+   en touch, donde no hay forma de "sacar" el mouse).
+   La opacidad del crossfade a la segunda foto (hoverMuestraSegunda) sigue
+   siendo un estado de React, no CSS — viaja en la misma clase para que
+   ambas transiciones (opacity del crossfade + transform del zoom) corran
+   juntas sin que un `transition` inline pise al otro. */
+.orb-pcard-img { transition: opacity 420ms ease, transform 500ms cubic-bezier(.2,.7,.3,1); }
+@media (hover: hover) {
+  .orb-pcard-grupo:hover .orb-pcard-img { transform: scale(1.05); }
+}
+
 /* En mobile los íconos flotantes (bolsa/ojo) de arriba se sacan del todo —
    pedido explícito del dueño con captura: en columna angosta se veían
    "sueltos" flotando sobre la foto — y el de agregar al carrito se reubica

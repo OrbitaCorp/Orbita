@@ -110,7 +110,7 @@ describe('recordPayment: un cobro aprobado solo reabre una tienda suspendida por
       platformAdminLog: { findFirst: jest.fn().mockResolvedValue(opts.ultimaAccion ? { action: opts.ultimaAccion } : null) },
       $transaction: jest.fn((cb: (t: unknown) => Promise<unknown>) => cb(tx)),
     };
-    const svc = new SubscriptionsService(prisma as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const svc = new SubscriptionsService(prisma as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
     Object.defineProperty(svc, 'payment', {
       value: { get: jest.fn().mockResolvedValue({ external_reference: BIZ, status: opts.mpStatus ?? 'approved', transaction_amount: 1000 }) },
     });

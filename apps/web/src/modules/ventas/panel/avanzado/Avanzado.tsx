@@ -81,6 +81,18 @@ const FEATURES: Feature[] = [
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
 const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social']
 
+// Piso de alto para las 6 cards de la grilla. Sin esto cada fila toma la
+// altura de su propio contenido: "Oferta relámpago" es la única que además
+// del botón lleva el interruptor + el estado de la oferta actual, así que su
+// fila salía notoriamente más alta que las demás (reportado con captura: las
+// dos filas de la grilla se veían con proporciones distintas). Con las 6
+// tarjetas ancladas al mismo piso, la fila más alta (la de "Oferta
+// relámpago") termina fijando la altura de TODAS — de ahí que el número de
+// acá abajo esté calculado sobre esa tarjeta a 3 columnas (el ancho más
+// angosto de texto que entra dentro del maxWidth de la grilla), con margen
+// para que un salto de línea de más no la deje corta.
+const ALTURA_MIN_TARJETA = 372
+
 export default function Avanzado() {
     const router = useRouter()
     const [advanced, setAdvanced] = useState(false)
@@ -190,7 +202,7 @@ export default function Avanzado() {
                             key={f.key}
                             padding="md"
                             hoverable
-                            style={{ position: 'relative', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}
+                            style={{ position: 'relative', overflow: 'hidden', height: '100%', minHeight: ALTURA_MIN_TARJETA, display: 'flex', flexDirection: 'column' }}
                         >
                             <div style={{ opacity: advanced ? 1 : 0.4, filter: advanced ? 'none' : 'blur(2px)', transition: 'opacity 160ms, filter 160ms', display: 'flex', flexDirection: 'column', flex: 1 }}>
                                 <div style={{

@@ -16,7 +16,7 @@ function svcCon(subscription: any, payments: any[] = [], total = 0) {
     },
   };
   const noop = {} as any;
-  const svc = new SubscriptionsService(prisma as any, noop, noop, noop, noop, noop);
+  const svc = new SubscriptionsService(prisma as any, noop, noop, noop, noop, noop, noop);
   return { svc, prisma };
 }
 

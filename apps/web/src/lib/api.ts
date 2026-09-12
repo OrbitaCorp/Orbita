@@ -412,6 +412,16 @@ export function previewDiscountCode(code: string, plan: PlanKey) {
 // andando los subdominios capaz haya que ajustar cómo se conectan al backend;
 // lo dejé anotado en PENDIENTES.md.
 
+// Códigos de error parseables que el backend manda en vez de un mensaje ya
+// armado (mismo patrón que ADDON_REQUIRED:<tipo>, ver AddonGuard) — acá se
+// traducen UNA sola vez, en el único choke point de todas las llamadas del
+// panel, para no tener que repetir el mapeo en cada módulo que podría
+// intentar guardar algo con la tienda suspendida.
+const MENSAJE_SUBSCRIPTION_SUSPENDED =
+  'Tu tienda está pausada por falta de pago — el panel está en modo solo lectura. Activá tu plan en Configuración → Suscripción para volver a editar.'
+const MENSAJE_SUBSCRIPTION_CANCELLED =
+  'Tu tienda está dada de baja — el panel está en modo solo lectura. Reactivala en Configuración para volver a editar.'
+
 // Ayudante que usan todas las funciones de abajo: hace el pedido al backend con
 // la sesión puesta y, si algo falla, arma el error con el mensaje para la pantalla.
 async function panelRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -419,6 +429,15 @@ async function panelRequest<T>(path: string, options: RequestInit = {}): Promise
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
+    // Los dos códigos del modo solo lectura se traducen ANTES del mensaje
+    // genérico: vienen crudos del backend y mensajeDeError() no los conoce.
+    const crudo = body?.message ?? body?.error
+    if (crudo === 'SUBSCRIPTION_SUSPENDED') {
+      throw new ApiError(res.status, MENSAJE_SUBSCRIPTION_SUSPENDED)
+    }
+    if (crudo === 'SUBSCRIPTION_CANCELLED') {
+      throw new ApiError(res.status, MENSAJE_SUBSCRIPTION_CANCELLED)
+    }
     const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
@@ -431,7 +450,18 @@ export function panelGetBusiness() {
     subdomain: string; mode: string; isActive: boolean; isPaused: boolean
     subrubros: string[]; teamSize: string | null
     operatesPhysical: boolean; operatesOnline: boolean
+    // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09).
+    cancelledAt: string | null; scheduledDeletionAt: string | null
   }>('/business')
+}
+
+// ── Cancelación voluntaria + ventana de 60 días ─────────────────────────
+export function panelCancelBusiness() {
+  return panelRequest<{ scheduledDeletionAt: string }>('/subscription/cancel', { method: 'POST' })
+}
+
+export function panelReactivateFromCancellation() {
+  return panelRequest<void>('/subscription/reactivate-from-cancellation', { method: 'POST' })
 }
 
 // ── Tutorial de primeros pasos (Checklist del panel) ──────────────────────
@@ -953,7 +983,6 @@ export type ApiAppearanceConfig = {
   fontScale: string | number | null
   headerLayout: string | null
   gridLayout: string | null
-  cardRadius: number | null
   // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).

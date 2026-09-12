@@ -142,6 +142,8 @@ export class BusinessesService {
     teamSize: string | null;
     operatesPhysical: boolean;
     operatesOnline: boolean;
+    cancelledAt: Date | null;
+    scheduledDeletionAt: Date | null;
   }) {
     return {
       id: business.id,
@@ -156,6 +158,11 @@ export class BusinessesService {
       teamSize: business.teamSize,
       operatesPhysical: business.operatesPhysical,
       operatesOnline: business.operatesOnline,
+      // Cancelación voluntaria (RBT — ciclo de vida de suscripciones,
+      // 2026-09): cancelledAt no nulo = dentro de la ventana de 60 días
+      // reactivable; scheduledDeletionAt es la fecha del borrado definitivo.
+      cancelledAt: business.cancelledAt,
+      scheduledDeletionAt: business.scheduledDeletionAt,
     };
   }
 

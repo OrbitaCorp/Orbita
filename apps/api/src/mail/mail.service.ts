@@ -154,6 +154,16 @@ export class MailService {
   private readonly PLATFORM_BRANDED_TEMPLATES = new Set([
     'subscription-payment-failed',
     'subscription-suspended',
+    // Ciclo de vida de suscripciones (RBT, 2026-09) — todos hablan de la
+    // relación negocio→Órbita, mismo criterio que las dos de arriba.
+    'subscription-ending-soon',
+    'subscription-period-ended',
+    'subscription-grace-reminder',
+    'subscription-reactivated',
+    'business-cancellation-confirmed',
+    'business-deletion-warning',
+    'business-deleted',
+    'business-cancellation-undone',
     'platform-admin-login-code',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
     'platform-discount-offer',
@@ -251,6 +261,36 @@ export class MailService {
     'subscription-payment-failed': this.svgIcon('<path d="m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
     // Pause — tienda suspendida.
     'subscription-suspended': this.svgIcon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
+    // CalendarClock — aviso previo a que termine bienvenida/cortesía.
+    'subscription-ending-soon': this.svgIcon(
+      '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="4"/><path d="M18 16.5V18l1 1"/>',
+    ),
+    // Hourglass — terminó el período, arrancó la gracia.
+    'subscription-period-ended': this.svgIcon(
+      '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+    ),
+    // BellRing — recordatorio a mitad de la gracia (mismo ícono que
+    // reset-password sería confuso; usamos una campana).
+    'subscription-grace-reminder': this.svgIcon(
+      '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+    ),
+    // CircleCheck — se resolvió el pago, tienda activa de nuevo (mismo look
+    // que order-confirmation: "todo bien").
+    'subscription-reactivated': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
+    // Archive — baja voluntaria, datos guardados.
+    'business-cancellation-confirmed': this.svgIcon(
+      '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/>',
+    ),
+    // TriangleAlert — mismo look urgente que payment-failed: quedan 7 días.
+    'business-deletion-warning': this.svgIcon('<path d="m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
+    // Trash2 — borrado definitivo.
+    'business-deleted': this.svgIcon(
+      '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    ),
+    // PartyPopper — volvió de la cancelación.
+    'business-cancellation-undone': this.svgIcon(
+      '<path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.91 9 5.52 9 6.23V7"/>',
+    ),
     // Gift — premio de un juego (paquete Avanzado).
     'game-prize': this.svgIcon(
       '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"/><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"/>',
@@ -858,6 +898,83 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Tu tienda en Orbita fue suspendida`, 'subscription-suspended', data, meta);
+  }
+
+  // ── Ciclo de vida de suscripciones (RBT, 2026-09) ─────
+
+  // 3 días antes de que termine la bienvenida o una cortesía (PRE_AVISO).
+  // `motivo` ya viene armado en texto por el llamador ("Tu período de
+  // bienvenida" / "Tu período de cortesía") para no tener que decidir
+  // gramática dentro de la plantilla.
+  async sendSubscriptionEndingSoon(
+    to: string,
+    data: { businessName: string; motivo: string; endDate: string; manageUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `${data.motivo} termina pronto`, 'subscription-ending-soon', data, meta);
+  }
+
+  // Día 0: terminó la bienvenida o una cortesía (no un cobro rechazado — para
+  // eso está sendSubscriptionPaymentFailed, que ya existía). Arranca la
+  // gracia de gracePeriodDays.
+  async sendSubscriptionPeriodEnded(
+    to: string,
+    data: { businessName: string; motivo: string; graceDaysLeft: number; manageUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `${data.motivo} terminó hoy`, 'subscription-period-ended', data, meta);
+  }
+
+  // Mitad de la gracia (GRACIA_MEDIO) — genérico para cualquiera de los tres
+  // motivos (bienvenida/cortesía/cobro rechazado), ya está en gracia así que
+  // el texto no necesita distinguir el origen.
+  async sendSubscriptionGraceReminder(
+    to: string,
+    data: { businessName: string; graceDaysLeft: number; manageUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Te quedan ${data.graceDaysLeft} días para regularizar tu suscripción`, 'subscription-grace-reminder', data, meta);
+  }
+
+  // Se resuelve el pago (cobro aprobado o plan activado) — cierra el círculo
+  // de cualquiera de los avisos de arriba, incluso si nunca se pausó de
+  // verdad (ej. pagó dentro de la gracia).
+  async sendSubscriptionReactivated(
+    to: string,
+    data: { businessName: string; storeUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `¡Tu tienda en Orbita está activa de nuevo!`, 'subscription-reactivated', data, meta);
+  }
+
+  // ── Cancelación voluntaria + ventana de 60 días (RBT, 2026-09) ────────
+
+  async sendBusinessCancellationConfirmed(
+    to: string,
+    data: { businessName: string; deletionDate: string; undoUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Confirmamos la baja de ${data.businessName}`, 'business-cancellation-confirmed', data, meta);
+  }
+
+  async sendBusinessDeletionWarning(
+    to: string,
+    data: { businessName: string; deletionDate: string; undoUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Quedan 7 días antes de eliminar ${data.businessName}`, 'business-deletion-warning', data, meta);
+  }
+
+  async sendBusinessDeleted(to: string, data: { businessName: string }, meta?: MailMeta) {
+    await this.sendOrLog(to, `${data.businessName} fue eliminada`, 'business-deleted', data, meta);
+  }
+
+  async sendBusinessCancellationUndone(
+    to: string,
+    data: { businessName: string; storeUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `¡Reactivamos ${data.businessName}!`, 'business-cancellation-undone', data, meta);
   }
 
   // ── Oferta de codigo de descuento (superadmin -> dueño potencial) ─────

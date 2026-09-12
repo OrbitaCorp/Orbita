@@ -202,7 +202,10 @@ export class AuthService implements OnModuleInit {
       const business = await this.prisma.business.findUnique({
         where: { subdomain: businessSlug },
       });
-      if (!business) throw new UnauthorizedException('Credenciales inválidas');
+      // deletedAt no nulo = borrado definitivo simulado (RBT — ciclo de vida
+      // de suscripciones, 2026-09): mismo mensaje genérico que "no existe" —
+      // ni el dueño ni un cliente pueden loguear en una tienda eliminada.
+      if (!business || business.deletedAt) throw new UnauthorizedException('Credenciales inválidas');
 
       // Buscar como member de ESTE negocio primero.
       const member = await this.prisma.member.findFirst({

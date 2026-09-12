@@ -32,7 +32,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/me/me.service.ts': { max: 5, motivo: 'Perfil del cliente: el id sale del token, no de la URL; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service)' },
   'src/member-profile/member-profile.service.ts': { max: 5, motivo: 'Perfil del miembro: el id sale del token; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service), sin filtrar por businessId porque refresh_tokens.business_id puede venir null' },
   'src/platform/platform.service.ts': { max: 6, motivo: 'Super admin: es cross-tenant por diseño, detrás de PlatformAdminGuard' },
-  'src/subscriptions/subscriptions.service.ts': { max: 3, motivo: 'Cron de reconciliación: recorre las suscripciones de todos los negocios' },
+  'src/subscriptions/subscriptions.service.ts': { max: 4, motivo: 'Crons de reconciliación y de avisos del ciclo de vida: recorren las suscripciones de todos los negocios' },
   'src/onboarding/onboarding.service.ts': { max: 2, motivo: 'Alta: todavía no hay negocio, y el email de dueño es único en toda la plataforma' },
   'src/domains/domain-purchase.service.ts': { max: 3, motivo: 'Webhook de pago: la orden se identifica por el id que mandó Mercado Pago; y el checkout mira si el dominio ya está vinculado en CUALQUIER negocio (custom_domains.domain es único global)' },
   'src/reviews/reviews.service.ts': { max: 2, motivo: 'Reseñas públicas de un producto: el producto es la unidad, no el negocio' },

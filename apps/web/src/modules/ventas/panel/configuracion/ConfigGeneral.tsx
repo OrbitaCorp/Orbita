@@ -18,8 +18,10 @@
 // Cada sección trae sus propios datos y tiene su propio botón de guardar
 // (así si falla una no se pierde lo del resto — sin cambios ahí). Usa la
 // sesión real del login: si no entraste con tu cuenta, muestra un aviso con
-// un botón para ir a iniciar sesión. "Eliminar espacio" está deshabilitado a
-// propósito: eso llega con el módulo de suscripciones (decisión del equipo).
+// un botón para ir a iniciar sesión. "Eliminar espacio" (RBT — ciclo de vida
+// de suscripciones, 2026-09) ya está conectada: la tienda queda guardada 60
+// días (no 30, como decía el texto viejo) antes del borrado definitivo
+// simulado — ver SubscriptionsService.cancelBusiness/reactivateFromCancellation.
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
@@ -38,6 +40,7 @@ import {
     panelGetBusinessConfig, panelUpdateBusinessConfig,
     panelListBranches, panelUpdateBranch,
     pauseBusiness, changeBusinessMode,
+    panelCancelBusiness, panelReactivateFromCancellation,
     panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
 
@@ -165,6 +168,14 @@ function ErrorInline({ msg }: { msg?: string | null }) {
     return <div style={{ fontSize: 13, color: 'var(--color-error)', marginTop: 10 }}>{msg}</div>
 }
 
+// Fecha del borrado definitivo (ventana de cancelación) — sin hora, en
+// español. '-' si todavía no se cargó (mismo criterio defensivo que el resto
+// de la pantalla mientras `cargando` es true).
+function formatFechaCorta(iso: string | null): string {
+    if (!iso) return '-'
+    return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 // Mismo aviso que ya tiene Apariencia (punto naranja + "Tenés cambios sin
 // guardar") pero acá al lado del botón de cada tarjeta en vez de una barra
 // flotante — cada sección de Configuración es su propia pantalla con una
@@ -268,11 +279,16 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // cupones). SHOWCASE = "vidriera digital": el storefront queda de solo
     // catálogo — el cliente consulta por WhatsApp, no compra desde acá.
     const [modo, setModo] = useState<'FULL' | 'SHOWCASE'>('FULL')
+    // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09):
+    // cancelledAt no nulo = dentro de la ventana de 60 días, reactivable.
+    const [cancelledAt, setCancelledAt] = useState<string | null>(null)
+    const [scheduledDeletionAt, setScheduledDeletionAt] = useState<string | null>(null)
 
     const [guardando, setGuardando] = useState<string | null>(null)                // card que está guardando
     const [errores, setErrores]     = useState<Record<string, string | null>>({}) // error por card
     const [modalPausa, setModalPausa] = useState(false)
     const [modalModo, setModalModo]   = useState(false)
+    const [modalCancelar, setModalCancelar] = useState(false)
 
     // Estado real de la conexión OAuth con Mercado Pago (distinto del toggle
     // acceptsMercadopago, que solo dice "quiero mostrar este método" — hace
@@ -355,6 +371,8 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 setNegocio(negocio0)
                 setIsPaused(biz.isPaused)
                 setModo(biz.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL')
+                setCancelledAt(biz.cancelledAt)
+                setScheduledDeletionAt(biz.scheduledDeletionAt)
                 setContacto(contacto0)
                 setPagos(pagos0)
                 setEnvios(envios0)
@@ -640,6 +658,33 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         } catch (e) {
             const msg = e instanceof ApiError ? e.message : 'Error inesperado'
             setErrores(prev => ({ ...prev, modo: msg }))
+        } finally {
+            setGuardando(null)
+        }
+    }
+
+    // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09).
+    // Un solo botón hace las dos cosas según el estado actual, mismo patrón
+    // que confirmarPausa — el modal de arriba ya distingue el texto.
+    async function confirmarCancelacion() {
+        setModalCancelar(false)
+        setGuardando('cancelar')
+        setErrores(prev => ({ ...prev, cancelar: null }))
+        try {
+            if (cancelledAt) {
+                await panelReactivateFromCancellation()
+                setCancelledAt(null)
+                setScheduledDeletionAt(null)
+                onToast('Tu tienda fue reactivada')
+            } else {
+                const r = await panelCancelBusiness()
+                setCancelledAt(new Date().toISOString())
+                setScheduledDeletionAt(r.scheduledDeletionAt)
+                onToast('Tu tienda quedó dada de baja')
+            }
+        } catch (e) {
+            const msg = e instanceof ApiError ? e.message : 'Error inesperado'
+            setErrores(prev => ({ ...prev, cancelar: msg }))
         } finally {
             setGuardando(null)
         }
@@ -1316,19 +1361,25 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 <div style={cajaPeligro}>
                                     <div className="cfg-peligro-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                                         <div style={{ minWidth: 180, flex: 1 }}>
-                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-error)' }}>Eliminar espacio</div>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: cancelledAt ? 'var(--color-body)' : 'var(--color-error)' }}>
+                                                {cancelledAt ? 'Reactivar espacio' : 'Eliminar espacio'}
+                                            </div>
                                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                                                Borra tu espacio con todos sus datos.
+                                                {cancelledAt
+                                                    ? `Se elimina de forma definitiva el ${formatFechaCorta(scheduledDeletionAt)} si no la reactivás antes.`
+                                                    : 'Borra tu espacio con todos sus datos.'}
                                             </div>
                                         </div>
-                                        <Button variant="danger" disabled>Eliminar</Button>
+                                        <Button variant={cancelledAt ? 'outline' : 'danger'} loading={guardando === 'cancelar'} onClick={() => setModalCancelar(true)}>
+                                            {cancelledAt ? 'Reactivar' : 'Eliminar'}
+                                        </Button>
                                     </div>
                                     <DetalleExpandible pregunta="¿Qué pasa si elimino mi espacio?">
-                                        <li>Con una suscripción activa, la tienda se pausa hasta que termine el período que ya pagaste.</li>
-                                        <li>Al terminar, tenés 30 días para arrepentirte y recuperar todo (volviendo a pagar la suscripción).</li>
-                                        <li>Pasados esos 30 días, el espacio y todos sus datos se eliminan de forma definitiva.</li>
-                                        <li style={{ color: 'var(--color-muted)' }}>Esta parte todavía la estamos armando, así que por ahora el botón no anda.</li>
+                                        <li>Tu tienda se pausa al instante — deja de verse para tus clientes.</li>
+                                        <li>Tenés 60 días para arrepentirte y recuperar todo tal cual estaba, con un click.</li>
+                                        <li>Pasados esos 60 días, el espacio y todos sus datos se eliminan de forma definitiva. No hay vuelta atrás después de esa fecha.</li>
                                     </DetalleExpandible>
+                                    <ErrorInline msg={errores.cancelar} />
                                 </div>
 
                             </div>
@@ -1373,6 +1424,27 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 {modo === 'SHOWCASE'
                                     ? 'Volvés a vender online: carrito, pago, seguimiento de pedidos, mensajería y reseñas se reactivan.'
                                     : 'El carrito, el pago online, el seguimiento de pedidos, la mensajería y las reseñas dejan de estar disponibles. Cada producto va a mostrar un botón para consultar por WhatsApp en su lugar. Si tenés pedidos online sin resolver, no vas a poder confirmar el cambio hasta entregarlos o cancelarlos.'}
+                            </div>
+                        </Modal>
+
+                        <Modal
+                            isOpen={modalCancelar}
+                            onClose={() => setModalCancelar(false)}
+                            title={cancelledAt ? '¿Reactivar tu espacio?' : '¿Eliminar tu espacio?'}
+                            variant={cancelledAt ? 'default' : 'danger'}
+                            footer={
+                                <>
+                                    <Button variant="secondary" onClick={() => setModalCancelar(false)}>Volver</Button>
+                                    <Button variant={cancelledAt ? 'primary' : 'danger'} onClick={() => void confirmarCancelacion()}>
+                                        {cancelledAt ? 'Sí, reactivar' : 'Sí, eliminar'}
+                                    </Button>
+                                </>
+                            }
+                        >
+                            <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                                {cancelledAt
+                                    ? 'Tu tienda vuelve a estar visible para tus clientes, tal cual la dejaste — nada se perdió.'
+                                    : 'Tu tienda se pausa al instante. Vas a poder reactivarla y recuperar todo durante los próximos 60 días — pasado ese plazo, se elimina de forma definitiva.'}
                             </div>
                         </Modal>
                     </>

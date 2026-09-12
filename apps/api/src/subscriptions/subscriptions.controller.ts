@@ -5,6 +5,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
+import { AllowWhenPaused } from '../common/decorators/allow-when-paused.decorator';
 import { SubscriptionsService, esPlanKey } from './subscriptions.service';
 import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
 import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
@@ -18,7 +19,13 @@ function entero(v: string | undefined, def: number, max: number): number {
   return Number.isFinite(n) && n >= 1 ? Math.min(n, max) : def;
 }
 
+// Todo el controller queda afuera del modo "solo lectura" de una tienda
+// suspendida (ver SubscriptionActiveGuard) — es literalmente el módulo que
+// el dueño necesita poder seguir usando SUSPENDIDO: activar/cambiar de plan
+// para volver a estar al día. Bloquearlo dejaría a alguien suspendido sin
+// forma de salir de esa situación desde el panel.
 @Controller('subscription')
+@AllowWhenPaused()
 export class SubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
@@ -104,6 +111,26 @@ export class SubscriptionsController {
   changePlan(@CurrentBusiness() ctx: AuthContext, @Body() dto: ChangePlanDto) {
     const member = assertMemberContext(ctx);
     return this.subscriptionsService.changePlan(member.businessId, dto.plan, member.memberId);
+  }
+
+  // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09):
+  // la tienda queda guardada 60 días (reactivable en cualquier momento de
+  // esa ventana) antes del borrado definitivo simulado — ver
+  // SubscriptionsService.cancelBusiness. Solo el owner, no admin: es la
+  // acción más grande que existe sobre un negocio, mismo criterio que
+  // POST /business/pause.
+  @Post('cancel')
+  @Roles('owner')
+  cancel(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.subscriptionsService.cancelBusiness(member.businessId);
+  }
+
+  @Post('reactivate-from-cancellation')
+  @Roles('owner')
+  reactivateFromCancellation(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.subscriptionsService.reactivateFromCancellation(member.businessId);
   }
 
   // Lo llama el frontend cuando MP devuelve al dueño después de autorizar la

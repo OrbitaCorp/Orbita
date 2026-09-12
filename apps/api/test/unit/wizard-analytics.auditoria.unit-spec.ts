@@ -50,7 +50,14 @@ describe('Retención', () => {
 
   it('el mantenimiento nocturno la corre', async () => {
     const analytics = { classifyPendingTurns: jest.fn(), purgarAntiguos: jest.fn() };
-    const subs = { reconcileOverdueSubscriptions: jest.fn(), cleanupExpiredPendingSignups: jest.fn() };
+    // Los 4 pasos que cuelgan del mismo disparo nocturno (los 2 últimos son
+    // del ciclo de vida de suscripciones, RBT 2026-09).
+    const subs = {
+      reconcileOverdueSubscriptions: jest.fn(),
+      processLifecycleNotices: jest.fn(),
+      processCancellationWindow: jest.fn(),
+      cleanupExpiredPendingSignups: jest.fn(),
+    };
     const corridas = { correrUnaVez: jest.fn((_n: string, _k: string, fn: () => Promise<unknown>) => fn()) };
     const ctrl = new InternalCronController(subs as any, {} as any, analytics as any, corridas as any);
     await ctrl.nightlySubscriptionsMaintenance();

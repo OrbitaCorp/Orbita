@@ -6,7 +6,6 @@ export type ModoColor    = 'claro' | 'oscuro' | 'sistema'
 export type EscalaFuente = 'sm' | 'md' | 'lg'
 export type LayoutHeader = 'standard' | 'full' | 'minimal' | 'centered'
 export type LayoutGrid   = '3col' | '4col' | 'list'
-export type RadioCards   = 'none' | 'sm' | 'md' | 'lg'
 export type ImageStyle    = 'full' | 'centered'
 export type ImagePosition = 'left' | 'center' | 'right'
 export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus' | 'bubbles' | 'sparkle' | 'orbit'
@@ -121,7 +120,6 @@ export interface Apariencia {
     layoutHeader: LayoutHeader
     headerLinks:  HeaderLink[]
     layoutGrid:   LayoutGrid
-    radioCards:   RadioCards
     mostrarResenas:     boolean
     mostrarBadgeNuevo:  boolean
     mostrarBadgeOferta: boolean
@@ -198,7 +196,7 @@ export const AP_DEFAULTS: Apariencia = {
         { id: 'ofertas',     label: 'Ofertas',      on: true  },
         { id: 'masVendidos', label: 'Más vendidos', on: true  },
     ],
-    layoutGrid: '4col', radioCards: 'md',
+    layoutGrid: '4col',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
     mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
     mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
@@ -223,7 +221,6 @@ export const AP_DEFAULTS: Apariencia = {
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']
-export const RADII: Record<RadioCards, number> = { none: 0, sm: 6, md: 12, lg: 18 }
 
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
 // Movido a src/lib/fonts.ts (2026-08-26) — lo necesita también el núcleo del

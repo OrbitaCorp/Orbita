@@ -34,7 +34,8 @@ function suscripciones(opts: { sub?: Record<string, unknown>; preapproval?: Reco
   const onboarding = { checkEmail: jest.fn().mockResolvedValue({ available: true }), registerBusiness: jest.fn() };
   const businesses = { publish: jest.fn().mockResolvedValue({}) };
   const audit = { registrar: jest.fn().mockResolvedValue(undefined) };
-  const svc = new SubscriptionsService(prisma as any, config as any, onboarding as any, businesses as any, {} as any, {} as any, audit as any);
+  // MailService va 7º y AuditService 8º (ver el constructor del service).
+  const svc = new SubscriptionsService(prisma as any, config as any, onboarding as any, businesses as any, {} as any, {} as any, {} as any, audit as any);
   (svc as any)._preapproval = { get: jest.fn().mockResolvedValue({ status: 'authorized', external_reference: BIZ, auto_recurring: MENSUAL, ...opts.preapproval }) };
   return { svc, prisma, onboarding, audit };
 }

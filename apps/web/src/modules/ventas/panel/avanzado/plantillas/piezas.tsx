@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { User, Package, ShoppingBag } from 'lucide-react'
+import { User, ShoppingBag } from 'lucide-react'
 import type { Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -242,11 +242,14 @@ export function Marquee({ t, texto }: { t: Tema; texto: string }) {
   )
 }
 
-// Acciones de cuenta y carrito. Son las MISMAS en las seis plantillas a
+// Acciones de cuenta y carrito. Son las MISMAS en todas las plantillas a
 // propósito: lo que cambia es la portada, no la forma de entrar a la cuenta ni
 // de comprar. Replican lo que ya hace StorefrontHeader en la tienda real
-// (ingresar / mis pedidos / carrito con contador), pintadas con el tema de
-// cada plantilla para que no se vean pegadas encima.
+// (ingresar / carrito con contador), pintadas con el tema de cada plantilla
+// para que no se vean pegadas encima. Sin ícono aparte de "Mis pedidos": el
+// header real no tiene uno — vive adentro del menú de cuenta, junto con "Mi
+// perfil" y "Mis direcciones" (regla 3 de la skill) — la maqueta no puede
+// prometer un ícono que la tienda real no tiene.
 export function AccionesTienda({ t, movil, items = 2 }: { t: Tema; movil?: boolean; items?: number }) {
   const redondeo = t.radio === 0 ? 4 : 999
   const globo = (
@@ -271,9 +274,6 @@ export function AccionesTienda({ t, movil, items = 2 }: { t: Tema; movil?: boole
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 15, fontSize: 12.5, color: t.muted, fontFamily: t.fb, whiteSpace: 'nowrap' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <Package size={14} strokeWidth={1.7} /> Mis pedidos
-      </span>
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6, color: t.text, fontWeight: 600,
         border: `1px solid ${t.border}`, borderRadius: redondeo, padding: '6px 13px',

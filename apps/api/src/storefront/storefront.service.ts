@@ -121,7 +121,12 @@ export class StorefrontService {
   // método público lo resuelve acá.
   private async resolveBusiness(slug: string) {
     const business = await this.prisma.business.findUnique({ where: { subdomain: slug } });
-    if (!business) throw NOT_FOUND();
+    // deletedAt no nulo = borrado definitivo simulado (RBT — ciclo de vida de
+    // suscripciones, 2026-09): 404 igual que si no existiera — las filas
+    // siguen en la base, pero el storefront lo trata como si no existiera
+    // más. Único punto de resolución del slug (ver comentario de arriba), así
+    // que este chequeo cubre TODO el storefront público de una vez.
+    if (!business || business.deletedAt) throw NOT_FOUND();
     return business;
   }
 
