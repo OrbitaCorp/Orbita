@@ -270,6 +270,12 @@ model StorefrontConfig {
   headerLayout String? @map("header_layout")
   gridLayout   String? @map("grid_layout")
   cardRadius   Int?    @map("card_radius")
+  // Estilo de la sección "Comprá por categoría" del home. null = "pills"
+  // (el de siempre: ícono + nombre + contador en carrusel). Los otros cinco
+  // están en CATEGORY_LAYOUTS (apps/web, apariencia.mock.ts) — dos de ellos
+  // ("mosaico"/"tarjetas") dependen de que las categorías tengan FOTO
+  // cargada, y el panel los ofrece deshabilitados si no hay ninguna.
+  categoryLayout String? @map("category_layout")
 
   // Plantilla de Home (paquete Avanzado) — null = home clásico de siempre.
   // "vidriera" es la única real por ahora (prueba de concepto); el resto del

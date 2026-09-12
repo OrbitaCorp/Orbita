@@ -22,6 +22,7 @@ import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/v
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
+import type { CategoryLayout } from '@/modules/ventas/panel/configuracion/mock/apariencia.mock'
 // Render compartido con el preview del panel: la portada con plantilla la
 // dibuja el MISMO componente que la galería de Avanzado → Plantillas, con
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
@@ -357,6 +358,70 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-marquee-track:hover { animation-play-state:paused; }
                 .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
 
+                /* ── Estilos de la sección de categorías (Apariencia →
+                   "Estilo de las categorías", ver SeccionCategorias) ──
+                   Todos con altura de fila/tap >= 44px por la pauta de touch
+                   target, y el hover moviendo color o la foto DENTRO de un
+                   overflow:hidden — nunca la caja, para no correr el layout. */
+
+                /* Índice: dos columnas de nombres grandes con filete. */
+                .sf-cat-indice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:40px; }
+                .sf-cat-indice-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
+                .sf-cat-indice-row:hover { border-bottom-color:var(--color-text); }
+                .sf-cat-indice-nombre { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--color-text); transition:color 150ms; }
+                .sf-cat-indice-row:hover .sf-cat-indice-nombre { color:var(--color-primary); }
+                .sf-cat-indice-count { font-size:11.5px; color:var(--color-subtle); font-family:"Geist Mono",monospace; flex-shrink:0; }
+                @media(max-width:760px){ .sf-cat-indice { grid-template-columns:minmax(0,1fr); } .sf-cat-indice-nombre { font-size:18px } }
+
+                /* Etiquetas: una línea con scroll, solo el nombre. */
+                .sf-cat-chips-wrap { overflow-x:auto; scrollbar-width:none; }
+                .sf-cat-chips-wrap::-webkit-scrollbar { display:none }
+                .sf-cat-chips { display:flex; gap:8px; width:max-content; min-width:100%; }
+                .sf-cat-chip { flex-shrink:0; height:40px; padding:0 16px; border-radius:999px; border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); font-size:13px; font-weight:500; font-family:inherit; cursor:pointer; transition:border-color 150ms, color 150ms; }
+                .sf-cat-chip:hover { border-color:var(--color-primary); color:var(--color-primary); }
+                @media(max-width:640px){ .sf-cat-chip { height:44px } }
+
+                /* Mosaico: la primera 2x2, el resto 1x1. */
+                .sf-cat-mosaico { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); grid-auto-rows:152px; gap:12px; }
+                .sf-cat-tile { position:relative; overflow:hidden; border-radius:16px; border:none; padding:0; cursor:pointer; background:none; display:block; }
+                .sf-cat-tile--grande { grid-column:span 2; grid-row:span 2; }
+                .sf-cat-tile-foto { position:absolute; inset:0; background-size:cover; background-position:center; transition:transform 400ms ease; }
+                .sf-cat-tile:hover .sf-cat-tile-foto { transform:scale(1.06); }
+                .sf-cat-tile-velo { position:absolute; inset:0; background:linear-gradient(to top, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.18) 52%, transparent 78%); }
+                .sf-cat-tile-texto { position:absolute; left:16px; right:16px; bottom:14px; display:flex; flex-direction:column; gap:2px; text-align:left; }
+                .sf-cat-tile-nombre { color:#fff; font-weight:700; font-size:16px; letter-spacing:-0.01em; }
+                .sf-cat-tile--grande .sf-cat-tile-nombre { font-size:22px; }
+                .sf-cat-tile-count { color:rgba(255,255,255,0.78); font-size:11.5px; font-family:"Geist Mono",monospace; }
+                @media(max-width:1024px){ .sf-cat-mosaico { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:132px } .sf-cat-tile--grande { grid-row:span 1 } }
+
+                /* Tarjetas: grilla pareja, nombre debajo de la foto. */
+                .sf-cat-tarjetas { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+                .sf-cat-tarjeta { background:none; border:none; padding:0; cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:2px; font-family:inherit; }
+                .sf-cat-tarjeta-marco { display:block; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; margin-bottom:8px; }
+                .sf-cat-tarjeta-foto { display:block; width:100%; height:100%; background-size:cover; background-position:center; transition:transform 400ms ease; }
+                .sf-cat-tarjeta:hover .sf-cat-tarjeta-foto { transform:scale(1.06); }
+                .sf-cat-tarjeta-nombre { font-size:14px; font-weight:600; color:var(--color-text); transition:color 150ms; }
+                .sf-cat-tarjeta:hover .sf-cat-tarjeta-nombre { color:var(--color-primary); }
+                .sf-cat-tarjeta-count { font-size:11.5px; color:var(--color-muted); font-family:"Geist Mono",monospace; }
+                @media(max-width:1024px){ .sf-cat-tarjetas { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px } }
+                @media(max-width:640px){ .sf-cat-tarjetas { grid-template-columns:repeat(2,minmax(0,1fr)) } }
+
+                /* Círculos: medallones en fila con scroll, nombre debajo. */
+                .sf-cat-circulos-wrap { overflow-x:auto; scrollbar-width:none; }
+                .sf-cat-circulos-wrap::-webkit-scrollbar { display:none }
+                .sf-cat-circulos { display:flex; gap:22px; width:max-content; min-width:100%; padding-top:2px; }
+                .sf-cat-circulo { flex-shrink:0; width:92px; background:none; border:none; padding:0; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px; font-family:inherit; }
+                .sf-cat-circulo > span:first-child { transition:transform 200ms ease; }
+                .sf-cat-circulo:hover > span:first-child { transform:scale(1.05); }
+                .sf-cat-circulo-nombre { font-size:12.5px; font-weight:500; color:var(--color-body); text-align:center; line-height:1.25; }
+                .sf-cat-circulo:hover .sf-cat-circulo-nombre { color:var(--color-primary); }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .sf-cat-tile:hover .sf-cat-tile-foto,
+                    .sf-cat-tarjeta:hover .sf-cat-tarjeta-foto,
+                    .sf-cat-circulo:hover > span:first-child { transform:none; }
+                }
+
                 /* Contenedor base — 1440 (antes 1280): pedido explícito de
                    que las cards de los estantes (4 por fila, ver el
                    comentario de .sf-g4 más abajo) se vean grandes SIN
@@ -559,7 +624,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             )}
 
             {/* ══ CATEGORÍAS ══ */}
-            {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && <CategoriaCarrusel cats={catsVisual} go={go} />}
+            {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && (
+                <SeccionCategorias cats={catsVisual} go={go} estilo={config?.appearance?.categoryLayout} />
+            )}
 
             {/* ══ OFERTA CON CUENTA REGRESIVA (paquete Avanzado) ══ — la
                 "cartelera": el reloj grande más los productos que están en
@@ -1191,6 +1258,171 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
     )
 }
 
+// ─── Sección "Comprá por categoría" ────────────────────────────────────────────
+// Seis estilos elegibles desde Configuración → Apariencia (CATEGORY_LAYOUTS en
+// apariencia.mock.ts). El encabezado (título + "Ver todas") es común a los
+// seis; lo que cambia es el cuerpo.
+//
+// `mosaico` y `tarjetas` dependen de que las categorías tengan FOTO: el panel
+// ya los ofrece deshabilitados si no hay ninguna, pero se revalida acá y se
+// cae a `pills` — el dueño puede haber elegido mosaico y borrado las fotos
+// después, y una grilla de rectángulos vacíos es peor que el estilo de
+// siempre.
+function SeccionCategorias({ cats, go, estilo }: { cats: CatVisual[]; go: (p: string) => void; estilo: string | null | undefined }) {
+    const hayFotos = cats.some(c => !!c.imageUrl)
+    const pedido = (estilo ?? 'pills') as CategoryLayout
+    const elegido: CategoryLayout = (pedido === 'mosaico' || pedido === 'tarjetas') && !hayFotos ? 'pills' : pedido
+
+    return (
+        <div style={{ paddingTop: 24, paddingBottom: 28 }}>
+            <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: elegido === 'indice' ? 6 : 12, gap: 10 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Comprá por categoría</h2>
+                <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>
+            </div>
+
+            {elegido === 'pills'    && <CategoriaCarrusel cats={cats} go={go} />}
+            {elegido === 'indice'   && <CatIndice cats={cats} go={go} />}
+            {elegido === 'chips'    && <CatChips cats={cats} go={go} />}
+            {elegido === 'mosaico'  && <CatMosaico cats={cats} go={go} />}
+            {elegido === 'tarjetas' && <CatTarjetas cats={cats} go={go} />}
+            {elegido === 'circulos' && <CatCirculos cats={cats} go={go} />}
+        </div>
+    )
+}
+
+// Medallón redondo de una categoría: foto real si la hay, y si no el
+// ícono+color de siempre (mismo criterio que CatPill). `size` en px.
+function CatMedallon({ c, size }: { c: CatVisual; size: number }) {
+    if (c.imageUrl) {
+        return (
+            <span style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', display: 'block' }}>
+                <img src={c.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            </span>
+        )
+    }
+    return (
+        <span style={{
+            width: size, height: size, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+            background: c.color ? `${c.color}22` : `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${c.hue}), oklch(0.74 0.08 ${c.hue}))`,
+            color: c.color ?? 'var(--color-muted)',
+        }}>
+            <CatIcon icono={c.icon ?? 'tag'} size={Math.round(size * 0.42)} />
+        </span>
+    )
+}
+
+// ── Índice ── Editorial: solo los nombres, en tipografía grande a dos
+// columnas, separados por filete. Cero dependencia de fotos e íconos — es el
+// estilo para una marca que quiere que la sección se lea sobria y no compita
+// con las fotos de producto.
+function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    return (
+        <div className="sf-w">
+            <div className="sf-cat-indice">
+                {cats.map(c => (
+                    <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo/${c.slug}`)}>
+                        <span className="sf-cat-indice-nombre">{c.nombre}</span>
+                        <span className="sf-cat-indice-count">{c.count}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ── Etiquetas ── El nombre y nada más, en una línea con scroll horizontal.
+// Para tiendas con muchas categorías donde la sección es navegación
+// secundaria y no merece peso visual propio.
+function CatChips({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    return (
+        <div className="sf-cat-chips-wrap">
+            <div className="sf-w sf-cat-chips">
+                {cats.map(c => (
+                    <button key={c.id} className="sf-cat-chip" onClick={() => go(`/catalogo/${c.slug}`)}>
+                        {c.nombre}
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ── Mosaico ── Bento: la primera categoría ocupa 2x2 y el resto 1x1, foto de
+// fondo + degradé + nombre encima. Pensado para 3-7 categorías con foto: con
+// muchas más, la primera deja de destacar y conviene `tarjetas`.
+function CatMosaico({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    return (
+        <div className="sf-w">
+            <div className="sf-cat-mosaico">
+                {cats.map((c, i) => (
+                    <button
+                        key={c.id}
+                        className={`sf-cat-tile${i === 0 ? ' sf-cat-tile--grande' : ''}`}
+                        onClick={() => go(`/catalogo/${c.slug}`)}
+                    >
+                        {/* Solo `backgroundImage`, nunca mezclado con el
+                            shorthand `background`: React aplica las dos
+                            claves del objeto y el shorthand en undefined
+                            RESETEA la longhand que se acaba de setear — con
+                            las dos juntas, las categorías CON foto quedaban
+                            sin fondo (bug encontrado verificando en vivo).
+                            Un degradé también es un background-image válido,
+                            así que una sola clave cubre los dos casos. */}
+                        <span className="sf-cat-tile-foto" style={{ backgroundImage: c.imageUrl ? `url(${c.imageUrl})` : `linear-gradient(135deg, oklch(0.80 0.07 ${c.hue}), oklch(0.66 0.09 ${c.hue}))` }} />
+                        <span className="sf-cat-tile-velo" />
+                        <span className="sf-cat-tile-texto">
+                            <span className="sf-cat-tile-nombre">{c.nombre}</span>
+                            <span className="sf-cat-tile-count">{c.count} productos</span>
+                        </span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ── Tarjetas ── Todas del mismo tamaño, foto cuadrada arriba y el nombre
+// DEBAJO (no encima): escala parejo a 12+ categorías, donde el mosaico se
+// desarma, y el nombre siempre se lee aunque la foto sea clara.
+function CatTarjetas({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    return (
+        <div className="sf-w">
+            <div className="sf-cat-tarjetas">
+                {cats.map(c => (
+                    <button key={c.id} className="sf-cat-tarjeta" onClick={() => go(`/catalogo/${c.slug}`)}>
+                        <span className="sf-cat-tarjeta-marco">
+                            {/* Una sola clave, igual que en el mosaico — ver
+                                el comentario de arriba sobre el shorthand. */}
+                            <span className="sf-cat-tarjeta-foto" style={{ backgroundImage: c.imageUrl ? `url(${c.imageUrl})` : `linear-gradient(135deg, oklch(0.80 0.07 ${c.hue}), oklch(0.66 0.09 ${c.hue}))` }} />
+                        </span>
+                        <span className="sf-cat-tarjeta-nombre">{c.nombre}</span>
+                        <span className="sf-cat-tarjeta-count">{c.count} productos</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ── Círculos ── El gesto de las historias de Instagram: medallones redondos
+// en fila con scroll y el nombre debajo. Anda con foto Y con ícono (el
+// recorte circular sirve para los dos), así que no depende de que el dueño
+// haya subido imágenes.
+function CatCirculos({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    return (
+        <div className="sf-cat-circulos-wrap">
+            <div className="sf-w sf-cat-circulos">
+                {cats.map(c => (
+                    <button key={c.id} className="sf-cat-circulo" onClick={() => go(`/catalogo/${c.slug}`)}>
+                        <CatMedallon c={c} size={76} />
+                        <span className="sf-cat-circulo-nombre">{c.nombre}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
     const isMarquee = cats.length > CAT_MIN_MARQUEE
 
@@ -1236,13 +1468,10 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
         return () => window.removeEventListener('resize', medir)
     }, [isMarquee, cats.length])
 
+    // El encabezado (título + "Ver todas") lo pone SeccionCategorias, que es
+    // común a los 6 estilos — acá queda solo el cuerpo.
     return (
-        <div style={{ paddingTop: 24, paddingBottom: 28 }}>
-            <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
-                <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Comprá por categoría</h2>
-                <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>
-            </div>
-
+        <>
             {isMarquee ? (
                 /* ── Marquee automático ── */
                 <div className="sf-marquee-wrap" ref={wrapRef} style={{ paddingLeft: 0 }}>
@@ -1278,7 +1507,7 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
                     </div>
                 </div>
             )}
-        </div>
+        </>
     )
 }
 

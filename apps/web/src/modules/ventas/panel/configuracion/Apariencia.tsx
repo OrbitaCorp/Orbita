@@ -20,9 +20,10 @@ import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
+    CATEGORY_LAYOUTS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
-    type LayoutGrid as LayoutGridT, type HeroSlide,
+    type LayoutGrid as LayoutGridT, type CategoryLayout as CategoryLayoutT, type HeroSlide,
     type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
@@ -207,14 +208,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // Aparte del Promise.all de arriba: si el negocio no tiene categorías, o
     // el pedido falla, la pantalla igual carga — la tarjeta "Header" queda
     // con los enlaces fijos y sin categorías, en vez de trabar todo.
+    // Ya no está gateado a `soloContenido`: además de los enlaces del header,
+    // ahora se usa para saber si alguna categoría tiene FOTO cargada, que es
+    // lo que habilita los estilos de categoría basados en imagen (ver
+    // "Estilo de las categorías" más abajo).
     useEffect(() => {
-        if (!soloContenido) return
         let cancelado = false
         panelGetCategoriesFlat()
             .then(cats => { if (!cancelado) setCategorias(cats.filter(c => c.isActive)) })
             .catch(() => { /* sin categorías: la tarjeta muestra solo los enlaces fijos */ })
         return () => { cancelado = true }
-    }, [soloContenido])
+    }, [])
 
     useEffect(() => { loadFont(ap.fuenteHeading); loadFont(ap.fuenteBody) }, [ap.fuenteHeading, ap.fuenteBody])
 
@@ -243,6 +247,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         ...LINKS_FIJOS_HEADER.map(l => ({ ...l, esCategoria: false })),
         ...categorias.map(c => ({ id: `cat:${c.slug}`, label: c.name, esCategoria: true })),
     ].map(base => ({ ...base, on: ap.headerLinks.find(x => x.id === base.id)?.on ?? false }))
+
+    // Habilita los estilos de categoría basados en imagen. Mientras las
+    // categorías no terminen de cargar queda en false: es el lado seguro —
+    // una opción que aparece deshabilitada y se habilita sola molesta menos
+    // que una elegible que dibuja una sección vacía.
+    const hayFotosDeCategoria = categorias.some(c => !!c.imageUrl)
 
     const toggles: [keyof Ap, string][] = soloContenido
         ? [['mostrarBannerEnvio', 'Anuncio arriba del header'], ['mostrarStats', 'Barra de confianza debajo del hero']]
@@ -779,6 +789,32 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 { id: 'list', label: 'Lista', svg: hline(<g>{[8, 18, 28].map(y => <rect key={y} x="8" y={y} width="44" height="6" rx="1.5" fill="var(--color-border)" />)}</g>) },
                             ]} />
                         </div>
+
+                        {/* Estilo de la sección "Comprá por categoría" del home
+                            (ver SeccionCategorias en Inicio.tsx). Mosaico y
+                            Tarjetas se ofrecen deshabilitados mientras ninguna
+                            categoría tenga foto: son estilos que SON la foto,
+                            sin imagen quedarían rectángulos de color. */}
+                        <FieldLabel help="Cómo se ve la fila de categorías en el home. El interruptor para mostrarla o no está en “¿Qué ven tus clientes?”.">Estilo de las categorías</FieldLabel>
+                        {!hayFotosDeCategoria && (
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>
+                                Cargá una foto en alguna categoría (Catálogo → Categorías) para desbloquear los estilos con imagen.
+                            </div>
+                        )}
+                        <div style={{ marginBottom: 4 }}>
+                            <VisualPick
+                                value={ap.estiloCategorias}
+                                onChange={v => set('estiloCategorias', v as CategoryLayoutT)}
+                                options={CATEGORY_LAYOUTS.map(op => ({
+                                    id: op.id,
+                                    label: op.label,
+                                    ayuda: op.desc,
+                                    disabled: op.necesitaFoto && !hayFotosDeCategoria,
+                                    motivo: 'Necesita al menos una categoría con foto cargada',
+                                    svg: MINIATURA_CATEGORIA[op.id],
+                                }))}
+                            />
+                        </div>
                     </SecCard>
 
                     {/* Banner con imagen de fondo fija (efecto parallax) en medio
@@ -979,15 +1015,89 @@ function hline(c: ReactNode) {
     return <svg width="60" height="34" viewBox="0 0 60 34">{c}</svg>
 }
 
-function VisualPick({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { id: string; label: string; svg: ReactNode }[] }) {
+// Miniaturas de los 6 estilos de la sección de categorías. Cada una tiene que
+// leerse como el LAYOUT que representa de un vistazo, sin texto: el círculo
+// del medallón, el filete del índice, el bloque grande del mosaico. Los
+// rellenos van con los tokens del tema para que funcionen en claro y oscuro.
+const MINIATURA_CATEGORIA: Record<CategoryLayoutT, ReactNode> = {
+    // Pastillas: cápsulas con un punto (el ícono) adentro.
+    pills: hline(<g>
+        {[2, 22, 42].map(x => <g key={x}>
+            <rect x={x} y="12" width="17" height="11" rx="5.5" fill="none" stroke="var(--color-border)" strokeWidth="1.5" />
+            <circle cx={x + 5.5} cy="17.5" r="2.6" fill="var(--color-primary)" />
+            <rect x={x + 10} y="15.5" width="5" height="2" rx="1" fill="var(--color-muted)" />
+        </g>)}
+    </g>),
+    // Índice: dos columnas de renglones grandes con filete debajo.
+    indice: hline(<g>
+        {[9, 19, 29].map(y => <g key={y}>
+            <rect x="4" y={y - 4} width="17" height="3.5" rx="1.5" fill="var(--color-text)" />
+            <rect x="4" y={y} width="24" height="1" fill="var(--color-border)" />
+            <rect x="33" y={y - 4} width="14" height="3.5" rx="1.5" fill="var(--color-text)" />
+            <rect x="33" y={y} width="24" height="1" fill="var(--color-border)" />
+        </g>)}
+    </g>),
+    // Etiquetas: cápsulas chicas, sin ícono, en una línea.
+    chips: hline(<g>
+        {[3, 19, 32, 47].map((x, i) => (
+            <rect key={x} x={x} y="14" width={i === 1 ? 11 : 13} height="7" rx="3.5" fill="none" stroke="var(--color-border)" strokeWidth="1.5" />
+        ))}
+    </g>),
+    // Mosaico: un bloque grande a la izquierda y cuatro chicos a la derecha.
+    mosaico: hline(<g>
+        <rect x="4" y="6" width="24" height="22" rx="3" fill="var(--color-primary)" opacity="0.75" />
+        {[[30, 6], [44, 6], [30, 18], [44, 18]].map(([x, y]) => (
+            <rect key={`${x}-${y}`} x={x} y={y} width="12" height="10" rx="2.5" fill="var(--color-border)" />
+        ))}
+    </g>),
+    // Tarjetas: cuatro cuadrados iguales con un renglón de texto debajo.
+    tarjetas: hline(<g>
+        {[4, 18, 32, 46].map(x => <g key={x}>
+            <rect x={x} y="6" width="11" height="11" rx="2.5" fill="var(--color-border)" />
+            <rect x={x} y="20" width="8" height="2.5" rx="1.25" fill="var(--color-muted)" />
+        </g>)}
+    </g>),
+    // Círculos: medallones redondos con el nombre debajo.
+    circulos: hline(<g>
+        {[9, 24, 39, 54].map(cx => <g key={cx}>
+            <circle cx={cx} cy="13" r="6" fill="var(--color-primary)" opacity="0.7" />
+            <rect x={cx - 4.5} y="23" width="9" height="2.5" rx="1.25" fill="var(--color-muted)" />
+        </g>)}
+    </g>),
+}
+
+// `disabled` + `motivo`: para opciones que dependen de un dato que la tienda
+// todavía no tiene (hoy, los estilos de categoría que necesitan foto). Se
+// muestran igual — que el dueño vea que existen y qué le falta para usarlas —
+// pero no se pueden elegir. `ayuda` es la descripción corta bajo el label.
+function VisualPick({ value, onChange, options }: {
+    value: string
+    onChange: (v: string) => void
+    options: { id: string; label: string; svg: ReactNode; ayuda?: string; disabled?: boolean; motivo?: string }[]
+}) {
     return (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {options.map(o => {
                 const a = value === o.id
+                const off = !!o.disabled
                 return (
-                    <button key={o.id} onClick={() => onChange(o.id)} className="ds-hover" style={{ width: 120, borderRadius: 10, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', padding: 8, fontFamily: 'inherit' }}>
+                    <button
+                        key={o.id}
+                        onClick={() => { if (!off) onChange(o.id) }}
+                        disabled={off}
+                        title={off ? o.motivo : undefined}
+                        className={off ? undefined : 'ds-hover'}
+                        style={{
+                            width: 120, borderRadius: 10,
+                            border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                            cursor: off ? 'not-allowed' : 'pointer', padding: 8, fontFamily: 'inherit',
+                            opacity: off ? 0.45 : 1, textAlign: 'center',
+                        }}
+                    >
                         <div style={{ height: 52, display: 'grid', placeItems: 'center' }}>{o.svg}</div>
                         <div style={{ fontSize: 12, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-body)', marginTop: 6 }}>{o.label}</div>
+                        {o.ayuda && <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 3, lineHeight: 1.3 }}>{o.ayuda}</div>}
                     </button>
                 )
             })}

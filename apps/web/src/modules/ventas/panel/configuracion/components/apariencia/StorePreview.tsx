@@ -265,26 +265,21 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                 </div>
             )}
 
-            {/* ══ Categorías ══ */}
+            {/* ══ Categorías ══ — los 6 estilos de ap.estiloCategorias, mismo
+                layout que SeccionCategorias en Inicio.tsx (el storefront
+                real). Las categorías de muestra de acá NO tienen foto, así
+                que los dos estilos con imagen usan el degradé por `hue` como
+                relleno — igual que hace el storefront real con una categoría
+                sin foto. A diferencia de allá, acá no se cae a "pastillas":
+                el dueño está justo eligiendo el estilo, tiene que ver la
+                forma que eligió aunque las fotos sean de muestra. */}
             {ap.mostrarCategorias && (
                 <div style={{ paddingTop: 24, paddingBottom: 28 }}>
-                    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: ap.estiloCategorias === 'indice' ? 6 : 12 }}>
                         <h2 style={{ fontSize: 14, fontWeight: 700, color: c.text, margin: 0, fontFamily: fh }}>Comprá por categoría</h2>
                         <span style={{ fontSize: 13, fontWeight: 500, color: prim }}>Ver todas →</span>
                     </div>
-                    <div className="pv-marquee-wrap">
-                        <div className="pv-marquee-track">
-                            {[...CATS, ...CATS].map((cat, i) => (
-                                <span key={`${cat.id}-${i}`} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, height: 50, padding: '0 14px 0 7px', borderRadius: 999, border: `1px solid ${c.border}`, background: c.bg }}>
-                                    <span style={{ width: 34, height: 34, borderRadius: '50%', background: `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${cat.hue}), oklch(0.74 0.08 ${cat.hue}))`, display: 'grid', placeItems: 'center', fontSize: 16 }}>{cat.emoji}</span>
-                                    <span style={{ textAlign: 'left' }}>
-                                        <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: c.text, lineHeight: 1.2 }}>{cat.nombre}</span>
-                                        <span style={{ display: 'block', fontSize: 11, color: c.muted, marginTop: 1, fontFamily: '"Geist Mono", monospace' }}>{cat.count} productos</span>
-                                    </span>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
+                    <PreviewCategorias ap={ap} c={c} prim={prim} fh={fh} />
                 </div>
             )}
 
@@ -446,6 +441,113 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                         {content}
                     </div>
                 </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Categorías: los 6 estilos ───────────────────────────────────────────────────
+// Espejo de SeccionCategorias (Inicio.tsx). Los tamaños están calcados del
+// storefront real porque toda esta preview se dibuja a 1280 de ancho y recién
+// después se escala — así lo que se ve acá es proporcionalmente lo que se va a
+// ver en la tienda.
+
+const FONDO_CAT = (hue: number) => `linear-gradient(135deg, oklch(0.80 0.07 ${hue}), oklch(0.66 0.09 ${hue}))`
+
+function PreviewCategorias({ ap, c, prim, fh }: { ap: Apariencia; c: any; prim: string; fh: string }) {
+    const estilo = ap.estiloCategorias
+
+    if (estilo === 'indice') {
+        return (
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', columnGap: 40 }}>
+                    {CATS.map(cat => (
+                        <span key={cat.id} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, minHeight: 52, padding: '12px 2px', borderBottom: `1px solid ${c.border}` }}>
+                            <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: c.text, fontFamily: fh }}>{cat.nombre}</span>
+                            <span style={{ fontSize: 11.5, color: c.subtle, fontFamily: '"Geist Mono", monospace' }}>{cat.count}</span>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    if (estilo === 'chips') {
+        return (
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {CATS.map(cat => (
+                        <span key={cat.id} style={{ height: 40, padding: '0 16px', borderRadius: 999, border: `1px solid ${c.border}`, background: c.bg, color: c.text, fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center' }}>
+                            {cat.nombre}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    if (estilo === 'mosaico') {
+        return (
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gridAutoRows: 152, gap: 12 }}>
+                    {CATS.slice(0, 7).map((cat, i) => (
+                        <span key={cat.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, display: 'block', background: FONDO_CAT(cat.hue), gridColumn: i === 0 ? 'span 2' : undefined, gridRow: i === 0 ? 'span 2' : undefined }}>
+                            <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.18) 52%, transparent 78%)' }} />
+                            <span style={{ position: 'absolute', left: 16, right: 16, bottom: 14, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <span style={{ color: '#fff', fontWeight: 700, fontSize: i === 0 ? 22 : 16, letterSpacing: '-0.01em', fontFamily: fh }}>{cat.nombre}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.78)', fontSize: 11.5, fontFamily: '"Geist Mono", monospace' }}>{cat.count} productos</span>
+                            </span>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    if (estilo === 'tarjetas') {
+        return (
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
+                    {CATS.map(cat => (
+                        <span key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ display: 'block', width: '100%', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', marginBottom: 8, background: FONDO_CAT(cat.hue) }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, color: c.text, fontFamily: fh }}>{cat.nombre}</span>
+                            <span style={{ fontSize: 11.5, color: c.muted, fontFamily: '"Geist Mono", monospace' }}>{cat.count} productos</span>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    if (estilo === 'circulos') {
+        return (
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
+                <div style={{ display: 'flex', gap: 22 }}>
+                    {CATS.map(cat => (
+                        <span key={cat.id} style={{ width: 92, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                            <span style={{ width: 76, height: 76, borderRadius: '50%', background: `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${cat.hue}), oklch(0.74 0.08 ${cat.hue}))`, display: 'grid', placeItems: 'center', fontSize: 30 }}>{cat.emoji}</span>
+                            <span style={{ fontSize: 12.5, fontWeight: 500, color: c.body, textAlign: 'center', lineHeight: 1.25 }}>{cat.nombre}</span>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    // 'pills' (default) — el marquee de siempre.
+    return (
+        <div className="pv-marquee-wrap">
+            <div className="pv-marquee-track">
+                {[...CATS, ...CATS].map((cat, i) => (
+                    <span key={`${cat.id}-${i}`} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, height: 50, padding: '0 14px 0 7px', borderRadius: 999, border: `1px solid ${c.border}`, background: c.bg }}>
+                        <span style={{ width: 34, height: 34, borderRadius: '50%', background: `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${cat.hue}), oklch(0.74 0.08 ${cat.hue}))`, display: 'grid', placeItems: 'center', fontSize: 16 }}>{cat.emoji}</span>
+                        <span style={{ textAlign: 'left' }}>
+                            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: c.text, lineHeight: 1.2 }}>{cat.nombre}</span>
+                            <span style={{ display: 'block', fontSize: 11, color: c.muted, marginTop: 1, fontFamily: '"Geist Mono", monospace' }}>{cat.count} productos</span>
+                        </span>
+                    </span>
+                ))}
             </div>
         </div>
     )

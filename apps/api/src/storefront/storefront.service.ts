@@ -303,6 +303,10 @@ export class StorefrontService {
             fontScale: appearance.fontScale ? Number(appearance.fontScale) : null,
             headerLayout: appearance.headerLayout,
             gridLayout: appearance.gridLayout,
+            // null = 'pills', el estilo de siempre (ver SeccionCategorias en
+            // Inicio.tsx) — no se normaliza acá para no inventarle un valor
+            // guardado a un negocio que nunca tocó la opción.
+            categoryLayout: appearance.categoryLayout,
             cardRadius: appearance.cardRadius,
             homeTemplate: appearance.homeTemplate,
             homeTemplateData: appearance.homeTemplateData ?? null,

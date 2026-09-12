@@ -38,6 +38,13 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsNumber() @Min(0.5) @Max(2) fontScale?: number;
   @IsOptional() @Matches(LAYOUT_ID, { message: 'headerLayout inválido' }) headerLayout?: string;
   @IsOptional() @Matches(LAYOUT_ID, { message: 'gridLayout inválido' }) gridLayout?: string;
+  // Lista cerrada y no un @Matches(LAYOUT_ID) como los dos de arriba: el
+  // storefront switchea sobre este valor para elegir qué sección de
+  // categorías dibuja, así que un id con forma válida pero desconocido sería
+  // una sección que no renderiza nada. 'pills' es el de siempre; ver
+  // CATEGORY_LAYOUTS en apps/web (apariencia.mock.ts) para cada uno.
+  @IsOptional() @IsIn(['pills', 'indice', 'chips', 'mosaico', 'tarjetas', 'circulos'])
+  categoryLayout?: 'pills' | 'indice' | 'chips' | 'mosaico' | 'tarjetas' | 'circulos';
   @IsOptional() @IsInt() @Min(0) @Max(64) cardRadius?: number;
 
   @IsOptional()

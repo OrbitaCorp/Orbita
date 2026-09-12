@@ -6,6 +6,10 @@ export type ModoColor    = 'claro' | 'oscuro' | 'sistema'
 export type EscalaFuente = 'sm' | 'md' | 'lg'
 export type LayoutHeader = 'standard' | 'full' | 'minimal' | 'centered'
 export type LayoutGrid   = '3col' | '4col' | 'list'
+// Estilo de la sección "Comprá por categoría" del home. 'pills' es el de
+// siempre (ícono + nombre + contador, en carrusel). Ver CATEGORY_LAYOUTS más
+// abajo para qué es cada uno y cuál depende de tener fotos cargadas.
+export type CategoryLayout = 'pills' | 'indice' | 'chips' | 'mosaico' | 'tarjetas' | 'circulos'
 export type ImageStyle    = 'full' | 'centered'
 export type ImagePosition = 'left' | 'center' | 'right'
 export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus' | 'bubbles' | 'sparkle' | 'orbit'
@@ -89,6 +93,26 @@ export const IMAGE_OVERLAYS: { id: ImageOverlay; label: string }[] = [
     { id: 'blanco',   label: 'Blanco' },
 ]
 
+// Los 6 estilos de la sección de categorías del home, con el criterio de
+// cuándo conviene cada uno (se muestra en el panel) y si DEPENDE de que las
+// categorías tengan foto cargada. Los que dependen se ofrecen deshabilitados
+// mientras ninguna categoría tenga imagen: un mosaico de fotos sin fotos no
+// es un estilo distinto, es una sección rota (mismo criterio que el resto del
+// panel — no prometer lo que la tienda no puede dibujar).
+export const CATEGORY_LAYOUTS: {
+    id: CategoryLayout
+    label: string
+    desc: string
+    necesitaFoto: boolean
+}[] = [
+    { id: 'pills',    label: 'Pastillas',        desc: 'Ícono, nombre y cantidad de productos, en fila. El de siempre.',   necesitaFoto: false },
+    { id: 'indice',   label: 'Índice',           desc: 'Solo los nombres, en tipografía grande a dos columnas. Sobrio.',   necesitaFoto: false },
+    { id: 'chips',    label: 'Etiquetas',        desc: 'Solo el nombre, chiquito y en una línea. Para muchas categorías.', necesitaFoto: false },
+    { id: 'mosaico',  label: 'Mosaico',          desc: 'La primera categoría grande y el resto alrededor, con foto.',      necesitaFoto: true  },
+    { id: 'tarjetas', label: 'Tarjetas',         desc: 'Todas del mismo tamaño, con foto arriba y nombre debajo.',         necesitaFoto: true  },
+    { id: 'circulos', label: 'Círculos',         desc: 'Fotos redondas en fila, con el nombre debajo. Ideal en celular.',  necesitaFoto: false },
+]
+
 export interface HeaderLink {
     id:    string
     label: string
@@ -127,6 +151,8 @@ export interface Apariencia {
     mostrarWhatsapp:    boolean
     mostrarBuscador:    boolean
     mostrarCategorias:  boolean
+    // Estilo de esa sección, cuando está encendida (ver CATEGORY_LAYOUTS).
+    estiloCategorias:   CategoryLayout
     mostrarFooter:      boolean
     mostrarRedesFooter: boolean
     // Banner angosto debajo del header (usa textoEnvio como contenido).
@@ -198,7 +224,7 @@ export const AP_DEFAULTS: Apariencia = {
     ],
     layoutGrid: '4col',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
-    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
+    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, estiloCategorias: 'pills', mostrarFooter: true, mostrarRedesFooter: true,
     mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
     stats: [
         { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },

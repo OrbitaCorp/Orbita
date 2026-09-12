@@ -70,6 +70,9 @@ export type StorefrontConfigResponse = {
     fontScale: string | number | null
     headerLayout: string | null
     gridLayout: string | null
+    // Estilo de la sección "Comprá por categoría" — null = 'pills' (el de
+    // siempre). Lo resuelve SeccionCategorias en Inicio.tsx.
+    categoryLayout: string | null
     // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
     // "vidriera" es la única real hoy (ver Inicio.tsx).
     homeTemplate: string | null

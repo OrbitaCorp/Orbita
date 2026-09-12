@@ -47,6 +47,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         fontScale: ESCALA_A_FONT_SCALE[ap.escalaFuente],
         headerLayout: ap.layoutHeader,
         gridLayout: ap.layoutGrid,
+        categoryLayout: ap.estiloCategorias,
         heroSlides: ap.sliders,
         headerLinks: ap.headerLinks,
         showReviews: ap.mostrarResenas,
@@ -131,6 +132,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarWhatsapp: dto.showWhatsapp,
         mostrarBuscador: dto.showSearch,
         mostrarCategorias: dto.showCategoriesSection,
+        // null en la base (negocio que nunca tocó la opción) = 'pills', que es
+        // exactamente lo que venía viendo — ver AP_DEFAULTS.
+        estiloCategorias: (dto.categoryLayout as Ap['estiloCategorias']) ?? defaults.estiloCategorias,
         mostrarFooter: dto.showFooter,
         mostrarRedesFooter: dto.showSocialFooter,
         mostrarBannerEnvio: dto.showAnnouncementBar,
