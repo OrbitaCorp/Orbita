@@ -29,4 +29,16 @@ MP_SUBSCRIPTION_FREQUENCY: "3"
 MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
 SUBSCRIPTION_ABANDONED_DAYS: "7"
 SUBSCRIPTION_SWEEP_DELETE: "false"
+# Saltos de proxy delante de la API (Firebase Hosting + el balanceador de
+# Cloud Run). Medido el 12/09 con GET /api/v1/health/ip, 3 muestras: el
+# X-Forwarded-For llega siempre con 2 entradas (IP real del cliente, IP de
+# Google) y req.ip es la interna de Cloud Run — con 1, Express tomaría la de
+# Google; con 2 toma la del cliente. Nunca "true": esa la escribe el cliente
+# y cualquiera se saltearía los límites (ver common/utils/proxy.ts).
+#
+# OJO: esto arregla los pedidos que van del navegador a la API. Los que pasan
+# por el BFF de Next.js (login, refresh, registro) siguen llegando todos con
+# la IP de Vercel — es la segunda mitad del hallazgo rate-limit-ip-proxy, que
+# necesita que el BFF reenvíe la IP con un secreto compartido.
+TRUST_PROXY_HOPS: "2"
 # SUPABASE_URL vive en Secret Manager (no acá) — ver SECRETS en deploy.sh.
