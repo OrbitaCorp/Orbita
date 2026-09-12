@@ -3,7 +3,7 @@
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, ShoppingCart, Eye, User } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Search, ShoppingBag, ShoppingCart, Eye, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
@@ -282,24 +282,6 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                     <PreviewCategorias ap={ap} c={c} prim={prim} fh={fh} />
                 </div>
             )}
-
-            {/* ══ Banner cupones ══ */}
-            <section style={{ maxWidth: 1280, margin: '0 auto', padding: '8px 32px 32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 28px', borderRadius: 16, background: 'linear-gradient(135deg, #4C1D95 0%, #6D28D9 50%, #7C3AED 100%)', boxShadow: '0 8px 28px rgba(109,40,217,0.22)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                            <Tag size={20} color="#fff" strokeWidth={2} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Cupones y descuentos activos</div>
-                            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', marginTop: 2 }}>4 cupones disponibles para tu próxima compra</div>
-                        </div>
-                    </div>
-                    <div style={{ height: 36, padding: '0 16px', borderRadius: 8, flexShrink: 0, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', color: '#fff', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        Ver todos <ArrowRight size={13} />
-                    </div>
-                </div>
-            </section>
 
             {/* ══ Secciones de productos ══ */}
             <ProductSection title="Más vendidos"   eyebrow="Top ventas"      color="#F59E0B" prods={MAS_VENDIDOS} ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
