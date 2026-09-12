@@ -97,18 +97,13 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
-      <StorefrontHeader
-        tienda={tienda}
-        logoUrl={config?.appearance?.logoUrl}
-        headerLinks={config?.appearance?.headerLinks}
-        showSearch={config?.appearance?.showSearch ?? true}
-        esVidriera={config?.business?.mode === 'SHOWCASE'}
-        centrado={centrado}
-        escaparate={bold}
-        logoIcono={logoIcono}
-        navCentrada={navCentrada}
-        sinNav={sinNav}
-      />
+      {/* Cartelera ARRIBA del header, no debajo — así la dibujan las dos
+          maquetas (Vidriera y Escaparate, ver homes.tsx: `<Marquee>`/el div
+          fijo van antes de `<HeaderCentrado>`/el navbar) y el propio preview
+          de Apariencia (StorePreview.tsx: "Announcement bar" antes de
+          "Header"). Quedó al revés acá siendo la única pieza de la tienda
+          real que dibujaba primero el header — bug reportado con captura
+          (Escaparate aplicada vs. la maqueta original). */}
       {anuncio && (
         <AnnouncementBar
           text={config?.appearance?.shippingText}
@@ -122,6 +117,18 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           dueño puede tener las dos. Si el countdown está configurado como "solo
           en la portada", esto no dibuja nada — lo dibuja Inicio.tsx. */}
       {slug && <CountdownBanner slug={slug} lugar="ALL_PAGES" />}
+      <StorefrontHeader
+        tienda={tienda}
+        logoUrl={config?.appearance?.logoUrl}
+        headerLinks={config?.appearance?.headerLinks}
+        showSearch={config?.appearance?.showSearch ?? true}
+        esVidriera={config?.business?.mode === 'SHOWCASE'}
+        centrado={centrado}
+        escaparate={bold}
+        logoIcono={logoIcono}
+        navCentrada={navCentrada}
+        sinNav={sinNav}
+      />
       {children}
     </div>
   )
