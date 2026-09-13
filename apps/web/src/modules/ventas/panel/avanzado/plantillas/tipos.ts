@@ -57,6 +57,47 @@ export interface Slide {
   link?: string
 }
 
+// ─── Secciones editables ─────────────────────────────────────────────────────
+//
+// Cada plantilla tiene secciones que las demás no tienen ("El taller" de
+// Premium, la carta de varietales de Bodega, el muro de Mosaico) y las tiene
+// en SU orden. Por eso el editor no puede ser una lista fija de campos como
+// Apariencia: cada plantilla declara acá qué se puede editar de ella, y el
+// panel dibuja ese formulario solo (ver Apariencia.tsx, pestaña "Secciones").
+//
+// Lo que se guarda va a `homeTemplateData.secciones[idSeccion][idCampo]`, un
+// JSON por negocio — sin migración de base ni una columna por plantilla.
+// Cualquier campo sin valor cae al texto de la maqueta, así que una tienda
+// que no editó nada se ve idéntica a su vitrina.
+
+export type TipoCampo =
+  | 'texto'    // una línea
+  | 'parrafo'  // varias líneas
+  | 'imagen'   // una foto subida por el dueño
+
+export interface CampoSeccion {
+  id: string
+  label: string
+  tipo: TipoCampo
+  /** Ayuda debajo del label, para explicar qué es o dónde se ve. */
+  help?: string
+  /** Tope de caracteres: es de DISEÑO (el texto desborda la caja), no de seguridad. */
+  max?: number
+}
+
+export interface SeccionPlantilla {
+  /** Clave de guardado. No cambiarla: lo guardado se busca por acá. */
+  id: string
+  /** Cómo se llama en el panel. Mismo nombre que usa el dueño para reconocerla. */
+  nombre: string
+  /** Una línea que ubique la sección dentro de la portada. */
+  nota?: string
+  campos: CampoSeccion[]
+}
+
+/** Lo que el dueño editó, por sección y campo. Lo arma plantillaReal(). */
+export type ContenidoSecciones = Record<string, Record<string, string> | undefined>
+
 export interface Plantilla {
   id: string; nombre: string; para: string; queCambia: string; secciones: string[]
   marca: string; tagline: string; layout: Layout; tema: Tema
@@ -116,6 +157,12 @@ export interface Plantilla {
   // no deja cargar un tercero que quedaría guardado pero invisible.
   // `undefined` = sin tope (Vidriera, o el home clásico).
   heroMaxSlides?: number
+  /**
+   * Lo que el dueño ya editó. Solo lo llena la tienda real (plantillaReal.ts);
+   * en la vitrina del panel viene vacío y todo cae a los textos de muestra.
+   */
+  sec?: ContenidoSecciones
+
   slides: Slide[]; productos: Producto[]
   // Segunda fila ("Más vendidos"). En las plantillas de muestra no se define
   // y sale de invertir `productos` (con 4 productos de muestra alcanza para

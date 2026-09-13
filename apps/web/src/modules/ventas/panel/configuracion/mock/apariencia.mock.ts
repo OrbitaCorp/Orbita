@@ -190,6 +190,13 @@ export interface Apariencia {
     // subido. Mismo criterio que `cupon`: contenido de ESA plantilla, no de
     // la tienda en general.
     mostrarIconoLogo: boolean
+    // Las secciones propias de la plantilla activa: "El taller" de Premium, el
+    // muro de Mosaico, la carta de varietales de Bodega. Cada plantilla declara
+    // cuáles tiene y en qué orden (ver plantillas/secciones.ts); acá se guarda
+    // lo que el dueño escribió, indexado por sección y campo. Un campo vacío
+    // cae al texto de la maqueta, así que vaciarlo devuelve el diseño original
+    // en vez de dejar un hueco.
+    seccionesPlantilla: Record<string, Record<string, string>>
 }
 
 // OJO con volver a poner texto de ejemplo en `nombreTienda`/`tagline`: estos
@@ -244,6 +251,9 @@ export const AP_DEFAULTS: Apariencia = {
     cupon: { titulo: '', bajada: '', codigo: '' },
     // false = el diseño original de Escaparate (nombre en texto, sin ícono).
     mostrarIconoLogo: false,
+    // Vacío = cada sección de la plantilla activa usa el texto con el que se
+    // diseñó. Se llena solo con lo que el dueño edite.
+    seccionesPlantilla: {},
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']

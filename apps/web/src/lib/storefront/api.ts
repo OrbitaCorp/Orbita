@@ -51,6 +51,10 @@ export type HomeTemplateData = {
   // texto (como su diseño original) — con esto en `true`, el dueño elige
   // mostrar además el ícono/logo subido. Ver StorefrontChrome.tsx.
   mostrarIconoLogo?: boolean | null
+  // Lo que el dueño editó de las secciones propias de la plantilla activa,
+  // indexado por sección y campo (ver plantillas/secciones.ts). Lo que falte
+  // cae al texto con el que se diseñó la sección.
+  secciones?: Record<string, Record<string, string>> | null
 }
 
 export type StorefrontConfigResponse = {

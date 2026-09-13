@@ -42,6 +42,12 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
+  // Texto de una sección editable de ESTA plantilla, con el de la maqueta de
+  // respaldo (ver secciones.ts). El fallback no es un detalle: es lo que hace
+  // que una tienda que todavía no editó nada se vea igual que su vitrina.
+  const txt = (seccion: string, campo: string, porDefecto: string) =>
+    p.sec?.[seccion]?.[campo]?.trim() || porDefecto
+
   // Las plantillas que dibujan SU PROPIA tarjeta (que es parte de lo que las
   // hace distintas) no la cambian por la de Órbita: se les enchufa el click
   // para llegar a la ficha real, que es donde vive el carrito de verdad
@@ -463,7 +469,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
     return (
       <div style={marco}>
         <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete }}>
-          Envío asegurado · Certificado de autenticidad · Grabado sin cargo
+          {txt('cintillo', 'texto', 'Envío asegurado · Certificado de autenticidad · Grabado sin cargo')}
         </div>
 
         {/* Logo centrado, buscador a la izquierda y las acciones de la tienda a
@@ -511,7 +517,11 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
 
         {/* Tres promesas en una línea, separadas por filetes. */}
         <div style={{ borderBottom: filete, display: 'grid', gridTemplateColumns: movil ? '1fr' : 'repeat(3, 1fr)' }}>
-          {([['Oro 18k con sello', 'Cada pieza sale con su certificado'], ['Garantía de por vida', 'Ajustes y pulido sin cargo'], ['Envío asegurado', 'Con seguimiento a todo el país']] as [string, string][]).map(([a, b], i) => (
+          {([
+            [txt('promesas', 't1', 'Oro 18k con sello'), txt('promesas', 'b1', 'Cada pieza sale con su certificado')],
+            [txt('promesas', 't2', 'Garantía de por vida'), txt('promesas', 'b2', 'Ajustes y pulido sin cargo')],
+            [txt('promesas', 't3', 'Envío asegurado'), txt('promesas', 'b3', 'Con seguimiento a todo el país')],
+          ] as [string, string][]).map(([a, b], i) => (
             <div key={a} style={{ padding: movil ? '20px 22px' : '30px 34px', textAlign: 'center', borderLeft: !movil && i > 0 ? filete : undefined, borderTop: movil && i > 0 ? filete : undefined }}>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 22, color: t.primary }}>{a}</div>
               <div style={{ fontSize: 12, color: t.muted, marginTop: 6, letterSpacing: '0.04em' }}>{b}</div>
@@ -567,17 +577,20 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         {/* El taller: foto a la izquierda, números grandes en serif a la derecha. */}
         <Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch', borderTop: filete, borderBottom: filete }}>
-            <Foto src={`${IMG}/joya-pulsera-rosa.jpg`} alto={movil ? 250 : 420} />
+            <Foto src={txt('taller', 'foto', `${IMG}/joya-pulsera-rosa.jpg`)} alto={movil ? 250 : 420} />
             <div style={{ padding: movil ? '32px 22px' : '56px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: t.soft }}>
               <div style={{ width: 40, height: 1, background: t.primary, marginBottom: 16 }} />
-              <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 14 }}>El taller</div>
-              <h2 style={{ fontFamily: t.fh, fontSize: movil ? 30 : 42, margin: 0, fontWeight: 400, lineHeight: 1.1 }}>Cuatro manos, una pieza por vez</h2>
-              <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '20px 0 28px', maxWidth: 420 }}>
-                Fundimos, engarzamos y pulimos en el mismo lugar desde 1998. Nada sale del taller
-                sin pasar por lupa dos veces.
+              <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 14 }}>{txt('taller', 'volanta', 'El taller')}</div>
+              <h2 style={{ fontFamily: t.fh, fontSize: movil ? 30 : 42, margin: 0, fontWeight: 400, lineHeight: 1.1 }}>{txt('taller', 'titulo', 'Cuatro manos, una pieza por vez')}</h2>
+              <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '20px 0 28px', maxWidth: 420, whiteSpace: 'pre-line' }}>
+                {txt('taller', 'texto', 'Fundimos, engarzamos y pulimos en el mismo lugar desde 1998. Nada sale del taller sin pasar por lupa dos veces.')}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: movil ? 20 : 38, justifyContent: 'start' }}>
-                {([['26', 'años'], ['4.100', 'piezas'], ['100%', 'a mano']] as [string, string][]).map(([n, l]) => (
+                {([
+                  [txt('taller', 'n1v', '26'), txt('taller', 'n1l', 'años')],
+                  [txt('taller', 'n2v', '4.100'), txt('taller', 'n2l', 'piezas')],
+                  [txt('taller', 'n3v', '100%'), txt('taller', 'n3l', 'a mano')],
+                ] as [string, string][]).map(([n, l]) => (
                   <div key={l}>
                     <div style={{ fontFamily: t.fh, fontSize: movil ? 30 : 40, color: t.primary, lineHeight: 1 }}>{n}</div>
                     <div style={{ fontSize: 10.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted, marginTop: 8 }}>{l}</div>
@@ -591,14 +604,16 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'center' }}>
             <div style={{ order: movil ? 2 : 1, padding: movil ? '32px 22px' : '0 52px' }}>
-              <Titulo t={t} volanta="A pedido" texto="Grabá la pieza por dentro" movil={movil} />
-              <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '0 0 24px', maxWidth: 400 }}>
-                Una fecha, un nombre o las coordenadas de un lugar. El grabado se hace a mano y suma
-                cinco días hábiles a la entrega, sin costo adicional.
+              <Titulo t={t} volanta={txt('grabado', 'volanta', 'A pedido')} texto={txt('grabado', 'titulo', 'Grabá la pieza por dentro')} movil={movil} />
+              <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '0 0 24px', maxWidth: 400, whiteSpace: 'pre-line' }}>
+                {txt('grabado', 'texto', 'Una fecha, un nombre o las coordenadas de un lugar. El grabado se hace a mano y suma cinco días hábiles a la entrega, sin costo adicional.')}
               </p>
-              <span style={enlaceOro}>Pedir una pieza</span>
+              <span
+                style={{ ...enlaceOro, cursor: acciones ? 'pointer' : undefined }}
+                onClick={acciones?.abrirWhatsapp}
+              >{txt('grabado', 'cta', 'Pedir una pieza')}</span>
             </div>
-            <div style={{ order: movil ? 1 : 2 }}><Foto src={`${IMG}/joya-anillos-caja.jpg`} alto={movil ? 260 : 420} /></div>
+            <div style={{ order: movil ? 1 : 2 }}><Foto src={txt('grabado', 'foto', `${IMG}/joya-anillos-caja.jpg`)} alto={movil ? 260 : 420} /></div>
           </div>
         </Reveal>
 

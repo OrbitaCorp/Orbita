@@ -15,7 +15,7 @@
 
 import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import type { Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import type { ContenidoSecciones, Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
 import { thumbGradient, fmt } from '@/lib/storefront/utils'
 import type { StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
@@ -167,7 +167,7 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
  */
 export function plantillaReal({
   base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
-  marca, tagline,
+  marca, tagline, secciones,
 }: {
   base: Plantilla
   // El nombre real del negocio y su bajada. Hacen falta desde que las
@@ -178,6 +178,11 @@ export function plantillaReal({
   // navbar — bug real, visto en la primera prueba.
   marca?: string
   tagline?: string
+  // Lo que el dueño editó de las secciones propias de ESTA plantilla
+  // (homeTemplateData.secciones — ver secciones.ts). Cada campo vacío cae al
+  // texto de muestra adentro del bloque, así que una tienda que no tocó nada
+  // se ve idéntica a la vitrina.
+  secciones?: ContenidoSecciones
   productos: Producto[]
   destacados: Producto[]
   masVendidos: Producto[]
@@ -219,6 +224,7 @@ export function plantillaReal({
     // La identidad es del NEGOCIO, no de la muestra — ver `marca` arriba.
     ...(marca?.trim() ? { marca: marca.trim() } : {}),
     ...(tagline?.trim() ? { tagline: tagline.trim() } : {}),
+    sec: secciones,
     // Barra de confianza: los stats reales del negocio (Apariencia → statsBar),
     // con el mismo par [fuerte, apagado] que usa la plantilla.
     confianza: stats.map(s => [s.value, s.label] as [string, string]),

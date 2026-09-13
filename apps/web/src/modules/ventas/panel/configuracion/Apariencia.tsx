@@ -8,6 +8,7 @@ import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalL
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
+import { seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
 import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
@@ -134,10 +135,14 @@ const LINKS_FIJOS_HEADER = [
 // todo asi en dos columnas, requiere mucho scroll igual"). Con pestañas cada
 // vista muestra solo lo suyo, en una columna prolija — mismo patrón
 // `role="tablist"` que ya usa JuegosConfig.tsx/ClienteDetalle.tsx.
-type TabPlantilla = 'hero' | 'header' | 'contenido' | 'pie'
+type TabPlantilla = 'hero' | 'header' | 'secciones' | 'contenido' | 'pie'
+// "Secciones" solo aparece si la plantilla activa declaró las suyas (ver
+// plantillas/secciones.ts): son las que ninguna otra plantilla tiene, así que
+// la pestaña no existe para las que todavía no las declararon.
 const TABS_PLANTILLA: [TabPlantilla, string][] = [
     ['hero', 'Hero'],
     ['header', 'Header'],
+    ['secciones', 'Secciones'],
     ['contenido', 'Contenido'],
     ['pie', 'Pie de página'],
 ]
@@ -177,6 +182,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // de "ícono de marca" solo tiene sentido ahí — las demás siempre
     // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
     const conIconoOpcional = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.headerBold
+    // Las secciones propias de la plantilla activa, en el orden en que se ven
+    // en la portada (lo define cada plantilla en secciones.ts).
+    const seccionesPlantilla = soloContenido ? seccionesDe(homeTemplate) : []
     const [modalVolver, setModalVolver] = useState(false)
     const [volviendo, setVolviendo] = useState(false)
     // Pestaña activa del editor de plantilla (ver TABS_PLANTILLA) — sin uso
@@ -478,6 +486,61 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         </SecCard>
     )
 
+    // Secciones propias de la plantilla activa. El formulario no está escrito
+    // a mano: lo dibuja el esquema que declara cada plantilla (secciones.ts),
+    // porque no hay dos que tengan las mismas secciones ni en el mismo orden.
+    // Lo que se escribe acá se guarda en homeTemplateData.secciones y lo lee
+    // el bloque de esa plantilla en homes.tsx (helper `txt()`), que cae al
+    // texto de la maqueta cuando el campo está vacío.
+    const valorSeccion = (seccion: string, campo: string) => ap.seccionesPlantilla?.[seccion]?.[campo] ?? ''
+    const setSeccion = (seccion: string, campo: string, valor: string) => {
+        const actual = ap.seccionesPlantilla ?? {}
+        set('seccionesPlantilla', {
+            ...actual,
+            [seccion]: { ...(actual[seccion] ?? {}), [campo]: valor },
+        })
+    }
+
+    const seccionesCards = seccionesPlantilla.map(sec => (
+        <SecCard key={sec.id} id={`ap-sec-${sec.id}`} title={sec.nombre} icon={LayoutGrid}>
+            {sec.nota && (
+                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>{sec.nota}</p>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {sec.campos.map(campo => (
+                    <div key={campo.id}>
+                        <FieldLabel help={campo.help}>{campo.label}</FieldLabel>
+                        {campo.tipo === 'imagen' ? (
+                            <ImgUploader
+                                value={valorSeccion(sec.id, campo.id) || null}
+                                onChange={v => setSeccion(sec.id, campo.id, v ?? '')}
+                                onUpload={subirImagenApariencia}
+                                shape="square"
+                                size={80}
+                                formats="JPG, PNG · máx 4MB"
+                            />
+                        ) : campo.tipo === 'parrafo' ? (
+                            <textarea
+                                value={valorSeccion(sec.id, campo.id)}
+                                onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
+                                maxLength={campo.max}
+                                rows={3}
+                                style={{
+                                    width: '100%', borderRadius: 8, border: '1px solid var(--color-border)',
+                                    background: 'var(--color-bg)', color: 'var(--color-text)',
+                                    padding: '10px 12px', fontSize: 13.5, fontFamily: 'inherit',
+                                    lineHeight: 1.55, resize: 'vertical',
+                                }}
+                            />
+                        ) : (
+                            <Inp value={valorSeccion(sec.id, campo.id)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} />
+                        )}
+                    </div>
+                ))}
+            </div>
+        </SecCard>
+    ))
+
     // Header — solo tiene sentido editando la plantilla activa: en Apariencia
     // completa los enlaces ya se editan dentro de "Diseño y layout".
     //
@@ -674,7 +737,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 // cambio en el comentario de TABS_PLANTILLA, arriba).
                 <div>
                     <div className="ap-tabs-plantilla" role="tablist" aria-label="Secciones de la plantilla">
-                        {TABS_PLANTILLA.map(([k, l]) => {
+                        {TABS_PLANTILLA.filter(([k]) => k !== 'secciones' || seccionesPlantilla.length > 0).map(([k, l]) => {
                             const a = tabPlantilla === k
                             return (
                                 <button
@@ -697,6 +760,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {tabPlantilla === 'hero' && heroCard}
                         {tabPlantilla === 'header' && headerCard}
+                        {tabPlantilla === 'secciones' && seccionesCards}
                         {tabPlantilla === 'contenido' && <>{secVisibilidad}{secTextos}{secEstadisticas}</>}
                         {tabPlantilla === 'pie' && <>{secPie}{secCupon}</>}
                     </div>

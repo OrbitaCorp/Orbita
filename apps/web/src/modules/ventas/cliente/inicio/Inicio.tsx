@@ -575,6 +575,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         transferPct,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
+                        secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
                     })}
                     movil={movil}
                     // `soloCuerpo` recorta header, hero y pie de la maqueta

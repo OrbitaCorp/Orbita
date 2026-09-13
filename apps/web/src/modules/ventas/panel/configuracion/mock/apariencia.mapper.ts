@@ -80,8 +80,21 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
                 ? { cupon: { titulo: ap.cupon.titulo.trim(), bajada: ap.cupon.bajada.trim(), codigo: ap.cupon.codigo.trim() } }
                 : { cupon: null }),
             mostrarIconoLogo: ap.mostrarIconoLogo,
+            // Solo lo que tenga algo escrito: un campo vacío no se guarda, así
+            // el home vuelve a caer al texto con el que se diseñó la sección
+            // (ver el helper `txt()` en homes.tsx) en vez de dibujar un hueco.
+            secciones: limpiarSecciones(ap.seccionesPlantilla),
         },
     }
+}
+
+function limpiarSecciones(secciones: Record<string, Record<string, string>>): Record<string, Record<string, string>> {
+    const salida: Record<string, Record<string, string>> = {}
+    for (const [seccion, campos] of Object.entries(secciones ?? {})) {
+        const conValor = Object.entries(campos ?? {}).filter(([, v]) => typeof v === 'string' && v.trim())
+        if (conValor.length > 0) salida[seccion] = Object.fromEntries(conValor.map(([k, v]) => [k, v.trim()]))
+    }
+    return salida
 }
 
 export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
@@ -151,5 +164,6 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         parallaxCtaLink: dto.parallaxCtaLink ?? defaults.parallaxCtaLink,
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
+        seccionesPlantilla: dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla,
     }
 }
