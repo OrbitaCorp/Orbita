@@ -58,10 +58,21 @@ type Props = {
   // y los colores clásicos por un instante (bug real, reportado: "aparece
   // la plantilla original de apariencia" en la carga).
   homeTemplateSSR?: string | null
+  // La página dibuja su propio header y este envoltorio no tiene que poner
+  // ninguno. Hoy lo usa solo el home con una plantilla que declara
+  // `headerPropio` (ver tipos.ts): ese navbar es parte del diseño de la
+  // plantilla —cambia la forma, los íconos y hasta dónde va el buscador— y
+  // la única manera de que salga idéntico a su vitrina es dejar que lo
+  // dibuje ella, con las acciones reales enchufadas adentro.
+  //
+  // El resto de las páginas (catálogo, ficha, carrito) siguen con el header
+  // de siempre, pintado con la paleta de la plantilla — mismo criterio que
+  // ya regía para Vidriera y Escaparate.
+  sinHeader?: boolean
   children: ReactNode
 }
 
-export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplateSSR = null, children }: Props) {
+export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplateSSR = null, sinHeader = false, children }: Props) {
   const { isDark } = useStorefrontTheme()
   // El slug sale del router y no de un prop: Chrome lo envuelve TODO el
   // storefront y agregar un prop obligatorio obligaría a tocar cada página.
@@ -117,18 +128,20 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           dueño puede tener las dos. Si el countdown está configurado como "solo
           en la portada", esto no dibuja nada — lo dibuja Inicio.tsx. */}
       {slug && <CountdownBanner slug={slug} lugar="ALL_PAGES" />}
-      <StorefrontHeader
-        tienda={tienda}
-        logoUrl={config?.appearance?.logoUrl}
-        headerLinks={config?.appearance?.headerLinks}
-        showSearch={config?.appearance?.showSearch ?? true}
-        esVidriera={config?.business?.mode === 'SHOWCASE'}
-        centrado={centrado}
-        escaparate={bold}
-        logoIcono={logoIcono}
-        navCentrada={navCentrada}
-        sinNav={sinNav}
-      />
+      {!sinHeader && (
+        <StorefrontHeader
+          tienda={tienda}
+          logoUrl={config?.appearance?.logoUrl}
+          headerLinks={config?.appearance?.headerLinks}
+          showSearch={config?.appearance?.showSearch ?? true}
+          esVidriera={config?.business?.mode === 'SHOWCASE'}
+          centrado={centrado}
+          escaparate={bold}
+          logoIcono={logoIcono}
+          navCentrada={navCentrada}
+          sinNav={sinNav}
+        />
+      )}
       {children}
     </div>
   )

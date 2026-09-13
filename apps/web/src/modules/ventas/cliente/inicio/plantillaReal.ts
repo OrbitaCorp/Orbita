@@ -167,8 +167,17 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
  */
 export function plantillaReal({
   base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
+  marca, tagline,
 }: {
   base: Plantilla
+  // El nombre real del negocio y su bajada. Hacen falta desde que las
+  // plantillas dibujan su PROPIO header y su propio pie (ver `headerPropio`
+  // en tipos.ts): esos bloques escriben `p.marca`, que en la vitrina es la
+  // marca inventada de la muestra ("Ritmo", "Distrito", "Solano"…). Sin esto,
+  // una tienda con Atleta aplicada se anunciaba como "RITMO" en su propio
+  // navbar — bug real, visto en la primera prueba.
+  marca?: string
+  tagline?: string
   productos: Producto[]
   destacados: Producto[]
   masVendidos: Producto[]
@@ -207,6 +216,9 @@ export function plantillaReal({
 
   return {
     ...base,
+    // La identidad es del NEGOCIO, no de la muestra — ver `marca` arriba.
+    ...(marca?.trim() ? { marca: marca.trim() } : {}),
+    ...(tagline?.trim() ? { tagline: tagline.trim() } : {}),
     // Barra de confianza: los stats reales del negocio (Apariencia → statsBar),
     // con el mismo par [fuerte, apagado] que usa la plantilla.
     confianza: stats.map(s => [s.value, s.label] as [string, string]),

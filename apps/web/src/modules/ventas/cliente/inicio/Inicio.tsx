@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
+import { navRealDe } from '@/components/storefront/StorefrontHeader'
+import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
@@ -338,8 +340,18 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // (el marquee de categorías, el banner de WhatsApp, los slides del hero)
     // ya tiene su propio `overflow: hidden` local más abajo — no hacía
     // falta este de más a nivel página.
+    // `anuncio` se apaga con una plantilla de header propio: esas dibujan SU
+    // cintillo o SU cartel corriendo arriba del navbar, parte de su diseño, y
+    // el banner de Apariencia quedaba encima como una segunda franja (bug
+    // visto al aplicar Atleta: dos carteles apilados).
     return (
-        <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate} anuncio>
+        <StorefrontChrome
+            tienda={tienda}
+            config={config}
+            homeTemplateSSR={__homeTemplate}
+            anuncio={!plantilla?.headerPropio}
+            sinHeader={!!plantilla?.headerPropio}
+        >
             {/* Estilos propios de las plantillas (reveals, hover de fotos,
                 marquee, botones). Es el MISMO string que usa el preview del
                 panel — si se copiara y pegara acá volvería a desincronizarse,
@@ -561,15 +573,38 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
                         heroSlides,
                         transferPct,
+                        marca: tienda.nombre,
+                        tagline: config?.appearance?.tagline ?? undefined,
                     })}
                     movil={movil}
-                    soloCuerpo
+                    // `soloCuerpo` recorta header, hero y pie de la maqueta
+                    // porque los pone la tienda real. Las plantillas con
+                    // `headerPropio` son al revés: su navbar, su hero y su pie
+                    // SON el diseño (ver tipos.ts), así que se dibujan enteras
+                    // y el chrome se corre — ver `sinHeader` más arriba.
+                    soloCuerpo={!plantilla.headerPropio}
                     acciones={{
                         irACatalogo: () => go('/catalogo'),
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),
                         abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
+                        // Los tres huecos interactivos del navbar de la
+                        // plantilla: cuenta+carrito, buscador y navegación.
+                        // La maqueta pone la forma y el tema; esto, el
+                        // comportamiento real.
+                        renderAcciones: ({ movil: m }) => (
+                            <AccionesPlantilla
+                                t={plantilla.tema}
+                                movil={m}
+                                esVidriera={config?.business?.mode === 'SHOWCASE'}
+                            />
+                        ),
+                        renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        nav: navRealDe(config?.appearance?.headerLinks).map(l => ({
+                            label: l.label,
+                            onClick: () => go(l.path),
+                        })),
                         // La tarjeta real, no la maqueta del panel: la
                         // plantilla pone la grilla (altos, a sangre) y acá
                         // adentro va el carrito/variantes/modo vidriera de
@@ -766,7 +801,12 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             </>
             )}
 
-            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+            {/* Las plantillas con `piePropio` ya dibujaron el suyo adentro de
+                PlantillaHome (es parte de su diseño: columnas, tipografía y
+                cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
+            {!plantilla?.piePropio && (
+                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+            )}
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
 
             {(reclamo || (modalJuego && elegibles.length > 0)) && (() => {

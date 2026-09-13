@@ -41,9 +41,16 @@ import Apariencia from '../../configuracion/Apariencia'
 import type { Plantilla } from './tipos'
 import { PLANTILLAS } from './datos'
 
-// Únicas plantillas con lógica real detrás (ver businesses.service.ts
-// setHomeTemplate) — el resto del catálogo de abajo sigue siendo vitrina.
-const PLANTILLAS_ENGANCHADAS = new Set(['vidriera', 'escaparate'])
+// Las dieciséis se pueden activar de verdad.
+//
+// Vidriera y Escaparate se enganchan a la vieja usanza (`soloCuerpo`: la
+// tienda real pone header, hero y pie, y la plantilla aporta el cuerpo). Las
+// otras catorce declaran `headerPropio`/`heroPropio`/`piePropio` y se dibujan
+// ENTERAS —su navbar, su hero, sus tarjetas, su pie— con las acciones reales
+// enchufadas adentro (cuenta, carrito, buscador, navegación y el click a la
+// ficha del producto). Por eso lo que ve el cliente es idéntico a la vitrina
+// del panel: es exactamente el mismo JSX, ver homes.tsx.
+const PLANTILLAS_ENGANCHADAS = new Set(PLANTILLAS.map(x => x.id))
 
 // Las que el dueño guardó pero no quiere ofrecer hoy no se listan ni se
 // pueden abrir (ver `oculta` en tipos.ts). No se borran: destapar una es

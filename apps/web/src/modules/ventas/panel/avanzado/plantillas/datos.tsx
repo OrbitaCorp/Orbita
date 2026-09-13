@@ -85,6 +85,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Sin hero', 'Muro de bloques', 'Grilla compacta de 5', 'Franja de envío', 'Marcas'],
     marca: 'Mercado Sur', tagline: 'Casa, cocina y jardín',
     layout: 'mosaico',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FAFAF9', surf: '#FFFFFF', soft: '#F1F1EF', text: '#1C1917', muted: '#78716C', border: '#E4E4E1',
       primary: '#0D9488', onPrimary: '#FFFFFF', accent: '#F59E0B',
@@ -109,6 +115,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Header dorado', 'Hero con foco sobre negro', 'Categorías oscuras', 'Piezas de a tres', 'Certificaciones', 'Grabado personalizado'],
     marca: 'Solano', tagline: 'Joyería en oro 18k, hecha a pedido',
     layout: 'premium',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#0C0A09', surf: '#171412', soft: '#12100E', text: '#F5F1EA', muted: '#A8A29E', border: '#2A2521',
       primary: '#C9A227', onPrimary: '#1C1917', accent: '#E0C060',
@@ -133,6 +145,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Contador de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Comparativa', 'Números grandes'],
     marca: 'Vector', tagline: 'Periféricos y audio, sin vueltas',
     layout: 'nocturno',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#0B1120', surf: '#131C2E', soft: '#101827', text: '#F1F5F9', muted: '#94A3B8', border: '#1E293B',
       primary: '#22D3EE', onPrimary: '#04121A', accent: '#818CF8',
@@ -157,6 +175,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero con degradé', 'Sellos de producto', 'Rutina en 3 productos', 'Best sellers', 'Antes y después', 'Galería de Instagram'],
     marca: 'Aura', tagline: 'Skincare simple, resultados visibles',
     layout: 'glow',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FFF9FB', surf: '#FFFFFF', soft: '#FDEEF3', text: '#3B1027', muted: '#9B6B80', border: '#F6DCE6',
       primary: '#DB2777', onPrimary: '#FFFFFF', accent: '#C084FC',
@@ -181,6 +205,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Buscador protagonista', 'Búsquedas frecuentes', 'Categorías en pastillas', 'Armá tu lista escolar', 'Grilla de 4', 'Vuelta a clases'],
     marca: 'Renglón', tagline: 'Librería, papelería y arte',
     layout: 'papeleria',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FAF7F0', surf: '#FFFFFF', soft: '#F3EEE3', text: '#1C1917', muted: '#78716C', border: '#E7E0D2',
       primary: '#1D4ED8', onPrimary: '#FFFFFF', accent: '#F59E0B',
@@ -205,6 +235,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Barra de departamentos', 'Hero partido en tres', 'Calculadora de materiales', 'Fichas con especificaciones', 'Retiro en sucursal'],
     marca: 'Bulón', tagline: 'Ferretería y corralón desde 1972',
     layout: 'corralon',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FFFFFF', surf: '#FFFFFF', soft: '#F5F5F4', text: '#0C0A09', muted: '#57534E', border: '#D6D3D1',
       primary: '#111827', onPrimary: '#FACC15', accent: '#FACC15',
@@ -229,6 +265,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero a sangre', 'Tiras por disciplina', 'Fichas con tecnología', 'Números de la comunidad', 'Guía de talles'],
     marca: 'Ritmo', tagline: 'Running, fuerza y ciclismo',
     layout: 'atleta',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#0A0A0A', surf: '#141414', soft: '#171717', text: '#FAFAFA', muted: '#A3A3A3', border: '#262626',
       primary: '#BEF264', onPrimary: '#0A0A0A', accent: '#F97316',
@@ -253,6 +295,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['¿Para quién comprás?', 'Hero redondeado', 'Fichas con badge', 'Categorías en círculo'],
     marca: 'Colita', tagline: 'Todo para tu perro y tu gato',
     layout: 'patitas',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FFF9F5', surf: '#FFFFFF', soft: '#FFF0E6', text: '#2D1B12', muted: '#8B7268', border: '#F2DFD1',
       primary: '#F97316', onPrimary: '#FFFFFF', accent: '#22C55E',
@@ -277,6 +325,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Índice editorial', 'Lista de varietales sin fotos', 'Botellas altas sobre crema', 'Maridajes'],
     marca: 'Cepa', tagline: 'Vinos de autor y bodegas chicas',
     layout: 'bodega',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#1A0F12', surf: '#241419', soft: '#201216', text: '#F5EDE6', muted: '#A99188', border: '#3A2228',
       primary: '#D4A373', onPrimary: '#1A0F12', accent: '#9F1239',
@@ -301,6 +355,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Línea de tiempo por edad', 'Hero suave', 'Certificaciones'],
     marca: 'Nube', tagline: 'Para los primeros años',
     layout: 'crecer',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     tema: {
       bg: '#FFFDFB', surf: '#FFFFFF', soft: '#F4F7FA', text: '#33302E', muted: '#8A8580', border: '#EAE6E1',
       primary: '#7FA9C9', onPrimary: '#FFFFFF', accent: '#F0B49B',
@@ -325,6 +385,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Panel lateral fijo', 'Hero a sangre', 'Datos de compra', 'Fichas partidas', 'Categorías en lista', 'Cupón'],
     marca: 'Circuito', tagline: 'Tecnología, audio y periféricos',
     layout: 'circuito',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     cartel: '✦ 12 CUOTAS SIN INTERÉS ✦ GARANTÍA OFICIAL 12 MESES',
     links: ['Inicio', 'Audio', 'Periféricos', 'Notebooks', 'Smartwatch'],
     confianza: [['12 cuotas', 'sin interés'], ['Garantía', 'oficial 12 meses'], ['Envío gratis', 'desde $150.000'], ['Cambios', 'hasta 30 días']],
@@ -357,6 +423,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Portada de catálogo', 'Servicios en filetes', 'Piezas numeradas', 'Índice de categorías', 'Cupón'],
     marca: 'Vera', tagline: 'Joyería en plata y oro, hecha a mano',
     layout: 'vera',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     cartel: '✦ GRABADO SIN CARGO ✦ ENVÍO ASEGURADO A TODO EL PAÍS',
     links: ['Inicio', 'Anillos', 'Collares', 'Aros', 'A pedido'],
     confianza: [['Envío', 'asegurado'], ['Grabado', 'sin cargo'], ['3 cuotas', 'sin interés'], ['Garantía', 'de por vida']],
@@ -389,6 +461,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero con tarjeta flotante', 'Ambientes en zigzag', 'Categorías', 'Cupón'],
     marca: 'Cobijo', tagline: 'Muebles, textiles y deco',
     layout: 'cobijo',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     cartel: '✦ ENVÍO GRATIS EN MUEBLES ✦ 6 CUOTAS SIN INTERÉS ✦ ARMADO SIN CARGO',
     links: ['Inicio', 'Muebles', 'Textiles', 'Deco', 'Plantas'],
     confianza: [['Envío gratis', 'en muebles'], ['6 cuotas', 'sin interés'], ['Armado', 'sin cargo'], ['Cambios', 'hasta 30 días']],
@@ -421,6 +499,12 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero partido en dos', 'Beneficios en píldoras', 'Fichas horizontales', 'Categorías verticales', 'Segunda campaña'],
     marca: 'Nítida', tagline: 'Skincare y maquillaje, fórmulas cortas',
     layout: 'nitida',
+    // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
+    // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
+    // lo que se ve es exactamente esta maqueta con datos y acciones reales.
+    headerPropio: true,
+    heroPropio: true,
+    piePropio: true,
     cartel: '✦ MUESTRAS DE REGALO EN TODA COMPRA ✦ ENVÍO GRATIS DESDE $45.000',
     links: ['Inicio', 'Skincare', 'Maquillaje', 'Cuerpo', 'Sets'],
     confianza: [['Envío gratis', 'desde $45.000'], ['Muestras', 'de regalo'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días']],

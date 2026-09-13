@@ -107,6 +107,22 @@ function pathDeLink(id: string): string {
   return PATH_POR_ID[id] ?? '/catalogo'
 }
 
+/**
+ * Los enlaces del header, resueltos a su destino real. Lo exporta este
+ * archivo porque acá vive el criterio (qué id lleva a qué filtro del
+ * catálogo, y el prefijo `cat:` de las categorías del negocio) — una
+ * plantilla con navbar propio (ver `headerPropio` en
+ * panel/avanzado/plantillas/tipos.ts) dibuja SU nav pero tiene que navegar a
+ * los mismos lados, y duplicar el mapa era garantizar que se desincronizaran.
+ */
+export function navRealDe(headerLinks?: { id: string; label: string; on: boolean }[]): { label: string; path: string }[] {
+  return headerLinks
+    ? headerLinks
+        .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
+        .map(l => ({ label: l.label, path: pathDeLink(l.id) }))
+    : NAV_LINKS_DEFAULT.map(l => ({ label: l.label, path: l.path }))
+}
+
 export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true, navCentrada = false, sinNav = false }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }

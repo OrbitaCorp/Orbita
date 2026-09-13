@@ -2,7 +2,7 @@ import type { Plantilla, Producto, AccionesHome } from './tipos'
 import { IMG } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
-  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda,
+  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe,
 } from './piezas'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
@@ -42,10 +42,19 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
+  // Las plantillas que dibujan SU PROPIA tarjeta (que es parte de lo que las
+  // hace distintas) no la cambian por la de Órbita: se les enchufa el click
+  // para llegar a la ficha real, que es donde vive el carrito de verdad
+  // —picker de variante, stock, comprar ahora—. Mismo criterio que ya se usó
+  // con el "Agregar" de Escaparate: nunca prometer un agregado directo que la
+  // tienda no arma.
+  const abrir = (x: Producto) =>
+    x.slug && acciones ? () => acciones.irAProducto(x.slug!) : undefined
+
   const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
     acciones?.renderProducto
       ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i, props)}</div>
-      : <Card key={x.nombre} p={x} t={t} sangre={props.sangre} alto={props.alto} />
+      : <Card key={x.nombre} p={x} t={t} sangre={props.sangre} alto={props.alto} onClick={abrir(x)} />
 
   // ── TIENDA ────────────────────────────────────────────────────────────────
   // El esqueleto de Vidriera, que es el que el dueño eligió para todas: la
@@ -69,7 +78,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         {!soloCuerpo && (
           <>
             {p.cartel && <Marquee t={t} texto={p.cartel} />}
-            <HeaderCentrado t={t} marca={p.marca} links={links} conBuscador movil={movil} />
+            <HeaderCentrado t={t} marca={p.marca} links={links} conBuscador movil={movil} acciones={acciones} />
             <Carrusel t={t} slides={p.slides} movil={movil} alto={movil ? 420 : 470} />
           </>
         )}
@@ -184,7 +193,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <span style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 800, letterSpacing: '-0.02em' }}>{p.marca}</span>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
             {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 999, padding: '7px 16px', background: t.soft }}>Buscar…</span>}
-            <AccionesTienda t={t} movil={movil} />
+            <AccionesTienda t={t} movil={movil} acciones={acciones} />
           </span>
         </div>
 
@@ -216,7 +225,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Se van rápido" texto="Lo más vendido" accion="Ver todo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(5, 2), gap: 14 }}>
               {[...p.productos, p.productos[0]].map((x, i) => (
-                <div key={i} className="pl-card" style={{ background: t.surf, borderRadius: t.radio, overflow: 'hidden', border: `1px solid ${t.border}` }}>
+                <div key={i} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, borderRadius: t.radio, overflow: 'hidden', border: `1px solid ${t.border}` }}>
                   <div className="pl-media" style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 172} />
                     {x.badge && <span style={{ position: 'absolute', top: 9, left: 9, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 6 }}>{x.badge}</span>}
@@ -282,7 +291,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               {!movil && <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{['Mujer', 'Hombre', 'Calzado', 'Sale'].map((l) => <span key={l} style={{ color: l === 'Sale' ? t.accent : t.text }}>{l}</span>)}</div>}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
                 {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 4, padding: '7px 14px' }}>Buscar</span>}
-                <AccionesTienda t={t} movil={movil} />
+                <AccionesTienda t={t} movil={movil} acciones={acciones} />
               </span>
             </div>
           </>
@@ -468,11 +477,11 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <div style={{ fontFamily: t.fh, fontSize: movil ? 24 : 34, fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 12, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted }}>
-                {['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'].map((l) => <span key={l}>{l}</span>)}
+                {navDe(p.links ?? ['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
           </div>
-          <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
 
         {/* Hero a sangre: la pieza ocupa todo y el texto se apoya abajo a la
@@ -533,7 +542,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Disponibles ahora" texto="Piezas de la colección" accion="Ver las 24 →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 24 : 32 }}>
               {p.productos.slice(0, 3).map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ textAlign: 'center' }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ textAlign: 'center' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 320 : 400} radio={t.radio} />
                     {x.badge && (
@@ -621,11 +630,11 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: movil ? '13px 16px' : '15px 32px', borderBottom: `1px solid ${t.border}` }}>
           <span style={{ fontFamily: t.fh, fontSize: movil ? 18 : 21, fontWeight: 800, letterSpacing: '-0.02em' }}>{p.marca}</span>
-          {!movil && <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted }}>{['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'].map((l) => <span key={l}>{l}</span>)}</div>}
+          {!movil && <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted }}>{navDe(p.links ?? ['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}</div>}
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 12, alignItems: 'center', fontSize: 12.5, color: t.muted }}>
             {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 8, padding: '7px 14px', background: t.soft, fontFamily: 'ui-monospace, monospace' }}>buscar…</span>}
             {!movil && <span style={{ border: `1px solid ${t.primary}`, color: t.primary, borderRadius: 8, padding: '6px 12px', fontWeight: 600 }}>Comparar</span>}
-            <AccionesTienda t={t} movil={movil} />
+            <AccionesTienda t={t} movil={movil} acciones={acciones} />
           </span>
         </div>
 
@@ -679,7 +688,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             </div>
             <Tira gap={14}>
               {p.productos.map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ width: movil ? 235 : 280, flexShrink: 0, scrollSnapAlign: 'start', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ width: movil ? 235 : 280, flexShrink: 0, scrollSnapAlign: 'start', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 178} />
                     {x.badge && <span style={{ position: 'absolute', top: 10, left: 10, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 6, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}>{x.badge}</span>}
@@ -793,12 +802,15 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               <span>⌕</span><span>Buscar por nombre, marca o código…</span>
             </div>
           )}
-          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
         {!movil && (
           <div style={{ display: 'flex', gap: 26, padding: '11px 32px', background: t.surf, borderBottom: `1px solid ${t.border}`, fontSize: 13, color: t.text }}>
-            {['Escolar', 'Oficina', 'Arte', 'Libros', 'Regalería', 'Ofertas'].map((l) => (
-              <span key={l} style={{ color: l === 'Ofertas' ? t.accent : t.text, fontWeight: l === 'Ofertas' ? 700 : 400 }}>{l}</span>
+            {navDe(p.links ?? ['Escolar', 'Oficina', 'Arte', 'Libros', 'Regalería', 'Ofertas'], acciones).map((l) => (
+              <span
+                key={l.label} onClick={l.onClick}
+                style={{ color: l.label === 'Ofertas' ? t.accent : t.text, fontWeight: l.label === 'Ofertas' ? 700 : 400, cursor: l.onClick ? 'pointer' : undefined }}
+              >{l.label}</span>
             ))}
           </div>
         )}
@@ -877,7 +889,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <div style={{ padding: movil ? '10px 16px 30px' : '16px 40px 48px' }}>
             <Titulo t={t} volanta="Lo que más sale" texto="Más vendidos de la semana" accion="Ver todo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} />)}
+              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -921,12 +933,15 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               <span>Buscar producto o código</span><span style={{ background: t.accent, color: t.primary, borderRadius: 3, padding: '2px 8px', fontWeight: 800 }}>⌕</span>
             </div>
           )}
-          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
         {/* Los doce departamentos, siempre visibles. */}
         <div style={{ background: t.primary, padding: movil ? '10px 12px' : '11px 30px', display: 'grid', gridTemplateColumns: cols(6, 3), gap: movil ? '7px 10px' : '8px 14px' }}>
-          {deptos.map((d) => (
-            <span key={d} style={{ fontSize: movil ? 10.5 : 12, fontWeight: 600, color: d === 'Ofertas' ? t.accent : '#E7E5E4', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d}</span>
+          {navDe(deptos, acciones).map((d) => (
+            <span
+              key={d.label} onClick={d.onClick}
+              style={{ fontSize: movil ? 10.5 : 12, fontWeight: 600, color: d.label === 'Ofertas' ? t.accent : '#E7E5E4', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: d.onClick ? 'pointer' : undefined }}
+            >{d.label}</span>
           ))}
         </div>
 
@@ -1004,7 +1019,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Lo más pedido" texto="Herramienta y obra" accion="Ver catálogo →" movil={movil} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {p.productos.map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ display: 'grid', gridTemplateColumns: movil ? '96px 1fr' : '150px 1fr auto', gap: movil ? 14 : 22, alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: t.radio, padding: movil ? 10 : 14, background: t.surf }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '96px 1fr' : '150px 1fr auto', gap: movil ? 14 : 22, alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: t.radio, padding: movil ? 10 : 14, background: t.surf }}>
                   <div style={{ borderRadius: t.radio, overflow: 'hidden' }}><Foto src={x.img} src2={x.img2} alto={movil ? 96 : 120} /></div>
                   <div style={{ minWidth: 0 }}>
                     {x.badge && <span style={{ display: 'inline-block', background: t.accent, color: t.primary, fontSize: 10, fontWeight: 900, padding: '3px 9px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 7 }}>{x.badge}</span>}
@@ -1061,12 +1076,15 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <span style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</span>
           {!movil && (
             <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: t.fh }}>
-              {['Running', 'Fuerza', 'Ciclismo', 'Indumentaria', 'Outlet'].map((l) => (
-                <span key={l} style={{ color: l === 'Outlet' ? t.accent : t.text }}>{l}</span>
+              {navDe(p.links ?? ['Running', 'Fuerza', 'Ciclismo', 'Indumentaria', 'Outlet'], acciones).map((l) => (
+                <span
+                  key={l.label} onClick={l.onClick}
+                  style={{ color: l.label === 'Outlet' ? t.accent : t.text, cursor: l.onClick ? 'pointer' : undefined }}
+                >{l.label}</span>
               ))}
             </div>
           )}
-          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
 
         {/* Hero a sangre: la foto ocupa todo y el titular se come el ancho. */}
@@ -1109,7 +1127,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Equipate" texto="Lo nuevo de la temporada" accion="Ver todo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 10 : 14 }}>
               {p.productos.map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 220} />
                     {x.badge && <span style={{ position: 'absolute', top: 10, left: 10, background: t.primary, color: t.onPrimary, fontSize: 10, fontWeight: 700, padding: '4px 10px', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: t.fh }}>{x.badge}</span>}
@@ -1170,10 +1188,10 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           </span>
           {!movil && (
             <div style={{ display: 'flex', gap: 22, fontSize: 13.5, fontWeight: 600, color: t.muted }}>
-              {['Perros', 'Gatos', 'Alimento', 'Juguetes', 'Farmacia'].map((l) => <span key={l}>{l}</span>)}
+              {navDe(p.links ?? ['Perros', 'Gatos', 'Alimento', 'Juguetes', 'Farmacia'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}
-          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
 
         <div style={{ background: `linear-gradient(160deg, ${t.soft} 0%, ${t.bg} 60%)` }}>
@@ -1215,7 +1233,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <div style={{ padding: movil ? '4px 16px 26px' : '10px 40px 44px' }}>
             <Titulo t={t} volanta="Recomendados" texto="Lo que más eligen" accion="Ver todo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 145 : 200} />)}
+              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 145 : 200} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -1250,11 +1268,11 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <div style={{ fontFamily: t.fh, fontSize: movil ? 26 : 38, fontWeight: 400, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.muted }}>
-                {['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'].map((l) => <span key={l}>{l}</span>)}
+                {navDe(p.links ?? ['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
           </div>
-          <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch' }}>
@@ -1291,7 +1309,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Selección del mes" texto="Tres para empezar" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 18 : 26 }}>
               {p.productos.slice(0, 3).map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ background: '#F3EADF', padding: movil ? 18 : 24, textAlign: 'center', color: '#2A1A14' }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: '#F3EADF', padding: movil ? 18 : 24, textAlign: 'center', color: '#2A1A14' }}>
                   <div style={{ margin: '0 auto', maxWidth: movil ? 200 : 230 }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 300 : 380} />
                   </div>
@@ -1349,10 +1367,10 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <div style={{ fontFamily: t.fh, fontSize: movil ? 25 : 32, fontWeight: 700, letterSpacing: '0.04em', color: t.primary }}>{p.marca}</div>
           {!movil && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 12, fontSize: 13.5, color: t.muted, fontWeight: 600 }}>
-              {['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'].map((l) => <span key={l}>{l}</span>)}
+              {navDe(p.links ?? ['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}
-          <span style={{ position: 'absolute', right: movil ? 16 : 34, top: movil ? 14 : 22 }}><AccionesTienda t={t} movil={movil} /></span>
+          <span style={{ position: 'absolute', right: movil ? 16 : 34, top: movil ? 14 : 22 }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
 
         <div style={{ background: `linear-gradient(150deg, ${t.soft} 0%, ${t.bg} 55%)`, padding: movil ? '30px 20px' : '56px 44px' }}>
@@ -1394,7 +1412,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <div style={{ padding: movil ? '4px 16px 28px' : '6px 44px 48px' }}>
             <Titulo t={t} volanta="Para 6 a 12 meses" texto="Lo más elegido" accion="Ver todo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} />)}
+              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -1431,7 +1449,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
     const panel = movil ? (
       <div style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 700, color: t.text, letterSpacing: '-0.02em' }}>{p.marca}</span>
-        <AccionesTienda t={t} movil />
+        <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     ) : (
       <div style={{ width: 232, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.surf, padding: '30px 26px', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
@@ -1439,13 +1457,16 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <div style={{ fontSize: 12, color: t.muted, marginTop: 7, lineHeight: 1.5 }}>{p.tagline}</div>
         <div style={{ margin: '26px 0 22px', height: 1, background: t.border }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-          {links.map((l, i) => (
-            <span key={l} style={{ fontSize: 13.5, color: i === 0 ? t.primary : t.text, fontWeight: i === 0 ? 700 : 500 }}>{l}</span>
+          {navDe(links, acciones).map((l, i) => (
+            <span
+              key={l.label} onClick={l.onClick}
+              style={{ fontSize: 13.5, color: i === 0 ? t.primary : t.text, fontWeight: i === 0 ? 700 : 500, cursor: l.onClick ? 'pointer' : undefined }}
+            >{l.label}</span>
           ))}
         </div>
         <div style={{ margin: '24px 0 18px', height: 1, background: t.border }} />
         <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, padding: '9px 13px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar…</div>
-        <div style={{ marginTop: 20 }}><AccionesTienda t={t} /></div>
+        <div style={{ marginTop: 20 }}><AccionesTienda t={t} acciones={acciones} /></div>
       </div>
     )
 
@@ -1491,7 +1512,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
                 <Titulo t={t} volanta="Ficha técnica a la vista" texto="Lo que más se vende" accion="Ver el catálogo →" movil={movil} />
                 <div style={{ display: 'grid', gap: movil ? 14 : 18 }}>
                   {p.productos.slice(0, 3).map((x) => (
-                    <div key={x.nombre} className="pl-card" style={{ display: 'grid', gridTemplateColumns: movil ? '116px 1fr' : '260px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                    <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '116px 1fr' : '260px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                       <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 186} />
                       <div style={{ padding: movil ? '13px 14px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 7 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
@@ -1534,7 +1555,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               <div style={{ padding: movil ? '4px 16px 26px' : '10px 44px 40px' }}>
                 <Titulo t={t} volanta="También te puede servir" texto="Nuevos ingresos" movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
-                  {[...p.productos].reverse().map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} />)}
+                  {[...p.productos].reverse().map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
                 </div>
               </div>
             </Reveal>
@@ -1582,7 +1603,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft }}>
           {p.cartel?.replace(/✦/g, '·')}
         </div>
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 380 : 500} />
@@ -1694,7 +1715,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
     return (
       <div style={marco}>
         {p.cartel && <Marquee t={t} texto={p.cartel} />}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 340 : 470} />
@@ -1733,7 +1754,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
                   <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.75, margin: '14px 0 20px', maxWidth: 400 }}>{bajada}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     {items.map((x) => (
-                      <div key={x.nombre} className="pl-card" style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                      <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                         <Foto src={x.img} src2={x.img2} alto={movil ? 108 : 132} />
                         <div style={{ padding: '11px 13px 14px' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{x.nombre}</div>
@@ -1804,7 +1825,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
     return (
       <div style={marco}>
         {p.cartel && <Marquee t={t} texto={p.cartel} />}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
           <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1837,7 +1858,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             <Titulo t={t} volanta="Lo esencial" texto="Los que más se repiten" accion="Ver el catálogo →" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => (
-                <div key={x.nombre} className="pl-card" style={{ display: 'grid', gridTemplateColumns: movil ? '112px 1fr' : '150px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '112px 1fr' : '150px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 168} />
                   <div style={{ padding: movil ? '13px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
                     {x.badge && <span style={{ alignSelf: 'flex-start', background: TONOS[x.badgeTono ?? 'verde'], color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>{x.badge}</span>}
@@ -1927,11 +1948,11 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <div style={{ fontFamily: t.fh, fontSize: movil ? 24 : 30, fontWeight: 800, letterSpacing: '-0.03em', color: t.primary }}>{p.marca}</div>
         {!movil && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 13.5, color: t.text }}>
-            {['Rostro', 'Maquillaje', 'Rutinas', 'Sets de regalo'].map((l) => <span key={l}>{l}</span>)}
+            {navDe(p.links ?? ['Rostro', 'Maquillaje', 'Rutinas', 'Sets de regalo'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
           </div>
         )}
         <span style={{ position: movil ? 'absolute' : 'absolute', right: movil ? 16 : 34, top: movil ? 16 : 22, display: 'inline-flex' }}>
-          <AccionesTienda t={t} movil={movil} />
+          <AccionesTienda t={t} movil={movil} acciones={acciones} />
         </span>
       </div>
 
@@ -1968,7 +1989,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <Titulo t={t} volanta="Tres pasos" texto="Tu rutina, resuelta" centrado movil={movil} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: 18 }}>
             {p.productos.slice(0, 3).map((x, i) => (
-              <div key={x.nombre} className="pl-card" style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', boxShadow: t.sombra }}>
+              <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', boxShadow: t.sombra }}>
                 <div style={{ position: 'relative' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 210 : 250} />
                   <span style={{ position: 'absolute', top: 14, left: 14, width: 32, height: 32, borderRadius: '50%', background: '#fff', color: t.primary, display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, boxShadow: '0 4px 12px rgba(0,0,0,0.14)' }}>{i + 1}</span>
@@ -1994,7 +2015,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           <Titulo t={t} volanta="Se llevan todo" texto="Las más elegidas" accion="Ver todo →" movil={movil} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 16 }}>
             {p.productos.map((x) => (
-              <div key={x.nombre} className="pl-card" style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+              <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                 <div style={{ position: 'relative' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 190} />
                   {x.badge && <span style={{ position: 'absolute', top: 11, left: 11, background: TONOS[x.badgeTono ?? 'violeta'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 999 }}>{x.badge}</span>}

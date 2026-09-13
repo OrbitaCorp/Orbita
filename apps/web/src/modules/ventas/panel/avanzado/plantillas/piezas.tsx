@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { User, ShoppingBag } from 'lucide-react'
-import type { Producto, Slide, Tema } from './tipos'
+import type { AccionesHome, Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 //
@@ -13,6 +13,10 @@ export const CSS = `
 
 .pl-card { transition: transform .38s cubic-bezier(.2,.7,.3,1), box-shadow .38s; }
 .pl-card:hover { transform: translateY(-7px); }
+/* Solo con la tienda real detrás: ahí la tarjeta lleva a la ficha del
+   producto. En la vitrina del panel no hay a dónde ir y el cursor de mano
+   prometería un click que no hace nada. */
+.pl-card[data-link="1"] { cursor: pointer; }
 .pl-media { position: relative; overflow: hidden; }
 .pl-media img { transition: transform .8s cubic-bezier(.2,.7,.3,1), opacity .55s; }
 .pl-card:hover .pl-media .pl-a { transform: scale(1.06); }
@@ -139,16 +143,22 @@ export function Estrellas({ n = 5, resenas, color }: { n?: number; resenas?: num
   )
 }
 
-export function Card({ p, t, sangre, alto = 300 }: { p: Producto; t: Tema; sangre?: boolean; alto?: number }) {
+// `onClick` solo lo pasa la tienda real: lleva a la ficha del producto, donde
+// vive el carrito de verdad (picker de variante, stock, comprar ahora). La
+// tarjeta conserva el diseño de SU plantilla — que es justamente lo que la
+// distingue — en vez de ser reemplazada por la tarjeta genérica de Órbita.
+export function Card({ p, t, sangre, alto = 300, onClick }: { p: Producto; t: Tema; sangre?: boolean; alto?: number; onClick?: () => void }) {
   return (
     <div
       className="pl-card"
+      onClick={onClick}
       style={{
         background: t.surf,
         border: sangre ? 'none' : `1px solid ${t.border}`,
         borderRight: sangre ? `1px solid ${t.border}` : undefined,
         borderRadius: sangre ? 0 : t.radio,
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        cursor: onClick ? 'pointer' : undefined,
       }}
     >
       <div style={{ position: 'relative' }}>
@@ -250,7 +260,12 @@ export function Marquee({ t, texto }: { t: Tema; texto: string }) {
 // header real no tiene uno — vive adentro del menú de cuenta, junto con "Mi
 // perfil" y "Mis direcciones" (regla 3 de la skill) — la maqueta no puede
 // prometer un ícono que la tienda real no tiene.
-export function AccionesTienda({ t, movil, items = 2 }: { t: Tema; movil?: boolean; items?: number }) {
+export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; movil?: boolean; items?: number; acciones?: AccionesHome }) {
+  // Con la tienda real detrás, este hueco lo llena la cuenta y el carrito de
+  // verdad (sesión, contador vivo, drawer) — ver `renderAcciones` en
+  // tipos.ts. La maqueta de abajo queda solo para la vitrina del panel.
+  if (acciones?.renderAcciones) return <>{acciones.renderAcciones({ movil })}</>
+
   const redondeo = t.radio === 0 ? 4 : 999
   const globo = (
     <span style={{
@@ -288,13 +303,22 @@ export function AccionesTienda({ t, movil, items = 2 }: { t: Tema; movil?: boole
   )
 }
 
-export function HeaderCentrado({ t, marca, links, conBuscador, movil }: { t: Tema; marca: string; links: string[]; conBuscador?: boolean; movil?: boolean }) {
+// Los enlaces del nav de una maqueta son strings sueltos; con la tienda real
+// detrás son los enlaces de Apariencia, que navegan. `navDe` deja a los
+// headers escribir un solo `.map` para los dos casos.
+export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+  if (acciones?.nav && acciones.nav.length > 0) return acciones.nav
+  return links.map((label) => ({ label }))
+}
+
+export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }: { t: Tema; marca: string; links: string[]; conBuscador?: boolean; movil?: boolean; acciones?: AccionesHome }) {
+  const nav = navDe(links, acciones)
   if (movil) {
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18 }}>☰</span>
         <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, color: t.text }}>{marca}</span>
-        <AccionesTienda t={t} movil />
+        <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
   }
@@ -302,38 +326,55 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil }: { t: Tem
     <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '16px 28px 12px', gap: 20 }}>
         {conBuscador ? (
-          <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio === 0 ? 6 : 999, padding: '8px 14px', fontSize: 12.5, color: t.muted, maxWidth: 230, display: 'flex', justifyContent: 'space-between' }}>
-            <span>¿Qué estás buscando?</span><span>⌕</span>
-          </div>
+          acciones?.renderBuscador
+            ? <span style={{ justifySelf: 'start' }}>{acciones.renderBuscador({})}</span>
+            : (
+              <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio === 0 ? 6 : 999, padding: '8px 14px', fontSize: 12.5, color: t.muted, maxWidth: 230, display: 'flex', justifyContent: 'space-between' }}>
+                <span>¿Qué estás buscando?</span><span>⌕</span>
+              </div>
+            )
         ) : <span />}
         <span style={{ fontFamily: t.fh, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{marca}</span>
-        <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} /></span>
+        <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} acciones={acciones} /></span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 28px 14px', fontSize: 13.5, color: t.text }}>
-        {links.map((l) => <span key={l}>{l}</span>)}
+        {nav.map((l) => (
+          <span
+            key={l.label}
+            onClick={l.onClick}
+            style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : undefined }}
+          >{l.label}</span>
+        ))}
       </div>
     </div>
   )
 }
 
-export function HeaderLateral({ t, marca, links, conBuscador, movil }: { t: Tema; marca: string; links: string[]; conBuscador?: boolean; movil?: boolean }) {
+export function HeaderLateral({ t, marca, links, conBuscador, movil, acciones }: { t: Tema; marca: string; links: string[]; conBuscador?: boolean; movil?: boolean; acciones?: AccionesHome }) {
+  const nav = navDe(links, acciones)
   if (movil) {
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18 }}>☰</span>
         <span style={{ fontFamily: t.fh, fontSize: 18, fontWeight: 800, color: t.text }}>{marca}</span>
-        <AccionesTienda t={t} movil />
+        <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
   }
   return (
     <div style={{ padding: '16px 32px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 28, background: t.surf }}>
       <span style={{ fontFamily: t.fh, fontSize: 21, fontWeight: 800, color: t.text, letterSpacing: '-0.015em' }}>{marca}</span>
-      <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted }}>{links.map((l) => <span key={l}>{l}</span>)}</div>
+      <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted }}>
+        {nav.map((l) => (
+          <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, color: l.activo ? t.text : undefined }}>{l.label}</span>
+        ))}
+      </div>
       {conBuscador && (
-        <div style={{ marginLeft: 'auto', minWidth: 240, border: `1px solid ${t.border}`, borderRadius: t.radio === 0 ? 6 : 999, padding: '8px 14px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar productos…</div>
+        acciones?.renderBuscador
+          ? <span style={{ marginLeft: 'auto' }}>{acciones.renderBuscador({})}</span>
+          : <div style={{ marginLeft: 'auto', minWidth: 240, border: `1px solid ${t.border}`, borderRadius: t.radio === 0 ? 6 : 999, padding: '8px 14px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar productos…</div>
       )}
-      <span style={{ marginLeft: conBuscador ? 18 : 'auto' }}><AccionesTienda t={t} /></span>
+      <span style={{ marginLeft: conBuscador ? 18 : 'auto' }}><AccionesTienda t={t} acciones={acciones} /></span>
     </div>
   )
 }

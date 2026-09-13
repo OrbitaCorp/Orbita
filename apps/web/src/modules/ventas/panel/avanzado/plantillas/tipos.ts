@@ -92,6 +92,24 @@ export interface Plantilla {
   // para no dibujar dos heros superpuestos. Ver Escaparate: dos campañas
   // partidas, no hay carrusel real que sepa dibujar eso todavía.
   heroPropio?: boolean
+  // Esta plantilla dibuja SU PROPIO header, en TODA la tienda (no solo el
+  // home) — `StorefrontChrome` la llama con `soloHeader` en vez de dibujar
+  // `StorefrontHeader`.
+  //
+  // Por qué se invirtió: `StorefrontHeader` solo sabe dos formas (la de
+  // siempre y la centrada de Vidriera) más el pintado de Escaparate, y las
+  // dieciséis maquetas tienen ocho headers distintos —el ☰ de Mosaico, el
+  // dorado centrado de Premium, la barra de departamentos de Corralón, el
+  // panel lateral de Circuito—. Sumar una forma por plantilla adentro del
+  // header real era reescribir dieciséis veces el mismo drawer de carrito.
+  // Al revés sale gratis y además queda idéntico POR CONSTRUCCIÓN: el
+  // header que se ve en la tienda es literalmente el mismo JSX que el de la
+  // vitrina, con los comportamientos reales enchufados por `AccionesHome`
+  // (cuenta, carrito, buscador y navegación).
+  headerPropio?: boolean
+  // Ídem para el pie: la plantilla dibuja el suyo (`Pie` de piezas.tsx) con
+  // los enlaces reales adentro, en vez del `StorefrontFooter` de siempre.
+  piePropio?: boolean
   // Tope de slides que el hero de esta plantilla realmente usa (ver
   // `heroPropio` arriba) — Escaparate solo dibuja los dos primeros
   // (`p.slides.slice(0, 2)` en homes.tsx), así que el editor de Apariencia
@@ -161,6 +179,27 @@ export interface AccionesHome {
   // para otra cosa — que es justo lo que se veía: la plantilla ponía la
   // grilla a sangre y adentro seguían las cards redondeadas de siempre.
   renderProducto?: (p: Producto, i: number, opts: { sangre?: boolean; alto: number }) => ReactNode
+
+  // ── Las piezas del "chrome", reales ────────────────────────────────────
+  //
+  // El header de cada plantilla ya está dibujado en su bloque de homes.tsx y
+  // es idéntico al de la vitrina. Lo único que le falta para servir en la
+  // tienda real es que sus tres piezas interactivas dejen de ser dibujitos:
+  // la cuenta, el carrito y el buscador. En vez de reescribir dieciséis
+  // headers, la tienda real pasa acá QUÉ dibujar adentro de cada hueco y la
+  // maqueta decide DÓNDE va, con el tema de la plantilla.
+  //
+  // Sin estas funciones (el panel), cada pieza cae a su versión de muestra
+  // de siempre — la vitrina sigue andando exactamente igual.
+
+  /** Cuenta + carrito reales (con contador y drawer). Reemplaza a `AccionesTienda`. */
+  renderAcciones?: (opts: { movil?: boolean }) => ReactNode
+  /** El buscador real. `compacto` = el ícono solo, sin la caja de texto. */
+  renderBuscador?: (opts: { compacto?: boolean }) => ReactNode
+  /** Los enlaces de navegación reales del header (Apariencia → Header). */
+  nav?: { label: string; onClick: () => void; activo?: boolean }[]
+  /** El pie real de la tienda, para las plantillas que no dibujan uno propio. */
+  renderPie?: () => ReactNode
 }
 
 export const sans = (n: string) => `"${n}", system-ui, -apple-system, sans-serif`

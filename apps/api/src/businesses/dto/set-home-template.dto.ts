@@ -1,11 +1,31 @@
 import { IsIn, IsOptional, ValidateIf } from 'class-validator';
 
-// Whitelist de plantillas realmente enganchadas al storefront — hoy Vidriera
-// y Escaparate. El catálogo completo de 16 vive en
-// apps/web/.../plantillas/datos.tsx (ver PLANTILLAS_ENGANCHADAS ahí, el
-// mismo Set del lado del panel) pero el resto sigue siendo vitrina, sin
-// lógica real detrás; no aceptar acá esos ids todavía.
-export const HOME_TEMPLATES_DISPONIBLES = ['vidriera', 'escaparate'] as const;
+// Whitelist de plantillas enganchadas al storefront: hoy son las dieciséis.
+//
+// Vidriera y Escaparate van con `soloCuerpo` (la tienda real pone header,
+// hero y pie); las otras catorce declaran headerPropio/heroPropio/piePropio y
+// se dibujan enteras con las acciones reales adentro. El catálogo con sus
+// definiciones vive en apps/web/.../plantillas/datos.tsx — si se da de baja
+// una, sacarla también de acá o el panel podría guardar un id que el
+// storefront no sabe dibujar.
+export const HOME_TEMPLATES_DISPONIBLES = [
+  'vidriera',
+  'escaparate',
+  'mosaico',
+  'premium',
+  'nocturno',
+  'glow',
+  'papeleria',
+  'corralon',
+  'atleta',
+  'patitas',
+  'bodega',
+  'crecer',
+  'circuito',
+  'vera',
+  'cobijo',
+  'nitida',
+] as const;
 
 export class SetHomeTemplateDto {
   @ValidateIf((o) => o.template !== null)
