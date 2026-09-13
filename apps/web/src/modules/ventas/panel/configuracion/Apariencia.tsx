@@ -166,6 +166,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // tipos.ts) — undefined = sin tope. Sin sentido fuera de soloContenido,
     // que es donde homeTemplate representa una plantilla realmente puesta.
     const heroMax = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate)?.heroMaxSlides : undefined
+    // Escaparate (heroPropio): sus "campañas" son posiciones FIJAS del hero
+    // (izquierda/derecha), no un carrusel que rota — a diferencia de Vidriera
+    // (heroGrande), que sí usa el HeroCarousel genérico con N slides. Sirve
+    // para no llamarlo "slider"/"carrusel" en la UI de una plantilla cuyo
+    // diseño no contempla eso (pedido explícito, con capturas de la maqueta
+    // original: dos imágenes fijas, nunca rotando).
+    const heroNoRotativo = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.heroPropio
     // Escaparate (o cualquier plantilla que declare headerBold): el toggle
     // de "ícono de marca" solo tiene sentido ahí — las demás siempre
     // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
@@ -397,6 +404,15 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // vive la identidad de marca (logo/favicon/nombre), editando una
     // plantilla activa esos tres campos los define la plantilla y no se
     // muestran, así que la tarjeta queda con los sliders nomás.
+    // Con un tope (Escaparate, heroMax=2): recortar a los primeros `heroMax`
+    // ítems — sin esto, un negocio que ya tenía 3+ slides cargados de antes
+    // (home clásico, u otra plantilla) los seguía viendo y pudiendo editar
+    // acá aunque el home real nunca dibuje el sobrante (ver homes.tsx, bloque
+    // 'escaparate': `p.slides.slice(0, 2)`) — confuso, y contradice el pedido
+    // explícito de que esta plantilla "permita solamente agregar/editar dos
+    // imágenes". Los datos de más no se borran (siguen ahí por si se vuelve
+    // a un home sin tope), solo se dejan de listar mientras el tope aplica.
+    const slidersVisibles = heroMax ? ap.sliders.slice(0, heroMax) : ap.sliders
     const heroCard = (
         <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
             {!soloContenido && (<>
@@ -409,44 +425,53 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 <div><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
                 <Divider />
             </>)}
-            <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
-            {/* Escaparate (y cualquier plantilla con heroPropio + un tope)
-                solo dibuja los primeros `heroMaxSlides` — sin este tope,
-                Apariencia dejaba cargar un tercer slide que se guardaba pero
-                nunca se veía en el home (ver homes.tsx, bloque 'escaparate'). */}
-            {heroMax && (
+            {/* Escaparate (heroPropio, sin rotación — ver heroNoRotativo más
+                arriba) muestra sus dos imágenes como posiciones fijas
+                (izquierda/derecha), nunca como un carrusel: el diseño de esa
+                maqueta no contempla slides rotando, así que ni el título ni
+                la ayuda pueden hablar de "sliders"/"carrusel" (pedido
+                explícito, con capturas de la maqueta original). */}
+            <FieldLabel help={heroNoRotativo
+                ? 'Las dos imágenes del hero de esta plantilla. No rotan: quedan fijas, una a cada lado.'
+                : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}>
+                {heroNoRotativo ? 'Imágenes del hero' : 'Sliders del hero'}
+            </FieldLabel>
+            {heroMax && !heroNoRotativo && (
                 <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>
                     Esta plantilla usa como máximo {heroMax} slide{heroMax === 1 ? '' : 's'} —
                     solo {heroMax === 1 ? 'el primero se ve' : `los primeros ${heroMax} se ven`} en el home.
                 </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
-                {ap.sliders.map((s, i) => (
+                {slidersVisibles.map((s, i) => (
                     <SlideItem
                         key={s.id}
                         slide={s}
                         index={i}
                         defaultOpen={i === 0}
                         soloTexto={soloContenido}
+                        etiqueta={heroNoRotativo ? 'Imagen' : 'Slide'}
                         onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                         onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
-                        // El orden del carrusel del hero ES el orden de este array — mover
-                        // un slide es solo intercambiarlo con su vecino. Sin drag-and-drop
-                        // (no hay ninguna librería de DnD en el proyecto todavía): dos
-                        // flechas alcanzan y no suman una dependencia nueva para esto.
+                        // El orden ES la posición (izquierda/derecha en
+                        // Escaparate, o el orden del carrusel en el resto) —
+                        // mover es solo intercambiar con el vecino. Sin
+                        // drag-and-drop (no hay ninguna librería de DnD en el
+                        // proyecto todavía): dos flechas alcanzan y no suman
+                        // una dependencia nueva para esto.
                         canMoveUp={i > 0}
-                        canMoveDown={i < ap.sliders.length - 1}
+                        canMoveDown={i < slidersVisibles.length - 1}
                         onMoveUp={() => set('sliders', moverElemento(ap.sliders, i, i - 1))}
                         onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
                     />
                 ))}
-                {(!heroMax || ap.sliders.length < heroMax) && (
+                {(!heroMax || slidersVisibles.length < heroMax) && (
                     <button
                         onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
                         className="ds-hover"
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                     >
-                        <Plus size={14} strokeWidth={2} /> Agregar slide
+                        <Plus size={14} strokeWidth={2} /> {heroNoRotativo ? 'Agregar imagen' : 'Agregar slide'}
                     </button>
                 )}
             </div>
@@ -1162,7 +1187,7 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto }: {
+function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto, etiqueta = 'Slide' }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
     canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
@@ -1172,6 +1197,11 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
     // dueño — mostrarlos acá invitaría a romper el diseño que la plantilla
     // ya definió. Solo imagen + texto quedan editables.
     soloTexto?: boolean
+    // "Imagen" en vez de "Slide" para una plantilla sin rotación (Escaparate,
+    // ver heroNoRotativo en Apariencia.tsx) — son dos posiciones fijas, no
+    // slides de un carrusel, y llamarlas "slide" ahí sugiere algo que el
+    // diseño de esa plantilla no tiene.
+    etiqueta?: string
 }) {
     const [open, setOpen] = useState(!!defaultOpen)
     const [removeBg, setRemoveBg] = useState(false)
@@ -1182,7 +1212,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
             {/* Header colapsable */}
             <div className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
                 <span style={{ width: 40, height: 28, borderRadius: 6, background: SLIDE_GRADS[index % SLIDE_GRADS.length], flexShrink: 0, ...(slide.img ? { backgroundImage: `url(${slide.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }} />
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Slide {index + 1}: {slide.titulo || 'Sin título'}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{etiqueta} {index + 1}: {slide.titulo || 'Sin título'}</span>
                 {/* Orden — mismas flechas que ordenan la lista, sin drag and
                     drop (no hay ninguna librería de DnD en el proyecto). */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
@@ -1200,7 +1230,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                     </button>
                 </div>
                 <ChevronDown size={14} style={{ color: 'var(--color-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms', flexShrink: 0 }} />
-                <button onClick={e => { e.stopPropagation(); onRemove() }} title="Eliminar slide"
+                <button onClick={e => { e.stopPropagation(); onRemove() }} title={`Eliminar ${etiqueta.toLowerCase()}`}
                     style={{ width: 22, height: 22, borderRadius: 5, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'color 150ms, background 150ms' }}
                     onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
                     onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}>
@@ -1210,7 +1240,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
             {/* Contenido */}
             {open && (
                 <div style={{ padding: '14px' }}>
-                    <FieldLabel help="Imagen de fondo del slide (1440×600px recomendado)">Imagen del slide</FieldLabel>
+                    <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
                     <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
                     <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-body)', borderRadius: 6, cursor: 'pointer' }}>
                         <input type="checkbox" checked={removeBg} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
