@@ -651,6 +651,51 @@ es el cursor. La clase compartida es `.pl-nav`, y va por **opacidad +
 subrayado, no por color** — así sirve igual en las paletas claras y en las
 oscuras sin pedirle a cada plantilla un tono de hover que hoy no define.
 
+### 10. "Rellenar con lo primero que haya" tampoco es contenido real
+
+Al enganchar una plantilla, la tentación es que ninguna sección quede vacía. El
+atajo de siempre: tomar las primeras N categorías o los primeros N productos.
+Pasó en Nocturno con "Armá tu setup" —los tres pasos eran
+`p.categorias.slice(0, 3)`— y **no significa nada**: qué va en un recorrido de
+tres pasos es una decisión del dueño, no el orden en que tenga cargadas las
+categorías.
+
+**Regla: `slice(0, n)` sirve para una FILA, no para una SELECCIÓN.**
+
+- *Fila* ("Más vendidos", "Destacados"): mostrar los primeros N está bien, el
+  criterio es la fila misma.
+- *Selección* (tres pasos, un antes/después, una pieza del mes, un combo): lo
+  elige el dueño. Si no eligió, la sección **no se dibuja**.
+
+Para eso existe el tipo de campo `seleccion` (`TipoCampo` en tipos.ts): guarda
+`cat:<slug>` o `prod:<id>` —con prefijo, igual que los `headerLinks`, para que
+una categoría y un producto no choquen nunca— y el panel dibuja un desplegable
+con el catálogo real agrupado. Lo resuelve `elegido()` en `homes.tsx`, contra
+`p.categorias` y `p.catalogo`. Si lo elegido se borró después, devuelve `null`
+y la tarjeta se saltea en vez de romperse.
+
+### 11. Una sección que el dueño tiene que llenar a mano no es una función
+
+La comparativa de Nocturno ("¿Cuál te conviene más?") era una tabla de tres
+modelos con sus specs y sus precios, inventada. Al sacarle los datos falsos
+quedó como cinco campos de texto libre con formato `etiqueta | col1 | col2 |
+col3`. Se sacó entera.
+
+**Regla: si al quitarle lo inventado una sección queda en "escribí vos una
+tabla de 5×4", la sección no va.** Órbita no tiene con qué llenarla, y pedirle
+eso al dueño para que se vea algo no es una función: es un formulario. Antes de
+pelear por conservar una sección, preguntarse qué dato REAL la llena.
+
+### 12. Un número es una afirmación cuando su etiqueta lo vuelve una
+
+El barrido del punto 8 marcó 46 campos pero se salteó dos: los números `12` y
+`12` de Nocturno. Vistos solos parecen inocuos —es un número— pero sus
+etiquetas decían "meses de garantía" y "cuotas sin interés".
+
+**Regla: en un par valor+etiqueta, mirar los DOS juntos antes de decidir.** Y
+marcar el par completo: si solo se marca el valor, la etiqueta queda huérfana
+y se dibuja sola.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -692,6 +737,10 @@ oscuras sin pedirle a cada plantilla un tono de hover que hoy no define.
 | Una hamburguesa que no abría nada | Se dibujó el `☰` como parte del diseño del header, sin menú detrás | `MenuMovil` de piezas.tsx; y si no lleva a ningún lado en esa vista, se saca |
 | Sin navegación en celular | El nav va con `!movil` en casi todas y no había reemplazo | El navbar tiene que funcionar en las dos pantallas — es parte del checklist |
 | Enlaces del nav sin hover | Los estilos van inline y el hover necesita una clase | `.pl-nav`, por opacidad y subrayado (no por color: tiene que servir en paletas claras y oscuras) |
+
+| "Armá tu setup" con las tres primeras categorías | Al enganchar, se rellenó la sección con `slice(0, 3)` para que no quedara vacía | `slice` sirve para una fila, no para una selección: campo `seleccion` y, sin elegir, la sección no se dibuja |
+| Una sección que pedía escribir una tabla de 5×4 a mano | Se le quitó el contenido inventado pero se quiso conservar la sección igual | Si lo que queda es un formulario, la sección no va — preguntarse qué dato REAL la llena |
+| Dos afirmaciones que el barrido no marcó | El valor era `12`, que parece un número inocente; la promesa estaba en la etiqueta | En un par valor+etiqueta, mirar los dos juntos y marcar el par completo |
 
 ## Convenciones del repo
 
