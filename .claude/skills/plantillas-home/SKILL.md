@@ -623,6 +623,33 @@ vez de dejar medio fondo con un botón suelto.
 **La prueba rápida:** leé el texto en voz alta poniéndole adelante "esta tienda
 garantiza que…". Si suena a algo que Órbita no puede saber, es una afirmación.
 
+### 9. Un control decorativo es peor que no tenerlo
+
+El `☰` de Mosaico, Premium, Bodega y `HeaderCentrado` era un glifo dibujado.
+En escritorio **sobraba** —los enlaces ya están a la vista— y en celular era
+**peor**: el nav se esconde con `!movil`, así que era el único control que
+prometía navegación y no hacía nada. Una tienda sin forma de llegar al catálogo
+desde el teléfono.
+
+**Regla: el navbar tiene que funcionar en las dos pantallas.** Si el nav se
+esconde en celular, hay que poner `MenuMovil` (piezas.tsx) — panel lateral con
+los mismos `acciones.nav`, pintado con el tema de la plantilla. Y si un control
+no lleva a ningún lado en esa vista, se saca: no se deja "de adorno".
+
+Dos detalles al usarlo:
+
+- **En la vitrina del panel se queda como el glifo.** Un panel con
+  `position: fixed` se escaparía del marco del celular dibujado y taparía el
+  panel entero. `MenuMovil` lo resuelve solo mirando `acciones`.
+- **Dónde ubicarlo lo dice el header.** En las filas inline va donde estaba el
+  nav; en los headers centrados (Crecer, Glow) va absoluto a la izquierda,
+  espejando las acciones que ya están absolutas a la derecha.
+
+Y los enlaces necesitan **hover**: sin él la única señal de que son clickeables
+es el cursor. La clase compartida es `.pl-nav`, y va por **opacidad +
+subrayado, no por color** — así sirve igual en las paletas claras y en las
+oscuras sin pedirle a cada plantilla un tono de hover que hoy no define.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -660,6 +687,10 @@ garantiza que…". Si suena a algo que Órbita no puede saber, es una afirmació
 | "Estilo de header" de Apariencia sin efecto con plantilla activa | `navCentrada`/`sinNav` se forzaban a false cuando había `homeTemplate` | El ajuste vale siempre; solo `centrado` lo puede pisar una plantilla que lo declare |
 | −40% / −25% / −30% sobre categorías de una tienda sin descuentos | El `porDefecto` de la maqueta se usa igual en la vitrina y en la tienda real | Marcar el campo con `afirmacion: true`: `txt()` deja de caer al ejemplo cuando hay `acciones` |
 | Una franja de color vacía arriba de todo | Al vaciarse el cintillo el `<div>` contenedor seguía dibujándose | Toda afirmación necesita su guarda: sin texto, la sección entera no va |
+
+| Una hamburguesa que no abría nada | Se dibujó el `☰` como parte del diseño del header, sin menú detrás | `MenuMovil` de piezas.tsx; y si no lleva a ningún lado en esa vista, se saca |
+| Sin navegación en celular | El nav va con `!movil` en casi todas y no había reemplazo | El navbar tiene que funcionar en las dos pantallas — es parte del checklist |
+| Enlaces del nav sin hover | Los estilos van inline y el hover necesita una clase | `.pl-nav`, por opacidad y subrayado (no por color: tiene que servir en paletas claras y oscuras) |
 
 ## Convenciones del repo
 
