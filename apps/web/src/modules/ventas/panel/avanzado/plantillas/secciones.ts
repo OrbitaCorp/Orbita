@@ -378,8 +378,13 @@ const NOCTURNO: SeccionPlantilla[] = [
   {
     id: 'hero',
     nombre: 'Hero',
-    nota: 'Las fotos y los textos salen de "Hero". Acá van el segundo botón y las tres specs de abajo.',
+    nota: 'Las fotos y los textos salen de "Hero". Acá van la etiqueta de arriba del título, el segundo botón y las tres specs.',
     campos: [
+      {
+        id: 'etiqueta', label: 'Etiqueta', tipo: 'texto', max: 22, afirmacion: true,
+        help: 'La pastilla chica arriba del título, en todos los slides. Vacía, no se dibuja.',
+        porDefecto: 'Lanzamiento',
+      },
       { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, porDefecto: 'Consultar', help: 'Abre el WhatsApp de la tienda.' },
       { id: 's1v', label: 'Spec 1 — valor', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '50 mm' },
       { id: 's1l', label: 'Spec 1 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'driver' },

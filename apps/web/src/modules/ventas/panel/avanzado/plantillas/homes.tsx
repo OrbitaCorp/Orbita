@@ -325,7 +325,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div className="pl-tile" style={{ gridRow: movil ? undefined : 'span 2', gridColumn: movil ? 'span 2' : undefined, position: 'relative', borderRadius: t.radio, boxShadow: t.sombra }}>
             <Foto src={s.img} alto={movil ? 250 : 480} radio={t.radio} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(115deg, rgba(4,47,46,0.86), transparent 72%)', padding: movil ? 22 : 38, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', borderRadius: t.radio }}>
-              <div style={{ fontSize: 11.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>{s.kicker}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 28 : 46, lineHeight: 1.04, margin: '12px 0 10px', color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.03em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.9)', margin: '0 0 20px', maxWidth: 380 }}>{s.bajada}</p>
               <div><Boton t={t} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton></div>
@@ -691,7 +691,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           }}>
             <div style={{ maxWidth: 460 }}>
               <div style={{ width: 46, height: 1, background: t.primary, marginBottom: 18 }} />
-              <div style={{ fontSize: 10.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, marginBottom: 18 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ fontSize: 10.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, marginBottom: 18 }}>{s.kicker}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 44 : 78, lineHeight: 0.98, margin: 0, whiteSpace: 'pre-line', fontWeight: 400, letterSpacing: '-0.015em', color: '#F7F2E8' }}>{s.titulo}</h1>
               <p style={{ fontSize: movil ? 14 : 15, color: 'rgba(247,242,232,0.7)', margin: '22px 0 30px', lineHeight: 1.85 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -836,6 +836,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // con cantidad, carrusel con specs y armador de setup.
   if (p.layout === 'nocturno') {
     const s = p.slides[iActual]
+    // La etiqueta de arriba del título. El slide de la maqueta trae `kicker`;
+    // el real no (Apariencia no tiene ese campo), así que cae a la sección
+    // `hero`, que el dueño sí edita.
+    const etiquetaHero = s?.kicker || txt('hero', 'etiqueta')
     // La comparativa: cinco filas de texto libre, cada una "etiqueta | col1 |
     // col2 | col3". Antes era una tabla entera inventada (V-70 / V-90 Pro /
     // V-90 Studio con sus drivers y precios). Una fila vacía no se dibuja, y
@@ -889,7 +893,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ position: 'relative', overflow: 'hidden', background: `radial-gradient(1100px 500px at 72% 46%, rgba(34,211,238,0.20), transparent 62%), ${t.bg}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1.05fr', gap: movil ? 0 : 40, padding: movil ? '30px 18px' : '62px 40px', alignItems: 'center' }}>
             <div>
-              <div style={{ display: 'inline-block', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, border: `1px solid ${t.primary}`, borderRadius: 999, padding: '5px 13px', marginBottom: 18 }}>{s.kicker}</div>
+              {/* La etiqueta de arriba del titulo. El slide real no trae `kicker`
+                  --Apariencia no tiene ese campo-- asi que sale de la seccion
+                  `hero`, editable desde el panel. Vacia, la pastilla no se
+                  dibuja: un borde redondeado con nada adentro se ve peor que
+                  no tenerlo. */}
+              {etiquetaHero && <div style={{ display: 'inline-block', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, border: `1px solid ${t.primary}`, borderRadius: 999, padding: '5px 13px', marginBottom: 18 }}>{etiquetaHero}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 62, lineHeight: 0.96, margin: 0, fontWeight: 800, letterSpacing: '-0.045em', whiteSpace: 'pre-line' }}>{s.titulo}</h1>
               <p style={{ fontSize: 15, color: t.muted, margin: '18px 0 26px', lineHeight: 1.7, maxWidth: 420 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
@@ -1113,7 +1122,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ background: t.soft, borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1.15fr 1fr', gap: movil ? 24 : 40, padding: movil ? '30px 20px' : '54px 40px', alignItems: 'center' }}>
             <div>
-              <div style={{ display: 'inline-block', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: t.primary, fontWeight: 800, background: t.surf, border: `1px solid ${t.border}`, borderRadius: 999, padding: '6px 14px', marginBottom: 18 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ display: 'inline-block', fontSize: 11.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: t.primary, fontWeight: 800, background: t.surf, border: `1px solid ${t.border}`, borderRadius: 999, padding: '6px 14px', marginBottom: 18 }}>{s.kicker}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.05, margin: 0, fontWeight: 800, letterSpacing: '-0.035em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 14.5, color: t.muted, margin: '14px 0 22px', lineHeight: 1.7, maxWidth: 420 }}>{s.bajada}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.surf, border: `2px solid ${t.primary}`, borderRadius: t.radio, padding: movil ? '10px 12px' : '13px 16px', boxShadow: t.sombra, maxWidth: 480 }}>
@@ -1265,7 +1274,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div className="pl-tile" style={{ position: 'relative', borderRadius: t.radio, overflow: 'hidden' }}>
             <Foto src={s.img} alto={movil ? 260 : 380} radio={t.radio} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(95deg, rgba(12,10,9,0.9), rgba(12,10,9,0.25) 72%)', padding: movil ? 22 : 38, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ alignSelf: 'flex-start', background: t.accent, color: t.primary, fontSize: 11, fontWeight: 900, padding: '5px 12px', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>{s.kicker}</span>
+              {s.kicker && <span style={{ alignSelf: 'flex-start', background: t.accent, color: t.primary, fontSize: 11, fontWeight: 900, padding: '5px 12px', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>{s.kicker}</span>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 30 : 46, lineHeight: 1.05, margin: 0, color: '#fff', whiteSpace: 'pre-line', fontWeight: 900, letterSpacing: '-0.035em', textTransform: 'uppercase' }}>{s.titulo}</h1>
               <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.86)', margin: '14px 0 20px', maxWidth: 360 }}>{s.bajada}</p>
               <div>
@@ -1432,7 +1441,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div className="pl-tile" style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 460 : 620} />
           <div style={{ position: 'absolute', inset: 0, background: movil ? 'linear-gradient(to top, rgba(10,10,10,0.95) 40%, rgba(10,10,10,0.4))' : 'linear-gradient(85deg, rgba(10,10,10,0.9) 30%, rgba(10,10,10,0.25) 70%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? '0 20px 34px' : '0 44px 56px' }}>
-            <div style={{ fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 600, marginBottom: 14 }}>{s.kicker}</div>
+            {s.kicker && <div style={{ fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 600, marginBottom: 14 }}>{s.kicker}</div>}
             <h1 style={{ fontFamily: t.fh, fontSize: movil ? 50 : 104, lineHeight: movil ? 1.02 : 0.9, margin: 0, whiteSpace: 'pre-line', fontWeight: 700, letterSpacing: '-0.01em', textTransform: 'uppercase', color: '#fff' }}>{s.titulo}</h1>
             <p style={{ fontSize: 14.5, color: 'rgba(250,250,250,0.72)', margin: '20px 0 26px', maxWidth: 420, lineHeight: 1.65 }}>{s.bajada}</p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1581,7 +1590,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ background: `linear-gradient(160deg, ${t.soft} 0%, ${t.bg} 60%)` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 22 : 36, padding: movil ? '28px 20px' : '52px 40px', alignItems: 'center' }}>
             <div style={{ order: movil ? 2 : 1 }}>
-              <div style={{ display: 'inline-block', background: t.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, padding: '6px 14px', borderRadius: 999, marginBottom: 16 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ display: 'inline-block', background: t.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, padding: '6px 14px', borderRadius: 999, marginBottom: 16 }}>{s.kicker}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.08, margin: 0, whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.03em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 15, color: t.muted, margin: '16px 0 24px', lineHeight: 1.7, maxWidth: 400 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1689,7 +1698,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch' }}>
           <div style={{ padding: movil ? '32px 22px' : '70px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'center', order: movil ? 2 : 1 }}>
             <div style={{ width: 44, height: 1, background: t.primary, marginBottom: 20 }} />
-            <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 18 }}>{s.kicker}</div>
+            {s.kicker && <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 18 }}>{s.kicker}</div>}
             <h1 style={{ fontFamily: t.fh, fontSize: movil ? 40 : 62, lineHeight: 1.02, margin: 0, whiteSpace: 'pre-line', fontWeight: 400, letterSpacing: '-0.015em' }}>{s.titulo}</h1>
             <p style={{ fontSize: 14.5, color: t.muted, margin: '24px 0 30px', lineHeight: 1.9, maxWidth: 400 }}>{s.bajada}</p>
             <span
@@ -1811,7 +1820,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ background: `linear-gradient(150deg, ${t.soft} 0%, ${t.bg} 55%)`, padding: movil ? '30px 20px' : '56px 44px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 24 : 40, alignItems: 'center' }}>
             <div style={{ order: movil ? 2 : 1 }}>
-              <div style={{ display: 'inline-block', background: t.accent, color: '#5C3A2C', fontSize: 11.5, fontWeight: 700, padding: '6px 15px', borderRadius: 999, marginBottom: 18 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ display: 'inline-block', background: t.accent, color: '#5C3A2C', fontSize: 11.5, fontWeight: 700, padding: '6px 15px', borderRadius: 999, marginBottom: 18 }}>{s.kicker}</div>}
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.1, margin: 0, whiteSpace: 'pre-line', fontWeight: 700, letterSpacing: '-0.02em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 15, color: t.muted, margin: '18px 0 26px', lineHeight: 1.8, maxWidth: 400 }}>{s.bajada}</p>
               <Boton t={t} grande onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
@@ -1950,7 +1959,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <div style={{ position: 'relative' }}>
               <Foto src={s.img} alto={movil ? 330 : 430} />
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? '0 20px 26px' : '0 44px 42px', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 12%, rgba(0,0,0,0.5) 52%, transparent 86%)' }}>
-                <div style={{ fontSize: movil ? 10.5 : 12, letterSpacing: '0.26em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 10 }}>{s.kicker}</div>
+                {s.kicker && <div style={{ fontSize: movil ? 10.5 : 12, letterSpacing: '0.26em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 10 }}>{s.kicker}</div>}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: movil ? 12 : 20, flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: t.fh, fontSize: movil ? 58 : 96, lineHeight: 0.86, fontWeight: 700, color: '#fff', letterSpacing: '-0.05em' }}>{s.titulo}</span>
                   <span style={{ fontSize: movil ? 15 : 21, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{s.bajada}</span>
@@ -2100,7 +2109,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', padding: movil ? 22 : 40, background: 'rgba(251,250,248,0.58)' }}>
             <div>
               <div style={{ width: 34, height: 1, background: t.primary, margin: '0 auto 16px' }} />
-              <div style={{ fontSize: movil ? 10 : 11.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ fontSize: movil ? 10 : 11.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
               <div style={{ fontFamily: t.fh, fontSize: movil ? 64 : 104, lineHeight: 1, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', margin: '14px 0 6px' }}>{s.titulo}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 24, color: t.text }}>{s.bajada}</div>
               <div style={{ marginTop: movil ? 20 : 28 }}>
@@ -2235,7 +2244,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <Foto src={s.img} alto={movil ? 340 : 470} />
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: movil ? '0 16px 20px' : '0 44px 40px' }}>
             <div style={{ background: t.surf, borderRadius: t.radio, padding: movil ? '20px 22px' : '30px 34px', maxWidth: movil ? '100%' : 430, boxShadow: t.sombra }}>
-              <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+              {s.kicker && <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
               <div style={{ fontFamily: t.fh, fontSize: movil ? 46 : 64, lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', margin: '10px 0 4px' }}>{s.titulo}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 22, color: t.muted, fontWeight: 500 }}>{s.bajada}</div>
               <div style={{ marginTop: 18 }}>
@@ -2363,7 +2372,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
           <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ fontSize: 11, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+            {s.kicker && <div style={{ fontSize: 11, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
             <div style={{ fontFamily: t.fh, fontSize: movil ? 56 : 88, lineHeight: 0.9, fontWeight: 800, letterSpacing: '-0.045em', margin: '14px 0 8px' }}>{s.titulo}</div>
             <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 26, color: t.muted, fontWeight: 600 }}>{s.bajada}</div>
             <div style={{ marginTop: 22, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -2512,7 +2521,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       <div style={{ background: `linear-gradient(120deg, ${t.soft} 0%, #FFFFFF 52%, ${t.soft} 100%)` }}>
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 0 : 30, padding: movil ? '30px 20px 0' : '54px 44px', alignItems: 'center' }}>
           <div style={{ order: movil ? 2 : 1, paddingBottom: movil ? 34 : 0 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 800, marginBottom: 14 }}>{s.kicker}</div>
+            {s.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 800, marginBottom: 14 }}>{s.kicker}</div>}
             <h1 style={{ fontFamily: t.fh, fontSize: movil ? 40 : 62, lineHeight: 1.0, margin: 0, whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.04em' }}>{s.titulo}</h1>
             <p style={{ fontSize: 15.5, color: t.muted, margin: '18px 0 26px', lineHeight: 1.75, maxWidth: 400 }}>{s.bajada}</p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
