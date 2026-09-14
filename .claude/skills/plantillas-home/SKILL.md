@@ -7,9 +7,8 @@ description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o
 
 Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las elige
 desde el panel: Avanzado → Plantillas de Home → Configurar. Hoy hay **dieciséis**,
-todas del módulo tienda; **Vidriera** y **Escaparate** son las únicas que además se
-pueden activar de verdad en un negocio (ver § Cómo se aplica una plantilla, más
-abajo).
+todas del módulo tienda, y **las dieciséis se pueden activar de verdad** en un
+negocio (ver § Cómo se aplica una plantilla, más abajo).
 
 ## Las cinco reglas que no se negocian
 
@@ -95,20 +94,22 @@ apps/web/src/components/storefront/
 `Avanzado.tsx` la engancha con `vista === 'plantillas'` (mismo patrón que
 `JuegosConfig`), sin ruta propia: el dueño nunca sale de la pantalla.
 
-## Cómo se aplica una plantilla a una tienda real (hoy: Vidriera y Escaparate)
+## Cómo se aplica una plantilla a una tienda real (las dieciséis)
 
-Esto NO es una vitrina que no aplica nada — dejó de serlo. Vidriera y
-Escaparate tienen el camino completo armado; las otras catorce todavía no.
-Antes de tocar nada de esta sección, ver primero § El plan: enganchar las que
-quedan.
+Esto NO es una vitrina que no aplica nada — dejó de serlo. **Las dieciséis
+tienen el camino completo armado.**
 
 **El interruptor.** `PlantillasConfig.tsx`:
 
 ```ts
-// Únicas plantillas con lógica real detrás (ver businesses.service.ts
-// setHomeTemplate) — el resto del catálogo de abajo sigue siendo vitrina.
-const PLANTILLAS_ENGANCHADAS = new Set(['vidriera', 'escaparate'])
+const PLANTILLAS_ENGANCHADAS = new Set(PLANTILLAS.map(x => x.id))
 ```
+
+El `Set` quedó porque el gateo sigue existiendo —si mañana se agrega una
+plantilla a medio hacer, se la saca de acá y no muestra el botón— pero hoy
+están todas. **Ojo:** el backend tiene su propia lista
+(`HOME_TEMPLATES_DISPONIBLES` en `set-home-template.dto.ts`); si no coinciden,
+el panel ofrece una plantilla que la API rechaza con 400.
 
 Solo si `p.id` está en ese `Set` aparece el botón "Usar esta plantilla". Activarla
 llama a `panelSetHomeTemplate(id)`, que guarda `homeTemplate` en

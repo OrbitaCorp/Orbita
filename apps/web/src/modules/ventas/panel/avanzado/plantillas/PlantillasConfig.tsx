@@ -1,12 +1,11 @@
 // src/modules/ventas/panel/avanzado/plantillas/PlantillasConfig.tsx —
 // "Plantillas de Home" (paquete Avanzado).
 //
-// Para la mayoría sigue siendo una VITRINA: se mira, no se aplica. Pero
-// Vidriera ya tiene lógica real detrás (ver PLANTILLAS_ENGANCHADAS acá abajo,
+// Ya NO es una vitrina: las dieciséis se pueden aplicar. Activar cualquiera
+// cambia la tienda real, con el catálogo de ese negocio (ver
+// PLANTILLAS_ENGANCHADAS acá abajo —hoy son todas—,
 // businesses.service.ts#setHomeTemplate y la skill plantillas-home § Cómo se
-// aplica una plantilla) — activarla cambia la tienda real, con el catálogo
-// de ese negocio. El resto sigue sin botón de "usar esta plantilla" hasta
-// que se haga el mismo trabajo de enganche, plantilla por plantilla.
+// aplica una plantilla).
 //
 // Tres cosas más que conviene tener claras:
 //
@@ -16,9 +15,9 @@
 //     plantilla (mismos filtros, mismo carrito, mismo "Mis pedidos" adentro
 //     del menú de cuenta, nunca un ícono aparte — ver AccionesTienda en
 //     piezas.tsx, que tiene que reflejar el header real, no inventar uno).
-//     Con una plantilla ENGANCHADA (hoy solo Vidriera) esas mismas páginas sí
-//     heredan su paleta y tipografía en todo el sitio — decisión aparte,
-//     explícita, ver StorefrontChrome.tsx — pero la estructura no se toca.
+//     Esas mismas páginas sí heredan la paleta y la tipografía de la
+//     plantilla en todo el sitio — decisión aparte, explícita, ver
+//     StorefrontChrome.tsx — pero la estructura no se toca.
 //
 //  2. Vive DENTRO de Avanzado, sin ruta propia — mismo patrón que
 //     JuegosConfig: `?vista=plantillas` y un "volver" que saca el query
