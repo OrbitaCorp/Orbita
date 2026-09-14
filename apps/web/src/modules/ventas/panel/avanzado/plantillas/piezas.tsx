@@ -40,6 +40,16 @@ export const CSS = `
 
 .pl-fila { transition: padding-left .28s cubic-bezier(.2,.7,.3,1); }
 .pl-fila:hover { padding-left: 12px; }
+
+/* Los enlaces del nav. No tenían ninguna señal de ser clickeables más que el
+   cursor. Va por opacidad y subrayado —no por color— para que sirva igual en
+   las paletas claras y en las oscuras, sin pedirle a cada plantilla un tono
+   de hover que hoy no define. */
+.pl-nav { transition: opacity .2s ease; }
+.pl-nav:hover { opacity: .58; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+
+.pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes plMenuIn { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 `
 
 // ─── Piezas ──────────────────────────────────────────────────────────────────
@@ -306,6 +316,72 @@ export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; mov
 // Los enlaces del nav de una maqueta son strings sueltos; con la tienda real
 // detrás son los enlaces de Apariencia, que navegan. `navDe` deja a los
 // headers escribir un solo `.map` para los dos casos.
+/**
+ * El menú de celular: la hamburguesa con un panel real detrás.
+ *
+ * Hasta acá el `☰` era un dibujo. En escritorio sobraba —los enlaces ya están
+ * a la vista— y en celular era peor: el nav se esconde con `!movil`, así que
+ * el cliente veía el único control que prometía navegación y no pasaba nada.
+ * Una tienda sin forma de llegar al catálogo desde el teléfono.
+ *
+ * En la vitrina del panel se queda como el glifo de siempre: un panel con
+ * `position: fixed` se escaparía del marco del celular dibujado y taparía el
+ * panel entero. `acciones` es lo que distingue los dos mundos.
+ */
+export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: string[]; acciones?: AccionesHome; color?: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const nav = navDe(links, acciones)
+  const glifo = <span style={{ fontSize: 18, lineHeight: 1, color: color ?? t.text }}>☰</span>
+
+  if (!acciones || nav.length === 0) return glifo
+
+  return (
+    <>
+      <button
+        type="button" onClick={() => setAbierto(true)} aria-label="Abrir menú"
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', fontFamily: 'inherit' }}
+      >{glifo}</button>
+      {abierto && (
+        <div
+          onClick={() => setAbierto(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 120 }}
+        >
+          <div
+            className="pl-menu-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(78vw, 300px)',
+              background: t.surf, color: t.text, fontFamily: t.fb,
+              borderRight: `1px solid ${t.border}`, padding: '18px 20px',
+              display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>Menú</span>
+              <button
+                type="button" onClick={() => setAbierto(false)} aria-label="Cerrar menú"
+                style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, color: t.muted, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+              >×</button>
+            </div>
+            {nav.map((l) => (
+              <button
+                key={l.label} type="button"
+                onClick={() => { setAbierto(false); l.onClick?.() }}
+                style={{
+                  background: 'none', border: 'none', borderBottom: `1px solid ${t.border}`,
+                  padding: '13px 0', textAlign: 'left', fontSize: 15, fontFamily: 'inherit',
+                  color: l.activo ? t.primary : t.text, fontWeight: l.activo ? 700 : 500,
+                  cursor: 'pointer',
+                }}
+              >{l.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
   // "Minimal" en Apariencia = header sin navegacion. Se resuelve aca y no en
   // cada bloque para que valga en las catorce de una: el que elige esto
@@ -320,8 +396,13 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
   if (movil) {
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 18 }}>☰</span>
-        <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, color: t.text }}>{marca}</span>
+        {/* Era un `☰` dibujado: el único control que prometía navegación en
+            celular, y no hacía nada. */}
+        <MenuMovil t={t} links={links} acciones={acciones} />
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
@@ -344,7 +425,7 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
       <div style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 28px 14px', fontSize: 13.5, color: t.text }}>
         {nav.map((l) => (
           <span
-            key={l.label}
+            key={l.label} className="pl-nav"
             onClick={l.onClick}
             style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : undefined }}
           >{l.label}</span>

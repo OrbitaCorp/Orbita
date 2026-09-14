@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import type { Plantilla, Producto, AccionesHome } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
-  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe,
+  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, MenuMovil,
 } from './piezas'
 import { esAfirmacion, porDefectoDe } from './secciones'
 
@@ -278,7 +278,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: movil ? '14px 16px' : '18px 28px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
-        <span style={{ fontSize: 19, lineHeight: 1 }}>☰</span>
+        {/* La hamburguesa solo en celular: en escritorio los enlaces ya están
+            a la vista al lado de la marca, y un control que promete un menú
+            que no existe sobra. */}
+        {movil && <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />}
         <span
           onClick={acciones?.irAInicio}
           style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 800, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
@@ -297,7 +300,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           return (
             <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted, ...(centrado ? { margin: '0 auto' } : {}) }}>
               {nav.map((l) => (
-                <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : 500, color: l.activo ? t.text : undefined }}>{l.label}</span>
+                <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : 500, color: l.activo ? t.text : undefined }}>{l.label}</span>
               ))}
             </div>
           )
@@ -646,7 +649,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             sitio, pintados en dorado. */}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '14px 16px' : '22px 44px', borderBottom: filete, gap: 14 }}>
           {movil
-            ? <span style={{ fontSize: 18, color: t.primary }}>☰</span>
+            ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} color={t.primary} />
             // Con la tienda real detrás el buscador busca de verdad; en la
             // vitrina del panel sigue siendo el dibujito decorativo de siempre.
             : acciones?.renderBuscador
@@ -659,7 +662,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             >{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 12, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted }}>
-                {navDe(p.links ?? ['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
+                {navDe(p.links ?? ['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
           </div>
@@ -864,7 +867,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             onClick={acciones?.irAInicio}
             style={{ fontFamily: t.fh, fontSize: movil ? 18 : 21, fontWeight: 800, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
           >{p.marca}</span>
-          {!movil && <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted }}>{navDe(p.links ?? ['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}</div>}
+          {movil
+            ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />
+            : <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted }}>{navDe(p.links ?? ['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}</div>}
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 12, alignItems: 'center', fontSize: 12.5, color: t.muted }}>
             {!movil && (acciones?.renderBuscador
               ? acciones.renderBuscador({})
@@ -1080,13 +1085,16 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 <span>⌕</span><span>Buscar por nombre, marca o código…</span>
               </div>
             ))}
-          <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 14 }}>
+            {movil && <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />}
+            <AccionesTienda t={t} movil={movil} acciones={acciones} />
+          </span>
         </div>
         {!movil && (
           <div style={{ display: 'flex', gap: 26, padding: '11px 32px', background: t.surf, borderBottom: `1px solid ${t.border}`, fontSize: 13, color: t.text }}>
             {navDe(p.links ?? ['Escolar', 'Oficina', 'Arte', 'Libros', 'Regalería', 'Ofertas'], acciones).map((l) => (
               <span
-                key={l.label} onClick={l.onClick}
+                key={l.label} className="pl-nav" onClick={l.onClick}
                 style={{ color: l.label === 'Ofertas' ? t.accent : t.text, fontWeight: l.label === 'Ofertas' ? 700 : 400, cursor: l.onClick ? 'pointer' : undefined }}
               >{l.label}</span>
             ))}
@@ -1238,7 +1246,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ background: t.primary, padding: movil ? '10px 12px' : '11px 30px', display: 'grid', gridTemplateColumns: cols(6, 3), gap: movil ? '7px 10px' : '8px 14px' }}>
           {navDe(deptos, acciones).map((d) => (
             <span
-              key={d.label} onClick={d.onClick}
+              key={d.label} className="pl-nav" onClick={d.onClick}
               style={{ fontSize: movil ? 10.5 : 12, fontWeight: 600, color: d.label === 'Ofertas' ? t.accent : '#E7E5E4', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: d.onClick ? 'pointer' : undefined }}
             >{d.label}</span>
           ))}
@@ -1399,11 +1407,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             onClick={acciones?.irAInicio}
             style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
           >{p.marca}</span>
-          {!movil && (
+          {movil ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} /> : (
             <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: t.fh }}>
               {navDe(p.links ?? ['Running', 'Fuerza', 'Ciclismo', 'Indumentaria', 'Outlet'], acciones).map((l) => (
                 <span
-                  key={l.label} onClick={l.onClick}
+                  key={l.label} className="pl-nav" onClick={l.onClick}
                   style={{ color: l.label === 'Outlet' ? t.accent : t.text, cursor: l.onClick ? 'pointer' : undefined }}
                 >{l.label}</span>
               ))}
@@ -1554,9 +1562,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <span style={{ width: 34, height: 34, borderRadius: '50%', background: t.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 17 }}>🐾</span>
             <span style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{p.marca}</span>
           </span>
-          {!movil && (
+          {movil ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} /> : (
             <div style={{ display: 'flex', gap: 22, fontSize: 13.5, fontWeight: 600, color: t.muted }}>
-              {navDe(p.links ?? ['Perros', 'Gatos', 'Alimento', 'Juguetes', 'Farmacia'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
+              {navDe(p.links ?? ['Perros', 'Gatos', 'Alimento', 'Juguetes', 'Farmacia'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}
           <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
@@ -1652,7 +1660,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         )}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '15px 16px' : '24px 44px', borderBottom: `1px solid ${t.border}`, gap: 14 }}>
           {movil
-            ? <span style={{ fontSize: 18, color: t.primary }}>☰</span>
+            ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} color={t.primary} />
             : acciones?.renderBuscador
               ? <span style={{ justifySelf: 'start' }}>{acciones.renderBuscador({})}</span>
               : <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.muted }}>⌕ Buscar etiqueta</span>}
@@ -1663,7 +1671,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             >{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.muted }}>
-                {navDe(p.links ?? ['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
+                {navDe(p.links ?? ['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
           </div>
@@ -1785,9 +1793,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           >{p.marca}</div>
           {!movil && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 12, fontSize: 13.5, color: t.muted, fontWeight: 600 }}>
-              {navDe(p.links ?? ['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
+              {navDe(p.links ?? ['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}
+          {movil && <span style={{ position: 'absolute', left: 16, top: 16 }}><MenuMovil t={t} links={p.links ?? []} acciones={acciones} /></span>}
           <span style={{ position: 'absolute', right: movil ? 16 : 34, top: movil ? 14 : 22 }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
       </>
@@ -1882,12 +1891,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // En celular el panel no puede quedar fijo al costado: pasa a ser una
     // barra común arriba, con el mismo contenido en una línea.
     const panel = movil ? (
-      <div style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <MenuMovil t={t} links={links} acciones={acciones} />
         <span
           onClick={acciones?.irAInicio}
           style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 700, color: t.text, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
         >{p.marca}</span>
-        <AccionesTienda t={t} movil acciones={acciones} />
+        <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil acciones={acciones} /></span>
       </div>
     ) : (
       <div style={{ width: 232, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.surf, padding: '30px 26px', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
@@ -1900,7 +1910,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           {navDe(links, acciones).map((l, i) => (
             <span
-              key={l.label} onClick={l.onClick}
+              key={l.label} className="pl-nav" onClick={l.onClick}
               style={{ fontSize: 13.5, color: i === 0 ? t.primary : t.text, fontWeight: i === 0 ? 700 : 500, cursor: l.onClick ? 'pointer' : undefined }}
             >{l.label}</span>
           ))}
@@ -2482,9 +2492,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         >{p.marca}</div>
         {!movil && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 13.5, color: t.text }}>
-            {navDe(p.links ?? ['Rostro', 'Maquillaje', 'Rutinas', 'Sets de regalo'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
+            {navDe(p.links ?? ['Rostro', 'Maquillaje', 'Rutinas', 'Sets de regalo'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
           </div>
         )}
+        {movil && <span style={{ position: 'absolute', left: 16, top: 16 }}><MenuMovil t={t} links={p.links ?? []} acciones={acciones} /></span>}
         <span style={{ position: 'absolute', right: movil ? 16 : 34, top: movil ? 16 : 22, display: 'inline-flex' }}>
           <AccionesTienda t={t} movil={movil} acciones={acciones} />
         </span>
