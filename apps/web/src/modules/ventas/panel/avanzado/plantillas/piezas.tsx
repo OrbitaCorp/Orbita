@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { User, ShoppingBag } from 'lucide-react'
-import type { AccionesHome, Producto, Slide, Tema } from './tipos'
+import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 //
@@ -470,29 +470,73 @@ export function Newsletter({ t, titulo, bajada, cta, movil }: { t: Tema; titulo:
   )
 }
 
-export function Pie({ t, marca, tagline, columnas, cierre, movil }: { t: Tema; marca: string; tagline: string; columnas: [string, string[]][]; cierre?: string; movil?: boolean }) {
+// El pie de las catorce plantillas con `piePropio`. El DISEÑO es el de la
+// plantilla (lo pone `t`: colores, tipografía, radio); el CONTENIDO, cuando la
+// tienda es real, lo arma `plantillaReal()` con los datos del negocio.
+//
+// Antes acá todo era de la maqueta: categorías inventadas, enlaces que eran
+// `<div>` sin href —no navegaban a ningún lado—, tres globitos "IG/FB/TK" que
+// no eran links, y un CUIT de ejemplo. Y encima le faltaban Términos,
+// Privacidad y el botón de Arrepentimiento, que el footer normal de Órbita sí
+// tiene porque son obligación legal.
+export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales, onDevolucion }: {
+  t: Tema; marca: string; tagline: string; columnas: [string, ItemPie[]][]
+  cierre?: string; movil?: boolean
+  redes?: { label: string; href: string }[]
+  legales?: { label: string; href: string }[]
+  onDevolucion?: () => void
+}) {
+  const badge = { width: 30, height: 30, borderRadius: t.radio === 0 ? 6 : '50%', border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', fontSize: 11, color: t.muted, fontWeight: 700 } as const
   return (
     <div style={{ borderTop: `1px solid ${t.border}`, background: t.surf }}>
       <div style={{ padding: movil ? '28px 18px' : '40px', display: 'grid', gridTemplateColumns: movil ? '1fr 1fr' : `1.4fr repeat(${columnas.length}, 1fr)`, gap: movil ? 22 : 34 }}>
         <div style={{ gridColumn: movil ? 'span 2' : undefined }}>
           <div style={{ fontFamily: t.fh, fontSize: 20, fontWeight: 800, color: t.text }}>{marca}</div>
           <div style={{ fontSize: 13, color: t.muted, marginTop: 6, lineHeight: 1.6, maxWidth: 260 }}>{tagline}</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            {['IG', 'FB', 'TK'].map((r) => (
-              <span key={r} style={{ width: 30, height: 30, borderRadius: t.radio === 0 ? 6 : '50%', border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', fontSize: 11, color: t.muted, fontWeight: 700 }}>{r}</span>
-            ))}
-          </div>
+          {/* Con `redes` (tienda real) son enlaces de verdad y solo se dibujan
+              las que el dueño cargó. Sin ellas es la maqueta del panel: los
+              tres globitos de siempre, decorativos. */}
+          {redes ? redes.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              {redes.map((r) => (
+                <a key={r.label} href={r.href} target="_blank" rel="noopener noreferrer" aria-label={r.label} style={{ ...badge, textDecoration: 'none' }}>{r.label.slice(0, 2).toUpperCase()}</a>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              {['IG', 'FB', 'TK'].map((r) => <span key={r} style={badge}>{r}</span>)}
+            </div>
+          )}
         </div>
         {columnas.map(([tit, items]) => (
           <div key={tit}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.09em', color: t.muted, fontWeight: 700, marginBottom: 13 }}>{tit}</div>
-            {items.map((i) => <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 9, lineHeight: 1.4 }}>{i}</div>)}
+            {items.map((i) => {
+              const est = { fontSize: 13, color: t.text, marginBottom: 9, lineHeight: 1.4, display: 'block' } as const
+              return typeof i === 'string'
+                ? <div key={i} style={est}>{i}</div>
+                : <a key={i.label} href={i.href} style={{ ...est, textDecoration: 'none' }}>{i.label}</a>
+            })}
           </div>
         ))}
       </div>
-      <div style={{ borderTop: `1px solid ${t.border}`, padding: '14px 40px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, fontSize: 12, color: t.muted }}>
+      <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '14px 18px' : '14px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 12, color: t.muted }}>
         <span>© 2026 {marca}{cierre ? ` · ${cierre}` : ''}</span>
-        <span>Hecho con Órbita</span>
+        {/* Términos, Privacidad y Arrepentimiento: no son decoración, son lo
+            que el footer normal muestra por obligación legal. Si la plantilla
+            dibuja SU pie, tiene que llevarlos igual. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          {(legales ?? []).map((l) => (
+            <a key={l.label} href={l.href} style={{ color: t.muted, textDecoration: 'none' }}>{l.label}</a>
+          ))}
+          {onDevolucion && (
+            <button
+              type="button" onClick={onDevolucion}
+              style={{ height: 30, padding: '0 13px', borderRadius: t.radio === 0 ? 0 : 999, background: 'transparent', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >Arrepentimiento / Devolución</button>
+          )}
+          <span>Hecho con Órbita</span>
+        </div>
       </div>
     </div>
   )

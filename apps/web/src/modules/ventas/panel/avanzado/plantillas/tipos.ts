@@ -215,8 +215,25 @@ export interface Plantilla {
   // tercer elemento con el slug para que el tile navegue a la categoría.
   categorias?: [string, string, string?][]
   cupon?: { titulo: string; bajada: string; codigo: string }
-  pie?: { columnas: [string, string[]][]; cierre: string }
+  // El pie. En la vitrina del panel los ítems son strings sueltos (texto
+  // muerto de la maqueta); en la tienda real `plantillaReal()` los reemplaza
+  // por `{ label, href }` y ahí sí navegan. `redes` y `legales` solo existen
+  // con datos reales: la maqueta no tiene Instagram ni Términos de nadie.
+  pie?: {
+    columnas: [string, ItemPie[]][]
+    cierre: string
+    redes?: { label: string; href: string }[]
+    legales?: { label: string; href: string }[]
+  }
+  // El toggle "Mostrar footer" de Apariencia. Las plantillas con `piePropio`
+  // lo ignoraban: el dueño lo apagaba y su pie seguía ahí, porque el que se
+  // chequeaba era el de `StorefrontFooter`, que en esas plantillas ni se
+  // dibuja. Solo lo pone `plantillaReal()`; en el panel siempre se ve.
+  ocultarPie?: boolean
 }
+
+// Un ítem de columna del pie: texto pelado (maqueta) o enlace real (tienda).
+export type ItemPie = string | { label: string; href: string }
 
 // ─── Acciones reales (solo storefront) ───────────────────────────────────────
 //
@@ -238,6 +255,11 @@ export interface AccionesHome {
    * producto, la marca del header es la única forma de volver al inicio.
    */
   irAInicio?: () => void
+  // Abre el modal de arrepentimiento/devolución (RBT-683). Lo dibuja el pie
+  // normal de Órbita por obligación legal, así que el pie de una plantilla
+  // tiene que poder abrirlo también. En el panel no existe: ahí el botón no
+  // se dibuja.
+  abrirDevolucion?: () => void
   irACatalogo: () => void
   irACategoria: (slug: string) => void
   irAProducto: (slug: string) => void

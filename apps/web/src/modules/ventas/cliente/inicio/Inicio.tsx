@@ -8,6 +8,7 @@ import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
@@ -60,6 +61,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
+
+    // El modal de arrepentimiento/devolucion. Con `piePropio` el
+    // StorefrontFooter --que normalmente lo trae adentro-- no se dibuja, asi
+    // que el estado vive aca y el pie de la plantilla lo abre por `acciones`.
+    const [devolucionAbierta, setDevolucionAbierta] = useState(false)
 
     // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
     // completa) — definida acá adentro porque go() de este componente ya
@@ -559,6 +565,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
                         heroSlides,
                         transferPct,
+                        // Para el pie: la raiz de la tienda (enlaces que
+                        // navegan) y el contacto real (redes y horario).
+                        baseUrl: base,
+                        contacto: config?.contact,
+                        mostrarPie: config?.appearance?.showFooter ?? true,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
@@ -577,6 +588,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irAProducto: (s) => go(`/producto/${s}`),
                         abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
+                        // Arrepentimiento/devolucion: el pie normal de Orbita
+                        // lo muestra por obligacion legal, asi que el pie de
+                        // la plantilla tiene que poder abrirlo igual.
+                        abrirDevolucion: () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
                         // La maqueta pone la forma y el tema; esto, el
@@ -794,6 +809,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
                 <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+            )}
+            {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
+                monta esta pagina: dentro de PlantillaHome no hay a donde. */}
+            {plantilla?.piePropio && (
+                <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
             )}
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
 

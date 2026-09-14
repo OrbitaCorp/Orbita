@@ -246,12 +246,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        {!soloCuerpo && (
-          <Pie
-            t={t} marca={p.marca} tagline={p.tagline} movil={movil}
-            cierre={p.pie?.cierre ?? 'Defensa al consumidor'}
-            columnas={p.pie?.columnas ?? [['Comprar', links.slice(1)], ['Ayuda', ['Envíos', 'Cambios', 'Contacto']], ['Legales', ['Términos', 'Privacidad']]]}
-          />
+        {!soloCuerpo && !p.ocultarPie && (
+          <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />
         )}
       </div>
     )
@@ -374,8 +370,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
         )}
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="CUIT 30-71234567-8"
-          columnas={[['Categorías', ['Cocina', 'Textil', 'Jardín', 'Deco']], ['Comprar', ['Pagos', 'Envíos', 'Sucursales']], ['Empresa', ['Nosotros', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -566,9 +561,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
         )}
 
-        {!soloCuerpo && (
-          <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Defensa al consumidor"
-            columnas={[['Comprar', ['Mujer', 'Hombre', 'Calzado', 'Sale']], ['Ayuda', ['Guía de talles', 'Envíos', 'Cambios']], ['Legales', ['Términos', 'Privacidad']]]} />
+        {!soloCuerpo && !p.ocultarPie && (
+          <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />
         )}
       </div>
     )
@@ -737,7 +731,6 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   )}
                   <div style={{ fontSize: 17.5, color: t.primary, marginTop: 10, letterSpacing: '0.03em' }}>{x.precio}</div>
                   {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
-                  <div style={{ fontSize: 11.5, color: t.muted, marginTop: 6 }}>3 cuotas sin interés · Envío asegurado</div>
                   <div style={{ marginTop: 16 }}>
                     <span style={{ ...enlaceOro, fontSize: 10.5, color: t.muted, borderBottomColor: t.border }}>Ver la pieza</span>
                   </div>
@@ -791,8 +784,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
 
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Taller en Buenos Aires"
-          columnas={[['Colección', ['Anillos', 'Collares', 'Aros', 'Relojes']], ['A pedido', ['Grabado', 'Talles', 'Encargues']], ['Ayuda', ['Envíos', 'Garantía', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1007,8 +999,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Garantía oficial"
-          columnas={[['Productos', ['Teclados', 'Mouses', 'Audio', 'Monitores']], ['Soporte', ['Garantía', 'Drivers', 'RMA']], ['Empresa', ['Nosotros', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1163,8 +1154,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Local en Av. Rivadavia 4820"
-          columnas={[['Rubros', ['Escolar', 'Oficina', 'Arte', 'Libros']], ['Comprar', ['Lista escolar', 'Mayorista', 'Envíos']], ['Ayuda', ['Cambios', 'Facturación', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1339,8 +1329,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             ))}
           </div>
         </div>
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Casa central: Av. San Martín 2140"
-          columnas={[['Departamentos', ['Herramientas', 'Pinturas', 'Jardín', 'Sanitarios']], ['Empresas', ['Cuenta corriente', 'Licitaciones', 'Facturación A']], ['Ayuda', ['Sucursales', 'Envíos', 'Garantías']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1491,8 +1480,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Entrenamos todos los días"
-          columnas={[['Disciplinas', ['Running', 'Fuerza', 'Ciclismo', 'Outdoor']], ['Ayuda', ['Guía de talles', 'Cambios', 'Envíos']], ['Nosotros', ['La marca', 'Equipo', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1591,8 +1579,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Atendemos de lunes a sábado"
-          columnas={[['Comprar', ['Perros', 'Gatos', 'Otras mascotas', 'Farmacia']], ['Planes', ['Suscripción', 'Cómo funciona', 'Cancelar']], ['Ayuda', ['Envíos', 'Cambios', 'WhatsApp']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1723,8 +1710,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Vinoteca en Palermo · Beber con moderación"
-          columnas={[['Vinos', ['Tintos', 'Blancos', 'Espumantes', 'Naranjos']], ['Cajas', ['Regalos', 'Empresas']], ['Ayuda', ['Envíos', 'Devoluciones', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -1831,8 +1817,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Hecho en Argentina"
-          columnas={[['Por edad', ['0 a 6 meses', '6 a 12 meses', '1 a 2 años', '2 a 4 años']], ['Productos', ['Ropa', 'Juguetes', 'Habitación', 'Paseo']], ['Ayuda', ['Cambios', 'Envíos', 'Contacto']]]} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -2014,8 +1999,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               </div>
             </Reveal>
 
-            <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre}
-              columnas={p.pie?.columnas ?? []} />
+            {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
           </div>
         </div>
       </div>
@@ -2154,7 +2138,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -2287,7 +2271,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -2425,7 +2409,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
   }
@@ -2593,8 +2577,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
       </Reveal>
 
-      <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Elaborado en Argentina"
-        columnas={[['Productos', ['Rostro', 'Maquillaje', 'Sets', 'Rutinas']], ['Conocenos', ['Ingredientes', 'Nuestra historia', 'Sustentabilidad']], ['Ayuda', ['Envíos', 'Cambios', 'Contacto']]]} />
+      {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
     </div>
   )
 }
