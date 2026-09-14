@@ -307,6 +307,10 @@ export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; mov
 // detrás son los enlaces de Apariencia, que navegan. `navDe` deja a los
 // headers escribir un solo `.map` para los dos casos.
 export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+  // "Minimal" en Apariencia = header sin navegacion. Se resuelve aca y no en
+  // cada bloque para que valga en las catorce de una: el que elige esto
+  // quiere el header limpio, sea cual sea la plantilla.
+  if (acciones?.navLayout === 'minimal') return []
   if (acciones?.nav && acciones.nav.length > 0) return acciones.nav
   return links.map((label) => ({ label }))
 }

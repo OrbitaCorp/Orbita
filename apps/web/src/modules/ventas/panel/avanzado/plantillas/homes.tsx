@@ -272,6 +272,25 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           onClick={acciones?.irAInicio}
           style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 800, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
         >{p.marca}</span>
+        {/* El nav. Faltaba: este header dibujaba solo el ☰ decorativo, la
+            marca y las acciones, así que en una tienda real no había forma de
+            llegar a Catálogo, Ofertas ni a las categorías desde la portada.
+            Los enlaces son los MISMOS que el header de Órbita (salen de
+            `acciones.nav`, ver navRealDe) — lo propio de la plantilla es cómo
+            se ven, no cuáles son. Centrado o al lado de la marca lo decide
+            "Estilo de header" en Apariencia. */}
+        {!movil && (() => {
+          const nav = navDe(p.links ?? ['Cocina', 'Textil', 'Jardín', 'Deco'], acciones)
+          if (nav.length === 0) return null
+          const centrado = acciones?.navLayout === 'centered'
+          return (
+            <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted, ...(centrado ? { margin: '0 auto' } : {}) }}>
+              {nav.map((l) => (
+                <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : 500, color: l.activo ? t.text : undefined }}>{l.label}</span>
+              ))}
+            </div>
+          )
+        })()}
         <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
           {!movil && (acciones?.renderBuscador
             ? acciones.renderBuscador({})

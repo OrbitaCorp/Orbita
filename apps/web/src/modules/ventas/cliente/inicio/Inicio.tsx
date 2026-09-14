@@ -604,6 +604,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             />
                         ),
                         renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Estilo de header" de Apariencia: con plantilla
+                        // activa antes se ignoraba del todo.
+                        navLayout: (config?.appearance?.headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
                         nav: navRealDe(config?.appearance?.headerLinks).map(l => ({
                             label: l.label,
                             onClick: () => go(l.path),

@@ -255,6 +255,13 @@ export interface AccionesHome {
    * producto, la marca del header es la única forma de volver al inicio.
    */
   irAInicio?: () => void
+  // "Estilo de header" de Apariencia. El nav de una plantilla muestra SIEMPRE
+  // los enlaces reales (los mismos que el header de Orbita, ver `nav` mas
+  // abajo); esto decide cuantos y donde. `minimal` los saca en todas por
+  // igual — es una decision de contenido, no de diseño. `centered` vs
+  // `standard` solo lo aplican las plantillas cuyo header no tenga ya una
+  // posicion propia como parte de su identidad.
+  navLayout?: 'full' | 'standard' | 'centered' | 'minimal'
   // Abre el modal de arrepentimiento/devolución (RBT-683). Lo dibuja el pie
   // normal de Órbita por obligación legal, así que el pie de una plantilla
   // tiene que poder abrirlo también. En el panel no existe: ahí el botón no
