@@ -36,7 +36,9 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
 //
 // Para sumar una: envolver el encabezado del bloque en una variable y
 // devolverlo cuando `soloHeader` esté puesto (ver el bloque `premium`).
-export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>(['premium', 'vera', 'cobijo', 'nitida'])
+export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>([
+  'premium', 'vera', 'cobijo', 'nitida', 'mosaico', 'atleta', 'patitas', 'bodega', 'crecer',
+])
 
 export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   p: Plantilla
@@ -256,17 +258,35 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // Sin hero: arranca con un muro de bloques de distinta altura. Los productos
   // van compactos, cinco por fila, con lo mínimo.
   if (p.layout === 'mosaico') {
-    const s = p.slides[0]
+    const s = p.slides[iActual]
+    // Los cuatro bloques chicos del muro son categorías REALES del negocio, no
+    // una lista de casa y deco: el descuento de cada uno lo escribe el dueño
+    // (sección "Muro"), porque es lo único que Órbita no sabe solo.
+    const tiles = (p.categorias ?? []).slice(0, 4)
+    // Una lista separada por comas, para no pedirle seis campos al dueño.
+    const marcas = txt('marcas', 'lista').split(',').map((m) => m.trim()).filter(Boolean)
+
+    const encabezado = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: movil ? '14px 16px' : '18px 28px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
+        <span style={{ fontSize: 19, lineHeight: 1 }}>☰</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 800, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{p.marca}</span>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
+          {!movil && (acciones?.renderBuscador
+            ? acciones.renderBuscador({})
+            : <span style={{ border: `1px solid ${t.border}`, borderRadius: 999, padding: '7px 16px', background: t.soft }}>Buscar…</span>)}
+          <AccionesTienda t={t} movil={movil} acciones={acciones} />
+        </span>
+      </div>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
     return (
       <div style={marco}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: movil ? '14px 16px' : '18px 28px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: 19, lineHeight: 1 }}>☰</span>
-          <span style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 800, letterSpacing: '-0.02em' }}>{p.marca}</span>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
-            {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 999, padding: '7px 16px', background: t.soft }}>Buscar…</span>}
-            <AccionesTienda t={t} movil={movil} acciones={acciones} />
-          </span>
-        </div>
+        {encabezado}
 
         {/* El muro. Alturas desparejas a propósito. */}
         <div style={{ padding: movil ? 12 : 16, display: 'grid', gridTemplateColumns: movil ? '1fr 1fr' : '1.7fr 1fr 1fr', gap: 12 }}>
@@ -276,14 +296,23 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ fontSize: 11.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>{s.kicker}</div>
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 28 : 46, lineHeight: 1.04, margin: '12px 0 10px', color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.03em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.9)', margin: '0 0 20px', maxWidth: 380 }}>{s.bajada}</p>
-              <div><Boton t={t}>{s.cta}</Boton></div>
+              <div><Boton t={t} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton></div>
+              {navHero({ marginTop: 18 })}
             </div>
           </div>
-          {([['Cocina', '-40%', `${IMG}/casa-ceramica.jpg`, 230], ['Textil', '-25%', `${IMG}/casa-sillon.jpg`, 230], ['Jardín', '-30%', `${IMG}/casa-plantas.jpg`, 238], ['Deco', 'Nuevo', `${IMG}/casa-deco.jpg`, 238]] as [string, string, string, number][]).map(([n, off, src, h]) => (
-            <div key={n} className="pl-tile" style={{ position: 'relative', borderRadius: t.radio }}>
-              <Foto src={src} alto={movil ? 128 : h} radio={t.radio} />
+          {tiles.map(([n, src, slug], i) => (
+            <div
+              key={n} className="pl-tile"
+              onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+              style={{ position: 'relative', borderRadius: t.radio, cursor: slug && acciones ? 'pointer' : undefined }}
+            >
+              <Foto src={src} alto={movil ? 128 : (i < 2 ? 230 : 238)} radio={t.radio} />
               <div style={{ position: 'absolute', inset: 0, padding: 15, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent 58%)', borderRadius: t.radio }}>
-                <span style={{ alignSelf: 'flex-start', background: t.accent, color: '#3B1D00', fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999 }}>{off}</span>
+                {/* El descuento de cada bloque lo escribe el dueño: vacío, no
+                    se dibuja la pastilla (mejor que inventarle un "-40%"). */}
+                {txt('muro', `of${i + 1}`) && (
+                  <span style={{ alignSelf: 'flex-start', background: t.accent, color: '#3B1D00', fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999 }}>{txt('muro', `of${i + 1}`)}</span>
+                )}
                 <span style={{ fontSize: movil ? 15 : 19, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{n}</span>
               </div>
             </div>
@@ -315,23 +344,31 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ background: t.primary, color: '#fff', padding: movil ? '26px 18px' : '38px 28px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 230 }}>
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 30, fontWeight: 800, letterSpacing: '-0.02em' }}>Envío gratis desde $70.000</div>
-              <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 6 }}>A todo el país. Llega en 48 a 72 horas.</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 30, fontWeight: 800, letterSpacing: '-0.02em' }}>{txt('franja', 'titulo')}</div>
+              <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 6 }}>{txt('franja', 'bajada')}</div>
             </div>
-            <span className="pl-cta" style={{ background: '#fff', color: t.primary, padding: '13px 28px', borderRadius: 999, fontWeight: 700, fontSize: 13.5 }}>Aprovechar</span>
+            <span
+              className="pl-cta" onClick={acciones?.irACatalogo}
+              style={{ background: '#fff', color: t.primary, padding: '13px 28px', borderRadius: 999, fontWeight: 700, fontSize: 13.5, cursor: acciones ? 'pointer' : undefined }}
+            >{txt('franja', 'cta')}</span>
           </div>
         </Reveal>
 
+        {/* Las marcas que trabaja el negocio. Vacío = la sección no se dibuja:
+            no toda tienda de deco revende marcas, y seis casilleros con
+            nombres inventados es peor que no tenerla. */}
+        {marcas.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '28px 16px' : '38px 28px' }}>
-            <Titulo t={t} texto="Marcas que trabajamos" centrado movil={movil} />
+            <Titulo t={t} texto={txt('marcas', 'titulo')} centrado movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(6, 3), gap: 12 }}>
-              {['Lume', 'Ronda', 'Casa Nova', 'Verde', 'Tramo', 'Norte'].map((m) => (
+              {marcas.map((m) => (
                 <div key={m} style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, padding: '20px 8px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: t.muted, background: t.surf }}>{m}</div>
               ))}
             </div>
           </div>
         </Reveal>
+        )}
 
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="CUIT 30-71234567-8"
           columnas={[['Categorías', ['Cocina', 'Textil', 'Jardín', 'Deco']], ['Comprar', ['Pagos', 'Envíos', 'Sucursales']], ['Empresa', ['Nosotros', 'Contacto']]]} />
@@ -1195,17 +1232,25 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // muestra en grilla sino en tiras por disciplina que se arrastran, porque el
   // que entra ya sabe si corre, levanta o pedalea.
   if (p.layout === 'atleta') {
-    const s = p.slides[0]
-    const disciplinas: [string, string[]][] = [
-      ['Running', [`${IMG}/dep-pista.jpg`, `${IMG}/dep-zapatilla.jpg`, `${IMG}/dep-correr.jpg`]],
-      ['Fuerza', [`${IMG}/dep-sentadilla.jpg`, `${IMG}/dep-pesas.jpg`, `${IMG}/dep-press.jpg`]],
-      ['Ciclismo', [`${IMG}/dep-bici.jpg`, `${IMG}/dep-pista.jpg`, `${IMG}/dep-correr.jpg`]],
-    ]
-    return (
-      <div style={marco}>
-        <Marquee t={t} texto="ENVÍO GRATIS +$120.000 ✦ 3 CUOTAS SIN INTERÉS ✦ CAMBIO DE TALLE SIN CARGO" />
+    const s = p.slides[iActual]
+    // Las tiras son las primeras tres CATEGORÍAS del negocio, con productos
+    // suyos adentro. Antes eran Running/Fuerza/Ciclismo con nueve fotos del
+    // repo y un conteo inventado ("18 artículos"), así que una tienda de ropa
+    // con Atleta aplicada mostraba disciplinas que no vende.
+    const disciplinas: [string, string | undefined, typeof p.productos][] =
+      (p.categorias ?? []).slice(0, 3).map(([nombre, , slug], i) => [
+        nombre,
+        slug,
+        p.productos.slice(i, i + 3).length >= 3 ? p.productos.slice(i, i + 3) : p.productos.slice(0, 3),
+      ])
+    const encabezado = (
+      <>
+        <Marquee t={t} texto={txt('cintillo', 'texto')} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '16px 34px', borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</span>
+          <span
+            onClick={acciones?.irAInicio}
+            style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+          >{p.marca}</span>
           {!movil && (
             <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: t.fh }}>
               {navDe(p.links ?? ['Running', 'Fuerza', 'Ciclismo', 'Indumentaria', 'Outlet'], acciones).map((l) => (
@@ -1218,6 +1263,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           )}
           <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         {/* Hero a sangre: la foto ocupa todo y el titular se come el ancho. */}
         <div className="pl-tile" style={{ position: 'relative' }}>
@@ -1227,26 +1280,44 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <h1 style={{ fontFamily: t.fh, fontSize: movil ? 50 : 104, lineHeight: movil ? 1.02 : 0.9, margin: 0, whiteSpace: 'pre-line', fontWeight: 700, letterSpacing: '-0.01em', textTransform: 'uppercase', color: '#fff' }}>{s.titulo}</h1>
             <p style={{ fontSize: 14.5, color: 'rgba(250,250,250,0.72)', margin: '20px 0 26px', maxWidth: 420, lineHeight: 1.65 }}>{s.bajada}</p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <span className="pl-cta" style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh }}>{s.cta}</span>
-              <span className="pl-cta" style={{ border: '1px solid rgba(250,250,250,0.4)', color: '#fff', padding: '14px 26px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh }}>Guía de talles</span>
+              <span
+                className="pl-cta"
+                onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
+                style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh, cursor: s.link && acciones ? 'pointer' : undefined }}
+              >{s.cta}</span>
+              <span
+                className="pl-cta" onClick={acciones?.abrirWhatsapp}
+                style={{ border: '1px solid rgba(250,250,250,0.4)', color: '#fff', padding: '14px 26px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh, cursor: acciones ? 'pointer' : undefined }}
+              >{txt('hero', 'cta2')}</span>
             </div>
+            {navHero({ marginTop: 26 })}
           </div>
         </div>
 
         {/* Tiras por disciplina, no grilla. */}
-        {disciplinas.map(([nombre, fotos], di) => (
+        {disciplinas.map(([nombre, slug, items], di) => (
           <Reveal key={nombre} delay={di * 60}>
             <div style={{ padding: movil ? '24px 0 6px 16px' : '40px 0 10px 34px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, paddingRight: movil ? 16 : 34, marginBottom: 14 }}>
                 <h2 style={{ fontFamily: t.fh, fontSize: movil ? 26 : 36, margin: 0, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.01em' }}>{nombre}</h2>
-                <span style={{ fontSize: 11.5, color: t.muted, textTransform: 'uppercase', letterSpacing: '0.14em' }}>{18 + di * 7} artículos</span>
-                {!movil && <span style={{ marginLeft: 'auto', fontSize: 12, color: t.primary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ver todo →</span>}
+                {/* Antes decía "18 artículos" — un número inventado que no
+                    salía de contar nada. Órbita no pasa el total por categoría
+                    hasta acá, así que no se promete. */}
+                {!movil && (
+                  <span
+                    onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                    style={{ marginLeft: 'auto', fontSize: 12, color: t.primary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: slug && acciones ? 'pointer' : undefined }}
+                  >Ver todo →</span>
+                )}
               </div>
               <Tira gap={10}>
-                {fotos.map((src, i) => (
-                  <div key={src + i} className="pl-tile" style={{ flex: `0 0 ${movil ? '75%' : '32%'}`, scrollSnapAlign: 'start', position: 'relative' }}>
-                    <Foto src={src} alto={movil ? 200 : 280} radio={t.radio} />
-                    <span style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(10,10,10,0.82)', color: t.primary, fontSize: 10.5, fontWeight: 700, padding: '5px 11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: t.fh }}>{nombre} 0{i + 1}</span>
+                {items.map((x, i) => (
+                  <div
+                    key={x.nombre + i} className="pl-tile" onClick={abrir(x)}
+                    style={{ flex: `0 0 ${movil ? '75%' : '32%'}`, scrollSnapAlign: 'start', position: 'relative', cursor: abrir(x) ? 'pointer' : undefined }}
+                  >
+                    <Foto src={x.img} src2={x.img2} alto={movil ? 200 : 280} radio={t.radio} />
+                    <span style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(10,10,10,0.82)', color: t.primary, fontSize: 10.5, fontWeight: 700, padding: '5px 11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: t.fh }}>{x.nombre}</span>
                   </div>
                 ))}
               </Tira>
@@ -1287,7 +1358,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Números de la comunidad. */}
         <div style={{ background: t.primary, color: t.onPrimary, padding: movil ? '26px 16px' : '40px 34px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 20 }}>
-            {([['+2.400', 'km este mes'], ['1.180', 'corredores'], ['48 hs', 'de entrega'], ['4,9', 'de puntaje']] as [string, string][]).map(([n, l]) => (
+            {([
+              [txt('numeros', 'n1v'), txt('numeros', 'n1l')],
+              [txt('numeros', 'n2v'), txt('numeros', 'n2l')],
+              [txt('numeros', 'n3v'), txt('numeros', 'n3l')],
+              [txt('numeros', 'n4v'), txt('numeros', 'n4l')],
+            ] as [string, string][]).filter(([n]) => n).map(([n, l]) => (
               <div key={l} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: t.fh, fontSize: movil ? 28 : 42, fontWeight: 700, letterSpacing: '-0.02em' }}>{n}</div>
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.16em', fontWeight: 600, marginTop: 6, opacity: 0.75 }}>{l}</div>
@@ -1307,14 +1383,24 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // grandes reemplazan al menú: se compra pensando en el animal, no en la
   // categoría.
   if (p.layout === 'patitas') {
-    const s = p.slides[0]
-    return (
-      <div style={marco}>
-        <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, fontWeight: 700, color: t.primary }}>
-          ✦ Envío en el día en CABA comprando antes de las 14 ✦
+    const s = p.slides[iActual]
+
+    const encabezado = (
+      <>
+        <div style={{ background: t.soft, padding: '9px 0', fontSize: 12, fontWeight: 700, color: t.primary, overflow: 'hidden' }}>
+          {activo('cintillo', 'cartelera') ? (
+            <div className="pl-marquee-track">
+              {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   `.repeat(6)}</span>)}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22, padding: movil ? '13px 16px' : '16px 32px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+          <span
+            onClick={acciones?.irAInicio}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 9, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+          >
             <span style={{ width: 34, height: 34, borderRadius: '50%', background: t.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 17 }}>🐾</span>
             <span style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{p.marca}</span>
           </span>
@@ -1325,6 +1411,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           )}
           <span style={{ marginLeft: 'auto' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         <div style={{ background: `linear-gradient(160deg, ${t.soft} 0%, ${t.bg} 60%)` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 22 : 36, padding: movil ? '28px 20px' : '52px 40px', alignItems: 'center' }}>
@@ -1333,9 +1427,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.08, margin: 0, whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.03em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 15, color: t.muted, margin: '16px 0 24px', lineHeight: 1.7, maxWidth: 400 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Boton t={t} grande>{s.cta}</Boton>
-                <Boton t={t} secundario grande>Ver el plan mensual</Boton>
+                <Boton t={t} grande onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+                <Boton t={t} secundario grande onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>
               </div>
+              {navHero({ marginTop: 20 })}
             </div>
             <div style={{ order: movil ? 1 : 2, borderRadius: 32, overflow: 'hidden', boxShadow: t.sombra }}>
               <Foto src={s.img} alto={movil ? 260 : 400} radio={32} />
@@ -1346,15 +1441,22 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* El selector que reemplaza al menú de categorías. */}
         <Reveal>
           <div style={{ padding: movil ? '26px 16px' : '46px 40px' }}>
-            <Titulo t={t} centrado volanta="Empecemos por acá" texto="¿Para quién comprás?" movil={movil} />
+            <Titulo t={t} centrado volanta={txt('selector', 'volanta')} texto={txt('selector', 'titulo')} movil={movil} />
+            {/* Los tres círculos son categorías REALES del negocio. Antes eran
+                Perro/Gato/Otros con "412 productos" inventados: una veterinaria
+                que vende otra cosa mostraba mascotas que no atiende, y el
+                conteo no salía de contar nada. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: movil ? 12 : 26, maxWidth: 720, margin: '0 auto' }}>
-              {([['Perro', `${IMG}/masc-perro.jpg`, '412 productos'], ['Gato', `${IMG}/masc-gato.jpg`, '268 productos'], ['Otros', `${IMG}/masc-hamster.jpg`, '94 productos']] as [string, string, string][]).map(([n, src, c]) => (
-                <div key={n} className="pl-card" style={{ textAlign: 'center' }}>
+              {(p.categorias ?? []).slice(0, 3).map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-card"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ textAlign: 'center', cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <div className="pl-tile" style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', overflow: 'hidden', border: `4px solid ${t.surf}`, boxShadow: t.sombra }}>
                     <Foto src={src} alto="100%" />
                   </div>
                   <div style={{ fontFamily: t.fh, fontSize: movil ? 16 : 21, fontWeight: 800, marginTop: 14 }}>{n}</div>
-                  <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{c}</div>
                 </div>
               ))}
             </div>
@@ -1381,23 +1483,33 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // varietales sin una sola foto, que es como se elige un vino. Las botellas
   // van altas y angostas sobre tarjetas crema, para que recorten del fondo.
   if (p.layout === 'bodega') {
-    const s = p.slides[0]
-    const varietales: [string, string, string, string][] = [
-      ['Malbec', 'Valle de Uco · Luján de Cuyo', '34 etiquetas', 'desde $18.900'],
-      ['Cabernet Franc', 'Agrelo · Paraje Altamira', '12 etiquetas', 'desde $24.500'],
-      ['Pinot Noir', 'Patagonia · Valle de Uco', '9 etiquetas', 'desde $28.400'],
-      ['Chardonnay', 'Tupungato · Chapadmalal', '15 etiquetas', 'desde $16.200'],
-      ['Blends de autor', 'Todo el país', '21 etiquetas', 'desde $31.000'],
-    ]
-    return (
-      <div style={marco}>
+    const s = p.slides[iActual]
+    // La carta son las CATEGORÍAS del negocio. La bajada y el "desde" de cada
+    // fila los escribe el dueño (sección "La carta"): son datos que Órbita no
+    // tiene por categoría, y antes estaban inventados —Malbec de Valle de Uco,
+    // "34 etiquetas"— en una vinoteca que podía vender otra cosa.
+    const varietales = (p.categorias ?? []).slice(0, 5).map(([nombre, , slug], i) => ({
+      nombre, slug,
+      bajada: txt('carta', `b${i + 1}`),
+      desde: txt('carta', `d${i + 1}`),
+    }))
+
+    const encabezado = (
+      <>
         <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, borderBottom: `1px solid ${t.border}` }}>
-          Envío refrigerado · Retiro en la vinoteca · Venta a mayores de 18
+          {txt('cintillo', 'texto')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '15px 16px' : '24px 44px', borderBottom: `1px solid ${t.border}`, gap: 14 }}>
-          {movil ? <span style={{ fontSize: 18, color: t.primary }}>☰</span> : <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.muted }}>⌕ Buscar etiqueta</span>}
+          {movil
+            ? <span style={{ fontSize: 18, color: t.primary }}>☰</span>
+            : acciones?.renderBuscador
+              ? <span style={{ justifySelf: 'start' }}>{acciones.renderBuscador({})}</span>
+              : <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.muted }}>⌕ Buscar etiqueta</span>}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: t.fh, fontSize: movil ? 26 : 38, fontWeight: 400, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</div>
+            <div
+              onClick={acciones?.irAInicio}
+              style={{ fontFamily: t.fh, fontSize: movil ? 26 : 38, fontWeight: 400, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+            >{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.muted }}>
                 {navDe(p.links ?? ['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
@@ -1406,6 +1518,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
           <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch' }}>
           <div style={{ padding: movil ? '32px 22px' : '70px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'center', order: movil ? 2 : 1 }}>
@@ -1413,7 +1533,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 18 }}>{s.kicker}</div>
             <h1 style={{ fontFamily: t.fh, fontSize: movil ? 40 : 62, lineHeight: 1.02, margin: 0, whiteSpace: 'pre-line', fontWeight: 400, letterSpacing: '-0.015em' }}>{s.titulo}</h1>
             <p style={{ fontSize: 14.5, color: t.muted, margin: '24px 0 30px', lineHeight: 1.9, maxWidth: 400 }}>{s.bajada}</p>
-            <span style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: t.primary, borderBottom: `1px solid ${t.primary}`, paddingBottom: 6, alignSelf: 'flex-start' }}>{s.cta}</span>
+            <span
+              onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
+              style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: t.primary, borderBottom: `1px solid ${t.primary}`, paddingBottom: 6, alignSelf: 'flex-start', cursor: s.link && acciones ? 'pointer' : undefined }}
+            >{s.cta}</span>
+            {navHero({ marginTop: 28 })}
           </div>
           <div style={{ order: movil ? 1 : 2 }}><Foto src={s.img} alto={movil ? 300 : 560} /></div>
         </div>
@@ -1421,14 +1545,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* La carta de varietales: puro texto, sin una sola foto. */}
         <Reveal>
           <div style={{ padding: movil ? '32px 22px' : '64px 52px', borderTop: `1px solid ${t.border}` }}>
-            <Titulo t={t} volanta="La carta" texto="Elegí por varietal" accion="Ver las 91 etiquetas →" movil={movil} />
+            <Titulo t={t} volanta={txt('carta', 'volanta')} texto={txt('carta', 'titulo')} accion={txt('carta', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div>
-              {varietales.map(([nombre, region, cant, desde]) => (
-                <div key={nombre} className="pl-fila" style={{ display: 'grid', gridTemplateColumns: movil ? '1fr auto' : '1.1fr 1.4fr auto auto', gap: movil ? 6 : 24, alignItems: 'baseline', padding: movil ? '16px 0' : '20px 0', borderBottom: `1px solid ${t.border}` }}>
-                  <span style={{ fontFamily: t.fh, fontSize: movil ? 22 : 30, fontWeight: 400 }}>{nombre}</span>
-                  {!movil && <span style={{ fontSize: 13, color: t.muted, letterSpacing: '0.03em' }}>{region}</span>}
-                  {!movil && <span style={{ fontSize: 12, color: t.muted, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{cant}</span>}
-                  <span style={{ fontSize: movil ? 13 : 14.5, color: t.primary, justifySelf: 'end', whiteSpace: 'nowrap' }}>{desde}</span>
+              {varietales.map((v) => (
+                <div
+                  key={v.nombre} className="pl-fila"
+                  onClick={v.slug && acciones ? () => acciones.irACategoria(v.slug!) : undefined}
+                  style={{ display: 'grid', gridTemplateColumns: movil ? '1fr auto' : '1.1fr 1.4fr auto', gap: movil ? 6 : 24, alignItems: 'baseline', padding: movil ? '16px 0' : '20px 0', borderBottom: `1px solid ${t.border}`, cursor: v.slug && acciones ? 'pointer' : undefined }}
+                >
+                  <span style={{ fontFamily: t.fh, fontSize: movil ? 22 : 30, fontWeight: 400 }}>{v.nombre}</span>
+                  {!movil && <span style={{ fontSize: 13, color: t.muted, letterSpacing: '0.03em' }}>{v.bajada}</span>}
+                  <span style={{ fontSize: movil ? 13 : 14.5, color: t.primary, justifySelf: 'end', whiteSpace: 'nowrap' }}>{v.desde}</span>
                 </div>
               ))}
             </div>
@@ -1462,10 +1589,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '28px 22px' : '46px 52px' }}>
             <Titulo t={t} centrado volanta="Para acompañar" texto="Maridajes que funcionan" movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 16 : 24 }}>
-              {([['Asado y achuras', 'Malbec joven o Bonarda. Fruta y poca madera para no tapar la carne.'], ['Pastas con salsa roja', 'Sangiovese o un blend liviano. Acidez que corte el tomate.'], ['Quesos duros', 'Cabernet Franc con guarda, o un espumante nature bien frío.']] as [string, string][]).map(([tit, txt]) => (
+              {([
+                [txt('maridajes', 't1'), txt('maridajes', 'b1')],
+                [txt('maridajes', 't2'), txt('maridajes', 'b2')],
+                [txt('maridajes', 't3'), txt('maridajes', 'b3')],
+              ] as [string, string][]).filter(([tit]) => tit).map(([tit, cuerpo]) => (
                 <div key={tit} style={{ background: t.soft, padding: movil ? 20 : 26 }}>
                   <div style={{ fontFamily: t.fh, fontSize: movil ? 20 : 24, color: t.primary, marginBottom: 10 }}>{tit}</div>
-                  <div style={{ fontSize: 13.5, color: t.muted, lineHeight: 1.8 }}>{txt}</div>
+                  <div style={{ fontSize: 13.5, color: t.muted, lineHeight: 1.8 }}>{cuerpo}</div>
                 </div>
               ))}
             </div>
@@ -1483,20 +1614,22 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // regala ("tiene ocho meses"). La línea de tiempo horizontal reemplaza al
   // menú, y hay un armador de lista de regalos para baby shower.
   if (p.layout === 'crecer') {
-    const s = p.slides[0]
-    const edades: [string, string][] = [
-      ['0 a 6 m', `${IMG}/bebe-pies.jpg`],
-      ['6 a 12 m', `${IMG}/bebe-oso.jpg`],
-      ['1 a 2 años', `${IMG}/bebe-juguetes.jpg`],
-      ['2 a 4 años', `${IMG}/bebe-nena.jpg`],
-    ]
-    return (
-      <div style={marco}>
+    const s = p.slides[iActual]
+    // La línea de tiempo son las CATEGORÍAS del negocio: antes eran cuatro
+    // tramos de edad fijos con fotos del repo, así que una tienda que agrupa
+    // de otra forma mostraba una navegación que no existía en su catálogo.
+    const edades = (p.categorias ?? []).slice(0, 4)
+
+    const encabezado = (
+      <>
         <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, color: t.text, fontWeight: 600 }}>
-          Algodón orgánico certificado · Cambios sin cargo dentro de los 30 días
+          {txt('cintillo', 'texto')}
         </div>
         <div style={{ textAlign: 'center', padding: movil ? '15px 16px' : '20px 34px 16px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
-          <div style={{ fontFamily: t.fh, fontSize: movil ? 25 : 32, fontWeight: 700, letterSpacing: '0.04em', color: t.primary }}>{p.marca}</div>
+          <div
+            onClick={acciones?.irAInicio}
+            style={{ fontFamily: t.fh, fontSize: movil ? 25 : 32, fontWeight: 700, letterSpacing: '0.04em', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+          >{p.marca}</div>
           {!movil && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 12, fontSize: 13.5, color: t.muted, fontWeight: 600 }}>
               {navDe(p.links ?? ['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
@@ -1504,6 +1637,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           )}
           <span style={{ position: 'absolute', right: movil ? 16 : 34, top: movil ? 14 : 22 }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         <div style={{ background: `linear-gradient(150deg, ${t.soft} 0%, ${t.bg} 55%)`, padding: movil ? '30px 20px' : '56px 44px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 24 : 40, alignItems: 'center' }}>
@@ -1511,7 +1652,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ display: 'inline-block', background: t.accent, color: '#5C3A2C', fontSize: 11.5, fontWeight: 700, padding: '6px 15px', borderRadius: 999, marginBottom: 18 }}>{s.kicker}</div>
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.1, margin: 0, whiteSpace: 'pre-line', fontWeight: 700, letterSpacing: '-0.02em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 15, color: t.muted, margin: '18px 0 26px', lineHeight: 1.8, maxWidth: 400 }}>{s.bajada}</p>
-              <Boton t={t} grande>{s.cta}</Boton>
+              <Boton t={t} grande onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+              {navHero({ marginTop: 20 })}
             </div>
             <div style={{ order: movil ? 1 : 2, borderRadius: movil ? 28 : 40, overflow: 'hidden', boxShadow: t.sombra }}>
               <Foto src={s.img} alto={movil ? 270 : 420} radio={movil ? 28 : 40} />
@@ -1522,12 +1664,16 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* La línea de tiempo por edad, que reemplaza al menú de categorías. */}
         <Reveal>
           <div style={{ padding: movil ? '30px 16px' : '52px 44px' }}>
-            <Titulo t={t} centrado volanta="Comprá por edad" texto="¿Cuántos meses tiene?" movil={movil} />
+            <Titulo t={t} centrado volanta={txt('edades', 'volanta')} texto={txt('edades', 'titulo')} movil={movil} />
             <div style={{ position: 'relative', marginTop: 26 }}>
               <div style={{ position: 'absolute', left: '12%', right: '12%', top: movil ? 40 : 56, height: 2, background: t.border }} />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: movil ? 8 : 20, position: 'relative' }}>
-                {edades.map(([n, src], i) => (
-                  <div key={n} className="pl-card" style={{ textAlign: 'center' }}>
+                {edades.map(([n, src, slug], i) => (
+                  <div
+                    key={n} className="pl-card"
+                    onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                    style={{ textAlign: 'center', cursor: slug && acciones ? 'pointer' : undefined }}
+                  >
                     <div className="pl-tile" style={{ width: movil ? 72 : 108, height: movil ? 72 : 108, borderRadius: '50%', overflow: 'hidden', margin: '0 auto', border: `3px solid ${t.surf}`, boxShadow: t.sombra }}>
                       <Foto src={src} alto="100%" />
                     </div>
@@ -1542,7 +1688,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 28px' : '6px 44px 48px' }}>
-            <Titulo t={t} volanta="Para 6 a 12 meses" texto="Lo más elegido" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta="Recomendados" texto="Lo más elegido" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
@@ -1551,7 +1697,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <div style={{ padding: movil ? '24px 16px' : '38px 44px', borderTop: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 20 }}>
-            {([['Algodón orgánico', 'certificado GOTS'], ['Sin tóxicos', 'pinturas al agua'], ['Costuras planas', 'no marcan la piel'], ['Cambios', 'sin cargo 30 días']] as [string, string][]).map(([a, b]) => (
+            {([
+              [txt('certificaciones', 't1'), txt('certificaciones', 'b1')],
+              [txt('certificaciones', 't2'), txt('certificaciones', 'b2')],
+              [txt('certificaciones', 't3'), txt('certificaciones', 'b3')],
+              [txt('certificaciones', 't4'), txt('certificaciones', 'b4')],
+            ] as [string, string][]).filter(([a]) => a).map(([a, b]) => (
               <div key={a} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: t.fh, fontSize: movil ? 15 : 18, fontWeight: 700, color: t.primary }}>{a}</div>
                 <div style={{ fontSize: 12.5, color: t.muted, marginTop: 4 }}>{b}</div>

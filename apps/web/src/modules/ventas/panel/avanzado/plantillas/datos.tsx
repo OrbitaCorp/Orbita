@@ -85,6 +85,15 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Sin hero', 'Muro de bloques', 'Grilla compacta de 5', 'Franja de envío', 'Marcas'],
     marca: 'Mercado Sur', tagline: 'Casa, cocina y jardín',
     layout: 'mosaico',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorías del negocio, que son las que arman los cuatro bloques chicos
+    // del muro.
+    categorias: [
+      ['Cocina', `${IMG}/casa-ceramica.jpg`],
+      ['Textil', `${IMG}/casa-sillon.jpg`],
+      ['Jardín', `${IMG}/casa-plantas.jpg`],
+      ['Deco', `${IMG}/casa-deco.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -291,6 +300,13 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero a sangre', 'Tiras por disciplina', 'Fichas con tecnología', 'Números de la comunidad', 'Guía de talles'],
     marca: 'Ritmo', tagline: 'Running, fuerza y ciclismo',
     layout: 'atleta',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['Running', `${IMG}/dep-pista.jpg`],
+      ['Fuerza', `${IMG}/dep-pesas.jpg`],
+      ['Ciclismo', `${IMG}/dep-bici.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -324,6 +340,13 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['¿Para quién comprás?', 'Hero redondeado', 'Fichas con badge', 'Categorías en círculo'],
     marca: 'Colita', tagline: 'Todo para tu perro y tu gato',
     layout: 'patitas',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['Perro', `${IMG}/masc-perro.jpg`],
+      ['Gato', `${IMG}/masc-gato.jpg`],
+      ['Otros', `${IMG}/masc-hamster.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -357,6 +380,14 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Índice editorial', 'Lista de varietales sin fotos', 'Botellas altas sobre crema', 'Maridajes'],
     marca: 'Cepa', tagline: 'Vinos de autor y bodegas chicas',
     layout: 'bodega',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['Malbec', `${IMG}/vino-botella.jpg`],
+      ['Cabernet Franc', `${IMG}/vino-barrica.jpg`],
+      ['Pinot Noir', `${IMG}/vino-estante.jpg`],
+      ['Chardonnay', `${IMG}/vino-copas-luz.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -390,6 +421,14 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Línea de tiempo por edad', 'Hero suave', 'Certificaciones'],
     marca: 'Nube', tagline: 'Para los primeros años',
     layout: 'crecer',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['0 a 6 m', `${IMG}/bebe-pies.jpg`],
+      ['6 a 12 m', `${IMG}/bebe-oso.jpg`],
+      ['1 a 2 años', `${IMG}/bebe-juguetes.jpg`],
+      ['2 a 4 años', `${IMG}/bebe-nena.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,

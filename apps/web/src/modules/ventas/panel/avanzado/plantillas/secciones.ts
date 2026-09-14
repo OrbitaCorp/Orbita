@@ -106,6 +106,190 @@ const PREMIUM: SeccionPlantilla[] = [
   },
 ]
 
+// ─── Mosaico ─────────────────────────────────────────────────────────────────
+// La única sin hero: arranca con un muro de bloques. Los cuatro chicos son
+// categorías reales del negocio; lo único que se escribe a mano es el
+// descuento de cada uno.
+const MOSAICO: SeccionPlantilla[] = [
+  {
+    id: 'muro',
+    nombre: 'Muro de bloques',
+    nota: 'Los cuatro bloques chicos son tus primeras cuatro categorías. Acá va el cartelito de oferta de cada uno; si lo dejás vacío, no se dibuja.',
+    campos: [
+      { id: 'of1', label: 'Bloque 1 — oferta', tipo: 'texto', max: 12, help: 'Ej: −40%', porDefecto: '−40%' },
+      { id: 'of2', label: 'Bloque 2 — oferta', tipo: 'texto', max: 12, porDefecto: '−25%' },
+      { id: 'of3', label: 'Bloque 3 — oferta', tipo: 'texto', max: 12, porDefecto: '−30%' },
+      { id: 'of4', label: 'Bloque 4 — oferta', tipo: 'texto', max: 12, porDefecto: 'Nuevo' },
+    ],
+  },
+  {
+    id: 'franja',
+    nombre: 'Franja de envío',
+    nota: 'La banda de color entre los productos y las marcas.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, porDefecto: 'Envío gratis desde $70.000' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, porDefecto: 'A todo el país. Llega en 48 a 72 horas.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Aprovechar' },
+    ],
+  },
+  {
+    id: 'marcas',
+    nombre: 'Marcas que trabajás',
+    nota: 'Si lo dejás vacío, la sección no aparece.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Marcas que trabajamos' },
+      {
+        id: 'lista', label: 'Marcas', tipo: 'texto', max: 160,
+        help: 'Separadas por coma. Entran seis cómodas.',
+        porDefecto: 'Lume, Ronda, Casa Nova, Verde, Tramo, Norte',
+      },
+    ],
+  },
+]
+
+// ─── Atleta ──────────────────────────────────────────────────────────────────
+// Deportes: cartel corriendo, hero a sangre y las tiras por categoría. Los
+// números de abajo son de la comunidad y los escribe el dueño.
+const ATLETA: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cartel corriendo',
+    nota: 'La franja de arriba de todo, antes del logo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: 'ENVÍO GRATIS +$120.000 ✦ 3 CUOTAS SIN INTERÉS ✦ CAMBIO DE TALLE SIN CARGO' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero',
+    nota: 'Las fotos y los textos salen de "Hero". Acá va el segundo botón.',
+    campos: [
+      { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, porDefecto: 'Guía de talles', help: 'Abre el WhatsApp de la tienda.' },
+    ],
+  },
+  {
+    id: 'numeros',
+    nombre: 'Números de la comunidad',
+    nota: 'La franja de color del final. Un número vacío no se dibuja.',
+    campos: [
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '+2.400' },
+      { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'km este mes' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '1.180' },
+      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'corredores' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '48 hs' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'de entrega' },
+      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, porDefecto: '4,9' },
+      { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'de puntaje' },
+    ],
+  },
+]
+
+// ─── Patitas ─────────────────────────────────────────────────────────────────
+// Petshop: la compra arranca por la mascota. Los tres círculos son categorías
+// reales del negocio.
+const PATITAS: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La franja de arriba de todo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: '✦ Envío en el día en CABA comprando antes de las 14 ✦' },
+      { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero',
+    nota: 'Las fotos y los textos salen de "Hero". Acá va el segundo botón.',
+    campos: [
+      { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 26, porDefecto: 'Ver el plan mensual', help: 'Abre el WhatsApp de la tienda.' },
+    ],
+  },
+  {
+    id: 'selector',
+    nombre: '¿Para quién comprás?',
+    nota: 'Los tres círculos grandes. Salen de tus primeras tres categorías.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30, porDefecto: 'Empecemos por acá' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: '¿Para quién comprás?' },
+    ],
+  },
+]
+
+// ─── Bodega ──────────────────────────────────────────────────────────────────
+// Vinoteca: el corazón es la carta de varietales, una lista sin fotos. Son
+// las categorías del negocio, con su bajada y su "desde".
+const BODEGA: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La línea fina de arriba de todo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Envío refrigerado · Retiro en la vinoteca · Venta a mayores de 18' },
+    ],
+  },
+  {
+    id: 'carta',
+    nombre: 'La carta',
+    nota: 'La lista de varietales: son tus categorías. Acá van el título y la bajada de la sección.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'La carta' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Elegí por varietal' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
+  {
+    id: 'maridajes',
+    nombre: 'Maridajes',
+    nota: 'Los tres bloques de texto del final. Uno sin título no se dibuja.',
+    campos: [
+      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 40, porDefecto: 'Asado y achuras' },
+      { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Malbec joven o Bonarda. Fruta y poca madera para no tapar la carne.' },
+      { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 40, porDefecto: 'Pastas con salsa roja' },
+      { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 160, porDefecto: 'Sangiovese o un blend liviano. Acidez que corte el tomate.' },
+      { id: 't3', label: 'Tercero — título', tipo: 'texto', max: 40, porDefecto: 'Quesos duros' },
+      { id: 'b3', label: 'Tercero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Cabernet Franc con guarda, o un espumante nature bien frío.' },
+    ],
+  },
+]
+
+// ─── Crecer ──────────────────────────────────────────────────────────────────
+// Bebés: se navega por edad. La línea de tiempo son categorías reales.
+const CRECER: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La franja de arriba de todo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Algodón orgánico certificado · Cambios sin cargo dentro de los 30 días' },
+    ],
+  },
+  {
+    id: 'edades',
+    nombre: 'Comprá por edad',
+    nota: 'La línea de tiempo: son tus primeras cuatro categorías. Acá van el título y la bajada.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30, porDefecto: 'Comprá por edad' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: '¿Cuántos meses tiene?' },
+    ],
+  },
+  {
+    id: 'certificaciones',
+    nombre: 'Certificaciones',
+    nota: 'La franja del final, antes del pie. Una sin título no se dibuja.',
+    campos: [
+      { id: 't1', label: 'Primera — título', tipo: 'texto', max: 30, porDefecto: 'Algodón orgánico' },
+      { id: 'b1', label: 'Primera — bajada', tipo: 'texto', max: 40, porDefecto: 'certificado GOTS' },
+      { id: 't2', label: 'Segunda — título', tipo: 'texto', max: 30, porDefecto: 'Sin tóxicos' },
+      { id: 'b2', label: 'Segunda — bajada', tipo: 'texto', max: 40, porDefecto: 'pinturas al agua' },
+      { id: 't3', label: 'Tercera — título', tipo: 'texto', max: 30, porDefecto: 'Costuras planas' },
+      { id: 'b3', label: 'Tercera — bajada', tipo: 'texto', max: 40, porDefecto: 'no marcan la piel' },
+      { id: 't4', label: 'Cuarta — título', tipo: 'texto', max: 30, porDefecto: 'Cambios' },
+      { id: 'b4', label: 'Cuarta — bajada', tipo: 'texto', max: 40, porDefecto: 'sin cargo 30 días' },
+    ],
+  },
+]
+
 // ─── Vera ────────────────────────────────────────────────────────────────────
 // Joyería como portada de catálogo impreso: cintillo de servicios, piezas
 // numeradas y el bloque de asesoramiento por WhatsApp al final.
@@ -219,6 +403,11 @@ const NITIDA: SeccionPlantilla[] = [
 // propio no es editable todavía.
 export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
   premium: PREMIUM,
+  mosaico: MOSAICO,
+  atleta: ATLETA,
+  patitas: PATITAS,
+  bodega: BODEGA,
+  crecer: CRECER,
   vera: VERA,
   cobijo: COBIJO,
   nitida: NITIDA,
