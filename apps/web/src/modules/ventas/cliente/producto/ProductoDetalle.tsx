@@ -450,17 +450,22 @@ export default function ProductoDetalle() {
                       thumbnail (y ninguno se mostraba con una sola foto). */}
                   {imagenes && imagenes.length > 1 && (
                     <>
+                      {/* La pastilla de las flechas es blanca a propósito: va
+                          sobre la foto del producto, que puede ser de cualquier
+                          color. Por eso la tinta también va clavada oscura —
+                          con `var(--color-text)` una plantilla oscura pintaba
+                          el chevron casi blanco sobre blanco y desaparecía. */}
                       <button
                         className="ds-hover"
                         onClick={() => setImgIdx(i => (i - 1 + imagenes.length) % imagenes.length)}
                         title="Foto anterior"
-                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                       ><ChevronLeft size={18} /></button>
                       <button
                         className="ds-hover"
                         onClick={() => setImgIdx(i => (i + 1) % imagenes.length)}
                         title="Foto siguiente"
-                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                       ><ChevronRight size={18} /></button>
                     </>
                   )}
@@ -820,7 +825,14 @@ export default function ProductoDetalle() {
                 <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
                 <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
               </div>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
+              {/* El velo que tapa el formulario. Antes era
+                  `rgba(var(--color-bg-raw, 255,255,255), 0.72)`, pero
+                  `--color-bg-raw` no existe en ningún lado: siempre caía al
+                  fallback y pintaba un rectángulo BLANCO, que sobre una
+                  plantilla oscura (o en modo oscuro) quedaba como un parche
+                  gris con el texto ilegible. `color-mix` toma el fondo real
+                  del tema, sea el que sea. */}
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'color-mix(in srgb, var(--color-bg) 78%, transparent)', backdropFilter: 'blur(4px)' }}>
                 <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
                   <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
                 </div>
