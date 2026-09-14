@@ -138,6 +138,28 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   const abrir = (x: Producto) =>
     x.slug && acciones ? () => acciones.irAProducto(x.slug!) : undefined
 
+  // Resuelve lo que el dueño eligió en un campo `seleccion` (ver TipoCampo):
+  // `cat:<slug>` o `prod:<id>`, contra las categorías y el catálogo reales.
+  // Devuelve null si no eligió nada o si eso ya no existe —una categoría
+  // borrada después de configurar la sección no puede dejar una tarjeta rota.
+  const elegido = (valor: string): { nombre: string; img: string; ir?: () => void } | null => {
+    const v = valor.trim()
+    if (!v) return null
+    if (v.startsWith('cat:')) {
+      const slug = v.slice(4)
+      const cat = (p.categorias ?? []).find(([, , s]) => s === slug)
+      if (!cat) return null
+      return { nombre: cat[0], img: cat[1], ir: acciones ? () => acciones.irACategoria(slug) : undefined }
+    }
+    if (v.startsWith('prod:')) {
+      const id = v.slice(5)
+      const prod = (p.catalogo ?? p.productos).find((x) => x.slug === id)
+      if (!prod) return null
+      return { nombre: prod.nombre, img: prod.img, ir: abrir(prod) }
+    }
+    return null
+  }
+
   const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
     acciones?.renderProducto
       ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i, props)}</div>
@@ -840,17 +862,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // el real no (Apariencia no tiene ese campo), así que cae a la sección
     // `hero`, que el dueño sí edita.
     const etiquetaHero = s?.kicker || txt('hero', 'etiqueta')
-    // La comparativa: cinco filas de texto libre, cada una "etiqueta | col1 |
-    // col2 | col3". Antes era una tabla entera inventada (V-70 / V-90 Pro /
-    // V-90 Studio con sus drivers y precios). Una fila vacía no se dibuja, y
-    // sin ninguna la sección entera desaparece.
-    const filasComparativa = ['f1', 'f2', 'f3', 'f4', 'f5']
-      .map((k) => txt('comparativa', k))
-      .filter(Boolean)
-      .map((fila) => {
-        const celdas = fila.split('|').map((c) => c.trim())
-        return [celdas[0] ?? '', celdas[1] ?? '', celdas[2] ?? '', celdas[3] ?? '']
-      })
+    // Los tres pasos de "Armá tu setup": lo que va ahí lo elige el dueño
+    // (categoría o producto), no el orden en que estén cargadas las
+    // categorías. Sin elegir nada la sección no se dibuja.
+    const pasos = ['i1', 'i2', 'i3']
+      .map((k) => elegido(txt('pasos', k)))
+      .filter((x): x is NonNullable<typeof x> => x !== null)
 
     const encabezado = (
       <>
@@ -987,20 +1004,24 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        {/* Armá tu setup: tres pasos con producto, no con texto. */}
+        {/* Armá tu setup: tres pasos que elige el dueño. Sin nada elegido la
+            sección no se dibuja — antes se rellenaba sola con las tres
+            primeras categorías del negocio, que no significaba nada. */}
+        {pasos.length > 0 && (
         <Reveal>
           <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '30px 16px' : '46px 40px' }}>
             <Titulo t={t} volanta={txt('pasos', 'volanta')} texto={txt('pasos', 'titulo')} centrado movil={movil} />
             {/* Eran tres pasos con producto y precio clavados, y un boton que
-                no armaba nada: Orbita no tiene configurador. Ahora son tres
-                categorias reales que llevan a su listado --el recorrido en
-                tres pasos se mantiene, pero cada paso va a donde dice. */}
+                no armaba nada: Orbita no tiene configurador. Despues fueron
+                las tres primeras categorias del negocio, que tampoco tenia
+                sentido: que va aca es una decision del dueño. Ahora elige
+                cada paso --categoria o producto-- desde el editor. */}
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: 16 }}>
-              {(p.categorias ?? []).slice(0, 3).map(([n, src, slug], i) => (
+              {pasos.map(({ nombre: n, img: src, ir }, i) => (
                 <div
                   key={n} className="pl-card"
-                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
-                  style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', cursor: slug && acciones ? 'pointer' : undefined }}
+                  onClick={ir}
+                  style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', cursor: ir ? 'pointer' : undefined }}
                 >
                   <div style={{ position: 'relative' }}>
                     <Foto src={src} alto={movil ? 140 : 158} />
@@ -1018,23 +1039,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <div style={{ textAlign: 'center', marginTop: 22 }}><Boton t={t} grande onClick={acciones?.irACatalogo}>{txt('pasos', 'cta')}</Boton></div>
           </div>
         </Reveal>
-
-        {filasComparativa.length > 0 && (
-        <Reveal>
-          <div style={{ padding: movil ? '30px 16px 34px' : '46px 40px 52px' }}>
-            <Titulo t={t} volanta={txt('comparativa', 'volanta')} texto={txt('comparativa', 'titulo')} movil={movil} />
-            <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
-              {filasComparativa.map((fila, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr', background: i === 0 ? t.soft : i % 2 ? t.surf : 'transparent', borderBottom: i === filasComparativa.length - 1 ? 'none' : `1px solid ${t.border}` }}>
-                  {fila.map((c, j) => (
-                    <div key={j} style={{ padding: movil ? '10px 8px' : '14px 16px', fontSize: movil ? 11.5 : 13, color: j === 0 ? t.muted : t.text, fontWeight: i === 0 || j === 2 ? 700 : 400, fontFamily: j > 0 && i > 0 ? 'ui-monospace, monospace' : t.fb, background: j === 2 && i > 0 ? 'rgba(34,211,238,0.07)' : undefined }}>{c}</div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Reveal>
         )}
+
 
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '26px 16px' : '40px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 20 }}>

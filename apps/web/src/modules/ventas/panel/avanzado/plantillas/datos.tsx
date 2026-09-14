@@ -164,8 +164,8 @@ export const PLANTILLAS: Plantilla[] = [
     id: 'nocturno',
     nombre: 'Nocturno',
     para: 'Gaming, audio, componentes',
-    queCambia: 'Oscura y con datos en vez de frases. Barra de lanzamiento con contador, el producto flotando sobre un foco de luz, categorías con su cantidad de artículos, carrusel horizontal con specs adentro de cada tarjeta, armador de setup en tres pasos y comparativa de tres modelos.',
-    secciones: ['Contador de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Comparativa', 'Números grandes'],
+    queCambia: 'Oscura y con datos en vez de frases. Barra de lanzamiento, el producto flotando sobre un foco de luz, carrusel horizontal con specs adentro de cada tarjeta, y un recorrido en tres pasos que armás vos eligiendo qué va en cada uno.',
+    secciones: ['Cintillo de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Números grandes'],
     marca: 'Vector', tagline: 'Periféricos y audio, sin vueltas',
     layout: 'nocturno',
     // De muestra: en una tienda real las pisa `plantillaReal()`.

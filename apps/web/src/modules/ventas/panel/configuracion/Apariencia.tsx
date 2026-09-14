@@ -14,7 +14,7 @@ import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, type ApiCategory } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -159,6 +159,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // completa no se piden: ahí el header se edita con la lista fija de
     // siempre, dentro de "Diseño y layout".
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
+    // El catálogo, para los campos `seleccion` de las secciones de plantilla
+    // (ver TipoCampo en plantillas/tipos.ts): "Armá tu setup" de Nocturno deja
+    // elegir una categoría O un producto concreto, así que hacen falta los dos.
+    const [productos, setProductos] = useState<ApiProductListItem[]>([])
     const [guardando, setGuardando] = useState(false)
     const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
 
@@ -233,6 +237,11 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         panelGetCategoriesFlat()
             .then(cats => { if (!cancelado) setCategorias(cats.filter(c => c.isActive)) })
             .catch(() => { /* sin categorías: la tarjeta muestra solo los enlaces fijos */ })
+        // Un tope alto pero finito: el desplegable es para elegir, no para
+        // navegar un catálogo de miles.
+        panelGetProducts({ limit: 200 })
+            .then(r => { if (!cancelado) setProductos(r.data) })
+            .catch(() => { /* sin catálogo: el selector ofrece solo categorías */ })
         return () => { cancelado = true }
     }, [])
 
@@ -594,6 +603,33 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                     lineHeight: 1.55, resize: 'vertical',
                                 }}
                             />
+                        ) : campo.tipo === 'seleccion' ? (
+                            /* Elegir del catálogo real. Sin elegir nada la
+                               sección no se dibuja en la portada — es a
+                               propósito: antes se rellenaba sola con las
+                               primeras categorías, que no significaba nada. */
+                            <select
+                                className="ds-field"
+                                value={valorSeccion(sec.id, campo)}
+                                onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
+                                style={{
+                                    width: '100%', height: 40, padding: '0 12px', borderRadius: 8,
+                                    border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                                    color: 'var(--color-text)', fontSize: 14, fontFamily: 'inherit',
+                                }}
+                            >
+                                <option value="">— Sin elegir —</option>
+                                {categorias.length > 0 && (
+                                    <optgroup label="Categorías">
+                                        {categorias.map(c => <option key={c.id} value={`cat:${c.slug}`}>{c.name}</option>)}
+                                    </optgroup>
+                                )}
+                                {productos.length > 0 && (
+                                    <optgroup label="Productos">
+                                        {productos.map(pr => <option key={pr.id} value={`prod:${pr.id}`}>{pr.name}</option>)}
+                                    </optgroup>
+                                )}
+                            </select>
                         ) : (
                             <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo)} />
                         )}

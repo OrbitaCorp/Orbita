@@ -363,8 +363,10 @@ const CRECER: SeccionPlantilla[] = [
 ]
 
 // ─── Nocturno ────────────────────────────────────────────────────────────────
-// Tech: la que más contenido inventado tenía. El contador de lanzamiento, la
-// ficha de cada tarjeta y la comparativa entera estaban escritos a mano.
+// Tech: la que más contenido inventado tenía. El contador de lanzamiento y la
+// ficha de cada tarjeta estaban escritos a mano; la comparativa de modelos se
+// sacó entera (Orbita no tiene con qué llenarla: eran tres modelos inventados
+// con sus specs y sus precios).
 const NOCTURNO: SeccionPlantilla[] = [
   {
     id: 'lanzamiento',
@@ -412,23 +414,12 @@ const NOCTURNO: SeccionPlantilla[] = [
     nombre: 'El recorrido en tres pasos',
     nota: 'Los tres pasos son tus primeras tres categorías y llevan a su listado.',
     campos: [
+      { id: 'i1', label: 'Paso 1', tipo: 'seleccion', help: 'Elegí la categoría o el producto que va en este paso.' },
+      { id: 'i2', label: 'Paso 2', tipo: 'seleccion' },
+      { id: 'i3', label: 'Paso 3', tipo: 'seleccion' },
       { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'En tres pasos' },
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, porDefecto: 'Armá tu setup' },
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Ver todo el catálogo' },
-    ],
-  },
-  {
-    id: 'comparativa',
-    nombre: 'Comparativa',
-    nota: 'Una fila por renglón, con las columnas separadas por |. La primera fila es el encabezado. Vacío: la sección no aparece.',
-    campos: [
-      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Sin vueltas' },
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Cuál te conviene' },
-      { id: 'f1', label: 'Encabezado', tipo: 'texto', max: 120, help: 'Ej: | Modelo A | Modelo B | Modelo C', porDefecto: ' | Modelo A | Modelo B | Modelo C' },
-      { id: 'f2', label: 'Fila 2', tipo: 'texto', max: 120, porDefecto: 'Característica | — | — | —' },
-      { id: 'f3', label: 'Fila 3', tipo: 'texto', max: 120 },
-      { id: 'f4', label: 'Fila 4', tipo: 'texto', max: 120 },
-      { id: 'f5', label: 'Fila 5', tipo: 'texto', max: 120 },
     ],
   },
   {
@@ -438,10 +429,10 @@ const NOCTURNO: SeccionPlantilla[] = [
     campos: [
       { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '24 h' },
       { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'de envío a todo el país' },
-      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '12' },
-      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'meses de garantía' },
-      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '12' },
-      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'cuotas sin interés' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '12' },
+      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 30, afirmacion: true, porDefecto: 'meses de garantía' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '12' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 30, afirmacion: true, porDefecto: 'cuotas sin interés' },
       { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10 },
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 30 },
     ],

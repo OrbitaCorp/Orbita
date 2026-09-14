@@ -79,6 +79,17 @@ export type TipoCampo =
   // ver `secciones` en home-template-data.dto.ts. Leerlo: helper `activo()`
   // en homes.tsx.
   | 'switch'
+  // Elegir UNA cosa del catálogo real del negocio: una categoría o un
+  // producto. Se guarda como `cat:<slug>` o `prod:<id>` —con prefijo, igual
+  // que los `headerLinks`, para que una categoría y un producto no choquen
+  // nunca— y el panel dibuja un desplegable con lo que la tienda tiene de
+  // verdad.
+  //
+  // Existe porque una sección como "Armá tu setup" (Nocturno) no se puede
+  // rellenar sola con las tres primeras categorías: qué va ahí es una
+  // decisión del dueño, no del orden en que estén cargadas. Sin elegir nada,
+  // la sección no se dibuja.
+  | 'seleccion'
 
 export interface CampoSeccion {
   id: string
@@ -230,6 +241,11 @@ export interface Plantilla {
   // [nombre, imagen] en las plantillas de muestra; la tienda real agrega un
   // tercer elemento con el slug para que el tile navegue a la categoría.
   categorias?: [string, string, string?][]
+  // El catálogo del negocio, SOLO para resolver los campos `seleccion` (ver
+  // TipoCampo): un `prod:<id>` guardado tiene que poder encontrar su nombre y
+  // su foto, y `productos` de acá arriba son los destacados nomás. En el
+  // panel no existe.
+  catalogo?: Producto[]
   cupon?: { titulo: string; bajada: string; codigo: string }
   // El pie. En la vitrina del panel los ítems son strings sueltos (texto
   // muerto de la maqueta); en la tienda real `plantillaReal()` los reemplaza

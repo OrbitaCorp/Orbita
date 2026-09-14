@@ -259,6 +259,7 @@ export function plantillaReal({
     // en blanco, que se ve peor que no tener cupón.
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
     productos: destacados.map(p => aProductoPlantilla(p, transferPct)),
+    catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
     productosSecundarios: masVendidos.map(p => aProductoPlantilla(p, transferPct)),
     // Sin slides editados, se queda con los de muestra de `base` (mismo
     // criterio que categorías/cupón: no dejar la sección vacía si el negocio
