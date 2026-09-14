@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
 // se ven salen del catálogo del negocio, de sus categorías, o de una sección
 // editable cuyo `porDefecto` vive en secciones.ts.
@@ -104,6 +104,46 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     </div>
   )
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
+  // Cuántos entran en UNA fila de esa grilla. Va siempre de a pares con
+  // `cols()`: si no coinciden, la fila queda con un hueco a la derecha o con
+  // un producto colgado abajo.
+  const cuantos = (d: number, m = 2) => (movil ? m : d)
+
+  // Un orden estable pero que no es el del catálogo. `p.productos` son los
+  // DESTACADOS, y rellenar toda la portada con ellos hace que la tienda
+  // muestre siempre los mismos cinco: las secciones que no piden destacados
+  // salen de acá.
+  //
+  // No usa Math.random(): tiene que dar lo mismo en el servidor y en el
+  // cliente (si no, React se queja al hidratar) y no puede barajarse de nuevo
+  // en cada render. Ordenar por un hash del slug da un orden "al azar" que es
+  // estable para esta tienda y distinto para cada una.
+  const hash = (s: string) => {
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
+    return h
+  }
+  const barajado = useMemo(() => {
+    const todos = p.catalogo ?? p.productos
+    return [...todos].sort((a, b) => hash(a.slug ?? a.nombre) - hash(b.slug ?? b.nombre))
+  }, [p.catalogo, p.productos])
+
+  /**
+   * Exactamente los productos que llenan una fila — ni uno de más ni de menos.
+   *
+   * `clave` es el id de la sección: desplaza el arranque dentro del barajado
+   * para que dos secciones de la misma portada no muestren los mismos.
+   * `base` solo lo pasan las secciones que de verdad piden destacados o más
+   * vendidos ("Destacados", "Top ventas"); el resto sale del catálogo.
+   */
+  const fila = (n: number, clave: string, base?: Producto[]) => {
+    const pool = base && base.length > 0 ? base : barajado
+    if (pool.length === 0) return []
+    const desde = Math.abs(hash(clave)) % pool.length
+    const salida: Producto[] = []
+    for (let i = 0; i < Math.min(n, pool.length); i++) salida.push(pool[(desde + i) % pool.length])
+    return salida
+  }
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
   // Contenido de una sección editable de ESTA plantilla. Si el dueño no lo
@@ -214,7 +254,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <h2 style={{ fontFamily: t.fh, fontSize: movil ? 24 : 32, textAlign: 'center', margin: '0 0 4px', fontWeight: 800, letterSpacing: '-0.025em' }}>{txt('destacados', 'titulo')}</h2>
             <p style={{ textAlign: 'center', color: t.muted, fontSize: 13.5, margin: '0 0 26px' }}>{txt('destacados', 'bajada')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: cols(4), borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}` }}>
-              {p.productos.map((x, i) => producto(x, i, { sangre: true, alto: movil ? 190 : 290 }))}
+              {fila(cuantos(4), 'vidriera-destacados', p.productos).map((x, i) => producto(x, i, { sangre: true, alto: movil ? 190 : 290 }))}
             </div>
           </div>
         </Reveal>
@@ -249,7 +289,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '4px 16px 30px' : '0 40px 44px' }}>
             <Titulo t={t} volanta={txt('masVendidos', 'volanta')} texto={txt('masVendidos', 'titulo')} accion={txt('masVendidos', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
-              {masVendidos.map((x, i) => producto(x, i, { alto: movil ? 150 : 215 }))}
+              {fila(cuantos(4), 'vidriera-mas-vendidos', masVendidos).map((x, i) => producto(x, i, { alto: movil ? 150 : 215 }))}
             </div>
           </div>
         </Reveal>
@@ -378,7 +418,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '24px 16px 30px' : '34px 28px 40px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(5, 2), gap: 14 }}>
-              {[...p.productos, p.productos[0]].map((x, i) => (
+              {fila(cuantos(5), 'mosaico-fila').map((x, i) => (
                 <div key={i} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, borderRadius: t.radio, overflow: 'hidden', border: `1px solid ${t.border}` }}>
                   <div className="pl-media" style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 172} />
@@ -781,7 +821,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '26px 16px 34px' : '46px 44px 62px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 24 : 32 }}>
-              {p.productos.slice(0, 3).map((x) => (
+              {fila(cuantos(3, 1), 'premium-piezas').map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ textAlign: 'center' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 320 : 400} radio={t.radio} />
@@ -972,7 +1012,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             </div>
             <Tira gap={14}>
-              {p.productos.map((x) => (
+              {fila(movil ? 4 : 6, 'nocturno-fila').map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ width: movil ? 235 : 280, flexShrink: 0, scrollSnapAlign: 'start', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 178} />
@@ -1201,7 +1241,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '10px 16px 30px' : '16px 40px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
+              {fila(cuantos(4), 'papeleria-fila').map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -1500,7 +1540,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '20px 16px 28px' : '34px 34px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 10 : 14 }}>
-              {p.productos.map((x) => (
+              {fila(cuantos(4), 'atleta-fila').map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <div style={{ position: 'relative' }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 220} />
@@ -1640,7 +1680,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '4px 16px 26px' : '10px 40px 44px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 145 : 200} onClick={abrir(x)} />)}
+              {fila(cuantos(4), 'patitas-fila').map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 145 : 200} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -1741,7 +1781,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '10px 22px 34px' : '20px 52px 60px' }}>
             <Titulo t={t} volanta={txt('seleccion', 'volanta')} texto={txt('seleccion', 'titulo')} movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 18 : 26 }}>
-              {p.productos.slice(0, 3).map((x) => (
+              {fila(cuantos(3, 1), 'bodega-seleccion').map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: '#F3EADF', padding: movil ? 18 : 24, textAlign: 'center', color: '#2A1A14' }}>
                   <div style={{ margin: '0 auto', maxWidth: movil ? 200 : 230 }}>
                     <Foto src={x.img} src2={x.img2} alto={movil ? 300 : 380} />
@@ -1867,7 +1907,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '4px 16px 28px' : '6px 44px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
+              {fila(cuantos(4), 'crecer-fila').map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
           </div>
         </Reveal>
@@ -2044,7 +2084,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ padding: movil ? '4px 16px 26px' : '10px 44px 40px' }}>
                 <Titulo t={t} volanta={txt('fila2', 'volanta')} texto={txt('fila2', 'titulo')} movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
-                  {[...p.productos].reverse().map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
+                  {fila(cuantos(4), 'circuito-nuevos').map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
                 </div>
               </div>
             </Reveal>
@@ -2406,7 +2446,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '28px 16px 8px' : '46px 44px 12px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 12 : 18 }}>
-              {p.productos.map((x) => (
+              {fila(cuantos(2, 1), 'nitida-fila').map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '112px 1fr' : '150px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 168} />
                   <div style={{ padding: movil ? '13px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
@@ -2564,7 +2604,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ padding: movil ? '32px 16px' : '52px 40px' }}>
           <Titulo t={t} volanta={txt('rutina', 'volanta')} texto={txt('rutina', 'titulo')} centrado movil={movil} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: 18 }}>
-            {p.productos.slice(0, 3).map((x, i) => (
+            {fila(cuantos(3, 1), 'glow-trio').map((x, i) => (
               <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', boxShadow: t.sombra }}>
                 <div style={{ position: 'relative' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 210 : 250} />
@@ -2594,7 +2634,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '32px 16px' : '52px 40px' }}>
           <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 16 }}>
-            {p.productos.map((x) => (
+            {fila(cuantos(4), 'glow-fila').map((x) => (
               <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
                 <div style={{ position: 'relative' }}>
                   <Foto src={x.img} src2={x.img2} alto={movil ? 150 : 190} />
