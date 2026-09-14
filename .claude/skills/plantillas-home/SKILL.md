@@ -457,6 +457,104 @@ document.head.appendChild(s)
 
 Y para que entre la página entera en una captura, `document.documentElement.style.zoom = '0.62'`.
 
+## Lo que apareció DESPUÉS de dar las dieciséis por terminadas
+
+Las dieciséis pasaron el checklist y se aplicaban con su diseño intacto. Aun
+así, probándolas en una tienda real con catálogo de verdad salieron estos
+bugs. **Todos son de la misma familia**: algo que la maqueta resolvía con un
+valor fijo y que en la tienda real tiene que salir de los datos. Revisar los
+cinco puntos de acá abajo en cualquier plantilla nueva, antes de darla por
+lista.
+
+### 1. Lo que solo estaba en la portada
+
+`Inicio.tsx` inyectaba `PLANTILLA_CSS` y llamaba a `cargarFuentes()`. Las dos
+cosas valían **solo en el home**. En el catálogo y en la ficha:
+
+- Sin `.pl-media .pl-b { position: absolute; opacity: 0 }`, la segunda foto de
+  la tarjeta no se apilaba sobre la primera: **se dibujaba al lado**, y el
+  crossfade del hover no existía. Se reportó como "se ven dos imágenes en el
+  product card" en *También te puede gustar*.
+- Sin `cargarFuentes()`, las variables CSS decían la tipografía de la
+  plantilla pero el archivo de la fuente nunca se bajaba: caía al fallback.
+
+Las dos viven ahora en `StorefrontChrome`, que envuelve TODAS las vistas.
+**Regla: lo que la plantilla necesita para verse bien no puede vivir en
+`Inicio.tsx`.** Si la plantilla se ve en otra vista, va en el chrome.
+
+### 2. Fondo clavado + tinta del tema (o al revés)
+
+Dos bugs de contraste, el mismo patrón:
+
+- El velo de "Solo compradores verificados" era
+  `rgba(var(--color-bg-raw, 255,255,255), 0.72)` — y **`--color-bg-raw` no
+  existe en ningún lado del repo**, así que el fallback blanco se aplicaba
+  siempre. Sobre una plantilla oscura quedaba un parche gris ilegible.
+- Las flechas de la galería son una pastilla blanca fija (correcto: van sobre
+  la foto del producto) pero con `color: var(--color-text)`. En plantilla
+  oscura: chevron casi blanco sobre blanco.
+
+**Regla: si el fondo va clavado, la tinta también; si la tinta sale del tema,
+el fondo también.** Mezclarlas es lo que rompe. Para velos, `color-mix(in
+srgb, var(--color-bg) 78%, transparent)` — que ya es convención del repo.
+Y antes de usar una variable CSS, `grep` que esté definida: una var
+inexistente no falla, cae al fallback en silencio.
+
+### 3. Datos que el adaptador arma y el bloque no dibuja
+
+`plantillaReal.ts` ya calculaba el precio con transferencia y lo dejaba en
+`x.transfer`, pero **once plantillas que dibujan SU PROPIA tarjeta nunca lo
+pintaban**. Solo Corralón y Nítida lo hacían.
+
+**Regla: si la plantilla arma su propia tarjeta, tiene que dibujar todo lo que
+`aProductoPlantilla()` rellena**, no solo `nombre`/`precio`/`img`. Hoy eso es
+`antes`, `transfer` y `variantOptions`. Las que van por `producto()` →
+`ProductCard` o por la `Card` de `piezas.tsx` lo heredan gratis — preferirlas.
+Y guardar siempre (`{x.transfer && ...}`): sin guarda queda un div vacío
+metiendo aire cuando la tienda no tiene ese descuento. En los bloques que
+parten celular/escritorio, guardar además con `movil &&` o se duplica.
+
+### 4. Enlaces que no son enlaces
+
+En el pie, los ítems de columna se dibujaban como `<div>` — sin `href` ni
+`onClick`. **Ningún enlace del footer navegaba a ningún lado**, en las catorce
+plantillas.
+
+**Regla: cualquier cosa que parezca clickeable tiene que serlo.** Después de
+enganchar una plantilla, `grep` por `accion="` sin `onAccion`, por `<Boton`
+sin `onClick` y por columnas de texto que deberían ser `<a>`. En esta pasada
+aparecieron **ocho** `<Titulo>` con un "Ver todo →" a la derecha que no hacía
+nada.
+
+### 5. El pie es contenido real, no decoración
+
+El pie era la maqueta entera en producción: categorías que la tienda no tiene,
+y un `cierre` clavado en `homes.tsx` — **once plantillas** mostraban cosas
+como `CUIT 30-71234567-8`, `Local en Av. Rivadavia 4820` o `Vinoteca en
+Palermo` en tiendas de verdad. Un CUIT falso.
+
+Peor: al pie de la plantilla le faltaba lo que `StorefrontFooter` tiene **por
+obligación legal** — Términos, Política de privacidad y el botón de
+Arrepentimiento/Devolución (RBT-683). En el home de esas catorce no estaban,
+aunque en el catálogo y la ficha sí.
+
+**Regla: el pie de una plantilla aporta DISEÑO, nunca contenido.** Las
+dieciséis llamadas a `<Pie>` eran idénticas — el "pie propio" era solo color y
+tipografía. El contenido lo arma `pieReal()` en `plantillaReal.ts` con las
+mismas columnas que `StorefrontFooter`. Si mañana se agrega algo legal al pie
+normal, hay que agregarlo también acá.
+
+### 6. Los toggles de Apariencia que la plantilla ignora
+
+"Mostrar footer" no lo respetaban las plantillas con `piePropio`: el que lo
+chequeaba era `StorefrontFooter`, que ahí ni se dibuja. Ahora va por
+`ocultarPie`.
+
+**Regla: cuando una plantilla reemplaza un componente de Órbita, hereda sus
+toggles.** Antes de dar por listo el reemplazo, mirar qué banderas de
+Apariencia leía el componente original (`showFooter`, `showSocialFooter`,
+`showStatsBar`, `showWhatsapp`…) y pasarlas.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -481,6 +579,14 @@ Y para que entre la página entera en una captura, `document.documentElement.sty
 | El hero editable de Escaparate casi termina con un campo nuevo en Apariencia | Se pensó en agregar un "kicker" propio para la maqueta antes de mirar qué campos tiene de verdad `StorefrontHeroSlide` | Reusar el `heroSlides` que YA edita el dueño (mismo editor de Vidriera): sin `kicker` porque Apariencia no lo tiene, y el bloque lo trata como opcional |
 | Esta skill decía "es una vitrina, no aplica nada" mientras Vidriera ya se podía activar en producción | El enganche real se hizo en otra sesión/rama y nadie volvió a esta skill a corregirla | Cuando se toque el enganche real, actualizar esta skill en el mismo commit — no en uno aparte |
 | `datos.tsx` quedó con `{ {` duplicado al borrar un bloque a mano con `sed`/Python por rango de líneas | El límite superior de un corte incluía la llave de apertura del bloque que se quería sacar, y el límite inferior del otro corte también traía la suya | Después de cualquier borrado por rango de líneas, correr `tsc` antes de dar por terminado — un error de sintaxis en un objeto grande a veces apunta a una línea lejos del problema real |
+
+| Dos fotos a la vez en la tarjeta, y el hover sin efecto | `PLANTILLA_CSS` se inyectaba solo en `Inicio.tsx`: fuera del home, `.pl-b` no era `absolute` ni `opacity: 0` | El CSS y `cargarFuentes()` van en `StorefrontChrome`, que envuelve todas las vistas |
+| Un parche gris ilegible sobre las plantillas oscuras | El velo usaba `var(--color-bg-raw, 255,255,255)` y esa variable NO EXISTE en el repo: caía siempre al blanco | `grep` que la variable esté definida antes de usarla; para velos, `color-mix` sobre `var(--color-bg)` |
+| Chevrons blancos sobre pastilla blanca | Fondo clavado (`rgba(255,255,255,0.92)`) con tinta del tema (`var(--color-text)`) | Si el fondo va clavado, la tinta también; si la tinta sale del tema, el fondo también |
+| Once plantillas sin el precio con transferencia | El adaptador ya lo dejaba en `x.transfer`, pero las que dibujan SU tarjeta nunca lo pintaban | Una tarjeta propia debe dibujar TODO lo que `aProductoPlantilla()` rellena, guardado con `{x.campo && ...}` |
+| Ocho "Ver todo →" que no hacían nada | `<Titulo>` con `accion` pero sin `onAccion` — el enlace se dibuja igual | `grep` por `accion="` sin `onAccion` y por `<Boton` sin `onClick` después de enganchar |
+| Un CUIT falso en el pie de tiendas reales | El `cierre` estaba clavado en `homes.tsx` (once plantillas), y las columnas eran las de la maqueta con `<div>` en vez de `<a>` | El pie aporta diseño, nunca contenido: lo arma `pieReal()` en `plantillaReal.ts` |
+| Faltaban Términos, Privacidad y Arrepentimiento en el home | Con `piePropio` no se dibuja `StorefrontFooter`, que es quien los traía por obligación legal | Al reemplazar un componente de Órbita, replicar lo legal Y heredar sus toggles de Apariencia |
 
 ## Convenciones del repo
 
