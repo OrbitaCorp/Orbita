@@ -325,7 +325,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Productos compactos: cinco por fila, imagen cuadrada, sin ficha larga. */}
         <Reveal>
           <div style={{ padding: movil ? '24px 16px 30px' : '34px 28px 40px' }}>
-            <Titulo t={t} volanta="Se van rápido" texto="Lo más vendido" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(5, 2), gap: 14 }}>
               {[...p.productos, p.productos[0]].map((x, i) => (
                 <div key={i} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, borderRadius: t.radio, overflow: 'hidden', border: `1px solid ${t.border}` }}>
@@ -689,7 +689,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px 8px' : '58px 44px 16px' }}>
-            <Titulo t={t} volanta="Por categoría" texto="Qué estás buscando" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
+            <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
               {/* Las categorías REALES del negocio (plantillaReal.ts las arma
                   con su foto propia, la del primer producto o el degradé).
@@ -718,7 +718,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Las piezas: tres, grandes, con aire. Sin tachados ni badges de oferta. */}
         <Reveal>
           <div style={{ padding: movil ? '26px 16px 34px' : '46px 44px 62px' }}>
-            <Titulo t={t} volanta="Disponibles ahora" texto="Piezas de la colección" accion="Ver las 24 →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 24 : 32 }}>
               {p.productos.slice(0, 3).map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ textAlign: 'center' }}>
@@ -903,7 +903,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '20px 0 30px 16px' : '26px 0 44px 40px' }}>
             <div style={{ paddingRight: movil ? 16 : 40 }}>
-              <Titulo t={t} volanta="Arman buen setup" texto="Se compran juntos" accion="Ver el catálogo →" movil={movil} onAccion={acciones?.irACatalogo} />
+              <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             </div>
             <Tira gap={14}>
               {p.productos.map((x) => (
@@ -1088,7 +1088,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '26px 16px 6px' : '44px 40px 10px' }}>
-            <Titulo t={t} volanta="Buscá por rubro" texto="Categorías" accion="Ver todas →" movil={movil} onAccion={acciones?.irACatalogo} />
+            <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(6, 3), gap: 10 }}>
               {(p.categorias ?? []).slice(0, 6).map(([n, src, slug]) => (
                 <div
@@ -1139,7 +1139,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '10px 16px 30px' : '16px 40px 48px' }}>
-            <Titulo t={t} volanta="Lo que más sale" texto="Más vendidos de la semana" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
@@ -1249,7 +1249,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '16px 12px' : '26px 18px' }}>
-            <Titulo t={t} volanta="Departamentos" texto="Entrá por rubro" accion="Ver los 12 →" movil={movil} />
+            <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 10 }}>
               {(p.categorias ?? []).slice(0, 4).map(([n, src, slug]) => (
                 <div
@@ -1292,7 +1292,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Productos en lista, con la ficha técnica al lado — no en grilla. */}
         <Reveal>
           <div style={{ padding: movil ? '0 12px 24px' : '0 18px 44px' }}>
-            <Titulo t={t} volanta="Lo más pedido" texto="Herramienta y obra" accion="Ver catálogo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {p.productos.map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '96px 1fr' : '150px 1fr auto', gap: movil ? 14 : 22, alignItems: 'center', border: `1px solid ${t.border}`, borderRadius: t.radio, padding: movil ? 10 : 14, background: t.surf }}>
@@ -1439,7 +1439,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '20px 16px 28px' : '34px 34px 48px' }}>
-            <Titulo t={t} volanta="Equipate" texto="Lo nuevo de la temporada" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 10 : 14 }}>
               {p.productos.map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
@@ -1577,7 +1577,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 26px' : '10px 40px 44px' }}>
-            <Titulo t={t} volanta="Recomendados" texto="Lo que más eligen" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 145 : 200} onClick={abrir(x)} />)}
             </div>
@@ -1677,7 +1677,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Botellas: altas y angostas, sobre crema para que recorten. */}
         <Reveal>
           <div style={{ padding: movil ? '10px 22px 34px' : '20px 52px 60px' }}>
-            <Titulo t={t} volanta="Selección del mes" texto="Tres para empezar" movil={movil} />
+            <Titulo t={t} volanta={txt('seleccion', 'volanta')} texto={txt('seleccion', 'titulo')} movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 18 : 26 }}>
               {p.productos.slice(0, 3).map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: '#F3EADF', padding: movil ? 18 : 24, textAlign: 'center', color: '#2A1A14' }}>
@@ -1699,7 +1699,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '28px 22px' : '46px 52px' }}>
-            <Titulo t={t} centrado volanta="Para acompañar" texto="Maridajes que funcionan" movil={movil} />
+            <Titulo t={t} centrado volanta={txt('maridajes', 'volanta')} texto={txt('maridajes', 'titulo')} movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: movil ? 16 : 24 }}>
               {([
                 [txt('maridajes', 't1'), txt('maridajes', 'b1')],
@@ -1800,7 +1800,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 28px' : '6px 44px 48px' }}>
-            <Titulo t={t} volanta="Recomendados" texto="Lo más elegido" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 210} onClick={abrir(x)} />)}
             </div>
@@ -1928,7 +1928,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 producto así, y es como se compra un periférico. */}
             <Reveal>
               <div style={{ padding: movil ? '26px 16px 8px' : '44px 44px 10px' }}>
-                <Titulo t={t} volanta="Ficha técnica a la vista" texto="Lo que más se vende" accion="Ver el catálogo →" movil={movil} />
+                <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
                 <div style={{ display: 'grid', gap: movil ? 14 : 18 }}>
                   {p.productos.slice(0, 3).map((x) => (
                     <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '116px 1fr' : '260px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
@@ -1957,7 +1957,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 panel lateral ya hay nav, esto es el atajo largo. */}
             <Reveal>
               <div style={{ padding: movil ? '20px 16px' : '30px 44px' }}>
-                <Titulo t={t} texto="Por categoría" movil={movil} />
+                <Titulo t={t} texto={txt('categorias', 'titulo')} movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: 10 }}>
                   {categorias.map(([n, src, slug]) => (
                     <div
@@ -1976,7 +1976,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
             <Reveal>
               <div style={{ padding: movil ? '4px 16px 26px' : '10px 44px 40px' }}>
-                <Titulo t={t} volanta="También te puede servir" texto="Nuevos ingresos" movil={movil} />
+                <Titulo t={t} volanta={txt('fila2', 'volanta')} texto={txt('fila2', 'titulo')} movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
                   {[...p.productos].reverse().map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
                 </div>
@@ -2074,7 +2074,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             izquierda, nombre en serif, precio a la derecha alineado. */}
         <Reveal>
           <div style={{ padding: movil ? '30px 16px 10px' : '50px 44px 16px' }}>
-            <Titulo t={t} volanta="La colección" texto="Piezas disponibles" centrado movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} centrado movil={movil} />
             <div style={{ borderTop: filete }}>
               {p.productos.map((x, i) => (
                 <div
@@ -2106,7 +2106,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             versalitas, en dos columnas. Ni mosaico ni pastillas. */}
         <Reveal>
           <div style={{ padding: movil ? '18px 16px 30px' : '26px 44px 48px' }}>
-            <Titulo t={t} texto="Buscá por pieza" centrado movil={movil} />
+            <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 10 : 16 }}>
               {(p.categorias ?? []).map(([n, src, slug]) => (
                 <div
@@ -2235,7 +2235,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 30px' : '34px 44px 44px' }}>
-            <Titulo t={t} volanta="Todo el catálogo" texto="Comprá por categoría" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
+            <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
               {cat.map(([n, src, slug]) => (
                 <div
@@ -2334,7 +2334,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             lado. Dos por fila en escritorio, una en celular. */}
         <Reveal>
           <div style={{ padding: movil ? '28px 16px 8px' : '46px 44px 12px' }}>
-            <Titulo t={t} volanta="Lo esencial" texto="Los que más se repiten" accion="Ver el catálogo →" movil={movil} />
+            <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 12 : 18 }}>
               {p.productos.map((x) => (
                 <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ display: 'grid', gridTemplateColumns: movil ? '112px 1fr' : '150px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
@@ -2364,7 +2364,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             debajo de la foto en vez de encima. */}
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 26px' : '32px 44px 40px' }}>
-            <Titulo t={t} texto="Por familia" centrado movil={movil} />
+            <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
               {(p.categorias ?? []).map(([n, src, slug]) => (
                 <div
@@ -2518,7 +2518,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
       <Reveal>
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '32px 16px' : '52px 40px' }}>
-          <Titulo t={t} volanta="Se llevan todo" texto="Las más elegidas" accion="Ver todo →" movil={movil} />
+          <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 16 }}>
             {p.productos.map((x) => (
               <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>

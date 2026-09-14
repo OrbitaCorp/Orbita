@@ -104,6 +104,26 @@ const PREMIUM: SeccionPlantilla[] = [
       { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Apaisada, se ve a media pantalla.', porDefecto: `${IMG}/joya-anillos-caja.jpg` },
     ],
   },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Por categoría' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Qué estás buscando' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de piezas',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Disponibles ahora' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Piezas de la colección' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver la colección →' },
+    ],
+  },
 ]
 
 // ─── Mosaico ─────────────────────────────────────────────────────────────────
@@ -145,6 +165,16 @@ const MOSAICO: SeccionPlantilla[] = [
       },
     ],
   },
+  {
+    id: 'fila',
+    nombre: 'Fila de destacados',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Se van rápido' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Lo más vendido' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Atleta ──────────────────────────────────────────────────────────────────
@@ -182,6 +212,16 @@ const ATLETA: SeccionPlantilla[] = [
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'de puntaje' },
     ],
   },
+  {
+    id: 'fila',
+    nombre: 'Fila de la temporada',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Equipate' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Lo nuevo de la temporada' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Patitas ─────────────────────────────────────────────────────────────────
@@ -214,6 +254,16 @@ const PATITAS: SeccionPlantilla[] = [
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: '¿Para quién comprás?' },
     ],
   },
+  {
+    id: 'fila',
+    nombre: 'Fila de recomendados',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Recomendados' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Lo que más eligen' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Bodega ──────────────────────────────────────────────────────────────────
@@ -243,12 +293,23 @@ const BODEGA: SeccionPlantilla[] = [
     nombre: 'Maridajes',
     nota: 'Los tres bloques de texto del final. Uno sin título no se dibuja.',
     campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Para acompañar' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Maridajes que funcionan' },
       { id: 't1', label: 'Primero — título', tipo: 'texto', max: 40, porDefecto: 'Asado y achuras' },
       { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Malbec joven o Bonarda. Fruta y poca madera para no tapar la carne.' },
       { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 40, porDefecto: 'Pastas con salsa roja' },
       { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 160, porDefecto: 'Sangiovese o un blend liviano. Acidez que corte el tomate.' },
       { id: 't3', label: 'Tercero — título', tipo: 'texto', max: 40, porDefecto: 'Quesos duros' },
       { id: 'b3', label: 'Tercero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Cabernet Franc con guarda, o un espumante nature bien frío.' },
+    ],
+  },
+  {
+    id: 'seleccion',
+    nombre: 'Selección del mes',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Selección del mes' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Tres para empezar' },
     ],
   },
 ]
@@ -286,6 +347,16 @@ const CRECER: SeccionPlantilla[] = [
       { id: 'b3', label: 'Tercera — bajada', tipo: 'texto', max: 40, porDefecto: 'no marcan la piel' },
       { id: 't4', label: 'Cuarta — título', tipo: 'texto', max: 30, porDefecto: 'Cambios' },
       { id: 'b4', label: 'Cuarta — bajada', tipo: 'texto', max: 40, porDefecto: 'sin cargo 30 días' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de recomendados',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Recomendados' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Lo más elegido' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
     ],
   },
 ]
@@ -369,6 +440,16 @@ const NOCTURNO: SeccionPlantilla[] = [
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 30 },
     ],
   },
+  {
+    id: 'fila',
+    nombre: 'Fila de accesorios',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Arman buen setup' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Se compran juntos' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver el catálogo →' },
+    ],
+  },
 ]
 
 // ─── Vera ────────────────────────────────────────────────────────────────────
@@ -396,6 +477,23 @@ const VERA: SeccionPlantilla[] = [
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con el talle o el grabado?' },
       { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te asesoramos antes de encargar.' },
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de piezas',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'La colección' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Piezas disponibles' },
+    ],
+  },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Buscá por pieza' },
     ],
   },
 ]
@@ -444,6 +542,16 @@ const COBIJO: SeccionPlantilla[] = [
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
     ],
   },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Todo el catálogo' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Comprá por categoría' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Nítida ──────────────────────────────────────────────────────────────────
@@ -474,6 +582,24 @@ const NITIDA: SeccionPlantilla[] = [
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿No sabés cuál te sirve?' },
       { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Contanos tu tipo de piel por WhatsApp y te armamos la rutina.' },
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de esenciales',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Lo esencial' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Los que más se repiten' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver el catálogo →' },
+    ],
+  },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Por familia' },
     ],
   },
 ]
@@ -528,6 +654,26 @@ const PAPELERIA: SeccionPlantilla[] = [
       { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140, porDefecto: 'Mandala por WhatsApp y te pasamos el presupuesto en el día.' },
     ],
   },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Buscá por rubro' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Categorías' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todas →' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de más vendidos',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Lo que más sale' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Más vendidos de la semana' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Corralón ────────────────────────────────────────────────────────────────
@@ -579,6 +725,26 @@ const CORRALON: SeccionPlantilla[] = [
       { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'años' },
       { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, porDefecto: '+18.000' },
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'productos' },
+    ],
+  },
+  {
+    id: 'categorias',
+    nombre: 'Grilla de rubros',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Departamentos' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Entrá por rubro' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todos →' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de más pedidos',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Lo más pedido' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Herramienta y obra' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver catálogo →' },
     ],
   },
 ]
@@ -659,6 +825,16 @@ const GLOW: SeccionPlantilla[] = [
       { id: 'f6', label: 'Foto 6', tipo: 'imagen', porDefecto: `${IMG}/belleza-spa.jpg` },
     ],
   },
+  {
+    id: 'fila',
+    nombre: 'Fila de más elegidos',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Se llevan todo' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Las más elegidas' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
 ]
 
 // ─── Circuito ────────────────────────────────────────────────────────────────
@@ -680,6 +856,33 @@ const CIRCUITO: SeccionPlantilla[] = [
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con la compatibilidad?' },
       { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te respondemos en el día.' },
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+  {
+    id: 'fila',
+    nombre: 'Fila de más vendidos',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Ficha técnica a la vista' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Lo que más se vende' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver el catálogo →' },
+    ],
+  },
+  {
+    id: 'categorias',
+    nombre: 'Lista de categorías',
+    nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Por categoría' },
+    ],
+  },
+  {
+    id: 'fila2',
+    nombre: 'Fila de nuevos ingresos',
+    nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'También te puede servir' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Nuevos ingresos' },
     ],
   },
 ]
