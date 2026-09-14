@@ -63,3 +63,8 @@ __pycache__/
 /graphify-out
 /graphify-out
 apps/api/CLAUDE.md
+
+# El repo usa pnpm, con lockfile por app (apps/web, apps/api). Un npm
+# install suelto en la raiz genera este archivo y ya hubo que borrarlo dos
+# veces a mano (ver 5a4ff16c).
+package-lock.json
