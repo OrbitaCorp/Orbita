@@ -74,6 +74,11 @@ export type TipoCampo =
   | 'texto'    // una línea
   | 'parrafo'  // varias líneas
   | 'imagen'   // una foto subida por el dueño
+  // Un interruptor. Se guarda como texto igual que el resto ('si' o vacío)
+  // porque la bolsa de secciones es un mapa de strings de punta a punta —
+  // ver `secciones` en home-template-data.dto.ts. Leerlo: helper `activo()`
+  // en homes.tsx.
+  | 'switch'
 
 export interface CampoSeccion {
   id: string
@@ -83,6 +88,17 @@ export interface CampoSeccion {
   help?: string
   /** Tope de caracteres: es de DISEÑO (el texto desborda la caja), no de seguridad. */
   max?: number
+  /**
+   * El contenido con el que se diseñó la sección. Es LA fuente de verdad, y se
+   * usa en los dos lados: lo dibuja la portada cuando el dueño no editó nada
+   * (helper `txt()` en homes.tsx) y aparece precargado en el editor, para que
+   * se vea qué se está por cambiar en vez de una caja vacía.
+   *
+   * Por eso vive acá y no suelto adentro del bloque de homes.tsx: con el texto
+   * en dos lugares, el día que se retoca una copia el editor muestra una cosa
+   * y la tienda otra.
+   */
+  porDefecto?: string
 }
 
 export interface SeccionPlantilla {
@@ -151,6 +167,13 @@ export interface Plantilla {
   // Ídem para el pie: la plantilla dibuja el suyo (`Pie` de piezas.tsx) con
   // los enlaces reales adentro, en vez del `StorefrontFooter` de siempre.
   piePropio?: boolean
+  // ¿Esta plantilla dibuja la barra de estadísticas (`p.confianza`)? Varias
+  // no: Premium tiene sus tres promesas propias, Nocturno sus números
+  // grandes, Glow sus sellos. Sin esto, el editor les ofrecía igual el
+  // interruptor y la lista de estadísticas, que no se veían en ningún lado
+  // (reportado con captura sobre Premium: "esta sección de Contenido no
+  // aplica nada realmente a la plantilla"). `undefined` = sí la usa.
+  usaStats?: boolean
   // Tope de slides que el hero de esta plantilla realmente usa (ver
   // `heroPropio` arriba) — Escaparate solo dibuja los dos primeros
   // (`p.slides.slice(0, 2)` en homes.tsx), así que el editor de Apariencia

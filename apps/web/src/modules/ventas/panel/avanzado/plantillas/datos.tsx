@@ -85,6 +85,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Sin hero', 'Muro de bloques', 'Grilla compacta de 5', 'Franja de envío', 'Marcas'],
     marca: 'Mercado Sur', tagline: 'Casa, cocina y jardín',
     layout: 'mosaico',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -115,6 +118,17 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Header dorado', 'Hero con foco sobre negro', 'Categorías oscuras', 'Piezas de a tres', 'Certificaciones', 'Grabado personalizado'],
     marca: 'Solano', tagline: 'Joyería en oro 18k, hecha a pedido',
     layout: 'premium',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorías del negocio y sus fotos.
+    categorias: [
+      ['Anillos', `${IMG}/joya-anillo-piedras.jpg`],
+      ['Collares', `${IMG}/joya-collar.jpg`],
+      ['Aros', `${IMG}/joya-aros.jpg`],
+      ['Relojes', `${IMG}/joya-reloj.jpg`],
+    ],
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -145,6 +159,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Contador de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Comparativa', 'Números grandes'],
     marca: 'Vector', tagline: 'Periféricos y audio, sin vueltas',
     layout: 'nocturno',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -175,6 +192,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero con degradé', 'Sellos de producto', 'Rutina en 3 productos', 'Best sellers', 'Antes y después', 'Galería de Instagram'],
     marca: 'Aura', tagline: 'Skincare simple, resultados visibles',
     layout: 'glow',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -205,6 +225,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Buscador protagonista', 'Búsquedas frecuentes', 'Categorías en pastillas', 'Armá tu lista escolar', 'Grilla de 4', 'Vuelta a clases'],
     marca: 'Renglón', tagline: 'Librería, papelería y arte',
     layout: 'papeleria',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -235,6 +258,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Barra de departamentos', 'Hero partido en tres', 'Calculadora de materiales', 'Fichas con especificaciones', 'Retiro en sucursal'],
     marca: 'Bulón', tagline: 'Ferretería y corralón desde 1972',
     layout: 'corralon',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -265,6 +291,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Hero a sangre', 'Tiras por disciplina', 'Fichas con tecnología', 'Números de la comunidad', 'Guía de talles'],
     marca: 'Ritmo', tagline: 'Running, fuerza y ciclismo',
     layout: 'atleta',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -295,6 +324,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['¿Para quién comprás?', 'Hero redondeado', 'Fichas con badge', 'Categorías en círculo'],
     marca: 'Colita', tagline: 'Todo para tu perro y tu gato',
     layout: 'patitas',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -325,6 +357,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Índice editorial', 'Lista de varietales sin fotos', 'Botellas altas sobre crema', 'Maridajes'],
     marca: 'Cepa', tagline: 'Vinos de autor y bodegas chicas',
     layout: 'bodega',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.
@@ -355,6 +390,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Línea de tiempo por edad', 'Hero suave', 'Certificaciones'],
     marca: 'Nube', tagline: 'Para los primeros años',
     layout: 'crecer',
+    // Dibuja su propia franja debajo del hero, no la barra de estadisticas
+    // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
+    usaStats: false,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.

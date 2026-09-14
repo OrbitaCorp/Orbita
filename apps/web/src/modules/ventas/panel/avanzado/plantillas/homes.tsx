@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import type { Plantilla, Producto, AccionesHome } from './tipos'
 import { IMG } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe,
 } from './piezas'
+import { porDefectoDe } from './secciones'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
 //
@@ -39,14 +41,59 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
 }) {
   const t = p.tema
   const marco: React.CSSProperties = soloCuerpo ? {} : { background: t.bg, color: t.text, fontFamily: t.fb }
+
+  // Hero de las plantillas que dibujan el suyo a partir de UN slide (Premium):
+  // Apariencia deja cargar varios, así que rotan y traen su navegación, en vez
+  // de mostrar siempre el primero y tirar el resto (reportado: "la edición
+  // permite eso, pero la plantilla no tiene los botones de navegación").
+  // El estado vive acá arriba, sin condicionar, porque los bloques de abajo
+  // son ramas de ESTE componente y un hook adentro de un `if` no es válido.
+  const [iHero, setIHero] = useState(0)
+  const nSlides = p.slides.length
+  useEffect(() => {
+    if (nSlides < 2) return
+    const id = setInterval(() => setIHero((v) => (v + 1) % nSlides), 5200)
+    return () => clearInterval(id)
+  }, [nSlides])
+  const iActual = nSlides > 0 ? iHero % nSlides : 0
+  const irASlide = (i: number) => setIHero((nSlides + i) % Math.max(nSlides, 1))
+
+  // Flechas + puntos, pintados con el tema de la plantilla. Solo se dibujan
+  // con más de un slide: con uno no hay a dónde ir.
+  const navHero = (estilo?: React.CSSProperties) => nSlides < 2 ? null : (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...estilo }}>
+      <button
+        onClick={() => irASlide(iActual - 1)} aria-label="Anterior"
+        style={{ width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%', border: `1px solid ${t.primary}`, background: 'transparent', color: t.primary, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1 }}
+      >‹</button>
+      <div style={{ display: 'flex', gap: 7 }}>
+        {p.slides.map((_, k) => (
+          <button
+            key={k} onClick={() => irASlide(k)} aria-label={`Ir al ${k + 1}`}
+            style={{ width: k === iActual ? 22 : 8, height: 8, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', background: k === iActual ? t.primary : `${t.primary}59`, transition: 'width .35s, background .35s' }}
+          />
+        ))}
+      </div>
+      <button
+        onClick={() => irASlide(iActual + 1)} aria-label="Siguiente"
+        style={{ width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%', border: `1px solid ${t.primary}`, background: 'transparent', color: t.primary, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1 }}
+      >›</button>
+    </div>
+  )
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
-  // Texto de una sección editable de ESTA plantilla, con el de la maqueta de
-  // respaldo (ver secciones.ts). El fallback no es un detalle: es lo que hace
-  // que una tienda que todavía no editó nada se vea igual que su vitrina.
-  const txt = (seccion: string, campo: string, porDefecto: string) =>
-    p.sec?.[seccion]?.[campo]?.trim() || porDefecto
+  // Contenido de una sección editable de ESTA plantilla. Si el dueño no lo
+  // tocó, cae al texto con el que se diseñó la sección, que vive en
+  // secciones.ts junto al resto del esquema — no acá adentro. Ese fallback no
+  // es un detalle: es lo que hace que una tienda que no editó nada se vea
+  // igual que su vitrina.
+  const txt = (seccion: string, campo: string) =>
+    p.sec?.[seccion]?.[campo]?.trim() || porDefectoDe(p.id, seccion, campo)
+
+  // Un campo de tipo interruptor (ver TipoCampo en tipos.ts): se guarda como
+  // texto igual que todo lo demás, así que 'si' es el único valor que cuenta.
+  const activo = (seccion: string, campo: string) => txt(seccion, campo) === 'si'
 
   // Las plantillas que dibujan SU PROPIA tarjeta (que es parte de lo que las
   // hace distintas) no la cambian por la de Órbita: se les enchufa el click
@@ -460,7 +507,9 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   // argumento es la pieza, no el descuento. Todo lo demás (dorado sobre
   // carbón, serif, filetes de un pixel) está al servicio de eso.
   if (p.layout === 'premium') {
-    const s = p.slides[0]
+    // El slide activo, no siempre el primero: el hero rota entre todos los que
+    // el dueño cargó en Apariencia y trae flechas y puntos (ver navHero).
+    const s = p.slides[iActual]
     const filete = `1px solid ${t.border}`
     const enlaceOro: React.CSSProperties = {
       fontSize: 11.5, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 700,
@@ -468,8 +517,20 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
     }
     return (
       <div style={marco}>
-        <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete }}>
-          {txt('cintillo', 'texto', 'Envío asegurado · Certificado de autenticidad · Grabado sin cargo')}
+        {/* El cintillo, fijo o corriendo en loop según lo elija el dueño. La
+            versión cartelera conserva el dorado sobre carbón de Premium en vez
+            de usar el `Marquee` compartido, que va en negativo (fondo oscuro
+            del tema) y acá se vería como una franja pegada de otra plantilla. */}
+        <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, overflow: 'hidden' }}>
+          {activo('cintillo', 'cartelera') ? (
+            <div className="pl-marquee-track">
+              {[0, 1].map((k) => (
+                <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+          )}
         </div>
 
         {/* Logo centrado, buscador a la izquierda y las acciones de la tienda a
@@ -508,9 +569,18 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 44 : 78, lineHeight: 0.98, margin: 0, whiteSpace: 'pre-line', fontWeight: 400, letterSpacing: '-0.015em', color: '#F7F2E8' }}>{s.titulo}</h1>
               <p style={{ fontSize: movil ? 14 : 15, color: 'rgba(247,242,232,0.7)', margin: '22px 0 30px', lineHeight: 1.85 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span className="pl-cta" style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 11.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase' }}>{s.cta}</span>
-                <span className="pl-cta" style={{ border: '1px solid rgba(247,242,232,0.35)', color: '#F7F2E8', padding: '14px 26px', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Pedir a medida</span>
+                <span
+                  className="pl-cta"
+                  onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
+                  style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 11.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', cursor: s.link && acciones ? 'pointer' : undefined }}
+                >{s.cta}</span>
+                <span
+                  className="pl-cta"
+                  onClick={acciones?.abrirWhatsapp}
+                  style={{ border: '1px solid rgba(247,242,232,0.35)', color: '#F7F2E8', padding: '14px 26px', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', cursor: acciones ? 'pointer' : undefined }}
+                >{txt('hero', 'cta2')}</span>
               </div>
+              {navHero({ marginTop: 30 })}
             </div>
           </div>
         </div>
@@ -518,9 +588,9 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         {/* Tres promesas en una línea, separadas por filetes. */}
         <div style={{ borderBottom: filete, display: 'grid', gridTemplateColumns: movil ? '1fr' : 'repeat(3, 1fr)' }}>
           {([
-            [txt('promesas', 't1', 'Oro 18k con sello'), txt('promesas', 'b1', 'Cada pieza sale con su certificado')],
-            [txt('promesas', 't2', 'Garantía de por vida'), txt('promesas', 'b2', 'Ajustes y pulido sin cargo')],
-            [txt('promesas', 't3', 'Envío asegurado'), txt('promesas', 'b3', 'Con seguimiento a todo el país')],
+            [txt('promesas', 't1'), txt('promesas', 'b1')],
+            [txt('promesas', 't2'), txt('promesas', 'b2')],
+            [txt('promesas', 't3'), txt('promesas', 'b3')],
           ] as [string, string][]).map(([a, b], i) => (
             <div key={a} style={{ padding: movil ? '20px 22px' : '30px 34px', textAlign: 'center', borderLeft: !movil && i > 0 ? filete : undefined, borderTop: movil && i > 0 ? filete : undefined }}>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 22, color: t.primary }}>{a}</div>
@@ -529,12 +599,23 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           ))}
         </div>
 
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px 8px' : '58px 44px 16px' }}>
-            <Titulo t={t} volanta="Por categoría" texto="Qué estás buscando" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta="Por categoría" texto="Qué estás buscando" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
-              {([['Anillos', `${IMG}/joya-anillo-piedras.jpg`], ['Collares', `${IMG}/joya-collar.jpg`], ['Aros', `${IMG}/joya-aros.jpg`], ['Relojes', `${IMG}/joya-reloj.jpg`]] as [string, string][]).map(([n, src]) => (
-                <div key={n} className="pl-tile" style={{ position: 'relative' }}>
+              {/* Las categorías REALES del negocio (plantillaReal.ts las arma
+                  con su foto propia, la del primer producto o el degradé).
+                  Antes eran cuatro fijas de joyería —Anillos, Collares, Aros,
+                  Relojes— así que una tienda de ropa con Premium aplicada
+                  mostraba categorías que no vendía. Las de muestra quedan
+                  solo para la vitrina del panel. */}
+              {(p.categorias ?? []).map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-tile"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ position: 'relative', cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <Foto src={src} alto={movil ? 140 : 250} radio={t.radio} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(12,10,9,0.9), rgba(12,10,9,0.1) 62%)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16 }}>
                     <span style={{ fontFamily: t.fh, fontSize: movil ? 16 : 22, letterSpacing: '0.06em', color: '#F7F2E8' }}>{n}</span>
@@ -545,6 +626,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Las piezas: tres, grandes, con aire. Sin tachados ni badges de oferta. */}
         <Reveal>
@@ -577,19 +659,19 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         {/* El taller: foto a la izquierda, números grandes en serif a la derecha. */}
         <Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch', borderTop: filete, borderBottom: filete }}>
-            <Foto src={txt('taller', 'foto', `${IMG}/joya-pulsera-rosa.jpg`)} alto={movil ? 250 : 420} />
+            <Foto src={txt('taller', 'foto')} alto={movil ? 250 : 420} />
             <div style={{ padding: movil ? '32px 22px' : '56px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: t.soft }}>
               <div style={{ width: 40, height: 1, background: t.primary, marginBottom: 16 }} />
-              <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 14 }}>{txt('taller', 'volanta', 'El taller')}</div>
-              <h2 style={{ fontFamily: t.fh, fontSize: movil ? 30 : 42, margin: 0, fontWeight: 400, lineHeight: 1.1 }}>{txt('taller', 'titulo', 'Cuatro manos, una pieza por vez')}</h2>
+              <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary, marginBottom: 14 }}>{txt('taller', 'volanta')}</div>
+              <h2 style={{ fontFamily: t.fh, fontSize: movil ? 30 : 42, margin: 0, fontWeight: 400, lineHeight: 1.1 }}>{txt('taller', 'titulo')}</h2>
               <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '20px 0 28px', maxWidth: 420, whiteSpace: 'pre-line' }}>
-                {txt('taller', 'texto', 'Fundimos, engarzamos y pulimos en el mismo lugar desde 1998. Nada sale del taller sin pasar por lupa dos veces.')}
+                {txt('taller', 'texto')}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: movil ? 20 : 38, justifyContent: 'start' }}>
                 {([
-                  [txt('taller', 'n1v', '26'), txt('taller', 'n1l', 'años')],
-                  [txt('taller', 'n2v', '4.100'), txt('taller', 'n2l', 'piezas')],
-                  [txt('taller', 'n3v', '100%'), txt('taller', 'n3l', 'a mano')],
+                  [txt('taller', 'n1v'), txt('taller', 'n1l')],
+                  [txt('taller', 'n2v'), txt('taller', 'n2l')],
+                  [txt('taller', 'n3v'), txt('taller', 'n3l')],
                 ] as [string, string][]).map(([n, l]) => (
                   <div key={l}>
                     <div style={{ fontFamily: t.fh, fontSize: movil ? 30 : 40, color: t.primary, lineHeight: 1 }}>{n}</div>
@@ -604,16 +686,16 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'center' }}>
             <div style={{ order: movil ? 2 : 1, padding: movil ? '32px 22px' : '0 52px' }}>
-              <Titulo t={t} volanta={txt('grabado', 'volanta', 'A pedido')} texto={txt('grabado', 'titulo', 'Grabá la pieza por dentro')} movil={movil} />
+              <Titulo t={t} volanta={txt('grabado', 'volanta')} texto={txt('grabado', 'titulo')} movil={movil} />
               <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '0 0 24px', maxWidth: 400, whiteSpace: 'pre-line' }}>
-                {txt('grabado', 'texto', 'Una fecha, un nombre o las coordenadas de un lugar. El grabado se hace a mano y suma cinco días hábiles a la entrega, sin costo adicional.')}
+                {txt('grabado', 'texto')}
               </p>
               <span
                 style={{ ...enlaceOro, cursor: acciones ? 'pointer' : undefined }}
                 onClick={acciones?.abrirWhatsapp}
-              >{txt('grabado', 'cta', 'Pedir una pieza')}</span>
+              >{txt('grabado', 'cta')}</span>
             </div>
-            <div style={{ order: movil ? 1 : 2 }}><Foto src={txt('grabado', 'foto', `${IMG}/joya-anillos-caja.jpg`)} alto={movil ? 260 : 420} /></div>
+            <div style={{ order: movil ? 1 : 2 }}><Foto src={txt('grabado', 'foto')} alto={movil ? 260 : 420} /></div>
           </div>
         </Reveal>
 

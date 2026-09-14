@@ -9,6 +9,7 @@ import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalL
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
 import { seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
+import type { CampoSeccion } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
@@ -269,8 +270,23 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // que una elegible que dibuja una sección vacía.
     const hayFotosDeCategoria = categorias.some(c => !!c.imageUrl)
 
+    // Editando una plantilla, solo se ofrece lo que ESA plantilla dibuja de
+    // verdad. El anuncio de Apariencia no se ve en las que traen su propio
+    // cintillo o cartel corriendo (`headerPropio` — ver StorefrontChrome, que
+    // apaga el banner ahí), y la barra de estadísticas no se ve en las que
+    // tienen su propia franja (`usaStats: false`: las tres promesas de
+    // Premium, los números de Nocturno, los sellos de Glow). Ofrecerlos igual
+    // era prometer un interruptor que no mueve nada (reportado con captura
+    // sobre Premium).
+    const plantillaActiva = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
+    const usaAnuncio = soloContenido ? !plantillaActiva?.headerPropio : true
+    const usaStats = soloContenido ? plantillaActiva?.usaStats !== false : true
+
     const toggles: [keyof Ap, string][] = soloContenido
-        ? [['mostrarBannerEnvio', 'Anuncio arriba del header'], ['mostrarStats', 'Barra de confianza debajo del hero']]
+        ? ([
+            ...(usaAnuncio ? [['mostrarBannerEnvio', 'Anuncio arriba del header'] as [keyof Ap, string]] : []),
+            ...(usaStats ? [['mostrarStats', 'Barra de confianza debajo del hero'] as [keyof Ap, string]] : []),
+        ])
         // `mostrarFooter`/`mostrarRedesFooter` viven en la nueva sección
         // "Pie de página" (tienen su propia tarjeta ahí, con la descripción
         // debajo del logo), no acá mezclados con el resto de la visibilidad.
@@ -492,7 +508,16 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // Lo que se escribe acá se guarda en homeTemplateData.secciones y lo lee
     // el bloque de esa plantilla en homes.tsx (helper `txt()`), que cae al
     // texto de la maqueta cuando el campo está vacío.
-    const valorSeccion = (seccion: string, campo: string) => ap.seccionesPlantilla?.[seccion]?.[campo] ?? ''
+    // Los campos arrancan con el contenido real con el que se diseñó la
+    // sección (`porDefecto` en secciones.ts), no vacíos: así el dueño ve qué
+    // está por cambiar, y para retocar una palabra no tiene que reescribir
+    // toda la frase (pedido explícito, con capturas del editor de Premium en
+    // blanco mientras la tienda mostraba texto). Vaciar un campo lo saca del
+    // guardado y la portada vuelve a ese mismo texto — ver limpiarSecciones().
+    const valorSeccion = (seccion: string, campo: CampoSeccion) => {
+        const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
+        return guardado !== undefined ? guardado : (campo.porDefecto ?? '')
+    }
     const setSeccion = (seccion: string, campo: string, valor: string) => {
         const actual = ap.seccionesPlantilla ?? {}
         set('seccionesPlantilla', {
@@ -501,18 +526,46 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         })
     }
 
+    // Las pestañas que esta plantilla en particular tiene algo que mostrar:
+    // "Secciones" solo si declaró las suyas, "Contenido" solo si le queda
+    // algún interruptor que de verdad mueva algo en su portada.
+    const tabsVisibles = TABS_PLANTILLA.filter(([k]) => {
+        if (k === 'secciones') return seccionesPlantilla.length > 0
+        if (k === 'contenido') return usaAnuncio || usaStats
+        return true
+    })
+    // Si la pestaña elegida no está entre las visibles (cambió la plantilla
+    // activa, o esta no la tiene), se cae a la primera en vez de dejar el
+    // formulario en blanco.
+    const tabActiva: TabPlantilla = tabsVisibles.some(([k]) => k === tabPlantilla)
+        ? tabPlantilla
+        : (tabsVisibles[0]?.[0] ?? 'hero')
+
     const seccionesCards = seccionesPlantilla.map(sec => (
         <SecCard key={sec.id} id={`ap-sec-${sec.id}`} title={sec.nombre} icon={LayoutGrid}>
             {sec.nota && (
                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>{sec.nota}</p>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {sec.campos.map(campo => (
+                {sec.campos.map(campo => campo.tipo === 'switch' ? (
+                    // El interruptor trae su propio label (ToggleRow), así que
+                    // no se le pone FieldLabel encima como al resto.
+                    <div key={campo.id}>
+                        <ToggleRow
+                            label={campo.label}
+                            on={valorSeccion(sec.id, campo) === 'si'}
+                            onChange={v => setSeccion(sec.id, campo.id, v ? 'si' : '')}
+                        />
+                        {campo.help && (
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, lineHeight: 1.45 }}>{campo.help}</div>
+                        )}
+                    </div>
+                ) : (
                     <div key={campo.id}>
                         <FieldLabel help={campo.help}>{campo.label}</FieldLabel>
                         {campo.tipo === 'imagen' ? (
                             <ImgUploader
-                                value={valorSeccion(sec.id, campo.id) || null}
+                                value={valorSeccion(sec.id, campo) || null}
                                 onChange={v => setSeccion(sec.id, campo.id, v ?? '')}
                                 onUpload={subirImagenApariencia}
                                 shape="square"
@@ -521,7 +574,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             />
                         ) : campo.tipo === 'parrafo' ? (
                             <textarea
-                                value={valorSeccion(sec.id, campo.id)}
+                                value={valorSeccion(sec.id, campo)}
                                 onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
                                 maxLength={campo.max}
                                 rows={3}
@@ -533,7 +586,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 }}
                             />
                         ) : (
-                            <Inp value={valorSeccion(sec.id, campo.id)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} />
+                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} />
                         )}
                     </div>
                 ))}
@@ -737,8 +790,8 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 // cambio en el comentario de TABS_PLANTILLA, arriba).
                 <div>
                     <div className="ap-tabs-plantilla" role="tablist" aria-label="Secciones de la plantilla">
-                        {TABS_PLANTILLA.filter(([k]) => k !== 'secciones' || seccionesPlantilla.length > 0).map(([k, l]) => {
-                            const a = tabPlantilla === k
+                        {tabsVisibles.map(([k, l]) => {
+                            const a = tabActiva === k
                             return (
                                 <button
                                     key={k}
@@ -758,11 +811,15 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         })}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {tabPlantilla === 'hero' && heroCard}
-                        {tabPlantilla === 'header' && headerCard}
-                        {tabPlantilla === 'secciones' && seccionesCards}
-                        {tabPlantilla === 'contenido' && <>{secVisibilidad}{secTextos}{secEstadisticas}</>}
-                        {tabPlantilla === 'pie' && <>{secPie}{secCupon}</>}
+                        {tabActiva === 'hero' && heroCard}
+                        {tabActiva === 'header' && headerCard}
+                        {tabActiva === 'secciones' && seccionesCards}
+                        {tabActiva === 'contenido' && <>
+                            {toggles.length > 0 && secVisibilidad}
+                            {usaAnuncio && secTextos}
+                            {usaStats && secEstadisticas}
+                        </>}
+                        {tabActiva === 'pie' && <>{secPie}{secCupon}</>}
                     </div>
                 </div>
             ) : (
