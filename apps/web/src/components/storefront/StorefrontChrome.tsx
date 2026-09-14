@@ -29,11 +29,12 @@
 // <StorefrontChrome tienda={tienda} config={config}>{...lo que antes iba
 // dentro del div, footer/whatsapp incluidos...}</StorefrontChrome>.
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { StorefrontHeader, navRealDe } from './StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from './AccionesPlantilla'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
+import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
@@ -129,8 +130,24 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // dibuja una barra común arriba y se apila como el resto.
   const lateral = usaHeaderPropio && !!plantilla?.headerLateral && !movil
 
+  // Las tipografías de la plantilla. `loadFont()` de Apariencia no las conoce
+  // (varias piden pesos 800/900), por eso su propio cargador. Vive acá y no en
+  // Inicio: las variables CSS ya decían la fuente en TODAS las vistas, pero el
+  // archivo solo se bajaba en la portada, así que el catálogo y la ficha caían
+  // a la fuente de fallback.
+  useEffect(() => {
+    if (plantilla) cargarFuentes()
+  }, [plantilla])
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
+      {/* Los estilos propios de las plantillas (reveals, hover de fotos,
+          marquee, botones). También estaban solo en la portada, y son los que
+          hacen `.pl-b { position: absolute; opacity: 0 }`: sin ellos la
+          segunda foto de una ProductCard con tema no se apilaba sobre la
+          primera sino que se dibujaba AL LADO, y el crossfade del hover no
+          existía. Se veía en "También te puede gustar" de la ficha. */}
+      {plantilla && <style>{PLANTILLA_CSS}</style>}
       {/* Cartelera ARRIBA del header, no debajo — así la dibujan las dos
           maquetas (Vidriera y Escaparate, ver homes.tsx: `<Marquee>`/el div
           fijo van antes de `<HeaderCentrado>`/el navbar) y el propio preview

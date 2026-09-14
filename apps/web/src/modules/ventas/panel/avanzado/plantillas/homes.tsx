@@ -337,6 +337,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     <div style={{ fontSize: 12.5, lineHeight: 1.35, height: 34, overflow: 'hidden' }}>{x.nombre}</div>
                     <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{x.precio}</div>
                     {x.antes && <div style={{ fontSize: 11.5, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</div>}
+                    {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   </div>
                 </div>
               ))}
@@ -476,6 +477,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                       {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                       <span style={{ fontSize: 16, fontWeight: 800 }}>{x.precio}</span>
                     </div>
+                    {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                     {x.cuotas && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>}
                     {x.colores && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
@@ -521,6 +523,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
                       <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{x.precio}</div>
+                      {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                     </div>
                     {/* "Agregar" de la maqueta no compra nada de verdad — con
                         datos reales pasa a "Ver" y navega a la ficha, ahí sí
@@ -733,6 +736,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     <div style={{ marginTop: 8, color: t.muted }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.primary} /></div>
                   )}
                   <div style={{ fontSize: 17.5, color: t.primary, marginTop: 10, letterSpacing: '0.03em' }}>{x.precio}</div>
+                  {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   <div style={{ fontSize: 11.5, color: t.muted, marginTop: 6 }}>3 cuotas sin interés · Envío asegurado</div>
                   <div style={{ marginTop: 16 }}>
                     <span style={{ ...enlaceOro, fontSize: 10.5, color: t.muted, borderBottomColor: t.border }}>Ver la pieza</span>
@@ -929,6 +933,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                       {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                       <span style={{ fontSize: 18, fontWeight: 800 }}>{x.precio}</span>
                     </div>
+                    {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                     <div style={{ fontSize: 11.5, color: t.muted, marginTop: 4 }}>{x.cuotas}</div>
                   </div>
                 </div>
@@ -1303,12 +1308,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 5, fontFamily: 'ui-monospace, monospace' }}>{x.tag}</div>
                     {x.estrellas && <div style={{ marginTop: 7 }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.text} /></div>}
                     {movil && <div style={{ fontSize: 18, fontWeight: 900, marginTop: 8 }}>{x.precio}</div>}
+                    {movil && x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   </div>
                   {!movil && (
                     <div style={{ textAlign: 'right', paddingRight: 8 }}>
                       {x.antes && <div style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</div>}
                       <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>{x.precio}</div>
-                      <div style={{ fontSize: 11.5, color: t.muted, margin: '2px 0 10px' }}>{x.transfer}</div>
+                      {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, margin: '2px 0 10px' }}>{x.transfer}</div>}
                       <Boton t={t} onClick={abrir(x)}>{acciones ? 'Ver producto' : 'Agregar al carrito'}</Boton>
                     </div>
                   )}
@@ -1455,6 +1461,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                       <span style={{ fontSize: movil ? 16 : 19, fontWeight: 800, color: t.primary, fontFamily: t.fh }}>{x.precio}</span>
                       {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                     </div>
+                    {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                     {x.colores && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                         {x.colores.map((c) => <span key={c} className="pl-swatch" style={{ width: 13, height: 13, borderRadius: 2, background: c, border: `1px solid ${t.border}` }} />)}
@@ -1688,6 +1695,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   <div style={{ fontSize: 11.5, color: '#7A6355', marginTop: 6, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{x.tag}</div>
                   {x.estrellas && <div style={{ marginTop: 10, color: '#7A6355' }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.accent} /></div>}
                   <div style={{ fontSize: 19, marginTop: 10, fontWeight: 700 }}>{x.precio}</div>
+                  {x.transfer && <div style={{ fontSize: 11.5, color: '#7A6355', marginTop: 3 }}>{x.transfer}</div>}
                   <div style={{ marginTop: 14 }}>
                     <span style={{ display: 'inline-block', border: '1px solid #2A1A14', padding: '10px 22px', fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 700 }}>Agregar</span>
                   </div>
@@ -1945,6 +1953,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                           <span style={{ fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{x.precio}</span>
                           {x.cuotas && !movil && <span style={{ fontSize: 12.5, color: t.primary, fontWeight: 600 }}>{x.cuotas}</span>}
                         </div>
+                        {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                         {x.stock && <div style={{ fontSize: 11.5, color: '#F87171', fontWeight: 600 }}>{x.stock}</div>}
                       </div>
                     </div>
@@ -2088,10 +2097,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     {x.estrellas && <div style={{ marginTop: 7, color: t.muted }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.primary} /></div>}
                     {x.badge && <div style={{ marginTop: 8, display: 'inline-block', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 9.5, fontWeight: 700, padding: '3px 9px', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{x.badge}</div>}
                     {movil && <div style={{ fontSize: 16, fontWeight: 700, color: t.primary, marginTop: 9 }}>{x.precio}</div>}
+                    {movil && x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   </div>
                   {!movil && (
                     <div style={{ textAlign: 'right', paddingRight: 4 }}>
                       <div style={{ fontSize: 20, fontWeight: 700, color: t.primary }}>{x.precio}</div>
+                      {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                       {x.cuotas && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 5 }}>{x.cuotas}</div>}
                       <div style={{ fontSize: 10.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted, marginTop: 10, borderBottom: `1px solid ${t.border}`, display: 'inline-block', paddingBottom: 3 }}>Ver la pieza</div>
                     </div>
@@ -2222,6 +2233,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                         <div style={{ padding: '11px 13px 14px' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{x.nombre}</div>
                           <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{x.precio}</div>
+                          {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                           {x.cuotas && <div style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>}
                         </div>
                       </div>
@@ -2502,6 +2514,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{x.nombre}</div>
                   <div style={{ marginTop: 6 }}><Estrellas n={x.estrellas ?? 5} resenas={x.resenas} color={t.accent} /></div>
                   <div style={{ fontSize: 19, fontWeight: 800, marginTop: 8 }}>{x.precio}</div>
+                  {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   <div style={{ marginTop: 12 }}><Boton t={t} ancho onClick={abrir(x)}>{acciones ? 'Ver' : 'Agregar'}</Boton></div>
                 </div>
               </div>
@@ -2533,6 +2546,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
                     <span style={{ fontSize: 17, fontWeight: 800 }}>{x.precio}</span>
                   </div>
+                  {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
                   {x.colores && (
                     <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
                       {x.colores.map((c) => <span key={c} className="pl-swatch" style={{ width: 15, height: 15, borderRadius: '50%', background: c, border: `1px solid ${t.border}` }} />)}

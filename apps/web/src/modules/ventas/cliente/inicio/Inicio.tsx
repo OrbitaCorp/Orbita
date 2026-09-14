@@ -31,7 +31,6 @@ import type { CategoryLayout } from '@/modules/ventas/panel/configuracion/mock/a
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
-import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { definicionPlantilla, plantillaReal } from './plantillaReal'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -274,12 +273,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // De qué lado del breakpoint dibuja la plantilla — ver useMovilPlantilla.
     const movil = useMovilPlantilla()
 
-    // Las plantillas traen tipografías que no están en Apariencia (varias
-    // piden pesos 800/900) — `loadFont()` no las conoce, por eso su propio
-    // cargador. Ver el porqué en la skill plantillas-home § Tipografías.
-    useEffect(() => {
-        if (plantilla) cargarFuentes()
-    }, [plantilla])
+    // Las tipografías de la plantilla las carga StorefrontChrome, para que
+    // valgan también en el catálogo y la ficha. Ver la skill plantillas-home
+    // § Tipografías.
 
     // La paleta y la tipografía de la plantilla activa (header, cartel, hero,
     // secciones, tarjetas, footer) y el modo oscuro del visitante las aplica
@@ -343,11 +339,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             anuncio={!plantilla?.headerPropio}
             sinHeader={!!plantilla?.headerPropio}
         >
-            {/* Estilos propios de las plantillas (reveals, hover de fotos,
-                marquee, botones). Es el MISMO string que usa el preview del
-                panel — si se copiara y pegara acá volvería a desincronizarse,
-                que es justo el problema que este refactor arregla. */}
-            {plantilla && <style>{PLANTILLA_CSS}</style>}
+            {/* Los estilos de plantilla (PLANTILLA_CSS) ya no se inyectan acá:
+                los pone StorefrontChrome, que envuelve TODAS las vistas. Acá
+                solo cubrían la portada, y por eso la ficha de producto
+                dibujaba mal la segunda foto de las tarjetas. */}
             <style>{`
                 @keyframes sfFadeIn   { from { opacity:0; transform:translateY(8px)  } to { opacity:1; transform:translateY(0) } }
                 @keyframes sfDotPulse { 0%,100%{ opacity:1; transform:scale(1)  } 50%{ opacity:.4; transform:scale(.7) } }
