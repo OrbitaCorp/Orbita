@@ -106,12 +106,122 @@ const PREMIUM: SeccionPlantilla[] = [
   },
 ]
 
+// ─── Vera ────────────────────────────────────────────────────────────────────
+// Joyería como portada de catálogo impreso: cintillo de servicios, piezas
+// numeradas y el bloque de asesoramiento por WhatsApp al final.
+const VERA: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La línea fina de arriba de todo, sobre fondo crema.',
+    campos: [
+      {
+        id: 'texto', label: 'Texto', tipo: 'texto', max: 90,
+        help: 'Se ve en versalitas. Separá con · los ítems.',
+        porDefecto: 'Grabado sin cargo · Envío asegurado a todo el país',
+      },
+      { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch', help: 'En vez de quedarse fijo, el texto corre en loop.' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    nombre: 'Consulta por WhatsApp',
+    nota: 'El bloque del final, antes del pie.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con el talle o el grabado?' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te asesoramos antes de encargar.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+]
+
+// ─── Cobijo ──────────────────────────────────────────────────────────────────
+// Deco: se compra por AMBIENTE. Los dos bloques en zigzag son lo que la
+// distingue, así que son lo primero que tiene que poder editar el dueño.
+const COBIJO: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cartel corriendo',
+    nota: 'La franja de arriba de todo, antes del logo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ ENVÍO GRATIS EN MUEBLES ✦ 6 CUOTAS SIN INTERÉS ✦ ARMADO SIN CARGO' },
+    ],
+  },
+  {
+    id: 'ambiente1',
+    nombre: 'Primer ambiente',
+    nota: 'El bloque en zigzag con la foto a un lado y sus dos productos al otro.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Ambiente 1' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'El living' },
+      { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 200, porDefecto: 'Sillones, sofás y mesas ratonas que entran por la puerta y duran.' },
+      { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Si no cargás una, se usa la de tu primera categoría.' },
+    ],
+  },
+  {
+    id: 'ambiente2',
+    nombre: 'Segundo ambiente',
+    nota: 'El mismo bloque, dado vuelta.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Ambiente 2' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'La mesa' },
+      { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 200, porDefecto: 'Cerámica esmaltada y textiles de algodón, hechos por talleres de acá.' },
+      { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Si no cargás una, se usa la de tu tercera categoría.' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    nombre: 'Consulta por WhatsApp',
+    nota: 'El bloque del final, antes del pie.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Entra por tu puerta?' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Mandanos las medidas por WhatsApp y lo chequeamos con vos.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+]
+
+// ─── Nítida ──────────────────────────────────────────────────────────────────
+// Cosmética de farmacia prolija: hero partido en dos mitades duras y una
+// segunda campaña al final que usa el SEGUNDO slide del hero.
+const NITIDA: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cartel corriendo',
+    nota: 'La franja de arriba de todo, antes del logo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ MUESTRAS DE REGALO EN TODA COMPRA ✦ ENVÍO GRATIS DESDE $45.000' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero',
+    nota: 'Las fotos y los textos salen de "Hero". Acá va el segundo botón.',
+    campos: [
+      { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, porDefecto: 'Ver todo', help: 'Lleva al catálogo completo.' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    nombre: 'Consulta por WhatsApp',
+    nota: 'El bloque del final, antes del pie.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿No sabés cuál te sirve?' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Contanos tu tipo de piel por WhatsApp y te armamos la rutina.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+]
+
 // ─── El registro ─────────────────────────────────────────────────────────────
 // Una plantilla que todavía no declaró sus secciones no muestra la pestaña
 // "Secciones" en el panel — se sigue viendo igual, solo que su contenido
 // propio no es editable todavía.
 export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
   premium: PREMIUM,
+  vera: VERA,
+  cobijo: COBIJO,
+  nitida: NITIDA,
 }
 
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {

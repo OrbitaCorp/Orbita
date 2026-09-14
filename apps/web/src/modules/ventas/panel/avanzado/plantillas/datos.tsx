@@ -543,6 +543,10 @@ export const PLANTILLAS: Plantilla[] = [
     headerPropio: true,
     heroPropio: true,
     piePropio: true,
+    // Dos slides con roles FIJOS, no un carrusel: el primero es la mitad dura
+    // de arriba y el segundo es la campaña ancha del final. Cargar un tercero
+    // quedaría guardado sin verse nunca — mismo criterio que Escaparate.
+    heroMaxSlides: 2,
     cartel: '✦ MUESTRAS DE REGALO EN TODA COMPRA ✦ ENVÍO GRATIS DESDE $45.000',
     links: ['Inicio', 'Skincare', 'Maquillaje', 'Cuerpo', 'Sets'],
     confianza: [['Envío gratis', 'desde $45.000'], ['Muestras', 'de regalo'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días']],

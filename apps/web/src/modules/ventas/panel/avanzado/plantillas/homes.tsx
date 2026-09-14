@@ -36,7 +36,7 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
 //
 // Para sumar una: envolver el encabezado del bloque en una variable y
 // devolverlo cuando `soloHeader` esté puesto (ver el bloque `premium`).
-export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>(['premium'])
+export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>(['premium', 'vera', 'cobijo', 'nitida'])
 
 export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   p: Plantilla
@@ -1728,14 +1728,29 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // 03— con filete entre una y otra, como el índice de un catálogo. Es lo
   // contrario de una grilla: acá se lee de arriba abajo, de a una pieza.
   if (p.layout === 'vera') {
-    const s = p.slides[0]
+    const s = p.slides[iActual]
     const filete = `1px solid ${t.border}`
-    return (
-      <div style={marco}>
-        <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft }}>
-          {p.cartel?.replace(/✦/g, '·')}
+
+    const encabezado = (
+      <>
+        <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft, overflow: 'hidden' }}>
+          {activo('cintillo', 'cartelera') ? (
+            <div className="pl-marquee-track">
+              {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>)}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+          )}
         </div>
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 380 : 500} />
@@ -1745,7 +1760,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ fontSize: movil ? 10 : 11.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 64 : 104, lineHeight: 1, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', margin: '14px 0 6px' }}>{s.titulo}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 24, color: t.text }}>{s.bajada}</div>
-              <div style={{ marginTop: movil ? 20 : 28 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+              <div style={{ marginTop: movil ? 20 : 28 }}>
+                <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+              </div>
+              {navHero({ marginTop: 26, justifyContent: 'center' })}
             </div>
           </div>
         </div>
@@ -1768,7 +1786,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Titulo t={t} volanta="La colección" texto="Piezas disponibles" centrado movil={movil} />
             <div style={{ borderTop: filete }}>
               {p.productos.map((x, i) => (
-                <div key={x.nombre} className="pl-fila" style={{ display: 'grid', gridTemplateColumns: movil ? '28px 84px 1fr' : '58px 132px 1fr auto', alignItems: 'center', gap: movil ? 12 : 22, padding: movil ? '14px 0' : '20px 0', borderBottom: filete }}>
+                <div
+                  key={x.nombre} className="pl-fila" onClick={abrir(x)}
+                  style={{ display: 'grid', gridTemplateColumns: movil ? '28px 84px 1fr' : '58px 132px 1fr auto', alignItems: 'center', gap: movil ? 12 : 22, padding: movil ? '14px 0' : '20px 0', borderBottom: filete, cursor: abrir(x) ? 'pointer' : undefined }}
+                >
                   <span style={{ fontFamily: t.fh, fontSize: movil ? 15 : 22, color: t.accent }}>{String(i + 1).padStart(2, '0')}</span>
                   <div className="pl-tile"><Foto src={x.img} src2={x.img2} alto={movil ? 84 : 132} /></div>
                   <div style={{ minWidth: 0 }}>
@@ -1796,8 +1817,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '18px 16px 30px' : '26px 44px 48px' }}>
             <Titulo t={t} texto="Buscá por pieza" centrado movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 10 : 16 }}>
-              {(p.categorias ?? []).map(([n, src]) => (
-                <div key={n} className="pl-tile" style={{ display: 'flex', alignItems: 'center', gap: 16, border: filete, background: t.surf }}>
+              {(p.categorias ?? []).map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-tile"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 16, border: filete, background: t.surf, cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <div style={{ width: movil ? 86 : 110, flexShrink: 0 }}><Foto src={src} alto={movil ? 78 : 96} /></div>
                   <span style={{ fontFamily: t.fh, fontSize: movil ? 16 : 20 }}>{n}</span>
                   <span style={{ marginLeft: 'auto', paddingRight: 18, color: t.accent }}>→</span>
@@ -1820,10 +1845,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '26px 20px' : '38px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', justifyContent: 'center', textAlign: movil ? 'center' : 'left' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24 }}>¿Dudas con el talle o el grabado?</div>
-              <div style={{ fontSize: 13, color: t.muted, marginTop: 6 }}>Escribinos por WhatsApp y te asesoramos antes de encargar.</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24 }}>{txt('whatsapp', 'titulo')}</div>
+              <div style={{ fontSize: 13, color: t.muted, marginTop: 6 }}>{txt('whatsapp', 'bajada')}</div>
             </div>
-            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
 
@@ -1838,16 +1863,28 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // lleva sus dos productos abajo. El hero no tapa la foto con un degradé:
   // apoya una tarjeta blanca encima, como una revista de decoración.
   if (p.layout === 'cobijo') {
-    const s = p.slides[0]
+    const s = p.slides[iActual]
     const cat = p.categorias ?? []
-    const ambientes: [string, string, string, typeof p.productos][] = [
-      ['El living', 'Sillones, sofás y mesas ratonas que entran por la puerta y duran.', cat[0]?.[1] ?? s.img, p.productos.slice(0, 2)],
-      ['La mesa', 'Cerámica esmaltada y textiles de algodón, hechos por talleres de acá.', cat[2]?.[1] ?? s.img, p.productos.slice(2, 4)],
+    // Los dos ambientes son lo que distingue a esta plantilla, así que su
+    // título, su texto y su foto los edita el dueño. La foto cae a la de una
+    // categoría suya (no a una del repo) cuando no subió ninguna.
+    const ambientes: [string, string, string, string, typeof p.productos][] = [
+      [txt('ambiente1', 'volanta'), txt('ambiente1', 'titulo'), txt('ambiente1', 'texto'), txt('ambiente1', 'foto') || cat[0]?.[1] || s.img, p.productos.slice(0, 2)],
+      [txt('ambiente2', 'volanta'), txt('ambiente2', 'titulo'), txt('ambiente2', 'texto'), txt('ambiente2', 'foto') || cat[2]?.[1] || s.img, p.productos.slice(2, 4)],
     ]
+
+    const encabezado = (
+      <>
+        <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
     return (
       <div style={marco}>
-        {p.cartel && <Marquee t={t} texto={p.cartel} />}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
+        {encabezado}
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 340 : 470} />
@@ -1856,7 +1893,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 46 : 64, lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', margin: '10px 0 4px' }}>{s.titulo}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 22, color: t.muted, fontWeight: 500 }}>{s.bajada}</div>
-              <div style={{ marginTop: 18 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+              <div style={{ marginTop: 18 }}>
+                <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+              </div>
+              {navHero({ marginTop: 18 })}
             </div>
           </div>
         </div>
@@ -1873,7 +1913,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Ambientes en zigzag. La foto ocupa la mitad y el texto la otra, y
             se dan vuelta en el segundo bloque: es lo que hace que no se lea
             como una grilla más. */}
-        {ambientes.map(([titulo, bajada, foto, items], k) => (
+        {ambientes.map(([volanta, titulo, bajada, foto, items], k) => (
           <Reveal key={titulo}>
             <div style={{ padding: movil ? '28px 16px 8px' : '48px 44px 16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 18 : 34, alignItems: 'center' }}>
@@ -1881,7 +1921,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   <Foto src={foto} alto={movil ? 230 : 340} radio={t.radio} />
                 </div>
                 <div style={{ order: movil ? 2 : k % 2 === 0 ? 2 : 1 }}>
-                  <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accent, fontWeight: 700, marginBottom: 10 }}>Ambiente {k + 1}</div>
+                  <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accent, fontWeight: 700, marginBottom: 10 }}>{volanta}</div>
                   <h2 style={{ fontFamily: t.fh, fontSize: movil ? 28 : 40, margin: 0, fontWeight: 700, letterSpacing: '-0.03em' }}>{titulo}</h2>
                   <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.75, margin: '14px 0 20px', maxWidth: 400 }}>{bajada}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -1904,10 +1944,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 30px' : '34px 44px 44px' }}>
-            <Titulo t={t} volanta="Todo el catálogo" texto="Comprá por categoría" accion="Ver todo →" movil={movil} />
+            <Titulo t={t} volanta="Todo el catálogo" texto="Comprá por categoría" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
-              {cat.map(([n, src]) => (
-                <div key={n} className="pl-tile" style={{ position: 'relative', borderRadius: t.radio }}>
+              {cat.map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-tile"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ position: 'relative', borderRadius: t.radio, cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <Foto src={src} alto={movil ? 118 : 168} radio={t.radio} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(42,35,32,0.66), transparent 58%)', display: 'flex', alignItems: 'flex-end', padding: 14, borderRadius: t.radio }}>
                     <span style={{ color: '#fff', fontWeight: 700, fontSize: movil ? 13 : 16 }}>{n}</span>
@@ -1933,10 +1977,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 700, letterSpacing: '-0.02em' }}>¿Entra por tu puerta?</div>
-              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Mandanos las medidas por WhatsApp y lo chequeamos con vos.</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{txt('whatsapp', 'titulo')}</div>
+              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>{txt('whatsapp', 'bajada')}</div>
             </div>
-            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
 
@@ -1952,12 +1996,24 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // "para qué sirve" al lado del precio. Glow es la versión romántica del
   // rubro; esta es la de farmacia prolija.
   if (p.layout === 'nitida') {
+    // El hero es fijo (no rota): el PRIMER slide es la mitad dura de arriba y
+    // el SEGUNDO es la campaña ancha del final — por eso `heroMaxSlides: 2`,
+    // igual que Escaparate, y por eso no lleva `navHero`.
     const s = p.slides[0]
     const extra = p.slides[1] ?? s
+
+    const encabezado = (
+      <>
+        <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
     return (
       <div style={marco}>
-        {p.cartel && <Marquee t={t} texto={p.cartel} />}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
+        {encabezado}
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
           <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -1965,8 +2021,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <div style={{ fontFamily: t.fh, fontSize: movil ? 56 : 88, lineHeight: 0.9, fontWeight: 800, letterSpacing: '-0.045em', margin: '14px 0 8px' }}>{s.titulo}</div>
             <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 26, color: t.muted, fontWeight: 600 }}>{s.bajada}</div>
             <div style={{ marginTop: 22, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Boton t={t} grande={!movil}>{s.cta}</Boton>
-              <Boton t={t} grande={!movil} secundario>Ver todo</Boton>
+              <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+              <Boton t={t} grande={!movil} secundario onClick={acciones?.irACatalogo}>{txt('hero', 'cta2')}</Boton>
             </div>
           </div>
           <div className="pl-tile"><Foto src={s.img} alto={movil ? 280 : 460} /></div>
@@ -2019,8 +2075,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '22px 16px 26px' : '32px 44px 40px' }}>
             <Titulo t={t} texto="Por familia" centrado movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {(p.categorias ?? []).map(([n, src]) => (
-                <div key={n} className="pl-tile" style={{ textAlign: 'center' }}>
+              {(p.categorias ?? []).map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-tile"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ textAlign: 'center', cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <div style={{ borderRadius: t.radio, overflow: 'hidden' }}><Foto src={src} alto={movil ? 160 : 230} radio={t.radio} /></div>
                   <div style={{ fontSize: movil ? 13.5 : 15, fontWeight: 700, marginTop: 11 }}>{n}</div>
                   <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>Ver productos</div>
@@ -2055,10 +2115,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>¿No sabés cuál te sirve?</div>
-              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Contanos tu tipo de piel por WhatsApp y te armamos la rutina.</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{txt('whatsapp', 'titulo')}</div>
+              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>{txt('whatsapp', 'bajada')}</div>
             </div>
-            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
 
