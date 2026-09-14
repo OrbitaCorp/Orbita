@@ -168,6 +168,13 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Contador de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Comparativa', 'Números grandes'],
     marca: 'Vector', tagline: 'Periféricos y audio, sin vueltas',
     layout: 'nocturno',
+    // De muestra: en una tienda real las pisa `plantillaReal()`.
+    categorias: [
+      ['Teclados', `${IMG}/tech-teclado.jpg`],
+      ['Mouses', `${IMG}/tech-mouse.jpg`],
+      ['Audio', `${IMG}/tech-auriculares-2.jpg`],
+      ['Setups', `${IMG}/tech-setup.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -234,6 +241,16 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Buscador protagonista', 'Búsquedas frecuentes', 'Categorías en pastillas', 'Armá tu lista escolar', 'Grilla de 4', 'Vuelta a clases'],
     marca: 'Renglón', tagline: 'Librería, papelería y arte',
     layout: 'papeleria',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['Escolar', `${IMG}/libre-escolar.jpg`],
+      ['Arte', `${IMG}/libre-lapices.jpg`],
+      ['Oficina', `${IMG}/libre-lapicera.jpg`],
+      ['Cuadernos', `${IMG}/libre-cuaderno.jpg`],
+      ['Libros', `${IMG}/libre-biblioteca.jpg`],
+      ['Mochilas', `${IMG}/libre-mochila.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,
@@ -267,6 +284,14 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Barra de departamentos', 'Hero partido en tres', 'Calculadora de materiales', 'Fichas con especificaciones', 'Retiro en sucursal'],
     marca: 'Bulón', tagline: 'Ferretería y corralón desde 1972',
     layout: 'corralon',
+    // De muestra: en una tienda real las pisa `plantillaReal()` con las
+    // categorias del negocio, que son las que arman esta seccion.
+    categorias: [
+      ['Herramientas', `${IMG}/ferre-pared.jpg`],
+      ['Pinturas', `${IMG}/ferre-pintura.jpg`],
+      ['Jardín', `${IMG}/ferre-jardin.jpg`],
+      ['Sanitarios', `${IMG}/ferre-canos.jpg`],
+    ],
     // Dibuja su propia franja debajo del hero, no la barra de estadisticas
     // de Apariencia: el editor no se la ofrece (ver usaStats en tipos.ts).
     usaStats: false,

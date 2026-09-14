@@ -290,6 +290,87 @@ const CRECER: SeccionPlantilla[] = [
   },
 ]
 
+// ─── Nocturno ────────────────────────────────────────────────────────────────
+// Tech: la que más contenido inventado tenía. El contador de lanzamiento, la
+// ficha de cada tarjeta y la comparativa entera estaban escritos a mano.
+const NOCTURNO: SeccionPlantilla[] = [
+  {
+    id: 'lanzamiento',
+    nombre: 'Cintillo de lanzamiento',
+    nota: 'La línea de arriba de todo. Vacía, no se dibuja. Para una cuenta regresiva de verdad usá Avanzado → Oferta relámpago.',
+    campos: [
+      { id: 'texto', label: 'Anuncio', tipo: 'texto', max: 60, porDefecto: 'Lanzamiento de temporada' },
+      { id: 'aclaracion', label: 'Aclaración', tipo: 'texto', max: 40, porDefecto: '15% off reservando' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero',
+    nota: 'Las fotos y los textos salen de "Hero". Acá van el segundo botón y las tres specs de abajo.',
+    campos: [
+      { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, porDefecto: 'Consultar', help: 'Abre el WhatsApp de la tienda.' },
+      { id: 's1v', label: 'Spec 1 — valor', tipo: 'texto', max: 10, porDefecto: '50 mm' },
+      { id: 's1l', label: 'Spec 1 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'driver' },
+      { id: 's2v', label: 'Spec 2 — valor', tipo: 'texto', max: 10, porDefecto: '38 h' },
+      { id: 's2l', label: 'Spec 2 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'batería' },
+      { id: 's3v', label: 'Spec 3 — valor', tipo: 'texto', max: 10, porDefecto: '35 dB' },
+      { id: 's3l', label: 'Spec 3 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'ANC' },
+    ],
+  },
+  {
+    id: 'ficha',
+    nombre: 'Ficha de las tarjetas',
+    nota: 'Los tres datos que aparecen en TODAS las tarjetas de "Se compran juntos".',
+    campos: [
+      { id: 'f1l', label: 'Dato 1 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Garantía' },
+      { id: 'f1v', label: 'Dato 1 — valor', tipo: 'texto', max: 16, porDefecto: '12 meses' },
+      { id: 'f2l', label: 'Dato 2 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Envío' },
+      { id: 'f2v', label: 'Dato 2 — valor', tipo: 'texto', max: 16, porDefecto: '24 h' },
+      { id: 'f3l', label: 'Dato 3 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Cuotas' },
+      { id: 'f3v', label: 'Dato 3 — valor', tipo: 'texto', max: 16, porDefecto: 'sin interés' },
+    ],
+  },
+  {
+    id: 'pasos',
+    nombre: 'El recorrido en tres pasos',
+    nota: 'Los tres pasos son tus primeras tres categorías y llevan a su listado.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'En tres pasos' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, porDefecto: 'Armá tu setup' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Ver todo el catálogo' },
+    ],
+  },
+  {
+    id: 'comparativa',
+    nombre: 'Comparativa',
+    nota: 'Una fila por renglón, con las columnas separadas por |. La primera fila es el encabezado. Vacío: la sección no aparece.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Sin vueltas' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Cuál te conviene' },
+      { id: 'f1', label: 'Encabezado', tipo: 'texto', max: 120, help: 'Ej: | Modelo A | Modelo B | Modelo C', porDefecto: ' | Modelo A | Modelo B | Modelo C' },
+      { id: 'f2', label: 'Fila 2', tipo: 'texto', max: 120, porDefecto: 'Característica | — | — | —' },
+      { id: 'f3', label: 'Fila 3', tipo: 'texto', max: 120 },
+      { id: 'f4', label: 'Fila 4', tipo: 'texto', max: 120 },
+      { id: 'f5', label: 'Fila 5', tipo: 'texto', max: 120 },
+    ],
+  },
+  {
+    id: 'numeros',
+    nombre: 'Números grandes',
+    nota: 'La franja del final. Un número vacío no se dibuja.',
+    campos: [
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '24 h' },
+      { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'de envío a todo el país' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '12' },
+      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'meses de garantía' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '12' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'cuotas sin interés' },
+      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10 },
+      { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 30 },
+    ],
+  },
+]
+
 // ─── Vera ────────────────────────────────────────────────────────────────────
 // Joyería como portada de catálogo impreso: cintillo de servicios, piezas
 // numeradas y el bloque de asesoramiento por WhatsApp al final.
@@ -397,6 +478,189 @@ const NITIDA: SeccionPlantilla[] = [
   },
 ]
 
+// ─── Papelería ───────────────────────────────────────────────────────────────
+// Librería: el buscador es el hero y la lista escolar es lo que resuelve el
+// problema de marzo. Las categorías en pastillas son las del negocio.
+const PAPELERIA: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La franja de color de arriba de todo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Envío gratis desde $25.000 · Retiro en el local sin cargo' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero buscador',
+    nota: 'El texto grande sale de "Hero". Acá van el texto de la caja de búsqueda y los atajos de abajo.',
+    campos: [
+      { id: 'placeholder', label: 'Texto de la caja', tipo: 'texto', max: 60, porDefecto: 'Ej: cuaderno rayado 48 hojas' },
+      { id: 'atajos', label: 'Búsquedas frecuentes', tipo: 'texto', max: 140, help: 'Separadas por coma. Entran cinco cómodas.', porDefecto: 'Lista escolar, Resma A4, Témperas, Carpeta N°3, Tinta' },
+    ],
+  },
+  {
+    id: 'lista',
+    nombre: 'Lista sugerida',
+    nota: 'Un renglón por producto, con el precio separado por |. Vacío: la sección no aparece.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Sin vueltas' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'La lista de la escuela' },
+      { id: 'i1', label: 'Ítem 1', tipo: 'texto', max: 70, help: 'Ej: Cuaderno A4 rayado × 3 | $14.700', porDefecto: 'Cuaderno A4 rayado × 3 | $14.700' },
+      { id: 'i2', label: 'Ítem 2', tipo: 'texto', max: 70, porDefecto: 'Cartuchera con 2 cierres | $12.900' },
+      { id: 'i3', label: 'Ítem 3', tipo: 'texto', max: 70, porDefecto: 'Lápices de colores × 24 | $8.700' },
+      { id: 'i4', label: 'Ítem 4', tipo: 'texto', max: 70, porDefecto: 'Resma A4 75 g | $9.400' },
+      { id: 'i5', label: 'Ítem 5', tipo: 'texto', max: 70, porDefecto: 'Mochila reforzada 18" | $38.500' },
+      { id: 'volantaCaja', label: 'Caja — volanta', tipo: 'texto', max: 30, porDefecto: 'Te la armamos' },
+      { id: 'tituloCaja', label: 'Caja — título', tipo: 'texto', max: 60, porDefecto: 'Mandanos la lista del cole' },
+      { id: 'bajadaCaja', label: 'Caja — bajada', tipo: 'texto', max: 90, porDefecto: 'Te pasamos el presupuesto en el día.' },
+      { id: 'cta', label: 'Caja — botón', tipo: 'texto', max: 28, porDefecto: 'Consultar por WhatsApp' },
+    ],
+  },
+  {
+    id: 'campana',
+    nombre: 'Banner de campaña',
+    nota: 'La foto ancha del final, antes del pie.',
+    campos: [
+      { id: 'foto', label: 'Foto', tipo: 'imagen', porDefecto: `${IMG}/libre-biblioteca.jpg` },
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30, porDefecto: 'Vuelta a clases' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 50, porDefecto: 'Traé la lista, nosotros la armamos' },
+      { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140, porDefecto: 'Mandala por WhatsApp y te pasamos el presupuesto en el día.' },
+    ],
+  },
+]
+
+// ─── Corralón ────────────────────────────────────────────────────────────────
+// Catálogo grande y comprador apurado: la barra de departamentos son las
+// categorías, y el cálculo de materiales se pide por WhatsApp.
+const CORRALON: SeccionPlantilla[] = [
+  {
+    id: 'servicios',
+    nombre: 'Barra de servicios',
+    nota: 'La línea de arriba de todo. Separá los ítems con ·',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 110, porDefecto: '9 sucursales · Retiro en el día · Cuenta corriente para empresas' },
+    ],
+  },
+  {
+    id: 'avisos',
+    nombre: 'Avisos del hero',
+    nota: 'Los dos bloques chicos al lado de la campaña grande. Uno sin título no se dibuja.',
+    campos: [
+      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 34, porDefecto: 'Retiro en 2 horas' },
+      { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 140, porDefecto: 'Comprás online y lo pasás a buscar por la sucursal que te quede.' },
+      { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 34, porDefecto: 'Envío a obra' },
+      { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 140, porDefecto: 'Camión propio en CABA y GBA. Coordinamos día y horario.' },
+    ],
+  },
+  {
+    id: 'calculo',
+    nombre: 'Cálculo de materiales',
+    nota: 'El bloque de color con la tarjeta blanca. El cálculo se pide por WhatsApp: Órbita no lo resuelve sola.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Cálculo' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: '¿Cuánto material necesitás?' },
+      { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 200, porDefecto: 'Contanos los metros y te decimos cuánto comprar. Sin comprar de más ni volver al local.' },
+      { id: 'volantaCaja', label: 'Tarjeta — volanta', tipo: 'texto', max: 30, porDefecto: 'Te lo calculamos' },
+      { id: 'tituloCaja', label: 'Tarjeta — título', tipo: 'texto', max: 60, porDefecto: 'Pasanos las medidas y te pasamos el total' },
+      { id: 'cta', label: 'Tarjeta — botón', tipo: 'texto', max: 28, porDefecto: 'Consultar por WhatsApp' },
+    ],
+  },
+  {
+    id: 'numeros',
+    nombre: 'Números de la casa',
+    nota: 'La franja del final. Un número vacío no se dibuja.',
+    campos: [
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '9' },
+      { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'sucursales' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '2 hs' },
+      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'para retirar' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '52' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'años' },
+      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, porDefecto: '+18.000' },
+      { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'productos' },
+    ],
+  },
+]
+
+// ─── Glow ────────────────────────────────────────────────────────────────────
+// Belleza: sellos, la rutina en tres pasos, el antes y después, y la galería.
+const GLOW: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La franja de color de arriba de todo.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: '✦ Envío gratis desde $45.000 · 3 cuotas sin interés' },
+    ],
+  },
+  {
+    id: 'hero',
+    nombre: 'Hero',
+    nota: 'Las fotos y los textos salen de "Hero". Acá va el segundo botón.',
+    campos: [
+      { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 26, porDefecto: 'Asesorate por WhatsApp', help: 'Abre el WhatsApp de la tienda.' },
+    ],
+  },
+  {
+    id: 'sellos',
+    nombre: 'Sellos de producto',
+    nota: 'La franja de cuatro columnas debajo del hero. Uno sin título no se dibuja.',
+    campos: [
+      { id: 't1', label: 'Sello 1', tipo: 'texto', max: 24, porDefecto: 'Vegano' },
+      { id: 'b1', label: 'Sello 1 — bajada', tipo: 'texto', max: 40, porDefecto: 'sin ingredientes animales' },
+      { id: 't2', label: 'Sello 2', tipo: 'texto', max: 24, porDefecto: 'Sin crueldad' },
+      { id: 'b2', label: 'Sello 2 — bajada', tipo: 'texto', max: 40, porDefecto: 'no testeado en animales' },
+      { id: 't3', label: 'Sello 3', tipo: 'texto', max: 24, porDefecto: 'Dermatológico' },
+      { id: 'b3', label: 'Sello 3 — bajada', tipo: 'texto', max: 40, porDefecto: 'testeado en piel sensible' },
+      { id: 't4', label: 'Sello 4', tipo: 'texto', max: 24, porDefecto: 'Sin fragancia' },
+      { id: 'b4', label: 'Sello 4 — bajada', tipo: 'texto', max: 40, porDefecto: 'apto rosácea' },
+    ],
+  },
+  {
+    id: 'rutina',
+    nombre: 'La rutina en tres pasos',
+    nota: 'Los tres productos son tus destacados. Acá van los nombres de cada paso.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Tres pasos' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Tu rutina, resuelta' },
+      { id: 'paso1', label: 'Paso 1', tipo: 'texto', max: 20, porDefecto: 'Limpiar' },
+      { id: 'paso2', label: 'Paso 2', tipo: 'texto', max: 20, porDefecto: 'Tratar' },
+      { id: 'paso3', label: 'Paso 3', tipo: 'texto', max: 20, porDefecto: 'Hidratar' },
+      { id: 'pie', label: 'Línea de abajo', tipo: 'texto', max: 90, help: 'Vacía, no se dibuja.' },
+    ],
+  },
+  {
+    id: 'antesDespues',
+    nombre: 'Antes y después',
+    nota: 'Las dos fotos comparadas. Usá fotos propias: es una promesa de resultado.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Ocho semanas' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Antes y después' },
+      { id: 'foto1', label: 'Foto — antes', tipo: 'imagen', porDefecto: `${IMG}/belleza-spa.jpg` },
+      { id: 'etiqueta1', label: 'Etiqueta — antes', tipo: 'texto', max: 16, porDefecto: 'Antes' },
+      { id: 'foto2', label: 'Foto — después', tipo: 'imagen', porDefecto: `${IMG}/belleza-labial.jpg` },
+      { id: 'etiqueta2', label: 'Etiqueta — después', tipo: 'texto', max: 16, porDefecto: 'Después' },
+      { id: 'leyenda', label: 'Leyenda', tipo: 'parrafo', max: 160, porDefecto: 'Resultados de uso diario. Fotos sin retoque.' },
+    ],
+  },
+  {
+    id: 'galeria',
+    nombre: 'Galería',
+    nota: 'La tira de fotos del final. Una foto vacía no se dibuja; sin ninguna, la sección desaparece.',
+    campos: [
+      { id: 'usuario', label: 'Usuario', tipo: 'texto', max: 30, porDefecto: '@tutienda' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Seguinos en Instagram' },
+      { id: 'f1', label: 'Foto 1', tipo: 'imagen', porDefecto: `${IMG}/belleza-maquillaje.jpg` },
+      { id: 'f2', label: 'Foto 2', tipo: 'imagen', porDefecto: `${IMG}/belleza-paletas.jpg` },
+      { id: 'f3', label: 'Foto 3', tipo: 'imagen', porDefecto: `${IMG}/belleza-manos.jpg` },
+      { id: 'f4', label: 'Foto 4', tipo: 'imagen', porDefecto: `${IMG}/belleza-coral.jpg` },
+      { id: 'f5', label: 'Foto 5', tipo: 'imagen', porDefecto: `${IMG}/belleza-cosmetica.jpg` },
+      { id: 'f6', label: 'Foto 6', tipo: 'imagen', porDefecto: `${IMG}/belleza-spa.jpg` },
+    ],
+  },
+]
+
 // ─── El registro ─────────────────────────────────────────────────────────────
 // Una plantilla que todavía no declaró sus secciones no muestra la pestaña
 // "Secciones" en el panel — se sigue viendo igual, solo que su contenido
@@ -404,6 +668,10 @@ const NITIDA: SeccionPlantilla[] = [
 export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
   premium: PREMIUM,
   mosaico: MOSAICO,
+  nocturno: NOCTURNO,
+  papeleria: PAPELERIA,
+  corralon: CORRALON,
+  glow: GLOW,
   atleta: ATLETA,
   patitas: PATITAS,
   bodega: BODEGA,
