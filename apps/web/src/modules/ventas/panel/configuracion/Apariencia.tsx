@@ -514,10 +514,18 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // toda la frase (pedido explícito, con capturas del editor de Premium en
     // blanco mientras la tienda mostraba texto). Vaciar un campo lo saca del
     // guardado y la portada vuelve a ese mismo texto — ver limpiarSecciones().
+    // ...con UNA excepción: los campos marcados como `afirmacion` (un
+    // descuento, un envío gratis, una cantidad — ver tipos.ts). Esos NO se
+    // precargan: si vinieran con el ejemplo puesto, guardar sin tocarlos
+    // alcanzaría para prometerle al comprador algo que el negocio nunca dijo.
+    // El ejemplo se sigue viendo, pero como placeholder: se lee, no se guarda.
     const valorSeccion = (seccion: string, campo: CampoSeccion) => {
         const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
-        return guardado !== undefined ? guardado : (campo.porDefecto ?? '')
+        if (guardado !== undefined) return guardado
+        return campo.afirmacion ? '' : (campo.porDefecto ?? '')
     }
+    const pistaSeccion = (campo: CampoSeccion) =>
+        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '') : undefined
     const setSeccion = (seccion: string, campo: string, valor: string) => {
         const actual = ap.seccionesPlantilla ?? {}
         set('seccionesPlantilla', {
@@ -577,6 +585,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 value={valorSeccion(sec.id, campo)}
                                 onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
                                 maxLength={campo.max}
+                                placeholder={pistaSeccion(campo)}
                                 rows={3}
                                 style={{
                                     width: '100%', borderRadius: 8, border: '1px solid var(--color-border)',
@@ -586,7 +595,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 }}
                             />
                         ) : (
-                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} />
+                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo)} />
                         )}
                     </div>
                 ))}
@@ -1078,11 +1087,11 @@ function Divider() {
     return <div style={{ height: 1, background: 'var(--color-border)', margin: '18px 0' }} />
 }
 
-function Inp({ value, onChange, maxLength, suffix, mono, prefix }: { value: string; onChange: (v: string) => void; maxLength?: number; suffix?: ReactNode; mono?: boolean; prefix?: ReactNode }) {
+function Inp({ value, onChange, maxLength, suffix, mono, prefix, placeholder }: { value: string; onChange: (v: string) => void; maxLength?: number; suffix?: ReactNode; mono?: boolean; prefix?: ReactNode; placeholder?: string }) {
     return (
         <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: 40, padding: '0 12px', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
             {prefix}
-            <input value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', minWidth: 0 }} />
+            <input value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', minWidth: 0 }} />
             {suffix}
         </div>
     )

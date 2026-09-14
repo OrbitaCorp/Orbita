@@ -99,6 +99,22 @@ export interface CampoSeccion {
    * y la tienda otra.
    */
   porDefecto?: string
+  /**
+   * Este campo AFIRMA algo del negocio: un descuento, un envío gratis, una
+   * cantidad, una certificación, un plazo de entrega. No es una etiqueta
+   * ("Más vendidos") sino una promesa al comprador.
+   *
+   * Su `porDefecto` se sigue usando en la vitrina del panel —es lo que hace
+   * que la plantilla se venda con una portada creíble— pero en la TIENDA REAL
+   * no se dibuja hasta que el dueño lo escriba. Mosaico mostraba −40% / −25% /
+   * −30% sobre las categorías de una tienda que nunca puso esos descuentos, y
+   * media docena de plantillas prometían envío gratis y cuotas sin interés que
+   * el negocio no había configurado.
+   *
+   * Lo resuelve `txt()` en homes.tsx: solo cae al ejemplo cuando NO hay
+   * `acciones` (o sea, en el panel).
+   */
+  afirmacion?: boolean
 }
 
 export interface SeccionPlantilla {

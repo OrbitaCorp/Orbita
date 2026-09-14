@@ -61,7 +61,7 @@ const PREMIUM: SeccionPlantilla[] = [
     nombre: 'Las tres promesas',
     nota: 'La franja de tres columnas que va debajo del hero.',
     campos: [
-      { id: 't1', label: 'Primera — título', tipo: 'texto', max: 34, porDefecto: 'Oro 18k con sello' },
+      { id: 't1', label: 'Primera — título', tipo: 'texto', max: 34, afirmacion: true, porDefecto: 'Oro 18k con sello' },
       { id: 'b1', label: 'Primera — bajada', tipo: 'texto', max: 60, porDefecto: 'Cada pieza sale con su certificado' },
       { id: 't2', label: 'Segunda — título', tipo: 'texto', max: 34, porDefecto: 'Garantía de por vida' },
       { id: 'b2', label: 'Segunda — bajada', tipo: 'texto', max: 60, porDefecto: 'Ajustes y pulido sin cargo' },
@@ -79,14 +79,15 @@ const PREMIUM: SeccionPlantilla[] = [
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, porDefecto: 'Cuatro manos, una pieza por vez' },
       {
         id: 'texto', label: 'Texto', tipo: 'parrafo', max: 260,
+        afirmacion: true,
         porDefecto: 'Fundimos, engarzamos y pulimos en el mismo lugar desde 1998. Nada sale del taller sin pasar por lupa dos veces.',
       },
-      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 8, help: 'Ej: 26', porDefecto: '26' },
-      { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 16, help: 'Ej: años', porDefecto: 'años' },
-      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 8, porDefecto: '4.100' },
-      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'piezas' },
-      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 8, porDefecto: '100%' },
-      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'a mano' },
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 8, help: 'Ej: 26', afirmacion: true, porDefecto: '26' },
+      { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 16, help: 'Ej: años', afirmacion: true, porDefecto: 'años' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 8, afirmacion: true, porDefecto: '4.100' },
+      { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 16, afirmacion: true, porDefecto: 'piezas' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 8, afirmacion: true, porDefecto: '100%' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 16, afirmacion: true, porDefecto: 'a mano' },
     ],
   },
   {
@@ -136,10 +137,10 @@ const MOSAICO: SeccionPlantilla[] = [
     nombre: 'Muro de bloques',
     nota: 'Los cuatro bloques chicos son tus primeras cuatro categorías. Acá va el cartelito de oferta de cada uno; si lo dejás vacío, no se dibuja.',
     campos: [
-      { id: 'of1', label: 'Bloque 1 — oferta', tipo: 'texto', max: 12, help: 'Ej: −40%', porDefecto: '−40%' },
-      { id: 'of2', label: 'Bloque 2 — oferta', tipo: 'texto', max: 12, porDefecto: '−25%' },
-      { id: 'of3', label: 'Bloque 3 — oferta', tipo: 'texto', max: 12, porDefecto: '−30%' },
-      { id: 'of4', label: 'Bloque 4 — oferta', tipo: 'texto', max: 12, porDefecto: 'Nuevo' },
+      { id: 'of1', label: 'Bloque 1 — oferta', tipo: 'texto', max: 12, help: 'Ej: −40%', afirmacion: true, porDefecto: '−40%' },
+      { id: 'of2', label: 'Bloque 2 — oferta', tipo: 'texto', max: 12, afirmacion: true, porDefecto: '−25%' },
+      { id: 'of3', label: 'Bloque 3 — oferta', tipo: 'texto', max: 12, afirmacion: true, porDefecto: '−30%' },
+      { id: 'of4', label: 'Bloque 4 — oferta', tipo: 'texto', max: 12, afirmacion: true, porDefecto: 'Nuevo' },
     ],
   },
   {
@@ -147,8 +148,8 @@ const MOSAICO: SeccionPlantilla[] = [
     nombre: 'Franja de envío',
     nota: 'La banda de color entre los productos y las marcas.',
     campos: [
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, porDefecto: 'Envío gratis desde $70.000' },
-      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, porDefecto: 'A todo el país. Llega en 48 a 72 horas.' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 48, afirmacion: true, porDefecto: 'Envío gratis desde $70.000' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'A todo el país. Llega en 48 a 72 horas.' },
       { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Aprovechar' },
     ],
   },
@@ -186,7 +187,7 @@ const ATLETA: SeccionPlantilla[] = [
     nombre: 'Cartel corriendo',
     nota: 'La franja de arriba de todo, antes del logo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: 'ENVÍO GRATIS +$120.000 ✦ 3 CUOTAS SIN INTERÉS ✦ CAMBIO DE TALLE SIN CARGO' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, afirmacion: true, porDefecto: 'ENVÍO GRATIS +$120.000 ✦ 3 CUOTAS SIN INTERÉS ✦ CAMBIO DE TALLE SIN CARGO' },
     ],
   },
   {
@@ -202,13 +203,13 @@ const ATLETA: SeccionPlantilla[] = [
     nombre: 'Números de la comunidad',
     nota: 'La franja de color del final. Un número vacío no se dibuja.',
     campos: [
-      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '+2.400' },
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '+2.400' },
       { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'km este mes' },
-      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '1.180' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '1.180' },
       { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'corredores' },
-      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '48 hs' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '48 hs' },
       { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'de entrega' },
-      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, porDefecto: '4,9' },
+      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '4,9' },
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'de puntaje' },
     ],
   },
@@ -233,7 +234,7 @@ const PATITAS: SeccionPlantilla[] = [
     nombre: 'Cintillo superior',
     nota: 'La franja de arriba de todo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: '✦ Envío en el día en CABA comprando antes de las 14 ✦' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, porDefecto: '✦ Envío en el día en CABA comprando antes de las 14 ✦' },
       { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch' },
     ],
   },
@@ -275,7 +276,7 @@ const BODEGA: SeccionPlantilla[] = [
     nombre: 'Cintillo superior',
     nota: 'La línea fina de arriba de todo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Envío refrigerado · Retiro en la vinoteca · Venta a mayores de 18' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'Envío refrigerado · Retiro en la vinoteca · Venta a mayores de 18' },
     ],
   },
   {
@@ -322,7 +323,7 @@ const CRECER: SeccionPlantilla[] = [
     nombre: 'Cintillo superior',
     nota: 'La franja de arriba de todo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Algodón orgánico certificado · Cambios sin cargo dentro de los 30 días' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'Algodón orgánico certificado · Cambios sin cargo dentro de los 30 días' },
     ],
   },
   {
@@ -346,7 +347,7 @@ const CRECER: SeccionPlantilla[] = [
       { id: 't3', label: 'Tercera — título', tipo: 'texto', max: 30, porDefecto: 'Costuras planas' },
       { id: 'b3', label: 'Tercera — bajada', tipo: 'texto', max: 40, porDefecto: 'no marcan la piel' },
       { id: 't4', label: 'Cuarta — título', tipo: 'texto', max: 30, porDefecto: 'Cambios' },
-      { id: 'b4', label: 'Cuarta — bajada', tipo: 'texto', max: 40, porDefecto: 'sin cargo 30 días' },
+      { id: 'b4', label: 'Cuarta — bajada', tipo: 'texto', max: 40, afirmacion: true, porDefecto: 'sin cargo 30 días' },
     ],
   },
   {
@@ -371,7 +372,7 @@ const NOCTURNO: SeccionPlantilla[] = [
     nota: 'La línea de arriba de todo. Vacía, no se dibuja. Para una cuenta regresiva de verdad usá Avanzado → Oferta relámpago.',
     campos: [
       { id: 'texto', label: 'Anuncio', tipo: 'texto', max: 60, porDefecto: 'Lanzamiento de temporada' },
-      { id: 'aclaracion', label: 'Aclaración', tipo: 'texto', max: 40, porDefecto: '15% off reservando' },
+      { id: 'aclaracion', label: 'Aclaración', tipo: 'texto', max: 40, afirmacion: true, porDefecto: '15% off reservando' },
     ],
   },
   {
@@ -380,11 +381,11 @@ const NOCTURNO: SeccionPlantilla[] = [
     nota: 'Las fotos y los textos salen de "Hero". Acá van el segundo botón y las tres specs de abajo.',
     campos: [
       { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, porDefecto: 'Consultar', help: 'Abre el WhatsApp de la tienda.' },
-      { id: 's1v', label: 'Spec 1 — valor', tipo: 'texto', max: 10, porDefecto: '50 mm' },
+      { id: 's1v', label: 'Spec 1 — valor', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '50 mm' },
       { id: 's1l', label: 'Spec 1 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'driver' },
-      { id: 's2v', label: 'Spec 2 — valor', tipo: 'texto', max: 10, porDefecto: '38 h' },
+      { id: 's2v', label: 'Spec 2 — valor', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '38 h' },
       { id: 's2l', label: 'Spec 2 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'batería' },
-      { id: 's3v', label: 'Spec 3 — valor', tipo: 'texto', max: 10, porDefecto: '35 dB' },
+      { id: 's3v', label: 'Spec 3 — valor', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '35 dB' },
       { id: 's3l', label: 'Spec 3 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'ANC' },
     ],
   },
@@ -394,9 +395,9 @@ const NOCTURNO: SeccionPlantilla[] = [
     nota: 'Los tres datos que aparecen en TODAS las tarjetas de "Se compran juntos".',
     campos: [
       { id: 'f1l', label: 'Dato 1 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Garantía' },
-      { id: 'f1v', label: 'Dato 1 — valor', tipo: 'texto', max: 16, porDefecto: '12 meses' },
+      { id: 'f1v', label: 'Dato 1 — valor', tipo: 'texto', max: 16, afirmacion: true, porDefecto: '12 meses' },
       { id: 'f2l', label: 'Dato 2 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Envío' },
-      { id: 'f2v', label: 'Dato 2 — valor', tipo: 'texto', max: 16, porDefecto: '24 h' },
+      { id: 'f2v', label: 'Dato 2 — valor', tipo: 'texto', max: 16, afirmacion: true, porDefecto: '24 h' },
       { id: 'f3l', label: 'Dato 3 — etiqueta', tipo: 'texto', max: 16, porDefecto: 'Cuotas' },
       { id: 'f3v', label: 'Dato 3 — valor', tipo: 'texto', max: 16, porDefecto: 'sin interés' },
     ],
@@ -430,7 +431,7 @@ const NOCTURNO: SeccionPlantilla[] = [
     nombre: 'Números grandes',
     nota: 'La franja del final. Un número vacío no se dibuja.',
     campos: [
-      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '24 h' },
+      { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '24 h' },
       { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'de envío a todo el país' },
       { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '12' },
       { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 30, porDefecto: 'meses de garantía' },
@@ -507,7 +508,7 @@ const COBIJO: SeccionPlantilla[] = [
     nombre: 'Cartel corriendo',
     nota: 'La franja de arriba de todo, antes del logo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ ENVÍO GRATIS EN MUEBLES ✦ 6 CUOTAS SIN INTERÉS ✦ ARMADO SIN CARGO' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, afirmacion: true, porDefecto: '✦ ENVÍO GRATIS EN MUEBLES ✦ 6 CUOTAS SIN INTERÉS ✦ ARMADO SIN CARGO' },
     ],
   },
   {
@@ -563,7 +564,7 @@ const NITIDA: SeccionPlantilla[] = [
     nombre: 'Cartel corriendo',
     nota: 'La franja de arriba de todo, antes del logo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ MUESTRAS DE REGALO EN TODA COMPRA ✦ ENVÍO GRATIS DESDE $45.000' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, afirmacion: true, porDefecto: '✦ MUESTRAS DE REGALO EN TODA COMPRA ✦ ENVÍO GRATIS DESDE $45.000' },
     ],
   },
   {
@@ -613,7 +614,7 @@ const PAPELERIA: SeccionPlantilla[] = [
     nombre: 'Cintillo superior',
     nota: 'La franja de color de arriba de todo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: 'Envío gratis desde $25.000 · Retiro en el local sin cargo' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'Envío gratis desde $25.000 · Retiro en el local sin cargo' },
     ],
   },
   {
@@ -632,11 +633,11 @@ const PAPELERIA: SeccionPlantilla[] = [
     campos: [
       { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Sin vueltas' },
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'La lista de la escuela' },
-      { id: 'i1', label: 'Ítem 1', tipo: 'texto', max: 70, help: 'Ej: Cuaderno A4 rayado × 3 | $14.700', porDefecto: 'Cuaderno A4 rayado × 3 | $14.700' },
-      { id: 'i2', label: 'Ítem 2', tipo: 'texto', max: 70, porDefecto: 'Cartuchera con 2 cierres | $12.900' },
-      { id: 'i3', label: 'Ítem 3', tipo: 'texto', max: 70, porDefecto: 'Lápices de colores × 24 | $8.700' },
-      { id: 'i4', label: 'Ítem 4', tipo: 'texto', max: 70, porDefecto: 'Resma A4 75 g | $9.400' },
-      { id: 'i5', label: 'Ítem 5', tipo: 'texto', max: 70, porDefecto: 'Mochila reforzada 18" | $38.500' },
+      { id: 'i1', label: 'Ítem 1', tipo: 'texto', max: 70, help: 'Ej: Cuaderno A4 rayado × 3 | $14.700', afirmacion: true, porDefecto: 'Cuaderno A4 rayado × 3 | $14.700' },
+      { id: 'i2', label: 'Ítem 2', tipo: 'texto', max: 70, afirmacion: true, porDefecto: 'Cartuchera con 2 cierres | $12.900' },
+      { id: 'i3', label: 'Ítem 3', tipo: 'texto', max: 70, afirmacion: true, porDefecto: 'Lápices de colores × 24 | $8.700' },
+      { id: 'i4', label: 'Ítem 4', tipo: 'texto', max: 70, afirmacion: true, porDefecto: 'Resma A4 75 g | $9.400' },
+      { id: 'i5', label: 'Ítem 5', tipo: 'texto', max: 70, afirmacion: true, porDefecto: 'Mochila reforzada 18" | $38.500' },
       { id: 'volantaCaja', label: 'Caja — volanta', tipo: 'texto', max: 30, porDefecto: 'Te la armamos' },
       { id: 'tituloCaja', label: 'Caja — título', tipo: 'texto', max: 60, porDefecto: 'Mandanos la lista del cole' },
       { id: 'bajadaCaja', label: 'Caja — bajada', tipo: 'texto', max: 90, porDefecto: 'Te pasamos el presupuesto en el día.' },
@@ -685,7 +686,7 @@ const CORRALON: SeccionPlantilla[] = [
     nombre: 'Barra de servicios',
     nota: 'La línea de arriba de todo. Separá los ítems con ·',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 110, porDefecto: '9 sucursales · Retiro en el día · Cuenta corriente para empresas' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 110, afirmacion: true, porDefecto: '9 sucursales · Retiro en el día · Cuenta corriente para empresas' },
     ],
   },
   {
@@ -693,7 +694,7 @@ const CORRALON: SeccionPlantilla[] = [
     nombre: 'Avisos del hero',
     nota: 'Los dos bloques chicos al lado de la campaña grande. Uno sin título no se dibuja.',
     campos: [
-      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 34, porDefecto: 'Retiro en 2 horas' },
+      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 34, afirmacion: true, porDefecto: 'Retiro en 2 horas' },
       { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 140, porDefecto: 'Comprás online y lo pasás a buscar por la sucursal que te quede.' },
       { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 34, porDefecto: 'Envío a obra' },
       { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 140, porDefecto: 'Camión propio en CABA y GBA. Coordinamos día y horario.' },
@@ -719,11 +720,11 @@ const CORRALON: SeccionPlantilla[] = [
     campos: [
       { id: 'n1v', label: 'Número 1', tipo: 'texto', max: 10, porDefecto: '9' },
       { id: 'n1l', label: 'Número 1 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'sucursales' },
-      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, porDefecto: '2 hs' },
+      { id: 'n2v', label: 'Número 2', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '2 hs' },
       { id: 'n2l', label: 'Número 2 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'para retirar' },
-      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, porDefecto: '52' },
-      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'años' },
-      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, porDefecto: '+18.000' },
+      { id: 'n3v', label: 'Número 3', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '52' },
+      { id: 'n3l', label: 'Número 3 — etiqueta', tipo: 'texto', max: 24, afirmacion: true, porDefecto: 'años' },
+      { id: 'n4v', label: 'Número 4', tipo: 'texto', max: 10, afirmacion: true, porDefecto: '+18.000' },
       { id: 'n4l', label: 'Número 4 — etiqueta', tipo: 'texto', max: 24, porDefecto: 'productos' },
     ],
   },
@@ -757,7 +758,7 @@ const GLOW: SeccionPlantilla[] = [
     nombre: 'Cintillo superior',
     nota: 'La franja de color de arriba de todo.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, porDefecto: '✦ Envío gratis desde $45.000 · 3 cuotas sin interés' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, porDefecto: '✦ Envío gratis desde $45.000 · 3 cuotas sin interés' },
     ],
   },
   {
@@ -845,7 +846,7 @@ const CIRCUITO: SeccionPlantilla[] = [
     nombre: 'Cartel corriendo',
     nota: 'La franja de arriba de todo, sobre el panel. Vacía, no se dibuja.',
     campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ 12 CUOTAS SIN INTERÉS ✦ GARANTÍA OFICIAL 12 MESES' },
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, afirmacion: true, porDefecto: '✦ 12 CUOTAS SIN INTERÉS ✦ GARANTÍA OFICIAL 12 MESES' },
     ],
   },
   {
@@ -993,6 +994,17 @@ export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlan
  * dueño no editó nada) y el editor (que lo muestra precargado) — así los dos
  * leen exactamente el mismo texto.
  */
+/**
+ * ¿Ese campo afirma algo del negocio (un descuento, un envío gratis, una
+ * cantidad) en vez de ser una etiqueta? Ver `afirmacion` en tipos.ts.
+ */
+export function esAfirmacion(idPlantilla: string, seccion: string, campo: string): boolean {
+  return !!SECCIONES_POR_PLANTILLA[idPlantilla]
+    ?.find(s => s.id === seccion)
+    ?.campos.find(c => c.id === campo)
+    ?.afirmacion
+}
+
 export function porDefectoDe(idPlantilla: string | null | undefined, seccion: string, campo: string): string {
   const sec = seccionesDe(idPlantilla).find(s => s.id === seccion)
   return sec?.campos.find(c => c.id === campo)?.porDefecto ?? ''

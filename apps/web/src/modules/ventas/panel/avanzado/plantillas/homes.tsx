@@ -7,7 +7,7 @@ import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe,
 } from './piezas'
-import { porDefectoDe } from './secciones'
+import { esAfirmacion, porDefectoDe } from './secciones'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
 //
@@ -111,8 +111,19 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // secciones.ts junto al resto del esquema — no acá adentro. Ese fallback no
   // es un detalle: es lo que hace que una tienda que no editó nada se vea
   // igual que su vitrina.
-  const txt = (seccion: string, campo: string) =>
-    p.sec?.[seccion]?.[campo]?.trim() || porDefectoDe(p.id, seccion, campo)
+  // ...salvo cuando ese texto AFIRMA algo del negocio. Un "−40%" sobre una
+  // categoría, un "envío gratis desde $70.000" o un "+18.000 clientes" son
+  // promesas al comprador, no etiquetas: en la vitrina del panel están bien
+  // (venden la plantilla), pero en una tienda REAL que no los escribió son
+  // mentira. Mosaico mostraba tres descuentos que ese negocio nunca cargó.
+  // `acciones` es lo que distingue los dos mundos: solo existe en la tienda.
+  // Ver `afirmacion` en tipos.ts.
+  const txt = (seccion: string, campo: string) => {
+    const guardado = p.sec?.[seccion]?.[campo]?.trim()
+    if (guardado) return guardado
+    if (acciones && esAfirmacion(p.id, seccion, campo)) return ''
+    return porDefectoDe(p.id, seccion, campo)
+  }
 
   // Un campo de tipo interruptor (ver TipoCampo en tipos.ts): se guarda como
   // texto igual que todo lo demás, así que 'si' es el único valor que cuenta.
@@ -360,6 +371,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
+        {/* La franja prometía "Envío gratis desde $70.000" y "llega en 48 a 72
+            horas" en cualquier tienda que aplicara Mosaico, la ofreciera o no.
+            Ahora el texto es una afirmación (ver secciones.ts) y sin él la
+            banda entera no se dibuja: media franja de color con un botón
+            suelto se ve peor que no tenerla. */}
+        {!!txt('franja', 'titulo') && (
         <Reveal>
           <div style={{ background: t.primary, color: '#fff', padding: movil ? '26px 18px' : '38px 28px', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 230 }}>
@@ -372,6 +389,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             >{txt('franja', 'cta')}</span>
           </div>
         </Reveal>
+        )}
 
         {/* Las marcas que trabaja el negocio. Vacío = la sección no se dibuja:
             no toda tienda de deco revende marcas, y seis casilleros con
@@ -609,17 +627,19 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             versión cartelera conserva el dorado sobre carbón de Premium en vez
             de usar el `Marquee` compartido, que va en negativo (fondo oscuro
             del tema) y acá se vería como una franja pegada de otra plantilla. */}
-        <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, overflow: 'hidden' }}>
-          {activo('cintillo', 'cartelera') ? (
-            <div className="pl-marquee-track">
-              {[0, 1].map((k) => (
-                <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>
-              ))}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
-          )}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, overflow: 'hidden' }}>
+            {activo('cintillo', 'cartelera') ? (
+              <div className="pl-marquee-track">
+                {[0, 1].map((k) => (
+                  <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+            )}
+          </div>
+        )}
 
         {/* Logo centrado, buscador a la izquierda y las acciones de la tienda a
             la derecha — la misma cuenta y el mismo carrito que el resto del
@@ -694,7 +714,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             [txt('promesas', 't1'), txt('promesas', 'b1')],
             [txt('promesas', 't2'), txt('promesas', 'b2')],
             [txt('promesas', 't3'), txt('promesas', 'b3')],
-          ] as [string, string][]).map(([a, b], i) => (
+          ] as [string, string][]).filter(([v]) => v).map(([a, b], i) => (
             <div key={a} style={{ padding: movil ? '20px 22px' : '30px 34px', textAlign: 'center', borderLeft: !movil && i > 0 ? filete : undefined, borderTop: movil && i > 0 ? filete : undefined }}>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 22, color: t.primary }}>{a}</div>
               <div style={{ fontSize: 12, color: t.muted, marginTop: 6, letterSpacing: '0.04em' }}>{b}</div>
@@ -775,7 +795,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   [txt('taller', 'n1v'), txt('taller', 'n1l')],
                   [txt('taller', 'n2v'), txt('taller', 'n2l')],
                   [txt('taller', 'n3v'), txt('taller', 'n3l')],
-                ] as [string, string][]).map(([n, l]) => (
+                ] as [string, string][]).filter(([v]) => v).map(([n, l]) => (
                   <div key={l}>
                     <div style={{ fontFamily: t.fh, fontSize: movil ? 30 : 40, color: t.primary, lineHeight: 1 }}>{n}</div>
                     <div style={{ fontSize: 10.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted, marginTop: 8 }}>{l}</div>
@@ -934,7 +954,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                         [txt('ficha', 'f1l'), txt('ficha', 'f1v')],
                         [txt('ficha', 'f2l'), txt('ficha', 'f2v')],
                         [txt('ficha', 'f3l'), txt('ficha', 'f3v')],
-                      ] as [string, string][]).filter(([a]) => a).map(([a, b]) => (
+                      ] as [string, string][]).filter(([a, b]) => a && b).map(([a, b]) => (
                         <div key={a} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 11.5, color: t.muted, fontFamily: 'ui-monospace, monospace' }}>
                           <span>{a}</span><span style={{ color: t.text }}>{b}</span>
                         </div>
@@ -1043,9 +1063,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
-          {txt('cintillo', 'texto')}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
+            {txt('cintillo', 'texto')}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: movil ? 12 : 24, padding: movil ? '13px 16px' : '16px 32px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -1371,7 +1393,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       ])
     const encabezado = (
       <>
-        <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '16px 34px', borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -1513,15 +1535,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <div style={{ background: t.soft, padding: '9px 0', fontSize: 12, fontWeight: 700, color: t.primary, overflow: 'hidden' }}>
-          {activo('cintillo', 'cartelera') ? (
-            <div className="pl-marquee-track">
-              {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   `.repeat(6)}</span>)}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
-          )}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ background: t.soft, padding: '9px 0', fontSize: 12, fontWeight: 700, color: t.primary, overflow: 'hidden' }}>
+            {activo('cintillo', 'cartelera') ? (
+              <div className="pl-marquee-track">
+                {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   `.repeat(6)}</span>)}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+            )}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 22, padding: movil ? '13px 16px' : '16px 32px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -1621,9 +1645,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, borderBottom: `1px solid ${t.border}` }}>
-          {txt('cintillo', 'texto')}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, borderBottom: `1px solid ${t.border}` }}>
+            {txt('cintillo', 'texto')}
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '15px 16px' : '24px 44px', borderBottom: `1px solid ${t.border}`, gap: 14 }}>
           {movil
             ? <span style={{ fontSize: 18, color: t.primary }}>☰</span>
@@ -1747,9 +1773,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, color: t.text, fontWeight: 600 }}>
-          {txt('cintillo', 'texto')}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, color: t.text, fontWeight: 600 }}>
+            {txt('cintillo', 'texto')}
+          </div>
+        )}
         <div style={{ textAlign: 'center', padding: movil ? '15px 16px' : '20px 34px 16px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
           <div
             onClick={acciones?.irAInicio}
@@ -2036,15 +2064,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft, overflow: 'hidden' }}>
-          {activo('cintillo', 'cartelera') ? (
-            <div className="pl-marquee-track">
-              {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>)}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
-          )}
-        </div>
+        {!!txt('cintillo', 'texto') && (
+          <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft, overflow: 'hidden' }}>
+            {activo('cintillo', 'cartelera') ? (
+              <div className="pl-marquee-track">
+                {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>)}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+            )}
+          </div>
+        )}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
       </>
     )
@@ -2180,7 +2210,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
@@ -2310,7 +2340,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
       </>
     )
@@ -2440,9 +2470,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
   const encabezado = (
     <>
-      <div style={{ background: t.primary, color: '#fff', textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
-        {txt('cintillo', 'texto')}
-      </div>
+      {!!txt('cintillo', 'texto') && (
+        <div style={{ background: t.primary, color: '#fff', textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
+          {txt('cintillo', 'texto')}
+        </div>
+      )}
       <div style={{ textAlign: 'center', padding: movil ? '14px 16px' : '18px 34px 14px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
         <div
           onClick={acciones?.irAInicio}
@@ -2570,7 +2602,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             {([
               [txt('antesDespues', 'etiqueta1'), txt('antesDespues', 'foto1')],
               [txt('antesDespues', 'etiqueta2'), txt('antesDespues', 'foto2')],
-            ] as [string, string][]).map(([l, src]) => (
+            ] as [string, string][]).filter(([v]) => v).map(([l, src]) => (
               <div key={l} style={{ position: 'relative' }}>
                 <Foto src={src} alto={movil ? 200 : 300} radio={0} />
                 <span style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(255,255,255,0.94)', color: t.text, fontSize: 11.5, fontWeight: 800, padding: '5px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{l}</span>
