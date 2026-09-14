@@ -14,6 +14,7 @@ import {
   toTiendaConfig, toProducto,
   type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontSort, type StorefrontFacet,
 } from '@/lib/storefront/api'
+import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 
 const LIMIT = 12
 // Columnas en tablet/desktop según "Grilla de productos" de Apariencia — ver
@@ -474,11 +475,11 @@ export default function Catalogo() {
               </div>
             ) : viewMode === 'list' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
               </div>
             ) : (
               <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
               </div>
             )}
 

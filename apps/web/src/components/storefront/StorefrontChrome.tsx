@@ -30,11 +30,12 @@
 // dentro del div, footer/whatsapp incluidos...}</StorefrontChrome>.
 
 import type { ReactNode } from 'react'
-import { StorefrontHeader } from './StorefrontHeader'
+import { StorefrontHeader, navRealDe } from './StorefrontHeader'
+import { AccionesPlantilla, BuscadorPlantilla } from './AccionesPlantilla'
+import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
-import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 import { definicionPlantilla, variablesDeTema, headerCentrado, headerBold } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import type { StorefrontConfigResponse } from '@/lib/storefront/api'
@@ -73,20 +74,30 @@ type Props = {
 }
 
 export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplateSSR = null, sinHeader = false, children }: Props) {
-  const { isDark } = useStorefrontTheme()
   // El slug sale del router y no de un prop: Chrome lo envuelve TODO el
   // storefront y agregar un prop obligatorio obligaría a tocar cada página.
   // Sirve igual accediendo por subdominio — el middleware reescribe a
   // /tienda/[slug], así que `query.slug` está en los dos modos.
-  const { slug } = useRouter().query as { slug?: string }
+  const router = useRouter()
+  const { slug } = router.query as { slug?: string }
+  const base = `/tienda/${slug}`
   const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : homeTemplateSSR
   const plantilla = definicionPlantilla(homeTemplate)
-  // Mismo criterio que ya usaba Inicio.tsx: el modo oscuro que eligió el
-  // visitante manda sobre la paleta de la plantilla (que solo define su
-  // versión clara) — sin esto, activar oscuro con una plantilla aplicada
-  // dejaba el fondo negro de siempre con el primario clarito de la
-  // plantilla encima, ilegible.
-  const varsPlantilla = plantilla && !isDark ? variablesDeTema(plantilla.tema) : undefined
+  // Los enlaces reales del header, para el nav propio de la plantilla.
+  const navReal = navRealDe(config?.appearance?.headerLinks)
+  // La paleta y la tipografía de la plantilla mandan SIEMPRE, en toda la
+  // tienda y sin importar el modo oscuro del visitante (pedido explícito:
+  // "los colores de las plantillas quedan fijos y deben aplicarse a todo el
+  // storefront al igual que su tipografía").
+  //
+  // Antes se salteaban con el modo oscuro puesto, porque las primeras
+  // plantillas solo definían su versión clara y el resultado era el fondo
+  // negro de siempre con el primario clarito encima. Hoy cada plantilla
+  // declara su tema completo —`oscuro: true` para las que ya son oscuras,
+  // como Premium— así que ese recorte solo lograba que la ficha de producto
+  // se viera con los colores de Órbita y no con los de la plantilla (bug
+  // reportado con captura).
+  const varsPlantilla = plantilla ? variablesDeTema(plantilla.tema) : undefined
   // "Estilo de header" de Apariencia (Configuración → Apariencia → Diseño y
   // layout) — hasta acá el valor se guardaba bien pero NUNCA se leía en
   // ningún lado: la tienda real siempre mostraba el mismo layout sea cual
@@ -128,7 +139,37 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           dueño puede tener las dos. Si el countdown está configurado como "solo
           en la portada", esto no dibuja nada — lo dibuja Inicio.tsx. */}
       {slug && <CountdownBanner slug={slug} lugar="ALL_PAGES" />}
-      {!sinHeader && (
+      {/* El header de la plantilla, en TODAS las vistas — no solo la portada.
+          Es el mismo JSX que dibuja su bloque en homes.tsx, así que el
+          catálogo y la ficha de producto se ven con la misma marca, la misma
+          tipografía y los mismos íconos que el home (antes la ficha salía con
+          el header clásico de Órbita, reportado con captura). El home no lo
+          dibuja acá: ya viene adentro de su propio `Home()` — por eso
+          `sinHeader`. */}
+      {!sinHeader && plantilla && LAYOUTS_CON_HEADER_PROPIO.has(plantilla.layout) ? (
+        <PlantillaHome
+          p={{
+            ...plantilla,
+            marca: tienda.nombre || plantilla.marca,
+            tagline: config?.appearance?.tagline || plantilla.tagline,
+            links: navReal.map(l => l.label),
+            sec: config?.appearance?.homeTemplateData?.secciones ?? undefined,
+          }}
+          movil={false}
+          soloHeader
+          acciones={{
+            irAInicio: () => router.push(`${base}/`),
+            irACatalogo: () => router.push(`${base}/catalogo`),
+            irACategoria: (s) => router.push(`${base}/catalogo?cat=${encodeURIComponent(s)}`),
+            irAProducto: (s) => router.push(`${base}/producto/${s}`),
+            nav: navReal.map(l => ({ label: l.label, onClick: () => router.push(`${base}${l.path}`) })),
+            renderAcciones: ({ movil: m }) => (
+              <AccionesPlantilla t={plantilla.tema} movil={m} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+            ),
+            renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+          }}
+        />
+      ) : !sinHeader && (
         <StorefrontHeader
           tienda={tienda}
           logoUrl={config?.appearance?.logoUrl}

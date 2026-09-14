@@ -24,7 +24,21 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
   )
 }
 
-export function Home({ p, movil, acciones, soloCuerpo }: {
+// Las plantillas que ya saben dibujar SOLO su header (modo `soloHeader`).
+//
+// El header de una plantilla no es del home: es de la tienda entera — la
+// ficha de producto, el catálogo y el carrito tienen que verse con la misma
+// marca, la misma tipografía y los mismos íconos (pedido explícito, con una
+// captura de la ficha de producto mostrando el header clásico de Órbita
+// mientras la portada tenía el de Premium). `StorefrontChrome` consulta esta
+// lista: la plantilla que todavía no separó su header sigue con el de
+// siempre en el resto de las vistas, en vez de romperlas.
+//
+// Para sumar una: envolver el encabezado del bloque en una variable y
+// devolverlo cuando `soloHeader` esté puesto (ver el bloque `premium`).
+export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>(['premium'])
+
+export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   p: Plantilla
   movil: boolean
   // Solo la tienda real las pasa: con esto el mismo render deja de ser una
@@ -38,6 +52,10 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   // que es la parte que antes Inicio.tsx re-implementaba a mano y quedaba
   // desincronizada de la plantilla.
   soloCuerpo?: boolean
+  // Dibuja SOLO el encabezado de esta plantilla (cintillo + navbar), para que
+  // el resto del storefront —catálogo, ficha, carrito— use el mismo header
+  // que la portada. Ver LAYOUTS_CON_HEADER_PROPIO arriba.
+  soloHeader?: boolean
 }) {
   const t = p.tema
   const marco: React.CSSProperties = soloCuerpo ? {} : { background: t.bg, color: t.text, fontFamily: t.fb }
@@ -515,8 +533,10 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
       fontSize: 11.5, letterSpacing: '0.22em', textTransform: 'uppercase', fontWeight: 700,
       color: t.primary, borderBottom: `1px solid ${t.primary}`, paddingBottom: 6,
     }
-    return (
-      <div style={marco}>
+    // El encabezado sale aparte porque no es del home: lo usa TODA la tienda
+    // (ver LAYOUTS_CON_HEADER_PROPIO y el modo `soloHeader`).
+    const encabezado = (
+      <>
         {/* El cintillo, fijo o corriendo en loop según lo elija el dueño. La
             versión cartelera conserva el dorado sobre carbón de Premium en vez
             de usar el `Marquee` compartido, que va en negativo (fondo oscuro
@@ -539,9 +559,16 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '14px 16px' : '22px 44px', borderBottom: filete, gap: 14 }}>
           {movil
             ? <span style={{ fontSize: 18, color: t.primary }}>☰</span>
-            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.muted }}>⌕ Buscar</span>}
+            // Con la tienda real detrás el buscador busca de verdad; en la
+            // vitrina del panel sigue siendo el dibujito decorativo de siempre.
+            : acciones?.renderBuscador
+              ? <span style={{ justifySelf: 'start' }}>{acciones.renderBuscador({})}</span>
+              : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.muted }}>⌕ Buscar</span>}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: t.fh, fontSize: movil ? 24 : 34, fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary }}>{p.marca}</div>
+            <div
+              onClick={acciones?.irAInicio}
+              style={{ fontFamily: t.fh, fontSize: movil ? 24 : 34, fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+            >{p.marca}</div>
             {!movil && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 12, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted }}>
                 {navDe(p.links ?? ['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'], acciones).map((l) => <span key={l.label} onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
@@ -550,6 +577,14 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           </div>
           <span style={{ justifySelf: 'end' }}><AccionesTienda t={t} movil={movil} acciones={acciones} /></span>
         </div>
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
 
         {/* Hero a sangre: la pieza ocupa todo y el texto se apoya abajo a la
             izquierda. Antes era una columna de texto al lado de una foto

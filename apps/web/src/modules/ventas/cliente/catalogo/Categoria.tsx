@@ -13,6 +13,7 @@ import {
   type StorefrontConfigResponse, type StorefrontCategoryItem,
 } from '@/lib/storefront/api'
 import { columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
+import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 
 export default function Categoria() {
   const router = useRouter()
@@ -124,11 +125,11 @@ export default function Categoria() {
           </div>
         ) : modoLista ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 48 }}>
-            {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
+            {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
           </div>
         ) : (
           <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16, marginBottom: 48 }}>
-            {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
+            {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
           </div>
         )}
 

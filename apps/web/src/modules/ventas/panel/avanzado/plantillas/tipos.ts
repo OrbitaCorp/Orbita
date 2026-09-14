@@ -226,6 +226,12 @@ export interface Plantilla {
 // storefront, y siempre se escapaba alguno. Compartiendo el render, una
 // plantilla nueva anda en la tienda sin tocar Inicio.tsx.
 export interface AccionesHome {
+  /**
+   * Volver a la portada. Hace falta desde que el header de la plantilla se
+   * usa en TODA la tienda (ver `soloHeader` en homes.tsx): en la ficha de un
+   * producto, la marca del header es la única forma de volver al inicio.
+   */
+  irAInicio?: () => void
   irACatalogo: () => void
   irACategoria: (slug: string) => void
   irAProducto: (slug: string) => void

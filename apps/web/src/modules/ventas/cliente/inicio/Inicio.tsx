@@ -585,6 +585,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     // y el chrome se corre — ver `sinHeader` más arriba.
                     soloCuerpo={!plantilla.headerPropio}
                     acciones={{
+                        irAInicio: () => go('/'),
                         irACatalogo: () => go('/catalogo'),
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),

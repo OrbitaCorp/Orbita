@@ -18,6 +18,7 @@ import {
   type StorefrontConfigResponse, type StorefrontProductDetail, type StorefrontProductReview,
 } from '@/lib/storefront/api'
 import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
+import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 
 function fechaResenia(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -844,7 +845,7 @@ export default function ProductoDetalle() {
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>También te puede gustar</h2>
             <div className="sf-pd-related" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              {relacionados.map(p => <ProductCard key={p.id} producto={p} mode={esVidriera ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
+              {relacionados.map(p => <ProductCard key={p.id} producto={p} mode={esVidriera ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
             </div>
           </div>
         )}

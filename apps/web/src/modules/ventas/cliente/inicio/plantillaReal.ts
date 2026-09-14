@@ -64,6 +64,20 @@ export function headerBold(homeTemplate: string | null | undefined): boolean {
 }
 
 /**
+ * El tema de la plantilla activa, para pasárselo a la `ProductCard` en TODAS
+ * las páginas del storefront y no solo en la portada.
+ *
+ * Sin esto, la tarjeta caía a su rama por defecto fuera del home: en la ficha
+ * de un producto, los íconos flotantes de "agregar" y "ver" salían blancos
+ * sobre la tarjeta oscura de la plantilla (bug reportado con captura de
+ * "También te puede gustar"). Devuelve `undefined` sin plantilla activa, que
+ * es exactamente lo que la tarjeta espera para dibujarse como siempre.
+ */
+export function temaDePlantilla(homeTemplate: string | null | undefined): Tema | undefined {
+  return definicionPlantilla(homeTemplate)?.tema
+}
+
+/**
  * El tema de la plantilla, traducido a las variables CSS del storefront.
  *
  * Por qué hace falta: hasta acá la plantilla pintaba SUS secciones con

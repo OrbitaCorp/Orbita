@@ -14,6 +14,7 @@ import {
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
 import type { Oferta, Producto } from '@/lib/storefront/types'
+import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 
 // Link compartible de un DESCUENTO (no cupón — sin código, nada que copiar ni
 // aplicar a mano: es automático). A diferencia de DescuentoExclusivo.tsx
@@ -181,7 +182,7 @@ export default function DescuentoCompartido() {
               Productos con este descuento
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-              {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
+              {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
             </div>
           </>
         ) : productos && productos.length === 0 ? (
