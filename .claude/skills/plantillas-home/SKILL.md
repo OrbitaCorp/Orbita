@@ -33,6 +33,21 @@ abajo).
    `AccionesTienda`: el header real no tiene un ícono aparte de "Mis pedidos"
    (vive adentro del menú de cuenta, junto con "Mi perfil" y "Mis direcciones")
    — la maqueta no puede prometer un ícono que la tienda real no tiene.
+
+   **Y tampoco DATOS que Órbita no tiene.** Esta es la mitad de la regla que se
+   escapó más veces, porque no se ve como una sección inventada sino como un
+   texto de relleno: un `−40%` sobre una categoría, un "ENVÍO GRATIS
+   +$120.000" en el cintillo, "9 sucursales", "4,9 de puntaje", "Algodón
+   orgánico certificado", "Retiro en 2 horas". Nada de eso sale de la base: son
+   los textos con los que se diseñó la plantilla, y en una tienda real son
+   promesas que el dueño nunca hizo.
+
+   Hay que distinguir **etiqueta** de **afirmación**. "Más vendidos" describe
+   la sección y su `porDefecto` está perfecto; "3 CUOTAS SIN INTERÉS" dice algo
+   del negocio y va marcada `afirmacion: true` en `secciones.ts` — ver el punto
+   8 de § Lo que apareció DESPUÉS. La prueba: leer el texto poniéndole adelante
+   *"esta tienda garantiza que…"*. Si suena a algo que Órbita no puede saber,
+   es una afirmación.
 4. **Tienen que verse MUY distintas entre sí**, no la misma página repintada.
    Lo que las diferencia de verdad: header propio, forma propia de mostrar el
    producto, proporción propia de imagen y al menos una sección que las otras
@@ -555,6 +570,59 @@ toggles.** Antes de dar por listo el reemplazo, mirar qué banderas de
 Apariencia leía el componente original (`showFooter`, `showSocialFooter`,
 `showStatsBar`, `showWhatsapp`…) y pasarlas.
 
+### 7. El navbar es contenido real, igual que el pie
+
+Mosaico dibujaba en su header un `☰` decorativo, la marca y las acciones — y
+**ningún enlace**. Desde la portada de una tienda real no había forma de llegar
+a Catálogo, a Ofertas ni a las categorías.
+
+**Regla: los enlaces del nav son los MISMOS que el header de Órbita.** Salen de
+`acciones.nav` (que arma `navRealDe()` con los `headerLinks` de Apariencia,
+categorías `cat:<slug>` incluidas). Lo propio de la plantilla es **cómo se
+ven**, no cuáles son — igual que el pie. Y "Estilo de header" de Apariencia
+vale aunque haya plantilla activa: `minimal` saca el nav en las catorce a la
+vez (resuelto adentro de `navDe()`), `standard`/`centered` ubican. La única
+excepción es `centrado`, que para Vidriera es identidad.
+
+### 8. `porDefecto` que promete algo es una mentira en producción
+
+El más caro de todos, y el que más se repitió: **46 campos** en las dieciséis.
+
+Mosaico mostraba `−40%`, `−25%` y `−30%` sobre las categorías de una tienda que
+nunca cargó esos descuentos. Casi todas prometen algo en el cintillo
+(`3 CUOTAS SIN INTERÉS`, `ENVÍO GRATIS +$120.000`, `GARANTÍA OFICIAL 12 MESES`)
+y varias inventan cantidades (`+18.000` clientes, `9` sucursales, `4.100`
+piezas, `26` años, `4,9` de puntaje), certificaciones, plazos de entrega y
+hasta precios (la lista de Papelería).
+
+El problema **no es el texto, es dónde vive**: `porDefecto` se usa en los dos
+mundos. Lo que en la vitrina del panel está bien —vende la plantilla— en una
+tienda real es una promesa que el dueño nunca hizo.
+
+**Regla: distinguir ETIQUETA de AFIRMACIÓN.**
+
+- *Etiqueta* ("Más vendidos", "Comprá por categoría", "Ambiente 1"): describe
+  la sección. Su `porDefecto` está perfecto.
+- *Afirmación* (un descuento, un envío gratis, una cuota, un plazo, una
+  cantidad, una certificación, un precio): dice algo del negocio. Va marcada
+  con `afirmacion: true` en `secciones.ts`.
+
+`txt()` en `homes.tsx` solo cae al ejemplo de una afirmación cuando **no** hay
+`acciones` — y `acciones` existe únicamente en la tienda real, así que la
+vitrina se sigue viendo completa. En el editor esos campos van como
+*placeholder*, no precargados: con el valor puesto, guardar sin tocarlo
+alcanzaría para afirmarlo.
+
+**Al marcar una afirmación, guardar el render.** Con el texto vacío no puede
+quedar nada colgado: sin cintillo no se dibuja la franja de color, un par
+número+etiqueta se filtra entero (un "años" sin el 26 adelante no dice nada,
+y ojo con el orden — la ficha de Nocturno es `[etiqueta, valor]` y filtraba por
+la etiqueta), y una banda entera que se queda sin su frase se saca completa en
+vez de dejar medio fondo con un botón suelto.
+
+**La prueba rápida:** leé el texto en voz alta poniéndole adelante "esta tienda
+garantiza que…". Si suena a algo que Órbita no puede saber, es una afirmación.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -587,6 +655,11 @@ Apariencia leía el componente original (`showFooter`, `showSocialFooter`,
 | Ocho "Ver todo →" que no hacían nada | `<Titulo>` con `accion` pero sin `onAccion` — el enlace se dibuja igual | `grep` por `accion="` sin `onAccion` y por `<Boton` sin `onClick` después de enganchar |
 | Un CUIT falso en el pie de tiendas reales | El `cierre` estaba clavado en `homes.tsx` (once plantillas), y las columnas eran las de la maqueta con `<div>` en vez de `<a>` | El pie aporta diseño, nunca contenido: lo arma `pieReal()` en `plantillaReal.ts` |
 | Faltaban Términos, Privacidad y Arrepentimiento en el home | Con `piePropio` no se dibuja `StorefrontFooter`, que es quien los traía por obligación legal | Al reemplazar un componente de Órbita, replicar lo legal Y heredar sus toggles de Apariencia |
+
+| Mosaico sin ningún enlace en el header | Dibujaba el `☰` decorativo, la marca y las acciones, pero nunca `p.links` | El nav sale de `acciones.nav`, igual que el pie: la plantilla aporta cómo se ve, no cuáles son |
+| "Estilo de header" de Apariencia sin efecto con plantilla activa | `navCentrada`/`sinNav` se forzaban a false cuando había `homeTemplate` | El ajuste vale siempre; solo `centrado` lo puede pisar una plantilla que lo declare |
+| −40% / −25% / −30% sobre categorías de una tienda sin descuentos | El `porDefecto` de la maqueta se usa igual en la vitrina y en la tienda real | Marcar el campo con `afirmacion: true`: `txt()` deja de caer al ejemplo cuando hay `acciones` |
+| Una franja de color vacía arriba de todo | Al vaciarse el cintillo el `<div>` contenedor seguía dibujándose | Toda afirmación necesita su guarda: sin texto, la sección entera no va |
 
 ## Convenciones del repo
 
