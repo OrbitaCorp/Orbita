@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+// Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
+// se ven salen del catálogo del negocio, de sus categorías, o de una sección
+// editable cuyo `porDefecto` vive en secciones.ts.
 import type { Plantilla, Producto, AccionesHome } from './tipos'
-import { IMG } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe,
@@ -38,7 +40,7 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
 // devolverlo cuando `soloHeader` esté puesto (ver el bloque `premium`).
 export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>([
   'premium', 'vera', 'cobijo', 'nitida', 'mosaico', 'atleta', 'patitas', 'bodega', 'crecer',
-  'nocturno', 'papeleria', 'corralon', 'glow',
+  'nocturno', 'papeleria', 'corralon', 'glow', 'circuito',
 ])
 
 export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
@@ -176,8 +178,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {p.productos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 0 0' : '48px 0 0' }}>
-            <h2 style={{ fontFamily: t.fh, fontSize: movil ? 24 : 32, textAlign: 'center', margin: '0 0 4px', fontWeight: 800, letterSpacing: '-0.025em' }}>Destacados</h2>
-            <p style={{ textAlign: 'center', color: t.muted, fontSize: 13.5, margin: '0 0 26px' }}>Los que más se venden esta semana</p>
+            <h2 style={{ fontFamily: t.fh, fontSize: movil ? 24 : 32, textAlign: 'center', margin: '0 0 4px', fontWeight: 800, letterSpacing: '-0.025em' }}>{txt('destacados', 'titulo')}</h2>
+            <p style={{ textAlign: 'center', color: t.muted, fontSize: 13.5, margin: '0 0 26px' }}>{txt('destacados', 'bajada')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: cols(4), borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}` }}>
               {p.productos.map((x, i) => producto(x, i, { sangre: true, alto: movil ? 190 : 290 }))}
             </div>
@@ -188,7 +190,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {categorias.length > 0 && (
           <Reveal>
             <div style={{ padding: movil ? '30px 16px' : '46px 40px' }}>
-              <Titulo t={t} texto="Comprá por categoría" centrado movil={movil} />
+              <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
               <div style={{ display: 'grid', gridTemplateColumns: cols(4), gap: 12 }}>
                 {categorias.map(([n, src, slug]) => (
                   <div
@@ -212,7 +214,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {masVendidos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 30px' : '0 40px 44px' }}>
-            <Titulo t={t} volanta="Top ventas" texto="Más vendidos" accion="Ver el catálogo →" movil={movil} onAccion={acciones?.irACatalogo} />
+            <Titulo t={t} volanta={txt('masVendidos', 'volanta')} texto={txt('masVendidos', 'titulo')} accion={txt('masVendidos', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
               {masVendidos.map((x, i) => producto(x, i, { alto: movil ? 150 : 215 }))}
             </div>
@@ -237,10 +239,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 20px' : '38px 40px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', justifyContent: 'center', textAlign: movil ? 'center' : 'left' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>¿Dudas con tu compra?</div>
-              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Escribinos por WhatsApp y te respondemos en el día.</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{txt('whatsapp', 'titulo')}</div>
+              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>{txt('whatsapp', 'bajada')}</div>
             </div>
-            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>Escribir por WhatsApp</Boton>
+            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
 
@@ -386,6 +388,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // Vidriera) — ver `heroPropio` en tipos.ts y plantillaReal.ts. No hay
     // `kicker` en datos reales (Apariencia no tiene ese campo): se dibuja
     // solo si vino de la maqueta.
+    // Cada punto es "alto,ancho" en porcentaje sobre la foto del look.
+    const puntosLook: [number, number][] = ['p1', 'p2', 'p3']
+      .map((k) => txt('look', k))
+      .filter(Boolean)
+      .map((v) => {
+        const [top, left] = v.split(',').map((n) => parseFloat(n.trim()))
+        return [Number.isFinite(top) ? top : 50, Number.isFinite(left) ? left : 50] as [number, number]
+      })
     const campanas = p.slides.slice(0, 2)
     const cats = p.categorias ?? []
     return (
@@ -431,7 +441,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '30px 0 34px 16px' : '48px 0 52px 34px' }}>
             <div style={{ paddingRight: movil ? 16 : 34 }}>
-              <Titulo t={t} volanta="Recién llegado" texto="Lo nuevo de la semana" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
+              <Titulo t={t} volanta={txt('tira', 'volanta')} texto={txt('tira', 'titulo')} accion={txt('tira', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
             </div>
             <Tira gap={14}>
               {/* Con datos reales, la ProductCard de verdad (vía `producto()`
@@ -483,11 +493,15 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Comprá el look: puntos numerados sobre la foto + lista al costado. */}
         <Reveal>
           <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '30px 16px' : '52px 34px' }}>
-            <Titulo t={t} volanta="Total look" texto="Comprá el look completo" movil={movil} />
+            <Titulo t={t} volanta={txt('look', 'volanta')} texto={txt('look', 'titulo')} movil={movil} />
             <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 0.85fr', gap: movil ? 20 : 34, alignItems: 'start' }}>
               <div style={{ position: 'relative' }}>
-                <Foto src={`${IMG}/vidriera-modelo.jpg`} alto={movil ? 340 : 460} radio={t.radio} />
-                {([[26, 32], [58, 54], [72, 78]] as [number, number][]).map(([top, left], i) => (
+                <Foto src={txt('look', 'foto')} alto={movil ? 340 : 460} radio={t.radio} />
+                {/* Los tres puntos sobre la foto: su posicion la elige el
+                    dueno en porcentajes (alto/ancho), porque depende de donde
+                    caiga cada prenda en SU foto. Antes estaban clavados en
+                    coordenadas pensadas para la foto de la maqueta. */}
+                {puntosLook.map(([top, left], i) => (
                   <span key={i} style={{
                     position: 'absolute', top: `${top}%`, left: `${left}%`, width: 30, height: 30, borderRadius: '50%',
                     background: '#fff', color: t.text, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800,
@@ -1821,7 +1835,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // El producto se muestra en fichas partidas (foto a un lado, specs al otro),
   // no en tarjeta, porque acá lo que decide la compra es la ficha técnica.
   if (p.layout === 'circuito') {
-    const s = p.slides[0]
+    const s = p.slides[iActual]
     const links = p.links ?? []
     const categorias = p.categorias ?? []
 
@@ -1829,12 +1843,18 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // barra común arriba, con el mismo contenido en una línea.
     const panel = movil ? (
       <div style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 700, color: t.text, letterSpacing: '-0.02em' }}>{p.marca}</span>
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 700, color: t.text, letterSpacing: '-0.02em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{p.marca}</span>
         <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     ) : (
       <div style={{ width: 232, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.surf, padding: '30px 26px', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
-        <div style={{ fontFamily: t.fh, fontSize: 25, fontWeight: 700, color: t.text, letterSpacing: '-0.03em' }}>{p.marca}</div>
+        <div
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 25, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{p.marca}</div>
         <div style={{ fontSize: 12, color: t.muted, marginTop: 7, lineHeight: 1.5 }}>{p.tagline}</div>
         <div style={{ margin: '26px 0 22px', height: 1, background: t.border }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
@@ -1846,14 +1866,29 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           ))}
         </div>
         <div style={{ margin: '24px 0 18px', height: 1, background: t.border }} />
-        <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, padding: '9px 13px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar…</div>
+        {acciones?.renderBuscador
+          ? acciones.renderBuscador({})
+          : <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, padding: '9px 13px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar…</div>}
         <div style={{ marginTop: 20 }}><AccionesTienda t={t} acciones={acciones} /></div>
       </div>
     )
 
+    // El cartel va arriba de todo y el panel al costado. En `soloHeader` se
+    // devuelven los dos y `StorefrontChrome` arma la fila con el contenido de
+    // la pagina a la derecha --es la unica plantilla cuyo header no es una
+    // franja sino una columna.
+    if (soloHeader) {
+      return (
+        <div style={marco}>
+          {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
+          {panel}
+        </div>
+      )
+    }
+
     return (
       <div style={marco}>
-        {p.cartel && <Marquee t={t} texto={p.cartel} />}
+        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
         {/* En celular el panel deja de ser una columna al costado y pasa a
             ser una barra arriba: en fila los dos hijos no entran en 390 px y
             el marco se llenaba de scroll horizontal. */}
@@ -1870,7 +1905,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   <span style={{ fontFamily: t.fh, fontSize: movil ? 58 : 96, lineHeight: 0.86, fontWeight: 700, color: '#fff', letterSpacing: '-0.05em' }}>{s.titulo}</span>
                   <span style={{ fontSize: movil ? 15 : 21, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{s.bajada}</span>
                 </div>
-                <div style={{ marginTop: movil ? 18 : 24 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+                <div style={{ marginTop: movil ? 18 : 24 }}>
+                  <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
+                </div>
+                {navHero({ marginTop: 18 })}
               </div>
             </div>
 
@@ -1921,8 +1959,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ padding: movil ? '20px 16px' : '30px 44px' }}>
                 <Titulo t={t} texto="Por categoría" movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: 10 }}>
-                  {categorias.map(([n, src]) => (
-                    <div key={n} className="pl-tile" style={{ display: 'flex', alignItems: 'center', gap: 14, background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                  {categorias.map(([n, src, slug]) => (
+                    <div
+                      key={n} className="pl-tile"
+                      onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', cursor: slug && acciones ? 'pointer' : undefined }}
+                    >
                       <div style={{ width: 92, flexShrink: 0 }}><Foto src={src} alto={72} /></div>
                       <span style={{ fontSize: 14.5, fontWeight: 600 }}>{n}</span>
                       <span style={{ marginLeft: 'auto', paddingRight: 16, color: t.primary, fontSize: 17 }}>→</span>
@@ -1956,10 +1998,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Reveal>
               <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '24px 18px' : '32px 44px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 700, letterSpacing: '-0.02em' }}>¿Dudas con la compatibilidad?</div>
-                  <div style={{ fontSize: 13, color: t.muted, marginTop: 5 }}>Escribinos por WhatsApp y te respondemos en el día.</div>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 700, letterSpacing: '-0.02em' }}>{txt('whatsapp', 'titulo')}</div>
+                  <div style={{ fontSize: 13, color: t.muted, marginTop: 5 }}>{txt('whatsapp', 'bajada')}</div>
                 </div>
-                <Boton t={t} grande>Escribir por WhatsApp</Boton>
+                <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
               </div>
             </Reveal>
 

@@ -487,6 +487,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Panel lateral fijo', 'Hero a sangre', 'Datos de compra', 'Fichas partidas', 'Categorías en lista', 'Cupón'],
     marca: 'Circuito', tagline: 'Tecnología, audio y periféricos',
     layout: 'circuito',
+    // Su header es una columna al costado, no una franja arriba: el chrome
+    // arma la fila en vez de apilarlo (ver headerLateral en tipos.ts).
+    headerLateral: true,
     // Dibuja su propio header, su propio hero y su propio pie (ver esos tres
     // campos en tipos.ts): la tienda real no pone los suyos encima, asi que
     // lo que se ve es exactamente esta maqueta con datos y acciones reales.

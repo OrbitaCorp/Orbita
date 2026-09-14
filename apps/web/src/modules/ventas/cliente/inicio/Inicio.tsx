@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
+import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -270,18 +271,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // null (ver businesses.service.ts#setHomeTemplate).
     const plantilla = definicionPlantilla(homeTemplate)
 
-    // La plantilla dibuja con un único booleano `movil` (fue pensada para los
-    // marcos Notebook/Celular del panel, no para CSS fluido), así que en la
-    // tienda real hay que decirle de qué lado del breakpoint estamos. 768px es
-    // el mismo corte que ya usan Sidebar/Shell/ConfigSidebar en este repo.
-    const [movil, setMovil] = useState(false)
-    useEffect(() => {
-        const mq = window.matchMedia('(max-width: 768px)')
-        const leer = () => setMovil(mq.matches)
-        leer()
-        mq.addEventListener('change', leer)
-        return () => mq.removeEventListener('change', leer)
-    }, [])
+    // De qué lado del breakpoint dibuja la plantilla — ver useMovilPlantilla.
+    const movil = useMovilPlantilla()
 
     // Las plantillas traen tipografías que no están en Apariencia (varias
     // piden pesos 800/900) — `loadFont()` no las conoce, por eso su propio

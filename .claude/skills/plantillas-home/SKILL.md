@@ -1,6 +1,6 @@
 ---
 name: plantillas-home
-description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda, y el trabajo de enganchar cada una con la tienda real (hoy Vidriera y Escaparate lo tienen). Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, enganchar una plantilla a datos reales, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el contrato de aplicación real (plantillaReal.ts, StorefrontChrome.tsx, PLANTILLAS_ENGANCHADAS, heroPropio/heroGrande), el estándar visual, de dónde salen las fotos, y el chequeo automático de las dieciséis en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, enganchar, aplicar."
+description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda, y el trabajo de enganchar cada una con la tienda real (las dieciseis ya se aplican). Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, enganchar una plantilla a datos reales, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el contrato de aplicación real (plantillaReal.ts, StorefrontChrome.tsx, PLANTILLAS_ENGANCHADAS, heroPropio/heroGrande), el estándar visual, de dónde salen las fotos, y el chequeo automático de las dieciséis en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, enganchar, aplicar."
 ---
 
 # Plantillas de Home
@@ -196,10 +196,10 @@ pulirlas de a una. **Premium es la referencia**: es la primera que pasó el
 checklist completo de abajo, y cada punto salió de un bug real encontrado
 probándola aplicada en una tienda con catálogo de verdad.
 
-El orden importa poco, pero conviene el del costo: Vera, Cobijo y Nítida son
-casi mecánicas; Mosaico, Atleta, Patitas, Bodega y Crecer tienen dos o tres
-secciones inventadas; Nocturno, Corralón, Papelería y Glow tienen entre cinco y
-ocho. Circuito sigue bloqueada por su panel lateral (ver abajo).
+Las dieciseis ya pasaron por acá (incluida Circuito, ver `headerLateral` abajo)
+y las dieciseis tienen su esquema en `secciones.ts`. El checklist queda como
+guía para la próxima plantilla que se agregue, y como lo que hay que revisar
+cuando se toque una existente.
 
 ### Checklist por plantilla
 
@@ -279,14 +279,25 @@ ocho. Circuito sigue bloqueada por su panel lateral (ver abajo).
 18. `npx tsc --noEmit`, `npx eslint` y el chequeo de `referencia/verificacion.js`
     en las dos vistas — enganchar no exime de verificar la vitrina.
 
-### La generalización que sigue pendiente
+### El header lateral de Circuito
 
 `StorefrontHeader.tsx` sigue sabiendo dibujar solo DOS formas (la de siempre y
-`centrado`), pero eso ya casi no importa: con `soloHeader` cada plantilla pone
-SU propio header en todas las vistas. La que todavía no se puede enganchar del
-todo es **Circuito**, porque su panel lateral fijo no es una franja arriba sino
-una columna al costado, y `StorefrontChrome` hoy apila el header como un bloque
-más. Resolverlo es trabajo propio, no una casilla del checklist.
+`centrado`), pero eso ya no importa: con `soloHeader` cada plantilla pone SU
+propio header en todas las vistas.
+
+El caso raro es **Circuito**: su header no es una franja arriba sino una
+columna al costado, así que el contenido de la página va a su DERECHA y no
+debajo. Se resuelve con `headerLateral: true` en `datos.tsx`
+— `StorefrontChrome` arma una fila y mete `children` adentro, en vez de
+apilarlos. En celular no aplica: ahí el propio bloque dibuja una barra común
+arriba y se apila como el resto, por eso `headerLateral` se mira junto a
+`useMovilPlantilla()`. Si aparece otra plantilla con panel lateral, marcarla
+igual; no hace falta tocar el chrome.
+
+Ojo con `movil`: el chrome lo tenía clavado en `false`, y eso le servía el
+navbar de escritorio —columna de 232px incluida— a quien entraba desde el
+teléfono al catálogo o a una ficha. Sale de `useMovilPlantilla()`, que arranca
+en `false` para que hidrate igual que el SSR.
 
 ## Piezas compartidas (usarlas antes de escribir una nueva)
 

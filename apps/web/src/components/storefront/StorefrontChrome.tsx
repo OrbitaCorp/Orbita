@@ -32,6 +32,7 @@
 import type { ReactNode } from 'react'
 import { StorefrontHeader, navRealDe } from './StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from './AccionesPlantilla'
+import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
@@ -81,6 +82,10 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   const router = useRouter()
   const { slug } = router.query as { slug?: string }
   const base = `/tienda/${slug}`
+  // De qué lado del breakpoint dibujar el navbar de la plantilla. Estaba fijo
+  // en escritorio: un cliente entrando desde el teléfono al catálogo se comía
+  // el header ancho, con el panel lateral de 232px incluido.
+  const movil = useMovilPlantilla()
   const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : homeTemplateSSR
   const plantilla = definicionPlantilla(homeTemplate)
   // Los enlaces reales del header, para el nav propio de la plantilla.
@@ -116,6 +121,13 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // (JSON por plantilla, ver home-template-data.dto.ts) porque es contenido
   // de ESA plantilla, no de Apariencia general.
   const logoIcono = bold ? (config?.appearance?.homeTemplateData?.mostrarIconoLogo ?? false) : true
+  // ¿Esta página dibuja el header de la plantilla en vez del clásico? El home
+  // no: ya viene adentro de su propio `Home()` (por eso `sinHeader`).
+  const usaHeaderPropio = !sinHeader && !!plantilla && LAYOUTS_CON_HEADER_PROPIO.has(plantilla.layout)
+  // Circuito y su panel lateral: el header no es una franja sino una columna,
+  // así que el contenido de la página va a su derecha. En celular su bloque ya
+  // dibuja una barra común arriba y se apila como el resto.
+  const lateral = usaHeaderPropio && !!plantilla?.headerLateral && !movil
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
@@ -146,7 +158,11 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           el header clásico de Órbita, reportado con captura). El home no lo
           dibuja acá: ya viene adentro de su propio `Home()` — por eso
           `sinHeader`. */}
-      {!sinHeader && plantilla && LAYOUTS_CON_HEADER_PROPIO.has(plantilla.layout) ? (
+      {usaHeaderPropio && plantilla ? (
+        // Circuito: su header es una COLUMNA al costado, así que el contenido
+        // de la página va a su derecha y no debajo. El resto se apila como
+        // siempre. En celular su propio bloque ya dibuja una barra arriba.
+        <div style={lateral ? { display: 'flex', alignItems: 'flex-start' } : undefined}>
         <PlantillaHome
           p={{
             ...plantilla,
@@ -155,7 +171,7 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
             links: navReal.map(l => l.label),
             sec: config?.appearance?.homeTemplateData?.secciones ?? undefined,
           }}
-          movil={false}
+          movil={movil}
           soloHeader
           acciones={{
             irAInicio: () => router.push(`${base}/`),
@@ -169,6 +185,8 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
             renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
           }}
         />
+        {lateral && <div style={{ flex: 1, minWidth: 0 }}>{children}</div>}
+        </div>
       ) : !sinHeader && (
         <StorefrontHeader
           tienda={tienda}
@@ -183,7 +201,9 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           sinNav={sinNav}
         />
       )}
-      {children}
+      {/* Con header lateral el contenido ya se dibujó adentro de la fila, a la
+          derecha del panel — ver arriba. */}
+      {!lateral && children}
     </div>
   )
 }

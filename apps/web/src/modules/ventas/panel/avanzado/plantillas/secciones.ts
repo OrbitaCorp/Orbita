@@ -661,6 +661,102 @@ const GLOW: SeccionPlantilla[] = [
   },
 ]
 
+// ─── Circuito ────────────────────────────────────────────────────────────────
+// Tech con panel lateral fijo: el cartel corriendo y el bloque de consulta.
+const CIRCUITO: SeccionPlantilla[] = [
+  {
+    id: 'cintillo',
+    nombre: 'Cartel corriendo',
+    nota: 'La franja de arriba de todo, sobre el panel. Vacía, no se dibuja.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 120, porDefecto: '✦ 12 CUOTAS SIN INTERÉS ✦ GARANTÍA OFICIAL 12 MESES' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    nombre: 'Consulta por WhatsApp',
+    nota: 'El bloque del final, antes del pie.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con la compatibilidad?' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te respondemos en el día.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+]
+
+// ─── Vidriera ────────────────────────────────────────────────────────────────
+// La más usada. Su header y su hero los dibuja la tienda real (va con
+// `soloCuerpo`), así que lo editable son los títulos de sus filas y el bloque
+// de WhatsApp.
+const VIDRIERA: SeccionPlantilla[] = [
+  {
+    id: 'destacados',
+    nombre: 'Fila de destacados',
+    nota: 'La primera fila de productos, a sangre.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Destacados' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 70, porDefecto: 'Los que más se venden esta semana' },
+    ],
+  },
+  {
+    id: 'categorias',
+    nombre: 'Comprá por categoría',
+    nota: 'El título de la grilla de categorías.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Comprá por categoría' },
+    ],
+  },
+  {
+    id: 'masVendidos',
+    nombre: 'Fila de más vendidos',
+    nota: 'La segunda fila de productos.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Top ventas' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Más vendidos' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver el catálogo →' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    nombre: 'Consulta por WhatsApp',
+    nota: 'El bloque del final, antes del pie.',
+    campos: [
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con tu compra?' },
+      { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te respondemos en el día.' },
+      { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+    ],
+  },
+]
+
+// ─── Escaparate ──────────────────────────────────────────────────────────────
+// Moda urbana. "Comprá el look" es lo que la distingue y era lo último que
+// seguía con una foto del repo y los puntos en coordenadas fijas.
+const ESCAPARATE: SeccionPlantilla[] = [
+  {
+    id: 'tira',
+    nombre: 'Tira de lo nuevo',
+    nota: 'La fila que se arrastra, debajo de las dos campañas.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Recién llegado' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: 'Lo nuevo de la semana' },
+      { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todo →' },
+    ],
+  },
+  {
+    id: 'look',
+    nombre: 'Comprá el look',
+    nota: 'La foto grande con los puntos numerados. Los productos de la lista son tus destacados.',
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Total look' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Comprá el look completo' },
+      { id: 'foto', label: 'Foto del look', tipo: 'imagen', help: 'Vertical, una persona con varias prendas puestas.', porDefecto: `${IMG}/vidriera-modelo.jpg` },
+      { id: 'p1', label: 'Punto 1 — posición', tipo: 'texto', max: 12, help: 'Alto,ancho en % sobre la foto. Ej: 26,32', porDefecto: '26,32' },
+      { id: 'p2', label: 'Punto 2 — posición', tipo: 'texto', max: 12, porDefecto: '58,54' },
+      { id: 'p3', label: 'Punto 3 — posición', tipo: 'texto', max: 12, porDefecto: '72,78' },
+    ],
+  },
+]
+
 // ─── El registro ─────────────────────────────────────────────────────────────
 // Una plantilla que todavía no declaró sus secciones no muestra la pestaña
 // "Secciones" en el panel — se sigue viendo igual, solo que su contenido
@@ -672,6 +768,9 @@ export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
   papeleria: PAPELERIA,
   corralon: CORRALON,
   glow: GLOW,
+  circuito: CIRCUITO,
+  vidriera: VIDRIERA,
+  escaparate: ESCAPARATE,
   atleta: ATLETA,
   patitas: PATITAS,
   bodega: BODEGA,

@@ -167,6 +167,12 @@ export interface Plantilla {
   // Ídem para el pie: la plantilla dibuja el suyo (`Pie` de piezas.tsx) con
   // los enlaces reales adentro, en vez del `StorefrontFooter` de siempre.
   piePropio?: boolean
+  // El header de esta plantilla no es una franja arriba sino una COLUMNA al
+  // costado (Circuito, con su panel lateral fijo). `StorefrontChrome` arma
+  // una fila —panel a la izquierda, contenido de la página a la derecha— en
+  // vez de apilarlo como un bloque más. En celular no cambia nada: ahí el
+  // propio bloque ya dibuja una barra común arriba.
+  headerLateral?: boolean
   // ¿Esta plantilla dibuja la barra de estadísticas (`p.confianza`)? Varias
   // no: Premium tiene sus tres promesas propias, Nocturno sus números
   // grandes, Glow sus sellos. Sin esto, el editor les ofrecía igual el
