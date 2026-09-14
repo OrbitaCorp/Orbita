@@ -696,6 +696,42 @@ etiquetas decían "meses de garantía" y "cuotas sin interés".
 marcar el par completo: si solo se marca el valor, la etiqueta queda huérfana
 y se dibuja sola.
 
+### 13. Una fila se corta por el ancho de su grilla, no por el largo del array
+
+Ninguna de las trece filas cortaba: se dibujaba `p.productos.map(...)` entero
+contra un `cols(4)`. Con cinco destacados quedaba **uno colgado** en una
+segunda fila; con tres, **un hueco** a la derecha.
+
+**Regla: `cols(d, m)` y `cuantos(d, m)` van SIEMPRE de a pares.** Si se toca
+uno hay que tocar el otro — son el mismo número escrito dos veces, y la única
+forma de que la fila cierre.
+
+Ojo con los atajos que tapan el síntoma en vez de arreglarlo: Mosaico hacía
+`[...p.productos, p.productos[0]]` para llenar el quinto hueco —el mismo
+producto dos veces en la misma fila— y Circuito dibujaba
+`[...p.productos].reverse()` para que su segunda fila pareciera otra. Las dos
+cosas se ven, y se ven mal.
+
+### 14. `p.productos` son los DESTACADOS, no el catálogo
+
+Rellenar toda la portada con `p.productos` hace que la tienda muestre siempre
+los mismos cinco productos, sección tras sección.
+
+**Regla: solo salen de destacados las secciones que lo DICEN.** El "Destacados"
+y el "Más vendidos" de Vidriera, sí. El resto sale de `fila(n, clave)`, que
+toma del catálogo (`p.catalogo`) en un orden barajado, y la `clave` de sección
+desplaza el arranque para que dos secciones de la misma portada no muestren lo
+mismo.
+
+**El barajado no puede usar `Math.random()`.** Tiene que dar lo mismo en el
+servidor y en el cliente —si no, React se queja al hidratar— y no puede
+rebarajarse en cada render. Se ordena por un hash del slug: da un orden
+estable para esa tienda, distinto para cada una, y sobrevive al `useMemo`.
+
+Las listas verticales y los carruseles quedan afuera: ahí no hay hueco que
+tapar y el largo es parte del diseño (Escaparate lista tres productos porque
+son los tres puntos sobre la foto).
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -741,6 +777,10 @@ y se dibuja sola.
 | "Armá tu setup" con las tres primeras categorías | Al enganchar, se rellenó la sección con `slice(0, 3)` para que no quedara vacía | `slice` sirve para una fila, no para una selección: campo `seleccion` y, sin elegir, la sección no se dibuja |
 | Una sección que pedía escribir una tabla de 5×4 a mano | Se le quitó el contenido inventado pero se quiso conservar la sección igual | Si lo que queda es un formulario, la sección no va — preguntarse qué dato REAL la llena |
 | Dos afirmaciones que el barrido no marcó | El valor era `12`, que parece un número inocente; la promesa estaba en la etiqueta | En un par valor+etiqueta, mirar los dos juntos y marcar el par completo |
+
+| Un producto colgado solo en una segunda fila | `p.productos.map()` completo contra un `cols(4)` — la fila no cortaba por el ancho de la grilla | `cols(d, m)` y `cuantos(d, m)` van siempre de a pares |
+| El mismo producto dos veces en la misma fila | Mosaico hacía `[...p.productos, p.productos[0]]` para tapar el quinto hueco | Tapar el síntoma se ve; cortar por `cuantos()` lo arregla |
+| Toda la portada con los mismos cinco productos | `p.productos` son los destacados, y se usaban para rellenar cada sección | Solo las secciones que dicen "destacados" salen de ahí; el resto, `fila(n, clave)` sobre el catálogo |
 
 ## Convenciones del repo
 
