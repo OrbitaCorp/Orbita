@@ -126,6 +126,22 @@ export interface CampoSeccion {
    * `acciones` (o sea, en el panel).
    */
   afirmacion?: boolean
+  /**
+   * El default para una TIENDA REAL, cuando el de la vitrina está escrito para
+   * el rubro de la maqueta.
+   *
+   * Cualquier negocio puede aplicar cualquier plantilla, y ahí el texto de
+   * muestra se lee mal: Papelería encabeza sus categorías con "Buscá por
+   * rubro" —jerga de librería— y eso terminó arriba de "Camisas street" en una
+   * tienda de ropa. Crecer pregunta "¿Cuántos meses tiene?", Corralón habla de
+   * "Departamentos", Nítida de "Por familia".
+   *
+   * No es lo mismo que `afirmacion`: acá no se promete nada falso, así que
+   * callarse no sirve —la sección se quedaría sin encabezado—. Lo que hace
+   * falta es una versión neutra. La vitrina sigue mostrando la sabrosa, que es
+   * lo que le da personalidad a la plantilla y ayuda al dueño a elegirla.
+   */
+  porDefectoReal?: string
 }
 
 export interface SeccionPlantilla {

@@ -331,8 +331,8 @@ const CRECER: SeccionPlantilla[] = [
     nombre: 'Comprá por edad',
     nota: 'La línea de tiempo: son tus primeras cuatro categorías. Acá van el título y la bajada.',
     campos: [
-      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30, porDefecto: 'Comprá por edad' },
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: '¿Cuántos meses tiene?' },
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30, porDefecto: 'Comprá por edad', porDefectoReal: 'Comprá por categoría' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 40, porDefecto: '¿Cuántos meses tiene?', porDefectoReal: 'Elegí una categoría' },
     ],
   },
   {
@@ -596,7 +596,7 @@ const NITIDA: SeccionPlantilla[] = [
     nombre: 'Grilla de categorías',
     nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
     campos: [
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Por familia' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Por familia', porDefectoReal: 'Por categoría' },
     ],
   },
 ]
@@ -657,7 +657,7 @@ const PAPELERIA: SeccionPlantilla[] = [
     nombre: 'Grilla de categorías',
     nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
     campos: [
-      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Buscá por rubro' },
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Buscá por rubro', porDefectoReal: 'Por categoría' },
       { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Categorías' },
       { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todas →' },
     ],
@@ -730,8 +730,8 @@ const CORRALON: SeccionPlantilla[] = [
     nombre: 'Grilla de rubros',
     nota: 'El encabezado de la grilla de categorías. Las categorías son las tuyas.',
     campos: [
-      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Departamentos' },
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Entrá por rubro' },
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Departamentos', porDefectoReal: 'Por categoría' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Entrá por rubro', porDefectoReal: 'Comprá por categoría' },
       { id: 'accion', label: 'Enlace de la derecha', tipo: 'texto', max: 30, porDefecto: 'Ver todos →' },
     ],
   },
@@ -1005,7 +1005,16 @@ export function esAfirmacion(idPlantilla: string, seccion: string, campo: string
     ?.afirmacion
 }
 
-export function porDefectoDe(idPlantilla: string | null | undefined, seccion: string, campo: string): string {
+/**
+ * El texto con el que se diseñó ese campo.
+ *
+ * `real` pide la versión para una tienda de verdad: si el campo declaró un
+ * `porDefectoReal` (porque el de la vitrina está escrito para el rubro de la
+ * maqueta), gana ese. Ver `porDefectoReal` en tipos.ts.
+ */
+export function porDefectoDe(idPlantilla: string | null | undefined, seccion: string, campo: string, real = false): string {
   const sec = seccionesDe(idPlantilla).find(s => s.id === seccion)
-  return sec?.campos.find(c => c.id === campo)?.porDefecto ?? ''
+  const c = sec?.campos.find(x => x.id === campo)
+  if (!c) return ''
+  return (real ? c.porDefectoReal ?? c.porDefecto : c.porDefecto) ?? ''
 }

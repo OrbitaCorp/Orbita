@@ -173,7 +173,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     const guardado = p.sec?.[seccion]?.[campo]?.trim()
     if (guardado) return guardado
     if (acciones && esAfirmacion(p.id, seccion, campo)) return ''
-    return porDefectoDe(p.id, seccion, campo)
+    // `!!acciones` = tienda real. Ahí, un campo escrito para el rubro de la
+    // maqueta ("Buscá por rubro" de Papelería) cae a su versión neutra.
+    return porDefectoDe(p.id, seccion, campo, !!acciones)
   }
 
   // Un campo de tipo interruptor (ver TipoCampo en tipos.ts): se guarda como

@@ -538,7 +538,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const valorSeccion = (seccion: string, campo: CampoSeccion) => {
         const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
         if (guardado !== undefined) return guardado
-        return campo.afirmacion ? '' : (campo.porDefecto ?? '')
+        if (campo.afirmacion) return ''
+        // La versión neutra cuando existe: el editor edita la TIENDA, no la
+        // vitrina, así que tiene que mostrar el mismo texto que el cliente ve.
+        return campo.porDefectoReal ?? campo.porDefecto ?? ''
     }
     const pistaSeccion = (campo: CampoSeccion) =>
         campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '') : undefined
