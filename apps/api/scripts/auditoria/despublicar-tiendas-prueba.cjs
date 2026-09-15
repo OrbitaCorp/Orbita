@@ -7,7 +7,8 @@
 // Las despublica (isActive: false, lo mismo que hace PUT /onboarding/business
 // al "pausar" la tienda): no borra nada, así que si hiciera falta se
 // revierten a mano. Las tiendas del equipo (negocio, zapatoslorena, alex,
-// tefaltacalle, asd…) NO se tocan: eso es una decisión aparte de Ale.
+// asd…) NO se tocan: eso es una decisión aparte de Ale. Y tefaltacalle es un
+// cliente real (Milagros), no una cuenta demo ni del equipo: jamás entra acá.
 //
 // La base del .env es PRODUCCIÓN. Por eso:
 //   node --env-file=.env scripts/auditoria/despublicar-tiendas-prueba.cjs        → muestra qué haría
