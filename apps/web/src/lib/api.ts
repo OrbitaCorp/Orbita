@@ -470,6 +470,9 @@ export function panelReactivateFromCancellation() {
 export type TutorialRemoto = {
   variante: string; fase: 'activo' | 'terminado'; paso: number
   hechas: string[]; minimizado: boolean; seccionesVistas: string[]
+  // Etapa de la Checklist (1 | 2). Opcional: lo guardado antes de la segunda
+  // etapa no lo tiene (ver resolverAlAbrir en estado.ts).
+  etapa?: 1 | 2
 }
 
 export function panelGetTutorial() {

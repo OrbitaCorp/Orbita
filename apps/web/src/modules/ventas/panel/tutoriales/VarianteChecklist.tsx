@@ -10,13 +10,20 @@
 // Pago") y se abre como hoja inferior al tocarla. Al tocar "Ir a X" se pliega
 // sola: se llega a la pantalla destino con la barra abajo y el recuadro azul
 // marcando qué tocar (la guía hace scroll hasta el elemento).
+//
+// Dos etapas con la MISMA tarjeta (estado.etapa, ver estado.ts): la 1 son los
+// primeros pasos; al cerrarla se pasa a la 2 (los demás módulos), que arranca
+// con una presentación corta (paso 0 = todavía no la vio) y termina con su
+// propio cierre. El host remonta el componente al cambiar de etapa (key), así
+// el acordeón y la guía arrancan limpios sin resets a mano.
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import type { PropsVariante } from './TutorialHost'
-import { TAREAS_CHECKLIST, TEXTOS, type PasoGuia, type TareaChecklist } from './copy'
+import { TEXTOS, tareasDeEtapa, type PasoGuia, type TareaChecklist } from './copy'
+import { etapaDe, iniciarEtapa2 } from './estado'
 import { CursorFantasma, EstilosTutorial, LinkDiscreto, Pulso, useRectAncla, type PasoCursor } from './piezas'
 import { rectDe, resolverAncla } from './anclas'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
@@ -28,6 +35,11 @@ const SIDEBAR_DE: Record<string, string> = {
     categorias: 'Productos',
     catalogo: 'Productos',
     dashboard: 'Dashboard',
+    // Segunda etapa.
+    pedidos: 'Pedidos',
+    clientes: 'Clientes',
+    mensajes: 'Mensajes',
+    descuentos: 'Descuentos',
 }
 
 // Widget NO bloqueante: vive debajo de los modales del panel (300) y lejos del
@@ -54,25 +66,37 @@ const useEsMovil = () => useSyncExternalStore(suscribirMovil, () => window.match
 const reducidoMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function VarianteChecklist(props: PropsVariante) {
-    const total = TAREAS_CHECKLIST.length
+    // La lista de tareas depende de la etapa; todo lo de abajo cuenta contra
+    // TAREAS y no contra una constante, así las dos etapas comparten el código.
+    const etapa = etapaDe(props.estado)
+    const TAREAS = tareasDeEtapa(etapa)
+    const nombreEtapa = etapa === 2 ? TEXTOS.etapa2Nombre : TEXTOS.etapa1Nombre
+    const total = TAREAS.length
     // hechas = manuales + detectadas por la API (el host ya las mergea y
     // persiste; la unión acá es por si llega una cumplida antes del PUT).
     const auto = props.hechasAuto
     const hechas = [...new Set([...props.estado.hechas, ...auto])]
     // Contamos contra las tareas reales por si quedó un id viejo en storage.
-    const nHechas = TAREAS_CHECKLIST.filter(t => hechas.includes(t.id)).length
+    const nHechas = TAREAS.filter(t => hechas.includes(t.id)).length
     const todasHechas = nHechas === total
     const esMovil = useEsMovil()
+
+    // Presentación de la segunda etapa: se muestra hasta que toca "Empezar"
+    // (o "Ahora no"). Se guarda en `paso` (que la Checklist no usaba) para
+    // que no vuelva a salir en cada recarga.
+    const mostrarIntro = etapa === 2 && props.estado.paso === 0
 
     // Acordeón: una sola fila abierta a la vez. Arranca abierta la primera
     // pendiente para señalar "por acá se sigue" sin obligar a nada.
     const [abierta, setAbierta] = useState<string | null>(
-        () => TAREAS_CHECKLIST.find(t => !props.estado.hechas.includes(t.id))?.id ?? null,
+        () => TAREAS.find(t => !props.estado.hechas.includes(t.id))?.id ?? null,
     )
 
     // Celular: la hoja arranca cerrada (barra plegada) y no se persiste —
-    // es un estado de esta pantalla, no del negocio.
-    const [hojaAbierta, setHojaAbierta] = useState(false)
+    // es un estado de esta pantalla, no del negocio. Excepción: recién
+    // llegada la segunda etapa se abre sola para que la transición se vea
+    // (si no, en celular el cambio sería solo un texto distinto en la barra).
+    const [hojaAbierta, setHojaAbierta] = useState(() => esMovil && mostrarIntro)
 
     // Dos formas de tildar (pedido de Ale): la API detecta lo cumplido de
     // verdad (hechasAuto: hay productos, MP conectado, tienda publicada...) y
@@ -84,7 +108,7 @@ export default function VarianteChecklist(props: PropsVariante) {
     if (claveAuto !== claveAutoPrev) {
         setClaveAutoPrev(claveAuto)
         if (abierta && auto.includes(abierta)) {
-            setAbierta(TAREAS_CHECKLIST.find(t => !hechas.includes(t.id))?.id ?? null)
+            setAbierta(TAREAS.find(t => !hechas.includes(t.id))?.id ?? null)
         }
     }
     const alternarHecha = (id: string) => {
@@ -94,7 +118,7 @@ export default function VarianteChecklist(props: PropsVariante) {
         props.actualizar({ hechas: proximas })
         // Si se completó la fila abierta, abrimos la siguiente pendiente.
         if (!yaHecha && abierta === id) {
-            setAbierta(TAREAS_CHECKLIST.find(t => !proximas.includes(t.id))?.id ?? null)
+            setAbierta(TAREAS.find(t => !proximas.includes(t.id))?.id ?? null)
         }
     }
 
@@ -105,9 +129,21 @@ export default function VarianteChecklist(props: PropsVariante) {
     const [verLista, setVerLista] = useState(false)
     const mostrarCierre = todasHechas && !verLista
 
+    // Fin de la primera etapa → arranca la segunda desde cero, en la misma
+    // tarjeta. Pasa por `actualizar` (no por `terminar`): la base nunca ve
+    // "terminado, etapa 1" por completarla, solo por ocultarla.
+    const seguirEtapa2 = () => props.actualizar(iniciarEtapa2(props.estado, auto))
+    const empezarEtapa2 = () => props.actualizar({ paso: 1 })
+    const etapa2AhoraNo = () => {
+        // Escritorio: queda como píldora; celular: se pliega la hoja. En los
+        // dos casos la presentación ya no vuelve a salir.
+        if (esMovil) { setHojaAbierta(false); props.actualizar({ paso: 1 }); return }
+        props.actualizar({ paso: 1, minimizado: true })
+    }
+
     const reiniciar = () => {
         // El componente no se remonta al reiniciar: el acordeón se resetea acá.
-        setAbierta(TAREAS_CHECKLIST.find(t => !auto.includes(t.id))?.id ?? TAREAS_CHECKLIST[0]?.id ?? null)
+        setAbierta(TAREAS.find(t => !auto.includes(t.id))?.id ?? TAREAS[0]?.id ?? null)
         setVerLista(true)
         props.reiniciar()
     }
@@ -120,7 +156,7 @@ export default function VarianteChecklist(props: PropsVariante) {
     // Cuando la tarea abierta es de ESTA pantalla, se le marca el elemento
     // exacto a tocar. Una tarea puede tener varios pasos (ej. producto: el
     // nombre primero, Orbi después): `pasoGuia` es en cuál está.
-    const tareaGuia = abierta ? TAREAS_CHECKLIST.find(t => t.id === abierta && !hechas.includes(t.id)) : undefined
+    const tareaGuia = abierta ? TAREAS.find(t => t.id === abierta && !hechas.includes(t.id)) : undefined
     const pasos = tareaGuia ? pasosDe(tareaGuia) : []
     const [pasoGuia, setPasoGuia] = useState(0)
     // Cambió la tarea o la pantalla → la guía vuelve al primer paso. Reset
@@ -138,7 +174,7 @@ export default function VarianteChecklist(props: PropsVariante) {
     const guiaActiva =
         !!pasoActual &&
         tareaGuia?.seccionDestino === props.seccionActual &&
-        !tapada && !orbiAbierto && !todasHechas
+        !tapada && !orbiAbierto && !todasHechas && !mostrarIntro
     const rectGuia = useRectAncla(pasoActual?.ancla ?? 'centro', guiaActiva)
 
     // ── Cursor fantasma ──────────────────────────────────────────────────────
@@ -286,7 +322,7 @@ export default function VarianteChecklist(props: PropsVariante) {
         <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                 <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Primeros pasos</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{nombreEtapa}</div>
                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
                         {nHechas} de {total} completados
                     </div>
@@ -348,20 +384,58 @@ export default function VarianteChecklist(props: PropsVariante) {
                     <polyline points="20 6 9 17 4 12" />
                 </svg>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{TEXTOS.cierreChecklistTitulo}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
+                {etapa === 2 ? TEXTOS.cierreEtapa2Titulo : TEXTOS.cierreChecklistTitulo}
+            </div>
             <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--color-body)', marginTop: 6 }}>
-                {TEXTOS.cierreChecklist}
+                {etapa === 2 ? TEXTOS.cierreEtapa2 : TEXTOS.cierreChecklist}
             </div>
             <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                <Button size="sm" onClick={props.terminar}>{TEXTOS.listo}</Button>
+                {/* Etapa 1: el remate no es "Listo" sino seguir con la segunda
+                    (pedido de Ale). Etapa 2: acá sí termina todo. */}
+                {etapa === 2
+                    ? <Button size="sm" onClick={props.terminar}>{TEXTOS.listo}</Button>
+                    : <Button size="sm" onClick={seguirEtapa2}>{TEXTOS.seguirEtapa2}</Button>}
                 <LinkDiscreto onClick={() => setVerLista(true)}>Ver la lista</LinkDiscreto>
+            </div>
+        </div>
+    )
+
+    const intro = (
+        // Presentación de la segunda etapa: misma caja que el cierre (mismo
+        // padding, mismos tamaños), sin tilde ni festejo — es un arranque, no
+        // un logro. El ícono reusa la entrada de EstilosTutorial (clase
+        // tut-check-cierre): un solo elemento animado, ease-out, y reduced
+        // motion lo apaga.
+        <div style={{ padding: '22px 18px 20px', textAlign: 'center' }}>
+            <div
+                className="tut-check-cierre"
+                aria-hidden
+                style={{
+                    width: 44, height: 44, margin: '0 auto 12px', borderRadius: 9999,
+                    background: 'var(--color-violet-bg)', color: 'var(--chip-violet-fg)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+            >
+                <Sparkles size={22} />
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{TEXTOS.etapa2IntroTitulo}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--color-body)', marginTop: 6 }}>
+                {TEXTOS.etapa2Intro}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
+                {total} tareas, a tu ritmo
+            </div>
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <Button size="sm" onClick={empezarEtapa2}>{TEXTOS.etapa2Empezar}</Button>
+                <LinkDiscreto onClick={etapa2AhoraNo}>{TEXTOS.etapa2AhoraNo}</LinkDiscreto>
             </div>
         </div>
     )
 
     const lista = (
         <div style={{ overflowY: 'auto', minHeight: 0, overscrollBehavior: 'contain' }}>
-            {TAREAS_CHECKLIST.map((t, i) => {
+            {TAREAS.map((t, i) => {
                 const esAuto = auto.includes(t.id)
                 const hecha = hechas.includes(t.id)
                 const estaAbierta = abierta === t.id
@@ -509,6 +583,9 @@ export default function VarianteChecklist(props: PropsVariante) {
         </div>
     )
 
+    // Qué va en el cuerpo de la tarjeta/hoja: presentación, cierre o lista.
+    const cuerpo = mostrarIntro ? intro : mostrarCierre ? cierre : lista
+
     // El remate de la guía: cartelito pegado al elemento marcado, por si el
     // recuadro solo no alcanza. Se va solo a los segundos. En celular se
     // clampa al ancho de la pantalla.
@@ -572,8 +649,8 @@ export default function VarianteChecklist(props: PropsVariante) {
 
     // ── Celular: barra plegada u hoja inferior ───────────────────────────────
     if (esMovil) {
-        const pendiente = TAREAS_CHECKLIST.find(t => !hechas.includes(t.id))
-        const nroPendiente = pendiente ? TAREAS_CHECKLIST.indexOf(pendiente) + 1 : total
+        const pendiente = TAREAS.find(t => !hechas.includes(t.id))
+        const nroPendiente = pendiente ? TAREAS.indexOf(pendiente) + 1 : total
         const bordeInferior = 'calc(12px + env(safe-area-inset-bottom, 0px))'
         return (
             <>
@@ -592,7 +669,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                         <div
                             className="tut-check-hoja"
                             role="dialog"
-                            aria-label="Primeros pasos"
+                            aria-label={nombreEtapa}
                             style={{
                                 position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: Z_CHECKLIST,
                                 display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
@@ -604,8 +681,8 @@ export default function VarianteChecklist(props: PropsVariante) {
                         >
                             {/* Manija: señal universal de "esto se cierra hacia abajo". */}
                             <div aria-hidden style={{ width: 36, height: 4, borderRadius: 9999, background: 'var(--color-border-strong)', margin: '8px auto -4px' }} />
-                            {encabezado(() => setHojaAbierta(false), 'Cerrar la lista de primeros pasos', 'abajo')}
-                            {mostrarCierre ? cierre : lista}
+                            {encabezado(() => setHojaAbierta(false), `Cerrar la lista de ${nombreEtapa.toLowerCase()}`, 'abajo')}
+                            {cuerpo}
                             {pie}
                         </div>
                     </>
@@ -613,7 +690,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                     <button
                         className="ds-hover"
                         onClick={() => setHojaAbierta(true)}
-                        aria-label="Abrir la lista de primeros pasos"
+                        aria-label={`Abrir la lista de ${nombreEtapa.toLowerCase()}`}
                         style={{
                             position: 'fixed', left: 12, right: 12, bottom: bordeInferior, zIndex: Z_CHECKLIST,
                             height: 56, padding: '0 14px 0 16px', boxSizing: 'border-box',
@@ -640,10 +717,14 @@ export default function VarianteChecklist(props: PropsVariante) {
                         </span>
                         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
                             <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>
-                                {todasHechas ? 'Primeros pasos' : `Paso ${nroPendiente} de ${total} · Primeros pasos`}
+                                {todasHechas || mostrarIntro ? nombreEtapa : `Paso ${nroPendiente} de ${total} · ${nombreEtapa}`}
                             </span>
                             <span style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {todasHechas ? TEXTOS.cierreChecklistTitulo : pendiente?.titulo}
+                                {mostrarIntro
+                                    ? `${total} tareas nuevas para sacarle jugo al panel`
+                                    : todasHechas
+                                        ? (etapa === 2 ? TEXTOS.cierreEtapa2Titulo : TEXTOS.cierreChecklistTitulo)
+                                        : pendiente?.titulo}
                             </span>
                         </span>
                         <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -663,7 +744,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                 <button
                     className="ds-hover tut-check-pill"
                     onClick={() => props.actualizar({ minimizado: false })}
-                    aria-label="Restaurar la lista de primeros pasos"
+                    aria-label={`Restaurar la lista de ${nombreEtapa.toLowerCase()}`}
                     style={{
                         position: 'fixed', right: 20, bottom: 20, zIndex: Z_CHECKLIST,
                         display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -674,7 +755,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                         animation: 'orbita-tut-entrada 200ms ease',
                     }}
                 >
-                    Primeros pasos · {nHechas}/{total}
+                    {nombreEtapa} · {nHechas}/{total}
                 </button>
             </>
         )
@@ -701,7 +782,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                 }}
             >
                 {encabezado(() => props.actualizar({ minimizado: true }), 'Minimizar', 'abajo')}
-                {mostrarCierre ? cierre : lista}
+                {cuerpo}
                 {pie}
             </div>
         </>
