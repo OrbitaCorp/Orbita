@@ -7,6 +7,7 @@ import { describeError } from '../common/utils/describe-error.util';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { DomainExpiryService } from '../domains/domain-expiry.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -55,6 +56,10 @@ export class InternalCronController {
     // anteriores a la retención construyen el controller con cuatro argumentos.
     // En la app real Nest lo inyecta siempre (está en providers del módulo).
     private readonly retencionLogs?: RetencionLogsService,
+    // Vencimiento de dominios comprados (hallazgo `dominios-comprados-sin-
+    // renovacion`): aviso a 30 y 7 días y pase a EXPIRED. Opcional por el
+    // mismo motivo que retencionLogs (specs viejos con menos argumentos).
+    private readonly domainExpiry?: DomainExpiryService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -87,6 +92,14 @@ export class InternalCronController {
           await this.retencionLogs?.purgar();
         } catch (e) {
           this.logger.error(`Retención de logs: no se pudo correr — ${describeError(e)}`);
+        }
+        // Dominios comprados por vencer (hallazgo `dominios-comprados-sin-
+        // renovacion`): mismo disparo, mismo criterio que la retención — si
+        // falla, se anota y mañana se reintenta sin marcar la corrida.
+        try {
+          await this.domainExpiry?.avisarVencimientos();
+        } catch (e) {
+          this.logger.error(`Vencimiento de dominios: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

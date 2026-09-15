@@ -6,9 +6,10 @@ import { RetencionLogsService } from './retencion-logs.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
+import { DomainsModule } from '../domains/domains.module';
 
 @Module({
-  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule],
+  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule],
   controllers: [InternalCronController],
   providers: [InternalCronSecretGuard, CronRunsService, RetencionLogsService],
 })

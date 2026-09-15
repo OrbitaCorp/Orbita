@@ -164,6 +164,8 @@ export class MailService {
     'business-deletion-warning',
     'business-deleted',
     'business-cancellation-undone',
+    // Dominio comprado por vencer: lo avisa Órbita, que es quien lo gestiona.
+    'domain-expiring-soon',
     'platform-admin-login-code',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
     'platform-discount-offer',
@@ -264,6 +266,10 @@ export class MailService {
     // CalendarClock — aviso previo a que termine bienvenida/cortesía.
     'subscription-ending-soon': this.svgIcon(
       '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="4"/><path d="M18 16.5V18l1 1"/>',
+    ),
+    // Globe — dominio comprado por vencer.
+    'domain-expiring-soon': this.svgIcon(
+      '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
     ),
     // Hourglass — terminó el período, arrancó la gracia.
     'subscription-period-ended': this.svgIcon(
@@ -915,6 +921,19 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `${data.motivo} termina pronto`, 'subscription-ending-soon', data, meta);
+  }
+
+  // Dominio comprado desde el panel por vencer (auditoría interna, hallazgo
+  // `dominios-comprados-sin-renovacion`): lo manda DomainExpiryService a los
+  // 30 y a los 7 días. El dominio va en el asunto a propósito: es la marca
+  // de "ya avisado" que ese barrido busca en email_logs.
+  async sendDomainExpiringSoon(
+    to: string,
+    data: { businessName: string; domain: string; expiresAt: string; daysLeft: number; manageUrl: string },
+    meta?: MailMeta,
+  ) {
+    const plazo = data.daysLeft === 1 ? '1 día' : `${data.daysLeft} días`;
+    await this.sendOrLog(to, `El dominio ${data.domain} vence en ${plazo}`, 'domain-expiring-soon', data, meta);
   }
 
   // Día 0: terminó la bienvenida o una cortesía (no un cobro rechazado — para
