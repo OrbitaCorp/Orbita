@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
 // se ven salen del catálogo del negocio, de sus categorías, o de una sección
 // editable cuyo `porDefecto` vive en secciones.ts.
-import type { Plantilla, Producto, AccionesHome } from './tipos'
+import type { BloqueReceta, Plantilla, Producto, AccionesHome } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, MenuMovil,
@@ -276,6 +276,342 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // tres cosas en el home (ver Inicio.tsx: cartel, hero, stats, categorías,
   // filas de productos, banner de WhatsApp y pie), y una plantilla que las
   // muestre promete algo que después la tienda no puede cumplir.
+  // ── RECETA ────────────────────────────────────────────────────────────────
+  // El render compartido de las plantillas que se arman con el vocabulario de
+  // siempre (ver Receta en tipos.ts). Lo que cambia entre una y otra es el
+  // TEMA y la lista de bloques: el mismo código dibuja las diez.
+  //
+  // Todo lo que muestra sale de la tienda —categorías, catálogo, destacados— y
+  // los textos van por `txt()`, así que el editor de estas plantillas se
+  // genera solo desde la receta y no hay que escribirle uno a mano.
+  if (p.receta) {
+    const r = p.receta
+    const s = p.slides[iActual]
+    const cats = p.categorias ?? []
+
+    // El encabezado de cada bloque, editable. La clave es el id del bloque,
+    // así que dos filas de la misma plantilla no comparten título.
+    const encabezadoDe = (id: string, centrado?: boolean) => (
+      <Titulo
+        t={t}
+        volanta={txt(id, 'volanta')}
+        texto={txt(id, 'titulo')}
+        accion={txt(id, 'accion')}
+        centrado={centrado}
+        movil={movil}
+        onAccion={acciones?.irACatalogo}
+      />
+    )
+
+    const fuenteDe = (b: Extract<BloqueReceta, { t: 'fila' }>, n: number) =>
+      b.fuente === 'destacados' ? fila(n, b.id, p.productos)
+        : b.fuente === 'masVendidos' ? fila(n, b.id, p.productosSecundarios ?? [])
+        : fila(n, b.id)
+
+    const heroTexto = (alineado: 'izq' | 'centro', claro: boolean) => (
+      <div style={{ textAlign: alineado === 'centro' ? 'center' : 'left', maxWidth: alineado === 'centro' ? 640 : 520, margin: alineado === 'centro' ? '0 auto' : undefined }}>
+        {s?.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: claro ? t.accent : t.primary, marginBottom: 14 }}>{s.kicker}</div>}
+        <h1 style={{ fontFamily: t.fh, fontSize: movil ? 38 : 66, lineHeight: 1.02, margin: 0, fontWeight: 800, letterSpacing: '-0.04em', color: claro ? '#fff' : t.text, whiteSpace: 'pre-line' }}>{s?.titulo}</h1>
+        <p style={{ fontSize: movil ? 15 : 17, lineHeight: 1.6, margin: '16px 0 26px', color: claro ? 'rgba(255,255,255,0.88)' : t.muted }}>{s?.bajada}</p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: alineado === 'centro' ? 'center' : undefined }}>
+          <Boton t={t} grande={!movil} onClick={s?.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : acciones?.irACatalogo}>{s?.cta}</Boton>
+          {txt('hero', 'cta2') && <Boton t={t} grande={!movil} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
+        </div>
+        {navHero({ marginTop: 22, justifyContent: alineado === 'centro' ? 'center' : undefined })}
+      </div>
+    )
+
+    const bloque = (b: BloqueReceta, i: number) => {
+      const pad = movil ? '28px 16px' : '52px 40px'
+      switch (b.t) {
+        // ── Hero, cuatro formas de la misma foto ───────────────────────────
+        case 'hero': {
+          if (!s) return null
+          if (b.estilo === 'minimo') {
+            return (
+              <div key={i} style={{ background: t.soft, borderBottom: `1px solid ${t.border}`, padding: movil ? '46px 16px' : '92px 40px' }}>
+                {heroTexto('centro', false)}
+              </div>
+            )
+          }
+          if (b.estilo === 'partido') {
+            return (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', borderBottom: `1px solid ${t.border}` }}>
+                <div style={{ background: t.soft, padding: movil ? '34px 18px' : '70px 48px', display: 'flex', alignItems: 'center' }}>
+                  {heroTexto('izq', false)}
+                </div>
+                <div style={{ minHeight: movil ? 240 : 460 }}><Foto src={s.img} alto={movil ? 240 : '100%'} /></div>
+              </div>
+            )
+          }
+          if (b.estilo === 'tarjeta') {
+            return (
+              <div key={i} style={{ padding: movil ? '16px 16px 6px' : '28px 40px 10px' }}>
+                <div style={{ position: 'relative', borderRadius: t.radio, overflow: 'hidden' }}>
+                  <Foto src={s.img} alto={movil ? 380 : 520} />
+                  <div style={{ position: 'absolute', inset: 0, background: t.oscuro ? 'linear-gradient(90deg, rgba(0,0,0,0.82), rgba(0,0,0,0.15))' : 'linear-gradient(90deg, rgba(0,0,0,0.66), rgba(0,0,0,0.05))', display: 'flex', alignItems: 'center', padding: movil ? 22 : 52 }}>
+                    {heroTexto('izq', true)}
+                  </div>
+                </div>
+              </div>
+            )
+          }
+          // pleno
+          return (
+            <div key={i} style={{ position: 'relative' }}>
+              <Foto src={s.img} alto={movil ? 430 : 580} />
+              <div style={{ position: 'absolute', inset: 0, background: t.oscuro ? 'linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.85))' : 'linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.72))', display: 'flex', alignItems: 'flex-end', padding: movil ? 22 : 54 }}>
+                {heroTexto('izq', true)}
+              </div>
+            </div>
+          )
+        }
+
+        // ── Categorías, cuatro formas de la misma lista ────────────────────
+        case 'categorias': {
+          if (cats.length === 0) return null
+          const max = b.cols ?? 4
+          const visibles = cats.slice(0, max)
+          const cab = encabezadoDe('categorias', b.estilo === 'pastillas')
+          if (b.estilo === 'pastillas') {
+            return (
+              <Reveal key={i}><div style={{ padding: pad }}>
+                {cab}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                  {visibles.map(([n, src, slug]) => (
+                    <span
+                      key={n} className="pl-cta" onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: `1px solid ${t.border}`, background: t.surf, borderRadius: 999, padding: '7px 18px 7px 7px', cursor: slug && acciones ? 'pointer' : undefined }}
+                    >
+                      <span style={{ width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}><Foto src={src} alto={34} /></span>
+                      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{n}</span>
+                    </span>
+                  ))}
+                </div>
+              </div></Reveal>
+            )
+          }
+          if (b.estilo === 'tira') {
+            return (
+              <Reveal key={i}><div style={{ padding: movil ? '28px 0 28px 16px' : '52px 0 52px 40px' }}>
+                <div style={{ paddingRight: movil ? 16 : 40 }}>{cab}</div>
+                <Tira gap={12}>
+                  {visibles.map(([n, src, slug]) => (
+                    <div
+                      key={n} className="pl-tile" onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                      style={{ width: movil ? 180 : 250, flexShrink: 0, position: 'relative', borderRadius: t.radio, overflow: 'hidden', cursor: slug && acciones ? 'pointer' : undefined }}
+                    >
+                      <Foto src={src} alto={movil ? 130 : 170} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.75))', display: 'flex', alignItems: 'flex-end', padding: 14 }}>
+                        <span style={{ color: '#fff', fontFamily: t.fh, fontSize: 15, fontWeight: 700 }}>{n}</span>
+                      </div>
+                    </div>
+                  ))}
+                </Tira>
+              </div></Reveal>
+            )
+          }
+          const alto = b.estilo === 'altas' ? (movil ? 190 : 300) : (movil ? 120 : 165)
+          return (
+            <Reveal key={i}><div style={{ padding: pad }}>
+              {cab}
+              <div style={{ display: 'grid', gridTemplateColumns: colsDe(max, visibles.length, Math.min(2, visibles.length)), gap: movil ? 10 : 14 }}>
+                {visibles.map(([n, src, slug]) => (
+                  <div
+                    key={n} className="pl-tile" onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                    style={{ position: 'relative', borderRadius: t.radio, overflow: 'hidden', cursor: slug && acciones ? 'pointer' : undefined }}
+                  >
+                    <Foto src={src} alto={alto} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.78))', display: 'flex', alignItems: 'flex-end', padding: 14 }}>
+                      <span style={{ color: '#fff', fontFamily: t.fh, fontSize: movil ? 14 : 17, fontWeight: 700, letterSpacing: '-0.01em' }}>{n}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div></Reveal>
+          )
+        }
+
+        // ── Fila de productos ──────────────────────────────────────────────
+        case 'fila': {
+          const nCols = b.cols ?? 4
+          if (b.estilo === 'tira') {
+            const items = fuenteDe(b, movil ? 4 : 6)
+            if (items.length === 0) return null
+            return (
+              <Reveal key={i}><div style={{ padding: movil ? '28px 0 28px 16px' : '52px 0 52px 40px' }}>
+                <div style={{ paddingRight: movil ? 16 : 40 }}>{encabezadoDe(b.id)}</div>
+                <Tira gap={14}>
+                  {items.map((x, j) => (
+                    <div key={x.slug ?? x.nombre} style={{ width: movil ? 200 : 260, flexShrink: 0 }}>
+                      {producto(x, j, { alto: movil ? 200 : 260 })}
+                    </div>
+                  ))}
+                </Tira>
+              </div></Reveal>
+            )
+          }
+          const sangre = b.estilo === 'sangre'
+          const items = fuenteDe(b, cuantos(nCols, 2))
+          if (items.length === 0) return null
+          return (
+            <Reveal key={i}><div style={{ padding: sangre ? (movil ? '28px 0' : '52px 0') : pad }}>
+              <div style={{ padding: sangre ? (movil ? '0 16px' : '0 40px') : undefined }}>{encabezadoDe(b.id)}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: cols(nCols, 2), gap: sangre ? 0 : (movil ? 12 : 18), borderTop: sangre ? `1px solid ${t.border}` : undefined, borderBottom: sangre ? `1px solid ${t.border}` : undefined }}>
+                {items.map((x, j) => producto(x, j, { sangre, alto: movil ? 170 : 250 }))}
+              </div>
+            </div></Reveal>
+          )
+        }
+
+        // ── El nombre de una categoría, y abajo productos DE esa categoría ──
+        case 'porCategoria': {
+          const filas = porCategoria(b.cuantas ?? 3, cuantos(b.porFila ?? 4, 2))
+          if (filas.length === 0) return null
+          return (
+            <div key={i}>
+              {filas.map((c, j) => (
+                <Reveal key={c.nombre} delay={j * 60}>
+                  <div style={{ padding: movil ? '24px 16px 8px' : '40px 40px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 14 }}>
+                      <h2 style={{ fontFamily: t.fh, fontSize: movil ? 22 : 30, margin: 0, fontWeight: 800, letterSpacing: '-0.025em' }}>{c.nombre}</h2>
+                      {c.slug && acciones && (
+                        <span
+                          className="pl-nav" onClick={() => acciones.irACategoria(c.slug!)}
+                          style={{ marginLeft: 'auto', fontSize: 12.5, color: t.primary, fontWeight: 700, cursor: 'pointer' }}
+                        >Ver todo →</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: colsDe(b.porFila ?? 4, c.productos.length, 2), gap: movil ? 12 : 16 }}>
+                      {c.productos.map((x, k) => producto(x, k, { alto: movil ? 160 : 230 }))}
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          )
+        }
+
+        // ── Franja de color con un mensaje ─────────────────────────────────
+        case 'franja': {
+          if (!txt('franja', 'titulo')) return null
+          return (
+            <Reveal key={i}>
+              <div style={{ background: t.primary, color: t.onPrimary, padding: movil ? '26px 18px' : '40px', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 230 }}>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 30, fontWeight: 800, letterSpacing: '-0.025em' }}>{txt('franja', 'titulo')}</div>
+                  <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 6 }}>{txt('franja', 'bajada')}</div>
+                </div>
+                <span
+                  className="pl-cta" onClick={acciones?.irACatalogo}
+                  style={{ background: t.onPrimary, color: t.primary, padding: '13px 26px', borderRadius: t.radio === 0 ? 0 : 999, fontWeight: 700, fontSize: 13.5, cursor: acciones ? 'pointer' : undefined }}
+                >{txt('franja', 'cta')}</span>
+              </div>
+            </Reveal>
+          )
+        }
+
+        // ── Campaña: foto ancha con el texto encima ─────────────────────────
+        case 'campana': {
+          const foto = txt('campana', 'foto')
+          if (!foto || !txt('campana', 'titulo')) return null
+          return (
+            <Reveal key={i}>
+              <div style={{ padding: movil ? '28px 16px' : '52px 40px' }}>
+                <div style={{ position: 'relative', borderRadius: t.radio, overflow: 'hidden' }}>
+                  <Foto src={foto} alto={movil ? 260 : 360} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,0.78), rgba(0,0,0,0.12))', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: movil ? 22 : 48, color: '#fff' }}>
+                    <div style={{ fontSize: 11.5, letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 800, marginBottom: 12 }}>{txt('campana', 'volanta')}</div>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 26 : 40, fontWeight: 800, letterSpacing: '-0.035em', maxWidth: 440, lineHeight: 1.1 }}>{txt('campana', 'titulo')}</div>
+                    <p style={{ fontSize: 14, margin: '12px 0 20px', maxWidth: 380, opacity: 0.9 }}>{txt('campana', 'texto')}</p>
+                    <div><span className="pl-cta" onClick={acciones?.irACatalogo} style={{ display: 'inline-block', background: '#fff', color: t.text, padding: '12px 24px', borderRadius: t.radio === 0 ? 0 : 999, fontSize: 13.5, fontWeight: 800, cursor: acciones ? 'pointer' : undefined }}>{txt('campana', 'cta')}</span></div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          )
+        }
+
+        // ── Consulta por WhatsApp ──────────────────────────────────────────
+        case 'whatsapp': {
+          if (!txt('whatsapp', 'titulo')) return null
+          return (
+            <Reveal key={i}>
+              <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 18px' : '40px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 25, fontWeight: 800, letterSpacing: '-0.02em' }}>{txt('whatsapp', 'titulo')}</div>
+                  <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>{txt('whatsapp', 'bajada')}</div>
+                </div>
+                <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
+              </div>
+            </Reveal>
+          )
+        }
+      }
+    }
+
+    // El header: el mismo de siempre en dos variantes. No hace falta uno por
+    // plantilla — lo que las distingue es el tema, no dónde cae el logo.
+    const encabezado = (
+      <>
+        {!!txt('cintillo', 'texto') && (
+          activo('cintillo', 'cartelera')
+            ? <Marquee t={t} texto={txt('cintillo', 'texto')} />
+            : (
+              <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em' }}>
+                {txt('cintillo', 'texto')}
+              </div>
+            )
+        )}
+        {r.header === 'centrado' ? (
+          <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: movil ? 12 : 26, padding: movil ? '13px 16px' : '16px 40px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
+            {movil && <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />}
+            <span
+              onClick={acciones?.irAInicio}
+              style={{ fontFamily: t.fh, fontSize: movil ? 20 : 25, fontWeight: 800, letterSpacing: '-0.03em', color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+            >{p.marca}</span>
+            {!movil && (() => {
+              const nav = navDe(p.links ?? [], acciones)
+              if (nav.length === 0) return null
+              return (
+                <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted, ...(acciones?.navLayout === 'centered' ? { margin: '0 auto' } : {}) }}>
+                  {nav.map((l) => (
+                    <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, color: l.activo ? t.text : undefined, fontWeight: l.activo ? 700 : undefined }}>{l.label}</span>
+                  ))}
+                </div>
+              )
+            })()}
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 14 }}>
+              {!movil && acciones?.renderBuscador && acciones.renderBuscador({})}
+              <AccionesTienda t={t} movil={movil} acciones={acciones} />
+            </span>
+          </div>
+        )}
+      </>
+    )
+
+    if (soloHeader) return <div style={marco}>{encabezado}</div>
+
+    return (
+      <div style={marco}>
+        {encabezado}
+        {r.bloques.map(bloque)}
+        {p.cupon && (
+          <Reveal>
+            <div style={{ margin: movil ? '0 16px 26px' : '0 40px 40px', border: `1px dashed ${t.primary}`, borderRadius: t.radio, padding: movil ? 22 : '28px 32px', textAlign: 'center' }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 20 : 26, fontWeight: 800, letterSpacing: '-0.02em' }}>{p.cupon.titulo}</div>
+              <div style={{ fontSize: 13, color: t.muted, margin: '8px 0 16px' }}>{p.cupon.bajada}</div>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 16, letterSpacing: '0.16em', fontWeight: 700, color: t.primary, border: `1px dashed ${t.primary}`, padding: '10px 22px', borderRadius: 999 }}>{p.cupon.codigo}</span>
+            </div>
+          </Reveal>
+        )}
+        {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
+      </div>
+    )
+  }
+
   if (p.layout === 'tienda' || p.layout === 'vidriera') {
     const links = p.links ?? ['Inicio', 'Novedades', 'Ofertas']
     const confianza = p.confianza ?? [['Envío gratis', 'a todo el país'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días'], ['Garantía', '1 año']]

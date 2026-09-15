@@ -29,6 +29,9 @@ export type Layout =
   | 'vidriera' | 'escaparate' | 'mosaico' | 'premium' | 'nocturno' | 'glow'
   | 'papeleria' | 'corralon' | 'atleta' | 'patitas' | 'bodega' | 'crecer'
   | 'circuito' | 'vera' | 'cobijo' | 'nitida'
+  // Las que se arman con el vocabulario compartido (ver Receta): el
+  // bloque no lo escribe cada una, lo dibuja el mismo render.
+  | 'receta'
 
 export interface Producto {
   nombre: string; precio: string; antes?: string; transfer?: string; cuotas?: string
@@ -52,6 +55,48 @@ export interface Producto {
   // cliente/inicio/plantillaReal.ts): a dónde lleva la tarjeta al hacerle
   // click. En las plantillas de muestra no existe y la tarjeta no navega.
   slug?: string
+}
+
+// ─── Recetas ─────────────────────────────────────────────────────────────────
+//
+// Las dieciséis primeras plantillas tienen cada una su bloque de JSX en
+// homes.tsx, y varias traen secciones que ninguna otra tiene ("El taller", la
+// carta de Bodega, el muro de Mosaico). Eso les da personalidad, pero tiene un
+// precio: cada una necesita su propio editor, y sumar una es escribir una
+// pantalla entera.
+//
+// Una RECETA es la otra mitad del catálogo: la plantilla declara qué bloques
+// muestra y en qué orden, y el render es compartido. Se cambia el DISEÑO —la
+// paleta, la tipografía, el tipo de hero, la forma de las categorías, el ritmo
+// de las filas— sin inventar funcionalidad nueva ni un editor nuevo. El
+// formulario de edición sale solo de la receta.
+//
+// Las dos formas conviven: una plantilla con una idea rara sigue escribiendo
+// su bloque a mano; una que se arma con el vocabulario de siempre usa receta.
+
+export type BloqueReceta =
+  // El hero. `pleno` es foto a sangre con el texto encima; `partido`, mitad
+  // color y mitad foto; `minimo`, solo tipografía sobre un fondo liso; y
+  // `tarjeta`, la foto adentro de una caja con aire alrededor.
+  | { t: 'hero'; estilo: 'pleno' | 'partido' | 'minimo' | 'tarjeta' }
+  // Las categorías del negocio. Cuatro formas distintas de la misma data.
+  | { t: 'categorias'; estilo: 'grilla' | 'pastillas' | 'tira' | 'altas'; cols?: number }
+  // Una fila de productos. `id` es la clave de su encabezado editable, así que
+  // dos filas de la misma plantilla no pueden repetirlo.
+  | { t: 'fila'; id: string; fuente?: 'destacados' | 'masVendidos' | 'catalogo'; estilo?: 'grilla' | 'tira' | 'sangre'; cols?: number }
+  // El nombre de una categoría y, abajo, productos DE esa categoría.
+  | { t: 'porCategoria'; cuantas?: number; porFila?: number }
+  // La franja de color ancha con un mensaje y un botón al catálogo.
+  | { t: 'franja' }
+  // Una foto ancha con texto encima, al final.
+  | { t: 'campana' }
+  // El bloque de consulta por WhatsApp.
+  | { t: 'whatsapp' }
+
+export interface Receta {
+  /** Dónde va el logo del header: a la izquierda (default) o centrado. */
+  header?: 'izquierda' | 'centrado'
+  bloques: BloqueReceta[]
 }
 
 export interface Slide {
@@ -268,6 +313,9 @@ export interface Plantilla {
   // su foto, y `productos` de acá arriba son los destacados nomás. En el
   // panel no existe.
   catalogo?: Producto[]
+  // Con esto puesto, el layout es 'receta': los bloques y su orden salen
+  // de acá y el render es el compartido. Ver Receta más arriba.
+  receta?: Receta
   cupon?: { titulo: string; bajada: string; codigo: string }
   // El pie. En la vitrina del panel los ítems son strings sueltos (texto
   // muerto de la maqueta); en la tienda real `plantillaReal()` los reemplaza
