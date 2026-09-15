@@ -106,6 +106,54 @@ Para agregar un secret **nuevo** (una env var sensible que no existía):
 3. Dar acceso al runtime SA (una sola vez, ya está hecho para todos los actuales):
    `gcloud projects add-iam-policy-binding orbita-api-corp --member="serviceAccount:681215569277-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`
 
+### `BFF_IP_SECRET` — IP real del cliente detrás del BFF (pendiente de cargar)
+
+Hallazgo `rate-limit-ip-proxy` de la auditoría interna (10/09). `TRUST_PROXY_HOPS`
+(env-vars.yaml) arregla los pedidos que van del navegador a la API, pero login,
+refresh, registro, alta y sesiones pasan por el BFF de Next.js en Vercel y le
+llegan a la API con la IP de Vercel: todos compartían un balde de throttling y
+las "sesiones activas" mostraban la IP del servidor. El BFF
+(`apps/web/src/lib/auth/bff.ts`) reenvía la IP real en `X-Orbita-Client-Ip`
+junto con `X-Orbita-Client-Ip-Secret`, y la API (`common/utils/proxy.ts`,
+`ipDelCliente`) la usa **solo** si el secreto coincide en tiempo constante.
+Es el MISMO valor en los dos lados, de 32+ caracteres (más corto se ignora).
+**Mientras no esté cargado, todo sigue exactamente como hoy** (sin regresión,
+solo sin el arreglo).
+
+1. Generar el valor una sola vez (desde Git Bash, no PowerShell — ver el aviso del BOM arriba):
+   ```bash
+   openssl rand -hex 32 > /tmp/bff-ip-secret.txt
+   ```
+2. Crearlo en Secret Manager para la API:
+   ```bash
+   gcloud secrets create BFF_IP_SECRET --project=orbita-api-corp \
+     --replication-policy=automatic --data-file=/tmp/bff-ip-secret.txt
+   ```
+   (el runtime SA ya tiene `secretmanager.secretAccessor` a nivel proyecto, no hace falta repetir el paso 3).
+3. Sumarlo a `SECRETS=` en `deploy/deploy.sh` (`BFF_IP_SECRET=BFF_IP_SECRET:latest`)
+   **recién cuando el secret exista** — si se referencia uno que no existe, el
+   deploy falla — y correr `deploy.sh`.
+4. Cargar el mismo valor en Vercel, proyecto web, como env var de servidor
+   **`BFF_IP_SECRET`** (nunca `NEXT_PUBLIC_`), entornos Production (y Preview
+   si se quiere probar ahí). Desde el panel: Settings → Environment Variables,
+   o con el CLI logueado en la cuenta del proyecto:
+   ```bash
+   vercel env add BFF_IP_SECRET production < /tmp/bff-ip-secret.txt
+   ```
+   Después hace falta un deploy nuevo del frontend para que lo tome (un push a
+   `main` alcanza). Borrar `/tmp/bff-ip-secret.txt` al terminar.
+5. Verificar sin exponer el secreto, con `GET /api/v1/health/ip`:
+   - Directo a la API desde dos redes distintas (por ejemplo wifi y 4G):
+     `curl -s https://api.orbita.site/api/v1/health/ip` tiene que dar `clientIp`
+     distinto en cada una e igual a la IP pública de esa red, con `viaBff: false`.
+   - A través del BFF: un login desde el panel (DevTools → Network →
+     `/api/auth/login`) tiene que crear en "Sesiones activas" (`/me/sessions`)
+     una sesión con la IP pública real, no una de Vercel (`76.76.x.x`). Y si se
+     repite el login de una cuenta desde dos redes, la segunda red NO tiene que
+     recibir el 429 de la primera.
+   Cuando el valor de `X-Orbita-Client-Ip-Secret` no coincide, la API ignora el
+   header y sigue con `req.ip`: nunca se puede elegir la propia IP desde afuera.
+
 ## Actualizar variables NO sensibles
 
 Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets) y correr
@@ -312,3 +360,68 @@ nada fuera de Cloud Run:
 - `roles/run.admin` (proyecto)
 - `roles/artifactregistry.reader` (proyecto)
 - `roles/iam.serviceAccountUser` sobre `681215569277-compute@developer.gserviceaccount.com`
+
+## Retención de logs y registros
+
+Hallazgo `logs-sin-retencion` de la auditoría interna (detectado el 10/09,
+cerrado el 14/09). Nada crece para siempre: el mantenimiento nocturno
+(`POST /internal-cron/nightly-subscriptions-maintenance`, ver § Cron jobs)
+borra lo más viejo que la retención de cada tabla, justo después de la purga
+de la analítica del wizard. Código:
+`src/internal-cron/retencion-logs.service.ts` (`purgar()`).
+
+### Tablas de la base
+
+| Tabla | Variable | Default | Qué guarda |
+|---|---|---|---|
+| `platform_admin_logs` | `PLATFORM_ADMIN_LOGS_RETENTION_DAYS` | 365 días | acciones del super admin sobre negocios y suscripciones |
+| `audit_logs` | `AUDIT_LOGS_RETENTION_DAYS` | 365 días | registro de solo agregado de cada negocio (quién cambió qué en el panel) |
+| `email_logs` | `EMAIL_LOGS_RETENTION_DAYS` | 180 días | qué mail se le mandó a quién y si salió |
+| `wizard_events` / `wizard_ai_turns` | `WIZARD_ANALYTICS_RETENTION_DAYS` | 180 días | analítica del wizard (ya existía, `wizard-analytics.service.ts`) |
+
+Reglas, iguales para las tres nuevas:
+
+- Se cuenta en días desde `created_at`, con el instante actual como referencia.
+- Nunca menos de **30** días: un valor menor se sube a 30. Por debajo de un
+  mes se pierde la trazabilidad de cualquier reclamo reciente.
+- `0` u `off` **apaga** la purga de esa tabla sola; las otras siguen.
+- Vacía o inválida (`"un año"`) = el default.
+- Cada corrida loguea por tabla `Retención de <tabla> (<n> días): <k> filas
+  borradas` (o `apagada por <variable>`). Una tabla que falla se anota con
+  `error` y no frena a las otras ni a la corrida nocturna: mañana vuelve a
+  intentar y lo que no se borró hoy cae entonces.
+- `audit_logs` es de solo agregado; esta purga por antigüedad es la única
+  excepción permitida y `test/unit/audit.auditoria.unit-spec.ts` la vigila
+  (borra por fecha y nada más, nunca por negocio, entidad ni acción).
+
+Las tres variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
+están **comentadas con su default**. Para cambiar una, descomentarla, poner el
+valor y volver a desplegar (§ Actualizar variables NO sensibles).
+
+Al 14/09 en producción: `platform_admin_logs` 20 filas, `audit_logs` 0,
+`email_logs` 676 (la más vieja del 30/07). Con estos defaults la primera noche
+no borra nada; `email_logs` empieza a perder filas recién a fines de enero
+de 2027.
+
+### Cloud Logging (lo que la API escribe por consola)
+
+Lo que sale por stdout/stderr (el `Logger` de Nest, los request logs de Cloud
+Run) va al bucket `_Default` de Cloud Logging del proyecto, que retiene
+**30 días** por defecto. El otro bucket, `_Required` (audit logs de
+administración de GCP), retiene 400 días y no se puede cambiar. Para ver la
+retención actual:
+
+```bash
+gcloud logging buckets describe _Default --location=global --project orbita-api-corp
+```
+
+Para cambiarla (`N` entre 1 y 3650; retener más de 30 días se cobra por GiB
+según la tarifa vigente de Cloud Logging, la ingesta hasta el free tier no):
+
+```bash
+gcloud logging buckets update _Default --location=global --project orbita-api-corp --retention-days=N
+```
+
+Decisión: se deja en 30 días. Lo que vale más que un mes (quién hizo qué, qué
+mail salió) ya queda en las tablas de arriba, con retención propia y más
+larga; los logs de consola sirven para diagnosticar lo reciente, nada más.
