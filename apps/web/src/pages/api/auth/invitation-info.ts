@@ -14,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const token = typeof req.query.token === 'string' ? req.query.token : ''
   const { status, body } = await callBackend('/auth/invitation-info', {
+    req,
     method: 'POST',
     body: { token },
   })

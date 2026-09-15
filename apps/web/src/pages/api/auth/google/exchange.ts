@@ -15,6 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (typeof code !== 'string' || !code) return res.status(400).json({ error: 'MISSING_CODE' })
 
   const { status, body } = await callBackend('/auth/google/exchange', {
+    req,
     method: 'POST',
     body: { code },
   })

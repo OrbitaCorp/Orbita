@@ -39,7 +39,8 @@ describe('trust proxy', () => {
 
   it('/health/ip devuelve la IP vista y la cadena X-Forwarded-For del pedido', () => {
     const r = new AppController({} as any).ip({ ip: '10.0.0.1', headers: { 'x-forwarded-for': '1.2.3.4, 10.0.0.1' } } as any);
-    expect(r).toEqual({ ip: '10.0.0.1', xForwardedFor: '1.2.3.4, 10.0.0.1' });
+    // clientIp/viaBff: ver ip-del-cliente.auditoria.unit-spec.ts (hallazgo rate-limit-ip-proxy).
+    expect(r).toEqual({ ip: '10.0.0.1', xForwardedFor: '1.2.3.4, 10.0.0.1', clientIp: '10.0.0.1', viaBff: false });
   });
 });
 

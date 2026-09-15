@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let status: number;
   let body: unknown;
   try {
-    ({ status, body } = await callBackend('/auth/refresh', { method: 'POST', body: { refreshToken }, slug }));
+    ({ status, body } = await callBackend('/auth/refresh', { req, method: 'POST', body: { refreshToken }, slug }));
   } catch {
     return res.status(503).json({ error: 'BACKEND_UNAVAILABLE' })
   }

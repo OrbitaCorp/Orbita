@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { MailModule } from './mail/mail.module';
@@ -15,6 +15,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { BusinessModeGuard } from './common/guards/business-mode.guard';
 import { AddonGuard } from './common/guards/addon.guard';
 import { SubscriptionActiveGuard } from './common/guards/subscription-active.guard';
+import { ClientIpThrottlerGuard } from './common/guards/client-ip-throttler.guard';
 
 import { AuthModule } from './auth/auth.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -118,7 +119,11 @@ import { SupportModule } from './support/support.module';
     // AddonGuard (paquete "Avanzado" — ver requires-addon.decorator.ts) y por
     // último SubscriptionActiveGuard (modo solo-lectura si la suscripción está
     // SUSPENDED — ver allow-when-paused.decorator.ts).
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    //
+    // El throttler global es el propio (ClientIpThrottlerGuard) y no el de
+    // @nestjs/throttler: trackea por la IP real del cliente también cuando el
+    // pedido pasa por el BFF de Vercel (hallazgo rate-limit-ip-proxy).
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

@@ -17,10 +17,14 @@ import { InvitationInfoDto } from './dto/invitation-info.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { DeviceInfo } from './auth.service';
+import { ipDelCliente } from '../common/utils/proxy';
 
 // user-agent + IP del request, para la metadata de "sesiones activas" (RBT-631).
+// La IP es la real del cliente, no la de Vercel: login/refresh/registro pasan
+// por el BFF, que la reenvía con un secreto compartido (hallazgo
+// rate-limit-ip-proxy, ver common/utils/proxy.ts).
 function deviceInfoFrom(req: Request): DeviceInfo {
-  return { userAgent: req.headers['user-agent'], ip: req.ip };
+  return { userAgent: req.headers['user-agent'], ip: ipDelCliente(req) };
 }
 
 @Controller('auth')

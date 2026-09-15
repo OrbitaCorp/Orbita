@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { ipDelCliente, type PedidoConIp } from '../utils/proxy';
 
 /**
  * Segundo balde de throttling, keyeado por email en vez de IP (RBT-662).
@@ -22,6 +23,8 @@ export class AuthThrottlerGuard extends ThrottlerGuard {
   protected async getTracker(req: Record<string, unknown>): Promise<string> {
     const body = req.body as { email?: unknown } | undefined;
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : null;
-    return email || (req as { ip?: string }).ip || 'unknown';
+    // Sin email, cae a la IP real del cliente (la que reenvió el BFF si el
+    // secreto coincide) — no a la de Vercel (hallazgo rate-limit-ip-proxy).
+    return email || ipDelCliente(req as PedidoConIp) || 'unknown';
   }
 }
