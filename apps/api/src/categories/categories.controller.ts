@@ -28,20 +28,20 @@ export class CategoriesController {
   @RequirePermission('catalog.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertCategoryDto) {
     const member = assertMemberContext(ctx);
-    return this.categoriesService.create(member.businessId, dto);
+    return this.categoriesService.create(member.businessId, dto, member.memberId);
   }
 
   @Put(':id')
   @RequirePermission('catalog.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertCategoryDto) {
     const member = assertMemberContext(ctx);
-    return this.categoriesService.update(member.businessId, id, dto);
+    return this.categoriesService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Delete(':id')
   @RequirePermission('catalog.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.categoriesService.remove(member.businessId, id);
+    return this.categoriesService.remove(member.businessId, id, member.memberId);
   }
 }

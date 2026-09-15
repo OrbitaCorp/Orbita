@@ -30,7 +30,7 @@ export class BranchesController {
   @Roles('owner')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: CreateBranchDto) {
     const member = assertMemberContext(ctx);
-    return this.branchesService.create(member.businessId, dto);
+    return this.branchesService.create(member.businessId, dto, member.memberId);
   }
 
   @Put(':id')
@@ -41,13 +41,13 @@ export class BranchesController {
     @Body() dto: UpdateBranchDto,
   ) {
     const member = assertMemberContext(ctx);
-    return this.branchesService.update(member.businessId, id, dto);
+    return this.branchesService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Delete(':id')
   @Roles('owner')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.branchesService.remove(member.businessId, id);
+    return this.branchesService.remove(member.businessId, id, member.memberId);
   }
 }

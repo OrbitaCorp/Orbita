@@ -53,3 +53,5 @@ TRUST_PROXY_HOPS: "2"
 # PLATFORM_ADMIN_LOGS_RETENTION_DAYS: "365"
 # AUDIT_LOGS_RETENTION_DAYS: "365"
 # EMAIL_LOGS_RETENTION_DAYS: "180"
+# Mails a clientes (individuales y masivos) por negocio y por día de Argentina, contando email_logs (hallazgo mail-masivo-sin-tope). Mínimo 50; comentada = el default de customers.service.ts.
+# MAIL_MASIVO_TOPE_DIARIO: "500"

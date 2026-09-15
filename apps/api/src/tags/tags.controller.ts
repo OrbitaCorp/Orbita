@@ -20,20 +20,20 @@ export class TagsController {
   @RequirePermission('catalog.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertTagDto) {
     const member = assertMemberContext(ctx);
-    return this.tagsService.create(member.businessId, dto);
+    return this.tagsService.create(member.businessId, dto, member.memberId);
   }
 
   @Put(':id')
   @RequirePermission('catalog.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertTagDto) {
     const member = assertMemberContext(ctx);
-    return this.tagsService.update(member.businessId, id, dto);
+    return this.tagsService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Delete(':id')
   @RequirePermission('catalog.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.tagsService.remove(member.businessId, id);
+    return this.tagsService.remove(member.businessId, id, member.memberId);
   }
 }

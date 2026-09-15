@@ -8,6 +8,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
 import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
+import { AuditService } from '../audit/audit.service';
+
+// Lo que vale la pena ver en el registro de auditoría de una categoría
+// (hallazgo `auditoria-acciones-sin-registro`). La posición queda afuera:
+// reordenar cambia varias a la vez y no es una acción sensible.
+const CAMPOS_AUDITADOS = ['name', 'slug', 'icon', 'color', 'imageUrl', 'parentId', 'isActive'];
 
 export interface CategoryListItem {
   id: string;
@@ -43,7 +49,11 @@ function assertSinCiclos(padreDe: Map<string, string | null>) {
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Registro de auditoría de alta, edición y baja. Opcional solo para los tests.
+    private readonly audit?: AuditService,
+  ) {}
 
   async findAll(businessId: string, flat?: boolean) {
     const categories = await this.prisma.category.findMany({
@@ -68,12 +78,13 @@ export class CategoriesService {
     return flat ? mapped : this.buildTree(mapped, null);
   }
 
-  async create(businessId: string, dto: UpsertCategoryDto) {
+  async create(businessId: string, dto: UpsertCategoryDto, actorId?: string) {
     if (dto.parentId) await this.validateParent(businessId, dto.parentId);
     const slug = this.resolveSlug(dto);
 
+    let creada;
     try {
-      return await this.prisma.category.create({
+      creada = await this.prisma.category.create({
         data: {
           businessId,
           name: dto.name,
@@ -88,10 +99,15 @@ export class CategoriesService {
     } catch (err) {
       throw this.mapSlugConflict(err);
     }
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'category', entityId: creada.id, action: 'CREATE',
+      changes: AuditService.diferencias({}, { ...creada }, CAMPOS_AUDITADOS),
+    });
+    return creada;
   }
 
-  async update(businessId: string, id: string, dto: UpsertCategoryDto) {
-    await this.findOneRaw(businessId, id);
+  async update(businessId: string, id: string, dto: UpsertCategoryDto, actorId?: string) {
+    const existente = await this.findOneRaw(businessId, id);
 
     if (dto.parentId) {
       if (dto.parentId === id) {
@@ -124,11 +140,17 @@ export class CategoriesService {
       throw this.mapSlugConflict(err);
     }
     if (result.count === 0) throw new NotFoundException('Categoría no encontrada');
-    return this.findOneRaw(businessId, id);
+    const actualizada = await this.findOneRaw(businessId, id);
+    // Solo lo que cambió de verdad (mismo criterio que productos y descuentos).
+    const cambios = AuditService.diferencias({ ...existente }, { ...actualizada }, CAMPOS_AUDITADOS);
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'category', entityId: id, action: 'UPDATE', changes: cambios });
+    }
+    return actualizada;
   }
 
-  async remove(businessId: string, id: string) {
-    await this.findOneRaw(businessId, id);
+  async remove(businessId: string, id: string, actorId?: string) {
+    const existente = await this.findOneRaw(businessId, id);
 
     const [productCount, childrenCount] = await Promise.all([
       this.prisma.product.count({ where: { categoryId: id, businessId, deletedAt: null } }),
@@ -142,6 +164,10 @@ export class CategoriesService {
 
     const { count } = await this.prisma.category.deleteMany({ where: { id, businessId } });
     if (count === 0) throw new NotFoundException('Categoría no encontrada');
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'category', entityId: id, action: 'DELETE',
+      changes: [{ field: 'name', before: existente.name, after: null }],
+    });
     return { ok: true };
   }
 

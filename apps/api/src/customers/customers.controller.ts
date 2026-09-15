@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -50,13 +51,20 @@ export class CustomersController {
   @RequirePermission('customers.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertCustomerDto) {
     const member = assertMemberContext(ctx);
-    return this.customersService.update(member.businessId, id, dto);
+    return this.customersService.update(member.businessId, id, dto, member.memberId);
   }
 
+  // Un solo endpoint para el mail individual (un customerId, desde el perfil)
+  // y el masivo (hasta 500, desde la lista). Throttle propio (hallazgo
+  // `mail-masivo-sin-tope`): con el global de 60/min se podían disparar 60
+  // masivos de 500 en un minuto. 30 POST por hora por IP alcanza para
+  // escribirle a clientes de a uno durante el día y para un par de campañas;
+  // el tope de destinatarios por día lo pone el service contando email_logs.
   @Post('email')
   @RequirePermission('customers.manage')
+  @Throttle({ default: { limit: 30, ttl: 3600000 } })
   sendEmail(@CurrentBusiness() ctx: AuthContext, @Body() dto: CustomerEmailDto) {
     const member = assertMemberContext(ctx);
-    return this.customersService.sendEmail(member.businessId, dto);
+    return this.customersService.sendEmail(member.businessId, dto, member.memberId);
   }
 }
