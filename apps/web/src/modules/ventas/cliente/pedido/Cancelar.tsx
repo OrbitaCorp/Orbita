@@ -11,6 +11,17 @@ import { meGetOrder, meCancelOrder, ApiError, type MeOrderDetail } from '@/lib/a
 
 const MOTIVOS_CANCELACION = ['Me arrepentí de la compra', 'El precio era demasiado alto', 'Encontré algo mejor', 'Error en la compra', 'Demoró mucho', 'Otro']
 
+// Compartido entre los CUATRO returns de esta pantalla (skeleton, "ya
+// pediste cancelar", "no se puede cancelar" y el formulario real) — el
+// padding angosto de mobile solo estaba en el último, así que los otros tres
+// se veían con el padding de escritorio en celular (mismo bug que en
+// ProductoDetalle.tsx/Devolucion.tsx).
+const CSS_CANCELAR = `
+  @media (max-width: 640px) {
+    .sf-can-wrap { padding: 20px 16px 48px !important; }
+  }
+`
+
 export default function CancelarPedido() {
   const router = useRouter()
   const { slug, id } = router.query as { slug: string; id: string }
@@ -58,7 +69,8 @@ export default function CancelarPedido() {
   if (cargando) {
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+        <style>{CSS_CANCELAR}</style>
+        <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 32, textAlign: 'center' }}>
             <SkeletonCircle size={56} style={{ margin: '0 auto 16px' }} />
@@ -105,7 +117,8 @@ export default function CancelarPedido() {
   if (solicitudPendiente) {
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
+        <style>{CSS_CANCELAR}</style>
+        <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Ya pediste cancelar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
             Está esperando que la tienda lo revise — te avisamos por email en cuanto se resuelva.
@@ -122,7 +135,8 @@ export default function CancelarPedido() {
   if (!puedeCancelarDirecto && !puedePedirCancelacion) {
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
+        <style>{CSS_CANCELAR}</style>
+        <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
             {config?.payment?.cancellationsEnabled === false ? 'Esta tienda no acepta cancelaciones' : 'Este pedido ya no se puede cancelar'}
           </div>
@@ -161,11 +175,7 @@ export default function CancelarPedido() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
-      <style>{`
-        @media (max-width: 640px) {
-          .sf-can-wrap { padding: 20px 16px 48px !important; }
-        }
-      `}</style>
+      <style>{CSS_CANCELAR}</style>
 
       <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[

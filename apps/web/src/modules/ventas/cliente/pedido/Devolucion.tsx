@@ -12,6 +12,19 @@ import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/
 
 const MOTIVOS = ['Talle incorrecto', 'No era lo que esperaba', 'Producto defectuoso', 'Me arrepentí', 'Otro']
 
+// Compartido entre el skeleton de carga y la pantalla real de más abajo —
+// esta página tiene dos returns, y el padding angosto de mobile solo estaba
+// en el segundo (mismo bug que en ProductoDetalle.tsx/CheckoutDatos.tsx,
+// acá sin desborde porque el contenido ya es de una sola columna, pero con
+// el salto visible del padding al terminar de cargar).
+const CSS_DEVOLUCION = `
+  @media (max-width: 768px) {
+    .sf-dev-wrap     { padding: 20px 16px 48px !important; }
+    .sf-dev-funciona { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-dev-motivos  { margin-left: 0 !important; }
+  }
+`
+
 function hueDeItem(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
@@ -79,7 +92,8 @@ export default function InicioDevolucion() {
   if (cargando) {
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+        <style>{CSS_DEVOLUCION}</style>
+        <div className="sf-dev-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <SkeletonText width={260} height={22} style={{ marginBottom: 8, borderRadius: 6 }} />
           <SkeletonText width={340} height={12} style={{ marginBottom: 28 }} />
@@ -215,13 +229,7 @@ export default function InicioDevolucion() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
-      <style>{`
-        @media (max-width: 768px) {
-          .sf-dev-wrap     { padding: 20px 16px 48px !important; }
-          .sf-dev-funciona { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-dev-motivos  { margin-left: 0 !important; }
-        }
-      `}</style>
+      <style>{CSS_DEVOLUCION}</style>
 
       <div className="sf-dev-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[

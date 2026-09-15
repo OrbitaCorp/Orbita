@@ -12,6 +12,25 @@ import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } fr
 import { saveCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 import { PromoChip } from '../../_shared/components'
 
+// En una constante y no inline en el return: esta pantalla tiene dos returns
+// (el skeleton de carga y el checkout real) y estas reglas vivían solo en el
+// segundo, así que la carga se veía con las dos columnas de escritorio en
+// celular. Mismo arreglo que ya tenía CheckoutPago.tsx, que lo resolvió
+// duplicando el bloque — acá se comparte, para que no queden dos copias de
+// los breakpoints que se puedan desincronizar.
+const CSS_CHECKOUT = `
+  @media (max-width: 768px) {
+    .sf-co-wrap   { padding: 24px 16px 48px !important; }
+    .sf-co-layout { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-co-aside  { position: static !important; }
+    .sf-co-2col   { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-co-3col   { grid-template-columns: 1fr 1fr !important; }
+  }
+  @media (max-width: 400px) {
+    .sf-co-3col { grid-template-columns: minmax(0,1fr) !important; }
+  }
+`
+
 export default function CheckoutDatos() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
@@ -157,17 +176,21 @@ export default function CheckoutDatos() {
             <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
           </div>
         </header>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
+        {/* Mismas clases y mismo css que el checkout real de más abajo (ver
+            CSS_CHECKOUT arriba): sin esto el skeleton se quedaba con las dos
+            columnas y el padding de escritorio en celular. */}
+        <style>{CSS_CHECKOUT}</style>
+        <div className="sf-co-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
           <CheckoutStepper step={1} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
+          <div className="sf-co-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
                 <SkeletonText width={160} height={16} style={{ marginBottom: 16, borderRadius: 5 }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
                   <Skeleton height={40} radius={8} delay={40} />
                   <Skeleton height={40} radius={8} delay={60} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <Skeleton height={40} radius={8} delay={80} />
                   <Skeleton height={40} radius={8} delay={100} />
                 </div>
@@ -214,18 +237,7 @@ export default function CheckoutDatos() {
         </div>
       </header>
 
-      <style>{`
-        @media (max-width: 768px) {
-          .sf-co-wrap   { padding: 24px 16px 48px !important; }
-          .sf-co-layout { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-co-aside  { position: static !important; }
-          .sf-co-2col   { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-co-3col   { grid-template-columns: 1fr 1fr !important; }
-        }
-        @media (max-width: 400px) {
-          .sf-co-3col { grid-template-columns: minmax(0,1fr) !important; }
-        }
-      `}</style>
+      <style>{CSS_CHECKOUT}</style>
       <div className="sf-co-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
         <CheckoutStepper step={1} />
         <div className="sf-co-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
