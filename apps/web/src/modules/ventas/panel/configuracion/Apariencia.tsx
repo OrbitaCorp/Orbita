@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, Image as ImageIcon } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Image as ImageIcon } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -19,6 +19,7 @@ import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
+import { LogoPicker } from './components/apariencia/LogoPicker'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
@@ -1065,6 +1066,76 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
                             <Inp value={ap.parallaxCtaLink} onChange={v => set('parallaxCtaLink', v)} />
                         </div>
+                    </SecCard>
+
+                    {/* Tira de marcas con las que trabaja el negocio — pedido
+                        explícito del dueño, con una tienda de referencia (una
+                        relojería: EUROTIME / QYQ / G-SHOCK / CASIO en gris,
+                        y la de abajo del mouse a color). Va acá y no en
+                        `tarjetasSecundarias` por el mismo motivo que el
+                        parallax: es una sección del home CLÁSICO, y con una
+                        plantilla activa la portada es asunto de la plantilla.
+                        El logo es opcional a propósito (ver LogoPicker y
+                        brand-item.dto.ts): sin logo, la tira dibuja el nombre
+                        en tipografía, que es justo como se ve la referencia. */}
+                    <SecCard id="ap-sec-marcas" title="Marcas con las que trabajás" icon={BadgeCheck}>
+                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                            Una tira que se desliza sola en el home, con las marcas que vendés. Se ven en gris y toman
+                            color cuando el visitante les pasa el mouse por encima. Necesita al menos una marca cargada
+                            para mostrarse.
+                        </p>
+                        <div style={{ marginBottom: 14 }}>
+                            <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarMarcas} onChange={v => set('mostrarMarcas', v)} />
+                        </div>
+                        <Divider />
+                        <FieldLabel help="El texto chiquito que va arriba de los logos.">Título de la sección</FieldLabel>
+                        <Inp value={ap.marcasTitulo} onChange={v => set('marcasTitulo', v)} maxLength={80} placeholder="Trabajamos con las mejores marcas" />
+                        <Divider />
+                        <FieldLabel help="El logo es opcional: sin logo se muestra el nombre escrito. El nombre siempre hace falta — es lo que leen los lectores de pantalla.">
+                            Marcas
+                        </FieldLabel>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                            {ap.marcas.map((m, i) => (
+                                <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                    <LogoPicker
+                                        value={m.logo}
+                                        nombre={m.name}
+                                        onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, logo: v } : x))}
+                                        onUpload={subirImagenApariencia}
+                                    />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <Inp
+                                            value={m.name}
+                                            onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, name: v } : x))}
+                                            maxLength={60}
+                                            placeholder="Nombre de la marca"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => set('marcas', ap.marcas.filter((_, j) => j !== i))}
+                                        title="Quitar"
+                                        aria-label={`Quitar ${m.name.trim() || 'esta marca'}`}
+                                        style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
+                                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Mismo tope que el DTO del backend (ArrayMaxSize(20)):
+                            si acá se pudieran cargar más, el guardado fallaría
+                            entero con un error de validación poco claro. */}
+                        {ap.marcas.length < 20 && (
+                            <button
+                                onClick={() => set('marcas', [...ap.marcas, { id: 'mk' + Date.now(), name: '', logo: null }])}
+                                className="ds-hover"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                            >
+                                <Plus size={14} strokeWidth={2} /> Agregar marca
+                            </button>
+                        )}
                     </SecCard>
 
                     {tarjetasSecundarias}

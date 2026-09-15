@@ -24,6 +24,20 @@ const PASOS: { status: string; label: string }[] = [
   { status: 'DELIVERED',  label: 'Entregado' },
 ]
 
+// En una constante y no inline en el return: esta pantalla tiene dos returns
+// (el skeleton de carga y el pedido real) y estas reglas vivían solo en el
+// segundo, así que la carga se veía con la columna de 360px de escritorio en
+// celular. Compartida así, no quedan dos copias de los breakpoints que se
+// puedan desincronizar con el tiempo (mismo criterio ya aplicado en
+// ProductoDetalle.tsx y CheckoutDatos.tsx).
+const CSS_SEGUIMIENTO = `
+  @media (max-width: 768px) {
+    .sf-seg-wrap   { padding: 20px 16px 48px !important; }
+    .sf-seg-layout { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-seg-sidebar { position: static !important; }
+  }
+`
+
 const ESTADO_UI: Record<string, { label: string; bg: string; color: string }> = {
   PENDING:    { label: 'Pendiente',      bg: 'var(--color-warning-bg)', color: '#B45309' },
   CONFIRMED:  { label: 'Confirmado',     bg: '#F0FDF4', color: '#15803D' },
@@ -132,9 +146,13 @@ export default function SeguimientoPedido() {
     // Contacto/Entrega/Comprobante (títulos + botones de 44px, no genéricos).
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+        {/* Mismas clases y mismo css que el pedido real de más abajo (ver
+            CSS_SEGUIMIENTO arriba): sin esto el skeleton se quedaba con la
+            columna de 360px de escritorio en celular. */}
+        <style>{CSS_SEGUIMIENTO}</style>
+        <div className="sf-seg-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={260} height={12} style={{ marginBottom: 24 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
+          <div className="sf-seg-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Encabezado: número + fecha, badge de estado */}
@@ -262,13 +280,7 @@ export default function SeguimientoPedido() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
-      <style>{`
-        @media (max-width: 768px) {
-          .sf-seg-wrap   { padding: 20px 16px 48px !important; }
-          .sf-seg-layout { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-seg-sidebar { position: static !important; }
-        }
-      `}</style>
+      <style>{CSS_SEGUIMIENTO}</style>
       <div className="sf-seg-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio', href: base },

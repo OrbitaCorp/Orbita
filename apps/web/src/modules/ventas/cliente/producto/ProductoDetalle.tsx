@@ -20,6 +20,50 @@ import {
 import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 
+// Responsive de la ficha. Vive acá arriba, en una constante, y NO inline en
+// el return: esta pantalla tiene dos returns (el skeleton de carga y la
+// ficha real) y antes estas reglas estaban solo en el segundo. El skeleton
+// quedaba con las dos columnas y el padding de escritorio SIEMPRE — en un
+// celular, la columna de 460px no entra y la carga se veía rota y con scroll
+// horizontal, justo antes de que el contenido real apareciera bien puesto
+// (reportado). Compartiendo la constante, además, no hay dos copias de los
+// breakpoints que se puedan desincronizar con el tiempo.
+const CSS_FICHA = `
+  @media (max-width: 768px) {
+    .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
+    .sf-pd-main     { grid-template-columns: minmax(0,1fr) !important; gap: 32px !important; }
+    /* align-items:flex-start viene del inline de .sf-pd-gallery
+       (pensado para la fila de escritorio, donde el cross-axis es
+       vertical) — en columna el cross-axis pasa a ser horizontal, así
+       que ese flex-start deja de "estirar" a los hijos y cada uno
+       pasa a medir su ancho de CONTENIDO en vez de ocupar todo el
+       ancho disponible. La foto principal (.sf-pd-img-main, un
+       div con width:100% adentro) queda sin un ancho real contra el
+       que resolver ese 100% y termina invisible (bug real, reportado
+       con captura: "no se ve la foto del detalle producto" en
+       responsive). stretch la vuelve a poner a ancho completo, que es
+       lo que ya pasaba en escritorio con flex-direction:row. */
+    .sf-pd-gallery  { flex-direction: column-reverse !important; align-items: stretch !important; gap: 10px !important; }
+    .sf-pd-thumbs   { flex-direction: row !important; overflow-x: auto; gap: 6px !important; flex-shrink: 1 !important; }
+    .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
+    .sf-pd-img-main > div { height: 300px !important; }
+    .sf-pd-belowimg { margin-left: 0 !important; }
+    .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
+    /* La silueta de la foto sigue los MISMOS altos que la foto real de
+       arriba: si el skeleton mide 560 y la foto 300, al terminar de
+       cargar la página pega un salto de 260px. El !important es para
+       ganarle al alto inline del componente Skeleton, igual que la
+       regla de .sf-pd-img-main de acá arriba con la foto real. */
+    .sf-pd-sk-img   { height: 300px !important; }
+  }
+  @media (max-width: 480px) {
+    .sf-pd-related  { grid-template-columns: minmax(0,1fr) !important; }
+    .sf-pd-img-main > div { height: 260px !important; }
+    .sf-pd-sk-img   { height: 260px !important; }
+  }
+`
+
 function fechaResenia(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -219,11 +263,15 @@ export default function ProductoDetalle() {
   if (cargando) {
     return (
       <StorefrontChrome tienda={tienda} config={config}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+        {/* Las MISMAS clases y el MISMO css que la ficha real de más abajo
+            (ver CSS_FICHA arriba): este es un return aparte, así que sin
+            esto se quedaba con las dos columnas de escritorio en celular. */}
+        <style>{CSS_FICHA}</style>
+        <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
+          <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <Skeleton width="100%" height={560} radius={14} />
+              <Skeleton width="100%" height={560} radius={14} className="sf-pd-sk-img" />
               <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <SkeletonText width={110} height={12} />
                 {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${70 - i * 6}%`} height={11} delay={i * 60} />)}
@@ -235,7 +283,10 @@ export default function ProductoDetalle() {
               <SkeletonText width="60%" height={12} delay={100} style={{ marginBottom: 20 }} />
               <SkeletonText width={140} height={30} delay={130} style={{ marginBottom: 24, borderRadius: 6 }} />
               <SkeletonText width={70} height={11} delay={160} style={{ marginBottom: 10 }} />
-              <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+              {/* flexWrap: cuatro talles de 48px entran en cualquier ancho,
+                  pero un producto con talles largos (XXL, 42/44) los dibuja
+                  más anchos y en un celular angosto se salían de la fila. */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
                 {[1, 2, 3, 4].map(i => <Skeleton key={i} width={48} height={40} radius={8} delay={160 + i * 40} />)}
               </div>
               <Skeleton width="100%" height={52} radius={10} delay={280} />
@@ -368,34 +419,7 @@ export default function ProductoDetalle() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
-      <style>{`
-        @media (max-width: 768px) {
-          .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
-          .sf-pd-main     { grid-template-columns: minmax(0,1fr) !important; gap: 32px !important; }
-          /* align-items:flex-start viene del inline de .sf-pd-gallery
-             (pensado para la fila de escritorio, donde el cross-axis es
-             vertical) — en columna el cross-axis pasa a ser horizontal, así
-             que ese flex-start deja de "estirar" a los hijos y cada uno
-             pasa a medir su ancho de CONTENIDO en vez de ocupar todo el
-             ancho disponible. La foto principal (.sf-pd-img-main, un
-             div con width:100% adentro) queda sin un ancho real contra el
-             que resolver ese 100% y termina invisible (bug real, reportado
-             con captura: "no se ve la foto del detalle producto" en
-             responsive). stretch la vuelve a poner a ancho completo, que es
-             lo que ya pasaba en escritorio con flex-direction:row. */
-          .sf-pd-gallery  { flex-direction: column-reverse !important; align-items: stretch !important; gap: 10px !important; }
-          .sf-pd-thumbs   { flex-direction: row !important; overflow-x: auto; gap: 6px !important; flex-shrink: 1 !important; }
-          .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
-          .sf-pd-img-main > div { height: 300px !important; }
-          .sf-pd-belowimg { margin-left: 0 !important; }
-          .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
-        }
-        @media (max-width: 480px) {
-          .sf-pd-related  { grid-template-columns: minmax(0,1fr) !important; }
-          .sf-pd-img-main > div { height: 260px !important; }
-        }
-      `}</style>
+      <style>{CSS_FICHA}</style>
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },

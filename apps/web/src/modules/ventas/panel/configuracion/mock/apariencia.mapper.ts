@@ -72,6 +72,15 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         parallaxSubtitle: ap.parallaxSubtitulo,
         parallaxCtaText: ap.parallaxCtaTexto,
         parallaxCtaLink: ap.parallaxCtaLink,
+        showBrands: ap.mostrarMarcas,
+        brandsTitle: ap.marcasTitulo,
+        // El DTO pide `logoUrl` string (o ausente), no null: una marca sin
+        // logo viaja sin la clave. Y las que quedaron sin nombre se filtran
+        // acá — una fila vacía en el panel no tiene por qué llegar a la
+        // tienda como un hueco en la tira.
+        brands: ap.marcas
+            .filter(m => m.name.trim() !== '')
+            .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo ? { logoUrl: m.logo } : {}) })),
         // Sin código no hay cupón: se manda null y la sección desaparece del
         // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
         // vez de eso se mandara el objeto con strings vacíos, el home
@@ -164,6 +173,16 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         parallaxSubtitulo: dto.parallaxSubtitle ?? defaults.parallaxSubtitulo,
         parallaxCtaTexto: dto.parallaxCtaText ?? defaults.parallaxCtaTexto,
         parallaxCtaLink: dto.parallaxCtaLink ?? defaults.parallaxCtaLink,
+        // ?? y no `dto.showBrands` pelado (a diferencia de los toggles
+        // viejos): entre el deploy del frontend en Vercel y el de la API a
+        // mano en Cloud Run hay unos minutos donde la API todavía no manda
+        // este campo. Sin el default, el toggle se dibujaría con `undefined`.
+        mostrarMarcas: dto.showBrands ?? defaults.mostrarMarcas,
+        marcasTitulo: dto.brandsTitle ?? defaults.marcasTitulo,
+        // Sin ?? defaults acá (a diferencia de `stats`): el default es [], y
+        // una tienda que borró todas sus marcas tiene que quedar en cero, no
+        // recuperar nada. `logo` vuelve a null si no vino.
+        marcas: (dto.brands ?? []).map(b => ({ id: b.id, name: b.name, logo: b.logoUrl || null })),
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
         seccionesPlantilla: dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla,

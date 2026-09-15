@@ -229,6 +229,13 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
         statsBar: [{ id: 's1', value: '+1.200', label: 'ventas realizadas' }],
         headerLinks: [{ id: 'catalogo', label: 'Catálogo', on: true }],
         parallaxCtaLink: '/catalogo',
+        brandsTitle: 'Trabajamos con las mejores marcas',
+        // Las dos formas válidas de una marca: con logo y sin logo (esta
+        // última se dibuja como texto en el home, ver brand-item.dto.ts).
+        brands: [
+          { id: 'mk1', name: 'Casio', logoUrl: 'https://hhaqlzrcskmwnvhgydon.supabase.co/storage/v1/object/public/business-logos/a/casio.webp' },
+          { id: 'mk2', name: 'G-Shock' },
+        ],
       }),
     ).toEqual([]);
   });
@@ -248,6 +255,17 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
     ['headerLayout', 'x;}body{display:none'],
   ])('UpdateStorefrontConfigDto rechaza %s = %j', async (campo, valor) => {
     expect(await errores(UpdateStorefrontConfigDto, { [campo]: valor })).toContain(campo);
+  });
+
+  it('acota la tira de marcas: 21 marcas, un logo que no es https, y una sin nombre', async () => {
+    const marca = (extra: Record<string, unknown> = {}) => ({ id: 'mk1', name: 'Casio', ...extra });
+    expect(await errores(UpdateStorefrontConfigDto, { brands: Array.from({ length: 21 }, (_, i) => marca({ id: `mk${i}` })) })).toContain('brands');
+    expect(await errores(UpdateStorefrontConfigDto, { brands: [marca({ logoUrl: 'javascript:alert(1)' })] })).toContain('brands');
+    expect(await errores(UpdateStorefrontConfigDto, { brands: [{ id: 'mk1' }] })).toContain('brands');
+    expect(await errores(UpdateStorefrontConfigDto, { brands: [marca({ name: 'x'.repeat(61) })] })).toContain('brands');
+    // El logo vacío tiene que pasar: es como queda una marca a la que le
+    // sacaron el logo desde el panel (URL_IMAGEN acepta '').
+    expect(await errores(UpdateStorefrontConfigDto, { brands: [marca({ logoUrl: '' })] })).toEqual([]);
   });
 
   it('rechaza 13 slides y un color de slide que no es hex', async () => {

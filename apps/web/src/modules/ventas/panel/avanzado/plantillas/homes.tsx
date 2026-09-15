@@ -1107,9 +1107,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <div style={{ padding: movil ? '30px 16px' : '48px 34px' }}>
             {/* Grilla del ancho de la cantidad real de categorías (2 a 4) —
                 con `cols(4,2)` fijo, una tienda con menos de 4 dejaba
-                columnas vacías a la derecha en vez de tiles más grandes. */}
+                columnas vacías a la derecha en vez de tiles más grandes. El
+                `.slice()` es el otro lado de la misma cuenta: sin él, una
+                tienda con MÁS de 4 (desde que el adaptador dejó de cortar a
+                4 categorías siempre, ver plantillaReal.ts) dejaba una
+                segunda fila a medio llenar — el mismo hueco, del otro lado. */}
             <div style={{ display: 'grid', gridTemplateColumns: movil ? `repeat(${Math.min(cats.length, 2)}, 1fr)` : `repeat(${Math.min(cats.length, 4)}, 1fr)`, gap: 12 }}>
-              {cats.map(([n, src, slug]) => (
+              {cats.slice(0, movil ? 2 : 4).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
                   onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
@@ -2807,8 +2811,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 30px' : '34px 44px 44px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
-              {cat.map(([n, src, slug]) => (
+            {/* colsDe (no `cols(4,2)` fijo) + el slice que lo acompaña: sin
+                esto, una tienda con más de 4 categorías dejaba una segunda
+                fila a medio llenar (el adaptador dejó de cortar a 4 siempre,
+                ver plantillaReal.ts) — mismo criterio que el resto de las
+                grillas de categorías. */}
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, cat.length, 2), gap: 12 }}>
+              {cat.slice(0, 4).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
                   onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}

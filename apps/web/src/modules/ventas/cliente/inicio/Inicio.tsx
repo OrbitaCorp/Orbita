@@ -1,6 +1,7 @@
 // src/modules/ventas/cliente/inicio/Inicio.tsx — Vista 01 (v3 editorial)
 
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
@@ -18,7 +19,7 @@ import { openWpp, columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/uti
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
-    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type ActiveGame, type ActivePromoModal,
+    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type StorefrontBrandItem, type ActiveGame, type ActivePromoModal,
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
@@ -244,6 +245,18 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
 
+    // ── Tira de marcas ──
+    // Se filtran las que quedaron sin nombre: el nombre es lo que se dibuja
+    // si no hay logo, y el `alt` si lo hay — sin él, la marca es un hueco.
+    // El panel ya filtra al guardar, pero una tienda pudo haber guardado
+    // antes de eso y acá no se puede confiar en el dato.
+    const marcas = (config?.appearance?.brands ?? []).filter(m => m.name.trim() !== '')
+    const tituloMarcas = (config?.appearance?.brandsTitle ?? '').trim()
+    // Con pocas marcas el loop no tiene sentido (ver el render). El corte es
+    // más alto que el de categorías porque cada marca ocupa bastante más
+    // ancho que una pastilla de categoría.
+    const marcasEnMarquee = marcas.length > 5
+
     // "Grilla de productos" de Apariencia (gridLayout) — hasta acá esta
     // página nunca la leía: los 5 estantes de abajo (Destacados/Nuevos
     // ingresos/Más vendidos/Lanzamientos/Más para vos) quedaban siempre en 4
@@ -361,6 +374,37 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 36s linear infinite; }
                 .sf-marquee-track:hover { animation-play-state:paused; }
                 .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
+                /* "Menos movimiento" del sistema: se frena. Acá además se
+                   habilita el scroll a mano, a diferencia del cartel de
+                   AnnouncementBar (que congelado se sigue leyendo entero):
+                   una tira congelada se come las categorías/marcas que
+                   quedaron fuera de pantalla, así que tiene que haber forma
+                   de llegar a ellas sin la animación. */
+                @media (prefers-reduced-motion: reduce) {
+                    .sf-marquee-track { animation:none; }
+                    .sf-marquee-wrap  { overflow-x:auto; }
+                }
+
+                /* ── Tira de marcas ── (Apariencia → "Marcas con las que
+                   trabajás"). Gris y a color al pasar el mouse, como la
+                   tienda de referencia del pedido.
+                   El tratamiento gris vive adentro del media query de
+                   hover:hover a propósito: en un celular no hay con qué
+                   "pasar el mouse", así que dejarlo gris sería un logo peor
+                   para siempre — ahí van a color de entrada. Mismo criterio
+                   que los íconos flotantes de la ProductCard (globals.css).
+                   Se mueven filter/opacity/color y NO el tamaño: el hover no
+                   puede correr de lugar a los logos de al lado. */
+                .sf-marcas { background:var(--color-surface); border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); padding:30px 0 34px; margin-bottom:52px; }
+                .sf-marcas-volanta { font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-muted); text-align:center; margin-bottom:22px; }
+                .sf-marca { display:flex; align-items:center; justify-content:center; height:46px; padding:0 10px; flex-shrink:0; }
+                .sf-marca-img { max-height:46px; max-width:150px; width:auto; object-fit:contain; display:block; transition:filter 260ms ease, opacity 260ms ease; }
+                .sf-marca-txt { font-family:var(--font-heading, inherit); font-size:23px; font-weight:600; letter-spacing:0.02em; white-space:nowrap; color:var(--color-muted); transition:color 260ms ease; }
+                @media (hover:hover) {
+                    .sf-marca-img { filter:grayscale(1); opacity:0.55; }
+                    .sf-marca:hover .sf-marca-img { filter:grayscale(0); opacity:1; }
+                    .sf-marca:hover .sf-marca-txt { color:var(--color-primary); }
+                }
 
                 /* ── Estilos de la sección de categorías (Apariencia →
                    "Estilo de las categorías", ver SeccionCategorias) ──
@@ -520,6 +564,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 @media(max-width:640px){
                     .sf-w          { padding:0 16px }
                     .sf-g4         { gap:10px }
+                    .sf-marcas     { padding:22px 0 24px; margin-bottom:32px }
+                    .sf-marcas-volanta { margin-bottom:16px }
+                    .sf-marca      { height:36px; padding:0 6px }
+                    .sf-marca-img  { max-height:36px; max-width:104px }
+                    .sf-marca-txt  { font-size:18px }
                     .sf-hero-grid  { padding:0 20px }
                     .sf-hero-inner { min-height:420px; padding-top:40px; padding-bottom:40px }
                     /* Bajan de "centradas a media altura" (donde el texto
@@ -752,6 +801,33 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 </section>
             )}
 
+            {/* ══ TIRA DE MARCAS ══ — "Trabajamos con las mejores marcas":
+                los logos en gris, a color al pasar el mouse (ver el CSS de
+                .sf-marca arriba). Editable en Apariencia → "Marcas con las
+                que trabajás".
+                Mismo gate que el parallax: no alcanza con el toggle, tiene
+                que haber al menos una marca cargada — si no sería una franja
+                con un título y nada abajo.
+                Va acá abajo, cerca del pie, y no debajo del hero: la barra de
+                stats ya ocupa ese lugar (el de "señal de confianza apenas
+                entrás") y dos franjas seguidas compitiendo se anulan. */}
+            {(config?.appearance?.showBrands ?? false) && marcas.length > 0 && (
+                <section className="sf-marcas">
+                    {tituloMarcas && <div className="sf-marcas-volanta">{tituloMarcas}</div>}
+                    {marcasEnMarquee ? (
+                        // Un poco más lenta que la de categorías (36s): estas
+                        // no se tocan, se leen al pasar — y son menos ítems,
+                        // así que a la misma velocidad se sentía apurada.
+                        <MarqueeLoop items={marcas} gap={26} duracion={48} render={(m, key) => <MarcaItem key={key} m={m} />} />
+                    ) : (
+                        // Pocas marcas: quietas y centradas. Un loop de tres
+                        // logos es un movimiento que no aporta nada.
+                        <div className="sf-w" style={{ display: 'flex', gap: 26, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {marcas.map(m => <MarcaItem key={m.id} m={m} />)}
+                        </div>
+                    )}
+                </section>
+            )}
 
             {/* ══ BANNER WHATSAPP ══ */}
             {config?.appearance?.showWhatsapp !== false && tienda.wpp && (
@@ -1496,40 +1572,67 @@ function CatCirculos({ cats, go }: { cats: CatVisual[]; go: (p: string) => void 
     )
 }
 
-function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
-    const isMarquee = cats.length > CAT_MIN_MARQUEE
+// ─── Una marca de la tira ─────────────────────────────────────────────────
+// Con logo cargado se dibuja el logo (y el nombre queda en el `alt`, que es
+// lo que leen los lectores de pantalla y lo que se ve si la imagen no carga);
+// sin logo, el nombre en tipografía — que no es un fallback pobre, es como se
+// ve la tienda de referencia del pedido (puras palabras en gris, la de abajo
+// del mouse a color).
+//
+// No es un enlace a propósito: Órbita no tiene filtro por marca, así que
+// hacerlo clickeable prometería una página que no existe.
+function MarcaItem({ m }: { m: StorefrontBrandItem }) {
+    return (
+        <div className="sf-marca">
+            {m.logoUrl
+                ? <img className="sf-marca-img" src={m.logoUrl} alt={m.name} loading="lazy" />
+                : <span className="sf-marca-txt">{m.name}</span>}
+        </div>
+    )
+}
 
-    // El truco del loop sin costuras es matemáticamente simple (duplicar el
-    // contenido y animar de 0% a -50%: al llegar al final, la segunda copia
-    // queda pixel a pixel donde arrancó la primera, así que el reinicio del
-    // `infinite` de CSS es invisible) — pero con POCAS categorías y pantalla
-    // ANCHA, 2 copias fijas no alcanzan: se llega a ver el set completo Y el
-    // arranque de la repetición al mismo tiempo, y el ojo lee eso como "se
-    // cortó y reinició" aunque el CSS nunca dé un salto real (bug reportado:
-    // con 6 categorías en una pantalla grande, se notaba clarísimo).
-    //
-    // Se mide el ancho real del contenedor y de UN set de categorías, y se
-    // repite ese set las veces que hagan falta para que el track completo
-    // mida siempre al menos el DOBLE del contenedor visible — así queda
-    // garantizado que en todo momento hay contenido de sobra afuera de los
-    // dos lados, sea cual sea la cantidad de categorías o el ancho de
-    // pantalla. La animación sigue siendo 0%→-50% sin tocar el CSS: en vez
-    // de 2 copias de `cats`, son 2 mitades idénticas, cada una con
-    // `repeticiones` copias adentro — el punto medio del track sigue siendo
-    // exactamente donde arrancó, la métrica no cambia, solo lo que hay
-    // adentro de cada mitad.
+// ─── Marquee en loop, sin costura ─────────────────────────────────────────
+// La mecánica compartida por el carrusel de categorías y la tira de marcas.
+// Está acá una sola vez a propósito: la cuenta de abajo salió de un bug
+// concreto y es lo bastante sutil como para que tenerla duplicada signifique
+// arreglarla dos veces la próxima.
+//
+// El truco del loop sin costuras es matemáticamente simple (duplicar el
+// contenido y animar de 0% a -50%: al llegar al final, la segunda copia
+// queda pixel a pixel donde arrancó la primera, así que el reinicio del
+// `infinite` de CSS es invisible) — pero con POCOS items y pantalla ANCHA,
+// 2 copias fijas no alcanzan: se llega a ver el set completo Y el arranque
+// de la repetición al mismo tiempo, y el ojo lee eso como "se cortó y
+// reinició" aunque el CSS nunca dé un salto real (bug reportado: con 6
+// categorías en una pantalla grande, se notaba clarísimo).
+//
+// Se mide el ancho real del contenedor y de UN set, y se repite ese set las
+// veces que hagan falta para que el track completo mida siempre al menos el
+// DOBLE del contenedor visible — así queda garantizado que en todo momento
+// hay contenido de sobra afuera de los dos lados, sea cual sea la cantidad
+// de items o el ancho de pantalla. La animación sigue siendo 0%→-50% sin
+// tocar el CSS: en vez de 2 copias del set, son 2 mitades idénticas, cada
+// una con `repeticiones` copias adentro — el punto medio del track sigue
+// siendo exactamente donde arrancó, la métrica no cambia, solo lo que hay
+// adentro de cada mitad.
+function MarqueeLoop<T>({ items, gap, duracion, render }: {
+    items: T[]
+    gap: number
+    /** Segundos de una vuelta entera. Sin esto manda el CSS (.sf-marquee-track). */
+    duracion?: number
+    render: (item: T, key: string) => ReactNode
+}) {
     const wrapRef = useRef<HTMLDivElement>(null)
-    // Ojo acá: este ref mide el ancho de UN set de categorías — tiene que
-    // apuntar a un elemento que SIEMPRE tenga exactamente una copia adentro,
-    // separado del track visible (que sí crece con `repeticiones`). Si
-    // midiera el track visible, la cuenta se retroalimentaría sola: al
-    // recalcular en un resize, ya no mediría "un set" sino "un set ×
-    // repeticiones anterior", y el resultado se iría de rango.
+    // Ojo acá: este ref mide el ancho de UN set — tiene que apuntar a un
+    // elemento que SIEMPRE tenga exactamente una copia adentro, separado del
+    // track visible (que sí crece con `repeticiones`). Si midiera el track
+    // visible, la cuenta se retroalimentaría sola: al recalcular en un
+    // resize, ya no mediría "un set" sino "un set × repeticiones anterior",
+    // y el resultado se iría de rango.
     const medidorRef = useRef<HTMLDivElement>(null)
     const [repeticiones, setRepeticiones] = useState(1)
 
     useEffect(() => {
-        if (!isMarquee) return
         const medir = () => {
             const anchoVisible = wrapRef.current?.clientWidth ?? 0
             const anchoSet = medidorRef.current?.scrollWidth ?? 0
@@ -1539,7 +1642,39 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
         medir()
         window.addEventListener('resize', medir)
         return () => window.removeEventListener('resize', medir)
-    }, [isMarquee, cats.length])
+    }, [items.length])
+
+    return (
+        <div className="sf-marquee-wrap" ref={wrapRef}>
+            {/* Medidor invisible: exactamente UN set, siempre — nunca crece
+                con `repeticiones`. Fuera de flujo (absolute + visibility:
+                hidden) para no ocupar espacio ni tapar nada, pero conserva su
+                ancho real para poder medirlo. */}
+            <div
+                ref={medidorRef}
+                aria-hidden
+                style={{ display: 'flex', gap, position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}
+            >
+                {items.map((x, i) => render(x, `medidor-${i}`))}
+            </div>
+
+            <div className="sf-marquee-track" style={duracion ? { animationDuration: `${duracion}s` } : undefined}>
+                {/* Dos mitades idénticas (loop sin costura) — cada una con
+                    `repeticiones` copias del set, calculadas arriba. */}
+                {[0, 1].map(mitad => (
+                    <div key={mitad} style={{ display: 'flex', gap }}>
+                        {Array.from({ length: repeticiones }).flatMap((_, r) =>
+                            items.map((x, i) => render(x, `${i}-${mitad}-${r}`)),
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    const isMarquee = cats.length > CAT_MIN_MARQUEE
 
     // El encabezado (título + "Ver todas") lo pone SeccionCategorias, que es
     // común a los 6 estilos — acá queda solo el cuerpo.
@@ -1547,31 +1682,7 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
         <>
             {isMarquee ? (
                 /* ── Marquee automático ── */
-                <div className="sf-marquee-wrap" ref={wrapRef} style={{ paddingLeft: 0 }}>
-                    {/* Medidor invisible: exactamente UN set, siempre — nunca
-                        crece con `repeticiones`. Fuera de flujo (absolute +
-                        visibility:hidden) para no ocupar espacio ni tapar nada,
-                        pero conserva su ancho real para poder medirlo. */}
-                    <div
-                        ref={medidorRef}
-                        aria-hidden
-                        style={{ display: 'flex', gap: 8, position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}
-                    >
-                        {cats.map(c => <CatPill key={c.id} c={c} go={go} />)}
-                    </div>
-
-                    <div className="sf-marquee-track">
-                        {/* Dos mitades idénticas (loop sin costura) — cada una
-                            con `repeticiones` copias del set, calculadas arriba. */}
-                        {[0, 1].map(mitad => (
-                            <div key={mitad} style={{ display: 'flex', gap: 8 }}>
-                                {Array.from({ length: repeticiones }).flatMap((_, r) =>
-                                    cats.map(c => <CatPill key={`${c.id}-${mitad}-${r}`} c={c} go={go} />),
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <MarqueeLoop items={cats} gap={8} render={(c, key) => <CatPill key={key} c={c} go={go} />} />
             ) : (
                 /* ── Scroll estático si ≤ 4 ── */
                 <div className="sf-w">

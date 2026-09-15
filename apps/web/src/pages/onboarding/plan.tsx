@@ -98,16 +98,39 @@ function MercadoPagoLogo({ size = 22 }: { size?: number }) {
 
 function Header() {
   return (
-    <div style={{
+    <div className="ob-hd" style={{
       position: 'sticky', top: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', height: 56, padding: '0 28px',
+      display: 'flex', alignItems: 'center', height: 56,
       background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
     }}>
-      <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8 }}>
+      {/* Responsive de esta pantalla, todo junto acá (el resto del archivo son
+          estilos inline, que no admiten media queries).
+
+          El stepper estaba centrado con position:absolute, o sea FUERA de
+          flujo: en celular no había forma de que empujara al logo, así que se
+          le montaba encima y tapaba la "a" de Órbita (reportado con captura).
+          De 560px para abajo deja de estar centrado, pasa a flujo normal
+          contra la derecha, y el paso ya terminado se queda solo con su
+          tilde — el nombre del paso actual alcanza para ubicarse, y justo
+          abajo el wizard repite "Pago · 6 de 6". */}
+      <style>{`
+        .ob-hd { padding: 0 28px; }
+        .ob-hd-pasos { position: absolute; left: 50%; transform: translateX(-50%); }
+        .ob-caja { padding: 24px 28px 20px; }
+        .ob-pagina { padding: 52px 24px 80px; }
+        @media (max-width: 560px) {
+          .ob-hd { padding: 0 14px; }
+          .ob-hd-pasos { position: static; transform: none; margin-left: auto; }
+          .ob-hd-hecho { display: none; }
+          .ob-caja { padding: 18px 18px 16px; }
+          .ob-pagina { padding: 32px 16px 64px; }
+        }
+      `}</style>
+      <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8, flexShrink: 0 }}>
         <OrbitaLogo size={24} />
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
       </a>
-      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="ob-hd-pasos" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {PASOS.map((paso, i) => {
           const done    = i < 1
           const current = i === 1
@@ -123,10 +146,13 @@ function Header() {
                 }}>
                   {done ? <Check size={11} strokeWidth={3} /> : i + 1}
                 </div>
-                <span style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: current ? 'var(--color-text)' : done ? '#10B981' : 'var(--color-subtle)',
-                }}>
+                <span
+                  className={done ? 'ob-hd-hecho' : undefined}
+                  style={{
+                    fontSize: 13, fontWeight: 600,
+                    color: current ? 'var(--color-text)' : done ? '#10B981' : 'var(--color-subtle)',
+                  }}
+                >
                   {paso}
                 </span>
               </div>
@@ -282,9 +308,8 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
       {/* La barra única del onboarding, con todo tildado menos el pago: el
           mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
       <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={5} />
-      <div style={{
+      <div className="ob-pagina" style={{
         maxWidth: 520, margin: '0 auto',
-        padding: '52px 24px 80px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
         <div style={{
@@ -321,22 +346,30 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
           overflow: 'hidden',
           boxShadow: '0 8px 32px rgba(37,99,235,0.12)',
         }}>
-          <div style={{
+          <div className="ob-caja" style={{
             background: 'linear-gradient(135deg, #1e3a8a 0%, #2563EB 100%)',
-            padding: '24px 28px 20px',
             position: 'relative',
           }}>
+            {/* El badge estaba en position:absolute arriba a la derecha y en
+                celular se comía "Tus primeros 3 meses", que arranca a la
+                izquierda (reportado con captura). Ahora los dos comparten una
+                fila que envuelve: cuando no entran juntos, el badge baja a su
+                propio renglón en vez de superponerse. */}
             <div style={{
-              position: 'absolute', top: 16, right: 16,
-              background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)',
-              borderRadius: 999, padding: '4px 12px',
-              fontSize: 11, fontWeight: 700, color: 'white',
-              border: '1px solid rgba(255,255,255,0.25)',
+              display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+              justifyContent: 'space-between', gap: 8, marginBottom: 8,
             }}>
-              ✦ BENEFICIO DE BIENVENIDA
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-              Tus primeros 3 meses
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+                Tus primeros 3 meses
+              </div>
+              <div style={{
+                background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)',
+                borderRadius: 999, padding: '4px 12px',
+                fontSize: 11, fontWeight: 700, color: 'white',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}>
+                ✦ BENEFICIO DE BIENVENIDA
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
@@ -732,9 +765,8 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
 
       <Header />
 
-      <div style={{
+      <div className="ob-pagina" style={{
         maxWidth: 480, margin: '0 auto',
-        padding: '52px 24px 80px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
 

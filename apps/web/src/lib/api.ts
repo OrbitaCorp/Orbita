@@ -975,6 +975,10 @@ export type ApiHeroSlide = {
 }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
 export type ApiStatsBarItem = { id: string; value: string; label: string }
+// Marca de la tira del home. Sin `logoUrl` (o vacío) se dibuja el nombre en
+// tipografía, no un hueco — por eso es opcional, igual que en el DTO del
+// backend (ver brand-item.dto.ts en apps/api).
+export type ApiBrandItem = { id: string; name: string; logoUrl?: string }
 
 export type ApiAppearanceConfig = {
   storeName: string | null
@@ -1033,6 +1037,9 @@ export type ApiAppearanceConfig = {
   // parallax (fondo fijo mientras el resto de la página se desplaza) —
   // ver Apariencia.tsx § "Banner con efecto parallax".
   showParallaxBanner: boolean
+  // Tira de marcas con las que trabaja el negocio (gris, a color al pasar el
+  // mouse) — ver Apariencia.tsx § "Marcas con las que trabajás".
+  showBrands: boolean
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null
@@ -1041,6 +1048,8 @@ export type ApiAppearanceConfig = {
   parallaxSubtitle: string | null
   parallaxCtaText: string | null
   parallaxCtaLink: string | null
+  brandsTitle: string | null
+  brands: ApiBrandItem[] | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

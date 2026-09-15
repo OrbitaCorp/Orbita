@@ -330,6 +330,7 @@ export class StorefrontService {
             announcementScroll: appearance.announcementScroll,
             showStatsBar: appearance.showStatsBar,
             showParallaxBanner: appearance.showParallaxBanner,
+            showBrands: appearance.showBrands,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
             statsBar: appearance.statsBar ?? [],
@@ -338,6 +339,11 @@ export class StorefrontService {
             parallaxSubtitle: appearance.parallaxSubtitle,
             parallaxCtaText: appearance.parallaxCtaText,
             parallaxCtaLink: appearance.parallaxCtaLink,
+            brandsTitle: appearance.brandsTitle,
+            // [] y no null, mismo criterio que statsBar/heroSlides: el
+            // storefront pregunta por `.length`, no tiene que defenderse
+            // además del null de una tienda que nunca cargó ninguna.
+            brands: appearance.brands ?? [],
           }
         : null,
       contact: contact

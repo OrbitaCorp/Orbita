@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { HeroSlideDto } from './hero-slide.dto';
 import { HeaderLinkDto } from './header-link.dto';
 import { StatsBarItemDto } from './stats-bar-item.dto';
+import { BrandItemDto } from './brand-item.dto';
 import { HomeTemplateDataDto } from './home-template-data.dto';
 import { URL_IMAGEN, URL_IMAGEN_MENSAJE } from './url-imagen';
 
@@ -92,6 +93,7 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() announcementScroll?: boolean;
   @IsOptional() @IsBoolean() showStatsBar?: boolean;
   @IsOptional() @IsBoolean() showParallaxBanner?: boolean;
+  @IsOptional() @IsBoolean() showBrands?: boolean;
 
   @IsOptional() @IsString() @MaxLength(200) shippingText?: string;
   @IsOptional() @IsString() @MaxLength(500) whatsappText?: string;
@@ -109,4 +111,15 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsString() @MaxLength(300) parallaxSubtitle?: string;
   @IsOptional() @IsString() @MaxLength(60) parallaxCtaText?: string;
   @IsOptional() @IsString() @MaxLength(500) parallaxCtaLink?: string;
+
+  // Tira de marcas — mismo criterio de tope que statsBar: holgado contra lo
+  // que tiene sentido mostrar en una fila que además se repite en loop.
+  @IsOptional() @IsString() @MaxLength(80) brandsTitle?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => BrandItemDto)
+  brands?: BrandItemDto[];
 }
