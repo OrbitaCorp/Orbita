@@ -682,7 +682,7 @@ const HALLAZGOS: SeedItem[] = [
     ['Definido qué se borra, qué se anonimiza y qué se conserva por obligación fiscal', 'Flujo de baja (pedido del dueño o acción del super admin) que deja la tienda fuera de línea y cancela la suscripción en MercadoPago', 'Documentado en los términos y en la política de privacidad'],
     { ruta: 'businesses.controller.ts:164 · subscriptions.service.ts' }),
   hallazgo('sucursal-principal-doble', G_INT, 'BAJA', '"Sucursal principal" tiene dos definiciones',
-    'Productos e inventario usan la sucursal marcada isDefault; la tienda (sucursalDeVenta) y los pedidos del panel sin branch_id usan la más antigua. Hoy coinciden porque la principal es la que crea el alta. Si alguna vez se reasigna, se separan: el panel carga stock en una y la tienda vende contra otra, mostrando sin stock productos que sí tienen.',
+    'Productos e inventario usan la sucursal marcada isDefault; la tienda (sucursalDeVenta) y los pedidos del panel sin branch_id usan la más antigua. Hoy coinciden porque la principal es la que crea el alta. Si alguna vez se reasigna, se separan: el panel carga stock en una y la tienda vende contra otra, mostrando sin stock productos que sí tienen. Postergado el 15/09 por decisión de Ale: multi-sucursal está en "próximamente" y esto se resuelve junto con ese alta, no antes.',
     ['Una sola definición (isDefault) en products, inventory, orders y storefront', 'Test que lo fije'],
     { ruta: 'storefront.service.ts#sucursalDeVenta · orders.service.ts:565 · products.service.ts#getDefaultBranch · inventory.service.ts#getDefaultBranch' }),
   hallazgo('domains-webhook-compra', G_INT, 'MEDIA', 'La compra de dominios podía pagarse con un cobro ajeno o comprarse dos veces',
