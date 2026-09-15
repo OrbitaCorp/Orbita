@@ -789,6 +789,36 @@ texto del botón sí es de la plantilla y va editable; el número de WhatsApp, e
 email, el horario y el CUIT no — tenerlos en dos lados garantiza que un día no
 coincidan. Lo mismo que ya vale para el pie (punto 5).
 
+### 18. La plantilla se diseña para un rubro, pero la aplica cualquiera
+
+Papelería encabezaba sus categorías con **"Buscá por rubro"** — jerga de
+librería — y eso terminó arriba de "Camisas street" en una tienda de ropa que
+le gustó el diseño. Lo mismo con "¿Cuántos meses tiene?" (Crecer),
+"Departamentos" y "Entrá por rubro" (Corralón), "Por familia" (Nítida).
+
+Esto es fácil de no ver, porque **en la vitrina se lee perfecto**: ahí la
+plantilla viene con su marca de muestra y sus productos de muestra, todos del
+mismo rubro. El texto solo desentona cuando lo aplica un negocio de otra cosa
+— que es el caso normal, no la excepción.
+
+**Regla: un `porDefecto` que nombra el rubro necesita su `porDefectoReal`.**
+La vitrina sigue mostrando la versión sabrosa —es lo que le da personalidad a
+la plantilla y ayuda al dueño a elegirla— y la tienda real muestra la neutra.
+El editor precarga la neutra, porque edita la tienda, no la vitrina.
+
+No confundir con `afirmacion` (punto 8), aunque el mecanismo sea parecido:
+
+| | Qué pasa | Qué se hace |
+|---|---|---|
+| `afirmacion` | Promete algo que puede ser falso | Se calla hasta que lo escriban |
+| `porDefectoReal` | No es falso, pero asume el rubro | Se reemplaza por una versión neutra |
+
+Callarse no serviría acá: la sección se quedaría sin encabezado.
+
+**La prueba:** leer el texto imaginando la plantilla aplicada en una tienda de
+otro rubro. Si "Buscá por rubro" arriba de "Camisas street" suena raro, hace
+falta la versión neutra.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -843,6 +873,8 @@ coincidan. Lo mismo que ya vale para el pie (punto 5).
 | Un precio escrito a mano en la portada | La lista sugerida se cargaba como texto `producto \| precio` | Si el dato vive en el catálogo, se elige (`seleccion`), no se escribe |
 | Dos huecos a la derecha en la grilla de categorías | `cols(6)` fijo contra las categorías que el negocio tenga (cuatro) | `colsDe(max, cuantas, movil)` + `.slice(0, max)`: la grilla se reparte entre las que haya |
 | Un botón de WhatsApp que no abría nada | Se dibujó como `<span>` decorativo al maquetar la sección | Que abra `acciones.abrirWhatsapp`; el número sale de Configuración, no se pide en la plantilla |
+
+| "Buscá por rubro" arriba de "Camisas street" | El `porDefecto` estaba escrito para el rubro de la maqueta, y en la vitrina se leía bien | `porDefectoReal` con la versión neutra: la vitrina conserva la sabrosa, la tienda muestra la neutra |
 
 ## Convenciones del repo
 
