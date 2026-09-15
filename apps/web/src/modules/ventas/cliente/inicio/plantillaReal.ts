@@ -15,10 +15,14 @@
 
 import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import type { ContenidoSecciones, Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import type { ContenidoSecciones, ItemPie, Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
-import { thumbGradient, fmt } from '@/lib/storefront/utils'
-import type { StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
+import { thumbGradient, fmt, urlRedSocial } from '@/lib/storefront/utils'
+import type { StorefrontConfigResponse, StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
+
+// El bloque de contacto de la config (Instagram, horario...). Se usa para el
+// pie: las redes que el negocio cargó de verdad, no tres globitos decorativos.
+type Contacto = NonNullable<StorefrontConfigResponse['contact']>
 
 type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null }
 
@@ -145,6 +149,7 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
     img: p.imgUrl ?? thumbGradient(p.hue),
     img2: p.imgUrl2 ?? undefined,
     slug: p.id,
+    cat: p.cat || undefined,
     precio: fmt(p.precio),
     antes: p.precioAnt ? fmt(p.precioAnt) : undefined,
     transfer: conTransferencia ? `${fmt(conTransferencia)} con transferencia` : undefined,
@@ -181,9 +186,15 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
  */
 export function plantillaReal({
   base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
-  marca, tagline, secciones,
+  marca, tagline, secciones, baseUrl, contacto, mostrarPie = true,
 }: {
   base: Plantilla
+  // La raíz de la tienda (`/tienda/<slug>`) y el contacto del negocio: los
+  // necesita el pie para armar enlaces que naveguen de verdad.
+  baseUrl: string
+  contacto?: Contacto | null
+  // El toggle "Mostrar footer" de Apariencia.
+  mostrarPie?: boolean
   // El nombre real del negocio y su bajada. Hacen falta desde que las
   // plantillas dibujan su PROPIO header y su propio pie (ver `headerPropio`
   // en tipos.ts): esos bloques escriben `p.marca`, que en la vitrina es la
@@ -249,6 +260,7 @@ export function plantillaReal({
     // en blanco, que se ve peor que no tener cupón.
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
     productos: destacados.map(p => aProductoPlantilla(p, transferPct)),
+    catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
     productosSecundarios: masVendidos.map(p => aProductoPlantilla(p, transferPct)),
     // Sin slides editados, se queda con los de muestra de `base` (mismo
     // criterio que categorías/cupón: no dejar la sección vacía si el negocio
@@ -256,5 +268,63 @@ export function plantillaReal({
     ...(base.heroPropio && heroSlides && heroSlides.length > 0
       ? { slides: heroSlides.map(aSlidePlantilla) }
       : {}),
+    // El pie: el DISEÑO sigue siendo el de la plantilla (lo pone su `tema`),
+    // pero el contenido pasa a ser el real. Antes quedaba el de la maqueta:
+    // categorías que la tienda no tiene, enlaces que no navegaban a ningún
+    // lado (eran `<div>`, no `<a>`) y cierres inventados como
+    // "CUIT 30-71234567-8" o "Local en Av. Rivadavia 4820" — mostrados en
+    // tiendas de verdad. Las columnas son las MISMAS que el pie normal de
+    // Órbita (StorefrontFooter), para que la tienda diga lo mismo esté la
+    // plantilla que esté.
+    pie: pieReal({ base: baseUrl, cats, contacto }),
+    ocultarPie: !mostrarPie,
+  }
+}
+
+// Las columnas del pie con datos reales. `Categorías` solo aparece si la
+// tienda cargó alguna: una columna vacía se ve peor que no tenerla.
+function pieReal({ base, cats, contacto }: {
+  base: string
+  cats: [string, string, string?][]
+  contacto?: Contacto | null
+}): NonNullable<Plantilla['pie']> {
+  const columnas: [string, ItemPie[]][] = []
+
+  if (cats.length > 0) {
+    columnas.push(['Categorías', cats.slice(0, 5).map(([nombre, , slug]) => ({
+      label: nombre,
+      href: slug ? `${base}/categoria/${slug}` : `${base}/catalogo`,
+    }))])
+  }
+
+  columnas.push(['Tienda', [
+    { label: 'Inicio', href: `${base}/` },
+    { label: 'Catálogo', href: `${base}/catalogo` },
+    { label: 'Mis pedidos', href: `${base}/pedido` },
+  ]])
+
+  columnas.push(['Mi cuenta', [
+    { label: 'Ingresar', href: `${base}/login` },
+    { label: 'Crear cuenta', href: `${base}/registro` },
+  ]])
+
+  // Solo lo que el negocio realmente cargó — si no hay Instagram, no se
+  // inventa un globito que no lleva a nada.
+  const redes = [
+    contacto?.instagram ? { label: 'Instagram', href: urlRedSocial(contacto.instagram, 'instagram') } : null,
+    contacto?.facebook ? { label: 'Facebook', href: urlRedSocial(contacto.facebook, 'facebook') } : null,
+    contacto?.tiktok ? { label: 'TikTok', href: urlRedSocial(contacto.tiktok, 'tiktok') } : null,
+  ].filter((r): r is { label: string; href: string } => r !== null)
+
+  return {
+    columnas,
+    // El cierre ya no inventa domicilio ni CUIT: solo el horario si el dueño
+    // lo cargó en Contacto. Sin dato, no se escribe nada.
+    cierre: contacto?.scheduleText?.trim() || '',
+    redes,
+    legales: [
+      { label: 'Términos y condiciones', href: `${base}/legales/terminos` },
+      { label: 'Política de privacidad', href: `${base}/legales/privacidad` },
+    ],
   }
 }

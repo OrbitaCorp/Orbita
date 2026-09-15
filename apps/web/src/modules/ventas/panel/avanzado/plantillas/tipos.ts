@@ -29,6 +29,9 @@ export type Layout =
   | 'vidriera' | 'escaparate' | 'mosaico' | 'premium' | 'nocturno' | 'glow'
   | 'papeleria' | 'corralon' | 'atleta' | 'patitas' | 'bodega' | 'crecer'
   | 'circuito' | 'vera' | 'cobijo' | 'nitida'
+  // Las que se arman con el vocabulario compartido (ver Receta): el
+  // bloque no lo escribe cada una, lo dibuja el mismo render.
+  | 'receta'
 
 export interface Producto {
   nombre: string; precio: string; antes?: string; transfer?: string; cuotas?: string
@@ -36,6 +39,12 @@ export interface Producto {
   tag?: string; estrellas?: number; resenas?: number; stock?: string
   colores?: string[]
   img: string; img2?: string
+  // El NOMBRE de su categoría. Solo con datos reales: lo necesita cualquier
+  // sección que arme filas por categoría ("Camisas street" y abajo camisas de
+  // verdad). Sin esto, lo único que se podía hacer era cortar el array de
+  // destacados en pedazos, que es como Atleta terminó mostrando los mismos
+  // productos bajo tres títulos distintos.
+  cat?: string
   // Solo con datos reales (ver plantillaReal.ts): los mismos swatches que
   // dibuja la ProductCard real, para plantillas que arman su PROPIA tarjeta
   // en vez de reusar `renderProducto`/ProductCard (ver Escaparate en
@@ -46,6 +55,55 @@ export interface Producto {
   // cliente/inicio/plantillaReal.ts): a dónde lleva la tarjeta al hacerle
   // click. En las plantillas de muestra no existe y la tarjeta no navega.
   slug?: string
+}
+
+// ─── Recetas ─────────────────────────────────────────────────────────────────
+//
+// Las dieciséis primeras plantillas tienen cada una su bloque de JSX en
+// homes.tsx, y varias traen secciones que ninguna otra tiene ("El taller", la
+// carta de Bodega, el muro de Mosaico). Eso les da personalidad, pero tiene un
+// precio: cada una necesita su propio editor, y sumar una es escribir una
+// pantalla entera.
+//
+// Una RECETA es la otra mitad del catálogo: la plantilla declara qué bloques
+// muestra y en qué orden, y el render es compartido. Se cambia el DISEÑO —la
+// paleta, la tipografía, el tipo de hero, la forma de las categorías, el ritmo
+// de las filas— sin inventar funcionalidad nueva ni un editor nuevo. El
+// formulario de edición sale solo de la receta.
+//
+// Las dos formas conviven: una plantilla con una idea rara sigue escribiendo
+// su bloque a mano; una que se arma con el vocabulario de siempre usa receta.
+
+export type BloqueReceta =
+  // El hero. `pleno` es foto a sangre con el texto encima; `partido`, mitad
+  // color y mitad foto; `minimo`, solo tipografía sobre un fondo liso; y
+  // `tarjeta`, la foto adentro de una caja con aire alrededor.
+  | { t: 'hero'; estilo: 'pleno' | 'partido' | 'minimo' | 'tarjeta' }
+  // Las categorías del negocio. Cuatro formas distintas de la misma data.
+  | { t: 'categorias'; estilo: 'grilla' | 'pastillas' | 'tira' | 'altas'; cols?: number }
+  // Una fila de productos. `id` es la clave de su encabezado editable, así que
+  // dos filas de la misma plantilla no pueden repetirlo.
+  | { t: 'fila'; id: string; fuente?: 'destacados' | 'masVendidos' | 'catalogo'; estilo?: 'grilla' | 'tira' | 'sangre'; cols?: number }
+  // El nombre de una categoría y, abajo, productos DE esa categoría.
+  | { t: 'porCategoria'; cuantas?: number; porFila?: number }
+  // Un espacio de anuncio. No todas las plantillas llevan uno, y las que sí
+  // no tienen por qué usar la misma forma: `plena` es la franja de color de
+  // punta a punta, `filete` una línea fina con el texto centrado, `cartelera`
+  // el texto corriendo en loop, y `apilada` un bloque centrado con aire.
+  | { t: 'franja'; estilo?: 'plena' | 'filete' | 'cartelera' | 'apilada' }
+  // Banner con la foto quieta y el contenido pasando por encima. Es el mismo
+  // efecto que ofrece Apariencia; acá es un bloque más, para las plantillas
+  // donde pega. En celular y con `prefers-reduced-motion` se apaga solo.
+  | { t: 'parallax' }
+  // Una foto ancha con texto encima, al final.
+  | { t: 'campana' }
+  // El bloque de consulta por WhatsApp.
+  | { t: 'whatsapp' }
+
+export interface Receta {
+  /** Dónde va el logo del header: a la izquierda (default) o centrado. */
+  header?: 'izquierda' | 'centrado'
+  bloques: BloqueReceta[]
 }
 
 export interface Slide {
@@ -79,6 +137,17 @@ export type TipoCampo =
   // ver `secciones` en home-template-data.dto.ts. Leerlo: helper `activo()`
   // en homes.tsx.
   | 'switch'
+  // Elegir UNA cosa del catálogo real del negocio: una categoría o un
+  // producto. Se guarda como `cat:<slug>` o `prod:<id>` —con prefijo, igual
+  // que los `headerLinks`, para que una categoría y un producto no choquen
+  // nunca— y el panel dibuja un desplegable con lo que la tienda tiene de
+  // verdad.
+  //
+  // Existe porque una sección como "Armá tu setup" (Nocturno) no se puede
+  // rellenar sola con las tres primeras categorías: qué va ahí es una
+  // decisión del dueño, no del orden en que estén cargadas. Sin elegir nada,
+  // la sección no se dibuja.
+  | 'seleccion'
 
 export interface CampoSeccion {
   id: string
@@ -99,6 +168,38 @@ export interface CampoSeccion {
    * y la tienda otra.
    */
   porDefecto?: string
+  /**
+   * Este campo AFIRMA algo del negocio: un descuento, un envío gratis, una
+   * cantidad, una certificación, un plazo de entrega. No es una etiqueta
+   * ("Más vendidos") sino una promesa al comprador.
+   *
+   * Su `porDefecto` se sigue usando en la vitrina del panel —es lo que hace
+   * que la plantilla se venda con una portada creíble— pero en la TIENDA REAL
+   * no se dibuja hasta que el dueño lo escriba. Mosaico mostraba −40% / −25% /
+   * −30% sobre las categorías de una tienda que nunca puso esos descuentos, y
+   * media docena de plantillas prometían envío gratis y cuotas sin interés que
+   * el negocio no había configurado.
+   *
+   * Lo resuelve `txt()` en homes.tsx: solo cae al ejemplo cuando NO hay
+   * `acciones` (o sea, en el panel).
+   */
+  afirmacion?: boolean
+  /**
+   * El default para una TIENDA REAL, cuando el de la vitrina está escrito para
+   * el rubro de la maqueta.
+   *
+   * Cualquier negocio puede aplicar cualquier plantilla, y ahí el texto de
+   * muestra se lee mal: Papelería encabeza sus categorías con "Buscá por
+   * rubro" —jerga de librería— y eso terminó arriba de "Camisas street" en una
+   * tienda de ropa. Crecer pregunta "¿Cuántos meses tiene?", Corralón habla de
+   * "Departamentos", Nítida de "Por familia".
+   *
+   * No es lo mismo que `afirmacion`: acá no se promete nada falso, así que
+   * callarse no sirve —la sección se quedaría sin encabezado—. Lo que hace
+   * falta es una versión neutra. La vitrina sigue mostrando la sabrosa, que es
+   * lo que le da personalidad a la plantilla y ayuda al dueño a elegirla.
+   */
+  porDefectoReal?: string
 }
 
 export interface SeccionPlantilla {
@@ -214,9 +315,34 @@ export interface Plantilla {
   // [nombre, imagen] en las plantillas de muestra; la tienda real agrega un
   // tercer elemento con el slug para que el tile navegue a la categoría.
   categorias?: [string, string, string?][]
+  // El catálogo del negocio, SOLO para resolver los campos `seleccion` (ver
+  // TipoCampo): un `prod:<id>` guardado tiene que poder encontrar su nombre y
+  // su foto, y `productos` de acá arriba son los destacados nomás. En el
+  // panel no existe.
+  catalogo?: Producto[]
+  // Con esto puesto, el layout es 'receta': los bloques y su orden salen
+  // de acá y el render es el compartido. Ver Receta más arriba.
+  receta?: Receta
   cupon?: { titulo: string; bajada: string; codigo: string }
-  pie?: { columnas: [string, string[]][]; cierre: string }
+  // El pie. En la vitrina del panel los ítems son strings sueltos (texto
+  // muerto de la maqueta); en la tienda real `plantillaReal()` los reemplaza
+  // por `{ label, href }` y ahí sí navegan. `redes` y `legales` solo existen
+  // con datos reales: la maqueta no tiene Instagram ni Términos de nadie.
+  pie?: {
+    columnas: [string, ItemPie[]][]
+    cierre: string
+    redes?: { label: string; href: string }[]
+    legales?: { label: string; href: string }[]
+  }
+  // El toggle "Mostrar footer" de Apariencia. Las plantillas con `piePropio`
+  // lo ignoraban: el dueño lo apagaba y su pie seguía ahí, porque el que se
+  // chequeaba era el de `StorefrontFooter`, que en esas plantillas ni se
+  // dibuja. Solo lo pone `plantillaReal()`; en el panel siempre se ve.
+  ocultarPie?: boolean
 }
+
+// Un ítem de columna del pie: texto pelado (maqueta) o enlace real (tienda).
+export type ItemPie = string | { label: string; href: string }
 
 // ─── Acciones reales (solo storefront) ───────────────────────────────────────
 //
@@ -238,6 +364,18 @@ export interface AccionesHome {
    * producto, la marca del header es la única forma de volver al inicio.
    */
   irAInicio?: () => void
+  // "Estilo de header" de Apariencia. El nav de una plantilla muestra SIEMPRE
+  // los enlaces reales (los mismos que el header de Orbita, ver `nav` mas
+  // abajo); esto decide cuantos y donde. `minimal` los saca en todas por
+  // igual — es una decision de contenido, no de diseño. `centered` vs
+  // `standard` solo lo aplican las plantillas cuyo header no tenga ya una
+  // posicion propia como parte de su identidad.
+  navLayout?: 'full' | 'standard' | 'centered' | 'minimal'
+  // Abre el modal de arrepentimiento/devolución (RBT-683). Lo dibuja el pie
+  // normal de Órbita por obligación legal, así que el pie de una plantilla
+  // tiene que poder abrirlo también. En el panel no existe: ahí el botón no
+  // se dibuja.
+  abrirDevolucion?: () => void
   irACatalogo: () => void
   irACategoria: (slug: string) => void
   irAProducto: (slug: string) => void

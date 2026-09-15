@@ -25,6 +25,20 @@ export const HOME_TEMPLATES_DISPONIBLES = [
   'vera',
   'cobijo',
   'nitida',
+  // Las de receta (ver tipos.ts en el panel): no escriben su propio
+  // bloque, declaran que secciones muestran. Igual van listadas una por
+  // una -- esta lista tiene que coincidir con PLANTILLAS de datos.tsx o
+  // el panel ofrece una que la API rechaza con 400.
+  'lienzo',
+  'pulso',
+  'terracota',
+  'base',
+  'carbon',
+  'bloque',
+  'sobrio',
+  'roble',
+  'petalo',
+  'sello',
 ] as const;
 
 export class SetHomeTemplateDto {

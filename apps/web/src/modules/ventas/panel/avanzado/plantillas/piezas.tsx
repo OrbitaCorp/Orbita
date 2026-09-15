@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { User, ShoppingBag } from 'lucide-react'
-import type { AccionesHome, Producto, Slide, Tema } from './tipos'
+import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 //
@@ -40,6 +40,26 @@ export const CSS = `
 
 .pl-fila { transition: padding-left .28s cubic-bezier(.2,.7,.3,1); }
 .pl-fila:hover { padding-left: 12px; }
+
+/* Los enlaces del nav. No tenían ninguna señal de ser clickeables más que el
+   cursor. Va por opacidad y subrayado —no por color— para que sirva igual en
+   las paletas claras y en las oscuras, sin pedirle a cada plantilla un tono
+   de hover que hoy no define. */
+.pl-nav { transition: opacity .2s ease; }
+.pl-nav:hover { opacity: .58; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+
+/* Banner parallax: el fondo se queda quieto y el contenido pasa por encima.
+   Mismas dos guardas que el banner del storefront (ver Inicio.tsx): iOS
+   Safari rompe background-attachment:fixed y en Android de gama baja tilda,
+   así que en pantallas chicas se apaga — el banner se ve igual, solo sin el
+   efecto. Y se respeta prefers-reduced-motion, que para mucha gente no es
+   una preferencia estética sino que le marea. */
+.pl-parallax { background-size: cover; background-position: center; background-attachment: fixed; }
+@media (max-width: 640px) { .pl-parallax { background-attachment: scroll; } }
+@media (prefers-reduced-motion: reduce) { .pl-parallax { background-attachment: scroll; } }
+
+.pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes plMenuIn { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 `
 
 // ─── Piezas ──────────────────────────────────────────────────────────────────
@@ -306,7 +326,77 @@ export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; mov
 // Los enlaces del nav de una maqueta son strings sueltos; con la tienda real
 // detrás son los enlaces de Apariencia, que navegan. `navDe` deja a los
 // headers escribir un solo `.map` para los dos casos.
+/**
+ * El menú de celular: la hamburguesa con un panel real detrás.
+ *
+ * Hasta acá el `☰` era un dibujo. En escritorio sobraba —los enlaces ya están
+ * a la vista— y en celular era peor: el nav se esconde con `!movil`, así que
+ * el cliente veía el único control que prometía navegación y no pasaba nada.
+ * Una tienda sin forma de llegar al catálogo desde el teléfono.
+ *
+ * En la vitrina del panel se queda como el glifo de siempre: un panel con
+ * `position: fixed` se escaparía del marco del celular dibujado y taparía el
+ * panel entero. `acciones` es lo que distingue los dos mundos.
+ */
+export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: string[]; acciones?: AccionesHome; color?: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const nav = navDe(links, acciones)
+  const glifo = <span style={{ fontSize: 18, lineHeight: 1, color: color ?? t.text }}>☰</span>
+
+  if (!acciones || nav.length === 0) return glifo
+
+  return (
+    <>
+      <button
+        type="button" onClick={() => setAbierto(true)} aria-label="Abrir menú"
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'grid', placeItems: 'center', fontFamily: 'inherit' }}
+      >{glifo}</button>
+      {abierto && (
+        <div
+          onClick={() => setAbierto(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 120 }}
+        >
+          <div
+            className="pl-menu-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed', top: 0, left: 0, bottom: 0, width: 'min(78vw, 300px)',
+              background: t.surf, color: t.text, fontFamily: t.fb,
+              borderRight: `1px solid ${t.border}`, padding: '18px 20px',
+              display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>Menú</span>
+              <button
+                type="button" onClick={() => setAbierto(false)} aria-label="Cerrar menú"
+                style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, color: t.muted, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+              >×</button>
+            </div>
+            {nav.map((l) => (
+              <button
+                key={l.label} type="button"
+                onClick={() => { setAbierto(false); l.onClick?.() }}
+                style={{
+                  background: 'none', border: 'none', borderBottom: `1px solid ${t.border}`,
+                  padding: '13px 0', textAlign: 'left', fontSize: 15, fontFamily: 'inherit',
+                  color: l.activo ? t.primary : t.text, fontWeight: l.activo ? 700 : 500,
+                  cursor: 'pointer',
+                }}
+              >{l.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+  // "Minimal" en Apariencia = header sin navegacion. Se resuelve aca y no en
+  // cada bloque para que valga en las catorce de una: el que elige esto
+  // quiere el header limpio, sea cual sea la plantilla.
+  if (acciones?.navLayout === 'minimal') return []
   if (acciones?.nav && acciones.nav.length > 0) return acciones.nav
   return links.map((label) => ({ label }))
 }
@@ -316,8 +406,13 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
   if (movil) {
     return (
       <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 18 }}>☰</span>
-        <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, color: t.text }}>{marca}</span>
+        {/* Era un `☰` dibujado: el único control que prometía navegación en
+            celular, y no hacía nada. */}
+        <MenuMovil t={t} links={links} acciones={acciones} />
+        <span
+          onClick={acciones?.irAInicio}
+          style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 800, color: t.text, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
+        >{marca}</span>
         <AccionesTienda t={t} movil acciones={acciones} />
       </div>
     )
@@ -340,7 +435,7 @@ export function HeaderCentrado({ t, marca, links, conBuscador, movil, acciones }
       <div style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 28px 14px', fontSize: 13.5, color: t.text }}>
         {nav.map((l) => (
           <span
-            key={l.label}
+            key={l.label} className="pl-nav"
             onClick={l.onClick}
             style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : undefined }}
           >{l.label}</span>
@@ -470,29 +565,73 @@ export function Newsletter({ t, titulo, bajada, cta, movil }: { t: Tema; titulo:
   )
 }
 
-export function Pie({ t, marca, tagline, columnas, cierre, movil }: { t: Tema; marca: string; tagline: string; columnas: [string, string[]][]; cierre?: string; movil?: boolean }) {
+// El pie de las catorce plantillas con `piePropio`. El DISEÑO es el de la
+// plantilla (lo pone `t`: colores, tipografía, radio); el CONTENIDO, cuando la
+// tienda es real, lo arma `plantillaReal()` con los datos del negocio.
+//
+// Antes acá todo era de la maqueta: categorías inventadas, enlaces que eran
+// `<div>` sin href —no navegaban a ningún lado—, tres globitos "IG/FB/TK" que
+// no eran links, y un CUIT de ejemplo. Y encima le faltaban Términos,
+// Privacidad y el botón de Arrepentimiento, que el footer normal de Órbita sí
+// tiene porque son obligación legal.
+export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales, onDevolucion }: {
+  t: Tema; marca: string; tagline: string; columnas: [string, ItemPie[]][]
+  cierre?: string; movil?: boolean
+  redes?: { label: string; href: string }[]
+  legales?: { label: string; href: string }[]
+  onDevolucion?: () => void
+}) {
+  const badge = { width: 30, height: 30, borderRadius: t.radio === 0 ? 6 : '50%', border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', fontSize: 11, color: t.muted, fontWeight: 700 } as const
   return (
     <div style={{ borderTop: `1px solid ${t.border}`, background: t.surf }}>
       <div style={{ padding: movil ? '28px 18px' : '40px', display: 'grid', gridTemplateColumns: movil ? '1fr 1fr' : `1.4fr repeat(${columnas.length}, 1fr)`, gap: movil ? 22 : 34 }}>
         <div style={{ gridColumn: movil ? 'span 2' : undefined }}>
           <div style={{ fontFamily: t.fh, fontSize: 20, fontWeight: 800, color: t.text }}>{marca}</div>
           <div style={{ fontSize: 13, color: t.muted, marginTop: 6, lineHeight: 1.6, maxWidth: 260 }}>{tagline}</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            {['IG', 'FB', 'TK'].map((r) => (
-              <span key={r} style={{ width: 30, height: 30, borderRadius: t.radio === 0 ? 6 : '50%', border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', fontSize: 11, color: t.muted, fontWeight: 700 }}>{r}</span>
-            ))}
-          </div>
+          {/* Con `redes` (tienda real) son enlaces de verdad y solo se dibujan
+              las que el dueño cargó. Sin ellas es la maqueta del panel: los
+              tres globitos de siempre, decorativos. */}
+          {redes ? redes.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              {redes.map((r) => (
+                <a key={r.label} href={r.href} target="_blank" rel="noopener noreferrer" aria-label={r.label} style={{ ...badge, textDecoration: 'none' }}>{r.label.slice(0, 2).toUpperCase()}</a>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              {['IG', 'FB', 'TK'].map((r) => <span key={r} style={badge}>{r}</span>)}
+            </div>
+          )}
         </div>
         {columnas.map(([tit, items]) => (
           <div key={tit}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.09em', color: t.muted, fontWeight: 700, marginBottom: 13 }}>{tit}</div>
-            {items.map((i) => <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 9, lineHeight: 1.4 }}>{i}</div>)}
+            {items.map((i) => {
+              const est = { fontSize: 13, color: t.text, marginBottom: 9, lineHeight: 1.4, display: 'block' } as const
+              return typeof i === 'string'
+                ? <div key={i} style={est}>{i}</div>
+                : <a key={i.label} href={i.href} style={{ ...est, textDecoration: 'none' }}>{i.label}</a>
+            })}
           </div>
         ))}
       </div>
-      <div style={{ borderTop: `1px solid ${t.border}`, padding: '14px 40px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, fontSize: 12, color: t.muted }}>
+      <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '14px 18px' : '14px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 12, color: t.muted }}>
         <span>© 2026 {marca}{cierre ? ` · ${cierre}` : ''}</span>
-        <span>Hecho con Órbita</span>
+        {/* Términos, Privacidad y Arrepentimiento: no son decoración, son lo
+            que el footer normal muestra por obligación legal. Si la plantilla
+            dibuja SU pie, tiene que llevarlos igual. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          {(legales ?? []).map((l) => (
+            <a key={l.label} href={l.href} style={{ color: t.muted, textDecoration: 'none' }}>{l.label}</a>
+          ))}
+          {onDevolucion && (
+            <button
+              type="button" onClick={onDevolucion}
+              style={{ height: 30, padding: '0 13px', borderRadius: t.radio === 0 ? 0 : 999, background: 'transparent', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+            >Arrepentimiento / Devolución</button>
+          )}
+          <span>Hecho con Órbita</span>
+        </div>
       </div>
     </div>
   )

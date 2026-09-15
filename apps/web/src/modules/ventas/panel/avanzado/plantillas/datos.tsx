@@ -164,8 +164,8 @@ export const PLANTILLAS: Plantilla[] = [
     id: 'nocturno',
     nombre: 'Nocturno',
     para: 'Gaming, audio, componentes',
-    queCambia: 'Oscura y con datos en vez de frases. Barra de lanzamiento con contador, el producto flotando sobre un foco de luz, categorías con su cantidad de artículos, carrusel horizontal con specs adentro de cada tarjeta, armador de setup en tres pasos y comparativa de tres modelos.',
-    secciones: ['Contador de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Comparativa', 'Números grandes'],
+    queCambia: 'Oscura y con datos en vez de frases. Barra de lanzamiento, el producto flotando sobre un foco de luz, carrusel horizontal con specs adentro de cada tarjeta, y un recorrido en tres pasos que armás vos eligiendo qué va en cada uno.',
+    secciones: ['Cintillo de lanzamiento', 'Hero con foco de luz', 'Categorías', 'Carrusel con specs', 'Armá tu setup', 'Números grandes'],
     marca: 'Vector', tagline: 'Periféricos y audio, sin vueltas',
     layout: 'nocturno',
     // De muestra: en una tienda real las pisa `plantillaReal()`.
@@ -636,6 +636,409 @@ export const PLANTILLAS: Plantilla[] = [
       { nombre: 'Paleta de sombras · 12 tonos', badge: 'Vegano', badgeTono: 'violeta', estrellas: 5, resenas: 194, colores: ['#C98B7A', '#8C6B3F', '#3F6B54'], img: `${IMG}/belleza-paletas.jpg`, img2: `${IMG}/belleza-paleta-2.jpg`, ...ar('$31.900', '$39.000', '$25.520', '$10.633') },
       { nombre: 'Labial hidratante', estrellas: 5, resenas: 411, colores: ['#9F1239', '#C98B7A', '#7C2D3A'], img: `${IMG}/belleza-labial.jpg`, img2: `${IMG}/belleza-coral.jpg`, ...ar('$16.400', '$21.000', '$13.120', '$5.466') },
       { nombre: 'Crema corporal de karité', badge: 'Piel sensible', badgeTono: 'azul', estrellas: 4, resenas: 129, stock: 'Quedan 9', img: `${IMG}/belleza-spa.jpg`, img2: `${IMG}/belleza-maquillaje.jpg`, ...ar('$24.900', '$31.000', '$19.920', '$8.300') },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Las diez con RECETA (ver tipos.ts § Recetas).
+  //
+  // No escriben su bloque en homes.tsx: declaran qué muestran y en qué orden,
+  // y el render es compartido. Lo que las hace distintas entre sí es el TEMA
+  // —paleta, tipografía, radio, sombra— y la combinación de bloques: qué hero,
+  // qué forma de categorías, con qué ritmo caen las filas, si llevan anuncio y
+  // de qué tipo.
+  //
+  // Son alternativas de DISEÑO para rubros que ya tienen plantilla: un local
+  // de deco que no se siente identificado con Cobijo tiene Terracota, una
+  // ferretería que quiere algo más limpio que Corralón tiene Roble. Ninguna
+  // inventa funcionalidad ni pide un editor propio.
+  {
+    id: 'lienzo',
+    nombre: 'Lienzo',
+    para: 'Moda, indumentaria, diseño de autor',
+    queCambia: 'Sin foto en el hero: un título enorme en serif sobre papel, y el peso visual lo llevan los productos a sangre. Categorías en pastillas chicas, banner con parallax al medio. Para marcas que prefieren la tipografía antes que la producción de fotos.',
+    secciones: ['Hero tipográfico', 'Pastillas de categoría', 'Fila a sangre', 'Banner parallax', 'WhatsApp'],
+    marca: 'Lienzo', tagline: 'Prendas de autor, series cortas',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'minimo' },
+        { t: 'categorias', estilo: 'pastillas', cols: 6 },
+        { t: 'fila', id: 'fila', estilo: 'sangre', cols: 4 },
+        { t: 'parallax' },
+        { t: 'fila', id: 'fila2', fuente: 'masVendidos', cols: 4 },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Series cortas · Hecho en Argentina',
+    links: ['Inicio', 'Prendas', 'Accesorios', 'Archivo'],
+    categorias: [['Abrigos', `${IMG}/moda-mujer-invierno.jpg`], ['Calzado', `${IMG}/moda-zapato.jpg`], ['Básicos', `${IMG}/vidriera-modelo.jpg`], ['Accesorios', `${IMG}/vidriera-reloj.jpg`]],
+    tema: {
+      bg: '#FAF8F4', surf: '#FFFFFF', soft: '#F1EDE5', text: '#16130F', muted: '#736C61', border: '#E2DBCE',
+      primary: '#16130F', onPrimary: '#FAF8F4', accent: '#A8724A',
+      fh: serif('Cormorant Garamond'), fb: sans('Inter'), radio: 0, oscuro: false,
+      sombra: 'none',
+    },
+    slides: [
+      { img: `${IMG}/moda-mujer-invierno.jpg`, kicker: 'Temporada', titulo: 'Invierno\nen capas', bajada: 'Series cortas, teñidas a mano.', cta: 'Ver la colección' },
+      { img: `${IMG}/vidriera-modelo.jpg`, kicker: 'Archivo', titulo: 'Última\noportunidad', bajada: 'Prendas de temporadas pasadas.', cta: 'Ver archivo' },
+    ],
+    productos: [
+      { nombre: 'Abrigo de lana cruda', estrellas: 5, resenas: 42, img: `${IMG}/moda-mujer-invierno.jpg`, img2: `${IMG}/vidriera-modelo.jpg`, ...ar('$168.000', '$210.000', '$134.400', '$56.000') },
+      { nombre: 'Camisa de algodón lavado', estrellas: 5, resenas: 88, img: `${IMG}/vidriera-modelo.jpg`, img2: `${IMG}/moda-zapato.jpg`, ...ar('$74.500', '$92.000', '$59.600', '$24.833') },
+      { nombre: 'Zapato de cuero natural', estrellas: 4, resenas: 31, img: `${IMG}/moda-zapato.jpg`, img2: `${IMG}/vidriera-reloj.jpg`, ...ar('$139.000', '$175.000', '$111.200', '$46.333') },
+      { nombre: 'Reloj de pulsera fino', estrellas: 5, resenas: 19, img: `${IMG}/vidriera-reloj.jpg`, img2: `${IMG}/moda-mujer-invierno.jpg`, ...ar('$96.000', '$120.000', '$76.800', '$32.000') },
+    ],
+  },
+  {
+    id: 'pulso',
+    nombre: 'Pulso',
+    para: 'Deportes, suplementos, outdoor',
+    queCambia: 'Negra con lima y tipografía condensada en mayúsculas. El cartel corre en loop arriba, el hero va a sangre completa, y abajo cada categoría abre su propia fila con productos DE esa categoría. Más agresiva que Atleta.',
+    secciones: ['Cartel corriendo', 'Hero a sangre', 'Filas por categoría', 'Tira de más vendidos', 'WhatsApp'],
+    marca: 'Pulso', tagline: 'Entrenamiento y suplementación',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'pleno' },
+        { t: 'franja', estilo: 'cartelera' },
+        { t: 'porCategoria', cuantas: 3, porFila: 4 },
+        { t: 'fila', id: 'fila', fuente: 'masVendidos', estilo: 'tira' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Envío en 48 hs · Cambio de talle sin cargo',
+    links: ['Inicio', 'Entrenamiento', 'Suplementos', 'Outdoor', 'Outlet'],
+    categorias: [['Running', `${IMG}/dep-zapatilla.jpg`], ['Fuerza', `${IMG}/dep-pesas.jpg`], ['Outdoor', `${IMG}/dep-bici.jpg`], ['Indumentaria', `${IMG}/dep-correr.jpg`]],
+    tema: {
+      bg: '#0B0D0C', surf: '#141817', soft: '#101413', text: '#F2F5F3', muted: '#8B9691', border: '#232B29',
+      primary: '#C6F24E', onPrimary: '#0B0D0C', accent: '#C6F24E',
+      fh: sans('Oswald'), fb: sans('Inter'), radio: 4, oscuro: true,
+      sombra: '0 20px 44px -24px rgba(0,0,0,0.8)',
+    },
+    slides: [
+      { img: `${IMG}/dep-zapatilla.jpg`, kicker: 'Nueva temporada', titulo: 'SALÍ\nA ROMPERLA', bajada: 'Calzado y ropa técnica para entrenar todos los días.', cta: 'Ver todo' },
+      { img: `${IMG}/dep-pesas.jpg`, kicker: 'Fuerza', titulo: 'EL GIMNASIO\nEN TU CASA', bajada: 'Discos, mancuernas y accesorios.', cta: 'Ver fuerza' },
+    ],
+    productos: [
+      { nombre: 'Zapatilla de running neutra', badge: 'Más vendido', badgeTono: 'verde', estrellas: 5, resenas: 240, img: `${IMG}/dep-zapatilla.jpg`, img2: `${IMG}/dep-zapatilla-roja.jpg`, ...ar('$142.000', '$178.000', '$113.600', '$47.333') },
+      { nombre: 'Par de mancuernas 10 kg', estrellas: 5, resenas: 96, img: `${IMG}/dep-pesas.jpg`, img2: `${IMG}/dep-press.jpg`, ...ar('$88.000', '$110.000', '$70.400', '$29.333') },
+      { nombre: 'Remera técnica seca', estrellas: 4, resenas: 155, img: `${IMG}/dep-correr.jpg`, img2: `${IMG}/dep-estirar.jpg`, ...ar('$31.500', '$39.000', '$25.200', '$10.500') },
+      { nombre: 'Bicicleta urbana', estrellas: 5, resenas: 28, img: `${IMG}/dep-bici.jpg`, img2: `${IMG}/dep-pista.jpg`, ...ar('$420.000', '$520.000', '$336.000', '$140.000') },
+    ],
+  },
+  {
+    id: 'terracota',
+    nombre: 'Terracota',
+    para: 'Deco, muebles, bazar',
+    queCambia: 'Hero partido en dos: tipografía serif sobre arena a un lado, foto del otro. Categorías en tarjetas altas tipo revista y una campaña ancha al final. Paleta de barro y crema, sin blancos fríos. Más cálida y editorial que Cobijo.',
+    secciones: ['Hero partido', 'Categorías altas', 'Fila de productos', 'Campaña', 'WhatsApp'],
+    marca: 'Terracota', tagline: 'Objetos para la casa',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      header: 'centrado',
+      bloques: [
+        { t: 'hero', estilo: 'partido' },
+        { t: 'categorias', estilo: 'altas', cols: 4 },
+        { t: 'fila', id: 'fila', cols: 4 },
+        { t: 'franja', estilo: 'apilada' },
+        { t: 'campana' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Retiro en showroom · Envíos a todo el país',
+    links: ['Inicio', 'Living', 'Mesa', 'Textiles', 'Iluminación'],
+    categorias: [['Living', `${IMG}/casa-living.jpg`], ['Mesa', `${IMG}/casa-ceramica.jpg`], ['Textiles', `${IMG}/casa-sillon.jpg`], ['Deco', `${IMG}/casa-deco.jpg`]],
+    tema: {
+      bg: '#FBF6EF', surf: '#FFFFFF', soft: '#F2E8DA', text: '#3A2B21', muted: '#8A7460', border: '#E5D7C4',
+      primary: '#B4593A', onPrimary: '#FFFFFF', accent: '#8A6B4F',
+      fh: serif('Libre Baskerville'), fb: sans('Nunito'), radio: 14, oscuro: false,
+      sombra: '0 18px 40px -20px rgba(58,43,33,0.28)',
+    },
+    slides: [
+      { img: `${IMG}/casa-living.jpg`, kicker: 'Nueva colección', titulo: 'La casa\nque abraza', bajada: 'Muebles y objetos de materiales nobles.', cta: 'Ver la colección' },
+      { img: `${IMG}/casa-ceramica.jpg`, kicker: 'Mesa', titulo: 'Para\ncompartir', bajada: 'Vajilla artesanal y textiles de mesa.', cta: 'Ver mesa' },
+    ],
+    productos: [
+      { nombre: 'Sillón de una plaza en lino', estrellas: 5, resenas: 34, img: `${IMG}/casa-sillon.jpg`, img2: `${IMG}/casa-living.jpg`, ...ar('$385.000', '$470.000', '$308.000', '$128.333') },
+      { nombre: 'Juego de platos de gres', estrellas: 5, resenas: 71, img: `${IMG}/casa-ceramica.jpg`, img2: `${IMG}/casa-deco.jpg`, ...ar('$62.000', '$78.000', '$49.600', '$20.666') },
+      { nombre: 'Manta de lana tejida', estrellas: 4, resenas: 52, img: `${IMG}/casa-deco.jpg`, img2: `${IMG}/casa-sofa-naranja.jpg`, ...ar('$48.500', '$61.000', '$38.800', '$16.166') },
+      { nombre: 'Lámpara de pie de madera', estrellas: 5, resenas: 23, img: `${IMG}/casa-interior.jpg`, img2: `${IMG}/casa-living.jpg`, ...ar('$124.000', '$155.000', '$99.200', '$41.333') },
+    ],
+  },
+
+  // ─── Las cuatro genéricas ───────────────────────────────────────────────────
+  // No están pensadas para un rubro: sirven para cualquiera. Es la respuesta a
+  // un problema real — una plantilla escrita para su rubro se lee mal en una
+  // tienda de otra cosa (ver `porDefectoReal` en tipos.ts, y "Buscá por rubro"
+  // arriba de "Camisas street"). Estas no lo tienen: su texto de muestra no
+  // nombra ningún rubro y su foto es de producto, no de ambiente.
+  {
+    id: 'base',
+    nombre: 'Base',
+    para: 'Cualquier rubro',
+    queCambia: 'La más neutra de todas: hero en tarjeta con aire alrededor, categorías en grilla pareja y dos filas de productos. Gris pizarra sobre blanco, sin color de marca fuerte. Pensada para que la tienda se vea ordenada el primer día, sin tener que decidir una estética.',
+    secciones: ['Hero en tarjeta', 'Categorías en grilla', 'Dos filas de productos', 'Anuncio', 'WhatsApp'],
+    marca: 'Base', tagline: 'Tu tienda, ordenada',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'tarjeta' },
+        { t: 'categorias', estilo: 'grilla', cols: 4 },
+        { t: 'fila', id: 'fila', fuente: 'destacados', cols: 4 },
+        { t: 'franja', estilo: 'plena' },
+        { t: 'fila', id: 'fila2', fuente: 'masVendidos', cols: 4 },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Envíos a todo el país',
+    links: ['Inicio', 'Catálogo', 'Ofertas', 'Contacto'],
+    categorias: [['Destacados', `${IMG}/vidriera-modelo.jpg`], ['Novedades', `${IMG}/tech-setup.jpg`], ['Ofertas', `${IMG}/casa-deco.jpg`], ['Regalos', `${IMG}/joya-set.jpg`]],
+    tema: {
+      bg: '#FFFFFF', surf: '#FFFFFF', soft: '#F4F6F8', text: '#111827', muted: '#6B7280', border: '#E5E7EB',
+      primary: '#334155', onPrimary: '#FFFFFF', accent: '#0EA5E9',
+      fh: sans('Inter'), fb: sans('Inter'), radio: 10, oscuro: false,
+      sombra: '0 12px 28px -16px rgba(17,24,39,0.22)',
+    },
+    slides: [
+      { img: `${IMG}/vidriera-local.jpg`, kicker: 'Bienvenido', titulo: 'Todo lo que\nbuscabas', bajada: 'Mirá el catálogo completo y elegí sin apuro.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/tech-setup.jpg`, kicker: 'Novedades', titulo: 'Recién\nllegados', bajada: 'Lo último que sumamos a la tienda.', cta: 'Ver novedades' },
+    ],
+    productos: [
+      { nombre: 'Producto destacado', estrellas: 5, resenas: 64, img: `${IMG}/vidriera-modelo.jpg`, img2: `${IMG}/vidriera-reloj.jpg`, ...ar('$42.000', '$52.000', '$33.600', '$14.000') },
+      { nombre: 'Lo más pedido', estrellas: 5, resenas: 118, img: `${IMG}/tech-setup.jpg`, img2: `${IMG}/tech-mouse.jpg`, ...ar('$78.500', '$96.000', '$62.800', '$26.166') },
+      { nombre: 'Novedad de la semana', estrellas: 4, resenas: 27, img: `${IMG}/casa-deco.jpg`, img2: `${IMG}/casa-living.jpg`, ...ar('$29.900', '$37.000', '$23.920', '$9.966') },
+      { nombre: 'Ideal para regalar', estrellas: 5, resenas: 45, img: `${IMG}/joya-set.jpg`, img2: `${IMG}/joya-aros.jpg`, ...ar('$56.000', '$70.000', '$44.800', '$18.666') },
+    ],
+  },
+  {
+    id: 'carbon',
+    nombre: 'Carbón',
+    para: 'Cualquier rubro',
+    queCambia: 'La versión oscura de una tienda cualquiera: fondo carbón, tipografía blanca y un solo acento ámbar. Hero a sangre, anuncio como línea fina y productos a sangre sin marco. Le sienta bien a marcas que venden pocas cosas caras.',
+    secciones: ['Hero a sangre', 'Anuncio en filete', 'Categorías en tira', 'Productos a sangre', 'WhatsApp'],
+    marca: 'Carbón', tagline: 'Selección chica, buena',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'pleno' },
+        { t: 'franja', estilo: 'filete' },
+        { t: 'categorias', estilo: 'tira', cols: 6 },
+        { t: 'fila', id: 'fila', estilo: 'sangre', cols: 4 },
+        { t: 'parallax' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Stock limitado · Envío con seguimiento',
+    links: ['Inicio', 'Catálogo', 'Novedades', 'Contacto'],
+    categorias: [['Selección', `${IMG}/editorial-perfume.jpg`], ['Nuevo', `${IMG}/joya-reloj.jpg`], ['Clásicos', `${IMG}/vidriera-reloj.jpg`], ['Regalos', `${IMG}/joya-set.jpg`]],
+    tema: {
+      bg: '#101010', surf: '#181818', soft: '#141414', text: '#F5F3F0', muted: '#9A938B', border: '#2A2825',
+      primary: '#D9A441', onPrimary: '#101010', accent: '#D9A441',
+      fh: sans('Manrope'), fb: sans('Manrope'), radio: 2, oscuro: true,
+      sombra: '0 22px 48px -26px rgba(0,0,0,0.9)',
+    },
+    slides: [
+      { img: `${IMG}/editorial-perfume.jpg`, kicker: 'Selección', titulo: 'Poco, y\nbien elegido', bajada: 'Una tienda chica con criterio.', cta: 'Ver la selección' },
+      { img: `${IMG}/joya-reloj.jpg`, kicker: 'Nuevo', titulo: 'Recién\nllegado', bajada: 'Las últimas incorporaciones.', cta: 'Ver novedades' },
+    ],
+    productos: [
+      { nombre: 'Pieza de la temporada', estrellas: 5, resenas: 38, img: `${IMG}/editorial-perfume.jpg`, img2: `${IMG}/joya-cadena.jpg`, ...ar('$118.000', '$145.000', '$94.400', '$39.333') },
+      { nombre: 'Reloj clásico', estrellas: 5, resenas: 52, img: `${IMG}/joya-reloj.jpg`, img2: `${IMG}/vidriera-reloj.jpg`, ...ar('$196.000', '$240.000', '$156.800', '$65.333') },
+      { nombre: 'Set de regalo', estrellas: 4, resenas: 21, img: `${IMG}/joya-set.jpg`, img2: `${IMG}/joya-aros.jpg`, ...ar('$84.000', '$105.000', '$67.200', '$28.000') },
+      { nombre: 'Cadena fina', estrellas: 5, resenas: 76, img: `${IMG}/joya-cadena.jpg`, img2: `${IMG}/joya-collar.jpg`, ...ar('$62.500', '$78.000', '$50.000', '$20.833') },
+    ],
+  },
+  {
+    id: 'bloque',
+    nombre: 'Bloque',
+    para: 'Cualquier rubro',
+    queCambia: 'Bloques de color plano, bordes duros y tipografía bien grande. El anuncio va apilado al medio de la página como una sección más, no como una barra. Para tiendas con mucho catálogo que quieren que se note movimiento.',
+    secciones: ['Hero partido', 'Categorías en grilla de seis', 'Filas por categoría', 'Anuncio apilado', 'WhatsApp'],
+    marca: 'Bloque', tagline: 'Todo, siempre',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'partido' },
+        { t: 'categorias', estilo: 'grilla', cols: 6 },
+        { t: 'fila', id: 'fila', fuente: 'destacados', cols: 5 },
+        { t: 'franja', estilo: 'apilada' },
+        { t: 'porCategoria', cuantas: 2, porFila: 5 },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Más de mil productos en stock',
+    links: ['Inicio', 'Catálogo', 'Ofertas', 'Marcas', 'Contacto'],
+    categorias: [['Hogar', `${IMG}/casa-living.jpg`], ['Tecno', `${IMG}/tech-notebook.jpg`], ['Librería', `${IMG}/libre-cuaderno.jpg`], ['Deco', `${IMG}/casa-deco.jpg`], ['Regalos', `${IMG}/joya-set.jpg`], ['Ofertas', `${IMG}/vidriera-local.jpg`]],
+    tema: {
+      bg: '#FFFDF7', surf: '#FFFFFF', soft: '#FFF3D6', text: '#1A1A1A', muted: '#6E6A62', border: '#1A1A1A',
+      primary: '#E5484D', onPrimary: '#FFFFFF', accent: '#2563EB',
+      fh: sans('Rubik'), fb: sans('Nunito Sans'), radio: 0, oscuro: false,
+      sombra: '6px 6px 0 #1A1A1A',
+    },
+    slides: [
+      { img: `${IMG}/vidriera-local.jpg`, kicker: 'Catálogo completo', titulo: 'ENTRÁ\nY MIRÁ', bajada: 'Mil productos en stock, listos para despachar.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/tech-notebook.jpg`, kicker: 'Ofertas', titulo: 'PRECIOS\nQUE BAJAN', bajada: 'Revisá la sección de ofertas.', cta: 'Ver ofertas' },
+    ],
+    productos: [
+      { nombre: 'Lo más vendido del mes', badge: 'Top', badgeTono: 'rojo', estrellas: 5, resenas: 210, img: `${IMG}/tech-notebook.jpg`, img2: `${IMG}/tech-teclado.jpg`, ...ar('$310.000', '$380.000', '$248.000', '$103.333') },
+      { nombre: 'Clásico de la casa', estrellas: 5, resenas: 143, img: `${IMG}/casa-living.jpg`, img2: `${IMG}/casa-sillon.jpg`, ...ar('$98.000', '$122.000', '$78.400', '$32.666') },
+      { nombre: 'Para el escritorio', estrellas: 4, resenas: 67, img: `${IMG}/libre-cuaderno.jpg`, img2: `${IMG}/libre-lapices.jpg`, ...ar('$18.900', '$24.000', '$15.120', '$6.300') },
+      { nombre: 'Detalle de deco', estrellas: 5, resenas: 89, img: `${IMG}/casa-deco.jpg`, img2: `${IMG}/casa-plantas.jpg`, ...ar('$34.500', '$43.000', '$27.600', '$11.500') },
+    ],
+  },
+  {
+    id: 'sobrio',
+    nombre: 'Sobrio',
+    para: 'Cualquier rubro',
+    queCambia: 'Todo el peso en el espacio en blanco: hero tipográfico sin foto, categorías en pastillas y una sola fila de productos bien grande. Sin anuncios ni banners. La opción para quien tiene pocas fotos y no quiere que se note.',
+    secciones: ['Hero tipográfico', 'Pastillas de categoría', 'Una fila grande', 'WhatsApp'],
+    marca: 'Sobrio', tagline: 'Lo justo, bien hecho',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      header: 'centrado',
+      bloques: [
+        { t: 'hero', estilo: 'minimo' },
+        { t: 'categorias', estilo: 'pastillas', cols: 6 },
+        { t: 'fila', id: 'fila', fuente: 'destacados', cols: 3 },
+        { t: 'campana' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Consultas por WhatsApp',
+    links: ['Inicio', 'Catálogo', 'Contacto'],
+    categorias: [['Catálogo', `${IMG}/vidriera-modelo.jpg`], ['Novedades', `${IMG}/belleza-cosmetica.jpg`], ['Regalos', `${IMG}/joya-aros.jpg`]],
+    tema: {
+      bg: '#FCFCFC', surf: '#FFFFFF', soft: '#F4F4F2', text: '#1C1C1A', muted: '#7C7C77', border: '#E8E8E4',
+      primary: '#1C1C1A', onPrimary: '#FCFCFC', accent: '#6B7F6E',
+      fh: sans('Outfit'), fb: sans('Inter'), radio: 6, oscuro: false,
+      sombra: 'none',
+    },
+    slides: [
+      { img: `${IMG}/vidriera-modelo.jpg`, kicker: 'Bienvenido', titulo: 'Poco,\nbien hecho', bajada: 'Una selección cuidada, sin vueltas.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/belleza-cosmetica.jpg`, kicker: 'Novedades', titulo: 'Lo nuevo', bajada: 'Las últimas incorporaciones.', cta: 'Ver novedades' },
+    ],
+    productos: [
+      { nombre: 'Primera selección', estrellas: 5, resenas: 41, img: `${IMG}/vidriera-modelo.jpg`, img2: `${IMG}/moda-zapato.jpg`, ...ar('$54.000', '$67.000', '$43.200', '$18.000') },
+      { nombre: 'Segunda selección', estrellas: 5, resenas: 63, img: `${IMG}/belleza-cosmetica.jpg`, img2: `${IMG}/belleza-manos.jpg`, ...ar('$38.900', '$48.000', '$31.120', '$12.966') },
+      { nombre: 'Tercera selección', estrellas: 4, resenas: 22, img: `${IMG}/joya-aros.jpg`, img2: `${IMG}/joya-collar.jpg`, ...ar('$46.500', '$58.000', '$37.200', '$15.500') },
+    ],
+  },
+
+  // ─── Y tres más por rubro ───────────────────────────────────────────────────
+  {
+    id: 'roble',
+    nombre: 'Roble',
+    para: 'Ferretería, construcción, industria',
+    queCambia: 'Industrial pero prolija: gris acero con naranja de señalización, tipografía condensada. El anuncio es una línea fina, y cada rubro abre su fila con productos de ese rubro. Más limpia que Corralón, para casas de materiales que quieren verse serias.',
+    secciones: ['Hero a sangre', 'Anuncio en filete', 'Filas por rubro', 'Campaña', 'WhatsApp'],
+    marca: 'Roble', tagline: 'Materiales y herramienta',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'pleno' },
+        { t: 'franja', estilo: 'filete' },
+        { t: 'categorias', estilo: 'grilla', cols: 6 },
+        { t: 'porCategoria', cuantas: 3, porFila: 4 },
+        { t: 'campana' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Retiro en el día · Cuenta corriente para empresas',
+    links: ['Inicio', 'Herramientas', 'Construcción', 'Pinturas', 'Jardín'],
+    categorias: [['Herramientas', `${IMG}/ferre-taladro.jpg`], ['Construcción', `${IMG}/ferre-canos.jpg`], ['Pinturas', `${IMG}/ferre-pintura.jpg`], ['Jardín', `${IMG}/ferre-jardin.jpg`], ['Electricidad', `${IMG}/ferre-electronica.jpg`], ['Baño y cocina', `${IMG}/ferre-cocina.jpg`]],
+    tema: {
+      bg: '#F6F7F8', surf: '#FFFFFF', soft: '#ECEFF1', text: '#1F2429', muted: '#6B7480', border: '#D7DCE1',
+      primary: '#E8590C', onPrimary: '#FFFFFF', accent: '#1F2429',
+      fh: sans('Oswald'), fb: sans('Inter'), radio: 4, oscuro: false,
+      sombra: '0 14px 30px -18px rgba(31,36,41,0.28)',
+    },
+    slides: [
+      { img: `${IMG}/ferre-corralon.jpg`, kicker: 'Obra y hogar', titulo: 'TODO PARA\nARRANCAR', bajada: 'Herramienta, materiales y asesoramiento.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/ferre-taladro-rojo.jpg`, kicker: 'Herramientas', titulo: 'MARCAS\nQUE DURAN', bajada: 'Con garantía oficial.', cta: 'Ver herramientas' },
+    ],
+    productos: [
+      { nombre: 'Taladro percutor', estrellas: 5, resenas: 186, img: `${IMG}/ferre-taladro.jpg`, img2: `${IMG}/ferre-taladro-rojo.jpg`, ...ar('$126.000', '$158.000', '$100.800', '$42.000') },
+      { nombre: 'Juego de formones', estrellas: 4, resenas: 58, img: `${IMG}/ferre-formones.jpg`, img2: `${IMG}/ferre-pared.jpg`, ...ar('$34.900', '$44.000', '$27.920', '$11.633') },
+      { nombre: 'Látex interior 20 L', estrellas: 5, resenas: 94, img: `${IMG}/ferre-pintura.jpg`, img2: `${IMG}/ferre-pared.jpg`, ...ar('$78.000', '$96.000', '$62.400', '$26.000') },
+      { nombre: 'Manguera reforzada 30 m', estrellas: 4, resenas: 41, img: `${IMG}/ferre-jardin.jpg`, img2: `${IMG}/ferre-canos.jpg`, ...ar('$28.500', '$36.000', '$22.800', '$9.500') },
+    ],
+  },
+  {
+    id: 'petalo',
+    nombre: 'Pétalo',
+    para: 'Bebés, infantil, juguetería',
+    queCambia: 'Pasteles, esquinas bien redondeadas y tipografía redonda. Hero en tarjeta con aire, categorías en pastillas y una campaña ancha al final. Más suave y menos institucional que Crecer.',
+    secciones: ['Hero en tarjeta', 'Pastillas de categoría', 'Fila de productos', 'Campaña', 'WhatsApp'],
+    marca: 'Pétalo', tagline: 'Para los primeros años',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      header: 'centrado',
+      bloques: [
+        { t: 'hero', estilo: 'tarjeta' },
+        { t: 'categorias', estilo: 'pastillas', cols: 6 },
+        { t: 'fila', id: 'fila', fuente: 'destacados', cols: 4 },
+        { t: 'franja', estilo: 'apilada' },
+        { t: 'campana' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Cambios sin cargo · Envoltorio para regalo',
+    links: ['Inicio', 'Ropa', 'Juguetes', 'Habitación', 'Regalos'],
+    categorias: [['Ropa', `${IMG}/bebe-ropa.jpg`], ['Juguetes', `${IMG}/bebe-juguetes.jpg`], ['Habitación', `${IMG}/bebe-habitacion.jpg`], ['Regalos', `${IMG}/bebe-oso.jpg`]],
+    tema: {
+      bg: '#FFFBFC', surf: '#FFFFFF', soft: '#FDF0F3', text: '#3D2F36', muted: '#8C7A82', border: '#F3DFE5',
+      primary: '#E8899F', onPrimary: '#FFFFFF', accent: '#7FB5C4',
+      fh: sans('Quicksand'), fb: sans('Nunito'), radio: 24, oscuro: false,
+      sombra: '0 18px 38px -20px rgba(232,137,159,0.4)',
+    },
+    slides: [
+      { img: `${IMG}/bebe-ambiente.jpg`, kicker: 'Bienvenidos', titulo: 'Los primeros\naños', bajada: 'Ropa, juguetes y todo para la habitación.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/bebe-verano.jpg`, kicker: 'Temporada', titulo: 'Liviano\ny fresco', bajada: 'La colección de verano.', cta: 'Ver temporada' },
+    ],
+    productos: [
+      { nombre: 'Body de algodón × 3', estrellas: 5, resenas: 132, img: `${IMG}/bebe-ropa.jpg`, img2: `${IMG}/bebe-nena.jpg`, ...ar('$24.900', '$31.000', '$19.920', '$8.300') },
+      { nombre: 'Tren de madera', estrellas: 5, resenas: 64, img: `${IMG}/bebe-tren.jpg`, img2: `${IMG}/bebe-juguetes.jpg`, ...ar('$32.500', '$41.000', '$26.000', '$10.833') },
+      { nombre: 'Osito de peluche', estrellas: 5, resenas: 98, img: `${IMG}/bebe-oso.jpg`, img2: `${IMG}/bebe-familia.jpg`, ...ar('$18.400', '$23.000', '$14.720', '$6.133') },
+      { nombre: 'Móvil para la cuna', estrellas: 4, resenas: 37, img: `${IMG}/bebe-habitacion.jpg`, img2: `${IMG}/bebe-ambiente.jpg`, ...ar('$28.900', '$36.000', '$23.120', '$9.633') },
+    ],
+  },
+  {
+    id: 'sello',
+    nombre: 'Sello',
+    para: 'Joyería, relojería, regalos finos',
+    queCambia: 'Negro y dorado, serif alta y muchísimo aire. Hero tipográfico sin foto, categorías en tarjetas altas y los productos en tira horizontal. Un banner con parallax al final. Más nocturna que Premium, sin cintillos ni promesas.',
+    secciones: ['Hero tipográfico', 'Categorías altas', 'Tira de piezas', 'Banner parallax', 'WhatsApp'],
+    marca: 'Sello', tagline: 'Piezas para toda la vida',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      header: 'centrado',
+      bloques: [
+        { t: 'hero', estilo: 'minimo' },
+        { t: 'categorias', estilo: 'altas', cols: 4 },
+        { t: 'fila', id: 'fila', estilo: 'tira' },
+        { t: 'parallax' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Grabado sin cargo · Estuche de regalo',
+    links: ['Inicio', 'Anillos', 'Collares', 'Relojes', 'A pedido'],
+    categorias: [['Anillos', `${IMG}/joya-anillo.jpg`], ['Collares', `${IMG}/joya-collar.jpg`], ['Aros', `${IMG}/joya-aros.jpg`], ['Relojes', `${IMG}/joya-reloj.jpg`]],
+    tema: {
+      bg: '#0C0B0A', surf: '#151312', soft: '#121010', text: '#F3EEE6', muted: '#9C9287', border: '#2A2523',
+      primary: '#C9A227', onPrimary: '#0C0B0A', accent: '#C9A227',
+      fh: serif('Cormorant Garamond'), fb: sans('Inter'), radio: 0, oscuro: true,
+      sombra: '0 24px 52px -28px rgba(0,0,0,0.9)',
+    },
+    slides: [
+      { img: `${IMG}/joya-anillos-caja.jpg`, kicker: 'Taller propio', titulo: 'Piezas para\ntoda la vida', bajada: 'Hechas a mano, una por vez.', cta: 'Ver las piezas' },
+      { img: `${IMG}/joya-cadena.jpg`, kicker: 'A pedido', titulo: 'Tu idea,\nen oro', bajada: 'Diseñamos la pieza con vos.', cta: 'Consultar' },
+    ],
+    productos: [
+      { nombre: 'Anillo de oro con piedra', estrellas: 5, resenas: 28, img: `${IMG}/joya-anillo-piedras.jpg`, img2: `${IMG}/joya-anillo.jpg`, ...ar('$248.000', '$310.000', '$198.400', '$82.666') },
+      { nombre: 'Collar de cadena fina', estrellas: 5, resenas: 51, img: `${IMG}/joya-collar.jpg`, img2: `${IMG}/joya-cadena.jpg`, ...ar('$132.000', '$165.000', '$105.600', '$44.000') },
+      { nombre: 'Aros de plata', estrellas: 4, resenas: 74, img: `${IMG}/joya-aros.jpg`, img2: `${IMG}/joya-set.jpg`, ...ar('$68.000', '$85.000', '$54.400', '$22.666') },
+      { nombre: 'Pulsera tejida a mano', estrellas: 5, resenas: 33, img: `${IMG}/joya-pulsera.jpg`, img2: `${IMG}/joya-pulsera-rosa.jpg`, ...ar('$94.500', '$118.000', '$75.600', '$31.500') },
     ],
   },
 ]

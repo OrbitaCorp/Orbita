@@ -14,7 +14,7 @@ import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, type ApiCategory } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -159,6 +159,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // completa no se piden: ahí el header se edita con la lista fija de
     // siempre, dentro de "Diseño y layout".
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
+    // El catálogo, para los campos `seleccion` de las secciones de plantilla
+    // (ver TipoCampo en plantillas/tipos.ts): "Armá tu setup" de Nocturno deja
+    // elegir una categoría O un producto concreto, así que hacen falta los dos.
+    const [productos, setProductos] = useState<ApiProductListItem[]>([])
     const [guardando, setGuardando] = useState(false)
     const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
 
@@ -233,6 +237,18 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         panelGetCategoriesFlat()
             .then(cats => { if (!cancelado) setCategorias(cats.filter(c => c.isActive)) })
             .catch(() => { /* sin categorías: la tarjeta muestra solo los enlaces fijos */ })
+        // 100 es el TOPE de la API (`@Max(100)` en find-products-query.dto.ts),
+        // no una elección: pedir más devuelve 400 y el catch de abajo se lo
+        // come en silencio, así que el desplegable quedaba sin productos y
+        // ofrecía solo categorías. Si el negocio tiene más de 100, el selector
+        // muestra los primeros 100.
+        panelGetProducts({ limit: 100 })
+            // Sin los borradores: la tienda no los publica, así que elegir uno
+            // no mostraría nada (la portada no lo encontraría y llenaría ese
+            // lugar con otro, sin avisar). OUT_OF_STOCK sí queda: está
+            // publicado, se ve, y puede volver a tener stock.
+            .then(r => { if (!cancelado) setProductos(r.data.filter(x => x.status !== 'DRAFT')) })
+            .catch(() => { /* sin catálogo: el selector ofrece solo categorías */ })
         return () => { cancelado = true }
     }, [])
 
@@ -514,10 +530,21 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // toda la frase (pedido explícito, con capturas del editor de Premium en
     // blanco mientras la tienda mostraba texto). Vaciar un campo lo saca del
     // guardado y la portada vuelve a ese mismo texto — ver limpiarSecciones().
+    // ...con UNA excepción: los campos marcados como `afirmacion` (un
+    // descuento, un envío gratis, una cantidad — ver tipos.ts). Esos NO se
+    // precargan: si vinieran con el ejemplo puesto, guardar sin tocarlos
+    // alcanzaría para prometerle al comprador algo que el negocio nunca dijo.
+    // El ejemplo se sigue viendo, pero como placeholder: se lee, no se guarda.
     const valorSeccion = (seccion: string, campo: CampoSeccion) => {
         const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
-        return guardado !== undefined ? guardado : (campo.porDefecto ?? '')
+        if (guardado !== undefined) return guardado
+        if (campo.afirmacion) return ''
+        // La versión neutra cuando existe: el editor edita la TIENDA, no la
+        // vitrina, así que tiene que mostrar el mismo texto que el cliente ve.
+        return campo.porDefectoReal ?? campo.porDefecto ?? ''
     }
+    const pistaSeccion = (campo: CampoSeccion) =>
+        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '') : undefined
     const setSeccion = (seccion: string, campo: string, valor: string) => {
         const actual = ap.seccionesPlantilla ?? {}
         set('seccionesPlantilla', {
@@ -577,6 +604,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 value={valorSeccion(sec.id, campo)}
                                 onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
                                 maxLength={campo.max}
+                                placeholder={pistaSeccion(campo)}
                                 rows={3}
                                 style={{
                                     width: '100%', borderRadius: 8, border: '1px solid var(--color-border)',
@@ -585,8 +613,35 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                     lineHeight: 1.55, resize: 'vertical',
                                 }}
                             />
+                        ) : campo.tipo === 'seleccion' ? (
+                            /* Elegir del catálogo real. Sin elegir nada la
+                               sección no se dibuja en la portada — es a
+                               propósito: antes se rellenaba sola con las
+                               primeras categorías, que no significaba nada. */
+                            <select
+                                className="ds-field"
+                                value={valorSeccion(sec.id, campo)}
+                                onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
+                                style={{
+                                    width: '100%', height: 40, padding: '0 12px', borderRadius: 8,
+                                    border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                                    color: 'var(--color-text)', fontSize: 14, fontFamily: 'inherit',
+                                }}
+                            >
+                                <option value="">— Sin elegir —</option>
+                                {categorias.length > 0 && (
+                                    <optgroup label="Categorías">
+                                        {categorias.map(c => <option key={c.id} value={`cat:${c.slug}`}>{c.name}</option>)}
+                                    </optgroup>
+                                )}
+                                {productos.length > 0 && (
+                                    <optgroup label="Productos">
+                                        {productos.map(pr => <option key={pr.id} value={`prod:${pr.id}`}>{pr.name}</option>)}
+                                    </optgroup>
+                                )}
+                            </select>
                         ) : (
-                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} />
+                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo)} />
                         )}
                     </div>
                 ))}
@@ -1078,11 +1133,11 @@ function Divider() {
     return <div style={{ height: 1, background: 'var(--color-border)', margin: '18px 0' }} />
 }
 
-function Inp({ value, onChange, maxLength, suffix, mono, prefix }: { value: string; onChange: (v: string) => void; maxLength?: number; suffix?: ReactNode; mono?: boolean; prefix?: ReactNode }) {
+function Inp({ value, onChange, maxLength, suffix, mono, prefix, placeholder }: { value: string; onChange: (v: string) => void; maxLength?: number; suffix?: ReactNode; mono?: boolean; prefix?: ReactNode; placeholder?: string }) {
     return (
         <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: 40, padding: '0 12px', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
             {prefix}
-            <input value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', minWidth: 0 }} />
+            <input value={value} onChange={e => onChange(e.target.value)} maxLength={maxLength} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', minWidth: 0 }} />
             {suffix}
         </div>
     )

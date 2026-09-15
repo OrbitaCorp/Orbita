@@ -29,11 +29,12 @@
 // <StorefrontChrome tienda={tienda} config={config}>{...lo que antes iba
 // dentro del div, footer/whatsapp incluidos...}</StorefrontChrome>.
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { StorefrontHeader, navRealDe } from './StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from './AccionesPlantilla'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
+import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
@@ -104,17 +105,25 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // reportado con captura).
   const varsPlantilla = plantilla ? variablesDeTema(plantilla.tema) : undefined
   // "Estilo de header" de Apariencia (Configuración → Apariencia → Diseño y
-  // layout) — hasta acá el valor se guardaba bien pero NUNCA se leía en
-  // ningún lado: la tienda real siempre mostraba el mismo layout sea cual
-  // sea la opción elegida (reportado con captura). Cuando hay una PLANTILLA
-  // de Home activa (Avanzado → Plantillas), su propio tratamiento de header
-  // manda sobre esto — es la identidad visual de esa plantilla paga, no una
-  // preferencia general — igual criterio que ya usa `logoIcono` más abajo.
+  // layout). Hasta acá el valor se guardaba bien pero NUNCA se leía en ningún
+  // lado: la tienda real mostraba el mismo layout sea cual sea la opción
+  // elegida (reportado con captura).
+  //
+  // Después se leyó, pero solo SIN plantilla activa: con una puesta, el
+  // ajuste volvía a no hacer nada. Eso era demasiado — pedido explícito:
+  // "centradas o al costado del logo eso es para editar en apariencia". La
+  // plantilla aporta el DISEÑO (colores, tipografía, forma, íconos); QUÉ
+  // enlaces se muestran y dónde se ubican es del dueño. Mismo criterio que el
+  // pie: diseño de la plantilla, contenido de la tienda.
+  //
+  // La única excepción es `centrado`: una plantilla que lo declara (Vidriera)
+  // lo tiene como identidad —logo al medio con el buscador debajo—, así que
+  // ahí sí manda ella. `navCentrada` y `sinNav` pasan a valer siempre.
   const headerLayout = config?.appearance?.headerLayout
-  const centrado = homeTemplate ? headerCentrado(homeTemplate) : headerLayout === 'centered'
+  const centrado = headerCentrado(homeTemplate) || headerLayout === 'centered'
   const bold = headerBold(homeTemplate)
-  const navCentrada = !homeTemplate && headerLayout === 'standard'
-  const sinNav = !homeTemplate && headerLayout === 'minimal'
+  const navCentrada = headerLayout === 'standard'
+  const sinNav = headerLayout === 'minimal'
   // El ícono de marca es opcional SOLO bajo una plantilla que lo declare
   // (`headerBold`, hoy Escaparate) — para cualquier otra página/plantilla
   // sigue mostrándose siempre, sin cambios. Guardado en homeTemplateData
@@ -129,8 +138,24 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // dibuja una barra común arriba y se apila como el resto.
   const lateral = usaHeaderPropio && !!plantilla?.headerLateral && !movil
 
+  // Las tipografías de la plantilla. `loadFont()` de Apariencia no las conoce
+  // (varias piden pesos 800/900), por eso su propio cargador. Vive acá y no en
+  // Inicio: las variables CSS ya decían la fuente en TODAS las vistas, pero el
+  // archivo solo se bajaba en la portada, así que el catálogo y la ficha caían
+  // a la fuente de fallback.
+  useEffect(() => {
+    if (plantilla) cargarFuentes()
+  }, [plantilla])
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
+      {/* Los estilos propios de las plantillas (reveals, hover de fotos,
+          marquee, botones). También estaban solo en la portada, y son los que
+          hacen `.pl-b { position: absolute; opacity: 0 }`: sin ellos la
+          segunda foto de una ProductCard con tema no se apilaba sobre la
+          primera sino que se dibujaba AL LADO, y el crossfade del hover no
+          existía. Se veía en "También te puede gustar" de la ficha. */}
+      {plantilla && <style>{PLANTILLA_CSS}</style>}
       {/* Cartelera ARRIBA del header, no debajo — así la dibujan las dos
           maquetas (Vidriera y Escaparate, ver homes.tsx: `<Marquee>`/el div
           fijo van antes de `<HeaderCentrado>`/el navbar) y el propio preview
@@ -178,6 +203,7 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
             irACatalogo: () => router.push(`${base}/catalogo`),
             irACategoria: (s) => router.push(`${base}/catalogo?cat=${encodeURIComponent(s)}`),
             irAProducto: (s) => router.push(`${base}/producto/${s}`),
+            navLayout: (headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
             nav: navReal.map(l => ({ label: l.label, onClick: () => router.push(`${base}${l.path}`) })),
             renderAcciones: ({ movil: m }) => (
               <AccionesPlantilla t={plantilla.tema} movil={m} esVidriera={config?.business?.mode === 'SHOWCASE'} />

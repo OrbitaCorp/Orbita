@@ -8,6 +8,7 @@ import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
@@ -31,7 +32,6 @@ import type { CategoryLayout } from '@/modules/ventas/panel/configuracion/mock/a
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
-import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
 import { definicionPlantilla, plantillaReal } from './plantillaReal'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -61,6 +61,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
+
+    // El modal de arrepentimiento/devolucion. Con `piePropio` el
+    // StorefrontFooter --que normalmente lo trae adentro-- no se dibuja, asi
+    // que el estado vive aca y el pie de la plantilla lo abre por `acciones`.
+    const [devolucionAbierta, setDevolucionAbierta] = useState(false)
 
     // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
     // completa) — definida acá adentro porque go() de este componente ya
@@ -274,12 +279,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // De qué lado del breakpoint dibuja la plantilla — ver useMovilPlantilla.
     const movil = useMovilPlantilla()
 
-    // Las plantillas traen tipografías que no están en Apariencia (varias
-    // piden pesos 800/900) — `loadFont()` no las conoce, por eso su propio
-    // cargador. Ver el porqué en la skill plantillas-home § Tipografías.
-    useEffect(() => {
-        if (plantilla) cargarFuentes()
-    }, [plantilla])
+    // Las tipografías de la plantilla las carga StorefrontChrome, para que
+    // valgan también en el catálogo y la ficha. Ver la skill plantillas-home
+    // § Tipografías.
 
     // La paleta y la tipografía de la plantilla activa (header, cartel, hero,
     // secciones, tarjetas, footer) y el modo oscuro del visitante las aplica
@@ -343,11 +345,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             anuncio={!plantilla?.headerPropio}
             sinHeader={!!plantilla?.headerPropio}
         >
-            {/* Estilos propios de las plantillas (reveals, hover de fotos,
-                marquee, botones). Es el MISMO string que usa el preview del
-                panel — si se copiara y pegara acá volvería a desincronizarse,
-                que es justo el problema que este refactor arregla. */}
-            {plantilla && <style>{PLANTILLA_CSS}</style>}
+            {/* Los estilos de plantilla (PLANTILLA_CSS) ya no se inyectan acá:
+                los pone StorefrontChrome, que envuelve TODAS las vistas. Acá
+                solo cubrían la portada, y por eso la ficha de producto
+                dibujaba mal la segunda foto de las tarjetas. */}
             <style>{`
                 @keyframes sfFadeIn   { from { opacity:0; transform:translateY(8px)  } to { opacity:1; transform:translateY(0) } }
                 @keyframes sfDotPulse { 0%,100%{ opacity:1; transform:scale(1)  } 50%{ opacity:.4; transform:scale(.7) } }
@@ -564,6 +565,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
                         heroSlides,
                         transferPct,
+                        // Para el pie: la raiz de la tienda (enlaces que
+                        // navegan) y el contacto real (redes y horario).
+                        baseUrl: base,
+                        contacto: config?.contact,
+                        mostrarPie: config?.appearance?.showFooter ?? true,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
@@ -582,6 +588,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irAProducto: (s) => go(`/producto/${s}`),
                         abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
+                        // Arrepentimiento/devolucion: el pie normal de Orbita
+                        // lo muestra por obligacion legal, asi que el pie de
+                        // la plantilla tiene que poder abrirlo igual.
+                        abrirDevolucion: () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
                         // La maqueta pone la forma y el tema; esto, el
@@ -594,6 +604,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             />
                         ),
                         renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Estilo de header" de Apariencia: con plantilla
+                        // activa antes se ignoraba del todo.
+                        navLayout: (config?.appearance?.headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
                         nav: navRealDe(config?.appearance?.headerLinks).map(l => ({
                             label: l.label,
                             onClick: () => go(l.path),
@@ -799,6 +812,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
                 <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+            )}
+            {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
+                monta esta pagina: dentro de PlantillaHome no hay a donde. */}
+            {plantilla?.piePropio && (
+                <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
             )}
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
 
