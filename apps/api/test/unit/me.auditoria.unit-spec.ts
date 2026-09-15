@@ -4,6 +4,7 @@ import * as argon2 from 'argon2';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MeService } from '../../src/me/me.service';
+import { AuthService } from '../../src/auth/auth.service';
 import { UpdateMeDto } from '../../src/me/dto/update-me.dto';
 import { ChangePasswordDto } from '../../src/me/dto/change-password.dto';
 
@@ -34,7 +35,9 @@ function cuenta(opts: { passwordHash?: string | null; email?: string | null; upd
     refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     business: { findUnique: jest.fn().mockResolvedValue(null) },
   };
-  return { svc: new MeService(prisma as any, {} as any), prisma };
+  // La revocación de sesiones vive en AuthService (hallazgo cambio-clave-sin-cerrar-sesiones).
+  const auth = new AuthService(prisma as any, {} as any, { getOrThrow: () => 'test-secret-de-al-menos-32-caracteres', get: () => undefined } as any);
+  return { svc: new MeService(prisma as any, {} as any, auth), prisma };
 }
 
 describe('Cambiar el email de la cuenta de la tienda pide la contraseña', () => {

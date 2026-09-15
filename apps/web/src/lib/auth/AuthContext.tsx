@@ -22,7 +22,11 @@ export interface Business {
 export type AuthUser =
   | {
       type: 'member'
-      member: { id: string; name: string; email: string; status?: string }
+      // hasTempPassword: entró con la temporal que le generó el dueño desde
+      // Equipo. Mientras sea true, RequireAuth manda a Mi perfil a elegir una
+      // propia (hallazgo contrasena-temporal-reseteo, auditoría interna
+      // 09/09). Opcional porque viene del backend: una API vieja no lo manda.
+      member: { id: string; name: string; email: string; status?: string; hasTempPassword?: boolean }
       role: string
       permissions: string[]
       business: Business

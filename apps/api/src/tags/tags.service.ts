@@ -2,10 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertTagDto } from './dto/upsert-tag.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Registro de auditoría de alta, edición y baja (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
+  ) {}
 
   // Devuelve además en cuántos productos se usa cada etiqueta: el wizard las
   // ofrece como sugerencia y las más usadas van primero (a igual uso, alfabético).
@@ -26,17 +32,23 @@ export class TagsService {
       .sort((a, b) => b.usageCount - a.usageCount || a.name.localeCompare(b.name));
   }
 
-  async create(businessId: string, dto: UpsertTagDto) {
+  async create(businessId: string, dto: UpsertTagDto, actorId?: string) {
     await this.assertNombreLibre(businessId, dto.name);
+    let creado;
     try {
-      return await this.prisma.tag.create({ data: { businessId, name: dto.name } });
+      creado = await this.prisma.tag.create({ data: { businessId, name: dto.name } });
     } catch (err) {
       throw this.mapNameConflict(err);
     }
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'tag', entityId: creado.id, action: 'CREATE',
+      changes: [{ field: 'name', before: null, after: creado.name }],
+    });
+    return creado;
   }
 
-  async update(businessId: string, id: string, dto: UpsertTagDto) {
-    await this.findOneRaw(businessId, id);
+  async update(businessId: string, id: string, dto: UpsertTagDto, actorId?: string) {
+    const existente = await this.findOneRaw(businessId, id);
     await this.assertNombreLibre(businessId, dto.name, id);
 
     // businessId va en el where del updateMany, no solo en el findOneRaw previo —
@@ -48,14 +60,25 @@ export class TagsService {
       throw this.mapNameConflict(err);
     }
     if (result.count === 0) throw new NotFoundException('Tag no encontrado');
+    // Solo si el nombre cambió de verdad (mismo criterio que productos).
+    if (existente.name !== dto.name) {
+      await this.audit?.registrar({
+        businessId, memberId: actorId, entityType: 'tag', entityId: id, action: 'UPDATE',
+        changes: [{ field: 'name', before: existente.name, after: dto.name }],
+      });
+    }
     return this.findOneRaw(businessId, id);
   }
 
-  async remove(businessId: string, id: string) {
-    await this.findOneRaw(businessId, id);
+  async remove(businessId: string, id: string, actorId?: string) {
+    const existente = await this.findOneRaw(businessId, id);
     // product_tags tiene onDelete: Cascade — no queda huérfano.
     const { count } = await this.prisma.tag.deleteMany({ where: { id, businessId } });
     if (count === 0) throw new NotFoundException('Tag no encontrado');
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'tag', entityId: id, action: 'DELETE',
+      changes: [{ field: 'name', before: existente.name, after: null }],
+    });
     return { ok: true };
   }
 

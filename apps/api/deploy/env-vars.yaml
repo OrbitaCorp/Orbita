@@ -36,9 +36,22 @@ SUBSCRIPTION_SWEEP_DELETE: "false"
 # Google; con 2 toma la del cliente. Nunca "true": esa la escribe el cliente
 # y cualquiera se saltearía los límites (ver common/utils/proxy.ts).
 #
-# OJO: esto arregla los pedidos que van del navegador a la API. Los que pasan
-# por el BFF de Next.js (login, refresh, registro) siguen llegando todos con
-# la IP de Vercel — es la segunda mitad del hallazgo rate-limit-ip-proxy, que
-# necesita que el BFF reenvíe la IP con un secreto compartido.
+# Esto arregla los pedidos que van del navegador a la API. Los que pasan por
+# el BFF de Next.js (login, refresh, registro, alta, sesiones) llegan con la
+# IP de Vercel: para esos, el BFF reenvía la IP real en X-Orbita-Client-Ip
+# con un secreto compartido y la API la usa solo si coincide (ipDelCliente en
+# common/utils/proxy.ts). El código ya está; falta el secret BFF_IP_SECRET,
+# que es sensible y va en Secret Manager (a sumar a SECRETS en deploy.sh) y
+# en Vercel — ver DEPLOYMENT.md § Actualizar secrets. Sin el secret, los
+# pedidos por el BFF siguen compartiendo balde como hasta ahora.
 TRUST_PROXY_HOPS: "2"
 # SUPABASE_URL vive en Secret Manager (no acá) — ver SECRETS en deploy.sh.
+# Retención de logs y registros (auditoría interna, hallazgo logs-sin-retencion;
+# ver DEPLOYMENT.md § Retención de logs y registros). Días desde created_at,
+# nunca menos de 30; "0" u "off" apaga la purga de esa tabla sola. Comentadas =
+# el default de retencion-logs.service.ts; descomentar solo para cambiarlo.
+# PLATFORM_ADMIN_LOGS_RETENTION_DAYS: "365"
+# AUDIT_LOGS_RETENTION_DAYS: "365"
+# EMAIL_LOGS_RETENTION_DAYS: "180"
+# Mails a clientes (individuales y masivos) por negocio y por día de Argentina, contando email_logs (hallazgo mail-masivo-sin-tope). Mínimo 50; comentada = el default de customers.service.ts.
+# MAIL_MASIVO_TOPE_DIARIO: "500"

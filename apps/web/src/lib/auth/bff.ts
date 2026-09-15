@@ -14,6 +14,7 @@
 // cliente lo mantiene en memoria (ver AuthContext).
 
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { isIP } from 'net'
 
 const BACKEND_URL =
   process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
@@ -94,15 +95,75 @@ export function clearRefreshCookie(res: NextApiResponse, req: NextApiRequest, ch
 
 type BackendResult = { status: number; body: unknown }
 
+// ─── IP real del visitante hacia la API ──────────────────────────────────────
+//
+// Como el BFF corre en Vercel, TODO lo que pasa por acá (login, refresh,
+// registro, alta, sesiones) le llega a la API con la IP de Vercel: todos los
+// usuarios compartían un solo balde de throttling y la "IP" de las sesiones
+// activas era la del servidor (auditoría interna 10/09, hallazgo
+// rate-limit-ip-proxy). Se reenvía la IP del visitante en un header propio
+// junto con un secreto compartido; la API la usa SOLO si el secreto coincide
+// (ver apps/api/src/common/utils/proxy.ts, ipDelCliente).
+//
+// BFF_IP_SECRET es una variable SOLO de servidor (nunca NEXT_PUBLIC_): mismo
+// valor en Vercel (proyecto web) y en Secret Manager (API). Sin la variable
+// no se manda nada y todo queda como antes. Cargarla únicamente en Vercel:
+// ahí X-Forwarded-For lo escribe Vercel con la IP real del visitante; en un
+// dev local sin proxy ese header lo puede inventar el cliente.
+const LARGO_MINIMO_SECRETO_BFF = 32
+
+function primerValor(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v
+}
+
+/** IP del visitante según Vercel (primer valor de X-Forwarded-For, o X-Real-Ip), solo si parece una IP. */
+export function ipDelVisitante(req: Pick<NextApiRequest, 'headers' | 'socket'>): string | null {
+  const candidatas = [
+    primerValor(req.headers['x-forwarded-for'])?.split(',')[0],
+    primerValor(req.headers['x-real-ip']),
+    req.socket?.remoteAddress,
+  ]
+  for (const c of candidatas) {
+    const ip = c?.trim()
+    if (ip && isIP(ip)) return ip
+  }
+  return null
+}
+
+/** Headers para que la API sepa la IP real del visitante; vacío si no hay secreto configurado. */
+export function headersDeIpDelCliente(
+  req: Pick<NextApiRequest, 'headers' | 'socket'>,
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string> {
+  const secreto = env.BFF_IP_SECRET
+  if (!secreto || secreto.length < LARGO_MINIMO_SECRETO_BFF) return {}
+  const ip = ipDelVisitante(req)
+  if (!ip) return {}
+  return { 'X-Orbita-Client-Ip': ip, 'X-Orbita-Client-Ip-Secret': secreto }
+}
+
 /**
  * Llama a un endpoint del backend server-side (sin CORS). Forwardea el body y,
- * opcionalmente, headers de auth (Authorization / X-Business-Slug).
+ * opcionalmente, headers de auth (Authorization / X-Business-Slug). `req` es
+ * obligatorio para reenviar la IP real del visitante (ver arriba): sin eso
+ * la API vería la IP de Vercel para todos.
  */
 export async function callBackend(
   path: string,
-  init: { method: string; body?: unknown; authorization?: string; slug?: string; extraHeaders?: Record<string, string> },
+  init: {
+    req: Pick<NextApiRequest, 'headers' | 'socket'>
+    method: string
+    body?: unknown
+    authorization?: string
+    slug?: string
+    extraHeaders?: Record<string, string>
+  },
 ): Promise<BackendResult> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...init.extraHeaders }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...headersDeIpDelCliente(init.req),
+    ...init.extraHeaders,
+  }
   if (init.authorization) headers['Authorization'] = init.authorization
   if (init.slug) headers['X-Business-Slug'] = init.slug
 

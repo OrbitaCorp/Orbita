@@ -5,13 +5,14 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import sharp from 'sharp';
 import { Prisma } from '@prisma/client';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { AuthService } from '../auth/auth.service';
 import { MailService } from '../mail/mail.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -30,6 +31,10 @@ export class MeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
+    // Dueño de refresh_tokens: cerrar las demás sesiones al cambiar la
+    // contraseña pasa por acá (hallazgo cambio-clave-sin-cerrar-sesiones,
+    // mismo criterio que Mi perfil del panel).
+    private readonly auth: AuthService,
     // Aviso "Tu contraseña fue actualizada". Opcional solo para los tests.
     private readonly mail?: MailService,
   ) {}
@@ -123,11 +128,9 @@ export class MeService {
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
     await this.prisma.customer.update({ where: { id: customerId }, data: { passwordHash } });
 
-    const hashActual = sesionActual ? createHash('sha256').update(sesionActual).digest('hex') : null;
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: customerId, userType: 'CUSTOMER', revokedAt: null, ...(hashActual ? { tokenHash: { not: hashActual } } : {}) },
-      data: { revokedAt: new Date() },
-    });
+    // Las demás sesiones del cliente dejan de valer; se preserva la actual si
+    // el BFF mandó su refresh token (hallazgo cambio-clave-sin-cerrar-sesiones).
+    await this.auth.revocarOtrasSesiones({ id: customerId, userType: 'CUSTOMER' }, sesionActual);
 
     await this.avisarCambioDeContrasena(c);
     return { message: 'Contraseña actualizada.' };

@@ -345,6 +345,9 @@ export class StorefrontService {
             whatsapp: contact.whatsapp,
             email: contact.email,
             scheduleText: contact.scheduleText,
+            // Para los legales de la tienda (hallazgo `legales-sin-cuit`).
+            cuit: contact.cuit,
+            legalName: contact.legalName,
             instagram: contact.instagram,
             tiktok: contact.tiktok,
             facebook: contact.facebook,

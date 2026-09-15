@@ -12,6 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const { status, body } = await callBackend('/auth/accept-invitation', {
+    req,
     method: 'POST',
     body: req.body,
   })

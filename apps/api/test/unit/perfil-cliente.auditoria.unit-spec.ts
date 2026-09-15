@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import * as argon2 from 'argon2';
 import { MeService } from '../../src/me/me.service';
+import { AuthService } from '../../src/auth/auth.service';
 
 // Auditoría interna 10/09, ítem web.cliente.perfil: cambiar la contraseña de
 // la cuenta de la tienda cierra las demás sesiones del cliente y avisa por
@@ -26,7 +27,12 @@ function armar(opts: { email?: string | null; mailFalla?: boolean } = {}) {
   const mail = {
     sendPasswordChanged: opts.mailFalla ? jest.fn().mockRejectedValue(new Error('Resend caído')) : jest.fn().mockResolvedValue(undefined),
   };
-  const svc = new MeService(prisma as any, {} as any, mail as any);
+  // La revocación pasa por AuthService.revocarOtrasSesiones sobre el MISMO
+  // prisma mockeado (hallazgo cambio-clave-sin-cerrar-sesiones): las
+  // aserciones sobre refreshToken.updateMany siguen valiendo tal cual.
+  const auth = new AuthService(prisma as any, {} as any, { getOrThrow: () => 'test-secret-de-al-menos-32-caracteres', get: () => undefined } as any);
+  (auth as any).logger = { log: jest.fn(), warn: jest.fn() };
+  const svc = new MeService(prisma as any, {} as any, auth, mail as any);
   (svc as any).avisoLogger = { warn: jest.fn() };
   return { svc, prisma, mail };
 }

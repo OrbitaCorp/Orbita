@@ -19,6 +19,16 @@ export const ACTION_LABELS: Record<string, string> = {
   audit_item_update: 'Actualizar ítem de auditoría',
   audit_item_create: 'Crear ítem de auditoría',
   audit_item_delete: 'Borrar ítem de auditoría',
+  // Login del super panel, segundo factor por mail y mails de prueba: los
+  // escribe PlatformAdminLogService (apps/api/src/platform/platform-admin-log.service.ts,
+  // ACCION_LOG_ADMIN) — hallazgo `auditoria-acciones-sin-registro`, parte 3.
+  login_ok: 'Ingreso al panel',
+  login_failed: 'Ingreso rechazado',
+  mfa_code_sent: 'Código de acceso enviado',
+  mfa_code_verified: 'Código de acceso verificado',
+  mfa_code_failed: 'Código de acceso rechazado',
+  mfa_code_blocked: 'Código de acceso bloqueado',
+  send_mail_test: 'Enviar mail de prueba',
 }
 
 // ─── Diccionarios de jerga ────────────────────────────────────────────────────

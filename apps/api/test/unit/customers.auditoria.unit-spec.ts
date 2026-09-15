@@ -33,6 +33,8 @@ function clientes(lista: unknown[] = [cliente()]) {
     order: { groupBy: jest.fn().mockResolvedValue([]) },
     member: { findFirst: jest.fn().mockResolvedValue({ name: 'Dueña' }) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
+    // Tope diario del mail masivo (hallazgo mail-masivo-sin-tope): acá nada salió hoy.
+    emailLog: { count: jest.fn().mockResolvedValue(0) },
   };
   const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
   const svc = new CustomersService(prisma as any, mail as any, { emit: jest.fn() } as any, new AuditService(prisma as any));

@@ -96,7 +96,19 @@ describe('AuditService', () => {
 });
 
 describe('El registro es de solo agregado', () => {
-  it('ningún archivo de src/ edita ni borra filas de audit_logs', () => {
+  // Única excepción permitida: la purga por antigüedad del mantenimiento
+  // nocturno (hallazgo logs-sin-retencion, 14/09). Borra por fecha de creación
+  // y nada más — nunca por negocio, entidad, acción ni actor — así que no
+  // sirve para hacer desaparecer un rastro puntual: lo que se va, se va parejo
+  // para todos y recién pasado el año (AUDIT_LOGS_RETENTION_DAYS, mínimo 30).
+  // Cualquier otro borrado o edición de audit_logs es un bug y este test lo
+  // tiene que agarrar; si aparece una segunda excepción, se discute acá antes
+  // de sumarla a la lista.
+  const EXCEPCIONES = [join('internal-cron', 'retencion-logs.service.ts')];
+  const SRC = join(__dirname, '../../src');
+  const MUTACION = /auditLog\.(update|updateMany|upsert|delete|deleteMany)\(/;
+
+  it('ningún archivo de src/ edita ni borra filas de audit_logs, salvo la purga por retención', () => {
     const archivos: string[] = [];
     const recorrer = (dir: string) => {
       for (const n of readdirSync(dir)) {
@@ -105,9 +117,18 @@ describe('El registro es de solo agregado', () => {
         else if (p.endsWith('.ts')) archivos.push(p);
       }
     };
-    recorrer(join(__dirname, '../../src'));
-    const culpables = archivos.filter((f) => /auditLog\.(update|updateMany|upsert|delete|deleteMany)\(/.test(readFileSync(f, 'utf8')));
+    recorrer(SRC);
+    const esExcepcion = (f: string) => EXCEPCIONES.some((e) => f.endsWith(e));
+    const culpables = archivos.filter((f) => !esExcepcion(f) && MUTACION.test(readFileSync(f, 'utf8')));
     expect(culpables).toEqual([]);
+  });
+
+  it('la purga por retención solo borra por antigüedad: un deleteMany por created_at y ninguna otra mutación', () => {
+    const fuente = readFileSync(join(SRC, EXCEPCIONES[0]), 'utf8');
+    expect(fuente).not.toMatch(/auditLog\.(update|updateMany|upsert|delete)\(/);
+    const borrados = fuente.match(/auditLog\.deleteMany\([^)]*\)/g) ?? [];
+    expect(borrados).toHaveLength(1);
+    expect(borrados[0]).toBe('auditLog.deleteMany({ where: { createdAt: { lt: corte } } })');
   });
 });
 

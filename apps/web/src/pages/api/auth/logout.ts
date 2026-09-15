@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const refreshToken = readRefreshCookie(req, channel)
   if (refreshToken) {
-    await callBackend('/auth/logout', { method: 'POST', body: { refreshToken } })
+    await callBackend('/auth/logout', { req, method: 'POST', body: { refreshToken } })
   }
 
   clearRefreshCookie(res, req, channel)

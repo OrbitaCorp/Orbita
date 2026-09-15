@@ -15,6 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { status, body } = await callBackend('/subscription/confirm', {
+    req,
     method: 'POST',
     body: { preapprovalId },
   })

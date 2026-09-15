@@ -54,25 +54,70 @@ contenido. Ese rol se lo damos solo a quien necesite ver/rotar un secret puntual
 Herramientas locales:
 - [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) instalado y autenticado
   (`gcloud auth login` con la cuenta `@orbita-corp.com`).
-- `git` (el script tagea la imagen con el commit SHA).
+- `git` (el script tagea la imagen con el commit SHA y verifica que esté en `main`)
+  y `pnpm` (el preflight corre typecheck, tests y `prisma migrate status`).
+- `gh` (GitHub CLI) logueado, opcional: con él el preflight confirma que CI
+  está en verde para el commit; sin él avisa y sigue.
 
 ## Deploy
 
+Se despliega **lo que ya está en `main` con CI verde**, nunca una rama de
+trabajo ni un árbol con cambios sin commitear. El orden completo (commit →
+push de `main` → CI verde → `deploy.sh`) está en el `CLAUDE.md` de la raíz,
+§ Commit y push; acá va la parte del script.
+
 ```bash
 cd apps/api
+git checkout main && git pull --ff-only origin main
 ./deploy/deploy.sh
 ```
 
-Esto: buildea la imagen con Cloud Build (no hace falta Docker instalado
-localmente), la sube a Artifact Registry taggeada con el SHA del commit actual
-+ `:latest`, y despliega esa imagen a Cloud Run con los recursos y secrets ya
-configurados. Al final imprime la URL directa de Cloud Run y recuerda el dominio
-de producción.
+Esto: corre el **preflight** (abajo), buildea la imagen con Cloud Build (no
+hace falta Docker instalado localmente), la sube a Artifact Registry taggeada
+con el SHA del commit actual + `:latest`, y despliega esa imagen a Cloud Run
+con los recursos y secrets ya configurados. Al final imprime la URL directa de
+Cloud Run y recuerda el dominio de producción.
 
 No hay CI/CD automático (no se configuró GitHub Actions ni un Cloud Build
 Trigger a propósito — decisión explícita para no sumar otro servicio con costo
 propio). El deploy es manual, corriendo el script cuando haya algo nuevo para
-publicar.
+publicar. Lo que sí hay es CI de verificación (`.github/workflows/ci.yml`:
+typecheck + tests unitarios de la API en cada push a `main` y en PRs), y el
+preflight del script es el puente entre las dos cosas: CI verifica, no
+despliega; el script despliega, pero solo lo que CI verificó.
+
+### Preflight: qué chequea y por qué
+
+Hallazgo `deploy-manual` de la auditoría interna (10/09/2026). Hasta el 15/09
+el script buildeaba y publicaba lo que hubiera en el disco de quien lo corría:
+con cambios sin commitear, desde una rama que nunca pasó por CI, o con una
+migración sin aplicar. Ahora, antes del build, verifica en este orden y corta
+con `exit 1` (sin buildear nada) en el primero que falla:
+
+| # | Chequeo | Cómo | Si falla |
+|---|---|---|---|
+| a | Árbol de git limpio | `git status --porcelain` vacío | lista lo sucio; commitear o descartar |
+| b | HEAD está en `main` | `git fetch origin` + `git merge-base --is-ancestor HEAD origin/main` | mergear a `main` (ff), pushear, esperar CI |
+| c | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**) | arreglar en `main` |
+| d | Migraciones al día | `pnpm exec prisma migrate status` (solo lectura, contra la base del `.env`, que es producción) | primero `pnpm exec prisma migrate deploy` (ver § Rollback si es destructiva) |
+| e | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success` | esperar o arreglar; si `gh` no está o no está logueado, avisa y sigue |
+
+`Web — lint (informativo)` tiene `continue-on-error` en `ci.yml` y su check run
+figura como `failure` aunque el workflow pase: el preflight lo ignora a
+propósito. El job `API — typecheck + tests` tiene que existir y estar en verde.
+
+Variables de entorno:
+
+- `DEPLOY_SOLO_PREFLIGHT=1 ./deploy/deploy.sh`: corre el preflight y termina
+  antes del build. Para probar el script o responder "¿se puede desplegar ya?"
+  sin tocar nada.
+- `DEPLOY_SIN_PREFLIGHT=1 ./deploy/deploy.sh`: **solo emergencias** (un hotfix
+  con CI caído, o la excepción del `CLAUDE.md` de la raíz: desplegar la API
+  desde `main` ya pusheado antes de que CI termine porque el frontend, que
+  Vercel publica solo, necesita un endpoint nuevo ya). Imprime un aviso grande
+  y pide confirmar escribiendo `si`; sin terminal interactiva (stdin que no es
+  una tty) aborta, así ningún script ni agente lo puede usar sin una persona
+  adelante. Dejar constancia en el reporte de la tarea de que se usó y por qué.
 
 ## Actualizar secrets
 
@@ -106,10 +151,59 @@ Para agregar un secret **nuevo** (una env var sensible que no existía):
 3. Dar acceso al runtime SA (una sola vez, ya está hecho para todos los actuales):
    `gcloud projects add-iam-policy-binding orbita-api-corp --member="serviceAccount:681215569277-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`
 
+### `BFF_IP_SECRET` — IP real del cliente detrás del BFF (pendiente de cargar)
+
+Hallazgo `rate-limit-ip-proxy` de la auditoría interna (10/09). `TRUST_PROXY_HOPS`
+(env-vars.yaml) arregla los pedidos que van del navegador a la API, pero login,
+refresh, registro, alta y sesiones pasan por el BFF de Next.js en Vercel y le
+llegan a la API con la IP de Vercel: todos compartían un balde de throttling y
+las "sesiones activas" mostraban la IP del servidor. El BFF
+(`apps/web/src/lib/auth/bff.ts`) reenvía la IP real en `X-Orbita-Client-Ip`
+junto con `X-Orbita-Client-Ip-Secret`, y la API (`common/utils/proxy.ts`,
+`ipDelCliente`) la usa **solo** si el secreto coincide en tiempo constante.
+Es el MISMO valor en los dos lados, de 32+ caracteres (más corto se ignora).
+**Mientras no esté cargado, todo sigue exactamente como hoy** (sin regresión,
+solo sin el arreglo).
+
+1. Generar el valor una sola vez (desde Git Bash, no PowerShell — ver el aviso del BOM arriba):
+   ```bash
+   openssl rand -hex 32 > /tmp/bff-ip-secret.txt
+   ```
+2. Crearlo en Secret Manager para la API:
+   ```bash
+   gcloud secrets create BFF_IP_SECRET --project=orbita-api-corp \
+     --replication-policy=automatic --data-file=/tmp/bff-ip-secret.txt
+   ```
+   (el runtime SA ya tiene `secretmanager.secretAccessor` a nivel proyecto, no hace falta repetir el paso 3).
+3. Sumarlo a `SECRETS=` en `deploy/deploy.sh` (`BFF_IP_SECRET=BFF_IP_SECRET:latest`)
+   **recién cuando el secret exista** — si se referencia uno que no existe, el
+   deploy falla — y correr `deploy.sh`.
+4. Cargar el mismo valor en Vercel, proyecto web, como env var de servidor
+   **`BFF_IP_SECRET`** (nunca `NEXT_PUBLIC_`), entornos Production (y Preview
+   si se quiere probar ahí). Desde el panel: Settings → Environment Variables,
+   o con el CLI logueado en la cuenta del proyecto:
+   ```bash
+   vercel env add BFF_IP_SECRET production < /tmp/bff-ip-secret.txt
+   ```
+   Después hace falta un deploy nuevo del frontend para que lo tome (un push a
+   `main` alcanza). Borrar `/tmp/bff-ip-secret.txt` al terminar.
+5. Verificar sin exponer el secreto, con `GET /api/v1/health/ip`:
+   - Directo a la API desde dos redes distintas (por ejemplo wifi y 4G):
+     `curl -s https://api.orbita.site/api/v1/health/ip` tiene que dar `clientIp`
+     distinto en cada una e igual a la IP pública de esa red, con `viaBff: false`.
+   - A través del BFF: un login desde el panel (DevTools → Network →
+     `/api/auth/login`) tiene que crear en "Sesiones activas" (`/me/sessions`)
+     una sesión con la IP pública real, no una de Vercel (`76.76.x.x`). Y si se
+     repite el login de una cuenta desde dos redes, la segunda red NO tiene que
+     recibir el 429 de la primera.
+   Cuando el valor de `X-Orbita-Client-Ip-Secret` no coincide, la API ignora el
+   header y sigue con `req.ip`: nunca se puede elegir la propia IP desde afuera.
+
 ## Actualizar variables NO sensibles
 
-Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets) y correr
-`deploy.sh` de nuevo.
+Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets), llevar
+el commit a `main` como cualquier otro cambio (el preflight no deja desplegar
+con el árbol sucio ni desde una rama) y correr `deploy.sh` de nuevo.
 
 ## Ver logs
 
@@ -124,8 +218,59 @@ O directo en la consola: [Cloud Run → orbita-api → Logs](https://console.clo
 
 ## Rollback
 
-Cada deploy queda taggeado con el SHA del commit. Para volver a una versión
-anterior sin rebuildear:
+Hallazgo `rollback-sin-simulacro` de la auditoría interna (10/09/2026): el
+rollback estaba documentado (la variante por imagen, abajo) pero nunca se
+había probado, y no decía nada de las migraciones, que son lo único que puede
+hacer que "volver a la revisión anterior" no alcance. Hay dos variantes; la
+primera es la que va casi siempre.
+
+### Variante 1: mover el tráfico a una revisión anterior (sin redeploy)
+
+Cloud Run guarda cada revisión desplegada con su imagen, env vars y secrets
+tal como estaban en ese momento. Volver atrás es cambiar a qué revisión va el
+100% del tráfico: tarda segundos, no rebuildea ni crea nada nuevo, y se
+deshace con el mismo comando.
+
+```bash
+# 1. Ver las revisiones (la más nueva primero; ACTIVE = sirve tráfico ahora).
+gcloud run revisions list --service orbita-api \
+  --region southamerica-east1 --project orbita-api-corp --limit 10
+
+# Qué commit tiene una revisión (la imagen está taggeada con el SHA corto):
+gcloud run revisions describe orbita-api-000XX-abc \
+  --region southamerica-east1 --project orbita-api-corp \
+  --format="value(spec.containers[0].image)"
+
+# 2. Mandar el 100% del tráfico a la revisión anterior.
+gcloud run services update-traffic orbita-api \
+  --region southamerica-east1 --project orbita-api-corp \
+  --to-revisions orbita-api-000XX-abc=100
+
+# 3. Verificar: reparto de tráfico y que la API responde por el dominio real.
+gcloud run services describe orbita-api \
+  --region southamerica-east1 --project orbita-api-corp \
+  --format="yaml(status.traffic)"
+curl -s -o /dev/null -w "%{http_code}\n" https://api.orbita.site/api/v1/health   # 200
+
+# 4. Volver a la revisión más nueva cuando esté arreglada (o para deshacer el rollback).
+gcloud run services update-traffic orbita-api \
+  --region southamerica-east1 --project orbita-api-corp --to-latest
+```
+
+**Volver siempre con `--to-latest`, no con `--to-revisions <actual>=100`.**
+Mientras el tráfico esté clavado en una revisión puntual, el servicio deja de
+seguir a "la última": un `deploy.sh` posterior crea la revisión nueva pero le
+manda **0%** del tráfico (gcloud lo avisa al final, fácil de pasar por alto).
+`--to-latest` restablece el comportamiento normal de "cada deploy sirve el
+100%". Si después de un rollback se despliega el arreglo y "no se ve", casi
+seguro es esto.
+
+### Variante 2: redesplegar una imagen anterior por tag
+
+Cada deploy queda taggeado con el SHA del commit. Sirve cuando la revisión
+que se necesita ya no está (Cloud Run conserva un número limitado de
+revisiones viejas) o cuando hace falta la imagen vieja con env vars o secrets
+nuevos:
 
 ```bash
 gcloud run deploy orbita-api \
@@ -134,7 +279,85 @@ gcloud run deploy orbita-api \
 ```
 
 (los flags de memoria/secrets/etc. no hace falta repetirlos — Cloud Run los
-mantiene de la revisión anterior si no los especificás de nuevo).
+mantiene de la revisión anterior si no los especificás de nuevo). Esto crea
+una revisión nueva con la imagen vieja; el rollback de código queda hecho pero
+el historial de revisiones no "vuelve", avanza.
+
+### Migraciones: un rollback de código NO revierte la base
+
+Las dos variantes vuelven el **código** atrás; el schema de Postgres queda
+como lo dejó la última `prisma migrate deploy` (Prisma no tiene migraciones
+"down": deshacer una migración es escribir otra hacia adelante). Entonces el
+rollback pone una **revisión vieja contra un schema nuevo**, y eso es seguro
+o no según qué hizo la migración:
+
+| Seguro (la revisión vieja no se entera) | NO seguro (la revisión vieja rompe) |
+|---|---|
+| columna agregada **nullable** o con `DEFAULT` | columna o tabla **borrada** |
+| tabla nueva | columna o tabla **renombrada** (para el código viejo es lo mismo que borrada) |
+| índice nuevo | valor de enum **quitado** o enum renombrado |
+| valor de enum **agregado** (mientras ninguna fila lo use todavía: el cliente viejo de Prisma falla al leer un valor que no conoce) | columna que pasa a `NOT NULL` sin `DEFAULT` (los inserts viejos no la mandan) |
+| | tipo de columna cambiado |
+
+**Regla expand/contract: nunca borrar en la misma release que deja de usar.**
+Un cambio destructivo se hace en dos releases: en la primera se agrega lo
+nuevo y el código deja de leer y escribir lo viejo (queda compatible con los
+dos schemas); en la segunda, cuando la primera ya está estable en producción
+y no se va a volver atrás, va la migración que borra o renombra. Así, en
+cualquier momento, la revisión anterior a la que está sirviendo funciona con
+el schema actual, y el rollback por tráfico es siempre una opción. Si una
+tarea necesita saltearse esto, hay que decirlo explícito en el reporte:
+"este deploy no tiene rollback sin restaurar backup".
+
+Antes de un rollback, confirmar que entre el commit que sirve y el commit al
+que se vuelve no hubo migraciones destructivas:
+
+```bash
+git log --oneline SHA_ANTERIOR..SHA_ACTUAL -- apps/api/prisma/migrations
+```
+
+Si la lista está vacía, el rollback es seguro sin más. Si hay migraciones,
+abrir cada `migration.sql` y buscar `DROP`, `RENAME`, `ALTER TYPE ... DROP`
+y `SET NOT NULL`.
+
+### Simulacro (pendiente, lo corre Ale)
+
+Check pendiente del hallazgo: "Simulacro de rollback con `gcloud run services
+update-traffic`". Necesita `gcloud` logueado con `contacto@orbita-corp.com`
+(`gcloud auth list` tiene que marcarla como activa) y se hace en un horario
+de poco tráfico: durante uno o dos minutos la API sirve la revisión anterior.
+Elegir la revisión **inmediatamente anterior** y confirmar con el `git log`
+de arriba que entre las dos no hubo migración.
+
+```bash
+# 0. Cuenta correcta y revisión que sirve ahora (anotarla: es ACTUAL).
+gcloud auth list
+gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp \
+  --format="value(status.latestReadyRevisionName)"
+
+# 1. Listar revisiones; la segunda de la lista es ANTERIOR. Anotar su nombre.
+gcloud run revisions list --service orbita-api --region southamerica-east1 --project orbita-api-corp --limit 5
+
+# 2. Mover el 100% del tráfico a ANTERIOR.
+gcloud run services update-traffic orbita-api --region southamerica-east1 --project orbita-api-corp \
+  --to-revisions ANTERIOR=100
+
+# 3. Verificar que el tráfico cambió y que la API responde por el dominio real.
+gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp \
+  --format="yaml(status.traffic)"
+curl -s -o /dev/null -w "%{http_code}\n" https://api.orbita.site/api/v1/health   # tiene que dar 200
+
+# 4. Volver a la actual (con --to-latest, ver el aviso de arriba).
+gcloud run services update-traffic orbita-api --region southamerica-east1 --project orbita-api-corp --to-latest
+
+# 5. Verificar de nuevo: status.traffic con latestRevision: true y percent: 100, y health en 200.
+gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp \
+  --format="yaml(status.traffic)"
+curl -s -o /dev/null -w "%{http_code}\n" https://api.orbita.site/api/v1/health
+```
+
+Al terminar, anotar acá la fecha, las dos revisiones usadas y cuánto tardó
+cada `update-traffic`, y marcar el check en la pestaña Auditoría.
 
 ## Recursos configurados y por qué
 
@@ -312,3 +535,68 @@ nada fuera de Cloud Run:
 - `roles/run.admin` (proyecto)
 - `roles/artifactregistry.reader` (proyecto)
 - `roles/iam.serviceAccountUser` sobre `681215569277-compute@developer.gserviceaccount.com`
+
+## Retención de logs y registros
+
+Hallazgo `logs-sin-retencion` de la auditoría interna (detectado el 10/09,
+cerrado el 14/09). Nada crece para siempre: el mantenimiento nocturno
+(`POST /internal-cron/nightly-subscriptions-maintenance`, ver § Cron jobs)
+borra lo más viejo que la retención de cada tabla, justo después de la purga
+de la analítica del wizard. Código:
+`src/internal-cron/retencion-logs.service.ts` (`purgar()`).
+
+### Tablas de la base
+
+| Tabla | Variable | Default | Qué guarda |
+|---|---|---|---|
+| `platform_admin_logs` | `PLATFORM_ADMIN_LOGS_RETENTION_DAYS` | 365 días | acciones del super admin sobre negocios y suscripciones |
+| `audit_logs` | `AUDIT_LOGS_RETENTION_DAYS` | 365 días | registro de solo agregado de cada negocio (quién cambió qué en el panel) |
+| `email_logs` | `EMAIL_LOGS_RETENTION_DAYS` | 180 días | qué mail se le mandó a quién y si salió |
+| `wizard_events` / `wizard_ai_turns` | `WIZARD_ANALYTICS_RETENTION_DAYS` | 180 días | analítica del wizard (ya existía, `wizard-analytics.service.ts`) |
+
+Reglas, iguales para las tres nuevas:
+
+- Se cuenta en días desde `created_at`, con el instante actual como referencia.
+- Nunca menos de **30** días: un valor menor se sube a 30. Por debajo de un
+  mes se pierde la trazabilidad de cualquier reclamo reciente.
+- `0` u `off` **apaga** la purga de esa tabla sola; las otras siguen.
+- Vacía o inválida (`"un año"`) = el default.
+- Cada corrida loguea por tabla `Retención de <tabla> (<n> días): <k> filas
+  borradas` (o `apagada por <variable>`). Una tabla que falla se anota con
+  `error` y no frena a las otras ni a la corrida nocturna: mañana vuelve a
+  intentar y lo que no se borró hoy cae entonces.
+- `audit_logs` es de solo agregado; esta purga por antigüedad es la única
+  excepción permitida y `test/unit/audit.auditoria.unit-spec.ts` la vigila
+  (borra por fecha y nada más, nunca por negocio, entidad ni acción).
+
+Las tres variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
+están **comentadas con su default**. Para cambiar una, descomentarla, poner el
+valor y volver a desplegar (§ Actualizar variables NO sensibles).
+
+Al 14/09 en producción: `platform_admin_logs` 20 filas, `audit_logs` 0,
+`email_logs` 676 (la más vieja del 30/07). Con estos defaults la primera noche
+no borra nada; `email_logs` empieza a perder filas recién a fines de enero
+de 2027.
+
+### Cloud Logging (lo que la API escribe por consola)
+
+Lo que sale por stdout/stderr (el `Logger` de Nest, los request logs de Cloud
+Run) va al bucket `_Default` de Cloud Logging del proyecto, que retiene
+**30 días** por defecto. El otro bucket, `_Required` (audit logs de
+administración de GCP), retiene 400 días y no se puede cambiar. Para ver la
+retención actual:
+
+```bash
+gcloud logging buckets describe _Default --location=global --project orbita-api-corp
+```
+
+Para cambiarla (`N` entre 1 y 3650; retener más de 30 días se cobra por GiB
+según la tarifa vigente de Cloud Logging, la ingesta hasta el free tier no):
+
+```bash
+gcloud logging buckets update _Default --location=global --project orbita-api-corp --retention-days=N
+```
+
+Decisión: se deja en 30 días. Lo que vale más que un mes (quién hizo qué, qué
+mail salió) ya queda en las tablas de arriba, con retención propia y más
+larga; los logs de consola sirven para diagnosticar lo reciente, nada más.

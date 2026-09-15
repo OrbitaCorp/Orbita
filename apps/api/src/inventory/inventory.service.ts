@@ -12,12 +12,16 @@ import { StockAdjustmentDto } from './dto/stock-adjustment.dto';
 import { FindStockQueryDto } from './dto/find-stock-query.dto';
 import { FindMovementsQueryDto } from './dto/find-movements-query.dto';
 import { UpsertSupplierDto } from './dto/upsert-supplier.dto';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    // Registro de auditoría de entradas y ajustes de stock (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   // ── Stock ────────────────────────────────────────────────────────────────
@@ -191,6 +195,9 @@ export class InventoryService {
         supplierId: movement.supplierId,
         createdAt: movement.createdAt.toISOString(),
         newQuantity: stock.quantity,
+        // Lo que había antes del movimiento (0 si la fila de stock no existía):
+        // solo para el registro de auditoría, no sale en la respuesta.
+        quantityBefore: existing?.quantity ?? 0,
         stockMin: stock.stockMin,
         productName: variant?.product.name ?? '',
         variantLabel:
@@ -213,7 +220,29 @@ export class InventoryService {
       });
     }
 
-    const { stockMin, productName, variantLabel, ...respuesta } = resultado;
+    // Después de la transacción, como el evento: si el ajuste hizo rollback no
+    // hay nada que registrar. stock_movements ya guarda quién y por qué, pero
+    // no aparecía en la pestaña Auditoría, que es donde el dueño mira "quién
+    // tocó qué" (hallazgo `auditoria-acciones-sin-registro`). La entidad es
+    // la variante (así el historial de una misma variante queda junto) y el
+    // cambio es la cantidad antes → después, con el tipo y el motivo.
+    await this.audit?.registrar({
+      businessId,
+      memberId,
+      entityType: 'inventory',
+      entityId: resultado.variantId,
+      action: 'UPDATE',
+      changes: [
+        { field: 'quantity', before: resultado.quantityBefore, after: resultado.newQuantity },
+        { field: 'type', before: null, after: resultado.type },
+        { field: 'reason', before: null, after: resultado.reason },
+        { field: 'product', before: null, after: resultado.variantLabel ? `${resultado.productName} / ${resultado.variantLabel}` : resultado.productName },
+        { field: 'branchId', before: null, after: input.branchId },
+        { field: 'movementId', before: null, after: resultado.id },
+      ],
+    });
+
+    const { stockMin, productName, variantLabel, quantityBefore, ...respuesta } = resultado;
     return respuesta;
   }
 

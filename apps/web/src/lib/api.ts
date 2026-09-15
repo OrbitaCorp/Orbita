@@ -297,6 +297,9 @@ export type UpdateBusinessConfigInput = Partial<{
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
+  // CUIT (con o sin guiones) y razón social para los legales de la tienda; vacío = borrar.
+  cuit: string
+  legalName: string
   freeShippingFrom: number
   shippingPolicy: string
   enabledCarriers: string[]
@@ -322,6 +325,7 @@ export function updateBusinessConfig(input: UpdateBusinessConfigInput) {
 export function getBusinessConfig() {
   return request<{
     whatsapp: string | null; email: string | null; scheduleText: string | null
+    cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
     transferCbu: string | null; transferHolder: string | null
@@ -352,7 +356,7 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado'
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado'
 
 // Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
 // (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
@@ -470,6 +474,9 @@ export function panelReactivateFromCancellation() {
 export type TutorialRemoto = {
   variante: string; fase: 'activo' | 'terminado'; paso: number
   hechas: string[]; minimizado: boolean; seccionesVistas: string[]
+  // Etapa de la Checklist (1 | 2). Opcional: lo guardado antes de la segunda
+  // etapa no lo tiene (ver resolverAlAbrir en estado.ts).
+  etapa?: 1 | 2
 }
 
 export function panelGetTutorial() {
@@ -489,6 +496,7 @@ export function panelSetTutorial(tutorial: TutorialRemoto) {
 export function panelGetBusinessConfig() {
   return panelRequest<{
     whatsapp: string | null; email: string | null; scheduleText: string | null
+    cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
     transferCbu: string | null; transferHolder: string | null

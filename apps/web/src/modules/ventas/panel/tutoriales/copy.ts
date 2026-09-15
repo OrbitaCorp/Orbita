@@ -246,6 +246,87 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
     },
 ]
 
+// ─── Checklist, segunda etapa: sacarle jugo al panel ─────────────────────────
+//
+// Arranca cuando se termina la primera (o sola, para los negocios que ya la
+// habían terminado: ver ETAPA_2_PARA_QUIEN_YA_TERMINO en estado.ts). Cubre los
+// módulos que la primera no toca. Rutas, vistas y anclas verificadas contra
+// el código real (15/09): Sidebar.tsx (subs con `vista`), ConfigSidebar.tsx
+// (title = label), PedidoNuevo.tsx, ClienteLista.tsx, Plantillas.tsx,
+// DescuentosListado.tsx, Equipo.tsx. Los ids también los conoce la API
+// (businesses.service.ts#getTutorial) para el tildado automático.
+//
+// Plantillas de Home quedó como TIP y no como tarea: vive en Avanzado, que
+// es un paquete pago aparte — una tarea que manda a un overlay de "ver qué
+// incluye" no se puede cumplir. Dominios se dejó afuera a propósito: es una
+// compra, no un primer paso.
+
+export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
+    {
+        id: 'pedidos', titulo: 'Cargá tu primer pedido',
+        detalle: 'Las ventas de la tienda entran solas a Pedidos. Las de mostrador o WhatsApp las cargás vos con "Nuevo pedido": elegís productos, cómo se cobró, y queda contada en tus números.',
+        destino: ['ventas', 'pedidos', { vista: 'nuevo' }], destinoLabel: 'Nuevo pedido',
+        seccionDestino: 'pedidos',
+        // Dos pasos: primero un producto (sin eso el botón de cerrar la venta
+        // está deshabilitado), recién después el botón que la registra.
+        pasos: [
+            {
+                ancla: 'input[placeholder="Buscar producto…"] || boton:Nuevo pedido',
+                label: 'Buscá y agregá un producto',
+                avanzarAlEscribir: true,
+            },
+            { ancla: 'boton:Registrar venta|Crear pedido', label: 'Y cerrás la venta acá' },
+        ],
+    },
+    {
+        id: 'clientes', titulo: 'Conocé tu base de clientes',
+        detalle: 'Se arma sola con cada venta: cuántos pedidos hizo cada uno, cuánto gastó y cuándo volvió. Buscá por nombre o email, y con "Email masivo" les escribís a todos los de la lista filtrada.',
+        destino: ['ventas', 'clientes'], destinoLabel: 'Ir a Clientes',
+        seccionDestino: 'clientes', anclaDestino: 'input[placeholder="Buscar por nombre o email…"] || boton:Email masivo',
+        guiaLabel: 'Buscá acá; "Email masivo" les escribe a todos',
+    },
+    {
+        id: 'plantillas', titulo: 'Armá tus plantillas de respuesta',
+        detalle: 'Lo que te preguntan siempre ("¿hacen envíos?", "¿cuándo llega?") lo respondés con un toque. Se crean en Mensajes → Plantillas y se usan desde el chat.',
+        destino: ['ventas', 'mensajes', { vista: 'plantillas' }], destinoLabel: 'Ir a Plantillas',
+        seccionDestino: 'mensajes', anclaDestino: 'boton:Nueva plantilla || boton:Crear plantilla',
+        guiaLabel: 'Creá la primera desde acá',
+    },
+    {
+        id: 'descuentos', titulo: 'Creá tu primer descuento o cupón',
+        detalle: 'Los descuentos se aplican solos cuando se cumple la condición; los cupones son códigos que el cliente escribe en el checkout. Los dos se comparten por link.',
+        destino: ['ventas', 'descuentos'], destinoLabel: 'Ir a Descuentos',
+        seccionDestino: 'descuentos', anclaDestino: 'boton:Crear descuento',
+        guiaLabel: 'Tu primera promo sale de acá',
+    },
+    {
+        id: 'equipo', titulo: 'Invitá a alguien de tu equipo',
+        detalle: 'Cada persona entra con su usuario y ve solo lo que su rol permite. Le llega un mail con la invitación.',
+        destino: ['ventas', 'configuracion', { vista: 'equipo' }], destinoLabel: 'Ir a Equipo',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-sidebar-item[title="Equipo"]',
+        guiaLabel: 'Invitá desde acá: elegís el rol y le llega un mail',
+    },
+    {
+        id: 'apariencia', titulo: 'Personalizá cómo se ve tu tienda',
+        detalle: 'Logo, colores, tipografía, banner y los textos de la portada. Cambiá algo y tocá "Guardar cambios": la tienda se actualiza al instante.',
+        tip: 'Con el paquete Avanzado tenés Plantillas de Home: veinte portadas distintas para tu tienda, en Avanzado → Plantillas de Home.',
+        destino: ['ventas', 'configuracion', { vista: 'apariencia' }], destinoLabel: 'Ir a Apariencia',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Apariencia"]',
+        guiaLabel: 'Logo, colores y textos se cambian acá',
+    },
+    {
+        id: 'notificaciones', titulo: 'Elegí qué avisos recibís',
+        detalle: 'Pedido nuevo, pago confirmado, stock crítico, cancelaciones: cada uno por el panel, por mail, o los dos. Ajustá la grilla y guardá.',
+        destino: ['ventas', 'configuracion', { vista: 'notificaciones' }], destinoLabel: 'Ir a Notificaciones',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Notificaciones"]',
+        guiaLabel: 'Cada aviso, por panel o por mail: se define acá',
+    },
+]
+
+/** Tareas de cada etapa de la Checklist. */
+export const tareasDeEtapa = (etapa: 1 | 2): TareaChecklist[] =>
+    etapa === 2 ? TAREAS_CHECKLIST_ETAPA2 : TAREAS_CHECKLIST
+
 // ─── Variante: Tooltips progresivos por sección ──────────────────────────────
 
 export interface TipSeccion {
@@ -378,4 +459,16 @@ export const TEXTOS = {
     // un "ya viste el mapa" — es "tu tienda quedó lista".
     cierreChecklistTitulo: 'Tu tienda está lista',
     cierreChecklist: 'Datos cargados, Mercado Pago conectado, categorías y productos creados, envíos definidos y tienda publicada. Ya podés vender.',
+    // Del cierre de la primera etapa se sigue a la segunda (pedido de Ale:
+    // "cuando termina el primero le sale el segundo").
+    seguirEtapa2: 'Seguir con la segunda etapa',
+    // Segunda etapa: nombre de la tarjeta, presentación y cierre propio.
+    etapa1Nombre: 'Primeros pasos',
+    etapa2Nombre: 'Segunda etapa',
+    etapa2IntroTitulo: 'Segunda etapa',
+    etapa2Intro: 'Lo básico ya está: tu tienda vende. Ahora viene sacarle jugo al panel: pedidos, clientes, plantillas de respuesta, promos, equipo y la cara de tu tienda.',
+    etapa2Empezar: 'Empezar',
+    etapa2AhoraNo: 'Ahora no',
+    cierreEtapa2Titulo: 'Ya le sacás el jugo al panel',
+    cierreEtapa2: 'Pedidos, clientes, plantillas, promos, equipo, apariencia y avisos: recorriste todo lo que hace al día a día. De acá en más, el panel es tuyo.',
 }

@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const slug = slugFromHost(req.headers.host) ?? undefined
 
   try {
-    const { status, body } = await callBackend('/auth/session/peek', { method: 'POST', body: { refreshToken }, slug })
+    const { status, body } = await callBackend('/auth/session/peek', { req, method: 'POST', body: { refreshToken }, slug })
     const exists = status === 200 && !!(body as { exists?: boolean } | null)?.exists
     return res.status(200).json({ exists })
   } catch {

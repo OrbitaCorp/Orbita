@@ -2,8 +2,10 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { ConfigService } from '@nestjs/config';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
+import { sumarAniosCalendario } from '../common/utils/fechas';
 import { VercelDomainsService } from './vercel-domains.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
+import { AuditService, CambioAuditoria } from '../audit/audit.service';
 import { CheckoutDomainPurchaseDto } from './dto/checkout-domain-purchase.dto';
 import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
 import { esDominioDeOrbita } from './dominio-de-orbita';
@@ -65,7 +67,19 @@ export class DomainPurchaseService {
     private readonly config: ConfigService,
     private readonly vercelDomains: VercelDomainsService,
     private readonly mercadopago: MercadopagoService,
+    // Registro de auditoría de la compra (quién la inició, y qué pasó cuando
+    // MP confirmó el pago: comprado, fallido y reembolsado, o comprado sin
+    // vincular). Hallazgo `auditoria-acciones-sin-registro`. Opcional solo
+    // para los tests.
+    private readonly audit?: AuditService,
   ) {}
+
+  // Todas las entradas de una compra comparten entityId (el pedido de compra):
+  // el CustomDomain recién existe cuando Vercel terminó, y el panel tiene que
+  // poder seguir el pedido desde que se cobró hasta que se resolvió.
+  private registrarCompra(order: { id: string; businessId: string }, memberId: string | null, action: 'CREATE' | 'UPDATE', changes: CambioAuditoria[]) {
+    return this.audit?.registrar({ businessId: order.businessId, memberId, entityType: 'domain', entityId: order.id, action, changes });
+  }
 
   // ── Tipo de cambio ────────────────────────────────────────────────────
   // dolarapi.com — pública, gratis, sin auth (confirmada funcionando antes
@@ -170,7 +184,7 @@ export class DomainPurchaseService {
   }
 
   // ── Arranca el pago — crea el pedido PENDING_PAYMENT + la preferencia de MP ──
-  async startCheckout(businessId: string, dto: CheckoutDomainPurchaseDto) {
+  async startCheckout(businessId: string, dto: CheckoutDomainPurchaseDto, actorId?: string) {
     const domain = dto.domain.trim().toLowerCase();
     if (esDominioDeOrbita(domain)) throw new BadRequestException('Ese dominio no está disponible');
     // Si otro negocio ya lo vinculó (LINKED, esperando DNS), comprarlo acá
@@ -218,6 +232,12 @@ export class DomainPurchaseService {
       backUrl,
     );
     await this.prisma.domainPurchaseOrder.update({ where: { id: order.id }, data: { mpPreferenceId } });
+    // Quién mandó a comprar qué dominio y por cuánto se lo cobró.
+    await this.registrarCompra({ id: order.id, businessId }, actorId ?? null, 'CREATE', [
+      { field: 'domain', before: null, after: domain },
+      { field: 'priceCharged', before: null, after: priceCharged },
+      { field: 'status', before: null, after: 'PENDING_PAYMENT' },
+    ]);
     return { orderId: order.id, initPoint };
   }
 
@@ -362,7 +382,9 @@ export class DomainPurchaseService {
           registrar: 'vercel',
           status: 'PENDING', // se confirma ACTIVE con el mismo verifyDns() de siempre
           purchasedAt: new Date(),
-          expiresAt: new Date(Date.now() + order.years * 365 * 24 * 60 * 60 * 1000),
+          // Años calendario, como el registrador (una compra del 29/02 vence el
+          // 28/02 de un año no bisiesto): ver common/utils/fechas.ts.
+          expiresAt: sumarAniosCalendario(new Date(), order.years),
           autoRenew: false,
         },
       });
@@ -371,6 +393,12 @@ export class DomainPurchaseService {
         where: { id: orderId },
         data: { status: 'COMPLETED', vercelOrderId, customDomainId: customDomain.id },
       });
+      // Sin actor: lo resolvió el webhook de MP, no alguien del panel.
+      await this.registrarCompra(order, null, 'UPDATE', [
+        { field: 'domain', before: null, after: order.domain },
+        { field: 'status', before: 'PENDING_PAYMENT', after: 'COMPLETED' },
+        { field: 'customDomainId', before: null, after: customDomain.id },
+      ]);
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Error desconocido comprando el dominio en Vercel';
       if (vercelOrderId) {
@@ -382,11 +410,18 @@ export class DomainPurchaseService {
           where: { id: orderId },
           data: { failReason: `Comprado en Vercel, falta vincular: ${reason}`.slice(0, 500) },
         });
+        await this.registrarCompra(order, null, 'UPDATE', [
+          { field: 'domain', before: null, after: order.domain },
+          { field: 'failReason', before: null, after: `Comprado en Vercel, falta vincular: ${reason}`.slice(0, 500) },
+        ]);
         return;
       }
       this.logger.error(`Compra de dominio ${order.domain} (pedido ${orderId}) falló después de cobrar — reembolsando`, err as Error);
+      // El reembolso queda en el registro con el id de MP (o sin él si falló:
+      // ahí es plata que hay que devolver a mano).
+      let mpRefundId: string | null = null;
       try {
-        await this.mercadopago.refundPlatformPayment(mpPaymentId);
+        ({ id: mpRefundId } = await this.mercadopago.refundPlatformPayment(mpPaymentId));
       } catch (refundErr) {
         // No debería pasar nunca (el pago se acaba de confirmar aprobado),
         // pero si el reembolso automático falla, queda bien logueado para
@@ -394,6 +429,12 @@ export class DomainPurchaseService {
         this.logger.error(`REEMBOLSO FALLIDO para el pedido ${orderId} (pago ${mpPaymentId}) — requiere atención manual`, refundErr as Error);
       }
       await this.prisma.domainPurchaseOrder.update({ where: { id: orderId }, data: { status: 'FAILED', failReason: reason } });
+      await this.registrarCompra(order, null, 'UPDATE', [
+        { field: 'domain', before: null, after: order.domain },
+        { field: 'status', before: 'PENDING_PAYMENT', after: 'FAILED' },
+        { field: 'failReason', before: null, after: reason },
+        { field: 'refund', before: null, after: { monto: Number(order.priceCharged), mpRefundId } },
+      ]);
     }
   }
 }

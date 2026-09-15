@@ -13,6 +13,7 @@ import { getStorefrontConfig } from '@/lib/storefront/api'
 import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
 import { TiendaPausada } from '@/components/storefront/TiendaPausada'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
+import { TEMA_SCRIPT } from '@/lib/csp'
 
 const queryClient = new QueryClient()
 
@@ -234,52 +235,19 @@ export default function App({ Component, pageProps }: AppProps) {
         No se puede usar el router de Next acá (corre antes de hidratar) —
         se detecta "es storefront" con la misma lógica de middleware.ts
         (slugFromHost) pero en el cliente, a partir de location.
+
+        El código vive en lib/csp.ts (TEMA_SCRIPT) desde el 15/09 (auditoría
+        interna, hallazgo csp-scripts): la CSP lo autoriza por hash sha256,
+        así que tiene que ser el MISMO string en todas las páginas — por eso
+        ya no interpola nada y lee ROOT_DOMAIN y el modo de color por defecto
+        de los atributos data-* de este mismo <script> (document.currentScript).
+        Ver en csp.ts por qué hash y no nonce.
       */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function() {
-          var ROOT_DOMAIN = ${JSON.stringify(process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local')};
-          var COLOR_MODE_DEFAULT = ${JSON.stringify(isStorefront ? (ssrColorMode ?? 'light') : 'light')};
-          var hostname = window.location.hostname.toLowerCase();
-          var pathname = window.location.pathname;
-
-          // '/admin' es el panel real (ver AdminSeccionShell.tsx) — mismo criterio
-          // que authChannel() en lib/tenant.ts. Sin el check de '/admin' acá, esas
-          // páginas bajo el subdominio de una tienda se clasificaban como storefront
-          // y leían la key de tema equivocada (orbita-theme-tienda en vez de
-          // orbita-theme): el panel en oscuro arrancaba en claro hasta que React
-          // hidrataba y el Header corregía la clase — el loader se veía saltar de
-          // color o duplicarse con temas distintos.
-          var esPanel = pathname === '/panel' || pathname.indexOf('/panel/') === 0 || pathname.indexOf('/admin') === 0;
-          var esTiendaPorPath = pathname.indexOf('/tienda/') === 0;
-          var esTiendaPorSubdominio = false;
-          if (hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== ROOT_DOMAIN && hostname.slice(-(ROOT_DOMAIN.length + 1)) === '.' + ROOT_DOMAIN) {
-            var sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1));
-            if (sub.indexOf('www.') === 0) sub = sub.slice(4);
-            esTiendaPorSubdominio = !!sub && sub !== 'www';
-          }
-          var esStorefront = !esPanel && (esTiendaPorPath || esTiendaPorSubdominio);
-
-          if (esStorefront) {
-            var temaTienda = localStorage.getItem('orbita-theme-tienda');
-            if (temaTienda === 'dark') {
-              document.documentElement.classList.add('dark');
-            } else if (temaTienda !== 'light') {
-              // El visitante nunca tocó el toggle — cae al default que
-              // eligió el dueño (COLOR_MODE_DEFAULT, arriba).
-              var prefiereDarkTienda = window.matchMedia('(prefers-color-scheme: dark)').matches;
-              if (COLOR_MODE_DEFAULT === 'dark' || (COLOR_MODE_DEFAULT === 'system' && prefiereDarkTienda)) {
-                document.documentElement.classList.add('dark');
-              }
-            }
-          } else {
-            var tema = localStorage.getItem('orbita-theme');
-            var prefiereDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (tema === 'dark' || (!tema && prefiereDark)) {
-              document.documentElement.classList.add('dark');
-            }
-          }
-        })();
-      `}} />
+      <script
+        data-root-domain={process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local'}
+        data-color-mode={isStorefront ? (ssrColorMode ?? 'light') : 'light'}
+        dangerouslySetInnerHTML={{ __html: TEMA_SCRIPT }}
+      />
       <AuthProvider>
         <CartProvider>
           {storePausada ? (

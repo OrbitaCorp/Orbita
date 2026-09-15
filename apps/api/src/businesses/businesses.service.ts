@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import sharp from 'sharp';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { cuitValido, limpiarCuit } from '../common/utils/cuit';
 import { suspendidoPorPlataforma } from './suspension';
 import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -23,6 +25,12 @@ import { UpdateNotificationConfigDto } from './dto/update-notification-config.dt
 import { TutorialStateDto, UpdateTutorialDto } from './dto/update-tutorial.dto';
 
 const BUSINESS_LOGOS_BUCKET = 'business-logos';
+
+// Fila de config creada con defaults en el onboarding: se considera "tocada"
+// por el dueño si se guardó después de crearse. El segundo de margen cubre
+// un create seguido de un update en la misma transacción.
+const tocada = (fila: { createdAt: Date; updatedAt: Date }) =>
+  fila.updatedAt.getTime() - fila.createdAt.getTime() > 1000;
 
 // Set cerrado de eventos y canales válidos para notification_config.matrix.
 // No están enumerados como tabla en MODELO_DATOS_DEFINITIVO.md (es un JSON libre),
@@ -70,10 +78,13 @@ export class BusinessesService {
   // ── Tutorial de primeros pasos ─────────────────────────────────────────
 
   async getTutorial(businessId: string): Promise<{ tutorial: TutorialStateDto | null; cumplidas: string[] }> {
-    const [business, config, mp, nCategorias, nProductos, sucursalConDireccion] = await Promise.all([
+    const [
+      business, config, mp, nCategorias, nProductos, sucursalConDireccion,
+      nPedidos, nClientes, nPlantillas, nDescuentos, nMiembros, storefront, notificaciones,
+    ] = await Promise.all([
       this.prisma.business.findUnique({
         where: { id: businessId },
-        select: { tutorial: true, name: true, industry: true, isActive: true, isPaused: true },
+        select: { tutorial: true, name: true, industry: true, isActive: true, isPaused: true, mode: true },
       }),
       this.prisma.businessConfig.findUnique({
         where: { businessId },
@@ -85,6 +96,25 @@ export class BusinessesService {
       // estar cumplida (auditoría interna 09/09, ítem `api.prisma`).
       this.prisma.product.count({ where: { businessId, deletedAt: null } }),
       this.prisma.branch.findFirst({ where: { businessId, address: { not: null } }, select: { address: true } }),
+      // ── Segunda etapa (ids = TAREAS_CHECKLIST_ETAPA2 en copy.ts) ──
+      // Los tres con soft-delete se cuentan vivos: si borró todo, la tarea
+      // vuelve a estar pendiente (mismo criterio que productos).
+      this.prisma.order.count({ where: { businessId, deletedAt: null } }),
+      this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
+      this.prisma.messageTemplate.count({ where: { businessId } }),
+      // Descuento automático o cupón (code null o no): cualquiera cumple.
+      this.prisma.discount.count({ where: { businessId, deletedAt: null } }),
+      // El dueño ya es member: más de uno = invitó a alguien (PENDING cuenta,
+      // la tarea es "invitá", no "que acepte").
+      this.prisma.member.count({ where: { businessId } }),
+      // Apariencia y notificaciones se crean en el onboarding con defaults:
+      // "tocada" = updatedAt distinto de createdAt (solo las escribe la
+      // pantalla de Apariencia / Plantillas de Home, y la de Notificaciones).
+      this.prisma.storefrontConfig.findUnique({
+        where: { businessId },
+        select: { homeTemplate: true, createdAt: true, updatedAt: true },
+      }),
+      this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { createdAt: true, updatedAt: true } }),
     ]);
     if (!business) throw new NotFoundException('Negocio no encontrado');
 
@@ -103,14 +133,28 @@ export class BusinessesService {
     }
     if (business.isActive && !business.isPaused) cumplidas.push('publicar');
 
+    // Segunda etapa.
+    if (nPedidos > 0) cumplidas.push('pedidos');
+    if (nClientes > 0) cumplidas.push('clientes');
+    // Mensajería es solo de modo FULL (BusinessModeGuard responde 403 en
+    // SHOWCASE): a una vidriera no se la manda a una pantalla que no puede
+    // abrir — la tarea se da por cumplida y no molesta.
+    if (nPlantillas > 0 || business.mode === 'SHOWCASE') cumplidas.push('plantillas');
+    if (nDescuentos > 0) cumplidas.push('descuentos');
+    if (nMiembros > 1) cumplidas.push('equipo');
+    if (storefront && (storefront.homeTemplate !== null || tocada(storefront))) cumplidas.push('apariencia');
+    if (notificaciones && tocada(notificaciones)) cumplidas.push('notificaciones');
+
     // NULL = nunca se tocó: el panel lo interpreta como "arrancar desde cero".
     return { tutorial: (business.tutorial as TutorialStateDto | null) ?? null, cumplidas };
   }
 
   async updateTutorial(businessId: string, dto: UpdateTutorialDto): Promise<{ tutorial: TutorialStateDto }> {
-    const { variante, fase, paso, hechas, minimizado, seccionesVistas } = dto.tutorial;
+    const { variante, fase, paso, hechas, minimizado, seccionesVistas, etapa } = dto.tutorial;
     // Se copia campo por campo: que a la base solo llegue el shape validado.
-    const tutorial: TutorialStateDto = { variante, fase, paso, hechas, minimizado, seccionesVistas };
+    // `etapa` solo si vino: guardar `etapa: undefined` en el JSONB sería
+    // ruido, y "ausente" tiene significado propio para el panel.
+    const tutorial: TutorialStateDto = { variante, fase, paso, hechas, minimizado, seccionesVistas, ...(etapa !== undefined ? { etapa } : {}) };
     await this.prisma.business.update({ where: { id: businessId }, data: { tutorial: { ...tutorial } } });
     return { tutorial };
   }
@@ -334,9 +378,23 @@ export class BusinessesService {
       }
     }
 
+    // CUIT y razón social (hallazgo `legales-sin-cuit`): el CUIT llega con o
+    // sin guiones, se guarda solo con los 11 dígitos y se rechaza si el
+    // verificador no cierra; vacío borra. Van a `data` aparte del DTO porque
+    // el valor guardado no es el que vino.
+    const data: Record<string, unknown> = { ...dto };
+    // null llega igual que '' (@IsOptional deja pasar null): los dos borran.
+    if (dto.cuit !== undefined) {
+      const digitos = limpiarCuit(dto.cuit ?? '');
+      if (digitos === '') data.cuit = null;
+      else if (!cuitValido(digitos)) throw new BadRequestException('El CUIT no es válido: son 11 dígitos y el último tiene que ser el verificador');
+      else data.cuit = digitos;
+    }
+    if (dto.legalName !== undefined) data.legalName = (dto.legalName ?? '').trim() || null;
+
     return this.prisma.businessConfig.update({
       where: { businessId },
-      data: dto,
+      data: data as Prisma.BusinessConfigUpdateInput,
     });
   }
 

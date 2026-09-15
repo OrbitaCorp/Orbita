@@ -2,9 +2,12 @@ import { Controller, Logger, Post, UseGuards } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { InternalCronSecretGuard } from './internal-cron-secret.guard';
 import { CronRunsService } from './cron-runs.service';
+import { RetencionLogsService } from './retencion-logs.service';
+import { describeError } from '../common/utils/describe-error.util';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { DomainExpiryService } from '../domains/domain-expiry.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -49,6 +52,14 @@ export class InternalCronController {
     private readonly notifications: NotificationsService,
     private readonly wizardAnalytics: WizardAnalyticsService,
     private readonly corridas: CronRunsService,
+    // Último y opcional, como AuditService en los demás servicios: los specs
+    // anteriores a la retención construyen el controller con cuatro argumentos.
+    // En la app real Nest lo inyecta siempre (está en providers del módulo).
+    private readonly retencionLogs?: RetencionLogsService,
+    // Vencimiento de dominios comprados (hallazgo `dominios-comprados-sin-
+    // renovacion`): aviso a cada owner a los 30 y a los 7 días. Opcional por
+    // el mismo motivo que retencionLogs (specs viejos con menos argumentos).
+    private readonly domainExpiry?: DomainExpiryService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -72,6 +83,26 @@ export class InternalCronController {
         // Retención de la analítica del wizard (auditoría interna 10/09, ítem
         // api.wizard-analytics). Mismo disparo por el mismo motivo.
         await this.wizardAnalytics.purgarAntiguos();
+        // Retención de platform_admin_logs, audit_logs y email_logs (auditoría
+        // interna, hallazgo logs-sin-retencion). Va última y con su propio
+        // try/catch: es limpieza, no negocio. Si falla, se anota y mañana lo
+        // vuelve a intentar — no tiene que marcar la corrida entera como
+        // fallida ni hacer que Cloud Scheduler reintente lo que ya se hizo.
+        try {
+          await this.retencionLogs?.purgar();
+        } catch (e) {
+          this.logger.error(`Retención de logs: no se pudo correr — ${describeError(e)}`);
+        }
+        // Dominios comprados por vencer (hallazgo `dominios-comprados-sin-
+        // renovacion`): mismo disparo y mismo criterio que la retención. Si el
+        // barrido entero tira, se anota sin marcar la corrida como fallida; un
+        // aviso que no salió se reintenta la noche siguiente porque solo cuenta
+        // como avisado un envío SENT (ver DomainExpiryService).
+        try {
+          await this.domainExpiry?.avisarVencimientos();
+        } catch (e) {
+          this.logger.error(`Vencimiento de dominios: no se pudo correr — ${describeError(e)}`);
+        }
       },
     );
   }

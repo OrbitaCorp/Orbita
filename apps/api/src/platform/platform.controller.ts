@@ -208,8 +208,8 @@ export class PlatformController {
   }
 
   @Post('mail-templates/:id/send-test')
-  sendMailTest(@Param('id') id: string, @Body() dto: SendMailTestDto) {
-    return this.platformService.sendMailTest(id, dto.to);
+  sendMailTest(@Param('id') id: string, @Body() dto: SendMailTestDto, @Req() req: RequestWithAdmin) {
+    return this.platformService.sendMailTest(id, dto.to, req.user.adminId);
   }
 
   // ── Códigos de descuento de plataforma ────────────────────────────────────

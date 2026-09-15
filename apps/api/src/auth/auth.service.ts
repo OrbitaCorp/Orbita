@@ -22,6 +22,8 @@ import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { createHash, randomBytes, randomInt } from 'crypto';
+import { contrasenaTemporalVencida } from '../common/utils/contrasena-temporal';
+import { PlatformAdminLogService } from '../platform/platform-admin-log.service';
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
@@ -72,6 +74,12 @@ export class AuthService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    // Registro en platform_admin_logs del login y el segundo factor del super
+    // panel (hallazgo `auditoria-acciones-sin-registro`, parte 3). Último y
+    // opcional solo para los tests que construyen el service con menos
+    // argumentos; en runtime lo provee PlatformAdminLogModule. Sus métodos
+    // nunca tiran: un insert fallido no deja a nadie afuera del panel.
+    private readonly adminLog?: PlatformAdminLogService,
   ) {
     this.jwtSecret = this.config.getOrThrow<string>('JWT_SECRET');
     // Falla rápido ante un deploy mal configurado (ej. el placeholder de
@@ -133,6 +141,23 @@ export class AuthService implements OnModuleInit {
     if (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date()) {
       throw new UnauthorizedException('Tu invitación venció. Pedile al dueño del negocio que te vuelva a invitar.');
     }
+  }
+
+  // Una contraseña temporal (reseteo desde Equipo) vencida no entra (hallazgo
+  // MEDIA `contrasena-temporal-reseteo`, auditoría interna 09/09): quien la
+  // generó la conoce, y sin vencimiento servía para entrar como esa persona
+  // para siempre. Se chequea DESPUÉS de argon2.verify y con el MISMO mensaje
+  // genérico que una contraseña incorrecta: ni el texto ni el tiempo de
+  // respuesta dicen si la temporal existe o venció. El detalle queda en el
+  // log, por id. Una temporal sin fecha (anterior a la columna) sigue
+  // entrando — ver contrasenaTemporalVencida().
+  private assertTemporalVigente(
+    tipo: 'member' | 'platform_admin',
+    cuenta: { id: string; hasTempPassword: boolean; tempPasswordExpiresAt: Date | null },
+  ) {
+    if (!contrasenaTemporalVencida(cuenta)) return;
+    this.logger.warn(`Login rechazado: contraseña temporal vencida (${tipo} ${cuenta.id})`);
+    throw new UnauthorizedException('Credenciales inválidas');
   }
 
   // ── Register (storefront) ─────────────────────────────────────────────────
@@ -228,6 +253,7 @@ export class AuthService implements OnModuleInit {
           throw new UnauthorizedException('Credenciales inválidas');
         }
         this.assertInvitacionVigente(member);
+        this.assertTemporalVigente('member', member);
 
         await this.prisma.member.update({
           where: { id: member.id },
@@ -241,7 +267,7 @@ export class AuthService implements OnModuleInit {
           type: 'member',
           token,
           refreshToken,
-          member: { id: member.id, name: member.name, email: member.email, status: member.status },
+          member: { id: member.id, name: member.name, email: member.email, status: member.status, hasTempPassword: member.hasTempPassword },
           role: member.role.name,
           permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
           business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
@@ -314,23 +340,34 @@ export class AuthService implements OnModuleInit {
     // real solo porque el mail coincide con el de un negocio).
     const admin = await this.prisma.platformAdmin.findUnique({ where: { email: dto.email } });
     if (admin && admin.isActive && admin.passwordHash) {
+      // Los rechazos del super panel quedan en platform_admin_logs (hallazgo
+      // `auditoria-acciones-sin-registro`, parte 3): antes un intento contra
+      // una cuenta de plataforma no dejaba más rastro que el contador de
+      // failed_login_attempts. Se registra ANTES de tirar, con el motivo y el
+      // origen, nunca con la contraseña.
+      if (admin.lockedUntil && admin.lockedUntil > new Date()) {
+        await this.adminLog?.loginFallido({ adminId: admin.id, email: dto.email, motivo: 'bloqueado', ...deviceInfo });
+      }
       await this.checkLockout(admin.lockedUntil);
 
       const valid = await argon2.verify(admin.passwordHash, dto.password);
       if (!valid) {
         await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts);
+        await this.adminLog?.loginFallido({ adminId: admin.id, email: dto.email, motivo: 'password', ...deviceInfo });
         throw new UnauthorizedException('Credenciales inválidas');
       }
+      this.assertTemporalVigente('platform_admin', admin);
 
       await this.prisma.platformAdmin.update({
         where: { id: admin.id },
         data: { failedLoginAttempts: 0, lockedUntil: null, lastAccessAt: new Date() },
       });
+      await this.adminLog?.loginOk({ adminId: admin.id, via: 'password', ...deviceInfo });
 
       // Contraseña correcta ≠ sesión todavía — falta el segundo factor
       // (RBT-647). El código viaja por mail; la sesión real la emite
       // verifyPlatformAdminLoginCode() recién cuando lo confirma.
-      await this.issuePlatformAdminLoginCode(admin.id, admin.email);
+      await this.issuePlatformAdminLoginCode(admin.id, admin.email, deviceInfo);
       return { type: 'platform_admin_mfa_required', email: admin.email };
     }
 
@@ -356,6 +393,7 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     this.assertInvitacionVigente(member);
+    this.assertTemporalVigente('member', member);
 
     await this.prisma.member.update({
       where: { id: member.id },
@@ -369,7 +407,7 @@ export class AuthService implements OnModuleInit {
       type: 'member',
       token,
       refreshToken,
-      member: { id: member.id, name: member.name, email: member.email, status: member.status },
+      member: { id: member.id, name: member.name, email: member.email, status: member.status, hasTempPassword: member.hasTempPassword },
       role: member.role.name,
       permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
       business: {
@@ -642,27 +680,40 @@ export class AuthService implements OnModuleInit {
     // los de PLATFORM_ADMIN no (email único global). Ver forgotPassword() — hoy
     // el apex solo emite tokens de member; el reset de admin queda para cuando se
     // exponga su flujo (ver PENDIENTES), pero la persistencia ya lo contempla.
+    // Después de restablecer se cierran TODAS las sesiones de la cuenta, sin
+    // preservar ninguna: quien restablece por el link no tiene sesión (o la
+    // tiene alguien más, que es justamente el caso que se quiere cortar).
+    // Hallazgo `cambio-clave-sin-cerrar-sesiones` (auditoría interna 09/09).
     let cambiado: { memberId?: string; customerId?: string } | null = null;
     if (stored.userType === 'MEMBER' && stored.businessId) {
       const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: stored.businessId } });
       if (member) {
-        // hasTempPassword se apaga: crear la definitiva por este camino ES el
-        // cambio que la marca pedía (sin esto, el miembro que restablecía por
-        // el link del admin quedaba con el cartel "Debe cambiar contraseña"
-        // para siempre).
-        await this.prisma.member.update({ where: { id: member.id }, data: { passwordHash, hasTempPassword: false, failedLoginAttempts: 0, lockedUntil: null } });
+        // hasTempPassword se apaga (y su vencimiento con él): crear la
+        // definitiva por este camino ES el cambio que la marca pedía (sin
+        // esto, el miembro que restablecía por el link del admin quedaba con
+        // el cartel "Debe cambiar contraseña" para siempre).
+        await this.prisma.member.update({
+          where: { id: member.id },
+          data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null },
+        });
+        await this.revocarOtrasSesiones({ id: member.id, userType: 'MEMBER' });
         cambiado = { memberId: member.id };
       }
     } else if (stored.userType === 'CUSTOMER' && stored.businessId) {
       const customer = await this.prisma.customer.findFirst({ where: { email: stored.email, businessId: stored.businessId, deletedAt: null } });
       if (customer) {
         await this.prisma.customer.update({ where: { id: customer.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+        await this.revocarOtrasSesiones({ id: customer.id, userType: 'CUSTOMER' });
         cambiado = { customerId: customer.id };
       }
     } else if (stored.userType === 'PLATFORM_ADMIN') {
       const admin = await this.prisma.platformAdmin.findUnique({ where: { email: stored.email } });
       if (admin) {
-        await this.prisma.platformAdmin.update({ where: { id: admin.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+        await this.prisma.platformAdmin.update({
+          where: { id: admin.id },
+          data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null },
+        });
+        await this.revocarOtrasSesiones({ id: admin.id, userType: 'PLATFORM_ADMIN' });
       }
     }
 
@@ -755,6 +806,9 @@ export class AuthService implements OnModuleInit {
           lastAccessAt: new Date(),
         },
       });
+      // Sin IP ni user-agent: el callback de Google no arma DeviceInfo (la
+      // sesión real, con su origen, la emite el segundo factor).
+      await this.adminLog?.loginOk({ adminId: admin.id, via: 'google' });
       // Mismo segundo factor que el login por password (RBT-647) — si no,
       // Google sería una forma de esquivar el 2FA.
       await this.issuePlatformAdminLoginCode(admin.id, admin.email);
@@ -787,7 +841,7 @@ export class AuthService implements OnModuleInit {
       type: 'member',
       token,
       refreshToken,
-      member: { id: member.id, name: member.name, email: member.email, status: member.status },
+      member: { id: member.id, name: member.name, email: member.email, status: member.status, hasTempPassword: member.hasTempPassword },
       role: member.role.name,
       permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
       business: {
@@ -831,27 +885,46 @@ export class AuthService implements OnModuleInit {
 
   // ── Segundo factor del login de platform admin (RBT-647) ───────────────────
 
-  private async issuePlatformAdminLoginCode(adminId: string, email: string): Promise<void> {
+  private async issuePlatformAdminLoginCode(adminId: string, email: string, deviceInfo?: DeviceInfo): Promise<void> {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const codeHash = this.hashToken(code);
-    await this.prisma.platformAdminLoginCode.create({
+    const creado = await this.prisma.platformAdminLoginCode.create({
       data: { adminId, codeHash, expiresAt: new Date(Date.now() + PLATFORM_ADMIN_CODE_TTL_MS) },
     });
     await this.mail.sendPlatformAdminLoginCode(email, { code, expiresIn: '10 minutos' });
+    // Recién después del mail: si Resend tira, el código no llegó a nadie y
+    // no hay "enviado" que registrar. Va el id de la fila, nunca el código.
+    await this.adminLog?.segundoFactor({ adminId, resultado: 'enviado', codeId: creado.id, ...deviceInfo });
   }
 
   // Confirma el código y recién acá emite la sesión real. `email` (no un id)
   // porque el cliente solo tiene el email en este punto — el challenge de
   // login() nunca reveló el id del admin.
+  //
+  // Cada rechazo queda en platform_admin_logs con su motivo (hallazgo
+  // `auditoria-acciones-sin-registro`, parte 3) — al cliente le llega siempre
+  // el mismo 401 genérico, el detalle es solo para el panel de logs.
   async verifyPlatformAdminLoginCode(email: string, code: string, deviceInfo?: DeviceInfo): Promise<PlatformAdminAuthResponse> {
     const admin = await this.prisma.platformAdmin.findUnique({ where: { email } });
-    if (!admin || !admin.isActive) throw new UnauthorizedException('Código inválido o expirado');
+    if (!admin || !admin.isActive) {
+      await this.adminLog?.segundoFactor({ adminId: admin?.id, email, resultado: 'fallido', motivo: admin ? 'admin_inactivo' : 'sin_codigo', ...deviceInfo });
+      throw new UnauthorizedException('Código inválido o expirado');
+    }
 
     const stored = await this.prisma.platformAdminLoginCode.findFirst({
       where: { adminId: admin.id, usedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    if (!stored || stored.attempts >= MAX_PLATFORM_ADMIN_CODE_ATTEMPTS || stored.expiresAt < new Date()) {
+    if (!stored) {
+      await this.adminLog?.segundoFactor({ adminId: admin.id, resultado: 'fallido', motivo: 'sin_codigo', ...deviceInfo });
+      throw new UnauthorizedException('Código inválido o expirado');
+    }
+    if (stored.attempts >= MAX_PLATFORM_ADMIN_CODE_ATTEMPTS) {
+      await this.adminLog?.segundoFactor({ adminId: admin.id, resultado: 'bloqueado', codeId: stored.id, ...deviceInfo });
+      throw new UnauthorizedException('Código inválido o expirado');
+    }
+    if (stored.expiresAt < new Date()) {
+      await this.adminLog?.segundoFactor({ adminId: admin.id, resultado: 'fallido', motivo: 'vencido', codeId: stored.id, ...deviceInfo });
       throw new UnauthorizedException('Código inválido o expirado');
     }
 
@@ -860,10 +933,19 @@ export class AuthService implements OnModuleInit {
         where: { id: stored.id },
         data: { attempts: { increment: 1 } },
       });
+      // El intento que agota el cupo se registra como bloqueo, no como un
+      // fallo más: es el momento en que el código dejó de servir.
+      const agotado = stored.attempts + 1 >= MAX_PLATFORM_ADMIN_CODE_ATTEMPTS;
+      await this.adminLog?.segundoFactor(
+        agotado
+          ? { adminId: admin.id, resultado: 'bloqueado', codeId: stored.id, ...deviceInfo }
+          : { adminId: admin.id, resultado: 'fallido', motivo: 'incorrecto', codeId: stored.id, ...deviceInfo },
+      );
       throw new UnauthorizedException('Código inválido o expirado');
     }
 
     await this.prisma.platformAdminLoginCode.update({ where: { id: stored.id }, data: { usedAt: new Date() } });
+    await this.adminLog?.segundoFactor({ adminId: admin.id, resultado: 'verificado', codeId: stored.id, ...deviceInfo });
     return this.buildPlatformAdminResponse(admin, deviceInfo);
   }
 
@@ -917,6 +999,7 @@ export class AuthService implements OnModuleInit {
         passwordHash,
         status: 'ACTIVE',
         hasTempPassword: false,
+        tempPasswordExpiresAt: null,
         invitationToken: null,
         invitationTokenExpiresAt: null,
         emailVerified: true,
@@ -957,7 +1040,9 @@ export class AuthService implements OnModuleInit {
 
       return {
         type: 'member',
-        member: { id: member.id, name: member.name, email: member.email },
+        // hasTempPassword también acá: /me rearma la sesión del panel en cada
+        // carga, y el guard del panel lo necesita para obligar a cambiarla.
+        member: { id: member.id, name: member.name, email: member.email, hasTempPassword: member.hasTempPassword },
         role: member.role.name,
         permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
         // `industry` (el rubro del onboarding) viaja solo acá — /me es lo que
@@ -1067,14 +1152,34 @@ export class AuthService implements OnModuleInit {
   // Revoca TODAS las sesiones vivas del usuario. Si se pasa el refresh token
   // actual, esa sesión se preserva ("cerrar en los demás dispositivos").
   async revokeAllSessions(userId: string, userType: 'MEMBER' | 'CUSTOMER', exceptRefreshToken?: string): Promise<void> {
-    const exceptHash = exceptRefreshToken ? this.hashToken(exceptRefreshToken) : null;
-    await this.prisma.refreshToken.updateMany({
+    await this.revocarOtrasSesiones({ id: userId, userType }, exceptRefreshToken);
+  }
+
+  // Cierra las demás sesiones de una cuenta cuando cambia su contraseña
+  // (hallazgo `cambio-clave-sin-cerrar-sesiones`, auditoría interna 09/09):
+  // si se cambió porque alguien más la sabía, la sesión de ese alguien no
+  // puede seguir andando. Mismo mecanismo que la revocación por reuso de
+  // refresh token (refresh()): se marca revokedAt en cada fila viva. Se
+  // preserva `sesionActual` (el refresh token en crudo de la sesión desde la
+  // que se hizo el cambio) si el que llama lo tiene; sin él, se cierran todas.
+  // Lo llaman member-profile y me (cambio con contraseña actual) y el reset
+  // por link (resetPassword(), sin sesión que preservar).
+  async revocarOtrasSesiones(
+    usuario: { id: string; userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' },
+    sesionActual?: string,
+  ): Promise<number> {
+    const hashActual = sesionActual ? this.hashToken(sesionActual) : null;
+    const { count } = await this.prisma.refreshToken.updateMany({
       where: {
-        userId, userType, revokedAt: null,
-        ...(exceptHash ? { tokenHash: { not: exceptHash } } : {}),
+        userId: usuario.id, userType: usuario.userType, revokedAt: null,
+        ...(hashActual ? { tokenHash: { not: hashActual } } : {}),
       },
       data: { revokedAt: new Date() },
     });
+    if (count > 0) {
+      this.logger.log(`Sesiones cerradas (${usuario.userType} ${usuario.id}): ${count}`);
+    }
+    return count;
   }
 
   private async checkLockout(lockedUntil: Date | null): Promise<void> {

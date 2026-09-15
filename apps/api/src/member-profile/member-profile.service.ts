@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash } from 'crypto';
 import * as argon2 from 'argon2';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { MailService } from '../mail/mail.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -17,6 +17,9 @@ export class MemberProfileService {
 
   constructor(
     private readonly prisma: PrismaService,
+    // Dueño de refresh_tokens: cerrar las demás sesiones al cambiar la
+    // contraseña pasa por acá (hallazgo cambio-clave-sin-cerrar-sesiones).
+    private readonly auth: AuthService,
     // Aviso "Tu contraseña fue actualizada". Opcional solo para los tests.
     private readonly mail?: MailService,
   ) {}
@@ -93,7 +96,11 @@ export class MemberProfileService {
   //   preserva la sesión desde la que se hizo el cambio si el BFF manda su
   //   refresh token (`sesionActual`, mismo criterio que /me/sessions); el
   //   panel, que no lo puede leer (cookie httpOnly), vuelve a entrar con la
-  //   contraseña nueva apenas termina.
+  //   contraseña nueva apenas termina. La revocación vive en
+  //   AuthService.revocarOtrasSesiones (mismo criterio que `me`, hallazgo
+  //   cambio-clave-sin-cerrar-sesiones).
+  // - Si venía con una temporal, se apaga la marca y su vencimiento (hallazgo
+  //   contrasena-temporal-reseteo).
   // - Sale el aviso "Tu contraseña fue actualizada", igual que en el reset:
   //   si no fue la persona, se entera. Best-effort, nunca voltea el cambio.
   async changePassword(memberId: string, dto: ChangePasswordDto, sesionActual?: string) {
@@ -112,14 +119,10 @@ export class MemberProfileService {
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
     await this.prisma.member.update({
       where: { id: memberId },
-      data: { passwordHash, hasTempPassword: false },
+      data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null },
     });
 
-    const hashActual = sesionActual ? createHash('sha256').update(sesionActual).digest('hex') : null;
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: memberId, userType: 'MEMBER', revokedAt: null, ...(hashActual ? { tokenHash: { not: hashActual } } : {}) },
-      data: { revokedAt: new Date() },
-    });
+    await this.auth.revocarOtrasSesiones({ id: memberId, userType: 'MEMBER' }, sesionActual);
 
     await this.avisarCambioDeContrasena(m);
     return { message: 'Contraseña actualizada' };

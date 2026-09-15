@@ -13,6 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!slug) return res.status(400).json({ error: 'MISSING_SLUG', message: 'Falta la tienda de destino' })
 
   const { status, body } = await callBackend('/auth/register', {
+    req,
     method: 'POST',
     body: req.body,
     slug,

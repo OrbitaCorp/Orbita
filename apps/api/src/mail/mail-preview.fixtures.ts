@@ -81,6 +81,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
       storeName: FIXTURE_BUSINESS_BRANDING.storeName,
       resetUrl: 'https://www.orbita.site/restablecer-contrasena?email=rosa%40tutienda.com&code=123456',
       tempPassword: 'Xk29-Trq4',
+      tempPasswordHoras: 72,
     },
   },
   {
@@ -356,5 +357,20 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     isPlatform: true,
     subject: `¡Reactivamos ${FIXTURE_BUSINESS_BRANDING.storeName}!`,
     data: { businessName: FIXTURE_BUSINESS_BRANDING.storeName, storeUrl: 'https://mitienda.orbita.site' },
+  },
+  {
+    id: 'domain-expiring-soon',
+    label: 'Dominio comprado por vencer (30 y 7 días)',
+    group: 'Plataforma',
+    template: 'domain-expiring-soon',
+    isPlatform: true,
+    subject: 'El dominio mitienda.com vence en 30 días',
+    data: {
+      businessName: FIXTURE_BUSINESS_BRANDING.storeName,
+      domain: 'mitienda.com',
+      expiresAt: '15/10/2026',
+      daysLeft: 30,
+      manageUrl: 'https://mitienda.orbita.site/admin/ventas/configuracion?vista=dominios',
+    },
   },
 ];

@@ -9,7 +9,17 @@ import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount 
 import { estadoDe, whereDeEstado, resumenesDeAlcance, vigenciaDe } from './discount-status.util';
 import { BusinessesService } from '../businesses/businesses.service';
 import { DiscountCountdownService } from './discount-countdown.service';
+import { AuditService } from '../audit/audit.service';
 import { diaYHoraArgentina } from '../common/utils/hora-argentina';
+
+// Lo que vale la pena ver en el registro de auditoría de un descuento: nombre,
+// tipo y valor, alcance, vigencia (fechas, días, horario), condiciones y topes
+// (hallazgo `auditoria-acciones-sin-registro`). La selección de productos y
+// categorías queda afuera: se reemplaza entera en cada edición y no se lee.
+const CAMPOS_AUDITADOS = [
+  'name', 'type', 'value', 'scope', 'startDate', 'endDate', 'activeDays', 'startTime', 'endTime',
+  'minQuantity', 'minAmount', 'maxUsesTotal', 'maxUsesPerCustomer', 'isPrivate', 'priority',
+];
 
 // Resultado de promoLabelsDeItems() — el storefront usa `label` para el
 // badge del catálogo, y el resto (scope, cantidades, ids) para armar la
@@ -50,6 +60,9 @@ export class DiscountsService {
     private readonly prisma: PrismaService,
     private readonly countdown: DiscountCountdownService,
     private readonly businesses: BusinessesService,
+    // Registro de auditoría de alta, edición, activación y baja (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   // Estado derivado, filtro SQL de estado y resumen de alcance viven en
@@ -293,11 +306,16 @@ export class DiscountsService {
 
     if (dto.countdown !== undefined) await this.countdown.aplicar(businessId, creado, dto.countdown);
 
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'discount', entityId: creado.id, action: 'CREATE',
+      changes: AuditService.diferencias({}, { ...creado }, CAMPOS_AUDITADOS),
+    });
+
     return this.findOne(businessId, creado.id);
   }
 
   // ── Edición ────────────────────────────────────────────────────────────────
-  async update(businessId: string, id: string, dto: UpsertDiscountDto) {
+  async update(businessId: string, id: string, dto: UpsertDiscountDto, actorId?: string) {
     this.validarReglas(dto);
     await this.exigirAvanzadoSi2x1(businessId, dto);
     await this.validarPertenencia(businessId, dto);
@@ -306,6 +324,7 @@ export class DiscountsService {
       where: { id, businessId, code: null, deletedAt: null },
     });
     if (!existente) throw new NotFoundException('Descuento no encontrado');
+    const datos = this.datosDe(dto);
     // La regla de "una sola a la vez" no cuenta a este mismo descuento.
     await this.countdown.validarAntesDeGuardar(businessId, dto, id);
 
@@ -317,7 +336,7 @@ export class DiscountsService {
     await this.prisma.$transaction(async (tx) => {
       // El where lleva businessId además del id: evita el TOCTUO de actualizar
       // por id "a ciegas" (mismo criterio que se corrigió en Catálogo).
-      await tx.discount.updateMany({ where: { id, businessId }, data: this.datosDe(dto) });
+      await tx.discount.updateMany({ where: { id, businessId }, data: datos });
       // Reemplazo completo de la selección: más simple y menos propenso a bugs
       // que un diff, y el volumen de filas por descuento es chico.
       await tx.discountProduct.deleteMany({ where: { discountId: id } });
@@ -347,20 +366,31 @@ export class DiscountsService {
       );
     }
 
+    // Solo lo que cambió de verdad (mismo criterio que productos y equipo).
+    const cambios = AuditService.diferencias({ ...existente }, datos, CAMPOS_AUDITADOS);
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'discount', entityId: id, action: 'UPDATE', changes: cambios });
+    }
+
     return this.findOne(businessId, id);
   }
 
   // ── Activar / desactivar ───────────────────────────────────────────────────
-  async toggle(businessId: string, id: string) {
+  async toggle(businessId: string, id: string, actorId?: string) {
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: null, deletedAt: null },
-      select: { id: true, isActive: true },
+      select: { id: true, name: true, isActive: true },
     });
     if (!existente) throw new NotFoundException('Descuento no encontrado');
 
     await this.prisma.discount.updateMany({
       where: { id, businessId },
       data: { isActive: !existente.isActive },
+    });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'discount', entityId: id,
+      action: existente.isActive ? 'DEACTIVATE' : 'ACTIVATE',
+      changes: [{ field: 'name', before: null, after: existente.name }, { field: 'isActive', before: existente.isActive, after: !existente.isActive }],
     });
     return this.findOne(businessId, id);
   }
@@ -369,10 +399,10 @@ export class DiscountsService {
   // ── Baja (RBT-614: "alta, edición y baja") ─────────────────────────────────
   // Soft-delete: el descuento pudo haberse aplicado a ventas históricas
   // (DiscountRedemption lo referencia), así que la fila se conserva.
-  async remove(businessId: string, id: string) {
+  async remove(businessId: string, id: string, actorId?: string) {
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: null, deletedAt: null },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!existente) throw new NotFoundException('Descuento no encontrado');
 
@@ -381,6 +411,10 @@ export class DiscountsService {
       data: { deletedAt: new Date(), isActive: false },
     });
     await this.countdown.apagarSiEsDe(businessId, id);
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'discount', entityId: id, action: 'DELETE',
+      changes: [{ field: 'name', before: existente.name, after: null }],
+    });
     return { ok: true };
   }
 

@@ -123,6 +123,10 @@ export type StorefrontConfigResponse = {
     whatsapp: string | null
     email: string | null
     scheduleText: string | null
+    // Para Términos y Privacidad (hallazgo `legales-sin-cuit`): 11 dígitos sin
+    // guiones. Opcionales: una API anterior a ese cambio no los manda.
+    cuit?: string | null
+    legalName?: string | null
     instagram: string | null
     tiktok: string | null
     facebook: string | null

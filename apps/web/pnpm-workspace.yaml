@@ -1,3 +1,20 @@
 allowBuilds:
   sharp: false
   unrs-resolver: false
+
+# Overrides de dependencias transitivas vulnerables (auditoría interna,
+# hallazgo `dependencias`, pnpm audit del 15/09). Todas de herramientas de
+# build o lint (eslint, babel, postcss/tailwind) o de exceljs (exportar).
+# Parche mínimo por rango mayor, sin cambiar de major. uuid@8 (exceljs) queda
+# afuera a propósito: el parche está en uuid 11 y exceljs pide 8; la falla es
+# solo en v3/v5/v6 con buffer propio y exceljs usa v4.
+overrides:
+  brace-expansion@1: '^1.1.18'
+  brace-expansion@2: '^2.1.4'
+  brace-expansion@5: '^5.0.9'
+  js-yaml@4: '^4.3.2'
+  nanoid@3: '^3.3.18'
+  postcss: '^8.5.23'
+  browserslist: '^4.28.7'
+  baseline-browser-mapping: '^2.11.0'
+  '@babel/core': '^7.29.6'

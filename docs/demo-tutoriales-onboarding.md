@@ -10,6 +10,57 @@
 > Las otras cuatro variantes siguen en el código, accesibles solo con `?tutorial=<variante>`
 > para probarlas. Lo que sigue abajo es la guía original de la demo.
 
+## Segunda etapa (15/09)
+
+Pedido de Ale: «lo mismo mismo, pero cuando termina el primero le sale el segundo tutorial».
+Misma tarjeta, misma píldora, misma barra + hoja en celular, mismo tildado (manual y
+automático por `cumplidas`); cambia la lista. Código: `estado.ts` (campo `etapa: 1 | 2`,
+opcional; `resolverAlAbrir` decide qué arranca), `copy.ts` (`TAREAS_CHECKLIST_ETAPA2`,
+`tareasDeEtapa`), `VarianteChecklist.tsx`, `TutorialHost.tsx`; en la API,
+`update-tutorial.dto.ts` (`etapa`) y `businesses.service.ts#getTutorial`.
+
+**Tareas** (rutas y anclas verificadas contra las pantallas) y cómo se tilda cada una:
+
+| # | id | Tarea | Va a | Se tilda sola cuando… |
+|---|----|-------|------|-----------------------|
+| 1 | `pedidos` | Cargá tu primer pedido (2 pasos: buscar producto → «Registrar venta / Crear pedido») | Pedidos → `?vista=nuevo` | hay algún pedido vivo (`orders.deleted_at IS NULL`) |
+| 2 | `clientes` | Conocé tu base de clientes (búsqueda + «Email masivo») | Clientes | hay algún cliente vivo |
+| 3 | `plantillas` | Armá tus plantillas de respuesta («Nueva plantilla») | Mensajes → `?vista=plantillas` | hay alguna `message_templates`; **o el negocio es SHOWCASE** (Mensajes le da 403, no se lo manda ahí) |
+| 4 | `descuentos` | Creá tu primer descuento o cupón («Crear descuento») | Descuentos | hay algún `discounts` vivo (automático o cupón) |
+| 5 | `equipo` | Invitá a alguien de tu equipo («Invitar miembro») | Configuración → Equipo | `members` > 1 (el dueño ya es uno; PENDING cuenta) |
+| 6 | `apariencia` | Personalizá cómo se ve tu tienda (tip: Plantillas de Home del paquete Avanzado) | Configuración → Apariencia | `storefront_config.home_template` no es null, **o** `updated_at` − `created_at` > 1 s (la fila la crea el onboarding con defaults) |
+| 7 | `notificaciones` | Elegí qué avisos recibís | Configuración → Notificaciones | `notification_config.updated_at` − `created_at` > 1 s |
+
+Todo lo demás se marca a mano, como en la primera etapa. Dominios quedó afuera (es una
+compra, no un primer paso); Plantillas de Home es tip y no tarea porque Avanzado es un
+paquete pago aparte (una tarea que lleva a un overlay de upgrade no se puede cumplir).
+
+**Disparo y transición:**
+
+- Al completar las 6 de la primera etapa, el cierre («Tu tienda está lista») ya no dice
+  «Listo» sino **«Seguir con la segunda etapa»**: pasa a `etapa: 2` desde cero (por
+  `actualizar`, nunca por `terminar`), la tarjeta se remonta y muestra una presentación
+  («Segunda etapa» + «Lo básico ya está… ahora viene sacarle jugo al panel», «Empezar» /
+  «Ahora no»). La presentación se guarda como vista en `paso` (`0` = pendiente, `1` = vista):
+  la Checklist no usaba ese campo. En celular la hoja se abre sola esa primera vez.
+- «Ocultar definitivamente» en la etapa 1 → `terminado` + `etapa: 1`: **la segunda NO
+  arranca sola** (si la escondió, no la quería). Queda disponible con `?tutorial=checklist2`.
+- Terminar u ocultar la etapa 2 → `terminado` + `etapa: 2`: no se muestra más nada.
+- **Negocios que ya habían terminado (u ocultado) la Checklist antes de este cambio**
+  (`terminado` sin `etapa`): les arranca la etapa 2 la próxima vez que abren el panel — Ale
+  pidió «que todas la tengan». Está detrás de la constante
+  **`ETAPA_2_PARA_QUIEN_YA_TERMINO`** en `estado.ts`: ponerla en `false` lo apaga en una
+  línea (a los que ya la tienen andando no los afecta: su estado ya dice `etapa: 2`).
+- `?tutorial=checklist` arranca la etapa 1 desde cero (como siempre);
+  **`?tutorial=checklist2`** arranca la etapa 2 desde cero; `?tutorial=off` ahora guarda
+  `terminado` + `etapa: 2` (antes, sin etapa, la próxima visita habría arrancado la segunda).
+- «Reiniciar tutorial» reinicia la etapa en la que está (no vuelve a la primera) y no repite
+  la presentación.
+
+Tests: `tutoriales/__tests__/estado.test.ts` (vitest: compatibilidad del estado viejo,
+qué arranca en cada caso, transición 1 → 2, ids sin pisarse) y
+`apps/api/test/unit/tutorial-etapa2.unit-spec.ts` (jest: las siete `cumplidas` y el DTO).
+
 ## Cómo dar la demo (de a una, en orden)
 
 Requisitos ya corriendo: front en `localhost:3001`, API en `localhost:3000`. Las cinco

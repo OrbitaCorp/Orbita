@@ -2,6 +2,7 @@ import { Controller, Get, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { PrismaService } from './prisma/prisma.service';
 import { Public } from './common/decorators/public.decorator';
+import { ipDelCliente, ipReenviadaPorBff } from './common/utils/proxy';
 
 // Público: el AuthGuard es global y /health respondía 401, inútil para un
 // uptime check (hallazgo health-guard del 04/09). No devuelve ningún dato.
@@ -19,10 +20,21 @@ export class AppController {
   // Diagnóstico para configurar TRUST_PROXY_HOPS (common/utils/proxy.ts):
   // devuelve la IP que Express ve y la cadena X-Forwarded-For que llegó. Son
   // datos del propio pedido de quien pregunta, nada de otros usuarios.
+  //
+  // `clientIp` es lo que usan los límites por IP (ipDelCliente) y `viaBff`
+  // dice si el pedido vino por el BFF de Next.js con el secreto correcto —
+  // sirve para verificar en producción que dos redes distintas no comparten
+  // balde (hallazgo rate-limit-ip-proxy) sin exponer el secreto.
   @Get('ip')
-  ip(@Req() req: Request): { ip: string | null; xForwardedFor: string | null } {
+  ip(@Req() req: Request): { ip: string | null; xForwardedFor: string | null; clientIp: string | null; viaBff: boolean } {
     const xff = req.headers['x-forwarded-for'];
-    return { ip: req.ip ?? null, xForwardedFor: Array.isArray(xff) ? xff.join(', ') : (xff ?? null) };
+    const reenviada = ipReenviadaPorBff(req);
+    return {
+      ip: req.ip ?? null,
+      xForwardedFor: Array.isArray(xff) ? xff.join(', ') : (xff ?? null),
+      clientIp: ipDelCliente(req) ?? null,
+      viaBff: reenviada !== null,
+    };
   }
 
   // Salud de la conexión a la base: query mínima contra Prisma.

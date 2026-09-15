@@ -274,7 +274,16 @@ export default function MiPerfil() {
           <Lock size={13} strokeWidth={2} style={{ color: 'var(--color-subtle)' }} />
           <div style={{ ...tituloSeccion, marginBottom: 0 }}>Seguridad</div>
         </div>
-        <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)' }}>Cambiá tu contraseña cuando quieras — te pedimos la actual primero.</p>
+        {user?.type === 'member' && user.member.hasTempPassword ? (
+          // Entró con la temporal del reseteo: RequireAuth lo trajo acá y no lo
+          // deja ir a otra pantalla hasta que elija una propia (hallazgo
+          // contrasena-temporal-reseteo). "Contraseña actual" es la temporal.
+          <div role="alert" style={avisoBox}>
+            Estás usando una contraseña temporal. Elegí una propia para seguir usando el panel: en &quot;Contraseña actual&quot; va la temporal que te dieron.
+          </div>
+        ) : (
+          <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)' }}>Cambiá tu contraseña cuando quieras — te pedimos la actual primero.</p>
+        )}
         <div className="mperf-grid3" style={{ marginBottom: 14 }}>
           <FI label="Contraseña actual">
             <input type="password" value={pwActual} onChange={(e) => setPwActual(e.target.value)} autoComplete="current-password" className="ds-field" style={inputStyle} />
@@ -348,6 +357,14 @@ const errorBox: React.CSSProperties = {
   background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
   borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)',
   marginBottom: 12,
+}
+
+// Aviso de contraseña temporal: mismo formato que errorBox, en ámbar (es una
+// indicación, no un error).
+const avisoBox: React.CSSProperties = {
+  background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.35)',
+  borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-text)',
+  marginBottom: 14, lineHeight: 1.5,
 }
 
 const btnPrimario = (guardando: boolean): React.CSSProperties => ({

@@ -17,6 +17,7 @@ import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PlatformAdminLogService } from './platform-admin-log.service';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -32,6 +33,12 @@ export class PlatformService {
     private readonly mail: MailService,
     private readonly subscriptions: SubscriptionsService,
     private readonly config: ConfigService,
+    // Registro de los mails de prueba en platform_admin_logs (hallazgo
+    // `auditoria-acciones-sin-registro`, parte 3). Las demás acciones de este
+    // service escriben platformAdminLog en línea, dentro de su transacción;
+    // esta no tiene transacción y no debe romper el envío si falla el insert.
+    // Último y opcional solo para los tests que construyen con 4 argumentos.
+    private readonly adminLog?: PlatformAdminLogService,
   ) {}
 
   // ── Testeo de plantillas de email (RBT-607) — MailModule es @Global, no
@@ -45,8 +52,18 @@ export class PlatformService {
     return this.mail.previewTemplate(id);
   }
 
-  async sendMailTest(id: string, to: string) {
-    const sent = await this.mail.sendPreview(id, to);
+  // Antes solo quedaba en email_logs, sin QUIÉN lo mandó. Ahora cada prueba
+  // registra plantilla, destinatario y si salió, también cuando Resend tira
+  // (se registra y se vuelve a tirar: el 500 al panel sigue igual).
+  async sendMailTest(id: string, to: string, adminId: string) {
+    let sent: boolean;
+    try {
+      sent = await this.mail.sendPreview(id, to);
+    } catch (e) {
+      await this.adminLog?.mailPrueba({ adminId, template: id, to, sent: false, error: e instanceof Error ? e.message : String(e) });
+      throw e;
+    }
+    await this.adminLog?.mailPrueba({ adminId, template: id, to, sent });
     return { sent };
   }
 

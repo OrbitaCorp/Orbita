@@ -46,20 +46,20 @@ export class CouponsController {
   @Roles('owner', 'admin')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertCouponDto) {
     const member = assertMemberContext(ctx);
-    return this.couponsService.update(member.businessId, id, dto);
+    return this.couponsService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Patch(':id/toggle')
   @Roles('owner', 'admin')
   toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.couponsService.toggle(member.businessId, id);
+    return this.couponsService.toggle(member.businessId, id, member.memberId);
   }
 
   @Delete(':id')
   @Roles('owner', 'admin')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.couponsService.remove(member.businessId, id);
+    return this.couponsService.remove(member.businessId, id, member.memberId);
   }
 }

@@ -22,6 +22,18 @@ cd apps/api
 ./deploy/deploy.sh
 ```
 
+**Se despliega SOLO lo que ya está en `main` con CI verde** (hallazgo
+`deploy-manual` de la auditoría interna, 10/09): el orden es commit → push de
+`main` → CI verde (`.github/workflows/ci.yml`) → `deploy.sh`, nunca al revés.
+El script lo hace cumplir con un preflight antes del build: árbol de git
+limpio, HEAD contenido en `origin/main`, `pnpm typecheck` + `pnpm test` (~10
+minutos, avisá que está corriendo), `prisma migrate status` sin pendientes y
+los check runs de CI del sha en `success`. Si algo falla corta con exit 1 sin
+buildear nada. `DEPLOY_SOLO_PREFLIGHT=1` corre solo el preflight;
+`DEPLOY_SIN_PREFLIGHT=1` es el escape para emergencias y pide confirmación por
+teclado, así que lo corre una persona, no un agente. Detalle en
+`DEPLOYMENT.md` § Deploy y en el `CLAUDE.md` de la raíz, § Commit y push.
+
 Necesita `gcloud` CLI autenticado (`gcloud auth login`, cuenta `@orbita-corp.com`)
 con permisos sobre `orbita-api-corp` — ver **`apps/api/DEPLOYMENT.md`** para el
 runbook completo (arquitectura, accesos, secrets, logs, rollback, troubleshooting
@@ -39,7 +51,12 @@ por "lista en prod" solo porque el push a GitHub salió bien.
 **Por defecto, desplegá el backend vos mismo al terminar cada tarea o cambio que
 haya tocado `apps/api/src/` o `apps/api/prisma/`** (corré `deploy/deploy.sh`),
 sin esperar a que el desarrollador lo pida explícitamente — mismo criterio que
-"commit y push al finalizar" para el frontend.
+"commit y push al finalizar" para el frontend. "Al terminar" quiere decir
+**después** de que el commit quedó en `main` y CI dio verde: si lo corrés
+antes, el preflight lo rechaza. Con ese orden el frontend sale en Vercel unos
+minutos antes que la API; si el cambio del frontend necesita un endpoint
+nuevo, corré `deploy.sh` apenas CI termine (ver el trade-off y la excepción
+`DEPLOY_SIN_PREFLIGHT=1` en el `CLAUDE.md` de la raíz).
 
 Esto es el default porque así trabaja Mateo (el uso más común de este repo con
 Claude Code): termina una tareita, la quiere ver desplegada de una, y sigue con

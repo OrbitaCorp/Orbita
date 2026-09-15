@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,11 +6,29 @@ import { MailService } from '../mail/mail.service';
 import { UpsertCustomerDto } from './dto/upsert-customer.dto';
 import { FindCustomersQueryDto } from './dto/find-customers-query.dto';
 import { escaparHtml } from '../common/utils/html';
+import { fechaArgentina, inicioDeDiaArgentina } from '../common/utils/hora-argentina';
 import { AuditService } from '../audit/audit.service';
 
 // Tope de una exportación: holgado (el negocio más grande tiene 162 clientes
 // al 10/09) y evita armar en memoria una lista sin fin.
 const MAX_EXPORTACION = 10_000;
+
+// Lo que vale la pena ver en el registro de auditoría de un cliente editado
+// desde el panel (hallazgo `auditoria-acciones-sin-registro`).
+const CAMPOS_AUDITADOS = ['firstName', 'lastName', 'email', 'phone', 'dni'];
+
+// Tope de mails a clientes por negocio y por día de Argentina (hallazgo
+// `mail-masivo-sin-tope`, BAJA). El DTO ya corta cada POST en 500
+// destinatarios, pero nada impedía repetirlo: una cuenta comprometida (o un
+// dueño con el dedo pesado) podía mandar miles de mails con el remitente de
+// Órbita, contra la cuota y la reputación de Resend. Se cuenta contra
+// email_logs, que es donde MailService deja cada envío personalizado
+// (template null). Env MAIL_MASIVO_TOPE_DIARIO, default 500, nunca menos de
+// 50 (un valor de prueba olvidado no puede dejar a los negocios sin mail).
+export const MAIL_MASIVO_TOPE_DIARIO_DEFAULT = 500;
+export function topeDiarioMailMasivo(): number {
+  return Math.max(50, Number(process.env.MAIL_MASIVO_TOPE_DIARIO) || MAIL_MASIVO_TOPE_DIARIO_DEFAULT);
+}
 
 // (Fase 2 — Alex) La base de clientes del negocio. Acá vive la lista con sus
 // números (cuántos pedidos hizo cada uno, cuánto gastó, su ticket promedio y
@@ -39,7 +57,8 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly eventEmitter: EventEmitter2,
-    // Registro de auditoría (exportación de clientes). Opcional solo para los tests.
+    // Registro de auditoría (exportación y edición de clientes, envío de
+    // mails). Opcional solo para los tests.
     private readonly audit?: AuditService,
   ) {}
 
@@ -293,22 +312,24 @@ export class CustomersService {
   }
 
   // ── Edición ───────────────────────────────────────────────────────────────
-  async update(businessId: string, id: string, dto: UpsertCustomerDto) {
+  async update(businessId: string, id: string, dto: UpsertCustomerDto, actorId?: string) {
     const existente = await this.prisma.customer.findFirst({ where: { id, businessId, deletedAt: null } });
     if (!existente) throw new NotFoundException('Cliente no encontrado');
 
+    const datos = {
+      firstName: dto.firstName,
+      lastName: dto.lastName ?? null,
+      email: dto.email ?? null,
+      phone: dto.phone ?? null,
+      dni: dto.dni ?? null,
+    };
+    let actualizado;
     try {
       // businessId también en el where: el aislamiento lo garantiza la
       // escritura misma, no el findFirst de arriba.
-      return await this.prisma.customer.update({
+      actualizado = await this.prisma.customer.update({
         where: { id, businessId },
-        data: {
-          firstName: dto.firstName,
-          lastName: dto.lastName ?? null,
-          email: dto.email ?? null,
-          phone: dto.phone ?? null,
-          dni: dto.dni ?? null,
-        },
+        data: datos,
         select: CAMPOS_PUBLICOS,
       });
     } catch (e) {
@@ -318,6 +339,14 @@ export class CustomersService {
       }
       throw e;
     }
+    // Cambiarle el email o el teléfono a un cliente desde el panel no dejaba
+    // rastro de quién lo hizo (hallazgo `auditoria-acciones-sin-registro`).
+    // Solo lo que cambió de verdad, mismo criterio que productos y equipo.
+    const cambios = AuditService.diferencias({ ...existente }, datos, CAMPOS_AUDITADOS);
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'customer', entityId: id, action: 'UPDATE', changes: cambios });
+    }
+    return actualizado;
   }
 
   // ── Email individual / masivo ─────────────────────────────────────────────
@@ -325,11 +354,19 @@ export class CustomersService {
   // completan por persona: {nombre}, {email}, {total_gastado} y
   // {ultima_compra}. Los clientes sin email se saltean y no cuentan en el
   // resultado. Sin mail configurado en local, cada envío sale como [MAIL STUB].
-  async sendEmail(businessId: string, dto: { customerIds: string[]; subject: string; body: string }) {
+  //
+  // Tope diario por negocio (hallazgo `mail-masivo-sin-tope`): antes de
+  // mandar nada se cuenta lo que ya salió hoy (día de Argentina, no UTC) y si
+  // este envío se pasa del tope, se rechaza entero con 429 y un mensaje que
+  // dice cuánto queda. Y el envío queda en audit_logs con quién lo mandó, a
+  // cuántos y con qué asunto (sin el cuerpo).
+  async sendEmail(businessId: string, dto: { customerIds: string[]; subject: string; body: string }, actorId?: string) {
     const clientes = await this.prisma.customer.findMany({
       where: { id: { in: dto.customerIds }, businessId, deletedAt: null, email: { not: null } },
     });
     if (clientes.length === 0) return { sent: 0 };
+
+    await this.exigirCupoDiario(businessId, clientes.length);
 
     const metricas = await this.metricasDe(businessId, clientes.map((c) => c.id));
 
@@ -372,6 +409,43 @@ export class CustomersService {
         this.logger.error(`No se pudo enviar el email masivo a ${c.email}: ${e}`);
       }
     }
+
+    // audit_logs no tiene un tipo "SEND" (sumarlo es una migración del enum):
+    // va como CREATE de una entidad `customer_email`, mismo criterio que la
+    // exportación (`customer_export`). El cuerpo no se guarda: puede ser
+    // largo y ya está en el mail que recibió cada cliente.
+    await this.audit?.registrar({
+      businessId,
+      memberId: actorId,
+      entityType: 'customer_email',
+      entityId: businessId,
+      action: 'CREATE',
+      changes: [
+        { field: 'destinatarios', before: null, after: clientes.length },
+        { field: 'enviados', before: null, after: sent },
+        { field: 'asunto', before: null, after: dto.subject },
+      ],
+    });
     return { sent };
+  }
+
+  // Cuenta los mails personalizados (template null: individuales y masivos
+  // del panel) que este negocio mandó hoy, en día de Argentina. Se cuentan
+  // también los que fallaron: un intento fallido también le llegó al
+  // proveedor, y si no se contaran, reintentar contra direcciones inválidas
+  // sería una forma de esquivar el tope.
+  private async exigirCupoDiario(businessId: string, destinatarios: number): Promise<void> {
+    const tope = topeDiarioMailMasivo();
+    const enviadosHoy = await this.prisma.emailLog.count({
+      where: { businessId, template: null, createdAt: { gte: inicioDeDiaArgentina(fechaArgentina(new Date())) } },
+    });
+    if (enviadosHoy + destinatarios > tope) {
+      const quedan = Math.max(0, tope - enviadosHoy);
+      throw new HttpException(
+        `Este envío es para ${destinatarios} clientes y hoy ya salieron ${enviadosHoy} mails: el tope es ${tope} por día` +
+          (quedan > 0 ? ` (te quedan ${quedan}). Achicá la selección o probá mañana.` : '. Mañana se renueva.'),
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 }

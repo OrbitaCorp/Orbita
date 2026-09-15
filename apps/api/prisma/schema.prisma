@@ -137,6 +137,13 @@ model BusinessConfig {
   whatsapp     String?
   email        String?
   scheduleText String? @map("schedule_text") // "Lun a Vie 9-18"
+  // Identificación fiscal del Comercio para los Términos y la Privacidad de
+  // la tienda (hallazgo `legales-sin-cuit`): la normativa de comercio
+  // electrónico espera ver quién vende. Opcionales: sin ellos, los legales
+  // muestran solo el nombre. El CUIT va sin guiones, validado con dígito
+  // verificador en BusinessesService.updateConfig (common/utils/cuit.ts).
+  cuit      String? @db.VarChar(11)
+  legalName String? @map("legal_name") @db.VarChar(120)
 
   // Pagos habilitados (toggles)
   acceptsMercadopago     Boolean @default(true) @map("accepts_mercadopago")
@@ -403,6 +410,10 @@ model Member {
   roleId                   String          @map("role_id")
   status                   MemberStatus    @default(PENDING)
   hasTempPassword          Boolean         @default(false) @map("has_temp_password")
+  // Vencimiento de la contraseña temporal de un reseteo (hallazgo MEDIA
+  // `contrasena-temporal-reseteo`, auditoría interna 09/09): null = no es
+  // temporal, o es de antes de esta columna y no vence.
+  tempPasswordExpiresAt    DateTime?       @map("temp_password_expires_at")
   // Secreto de invitación: reemplaza el uso de `id` como token en accept-invitation
   // (deuda de seguridad — ver PENDIENTES.md). Se genera en invite(), es de un solo
   // uso (se limpia al aceptar) y expira a los 7 días.
@@ -2001,6 +2012,7 @@ model PlatformAdmin {
   googleId            String?           @unique @map("google_id") // sub del id_token — vincula, no reemplaza el password
   emailVerified       Boolean           @default(false) @map("email_verified")
   hasTempPassword     Boolean           @default(false) @map("has_temp_password")
+  tempPasswordExpiresAt DateTime?       @map("temp_password_expires_at")
   failedLoginAttempts Int               @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime?         @map("locked_until")
   lastAccessAt        DateTime?         @map("last_access_at")

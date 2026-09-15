@@ -16,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const slug = firstHeader(req.headers['x-business-slug'])
 
   const { status, body } = await callBackend('/me/sessions/revoke-all', {
+    req,
     method: 'POST',
     authorization,
     slug,

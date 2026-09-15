@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus, Ip } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
+import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
@@ -328,10 +329,13 @@ export class OrbiController {
   @Public()
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // sin auth: 10 mensajes/min por IP
-  async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response, @Ip() ip?: string) {
+  async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response, @IpDelCliente() ip?: string) {
     dto.context.surface = OrbiSurface.WIZARD;
 
     // Público: cuota por IP y por día, antes de abrir el stream (429 normal).
+    // La IP sale de @IpDelCliente (no de @Ip): misma fuente que el throttler
+    // global, por si algún día este pedido pasa por el BFF (hallazgo
+    // rate-limit-ip-proxy).
     if (!this.cuota.consumir(`wizard:${ip ?? 'desconocida'}`, TURNOS_DIA_IP_WIZARD)) {
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
     }

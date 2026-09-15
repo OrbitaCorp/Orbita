@@ -5,6 +5,7 @@ import { MercadoPagoConfig, OAuth, User, Preference, Payment, PaymentRefund, Web
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { AuditService } from '../audit/audit.service';
 import { describeError } from '../common/utils/describe-error.util';
 
 // OAuth por negocio para el checkout del storefront (Orders API) — "Conectar
@@ -26,6 +27,12 @@ import { describeError } from '../common/utils/describe-error.util';
 
 interface ConnectStatePayload {
   businessId: string;
+  // Quién apretó "Conectar" en el panel. El callback es público (vuelve
+  // desde MP sin sesión), así que el actor viaja adentro del state firmado —
+  // no se puede inventar sin JWT_SECRET (hallazgo
+  // `auditoria-acciones-sin-registro`). Opcional: los states emitidos antes
+  // de este campo siguen siendo válidos hasta que vencen.
+  memberId?: string;
   nonce: string;
   exp: number;
 }
@@ -72,6 +79,9 @@ export class MercadopagoService {
     private readonly config: ConfigService,
     private readonly orders: OrdersService,
     private readonly eventEmitter: EventEmitter2,
+    // Registro de auditoría de conectar/desconectar la cuenta de MP (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {
     this.clientId = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_ID');
     this.clientSecret = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_SECRET');
@@ -99,8 +109,13 @@ export class MercadopagoService {
   }
 
   // ── state firmado (HMAC, no JWT — mismo patrón que google-auth.service.ts) ──
-  private signState(businessId: string): string {
-    const payload: ConnectStatePayload = { businessId, nonce: randomBytes(16).toString('hex'), exp: Date.now() + STATE_TTL_MS };
+  private signState(businessId: string, memberId?: string): string {
+    const payload: ConnectStatePayload = {
+      businessId,
+      ...(memberId ? { memberId } : {}),
+      nonce: randomBytes(16).toString('hex'),
+      exp: Date.now() + STATE_TTL_MS,
+    };
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const sig = createHmac('sha256', this.stateSecret).update(body).digest('base64url');
     return `${body}.${sig}`;
@@ -128,8 +143,8 @@ export class MercadopagoService {
   }
 
   // ── Conectar (iniciar) ───────────────────────────────────────────────────
-  getAuthorizationUrl(businessId: string): string {
-    const state = this.signState(businessId);
+  getAuthorizationUrl(businessId: string, memberId?: string): string {
+    const state = this.signState(businessId, memberId);
     return this.oauth.getAuthorizationURL({
       options: { client_id: this.clientId, redirect_uri: this.redirectUri, state },
     });
@@ -140,7 +155,7 @@ export class MercadopagoService {
   // pueda armar el redirect de vuelta a /admin/{subdomain}/ventas/configuracion
   // sin que el frontend tenga que resolverlo por su cuenta.
   async handleCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string }> {
-    const { businessId } = this.verifyState(state);
+    const { businessId, memberId } = this.verifyState(state);
 
     const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
     if (!business) throw new BadRequestException('Negocio no encontrado');
@@ -166,6 +181,15 @@ export class MercadopagoService {
       refreshToken: tokens.refresh_token,
       tokenExpiresAt,
       scopes,
+    });
+
+    // Quién conectó qué cuenta de MP. Solo el user id: los tokens NUNCA van al
+    // registro (hallazgo `auditoria-acciones-sin-registro`). La fila de
+    // mp_credentials es 1:1 con el negocio (business_id es único), por eso el
+    // entityId es el businessId y no el id interno de la fila.
+    await this.audit?.registrar({
+      businessId, memberId: memberId ?? null, entityType: 'mp_credentials', entityId: businessId, action: 'ACTIVATE',
+      changes: [{ field: 'mpUserId', before: null, after: String(tokens.user_id) }],
     });
 
     return { businessId, subdomain: business.subdomain };
@@ -230,8 +254,17 @@ export class MercadopagoService {
   }
 
   // ── Desconectar (soft — CONTRATO_API.md: isActive=false, no se borra) ───
-  async disconnect(businessId: string): Promise<{ ok: boolean }> {
+  async disconnect(businessId: string, actorId?: string): Promise<{ ok: boolean }> {
+    // Se lee antes para registrar qué cuenta se desconectó (y no registrar
+    // nada si no había ninguna conectada).
+    const cred = await this.prisma.mpCredentials.findUnique({ where: { businessId }, select: { mpUserId: true, isActive: true } });
     await this.prisma.mpCredentials.updateMany({ where: { businessId }, data: { isActive: false } });
+    if (cred?.isActive) {
+      await this.audit?.registrar({
+        businessId, memberId: actorId, entityType: 'mp_credentials', entityId: businessId, action: 'DEACTIVATE',
+        changes: [{ field: 'mpUserId', before: cred.mpUserId, after: null }],
+      });
+    }
     return { ok: true };
   }
 
@@ -297,7 +330,17 @@ export class MercadopagoService {
   // ── Webhook de desautorización (el comercio revoca desde SU cuenta de MP) ──
   async handleOAuthWebhook(mpUserId: string | undefined): Promise<void> {
     if (!mpUserId) return;
+    // La misma cuenta de MP puede estar conectada en más de un negocio: se
+    // registra la desconexión en cada uno, sin actor (lo disparó el comercio
+    // desde su cuenta de MP, no alguien del panel).
+    const afectadas = await this.prisma.mpCredentials.findMany({ where: { mpUserId, isActive: true }, select: { businessId: true } });
     await this.prisma.mpCredentials.updateMany({ where: { mpUserId }, data: { isActive: false } });
+    for (const { businessId } of afectadas) {
+      await this.audit?.registrar({
+        businessId, memberId: null, entityType: 'mp_credentials', entityId: businessId, action: 'DEACTIVATE',
+        changes: [{ field: 'mpUserId', before: mpUserId, after: null }],
+      });
+    }
   }
 
   // ── Checkout: crear la preferencia de pago de un pedido ─────────────────

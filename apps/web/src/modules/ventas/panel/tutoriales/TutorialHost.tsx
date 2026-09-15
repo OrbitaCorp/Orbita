@@ -5,7 +5,9 @@
 // Checklist desde cero; si quedó a medias la retoma; si está terminado no
 // renderiza nada. Cada avance se guarda en la base (PUT), así el progreso
 // acompaña al negocio en cualquier dispositivo. ?tutorial=<variante> fuerza
-// una variante — ver contrato en estado.ts.
+// una variante (?tutorial=checklist2, la segunda etapa) — ver contrato en
+// estado.ts. Qué se muestra al abrir lo decide resolverAlAbrir (pura, con
+// tests): es donde vive la regla de las dos etapas de la Checklist.
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
@@ -15,8 +17,8 @@ import { adminPath } from '@/lib/tenant'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { panelGetTutorial, panelSetTutorial } from '@/lib/api'
 import {
-    EstadoTutorial, TUTORIAL_INICIAL, Variante, VARIANTES,
-    desdeRemoto, inicial,
+    EstadoTutorial, QUERY_ETAPA_2, TUTORIAL_INICIAL, Variante, VARIANTES,
+    desdeRemoto, etapaDe, inicial, resolverAlAbrir,
 } from './estado'
 
 export interface PropsVariante {
@@ -80,8 +82,21 @@ export default function TutorialHost() {
         if (queryTutorial === 'off') {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setEstado(null)
-            panelSetTutorial({ ...inicial(TUTORIAL_INICIAL), fase: 'terminado' })
+            // "off" = no mostrar más nada: se guarda como etapa 2 terminada.
+            // Con etapa 1 (o sin etapa) resolverAlAbrir podría arrancar la
+            // segunda etapa en la próxima visita, que es lo contrario de "off".
+            panelSetTutorial({ ...inicial(TUTORIAL_INICIAL, 2), fase: 'terminado' })
                 .catch(() => { /* la relectura de abajo muestra lo que haya */ })
+                .finally(sacarQuery)
+            return () => { vigente = false }
+        }
+        if (queryTutorial === QUERY_ETAPA_2) {
+            // Segunda etapa de la Checklist desde cero, para probarla sin
+            // pasar por la primera.
+            const nuevo = inicial('checklist', 2)
+            setEstado(nuevo)
+            panelSetTutorial(nuevo)
+                .catch(() => { /* idem */ })
                 .finally(sacarQuery)
             return () => { vigente = false }
         }
@@ -95,23 +110,16 @@ export default function TutorialHost() {
         }
         // Sin query: lo que diga la base. Las tareas cumplidas de verdad
         // (`cumplidas`) se suman a las hechas y, si cambió algo, se persiste.
+        // Nunca lo tocó → arranca la Checklist; ya terminó la primera etapa
+        // antes de que existiera la segunda → arranca la segunda (ver
+        // ETAPA_2_PARA_QUIEN_YA_TERMINO); terminado de verdad → nada.
         panelGetTutorial()
             .then(({ tutorial, cumplidas }) => {
                 if (!vigente) return
                 setHechasAuto(cumplidas)
-                const remoto = desdeRemoto(tutorial)
-                if (remoto === null) {
-                    // Nunca lo tocó: arranca la Checklist y queda registrado.
-                    const nuevo = { ...inicial(TUTORIAL_INICIAL), hechas: cumplidas }
-                    guardar(nuevo)
-                    setEstado(nuevo)
-                    return
-                }
-                if (remoto.fase !== 'activo') { setEstado(null); return }
-                const faltan = cumplidas.filter(id => !remoto.hechas.includes(id))
-                const conAuto = faltan.length ? { ...remoto, hechas: [...remoto.hechas, ...faltan] } : remoto
-                if (faltan.length) guardar(conAuto)
-                setEstado(conAuto)
+                const { estado: resuelto, persistir } = resolverAlAbrir(desdeRemoto(tutorial), cumplidas)
+                if (resuelto && persistir) guardar(resuelto)
+                setEstado(resuelto)
             })
             .catch(() => {
                 // Sin respuesta de la API no se muestra nada: mejor un panel
@@ -179,7 +187,11 @@ export default function TutorialHost() {
     const reiniciar = useCallback(() => {
         setEstado(prev => {
             if (!prev) return prev
-            const nuevo = inicial(prev.variante)
+            // Reiniciar es "esta etapa desde cero", no volver a la primera.
+            // En la Checklist `paso` marca que la presentación de la segunda
+            // etapa ya se vio: reiniciar borra los tildes, no la presentación.
+            const nuevo = inicial(prev.variante, etapaDe(prev))
+            if (prev.variante === 'checklist') nuevo.paso = prev.paso
             guardar(nuevo)
             return nuevo
         })
@@ -199,7 +211,10 @@ export default function TutorialHost() {
 
     const Componente = VARIANTE_COMPONENTES[estado.variante]
     return (
+        // key por etapa: al pasar de la primera a la segunda la variante se
+        // remonta y su estado local (acordeón, guía, hoja) arranca limpio.
         <Componente
+            key={`${estado.variante}-${etapaDe(estado)}`}
             estado={estado}
             actualizar={actualizar}
             terminar={terminar}

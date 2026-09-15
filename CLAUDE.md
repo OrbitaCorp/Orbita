@@ -25,7 +25,9 @@ El backend (`apps/api/`) **ya no corre en Railway**, corre en **Google Cloud Run
 desde el 2026-08-31. Un push a `main` despliega el FRONTEND solo (Vercel) — el
 backend **no tiene CI/CD**, hay que desplegarlo a mano con `cd apps/api &&
 ./deploy/deploy.sh` cada vez que se toque algo en `apps/api/src/` o
-`apps/api/prisma/`. Ver [`apps/api/CLAUDE.md`](apps/api/CLAUDE.md) y
+`apps/api/prisma/`, y **solo después de que el cambio esté en `main` con CI verde**:
+el script tiene un preflight que lo exige (hallazgo `deploy-manual` de la auditoría
+interna). Ver [`apps/api/CLAUDE.md`](apps/api/CLAUDE.md) y
 [`apps/api/DEPLOYMENT.md`](apps/api/DEPLOYMENT.md) para el detalle completo
 antes de asumir que "pushear alcanza" o de mencionar Railway.
 
@@ -40,15 +42,10 @@ este orden exacto, sin saltear pasos:
    en `apps/web` y `apps/api`) y los tests unitarios de la API si se tocó `apps/api`.
 2. **Si el cambio toca `apps/api/prisma/migrations/`:** aplicar la migración en producción con
    `cd apps/api && pnpm exec prisma migrate deploy` ANTES de desplegar la API. La base local
-   ES la de producción, así que esto ya es producción.
-3. **Si el cambio toca `apps/api/src/` o `apps/api/prisma/`:** desplegar la API a Cloud Run
-   con `cd apps/api && ./deploy/deploy.sh` (necesita `gcloud auth login` con
-   `contacto@orbita-corp.com`; si no hay cuenta logueada, pedirle a Ale que corra
-   `! gcloud auth login` y recién después correr el script). Un push a `main` NO despliega
-   la API. Verificar con `gcloud run services describe orbita-api --region
-   southamerica-east1 --project orbita-api-corp` que la revisión nueva esté sirviendo el
-   100% del tráfico.
-4. **Frontend: se pushea SOLO `main`. La rama de trabajo NO se pushea.** Vercel construye
+   ES la de producción, así que esto ya es producción. `deploy.sh` se niega a desplegar si
+   quedó alguna migración sin aplicar. Si la migración es destructiva (borra o renombra
+   algo), leer antes `apps/api/DEPLOYMENT.md` § Rollback: se hace en dos releases.
+3. **Frontend: se pushea SOLO `main`. La rama de trabajo NO se pushea.** Vercel construye
    cada commit UNA sola vez. Si el commit llega primero por la rama de feature, Vercel lo
    despliega como *Preview*, y cuando `main` avanza al mismo commit por fast-forward lo
    ignora: producción queda vieja. Y pushear la rama después de `main` tampoco sirve: es el
@@ -61,16 +58,42 @@ este orden exacto, sin saltear pasos:
    Ale lo pide explícito, por ejemplo para abrir un PR o compartirla.
    Si por error la rama ya se pusheó antes que `main`, hacer un commit vacío en `main`
    (`git commit --allow-empty -m "chore: forzar deploy de producción"`) y pushearlo.
-5. **Verificar que fue a producción, no a preview.** El estado "Vercel success" en el commit
-   NO alcanza (también es success en un preview). Chequear el entorno del deployment:
+4. **Verificar que fue a producción, no a preview, y esperar CI verde.** El estado "Vercel
+   success" en el commit NO alcanza (también es success en un preview). Chequear el entorno
+   del deployment y los check runs de CI (`.github/workflows/ci.yml`, corre en cada push a
+   `main`):
    ```
    gh api "repos/OrbitaCorp/Orbita/deployments?sha=<sha completo de main>" --jq '.[] | "\(.environment) \(.sha[0:5])"'
+   gh api "repos/OrbitaCorp/Orbita/commits/<sha completo de main>/check-runs" --jq '.check_runs[] | "\(.name) \(.status) \(.conclusion)"'
    ```
-   Tiene que decir `Production`. Esperar a que el commit status pase de `pending` a
-   `success` y recién ahí dar el trabajo por terminado. El Vercel CLI de esta máquina está
-   logueado con una cuenta personal que no ve el proyecto de Órbita: no sirve para esto.
-6. **Reportar** en el mensaje final: sha en `main`, entorno del deployment de Vercel, y (si
-   aplica) la revisión de Cloud Run y si la migración quedó aplicada.
+   Tiene que decir `Production`, y `API — typecheck + tests` y `Web — typecheck` tienen que
+   estar `completed success` (`Web — lint (informativo)` puede estar en failure: no bloquea).
+   Esperar a que el commit status pase de `pending` a `success` y recién ahí seguir. El
+   Vercel CLI de esta máquina está logueado con una cuenta personal que no ve el proyecto
+   de Órbita: no sirve para esto.
+5. **Si el cambio toca `apps/api/src/` o `apps/api/prisma/`: desplegar la API a Cloud Run
+   RECIÉN AHORA**, con `main` pusheado y CI verde, con `cd apps/api && ./deploy/deploy.sh`
+   (necesita `gcloud auth login` con `contacto@orbita-corp.com`; si no hay cuenta logueada,
+   pedirle a Ale que corra `! gcloud auth login` y recién después correr el script). Un push
+   a `main` NO despliega la API. Verificar con `gcloud run services describe orbita-api
+   --region southamerica-east1 --project orbita-api-corp` que la revisión nueva esté
+   sirviendo el 100% del tráfico.
+   **Por qué la API va después de `main` y no antes** (hallazgo `deploy-manual` de la
+   auditoría interna): a producción va solo lo que ya está en `main` con CI verde, y
+   `deploy.sh` ahora lo exige con un preflight (árbol limpio, HEAD contenido en
+   `origin/main`, typecheck + tests, sin migraciones pendientes, check runs de CI en
+   success): si se corre desde la rama o antes del push, corta con exit 1 sin buildear.
+   **Trade-off:** con este orden Vercel publica el frontend unos minutos antes de que la API
+   nueva esté sirviendo. Si el frontend necesita un endpoint nuevo, correr `deploy.sh` apenas
+   CI da verde (el preflight tarda ~10 minutos por los tests: avisar que está corriendo). Si
+   un cambio no tolera ni esa ventana (el storefront rompe sin el endpoint), la excepción
+   documentada es desplegar la API PRIMERO, desde `main` ya pusheado, con
+   `DEPLOY_SIN_PREFLIGHT=1 ./deploy/deploy.sh`: imprime un aviso grande y pide confirmar
+   escribiendo `si` en la consola (sin tty aborta), así que lo tiene que correr Ale, y hay
+   que decirlo en el reporte. `DEPLOY_SOLO_PREFLIGHT=1` corre solo el preflight, sin
+   desplegar, para responder "¿se puede desplegar ya?".
+6. **Reportar** en el mensaje final: sha en `main`, entorno del deployment de Vercel, si CI
+   quedó en verde, y (si aplica) la revisión de Cloud Run y si la migración quedó aplicada.
 
 ## Skill de UI/UX: ui-ux-pro-max
 
