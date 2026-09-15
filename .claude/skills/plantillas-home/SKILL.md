@@ -748,6 +748,47 @@ Las listas verticales y los carruseles quedan afuera: ahí no hay hueco que
 tapar y el largo es parte del diseño (Escaparate lista tres productos porque
 son los tres puntos sobre la foto).
 
+### 15. Un dato que el dueño escribe a mano se desactualiza solo
+
+La lista escolar de Papelería eran cinco renglones `producto | precio`
+escritos a mano. El precio queda **pegado en la portada**: el dueño cambia el
+precio del producto y la home sigue mostrando el viejo.
+
+**Regla: si el dato ya vive en el catálogo, no se escribe — se elige.** Campo
+`seleccion`, y el nombre y el precio salen del producto. Vale para cualquier
+sección que muestre productos "de ejemplo": listas sugeridas, combos,
+recomendados, pasos.
+
+Corolario: un campo de texto con formato (`producto | precio`, `etiqueta |
+col1 | col2`) casi siempre es señal de que falta un tipo de campo. Si hay que
+explicar una sintaxis en el `help`, revisar si no debería ser un selector.
+
+### 16. Las categorías son las que son: la grilla se reparte, no se rellena
+
+Papelería dibujaba `cols(6)` con cuatro categorías: **dos huecos a la
+derecha**. Y al revés también — un `.map()` sin cortar manda la quinta a una
+segunda fila a medio llenar. Pasaba en NUEVE plantillas.
+
+**Regla: `colsDe(max, cuantas, movil)` para toda grilla de categorías**, y un
+`.slice(0, max)` que la acompañe.
+
+La diferencia con los productos importa: una fila de productos siempre se
+puede llenar —`fila()` toma del catálogo— pero **las categorías no se
+inventan**. Si hay cuatro, la fila se reparte entre cuatro. Escaparate ya lo
+resolvía a mano con `Math.min(cats.length, N)`; ahora es un helper y vale para
+todas.
+
+### 17. Si el dato ya está en Configuración, no se pide de nuevo
+
+El botón "Mandar mi lista" del banner de campaña era un `<span>` sin
+`onClick`. Lo que corresponde es que abra el WhatsApp del negocio — y el
+número **no se carga en la plantilla**: ya está en Configuración.
+
+**Regla: la plantilla edita CONTENIDO propio, nunca datos del negocio.** El
+texto del botón sí es de la plantilla y va editable; el número de WhatsApp, el
+email, el horario y el CUIT no — tenerlos en dos lados garantiza que un día no
+coincidan. Lo mismo que ya vale para el pie (punto 5).
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -798,6 +839,10 @@ son los tres puntos sobre la foto).
 | Un producto colgado solo en una segunda fila | `p.productos.map()` completo contra un `cols(4)` — la fila no cortaba por el ancho de la grilla | `cols(d, m)` y `cuantos(d, m)` van siempre de a pares |
 | El mismo producto dos veces en la misma fila | Mosaico hacía `[...p.productos, p.productos[0]]` para tapar el quinto hueco | Tapar el síntoma se ve; cortar por `cuantos()` lo arregla |
 | Toda la portada con los mismos cinco productos | `p.productos` son los destacados, y se usaban para rellenar cada sección | Solo las secciones que dicen "destacados" salen de ahí; el resto, `fila(n, clave)` sobre el catálogo |
+
+| Un precio escrito a mano en la portada | La lista sugerida se cargaba como texto `producto \| precio` | Si el dato vive en el catálogo, se elige (`seleccion`), no se escribe |
+| Dos huecos a la derecha en la grilla de categorías | `cols(6)` fijo contra las categorías que el negocio tenga (cuatro) | `colsDe(max, cuantas, movil)` + `.slice(0, max)`: la grilla se reparte entre las que haya |
+| Un botón de WhatsApp que no abría nada | Se dibujó como `<span>` decorativo al maquetar la sección | Que abra `acciones.abrirWhatsapp`; el número sale de Configuración, no se pide en la plantilla |
 
 ## Convenciones del repo
 
