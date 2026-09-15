@@ -139,6 +139,16 @@ export interface StatItem {
     label: string
 }
 
+// Marca de la tira "Trabajamos con las mejores marcas" del home. El logo es
+// opcional: sin logo, la tira dibuja el NOMBRE en tipografía (la tienda de
+// referencia del pedido son puras palabras). El nombre siempre se pide —
+// con logo, es el `alt` de la imagen.
+export interface MarcaItem {
+    id:   string
+    name: string
+    logo: string | null
+}
+
 export interface Apariencia {
     nombreTienda: string
     tagline:      string
@@ -196,6 +206,14 @@ export interface Apariencia {
     parallaxSubtitulo: string
     parallaxCtaTexto:  string
     parallaxCtaLink:   string
+    // Tira de marcas con las que trabaja el negocio, en carrusel: en gris, y
+    // a color al pasar el mouse. Mismo gate que el parallax — no alcanza con
+    // mostrarMarcas, tiene que haber al menos una marca cargada, si no sería
+    // una franja vacía. Tampoco aplica con una plantilla de Home activa (la
+    // plantilla dibuja SU propia portada).
+    mostrarMarcas: boolean
+    marcasTitulo:  string
+    marcas:        MarcaItem[]
     // Contenido que pide UNA plantilla de Home y no existe en el home clásico
     // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
     // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
@@ -263,6 +281,12 @@ export const AP_DEFAULTS: Apariencia = {
     parallaxTitulo: 'Descubrí nuestra selección',
     parallaxSubtitulo: 'Productos elegidos especialmente para vos.',
     parallaxCtaTexto: 'Ver catálogo', parallaxCtaLink: '/catalogo',
+    // Mismo criterio que el parallax: apagada y sin marcas de ejemplo. Las
+    // marcas son un dato REAL del negocio (con cuáles trabaja) — precargar
+    // nombres inventados sería poner al dueño a decir algo que no dijo.
+    mostrarMarcas: false,
+    marcasTitulo: 'Trabajamos con las mejores marcas',
+    marcas: [],
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },

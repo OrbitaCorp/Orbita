@@ -335,6 +335,13 @@ model StorefrontConfig {
   // default: es una sección nueva, no tiene que aparecer sola en ninguna
   // tienda existente hasta que el dueño suba su propia imagen y la prenda.
   showParallaxBanner    Boolean @default(false) @map("show_parallax_banner")
+  // Tira de marcas con las que trabaja el negocio, en carrusel: los logos
+  // van en gris y toman color al pasar el mouse — pedido explícito del
+  // dueño, con una tienda de referencia (una relojería con EUROTIME/CASIO/
+  // G-SHOCK). false por default, igual que el parallax: es una sección
+  // nueva, no tiene que aparecer sola en ninguna tienda existente hasta que
+  // el dueño cargue sus marcas y la prenda.
+  showBrands            Boolean @default(false) @map("show_brands")
 
   // Textos configurables de la tienda
   shippingText     String? @map("shipping_text") // también es el texto del banner debajo del header
@@ -348,6 +355,14 @@ model StorefrontConfig {
   parallaxSubtitle String? @map("parallax_subtitle")
   parallaxCtaText  String? @map("parallax_cta_text")
   parallaxCtaLink  String? @map("parallax_cta_link")
+  // Contenido de la tira de marcas de arriba. `brands` es [{ id, name,
+  // logoUrl }] y va como JSON por el mismo criterio que statsBar: son datos
+  // de presentación, una lista corta que el dueño escribe, no una entidad
+  // con la que se relacione nada. `logoUrl` puede venir vacío: sin logo la
+  // tira dibuja el NOMBRE como tipografía (así es la tienda de referencia,
+  // que son puras palabras) — ver Inicio.tsx § TIRA DE MARCAS.
+  brandsTitle      String? @map("brands_title")
+  brands           Json?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

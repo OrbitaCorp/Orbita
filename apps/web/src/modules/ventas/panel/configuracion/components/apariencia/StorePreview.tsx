@@ -101,6 +101,11 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
         ? { bg: '#0F172A', surf: '#1E293B', border: '#334155', borderStrong: '#475569', text: '#F1F5F9', body: '#CBD5E1', muted: '#94A3B8', subtle: '#64748B' }
         : { bg: ap.colorFondo === 'custom' ? '#F8FAFC' : ap.colorFondo, surf: '#FFFFFF', border: '#E2E8F0', borderStrong: '#CBD5E1', text: ap.colorSecundario, body: '#334155', muted: '#64748B', subtle: '#94A3B8' }
 
+    // Las marcas a medio cargar (fila recién agregada, todavía sin nombre) no
+    // se dibujan: mismo filtro que hace el mapper al guardar y el storefront
+    // al leer, así el preview no muestra un hueco que la tienda no va a tener.
+    const marcasVisibles = ap.marcas.filter(m => m.name.trim() !== '')
+
     // Identidad de ESTA tienda para el preview. Antes habia dos datos de la
     // tienda ficticia del mock escritos a mano (el subdominio bajo el logo y el
     // mail del footer), asi que cualquier dueño veia la marca de otro adentro de
@@ -315,6 +320,40 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
 
             <ProductSection title="Productos destacados" eyebrow="Destacados" color="#EF4444" prods={DESTACADOS}   ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
             <ProductSection title="Recién llegados" eyebrow="Nuevos ingresos" color="#10B981" prods={NUEVOS}      ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
+
+            {/* ══ Tira de marcas ══ — mismo gate que el storefront real
+                (Inicio.tsx): el toggle Y al menos una marca con nombre.
+                Acá se dibuja quieta, sin el loop: la preview es para ver
+                cómo QUEDA (gris, tipografía, franja), y una tira corriendo
+                al lado del formulario que se está editando distrae más de
+                lo que muestra. El gris/color al hover sí es real. */}
+            {ap.mostrarMarcas && marcasVisibles.length > 0 && (
+                <section style={{ background: c.surf, borderTop: `1px solid ${c.border}`, borderBottom: `1px solid ${c.border}`, padding: '24px 0 26px', marginBottom: 32 }}>
+                    {ap.marcasTitulo.trim() && (
+                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: c.muted, textAlign: 'center', marginBottom: 18 }}>
+                            {ap.marcasTitulo.trim()}
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', justifyContent: 'center', padding: '0 32px' }}>
+                        {marcasVisibles.map(m => (
+                            <span key={m.id} className="ap-marca-prev" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 38 }}>
+                                {m.logo
+                                    ? <img src={m.logo} alt={m.name} style={{ maxHeight: 38, maxWidth: 120, width: 'auto', objectFit: 'contain', display: 'block' }} />
+                                    : <span style={{ fontFamily: fh, fontSize: 19, fontWeight: 600, letterSpacing: '0.02em', whiteSpace: 'nowrap', color: c.muted }}>{m.name}</span>}
+                            </span>
+                        ))}
+                    </div>
+                    {/* El gris se va al pasar el mouse — igual que en la tienda
+                        (ver .sf-marca en Inicio.tsx). Va como clase porque un
+                        :hover no se puede escribir inline. */}
+                    <style>{`
+                        .ap-marca-prev img  { filter:grayscale(1); opacity:0.55; transition:filter 260ms ease, opacity 260ms ease; }
+                        .ap-marca-prev span { transition:color 260ms ease; }
+                        .ap-marca-prev:hover img  { filter:grayscale(0); opacity:1; }
+                        .ap-marca-prev:hover span { color:${prim} !important; }
+                    `}</style>
+                </section>
+            )}
 
             {/* ══ Banner WhatsApp ══ */}
             {ap.mostrarWhatsapp && (

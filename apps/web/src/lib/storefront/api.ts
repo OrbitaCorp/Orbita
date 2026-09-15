@@ -40,6 +40,10 @@ export type StorefrontHeroSlide = {
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }
+// Marca de la tira del home. Sin `logoUrl` se dibuja el `name` en
+// tipografía — la tira funciona igual con una tienda que solo escribió
+// nombres (ver brand-item.dto.ts en apps/api).
+export type StorefrontBrandItem = { id: string; name: string; logoUrl?: string | null }
 
 // Contenido propio de una plantilla de Home. Cada clave la usa UNA plantilla
 // (`cupon` de Vidriera, `mostrarIconoLogo` de Escaparate) — se van sumando
@@ -110,6 +114,10 @@ export type StorefrontConfigResponse = {
     // Solo se dibuja con showParallaxBanner true Y parallaxImageUrl cargada
     // (sin imagen no hay nada que mostrar).
     showParallaxBanner: boolean
+    // Tira de marcas del home clásico (gris, a color al pasar el mouse) —
+    // ver Inicio.tsx § "TIRA DE MARCAS". Mismo gate que el parallax: no
+    // alcanza con el toggle, tiene que haber al menos una marca cargada.
+    showBrands: boolean
     shippingText: string | null
     whatsappText: string | null
     statsBar: StorefrontStatsItem[]
@@ -118,6 +126,8 @@ export type StorefrontConfigResponse = {
     parallaxSubtitle: string | null
     parallaxCtaText: string | null
     parallaxCtaLink: string | null
+    brandsTitle: string | null
+    brands: StorefrontBrandItem[]
   } | null
   contact: {
     whatsapp: string | null
