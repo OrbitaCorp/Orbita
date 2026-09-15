@@ -37,7 +37,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/domains/domain-purchase.service.ts': { max: 3, motivo: 'Webhook de pago: la orden se identifica por el id que mandó Mercado Pago; y el checkout mira si el dominio ya está vinculado en CUALQUIER negocio (custom_domains.domain es único global)' },
   'src/reviews/reviews.service.ts': { max: 2, motivo: 'Reseñas públicas de un producto: el producto es la unidad, no el negocio' },
   'src/games/games-play.service.ts': { max: 1, motivo: 'El juego se resuelve desde una sesión que el caller ya verificó' },
-  'src/mercadopago/mercadopago.service.ts': { max: 1, motivo: 'Webhook de OAuth: la credencial se identifica por el usuario de Mercado Pago' },
+  'src/internal-cron/retencion-logs.service.ts': { max: 2, motivo: 'Purga por antigüedad de audit_logs y email_logs (hallazgo logs-sin-retencion): borra por fecha de creación para todos los negocios a la vez, nunca por negocio, entidad ni acción' },
   'src/storefront/storefront.service.ts': { max: 1, motivo: 'Helper que recibe el where ya armado por quien lo llama' },
 };
 
