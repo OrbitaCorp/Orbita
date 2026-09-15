@@ -237,10 +237,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         panelGetCategoriesFlat()
             .then(cats => { if (!cancelado) setCategorias(cats.filter(c => c.isActive)) })
             .catch(() => { /* sin categorías: la tarjeta muestra solo los enlaces fijos */ })
-        // Un tope alto pero finito: el desplegable es para elegir, no para
-        // navegar un catálogo de miles.
-        panelGetProducts({ limit: 200 })
-            .then(r => { if (!cancelado) setProductos(r.data) })
+        // 100 es el TOPE de la API (`@Max(100)` en find-products-query.dto.ts),
+        // no una elección: pedir más devuelve 400 y el catch de abajo se lo
+        // come en silencio, así que el desplegable quedaba sin productos y
+        // ofrecía solo categorías. Si el negocio tiene más de 100, el selector
+        // muestra los primeros 100.
+        panelGetProducts({ limit: 100 })
+            // Sin los borradores: la tienda no los publica, así que elegir uno
+            // no mostraría nada (la portada no lo encontraría y llenaría ese
+            // lugar con otro, sin avisar). OUT_OF_STOCK sí queda: está
+            // publicado, se ve, y puede volver a tener stock.
+            .then(r => { if (!cancelado) setProductos(r.data.filter(x => x.status !== 'DRAFT')) })
             .catch(() => { /* sin catálogo: el selector ofrece solo categorías */ })
         return () => { cancelado = true }
     }, [])
