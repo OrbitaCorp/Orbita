@@ -27,7 +27,7 @@ export class DomainsController {
   @RequirePermission('config.domains.manage')
   link(@CurrentBusiness() ctx: AuthContext, @Body() dto: LinkDomainDto) {
     const member = assertMemberContext(ctx);
-    return this.domainsService.linkDomain(member.businessId, dto);
+    return this.domainsService.linkDomain(member.businessId, dto, member.memberId);
   }
 
   // Compra real vía la API de registrador de Vercel (reemplaza el mock que
@@ -45,7 +45,7 @@ export class DomainsController {
   @RequirePermission('config.domains.manage')
   checkoutPurchase(@CurrentBusiness() ctx: AuthContext, @Body() dto: CheckoutDomainPurchaseDto) {
     const member = assertMemberContext(ctx);
-    return this.domainPurchaseService.startCheckout(member.businessId, dto);
+    return this.domainPurchaseService.startCheckout(member.businessId, dto, member.memberId);
   }
 
   @Get('purchase/:orderId')
@@ -66,7 +66,7 @@ export class DomainsController {
   @RequirePermission('config.domains.manage')
   verifyDns(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.domainsService.verifyDns(member.businessId, id);
+    return this.domainsService.verifyDns(member.businessId, id, member.memberId);
   }
 
   @Get(':id/ssl-status')
@@ -80,6 +80,6 @@ export class DomainsController {
   @RequirePermission('config.domains.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.domainsService.remove(member.businessId, id);
+    return this.domainsService.remove(member.businessId, id, member.memberId);
   }
 }

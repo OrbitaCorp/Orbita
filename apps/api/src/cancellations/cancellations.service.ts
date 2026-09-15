@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { OrdersService } from '../orders/orders.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
+import { AuditService } from '../audit/audit.service';
 import { describeError } from '../common/utils/describe-error.util';
 import { escaparHtml } from '../common/utils/html';
 import { FindCancellationsQueryDto } from './dto/find-cancellations-query.dto';
@@ -62,6 +63,9 @@ export class CancellationsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly orders: OrdersService,
     private readonly mercadopago: MercadopagoService,
+    // Registro de auditoría de aprobar/rechazar y del reembolso (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   private nombreCliente(o: OrdenResumida): string | null {
@@ -255,6 +259,17 @@ export class CancellationsService {
       throw new UnprocessableEntityException('Esa solicitud ya fue resuelta por otra persona.');
     }
 
+    // Quién aceptó la cancelación y cómo pidió el cliente que le devuelvan la
+    // plata. El reembolso o la nota van en una entrada aparte, más abajo:
+    // recién ahí se sabe si salió.
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'cancellation', entityId: id, action: 'ACTIVATE',
+      changes: [
+        { field: 'status', before: 'PENDING', after: 'APPROVED' },
+        { field: 'refundMethod', before: null, after: solicitud.refundMethod },
+      ],
+    });
+
     let refundStatus: RefundApiStatus = 'NONE';
     let mpRefundId: string | null = null;
 
@@ -274,11 +289,16 @@ export class CancellationsService {
           expiresAt: vence,
         },
       });
+      // Plata que sale (como saldo a favor): queda por cuánto se emitió.
+      await this.audit?.registrar({
+        businessId, memberId, entityType: 'cancellation', entityId: id, action: 'UPDATE',
+        changes: [{ field: 'creditNote', before: null, after: { monto: Number(solicitud.order.total) } }],
+      });
     } else {
       // El pago de Mercado Pago (si lo hay) para intentar el reembolso real.
       const pagoMp = await this.prisma.payment.findFirst({
         where: { orderId: solicitud.orderId, businessId, method: 'MERCADOPAGO', status: 'APPROVED' },
-        select: { id: true, mpPaymentId: true },
+        select: { id: true, mpPaymentId: true, amount: true },
       });
 
       if (pagoMp?.mpPaymentId) {
@@ -307,6 +327,21 @@ export class CancellationsService {
       if (refundStatus === 'FAILED') {
         this.logger.warn(`Cancelación ${id} aprobada pero el reembolso de Mercado Pago falló — requiere revisión manual.`);
       }
+
+      // El reembolso es plata que vuelve al cliente desde la cuenta de MP del
+      // negocio: monto e id del reembolso en MP. Si falló, queda que falló
+      // (hay que devolverla a mano) — sin id, porque no hay.
+      if (refundStatus === 'REFUNDED' && pagoMp) {
+        await this.audit?.registrar({
+          businessId, memberId, entityType: 'cancellation', entityId: id, action: 'UPDATE',
+          changes: [{ field: 'refund', before: null, after: { monto: Number(pagoMp.amount), mpRefundId } }],
+        });
+      } else if (refundStatus === 'FAILED') {
+        await this.audit?.registrar({
+          businessId, memberId, entityType: 'cancellation', entityId: id, action: 'UPDATE',
+          changes: [{ field: 'refundStatus', before: null, after: 'FAILED' }],
+        });
+      }
     }
 
     const actualizada = await this.prisma.cancellationRequest.findFirstOrThrow({ where: { id }, include: INCLUDE_ORDEN });
@@ -314,17 +349,28 @@ export class CancellationsService {
   }
 
   // ── Rechazar ───────────────────────────────────────────────────────────────
-  async reject(businessId: string, id: string, dto: RejectCancellationDto) {
+  async reject(businessId: string, id: string, dto: RejectCancellationDto, actorId?: string) {
     const solicitud = await this.prisma.cancellationRequest.findFirst({ where: { id, businessId }, include: INCLUDE_ORDEN });
     if (!solicitud) throw new NotFoundException('Solicitud de cancelación no encontrada');
 
+    const mensaje = dto.rejectionMessage?.trim() || null;
     const escrito = await this.prisma.cancellationRequest.updateMany({
       where: { id, businessId, status: 'PENDING' },
-      data: { status: 'REJECTED', rejectionMessage: dto.rejectionMessage?.trim() || null },
+      data: { status: 'REJECTED', rejectionMessage: mensaje },
     });
     if (escrito.count === 0) {
       throw new UnprocessableEntityException('Esa solicitud ya fue resuelta por otra persona.');
     }
+
+    // Quién rechazó y qué se le dijo al cliente.
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'cancellation', entityId: id, action: 'DEACTIVATE',
+      changes: [
+        { field: 'status', before: 'PENDING', after: 'REJECTED' },
+        { field: 'orderNumber', before: null, after: solicitud.order.orderNumber },
+        { field: 'rejectionMessage', before: null, after: mensaje },
+      ],
+    });
 
     const destino = this.emailCliente(solicitud.order);
     if (destino) {

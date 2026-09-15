@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { DomainStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelDomainsService } from './vercel-domains.service';
+import { AuditService } from '../audit/audit.service';
 import { esDominioDeOrbita } from './dominio-de-orbita';
 import { LinkDomainDto } from './dto/link-domain.dto';
 
@@ -10,6 +11,9 @@ export class DomainsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vercelDomains: VercelDomainsService,
+    // Registro de auditoría de vincular/verificar/borrar dominios (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   findAll(businessId: string) {
@@ -24,7 +28,7 @@ export class DomainsService {
 
   // ── LINKED: el negocio ya es dueño del dominio, solo lo apunta a Órbita ──
 
-  async linkDomain(businessId: string, dto: LinkDomainDto) {
+  async linkDomain(businessId: string, dto: LinkDomainDto, actorId?: string) {
     const normalized = dto.domain.trim().toLowerCase();
     if (esDominioDeOrbita(normalized)) {
       throw new BadRequestException('Los dominios de Órbita no se pueden vincular como dominio propio');
@@ -49,8 +53,8 @@ export class DomainsService {
     // Dos negocios vinculando el mismo dominio a la vez pasan los dos el
     // chequeo de arriba; el @unique de `domain` decide, y el segundo recibe un
     // 409 en vez de un 500 (auditoría interna 10/09, ítem `api.domains`).
-    try {
-      return await this.prisma.customDomain.create({
+    const creado = await this.prisma.customDomain
+      .create({
         data: {
           businessId,
           domain: normalized,
@@ -58,13 +62,19 @@ export class DomainsService {
           status: 'PENDING',
           dnsVerified: false,
         },
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          throw new ConflictException('Ese dominio ya está vinculado a un negocio en Órbita');
+        }
+        throw err;
       });
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new ConflictException('Ese dominio ya está vinculado a un negocio en Órbita');
-      }
-      throw err;
-    }
+    // Quién vinculó qué dominio (hallazgo `auditoria-acciones-sin-registro`).
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'domain', entityId: creado.id, action: 'CREATE',
+      changes: [{ field: 'domain', before: null, after: normalized }, { field: 'source', before: null, after: 'LINKED' }],
+    });
+    return creado;
   }
 
   /**
@@ -101,7 +111,7 @@ export class DomainsService {
     return [{ type: 'CNAME', domain: nombre, value: limpiar(cname) }];
   }
 
-  async verifyDns(businessId: string, id: string) {
+  async verifyDns(businessId: string, id: string, actorId?: string) {
     const domain = await this.findOwned(businessId, id);
     const configured = await this.vercelDomains.isDnsConfigured(domain.domain);
     const info = configured ? await this.vercelDomains.getDomainInfo(domain.domain) : null;
@@ -110,10 +120,24 @@ export class DomainsService {
     const status: DomainStatus = verified ? 'ACTIVE' : 'VERIFYING';
     // businessId también en el where de la escritura: el aislamiento lo tiene
     // que garantizar la consulta misma, no el findOwned() de arriba.
-    return this.prisma.customDomain.update({
+    const actualizado = await this.prisma.customDomain.update({
       where: { id, businessId },
       data: { dnsVerified: verified, status },
     });
+    // Solo cuando cambia algo: "verificar" se aprieta muchas veces mientras
+    // el DNS propaga y no vale la pena una fila por cada intento sin novedad.
+    const cambios = AuditService.diferencias(
+      { status: domain.status, dnsVerified: domain.dnsVerified },
+      { status, dnsVerified: verified },
+      ['status', 'dnsVerified'],
+    );
+    if (cambios.length > 0) {
+      await this.audit?.registrar({
+        businessId, memberId: actorId, entityType: 'domain', entityId: id, action: 'UPDATE',
+        changes: [{ field: 'domain', before: null, after: domain.domain }, ...cambios],
+      });
+    }
+    return actualizado;
   }
 
   async sslStatus(businessId: string, id: string) {
@@ -126,12 +150,18 @@ export class DomainsService {
     return this.prisma.customDomain.update({ where: { id, businessId }, data: { sslStatus } });
   }
 
-  async remove(businessId: string, id: string) {
+  async remove(businessId: string, id: string, actorId?: string) {
     const domain = await this.findOwned(businessId, id);
     // Best-effort en Vercel — igual que el borrado de imágenes en products.service.ts,
     // un error de red ahí no debería trabar que el negocio se saque el dominio de encima.
     await this.vercelDomains.removeDomain(domain.domain).catch(() => {});
     await this.prisma.customDomain.delete({ where: { id, businessId } });
+    // Un dominio borrado deja la tienda sin esa dirección: queda quién lo hizo
+    // (hallazgo `auditoria-acciones-sin-registro`).
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'domain', entityId: id, action: 'DELETE',
+      changes: [{ field: 'domain', before: domain.domain, after: null }, { field: 'source', before: domain.source, after: null }],
+    });
     return { ok: true };
   }
 

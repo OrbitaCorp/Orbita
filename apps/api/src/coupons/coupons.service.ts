@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { AuditService } from '../audit/audit.service';
 import { escaparHtml } from '../common/utils/html';
 import { FindCouponsQueryDto } from './dto/find-coupons-query.dto';
 import { UpsertCouponDto } from './dto/upsert-coupon.dto';
@@ -14,6 +15,15 @@ import { estadoDe, whereDeEstado, resumenesDeAlcance, EstadoDiscount, vigenciaDe
 function codigoDe(code: string): string {
   return code.trim().toUpperCase();
 }
+
+// Lo que vale la pena ver en el registro de auditoría de un cupón: código,
+// nombre, tipo y valor, alcance, vigencia, condiciones, topes y el link
+// compartible (hallazgo `auditoria-acciones-sin-registro`). Mismo criterio
+// que CAMPOS_AUDITADOS de DiscountsService, más lo propio del cupón.
+const CAMPOS_AUDITADOS = [
+  'code', 'name', 'type', 'value', 'scope', 'startDate', 'endDate', 'minAmount',
+  'maxUsesTotal', 'maxUsesPerCustomer', 'isPrivate', 'linkActive', 'linkRedirect',
+];
 
 // (RBT-615) Cupones del panel. Comparten la tabla `discounts` con los descuentos,
 // pero un cupón es una fila con `code ≠ null`. Todo query filtra `code: { not: null }`
@@ -29,6 +39,9 @@ export class CouponsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    // Registro de auditoría de alta, edición, activación y baja (hallazgo
+    // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   // Envío libre del link de un cupón exclusivo — mismo patrón que
@@ -284,11 +297,16 @@ export class CouponsService {
       return cupon;
     });
 
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'coupon', entityId: creado.id, action: 'CREATE',
+      changes: AuditService.diferencias({}, { ...creado }, CAMPOS_AUDITADOS),
+    });
+
     return this.findOne(businessId, creado.id);
   }
 
   // ── Edición ────────────────────────────────────────────────────────────────
-  async update(businessId: string, id: string, dto: UpsertCouponDto) {
+  async update(businessId: string, id: string, dto: UpsertCouponDto, actorId?: string) {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
 
@@ -296,6 +314,7 @@ export class CouponsService {
       where: { id, businessId, code: { not: null }, deletedAt: null },
     });
     if (!existente) throw new NotFoundException('Cupón no encontrado');
+    const datos = this.datosDe(dto);
 
     const dupNombre = await this.prisma.discount.findFirst({
       where: { businessId, code: { not: null }, name: dto.name, deletedAt: null, id: { not: id } },
@@ -310,7 +329,7 @@ export class CouponsService {
     if (dupCodigo) throw new BadRequestException('Ya existe un cupón con ese código.');
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.discount.updateMany({ where: { id, businessId }, data: this.datosDe(dto) });
+      await tx.discount.updateMany({ where: { id, businessId }, data: datos });
       await tx.discountProduct.deleteMany({ where: { discountId: id } });
       await tx.discountCategory.deleteMany({ where: { discountId: id } });
       if (dto.productIds?.length) {
@@ -325,14 +344,20 @@ export class CouponsService {
       }
     });
 
+    // Solo lo que cambió de verdad (mismo criterio que productos y equipo).
+    const cambios = AuditService.diferencias({ ...existente }, datos, CAMPOS_AUDITADOS);
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'coupon', entityId: id, action: 'UPDATE', changes: cambios });
+    }
+
     return this.findOne(businessId, id);
   }
 
   // ── Activar / desactivar ───────────────────────────────────────────────────
-  async toggle(businessId: string, id: string) {
+  async toggle(businessId: string, id: string, actorId?: string) {
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: { not: null }, deletedAt: null },
-      select: { id: true, isActive: true },
+      select: { id: true, code: true, isActive: true },
     });
     if (!existente) throw new NotFoundException('Cupón no encontrado');
 
@@ -340,22 +365,31 @@ export class CouponsService {
       where: { id, businessId },
       data: { isActive: !existente.isActive },
     });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'coupon', entityId: id,
+      action: existente.isActive ? 'DEACTIVATE' : 'ACTIVATE',
+      changes: [{ field: 'code', before: null, after: existente.code }, { field: 'isActive', before: existente.isActive, after: !existente.isActive }],
+    });
     return this.findOne(businessId, id);
   }
 
   // ── Baja (soft-delete) ──────────────────────────────────────────────────────
   // El cupón pudo haberse canjeado en ventas históricas (DiscountRedemption lo
   // referencia), así que la fila se conserva.
-  async remove(businessId: string, id: string) {
+  async remove(businessId: string, id: string, actorId?: string) {
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: { not: null }, deletedAt: null },
-      select: { id: true },
+      select: { id: true, code: true, name: true },
     });
     if (!existente) throw new NotFoundException('Cupón no encontrado');
 
     await this.prisma.discount.updateMany({
       where: { id, businessId },
       data: { deletedAt: new Date(), isActive: false },
+    });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'coupon', entityId: id, action: 'DELETE',
+      changes: [{ field: 'code', before: existente.code, after: null }, { field: 'name', before: existente.name, after: null }],
     });
     return { ok: true };
   }

@@ -31,6 +31,6 @@ export class CancellationsController {
   @RequirePermission('orders.manage')
   reject(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: RejectCancellationDto) {
     const member = assertMemberContext(ctx);
-    return this.cancellationsService.reject(member.businessId, id, dto);
+    return this.cancellationsService.reject(member.businessId, id, dto, member.memberId);
   }
 }

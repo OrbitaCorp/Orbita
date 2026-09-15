@@ -37,7 +37,9 @@ export class MercadopagoController {
   @Roles('owner', 'admin')
   connect(@CurrentBusiness() auth: AuthContext) {
     if (auth?.type !== 'member') throw new ForbiddenException();
-    const authUrl = this.mercadopagoService.getAuthorizationUrl(auth.businessId);
+    // El actor viaja en el state firmado: el callback es público y no tiene
+    // otra forma de saber quién conectó (registro de auditoría).
+    const authUrl = this.mercadopagoService.getAuthorizationUrl(auth.businessId, auth.memberId);
     return { authUrl };
   }
 
@@ -64,7 +66,7 @@ export class MercadopagoController {
   @Roles('owner', 'admin')
   disconnect(@CurrentBusiness() auth: AuthContext) {
     if (auth?.type !== 'member') throw new ForbiddenException();
-    return this.mercadopagoService.disconnect(auth.businessId);
+    return this.mercadopagoService.disconnect(auth.businessId, auth.memberId);
   }
 
   @Get('status')
