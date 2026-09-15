@@ -22,7 +22,7 @@ import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
-    CATEGORY_LAYOUTS,
+    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type CategoryLayout as CategoryLayoutT, type HeroSlide,
@@ -994,15 +994,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         {/* Estilo de la sección "Comprá por categoría" del home
                             (ver SeccionCategorias en Inicio.tsx). Mosaico y
                             Tarjetas se ofrecen deshabilitados mientras ninguna
-                            categoría tenga foto: son estilos que SON la foto,
-                            sin imagen quedarían rectángulos de color. */}
+                            categoría tenga foto: son estilos que SON la foto —
+                            a diferencia de los otros cuatro, acá la imagen NO
+                            es opcional, no hay color de relleno para las que
+                            no tengan (ver resolverCategorias() en Inicio.tsx). */}
                         <FieldLabel help="Cómo se ve la fila de categorías en el home. El interruptor para mostrarla o no está en “¿Qué ven tus clientes?”.">Estilo de las categorías</FieldLabel>
                         {!hayFotosDeCategoria && (
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>
-                                Cargá una foto en alguna categoría (Catálogo → Categorías) para desbloquear los estilos con imagen.
+                                Mosaico y Tarjetas necesitan que la categoría tenga foto — sin eso no se pueden armar (no hay un color de relleno para reemplazarla). Cargá una en Catálogo → Categorías para desbloquearlos.
                             </div>
                         )}
-                        <div style={{ marginBottom: 4 }}>
+                        <div style={{ marginBottom: 18 }}>
                             <VisualPick
                                 value={ap.estiloCategorias}
                                 onChange={v => set('estiloCategorias', v as CategoryLayoutT)}
@@ -1016,6 +1018,22 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 }))}
                             />
                         </div>
+
+                        {/* Selector de categorías — solo índice/mosaico/tarjetas
+                            lo tienen: son los tres estilos donde mostrar TODAS
+                            las categorías puede no quedar bien (mosaico/tarjetas
+                            por el tope de 5/4; índice porque una lista muy larga
+                            deja de ser un "índice" prolijo). Pastillas/etiquetas/
+                            círculos siempre muestran todas, sin selector. */}
+                        {(ap.estiloCategorias === 'indice' || ap.estiloCategorias === 'mosaico' || ap.estiloCategorias === 'tarjetas') && (
+                            <SelectorCategorias
+                                candidatas={ap.estiloCategorias === 'indice' ? categorias : categorias.filter(c => !!c.imageUrl)}
+                                seleccionadas={ap.categoriasIds}
+                                tope={CATEGORY_LAYOUT_MAX[ap.estiloCategorias]}
+                                necesitaFoto={ap.estiloCategorias !== 'indice'}
+                                onChange={ids => set('categoriasIds', ids)}
+                            />
+                        )}
                     </SecCard>
 
                     {/* Banner con imagen de fondo fija (efecto parallax) en medio
@@ -1302,6 +1320,73 @@ function VisualPick({ value, onChange, options }: {
                     </button>
                 )
             })}
+        </div>
+    )
+}
+
+// Picker de categorías para índice/mosaico/tarjetas (ver CATEGORY_LAYOUT_MAX
+// y resolverCategorias() en Inicio.tsx). `candidatas` ya viene filtrada por
+// el caller a las que el estilo puede mostrar (todas para índice, solo con
+// foto para mosaico/tarjetas) — acá solo se listan, se marcan, y se aplica
+// el tope. [] seleccionadas = automático, no una lista vacía de verdad: el
+// storefront resuelve solo qué mostrar (ver el mensaje del contador).
+function SelectorCategorias({ candidatas, seleccionadas, tope, necesitaFoto, onChange }: {
+    candidatas: ApiCategory[]
+    seleccionadas: string[]
+    tope?: number
+    necesitaFoto: boolean
+    onChange: (ids: string[]) => void
+}) {
+    const enTope = tope !== undefined && seleccionadas.length >= tope
+
+    function toggle(id: string) {
+        if (seleccionadas.includes(id)) { onChange(seleccionadas.filter(x => x !== id)); return }
+        if (enTope) return
+        onChange([...seleccionadas, id])
+    }
+
+    return (
+        <div style={{ marginBottom: 18 }}>
+            <FieldLabel help={necesitaFoto ? 'Solo se pueden elegir categorías con foto cargada — es lo que se ve en este estilo.' : 'Sin elegir ninguna, se muestran todas las categorías activas.'}>
+                Qué categorías mostrar{tope !== undefined && <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}> · hasta {tope}</span>}
+            </FieldLabel>
+
+            {candidatas.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                    {necesitaFoto
+                        ? 'Ninguna categoría tiene foto todavía — cargá alguna en Catálogo → Categorías.'
+                        : 'Todavía no tenés categorías activas.'}
+                </div>
+            ) : (
+                <>
+                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px', marginBottom: 8, maxHeight: 260, overflowY: 'auto' }}>
+                        {candidatas.map((c, i) => {
+                            const marcada = seleccionadas.includes(c.id)
+                            const bloqueada = !marcada && enTope
+                            return (
+                                <div key={c.id} style={{ borderBottom: i < candidatas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', cursor: bloqueada ? 'not-allowed' : 'pointer', opacity: bloqueada ? 0.45 : 1 }}>
+                                        <input type="checkbox" checked={marcada} disabled={bloqueada} onChange={() => toggle(c.id)} style={{ width: 16, height: 16, flexShrink: 0, cursor: bloqueada ? 'not-allowed' : 'pointer' }} />
+                                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                                    </label>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12, color: 'var(--color-muted)' }}>
+                        <span>
+                            {seleccionadas.length === 0
+                                ? `Sin elegir ninguna: se muestran ${tope ? `las primeras ${tope}` : 'todas'}${necesitaFoto ? ' con foto' : ''} automáticamente.`
+                                : `${seleccionadas.length}${tope ? ` de ${tope}` : ''} seleccionadas`}
+                        </span>
+                        {seleccionadas.length > 0 && (
+                            <button type="button" onClick={() => onChange([])} className="ds-link" style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                                Volver a automático
+                            </button>
+                        )}
+                    </div>
+                </>
+            )}
         </div>
     )
 }

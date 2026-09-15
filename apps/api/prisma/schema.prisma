@@ -276,6 +276,12 @@ model StorefrontConfig {
   // ("mosaico"/"tarjetas") dependen de que las categorías tengan FOTO
   // cargada, y el panel los ofrece deshabilitados si no hay ninguna.
   categoryLayout String? @map("category_layout")
+  // Categorías elegidas a mano para "índice"/"mosaico"/"tarjetas" — [] (el
+  // default) = automático, se resuelve en el storefront (las activas, en
+  // "mosaico"/"tarjetas" filtradas a las que tienen foto). IDs de Category,
+  // no se valida FK acá (mismo criterio que categoryIds en discounts/coupons):
+  // un id borrado después simplemente no matchea nada al filtrar, no rompe.
+  categoryIds String[] @default([]) @map("category_ids")
 
   // Plantilla de Home (paquete Avanzado) — null = home clásico de siempre.
   // "vidriera" es la única real por ahora (prueba de concepto); el resto del

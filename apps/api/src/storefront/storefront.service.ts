@@ -307,6 +307,11 @@ export class StorefrontService {
             // Inicio.tsx) — no se normaliza acá para no inventarle un valor
             // guardado a un negocio que nunca tocó la opción.
             categoryLayout: appearance.categoryLayout,
+            // [] = automático — el storefront resuelve qué mostrar según el
+            // estilo (ver resolverCategorias() en Inicio.tsx): todas las
+            // activas para índice, las primeras N con foto para mosaico/
+            // tarjetas. Con contenido, son ids elegidos a mano en el panel.
+            categoryIds: appearance.categoryIds,
             cardRadius: appearance.cardRadius,
             homeTemplate: appearance.homeTemplate,
             homeTemplateData: appearance.homeTemplateData ?? null,

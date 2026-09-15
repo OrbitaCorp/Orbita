@@ -113,6 +113,18 @@ export const CATEGORY_LAYOUTS: {
     { id: 'circulos', label: 'Círculos',         desc: 'Fotos redondas en fila, con el nombre debajo. Ideal en celular.',  necesitaFoto: false },
 ]
 
+// Cuántas categorías entran como máximo en cada estilo con selección manual
+// (ver `categoriasIds` más abajo) — sin entrada acá = sin tope (índice, y el
+// resto de los estilos que no admiten selección). Pedido explícito del
+// dueño: mosaico se ve mejor con pocas ("como máximo 5, permanentemente");
+// tarjetas, un poco menos ("el máximo sea 4"). Fuente única de verdad — la
+// usan tanto el picker del panel (Apariencia.tsx) como el storefront real
+// (resolverCategorias() en Inicio.tsx) y su preview (StorePreview.tsx).
+export const CATEGORY_LAYOUT_MAX: Partial<Record<CategoryLayout, number>> = {
+    mosaico: 5,
+    tarjetas: 4,
+}
+
 export interface HeaderLink {
     id:    string
     label: string
@@ -153,6 +165,11 @@ export interface Apariencia {
     mostrarCategorias:  boolean
     // Estilo de esa sección, cuando está encendida (ver CATEGORY_LAYOUTS).
     estiloCategorias:   CategoryLayout
+    // Categorías elegidas a mano, solo para índice/mosaico/tarjetas — [] =
+    // automático (todas las activas en índice; las primeras N con foto en
+    // mosaico/tarjetas, ver CATEGORY_LAYOUT_MAX). Ids de Category. Ignorado
+    // por completo en pastillas/etiquetas/círculos.
+    categoriasIds:      string[]
     mostrarFooter:      boolean
     mostrarRedesFooter: boolean
     // Banner angosto debajo del header (usa textoEnvio como contenido).
@@ -231,7 +248,7 @@ export const AP_DEFAULTS: Apariencia = {
     ],
     layoutGrid: '4col',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
-    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, estiloCategorias: 'pills', mostrarFooter: true, mostrarRedesFooter: true,
+    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, estiloCategorias: 'pills', categoriasIds: [], mostrarFooter: true, mostrarRedesFooter: true,
     mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
     stats: [
         { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },

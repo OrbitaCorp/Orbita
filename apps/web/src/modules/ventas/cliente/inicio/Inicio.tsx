@@ -26,7 +26,7 @@ import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/v
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
-import type { CategoryLayout } from '@/modules/ventas/panel/configuracion/mock/apariencia.mock'
+import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel/configuracion/mock/apariencia.mock'
 // Render compartido con el preview del panel: la portada con plantilla la
 // dibuja el MISMO componente que la galería de Avanzado → Plantillas, con
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
@@ -666,7 +666,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
             {/* ══ CATEGORÍAS ══ */}
             {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && (
-                <SeccionCategorias cats={catsVisual} go={go} estilo={config?.appearance?.categoryLayout} />
+                <SeccionCategorias cats={catsVisual} go={go} estilo={config?.appearance?.categoryLayout} categoryIds={config?.appearance?.categoryIds} />
             )}
 
             {/* ══ OFERTA CON CUENTA REGRESIVA (paquete Avanzado) ══ — la
@@ -1319,10 +1319,29 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
 // cae a `pills` — el dueño puede haber elegido mosaico y borrado las fotos
 // después, y una grilla de rectángulos vacíos es peor que el estilo de
 // siempre.
-function SeccionCategorias({ cats, go, estilo }: { cats: CatVisual[]; go: (p: string) => void; estilo: string | null | undefined }) {
+//
+// `categoryIds` (elegidas a mano en el panel, ver CATEGORY_LAYOUT_MAX) solo
+// aplica a índice/mosaico/tarjetas — pastillas/etiquetas/círculos siempre
+// muestran TODAS las activas, no tienen selector en el panel. [] = automático:
+// todas para índice; las primeras N (por orden del catálogo) CON FOTO para
+// mosaico/tarjetas — nunca cae a un color de relleno ahí, la foto no es
+// opcional en esos dos estilos.
+function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryIds: string[] | null | undefined): CatVisual[] {
+    if (estilo !== 'indice' && estilo !== 'mosaico' && estilo !== 'tarjetas') return cats
+
+    // El filter sobre `cats` ya preserva el orden del catálogo (no el de
+    // selección) — no hace falta reordenar aparte.
+    const elegidas = categoryIds && categoryIds.length > 0 ? cats.filter(c => categoryIds.includes(c.id)) : cats
+    const base = estilo === 'indice' ? elegidas : elegidas.filter(c => !!c.imageUrl)
+    const tope = CATEGORY_LAYOUT_MAX[estilo]
+    return tope ? base.slice(0, tope) : base
+}
+
+function SeccionCategorias({ cats, go, estilo, categoryIds }: { cats: CatVisual[]; go: (p: string) => void; estilo: string | null | undefined; categoryIds?: string[] | null }) {
     const hayFotos = cats.some(c => !!c.imageUrl)
     const pedido = (estilo ?? 'pills') as CategoryLayout
     const elegido: CategoryLayout = (pedido === 'mosaico' || pedido === 'tarjetas') && !hayFotos ? 'pills' : pedido
+    const catsAMostrar = resolverCategorias(cats, elegido, categoryIds)
 
     return (
         <div style={{ paddingTop: 24, paddingBottom: 28 }}>
@@ -1331,11 +1350,14 @@ function SeccionCategorias({ cats, go, estilo }: { cats: CatVisual[]; go: (p: st
                 <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>
             </div>
 
+            {/* pastillas/etiquetas/círculos: siempre TODAS las activas (`cats`),
+                sin selección ni tope — son los tres estilos "de navegación",
+                pensados para mostrar el catálogo entero de un vistazo. */}
             {elegido === 'pills'    && <CategoriaCarrusel cats={cats} go={go} />}
-            {elegido === 'indice'   && <CatIndice cats={cats} go={go} />}
+            {elegido === 'indice'   && <CatIndice cats={catsAMostrar} go={go} />}
             {elegido === 'chips'    && <CatChips cats={cats} go={go} />}
-            {elegido === 'mosaico'  && <CatMosaico cats={cats} go={go} />}
-            {elegido === 'tarjetas' && <CatTarjetas cats={cats} go={go} />}
+            {elegido === 'mosaico'  && <CatMosaico cats={catsAMostrar} go={go} />}
+            {elegido === 'tarjetas' && <CatTarjetas cats={catsAMostrar} go={go} />}
             {elegido === 'circulos' && <CatCirculos cats={cats} go={go} />}
         </div>
     )

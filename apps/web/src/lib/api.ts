@@ -986,6 +986,9 @@ export type ApiAppearanceConfig = {
   // Estilo de la sección "Comprá por categoría" del home — null = 'pills'
   // (el de siempre). Ver CATEGORY_LAYOUTS en apariencia.mock.ts.
   categoryLayout: string | null
+  // Categorías elegidas a mano para índice/mosaico/tarjetas — [] = automático
+  // (ver resolverCategorias() en Inicio.tsx). Ids de Category.
+  categoryIds: string[]
   // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).
