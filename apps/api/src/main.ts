@@ -4,7 +4,9 @@ import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { crearOrigenPermitido } from './common/cors/origen-permitido';
 import { saltosDeProxy } from './common/utils/proxy';
+import { PrismaService } from './prisma/prisma.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -46,18 +48,36 @@ async function bootstrap(): Promise<void> {
   // subdominio, porque el subdominio de cada negocio es dinámico — el
   // storefront de cada tienda llama a la API directo desde el browser
   // (lib/api.ts), así que cada tienda.orbita.site necesita pasar CORS.
+  //
+  // Dominios propios (Configuración → Dominios): la tienda en
+  // "tefaltacalleok.com" también llama a la API desde el browser, y no hay
+  // forma de derivarlos del hostname — se consulta CustomDomain (solo ACTIVE
+  // con DNS verificado) con caché en memoria de 5 minutos, positiva y
+  // negativa, para no pegarle a la base en cada request (auditoría interna
+  // 10/09, hallazgo `hallazgo.cors-dominios-propios`; ver
+  // common/cors/origen-permitido.ts). Consecuencia: un dominio recién
+  // activado tarda hasta 5 minutos en pasar CORS, y uno eliminado o
+  // suspendido sigue pasando ese mismo rato. Los orígenes fijos de abajo se
+  // evalúan antes y nunca tocan la base.
   const ORBITA_LOCAL_ORIGIN = /^http:\/\/([a-z0-9-]+\.)?orbita\.local:3001$/;
   const ORBITA_SITE_ORIGIN = /^https:\/\/([a-z0-9-]+\.)?orbita\.site$/;
   const isProd = process.env.NODE_ENV === 'production';
+  const prisma = app.get(PrismaService);
   app.enableCors({
-    origin: [
-      process.env.FRONTEND_URL ?? 'http://localhost:3001',
-      // Orígenes de desarrollo local — nunca en producción (RBT-665). El de
-      // orbita.local:3001 también: quedaba permitido con credenciales en
-      // producción (auditoría interna 10/09, ítem trans.cors-headers).
-      ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000', ORBITA_LOCAL_ORIGIN]),
-      ORBITA_SITE_ORIGIN,
-    ],
+    origin: crearOrigenPermitido({
+      fijos: [
+        process.env.FRONTEND_URL ?? 'http://localhost:3001',
+        // Orígenes de desarrollo local — nunca en producción (RBT-665). El de
+        // orbita.local:3001 también: quedaba permitido con credenciales en
+        // producción (auditoría interna 10/09, ítem trans.cors-headers).
+        ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000', ORBITA_LOCAL_ORIGIN]),
+        ORBITA_SITE_ORIGIN,
+      ],
+      esDominioPropioActivo: (host) =>
+        prisma.customDomain
+          .findFirst({ where: { domain: host, status: 'ACTIVE', dnsVerified: true }, select: { id: true } })
+          .then(Boolean),
+    }),
     credentials: true,
   });
 
