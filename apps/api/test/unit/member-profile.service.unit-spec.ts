@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { MemberProfileService } from '../../src/member-profile/member-profile.service';
+import { AuthService } from '../../src/auth/auth.service';
 
 // Unit test de "Mi perfil" del panel (RBT-646). Mockea Prisma — no toca la base.
 // Desde la auditoría interna del 10/09 (ítem `api.member-profile`), cambiar el
@@ -25,7 +26,9 @@ function svcCon(overrides: { existente?: any } = {}) {
     refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     business: { findUnique: jest.fn().mockResolvedValue(null) },
   };
-  const svc = new MemberProfileService(prisma as any);
+  // La revocación de sesiones vive en AuthService (hallazgo cambio-clave-sin-cerrar-sesiones).
+  const auth = new AuthService(prisma as any, {} as any, { getOrThrow: () => 'test-secret-de-al-menos-32-caracteres', get: () => undefined } as any);
+  const svc = new MemberProfileService(prisma as any, auth);
   return { svc, prisma };
 }
 

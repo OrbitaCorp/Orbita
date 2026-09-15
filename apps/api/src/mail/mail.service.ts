@@ -655,13 +655,16 @@ export class MailService {
 
   // El admin le reseteó la contraseña a un miembro: link a la pantalla de
   // restablecer (crea la definitiva ahí, como en la invitación) + la temporal
-  // como plan B para entrar por el login. El link vale 1 hora, un solo uso.
+  // como plan B para entrar por el login. El link vale 1 hora, un solo uso;
+  // la temporal vence a las `tempPasswordHoras` (TEMP_PASSWORD_HORAS, hallazgo
+  // contrasena-temporal-reseteo).
   async sendMemberPasswordReset(
     to: string,
     data: {
       storeName: string;
       resetUrl: string;
       tempPassword: string;
+      tempPasswordHoras: number;
     },
     meta?: MailMeta,
   ) {

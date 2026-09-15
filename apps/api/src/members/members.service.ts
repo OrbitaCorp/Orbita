@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { AuditService } from '../audit/audit.service';
+import { tempPasswordHoras, vencimientoContrasenaTemporal } from '../common/utils/contrasena-temporal';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import * as argon2 from 'argon2';
@@ -74,6 +75,10 @@ export class MembersService {
         roleId: dto.roleId,
         status: 'PENDING',
         hasTempPassword: true,
+        // La temporal de la invitación vence junto con el link (24 h): el
+        // login ya la rechazaba por assertInvitacionVigente, pero así la
+        // columna dice lo mismo que el mail (hallazgo contrasena-temporal-reseteo).
+        tempPasswordExpiresAt: invitationTokenExpiresAt,
         passwordHash: tempPasswordHash,
         invitationToken,
         invitationTokenExpiresAt,
@@ -208,9 +213,13 @@ export class MembersService {
     const tempPassword = this.genTempPassword();
     const tempPasswordHash = await argon2.hash(tempPassword, { type: argon2.argon2id });
 
+    // La temporal vence (TEMP_PASSWORD_HORAS, default 72 h): quien la generó
+    // la conoce, y sin vencimiento servía para entrar como esa persona para
+    // siempre (hallazgo MEDIA contrasena-temporal-reseteo, auditoría 09/09).
+    // El login la rechaza pasada la fecha; cambiarla la limpia.
     await this.prisma.member.update({
       where: { id: member.id },
-      data: { passwordHash: tempPasswordHash, hasTempPassword: true },
+      data: { passwordHash: tempPasswordHash, hasTempPassword: true, tempPasswordExpiresAt: vencimientoContrasenaTemporal() },
     });
 
     // Todas las sesiones abiertas del miembro dejan de valer: con la
@@ -246,7 +255,7 @@ export class MembersService {
       emailSent = true;
       await this.mail.sendMemberPasswordReset(
         member.email,
-        { storeName, resetUrl, tempPassword },
+        { storeName, resetUrl, tempPassword, tempPasswordHoras: tempPasswordHoras() },
         { businessId, memberId: member.id },
       );
     }

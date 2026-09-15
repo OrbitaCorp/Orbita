@@ -2,7 +2,10 @@ export interface MemberAuthResponse {
   type: 'member';
   token: string;
   refreshToken: string;
-  member: { id: string; name: string; email: string; status: string };
+  // hasTempPassword: el panel lo lee para obligar a elegir una contraseña
+  // propia antes de usar cualquier otra pantalla (hallazgo
+  // contrasena-temporal-reseteo, auditoría interna 09/09).
+  member: { id: string; name: string; email: string; status: string; hasTempPassword: boolean };
   role: string;
   permissions: string[];
   business: { id: string; name: string; subdomain: string; mode: string };
