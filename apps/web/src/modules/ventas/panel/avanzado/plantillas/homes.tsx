@@ -43,6 +43,11 @@ export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>([
   'nocturno', 'papeleria', 'corralon', 'glow', 'circuito',
 ])
 
+// Un lugar de una seccion de pasos, ya resuelto: puede venir de algo que el
+// dueño eligió (categoría o producto) o del relleno del catálogo. `producto`
+// solo existe cuando es un producto — una categoría no tiene precio.
+type Elegido = { nombre: string; img: string; ir?: () => void; producto?: Producto }
+
 export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   p: Plantilla
   movil: boolean
@@ -182,7 +187,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // `cat:<slug>` o `prod:<id>`, contra las categorías y el catálogo reales.
   // Devuelve null si no eligió nada o si eso ya no existe —una categoría
   // borrada después de configurar la sección no puede dejar una tarjeta rota.
-  const elegido = (valor: string): { nombre: string; img: string; ir?: () => void } | null => {
+  const elegido = (valor: string): Elegido | null => {
     const v = valor.trim()
     if (!v) return null
     if (v.startsWith('cat:')) {
@@ -195,9 +200,33 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       const id = v.slice(5)
       const prod = (p.catalogo ?? p.productos).find((x) => x.slug === id)
       if (!prod) return null
-      return { nombre: prod.nombre, img: prod.img, ir: abrir(prod) }
+      // `producto` va aparte: una sección que muestra precio y estrellas solo
+      // puede hacerlo si lo elegido es un producto, no una categoría.
+      return { nombre: prod.nombre, img: prod.img, ir: abrir(prod), producto: prod }
     }
     return null
+  }
+
+  /**
+   * Los lugares de una sección de "pasos" (Nocturno: Armá tu setup; Glow: Tu
+   * rutina). Lo que el dueño eligió manda; los lugares que no tocó se llenan
+   * con el catálogo, igual que cualquier otra fila.
+   *
+   * Antes esto se rellenaba con las tres PRIMERAS categorías del negocio, que
+   * no significaba nada. El primer intento de arreglarlo fue esconder la
+   * sección hasta que eligiera algo, y fue peor: parecía que la plantilla
+   * había perdido una sección.
+   */
+  const lugares = (n: number, seccion: string, clave: string): Elegido[] => {
+    const relleno = fila(n, clave)
+    const salida: Elegido[] = []
+    for (let i = 0; i < n; i++) {
+      const puesto = elegido(txt(seccion, `i${i + 1}`))
+      if (puesto) { salida.push(puesto); continue }
+      const x = relleno[i]
+      if (x) salida.push({ nombre: x.nombre, img: x.img, ir: abrir(x), producto: x })
+    }
+    return salida
   }
 
   const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
@@ -905,9 +934,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // Los tres pasos de "Armá tu setup": lo que va ahí lo elige el dueño
     // (categoría o producto), no el orden en que estén cargadas las
     // categorías. Sin elegir nada la sección no se dibuja.
-    const pasos = ['i1', 'i2', 'i3']
-      .map((k) => elegido(txt('pasos', k)))
-      .filter((x): x is NonNullable<typeof x> => x !== null)
+    const pasos = lugares(3, 'pasos', 'nocturno-pasos')
 
     const encabezado = (
       <>
@@ -1044,10 +1071,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        {/* Armá tu setup: tres pasos que elige el dueño. Sin nada elegido la
-            sección no se dibuja — antes se rellenaba sola con las tres
-            primeras categorías del negocio, que no significaba nada. */}
-        {pasos.length > 0 && (
+        {/* Armá tu setup: los tres pasos los elige el dueño desde el editor
+            (categoría o producto). Los que no eligió se llenan con el
+            catálogo, igual que cualquier otra fila. */}
         <Reveal>
           <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '30px 16px' : '46px 40px' }}>
             <Titulo t={t} volanta={txt('pasos', 'volanta')} texto={txt('pasos', 'titulo')} centrado movil={movil} />
@@ -1079,7 +1105,6 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <div style={{ textAlign: 'center', marginTop: 22 }}><Boton t={t} grande onClick={acciones?.irACatalogo}>{txt('pasos', 'cta')}</Boton></div>
           </div>
         </Reveal>
-        )}
 
 
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '26px 16px' : '40px' }}>
@@ -2604,19 +2629,26 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ padding: movil ? '32px 16px' : '52px 40px' }}>
           <Titulo t={t} volanta={txt('rutina', 'volanta')} texto={txt('rutina', 'titulo')} centrado movil={movil} />
           <div style={{ display: 'grid', gridTemplateColumns: cols(3, 1), gap: 18 }}>
-            {fila(cuantos(3, 1), 'glow-trio').map((x, i) => (
-              <div key={x.nombre} className="pl-card" data-link={abrir(x) ? '1' : undefined} onClick={abrir(x)} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', boxShadow: t.sombra }}>
+            {/* Los tres pasos de la rutina: los elige el dueño (categoría o
+                producto) y los que no tocó salen del catálogo. Una categoría
+                no tiene precio ni estrellas, por eso van con guarda. */}
+            {lugares(cuantos(3, 1), 'rutina', 'glow-trio').map((x, i) => (
+              <div key={x.nombre} className="pl-card" data-link={x.ir ? '1' : undefined} onClick={x.ir} style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden', boxShadow: t.sombra }}>
                 <div style={{ position: 'relative' }}>
-                  <Foto src={x.img} src2={x.img2} alto={movil ? 210 : 250} />
+                  <Foto src={x.img} src2={x.producto?.img2} alto={movil ? 210 : 250} />
                   <span style={{ position: 'absolute', top: 14, left: 14, width: 32, height: 32, borderRadius: '50%', background: '#fff', color: t.primary, display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, boxShadow: '0 4px 12px rgba(0,0,0,0.14)' }}>{i + 1}</span>
                 </div>
                 <div style={{ padding: '15px 16px 18px' }}>
                   <div style={{ fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', color: t.primary, fontWeight: 800 }}>{txt('rutina', `paso${i + 1}`)}</div>
                   <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{x.nombre}</div>
-                  <div style={{ marginTop: 6 }}><Estrellas n={x.estrellas ?? 5} resenas={x.resenas} color={t.accent} /></div>
-                  <div style={{ fontSize: 19, fontWeight: 800, marginTop: 8 }}>{x.precio}</div>
-                  {x.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.transfer}</div>}
-                  <div style={{ marginTop: 12 }}><Boton t={t} ancho onClick={abrir(x)}>{acciones ? 'Ver' : 'Agregar'}</Boton></div>
+                  {x.producto && (
+                    <>
+                      <div style={{ marginTop: 6 }}><Estrellas n={x.producto.estrellas ?? 5} resenas={x.producto.resenas} color={t.accent} /></div>
+                      <div style={{ fontSize: 19, fontWeight: 800, marginTop: 8 }}>{x.producto.precio}</div>
+                      {x.producto.transfer && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.producto.transfer}</div>}
+                    </>
+                  )}
+                  <div style={{ marginTop: 12 }}><Boton t={t} ancho onClick={x.ir}>{acciones ? 'Ver' : 'Agregar'}</Boton></div>
                 </div>
               </div>
             ))}
