@@ -61,6 +61,12 @@ describe('Configuración del negocio: CUIT y razón social', () => {
     expect(prisma.businessConfig.update).toHaveBeenCalledWith({ where: { businessId: 'biz-1' }, data: { cuit: null, legalName: null } });
   });
 
+  it('null borra igual que vacío (no un 500)', async () => {
+    const { svc, prisma } = servicio();
+    await svc.updateConfig('biz-1', { cuit: null, legalName: null } as any);
+    expect(prisma.businessConfig.update).toHaveBeenCalledWith({ where: { businessId: 'biz-1' }, data: { cuit: null, legalName: null } });
+  });
+
   it('si no vienen, no se tocan', async () => {
     const { svc, prisma } = servicio();
     await svc.updateConfig('biz-1', { scheduleText: 'Lun a Vie' } as any);

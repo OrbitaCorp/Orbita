@@ -3,7 +3,7 @@
 //
 // El TEXTO es el de las plantillas que dejó Ale en docs/legales/ (08/09/2026),
 // tal cual — acá no se redacta nada: solo se completan las variables
-// {{ }} con los datos que ya tiene cada tienda (nombre, email, WhatsApp,
+// {{ }} con los datos que ya tiene cada tienda (nombre, razón social y CUIT, email, WhatsApp,
 // medios de pago, envíos). Si alguna vez hay que cambiar una palabra del
 // texto, se cambia en la plantilla de docs/legales/ Y acá, y se corre la
 // fecha de actualización.
@@ -11,11 +11,13 @@
 // Lo que las plantillas marcaban como "nota interna" o como ejemplo entre
 // paréntesis no se publica: era guía para nosotros, no texto para el cliente.
 //
-// Variables que la plantilla pide y hoy la tienda NO tiene como dato:
+// Variable con dato opcional:
 //   - {{cuit_comercio}}: el CUIT de Configuración → Contacto (11 dígitos, se
-//     muestra con guiones). Si el Comercio no lo cargó, la frase ", CUIT …"
-//     se omite. Con razón social cargada, ella es el titular y el nombre
-//     comercial va entre paréntesis.
+//     muestra con guiones), junto con la razón social. Si el Comercio no lo
+//     cargó, la frase ", CUIT …" se omite. Con razón social distinta del
+//     nombre, ella es el titular y el nombre comercial va entre paréntesis.
+//
+// Variables que la plantilla pide y hoy la tienda NO tiene como dato:
 //   - {{finalidad_marketing_opcional}}: no hay opt-in de marketing → el
 //     punto se omite (la plantilla ya decía que va solo si está habilitado).
 //   - {{politica_de_cambios_comercial}}: no hay campo propio → va un texto

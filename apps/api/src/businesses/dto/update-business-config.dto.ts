@@ -34,8 +34,8 @@ export class UpdateBusinessConfigDto {
   // CUIT y razón social del Comercio (hallazgo `legales-sin-cuit`). El CUIT
   // se acepta con o sin guiones y se valida con dígito verificador en el
   // service; vacío = borrar. La razón social es texto libre, vacío = borrar.
-  @IsOptional() @IsString() @MaxLength(20) cuit?: string;
-  @IsOptional() @IsString() @MaxLength(120) legalName?: string;
+  @IsOptional() @IsString() @MaxLength(20) cuit?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) legalName?: string | null;
   @IsOptional() @IsBoolean() acceptsMercadopago?: boolean;
   @IsOptional() @IsBoolean() acceptsCash?: boolean;
   @IsOptional() @IsBoolean() acceptsTransfer?: boolean;

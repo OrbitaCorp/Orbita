@@ -381,7 +381,9 @@ export class DomainPurchaseService {
           registrar: 'vercel',
           status: 'PENDING', // se confirma ACTIVE con el mismo verifyDns() de siempre
           purchasedAt: new Date(),
-          expiresAt: new Date(Date.now() + order.years * 365 * 24 * 60 * 60 * 1000),
+          // Años calendario, no 365 días por año: una compra que cruza un 29/02
+          // no queda venciendo un día antes que en el registrador.
+          expiresAt: (() => { const vence = new Date(); vence.setUTCFullYear(vence.getUTCFullYear() + order.years); return vence; })(),
           autoRenew: false,
         },
       });

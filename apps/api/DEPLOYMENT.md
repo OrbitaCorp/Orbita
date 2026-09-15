@@ -369,7 +369,6 @@ cada `update-traffic`, y marcar el check en la pestaña Auditoría.
 | Min instances | 0 | escala a cero sin tráfico. También revertido — ya no depende de tener una instancia siempre viva. |
 | Max instances | 10 | techo de escalado, ajustable según tráfico real |
 | Concurrency | 40 (default de Cloud Run es 80) | las tareas de imagen son pesadas, se bajó para que no se amontonen muchas en la misma instancia |
-| Session affinity | activada | el throttler (límites por IP) y el canje del login con Google viven en memoria de cada instancia (hallazgo `auth-estado-en-memoria`). Con afinidad, Cloud Run manda las requests de un mismo cliente a la misma instancia mientras viva, así los contadores y el canje no se pierden al escalar por encima de 1. No es un storage compartido: si algún día hace falta exactitud entre instancias, va Redis/Postgres. |
 
 Subir CPU/memoria es un solo comando (`gcloud run services update --memory=4Gi
 --cpu=4 ...`), sin rebuild ni downtime. Ver el reporte del CTO para el impacto

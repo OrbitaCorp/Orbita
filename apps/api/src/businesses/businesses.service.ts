@@ -383,13 +383,14 @@ export class BusinessesService {
     // verificador no cierra; vacío borra. Van a `data` aparte del DTO porque
     // el valor guardado no es el que vino.
     const data: Record<string, unknown> = { ...dto };
+    // null llega igual que '' (@IsOptional deja pasar null): los dos borran.
     if (dto.cuit !== undefined) {
-      const digitos = limpiarCuit(dto.cuit);
+      const digitos = limpiarCuit(dto.cuit ?? '');
       if (digitos === '') data.cuit = null;
       else if (!cuitValido(digitos)) throw new BadRequestException('El CUIT no es válido: son 11 dígitos y el último tiene que ser el verificador');
       else data.cuit = digitos;
     }
-    if (dto.legalName !== undefined) data.legalName = dto.legalName.trim() || null;
+    if (dto.legalName !== undefined) data.legalName = (dto.legalName ?? '').trim() || null;
 
     return this.prisma.businessConfig.update({
       where: { businessId },

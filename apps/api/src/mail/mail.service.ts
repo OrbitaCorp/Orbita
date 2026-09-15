@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { asuntoDominioPorVencer, TEMPLATE_DOMINIO_POR_VENCER } from '../domains/dominio-por-vencer';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as Handlebars from 'handlebars';
@@ -925,15 +926,15 @@ export class MailService {
 
   // Dominio comprado desde el panel por vencer (auditoría interna, hallazgo
   // `dominios-comprados-sin-renovacion`): lo manda DomainExpiryService a los
-  // 30 y a los 7 días. El dominio va en el asunto a propósito: es la marca
-  // de "ya avisado" que ese barrido busca en email_logs.
+  // 30 y a los 7 días. El asunto sale de domains/dominio-por-vencer.ts porque
+  // lleva la marca que ese barrido busca en email_logs (junto con status SENT y
+  // el destinatario). Devuelve si salió: un rechazo se reintenta otra noche.
   async sendDomainExpiringSoon(
     to: string,
     data: { businessName: string; domain: string; expiresAt: string; daysLeft: number; manageUrl: string },
     meta?: MailMeta,
-  ) {
-    const plazo = data.daysLeft === 1 ? '1 día' : `${data.daysLeft} días`;
-    await this.sendOrLog(to, `El dominio ${data.domain} vence en ${plazo}`, 'domain-expiring-soon', data, meta);
+  ): Promise<boolean> {
+    return this.sendOrLog(to, asuntoDominioPorVencer(data.domain, data.daysLeft), TEMPLATE_DOMINIO_POR_VENCER, data, meta);
   }
 
   // Día 0: terminó la bienvenida o una cortesía (no un cobro rechazado — para

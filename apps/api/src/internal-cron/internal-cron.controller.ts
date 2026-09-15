@@ -57,8 +57,8 @@ export class InternalCronController {
     // En la app real Nest lo inyecta siempre (está en providers del módulo).
     private readonly retencionLogs?: RetencionLogsService,
     // Vencimiento de dominios comprados (hallazgo `dominios-comprados-sin-
-    // renovacion`): aviso a 30 y 7 días y pase a EXPIRED. Opcional por el
-    // mismo motivo que retencionLogs (specs viejos con menos argumentos).
+    // renovacion`): aviso a cada owner a los 30 y a los 7 días. Opcional por
+    // el mismo motivo que retencionLogs (specs viejos con menos argumentos).
     private readonly domainExpiry?: DomainExpiryService,
   ) {}
 
@@ -94,8 +94,10 @@ export class InternalCronController {
           this.logger.error(`Retención de logs: no se pudo correr — ${describeError(e)}`);
         }
         // Dominios comprados por vencer (hallazgo `dominios-comprados-sin-
-        // renovacion`): mismo disparo, mismo criterio que la retención — si
-        // falla, se anota y mañana se reintenta sin marcar la corrida.
+        // renovacion`): mismo disparo y mismo criterio que la retención. Si el
+        // barrido entero tira, se anota sin marcar la corrida como fallida; un
+        // aviso que no salió se reintenta la noche siguiente porque solo cuenta
+        // como avisado un envío SENT (ver DomainExpiryService).
         try {
           await this.domainExpiry?.avisarVencimientos();
         } catch (e) {
