@@ -32,6 +32,13 @@ export const HOME_TEMPLATES_DISPONIBLES = [
   'lienzo',
   'pulso',
   'terracota',
+  'base',
+  'carbon',
+  'bloque',
+  'sobrio',
+  'roble',
+  'petalo',
+  'sello',
 ] as const;
 
 export class SetHomeTemplateDto {
