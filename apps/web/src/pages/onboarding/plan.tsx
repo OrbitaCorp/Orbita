@@ -266,6 +266,15 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   // una pantalla de $0 sería confuso y encima MP la rechaza.
   const esGratis = !!descuento && descuento.amountFinal === 0
   const cardActual = CARDS.find(c => c.key === plan) ?? CARDS[0]
+  // "$5.500 en total" al lado de un cartel que dice "Tus primeros 3 meses"
+  // se seguía leyendo como "$5.500 por mes, durante 3 meses" (reportado con
+  // captura) a pesar del "en total" ya agregado antes — hacía falta el
+  // número dividido, no solo la palabra. Se redondea (no hay centavos acá:
+  // fmtPesos ya trunca decimales) — no es el monto real que cobra MercadoPago
+  // (eso sigue siendo precioBienvenida, un solo cargo), es solo la cuenta
+  // para que se entienda el total.
+  const precioBienvenidaMostrado = esGratis ? 0 : descuento ? descuento.amountFinal : cardActual.precioBienvenida
+  const precioPorMesDurante3 = Math.round(precioBienvenidaMostrado / 3)
   const [detalle, setDetalle] = useState<PlanKey | null>(null)
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
@@ -349,11 +358,16 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 </span>
               )}
             </div>
+            {!esGratis && (
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 3 }}>
+                Equivale a {fmtPesos(precioPorMesDurante3)}/mes durante los primeros 3 meses
+              </div>
+            )}
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
               {esGratis
                 ? `Con el código ${descuento!.code} no pagás nada`
                 : descuento
-                  ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
+                  ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos · después, ${fmtPesos(cardActual.precioRecurrente)}/mes`
                   : `Después, ${fmtPesos(cardActual.precioRecurrente)}/mes`}
             </div>
           </div>
@@ -409,9 +423,12 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                     {/* Esta mini-card no tiene el título "Tus primeros 3 meses" de la
                         caja grande de arriba, así que acá el "en total" es la única
                         pista de que el precio no es una tarifa mensual — mismo
-                        hallazgo que el resto de los precios de esta pantalla. */}
+                        hallazgo que el resto de los precios de esta pantalla. El
+                        "≈ $X/mes" es el mismo agregado que la caja grande (ver
+                        precioPorMesDurante3 más arriba): el número dividido, no
+                        solo la palabra "total". */}
                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 1 }}>
-                      en total, 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
+                      en total, 3 meses (≈ {fmtPesos(Math.round(c.precioBienvenida / 3))}/mes) · después {fmtPesos(c.precioRecurrente)}/mes
                     </div>
                     <ul style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {c.incluye.slice(0, 3).map(t => (
