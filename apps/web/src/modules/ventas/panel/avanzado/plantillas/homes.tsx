@@ -113,6 +113,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // `cols()`: si no coinciden, la fila queda con un hueco a la derecha o con
   // un producto colgado abajo.
   const cuantos = (d: number, m = 2) => (movil ? m : d)
+  // Columnas que se achican a cuántos hay. Una grilla de 6 con 4 categorías
+  // deja dos huecos a la derecha; con esto la fila se reparte entre las 4 y
+  // queda llena. Para productos no hace falta —`fila()` siempre trae los que
+  // entran— pero las categorías son las que son: no se pueden inventar.
+  const colsDe = (d: number, n: number, m = 2) =>
+    cols(Math.max(1, Math.min(d, n)), Math.max(1, Math.min(m, n)))
 
   // Un orden estable pero que no es el del catálogo. `p.productos` son los
   // DESTACADOS, y rellenar toda la portada con ellos hace que la tienda
@@ -293,8 +299,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           <Reveal>
             <div style={{ padding: movil ? '30px 16px' : '46px 40px' }}>
               <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
-              <div style={{ display: 'grid', gridTemplateColumns: cols(4), gap: 12 }}>
-                {categorias.map(([n, src, slug]) => (
+              <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, categorias.length), gap: 12 }}>
+                {categorias.slice(0, 4).map(([n, src, slug]) => (
                   <div
                     key={n} className="pl-tile"
                     onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
@@ -820,14 +826,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '30px 16px 8px' : '58px 44px 16px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, (p.categorias ?? []).length, 2), gap: 12 }}>
               {/* Las categorías REALES del negocio (plantillaReal.ts las arma
                   con su foto propia, la del primer producto o el degradé).
                   Antes eran cuatro fijas de joyería —Anillos, Collares, Aros,
                   Relojes— así que una tienda de ropa con Premium aplicada
                   mostraba categorías que no vendía. Las de muestra quedan
                   solo para la vitrina del panel. */}
-              {(p.categorias ?? []).map(([n, src, slug]) => (
+              {(p.categorias ?? []).slice(0, 4).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
                   onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
@@ -1013,7 +1019,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         {/* Categorías con cantidad de artículos. */}
         <Reveal>
           <div style={{ padding: movil ? '24px 16px 10px' : '34px 40px 12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, (p.categorias ?? []).length, 2), gap: 12 }}>
               {/* Las categorias del negocio. Antes eran cuatro fijas de tech
                   con su conteo de modelos inventado ("42 modelos"): Orbita no
                   pasa ese total, asi que no se promete. */}
@@ -1134,17 +1140,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // derecha, y por eso hay un armador de lista escolar con total.
   if (p.layout === 'papeleria') {
     const s = p.slides[iActual]
-    // La lista escolar: cinco renglones "producto | precio" que escribe el
-    // dueño. Antes era un armador con total y "10% off" que no sumaba nada
-    // --Órbita no tiene listas ni combos-- así que ahora es lo que de verdad
-    // es: una lista sugerida, y el botón consulta por WhatsApp.
-    const lista = ['i1', 'i2', 'i3', 'i4', 'i5']
-      .map((k) => txt('lista', k))
-      .filter(Boolean)
-      .map((fila) => {
-        const [nombre, precio] = fila.split('|').map((c) => c.trim())
-        return [nombre ?? '', precio ?? ''] as [string, string]
-      })
+    // La lista escolar. Primero fue un armador con total y "10% off llevando
+    // la lista completa" que no sumaba nada --Órbita no tiene listas ni
+    // combos--. Después, cinco renglones "producto | precio" que el dueño
+    // escribía a mano: el precio quedaba pegado en la portada y desactualizado
+    // al día siguiente. Ahora son productos de verdad, elegidos del catálogo,
+    // con SU precio; el presupuesto se pide por WhatsApp.
 
     const encabezado = (
       <>
@@ -1214,7 +1215,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '26px 16px 6px' : '44px 40px 10px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(6, 3), gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(6, (p.categorias ?? []).length, 3), gap: 10 }}>
               {(p.categorias ?? []).slice(0, 6).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
@@ -1243,11 +1244,16 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                     tiene listas ni combos. Ahora es lo que de verdad es --una
                     lista sugerida-- y el presupuesto se pide por WhatsApp. */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {lista.map(([n, precio]) => (
-                    <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${t.border}` }}>
+                  {lugares(5, 'lista', 'papeleria-lista').map((x) => (
+                    <div
+                      key={x.nombre} className="pl-fila"
+                      onClick={x.ir}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${t.border}`, cursor: x.ir ? 'pointer' : undefined }}
+                    >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: t.primary }} />
-                      <span style={{ fontSize: 13.5, flex: 1, color: t.text }}>{n}</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{precio}</span>
+                      <span style={{ fontSize: 13.5, flex: 1, color: t.text }}>{x.nombre}</span>
+                      {/* El precio sale del producto: una categoría no tiene. */}
+                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>{x.producto?.precio}</span>
                     </div>
                   ))}
                 </div>
@@ -1278,7 +1284,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ fontSize: 11.5, letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 800, marginBottom: 12 }}>{txt('campana', 'volanta')}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 26 : 40, fontWeight: 800, letterSpacing: '-0.035em', maxWidth: 420, lineHeight: 1.1 }}>{txt('campana', 'titulo')}</div>
               <p style={{ fontSize: 14, margin: '12px 0 20px', maxWidth: 380, opacity: 0.9 }}>{txt('campana', 'texto')}</p>
-              <div><span className="pl-cta" style={{ display: 'inline-block', background: '#fff', color: t.primary, padding: '12px 24px', borderRadius: t.radio, fontSize: 13.5, fontWeight: 800 }}>Mandar mi lista</span></div>
+              {/* Abre el WhatsApp del negocio. No se personaliza: el número
+                  ya está en Configuración, y pedirlo de nuevo acá sería tener
+                  el mismo dato en dos lados. Antes el botón no hacía nada. */}
+              <div><span className="pl-cta" onClick={acciones?.abrirWhatsapp} style={{ display: 'inline-block', background: '#fff', color: t.primary, padding: '12px 24px', borderRadius: t.radio, fontSize: 13.5, fontWeight: 800, cursor: acciones?.abrirWhatsapp ? 'pointer' : undefined }}>{txt('campana', 'cta')}</span></div>
             </div>
           </div>
         </Reveal>
@@ -1374,7 +1383,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '16px 12px' : '26px 18px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, (p.categorias ?? []).length, 2), gap: 10 }}>
               {(p.categorias ?? []).slice(0, 4).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
@@ -1684,7 +1693,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 Perro/Gato/Otros con "412 productos" inventados: una veterinaria
                 que vende otra cosa mostraba mascotas que no atiende, y el
                 conteo no salía de contar nada. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: movil ? 12 : 26, maxWidth: 720, margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(3, (p.categorias ?? []).length, 3), gap: movil ? 12 : 26, maxWidth: 720, margin: '0 auto' }}>
               {(p.categorias ?? []).slice(0, 3).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-card"
@@ -2089,8 +2098,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Reveal>
               <div style={{ padding: movil ? '20px 16px' : '30px 44px' }}>
                 <Titulo t={t} texto={txt('categorias', 'titulo')} movil={movil} />
-                <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: 10 }}>
-                  {categorias.map(([n, src, slug]) => (
+                <div style={{ display: 'grid', gridTemplateColumns: colsDe(2, categorias.length, 1), gap: 10 }}>
+                  {categorias.slice(0, 2).map(([n, src, slug]) => (
                     <div
                       key={n} className="pl-tile"
                       onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
@@ -2241,8 +2250,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '18px 16px 30px' : '26px 44px 48px' }}>
             <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 10 : 16 }}>
-              {(p.categorias ?? []).map(([n, src, slug]) => (
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(2, (p.categorias ?? []).length, 1), gap: movil ? 10 : 16 }}>
+              {(p.categorias ?? []).slice(0, 2).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
                   onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
@@ -2500,8 +2509,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 26px' : '32px 44px 40px' }}>
             <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
-              {(p.categorias ?? []).map(([n, src, slug]) => (
+            <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, (p.categorias ?? []).length, 2), gap: movil ? 12 : 18 }}>
+              {(p.categorias ?? []).slice(0, 4).map(([n, src, slug]) => (
                 <div
                   key={n} className="pl-tile"
                   onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
