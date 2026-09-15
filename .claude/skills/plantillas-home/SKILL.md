@@ -665,14 +665,30 @@ categorías.
 - *Fila* ("Más vendidos", "Destacados"): mostrar los primeros N está bien, el
   criterio es la fila misma.
 - *Selección* (tres pasos, un antes/después, una pieza del mes, un combo): lo
-  elige el dueño. Si no eligió, la sección **no se dibuja**.
+  elige el dueño, con el tipo de campo `seleccion`.
 
-Para eso existe el tipo de campo `seleccion` (`TipoCampo` en tipos.ts): guarda
-`cat:<slug>` o `prod:<id>` —con prefijo, igual que los `headerLinks`, para que
-una categoría y un producto no choquen nunca— y el panel dibuja un desplegable
-con el catálogo real agrupado. Lo resuelve `elegido()` en `homes.tsx`, contra
-`p.categorias` y `p.catalogo`. Si lo elegido se borró después, devuelve `null`
-y la tarjeta se saltea en vez de romperse.
+`seleccion` (`TipoCampo` en tipos.ts) guarda `cat:<slug>` o `prod:<id>` —con
+prefijo, igual que los `headerLinks`, para que una categoría y un producto no
+choquen nunca— y el panel dibuja un desplegable con el catálogo real agrupado.
+Lo resuelve `elegido()` en `homes.tsx` contra `p.categorias` y `p.catalogo`; si
+lo elegido se borró después devuelve `null`, y la tarjeta se saltea en vez de
+romperse.
+
+**Pero "no elegido" NO significa "no dibujar la sección".** Ese fue el primer
+intento en Nocturno y salió mal: la portada perdía una sección entera y se
+reportó como si la hubieran borrado. Una tienda recién configurada tiene TODOS
+los campos vacíos — si cada sección elegible desaparece hasta que el dueño la
+complete, la plantilla que eligió no se parece a la que vio en la vitrina.
+
+Lo correcto es `lugares(n, seccion, clave)`: lo elegido manda, y los lugares
+sin elegir se llenan con el catálogo igual que cualquier otra fila. Ni se
+rellena "porque sí" con las primeras N categorías, ni desaparece.
+
+Esto convive con la regla de las afirmaciones (punto 8) sin contradecirla: un
+texto que promete algo se calla hasta que lo escriban, porque decirlo sin que
+sea cierto es peor que no decirlo. Un lugar de una grilla no promete nada —
+mostrar un producto del catálogo ahí es verdad igual. **Callarse aplica a las
+afirmaciones, no al layout.**
 
 ### 11. Una sección que el dueño tiene que llenar a mano no es una función
 
@@ -774,7 +790,8 @@ son los tres puntos sobre la foto).
 | Sin navegación en celular | El nav va con `!movil` en casi todas y no había reemplazo | El navbar tiene que funcionar en las dos pantallas — es parte del checklist |
 | Enlaces del nav sin hover | Los estilos van inline y el hover necesita una clase | `.pl-nav`, por opacidad y subrayado (no por color: tiene que servir en paletas claras y oscuras) |
 
-| "Armá tu setup" con las tres primeras categorías | Al enganchar, se rellenó la sección con `slice(0, 3)` para que no quedara vacía | `slice` sirve para una fila, no para una selección: campo `seleccion` y, sin elegir, la sección no se dibuja |
+| "Armá tu setup" con las tres primeras categorías | Al enganchar, se rellenó la sección con `slice(0, 3)` para que no quedara vacía | Campo `seleccion` para elegirlo, y `lugares()` para llenar lo que no se eligió |
+| Una sección elegible que desaparecía de la portada | Se escondió "hasta que el dueño elija", y una tienda nueva tiene todo vacío | Callarse es para las AFIRMACIONES, no para el layout: `lugares()` llena con el catálogo |
 | Una sección que pedía escribir una tabla de 5×4 a mano | Se le quitó el contenido inventado pero se quiso conservar la sección igual | Si lo que queda es un formulario, la sección no va — preguntarse qué dato REAL la llena |
 | Dos afirmaciones que el barrido no marcó | El valor era `12`, que parece un número inocente; la promesa estaba en la etiqueta | En un par valor+etiqueta, mirar los dos juntos y marcar el par completo |
 
