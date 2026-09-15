@@ -77,6 +77,9 @@ export type StorefrontConfigResponse = {
     // Estilo de la sección "Comprá por categoría" — null = 'pills' (el de
     // siempre). Lo resuelve SeccionCategorias en Inicio.tsx.
     categoryLayout: string | null
+    // Categorías elegidas a mano para índice/mosaico/tarjetas — [] =
+    // automático. Lo resuelve resolverCategorias() en Inicio.tsx.
+    categoryIds: string[]
     // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
     // "vidriera" es la única real hoy (ver Inicio.tsx).
     homeTemplate: string | null

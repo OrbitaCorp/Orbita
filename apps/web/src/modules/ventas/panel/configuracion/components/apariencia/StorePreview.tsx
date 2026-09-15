@@ -7,7 +7,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Search, ShoppingBag, ShoppingCar
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
-import { fontStack, type Apariencia } from '../../mock/apariencia.mock'
+import { fontStack, CATEGORY_LAYOUT_MAX, type Apariencia } from '../../mock/apariencia.mock'
 
 const DESIGN_W = 1280
 
@@ -472,7 +472,7 @@ function PreviewCategorias({ ap, c, prim, fh }: { ap: Apariencia; c: any; prim: 
         return (
             <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gridAutoRows: 152, gap: 12 }}>
-                    {CATS.slice(0, 7).map((cat, i) => (
+                    {CATS.slice(0, CATEGORY_LAYOUT_MAX.mosaico).map((cat, i) => (
                         <span key={cat.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, display: 'block', background: FONDO_CAT(cat.hue), gridColumn: i === 0 ? 'span 2' : undefined, gridRow: i === 0 ? 'span 2' : undefined }}>
                             <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.18) 52%, transparent 78%)' }} />
                             <span style={{ position: 'absolute', left: 16, right: 16, bottom: 14, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -490,7 +490,7 @@ function PreviewCategorias({ ap, c, prim, fh }: { ap: Apariencia; c: any; prim: 
         return (
             <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 32px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
-                    {CATS.map(cat => (
+                    {CATS.slice(0, CATEGORY_LAYOUT_MAX.tarjetas).map(cat => (
                         <span key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <span style={{ display: 'block', width: '100%', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', marginBottom: 8, background: FONDO_CAT(cat.hue) }} />
                             <span style={{ fontSize: 14, fontWeight: 600, color: c.text, fontFamily: fh }}>{cat.nombre}</span>

@@ -352,7 +352,7 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado'
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado'
 
 // Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
 // (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
@@ -989,6 +989,9 @@ export type ApiAppearanceConfig = {
   // Estilo de la sección "Comprá por categoría" del home — null = 'pills'
   // (el de siempre). Ver CATEGORY_LAYOUTS en apariencia.mock.ts.
   categoryLayout: string | null
+  // Categorías elegidas a mano para índice/mosaico/tarjetas — [] = automático
+  // (ver resolverCategorias() en Inicio.tsx). Ids de Category.
+  categoryIds: string[]
   // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).

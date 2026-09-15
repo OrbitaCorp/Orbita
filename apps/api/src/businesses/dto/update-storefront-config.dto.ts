@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsArray, IsIn, Matches, ValidateNested, MaxLength, ArrayMaxSize, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsArray, IsIn, IsUUID, Matches, ValidateNested, MaxLength, ArrayMaxSize, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { HeroSlideDto } from './hero-slide.dto';
 import { HeaderLinkDto } from './header-link.dto';
@@ -45,6 +45,12 @@ export class UpdateStorefrontConfigDto {
   // CATEGORY_LAYOUTS en apps/web (apariencia.mock.ts) para cada uno.
   @IsOptional() @IsIn(['pills', 'indice', 'chips', 'mosaico', 'tarjetas', 'circulos'])
   categoryLayout?: 'pills' | 'indice' | 'chips' | 'mosaico' | 'tarjetas' | 'circulos';
+  // Categorías elegidas a mano para "índice"/"mosaico"/"tarjetas" — [] (o
+  // ausente) = automático (ver categoryIds en storefront.service.ts). El tope
+  // real por estilo (5 para mosaico, 4 para tarjetas, sin tope para índice) lo
+  // aplica el storefront al leer, no acá: un mismo array sirve para los tres,
+  // así que un límite fijo en el DTO sería el más chico de los tres o nada.
+  @IsOptional() @IsArray() @ArrayMaxSize(30) @IsUUID('4', { each: true }) categoryIds?: string[];
   @IsOptional() @IsInt() @Min(0) @Max(64) cardRadius?: number;
 
   @IsOptional()

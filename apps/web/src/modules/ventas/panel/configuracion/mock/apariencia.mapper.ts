@@ -48,6 +48,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         headerLayout: ap.layoutHeader,
         gridLayout: ap.layoutGrid,
         categoryLayout: ap.estiloCategorias,
+        categoryIds: ap.categoriasIds,
         heroSlides: ap.sliders,
         headerLinks: ap.headerLinks,
         showReviews: ap.mostrarResenas,
@@ -148,6 +149,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         // null en la base (negocio que nunca tocó la opción) = 'pills', que es
         // exactamente lo que venía viendo — ver AP_DEFAULTS.
         estiloCategorias: (dto.categoryLayout as Ap['estiloCategorias']) ?? defaults.estiloCategorias,
+        categoriasIds: dto.categoryIds ?? [],
         mostrarFooter: dto.showFooter,
         mostrarRedesFooter: dto.showSocialFooter,
         mostrarBannerEnvio: dto.showAnnouncementBar,

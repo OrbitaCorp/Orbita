@@ -563,13 +563,14 @@ function StepUbicacion({ negocio, setNegocio }: { negocio: Negocio; setNegocio: 
   )
 }
 
-export type Cuenta = { ownerName: string; email: string; password: string; terms: boolean }
+export type Cuenta = { ownerName: string; email: string; password: string; confirmPassword: string; terms: boolean }
 
 // Último paso del wizard: recién acá se pide crear la cuenta — todo lo
 // completado antes (rubro, negocio, ubicación) se guarda de
 // una vez cuando se envía este paso (ver PENDIENTES.md).
 function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch<SetStateAction<Cuenta>> }) {
   const [showPw, setShowPw] = useState(false)
+  const [showPw2, setShowPw2] = useState(false)
   const [legalAbierto, setLegalAbierto] = useState<LegalKey | null>(null)
   const [estadoEmail, setEstadoEmail] = useState<EstadoSub>('idle')
   const set = (k: 'ownerName' | 'email') => (v: string) => setCuenta(prev => ({ ...prev, [k]: v }))
@@ -666,6 +667,39 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
           {cuenta.password.length > 0 && cuenta.password.length < 8 && (
             <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
               Necesita al menos 8 caracteres ({cuenta.password.length}/8)
+            </p>
+          )}
+        </Field>
+        <Field label="Confirmar contraseña" required>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPw2 ? 'text' : 'password'}
+              value={cuenta.confirmPassword}
+              onChange={e => setCuenta(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              placeholder="Repetí la contraseña"
+              onFocus={() => trackFoco('confirmPassword', 'cuenta')}
+              onBlur={() => {
+                trackDesenfoque('confirmPassword', 'cuenta', cuenta.confirmPassword === '')
+                // Mismo criterio que la contraseña de arriba: solo cuenta como
+                // error si ya escribió algo y no coincide, no en un campo recién
+                // vacío.
+                if (cuenta.confirmPassword.length > 0 && cuenta.confirmPassword !== cuenta.password) {
+                  trackErrorDeCampo('confirmPassword', 'cuenta', 'no-coincide')
+                }
+              }}
+              style={{ ...inputBase, paddingRight: 40 }}
+            />
+            <button
+              type="button" onClick={() => setShowPw2(p => !p)}
+              className="ds-hover"
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
+            >
+              <Eye size={15} strokeWidth={1.5} />
+            </button>
+          </div>
+          {cuenta.confirmPassword.length > 0 && cuenta.confirmPassword !== cuenta.password && (
+            <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
+              Las contraseñas no coinciden
             </p>
           )}
         </Field>
@@ -823,7 +857,7 @@ export function SetupUnificado({
     nombre: '', descripcion: '', telefono: '',
     direccion: '', logo: '', latLng: BA, subdominio: '', tipoLocal: [], modoVenta: '',
   })
-  const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', terms: true })
+  const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', confirmPassword: '', terms: true })
   const [estadoSub,   setEstadoSub]   = useState<EstadoSub>('idle')
   const toggleOrbi = useOrbiStore(s => s.toggle)
   const { send } = useOrbiChat()
@@ -897,7 +931,7 @@ export function SetupUnificado({
     })
     // La contraseña no se persiste (ver useOnboardingStore.ts) — si el
     // usuario recarga la página en este paso, la tiene que volver a escribir.
-    setCuenta({ ownerName: wizard.ownerName, email: wizard.ownerEmail, password: '', terms: true })
+    setCuenta({ ownerName: wizard.ownerName, email: wizard.ownerEmail, password: '', confirmPassword: '', terms: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidratado])
 
@@ -1031,6 +1065,7 @@ export function SetupUnificado({
       if (!cuenta.ownerName.trim())            return { campo: 'ownerName', texto: 'Completá tu nombre' }
       if (!/\S+@\S+\.\S+/.test(cuenta.email))  return { campo: 'email',     texto: 'Ingresá un email válido' }
       if (cuenta.password.length < 8)          return { campo: 'password',  texto: 'La contraseña necesita 8 caracteres' }
+      if (cuenta.confirmPassword !== cuenta.password) return { campo: 'confirmPassword', texto: 'Las contraseñas no coinciden' }
       if (!cuenta.terms)                       return { campo: 'terms',     texto: 'Aceptá los términos para continuar' }
       return null
     }
