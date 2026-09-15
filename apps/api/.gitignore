@@ -17,3 +17,16 @@
 
 # Firebase CLI (cache local de deploys de Hosting, nada que versionar)
 .firebase/
+
+# Dumps y backups de la base (docs/base-de-prueba.md): traen producción entera,
+# sin sanear. Se guardan FUERA del repo; esto es la última barrera para que no
+# lleguen a git ni al tarball de Cloud Build (.gcloudignore hace
+# #!include:.gitignore).
+*.dump
+*.backup
+*.sql.gz
+backups/
+
+# .env.prueba (configuración local contra la base de prueba) no se repite acá:
+# ya lo cubren `.env*` en el .gitignore de la raíz (git) y `.env.*` en el
+# .gcloudignore de esta carpeta (Cloud Build).
