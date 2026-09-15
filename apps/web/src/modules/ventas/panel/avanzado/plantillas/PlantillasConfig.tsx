@@ -190,7 +190,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
                 <Encabezado
                     titulo="Plantillas de Home"
-                    bajada="Dieciséis portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— mantiene su estructura y su funcionalidad con cualquiera de las dieciséis."
+                    bajada="Veintiséis portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— mantiene su estructura y su funcionalidad con cualquiera de ellas."
                 />
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>

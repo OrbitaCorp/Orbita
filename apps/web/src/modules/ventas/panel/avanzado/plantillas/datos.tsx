@@ -110,7 +110,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: '0 16px 38px -20px rgba(28,25,23,0.30)',
     },
     slides: [
-      { img: `${IMG}/casa-living.jpg`, kicker: 'Temporada', titulo: 'Todo para\nrenovar la casa', bajada: 'Hasta 40% en cocina, textil y jardín.', cta: 'Ver ofertas' },
+      { img: `${IMG}/casa-moderno.jpg`, kicker: 'Temporada', titulo: 'Todo para\nrenovar la casa', bajada: 'Hasta 40% en cocina, textil y jardín.', cta: 'Ver ofertas' },
     ],
     productos: [
       { nombre: 'Set de cerámica esmaltada', badge: 'Envío gratis', badgeTono: 'verde', estrellas: 5, resenas: 62, colores: ['#D6D3D1', '#78716C'], img: `${IMG}/casa-ceramica.jpg`, img2: `${IMG}/casa-deco.jpg`, ...ar('$142.000', '$198.000', '$113.600', '$47.333') },
@@ -680,7 +680,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: 'none',
     },
     slides: [
-      { img: `${IMG}/moda-mujer-invierno.jpg`, kicker: 'Temporada', titulo: 'Invierno\nen capas', bajada: 'Series cortas, teñidas a mano.', cta: 'Ver la colección' },
+      { img: `${IMG}/moda-zapatilla-pastel.jpg`, kicker: 'Temporada', titulo: 'Invierno\nen capas', bajada: 'Series cortas, teñidas a mano.', cta: 'Ver la colección' },
       { img: `${IMG}/vidriera-modelo.jpg`, kicker: 'Archivo', titulo: 'Última\noportunidad', bajada: 'Prendas de temporadas pasadas.', cta: 'Ver archivo' },
     ],
     productos: [
@@ -756,7 +756,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: '0 18px 40px -20px rgba(58,43,33,0.28)',
     },
     slides: [
-      { img: `${IMG}/casa-living.jpg`, kicker: 'Nueva colección', titulo: 'La casa\nque abraza', bajada: 'Muebles y objetos de materiales nobles.', cta: 'Ver la colección' },
+      { img: `${IMG}/casa-ceramica.jpg`, kicker: 'Nueva colección', titulo: 'La casa\nque abraza', bajada: 'Muebles y objetos de materiales nobles.', cta: 'Ver la colección' },
       { img: `${IMG}/casa-ceramica.jpg`, kicker: 'Mesa', titulo: 'Para\ncompartir', bajada: 'Vajilla artesanal y textiles de mesa.', cta: 'Ver mesa' },
     ],
     productos: [
@@ -877,7 +877,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: '6px 6px 0 #1A1A1A',
     },
     slides: [
-      { img: `${IMG}/vidriera-local.jpg`, kicker: 'Catálogo completo', titulo: 'ENTRÁ\nY MIRÁ', bajada: 'Mil productos en stock, listos para despachar.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/libre-libros-color.jpg`, kicker: 'Catálogo completo', titulo: 'ENTRÁ\nY MIRÁ', bajada: 'Mil productos en stock, listos para despachar.', cta: 'Ver el catálogo' },
       { img: `${IMG}/tech-notebook.jpg`, kicker: 'Ofertas', titulo: 'PRECIOS\nQUE BAJAN', bajada: 'Revisá la sección de ofertas.', cta: 'Ver ofertas' },
     ],
     productos: [
@@ -915,7 +915,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: 'none',
     },
     slides: [
-      { img: `${IMG}/vidriera-modelo.jpg`, kicker: 'Bienvenido', titulo: 'Poco,\nbien hecho', bajada: 'Una selección cuidada, sin vueltas.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/vidriera-anteojos.jpg`, kicker: 'Bienvenido', titulo: 'Poco,\nbien hecho', bajada: 'Una selección cuidada, sin vueltas.', cta: 'Ver el catálogo' },
       { img: `${IMG}/belleza-cosmetica.jpg`, kicker: 'Novedades', titulo: 'Lo nuevo', bajada: 'Las últimas incorporaciones.', cta: 'Ver novedades' },
     ],
     productos: [
@@ -954,8 +954,8 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: '0 14px 30px -18px rgba(31,36,41,0.28)',
     },
     slides: [
-      { img: `${IMG}/ferre-corralon.jpg`, kicker: 'Obra y hogar', titulo: 'TODO PARA\nARRANCAR', bajada: 'Herramienta, materiales y asesoramiento.', cta: 'Ver el catálogo' },
-      { img: `${IMG}/ferre-taladro-rojo.jpg`, kicker: 'Herramientas', titulo: 'MARCAS\nQUE DURAN', bajada: 'Con garantía oficial.', cta: 'Ver herramientas' },
+      { img: `${IMG}/ferre-taladro-rojo.jpg`, kicker: 'Obra y hogar', titulo: 'TODO PARA\nARRANCAR', bajada: 'Herramienta, materiales y asesoramiento.', cta: 'Ver el catálogo' },
+      { img: `${IMG}/ferre-formones.jpg`, kicker: 'Herramientas', titulo: 'MARCAS\nQUE DURAN', bajada: 'Con garantía oficial.', cta: 'Ver herramientas' },
     ],
     productos: [
       { nombre: 'Taladro percutor', estrellas: 5, resenas: 186, img: `${IMG}/ferre-taladro.jpg`, img2: `${IMG}/ferre-taladro-rojo.jpg`, ...ar('$126.000', '$158.000', '$100.800', '$42.000') },
@@ -1031,7 +1031,7 @@ export const PLANTILLAS: Plantilla[] = [
       sombra: '0 24px 52px -28px rgba(0,0,0,0.9)',
     },
     slides: [
-      { img: `${IMG}/joya-anillos-caja.jpg`, kicker: 'Taller propio', titulo: 'Piezas para\ntoda la vida', bajada: 'Hechas a mano, una por vez.', cta: 'Ver las piezas' },
+      { img: `${IMG}/joya-anillo-piedras.jpg`, kicker: 'Taller propio', titulo: 'Piezas para\ntoda la vida', bajada: 'Hechas a mano, una por vez.', cta: 'Ver las piezas' },
       { img: `${IMG}/joya-cadena.jpg`, kicker: 'A pedido', titulo: 'Tu idea,\nen oro', bajada: 'Diseñamos la pieza con vos.', cta: 'Consultar' },
     ],
     productos: [
