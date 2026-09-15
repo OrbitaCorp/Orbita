@@ -40,27 +40,20 @@ describe('RLS y roles públicos de Supabase', () => {
     expect(culpables).toEqual([]);
   });
 
-  // Excepciones conocidas: tablas creadas sin RLS que YA están aplicadas en
-  // producción y se decidió no tocar todavía. Cada una tiene que tener su
-  // hallazgo abierto en el tablero de auditoría — esto no las perdona, solo
-  // evita que el test tape el resto de los casos nuevos.
-  //
-  // - subscription_lifecycle_notices: la creó la migración
-  //   20260910182701_subscription_lifecycle_fase0 (ciclo de vida de
-  //   suscripciones), aplicada en prod el 10/09. Hallazgo
-  //   `rls-tabla-ciclo-vida`. Atenuante: no tiene grants para anon ni
-  //   authenticated, así que la clave pública no la alcanza igual; la escribe
-  //   solo el cron, con la service key.
-  const EXCEPCIONES = ['subscription_lifecycle_notices'];
-
+  // Una tabla puede nacer sin RLS en su migración y recibirlo en una posterior
+  // (pasó con subscription_lifecycle_notices: la creó
+  // 20260910182701_subscription_lifecycle_fase0 y la cerró
+  // 20260914120100_rls_subscription_lifecycle_notices, hallazgo
+  // `rls-tabla-ciclo-vida`). Lo que no puede pasar es que quede sin RLS en el
+  // estado final de las migraciones: sin lista de excepciones.
   it('las tablas que se crean después también quedan con RLS (o no hay tablas nuevas)', () => {
     const posteriores = carpetas.filter((c) => c > CIERRE);
     const sinRls = posteriores.flatMap((c) => {
-      const s = sql(c);
-      const creadas = [...s.matchAll(/CREATE TABLE "([a-z_]+)"/g)].map((m) => m[1]);
+      const creadas = [...sql(c).matchAll(/CREATE TABLE "([a-z_]+)"/g)].map((m) => m[1]);
+      // Esta migración y todas las que vienen después.
+      const desdeAca = carpetas.filter((x) => x >= c).map(sql).join('\n');
       return creadas
-        .filter((t) => !EXCEPCIONES.includes(t))
-        .filter((t) => !new RegExp(`ALTER TABLE "?${t}"? ENABLE ROW LEVEL SECURITY`, 'i').test(s))
+        .filter((t) => !new RegExp(`ALTER TABLE "?${t}"? ENABLE ROW LEVEL SECURITY`, 'i').test(desdeAca))
         .map((t) => `${c}: ${t}`);
     });
     expect(sinRls).toEqual([]);
