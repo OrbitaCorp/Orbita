@@ -6,9 +6,12 @@ description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o
 # Plantillas de Home
 
 Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las elige
-desde el panel: Avanzado → Plantillas de Home → Configurar. Hoy hay **dieciséis**,
-todas del módulo tienda, y **las dieciséis se pueden activar de verdad** en un
-negocio (ver § Cómo se aplica una plantilla, más abajo).
+desde el panel: Avanzado → Plantillas de Home → Configurar. Hoy hay
+**veintiséis**, todas del módulo tienda, y **todas se pueden activar de
+verdad** en un negocio (ver § Cómo se aplica una plantilla, más abajo).
+
+Se escriben de dos formas —con bloque propio o con receta— y elegir bien cuál
+es la primera decisión: ver § Dos formas de escribir una plantilla.
 
 ## Las cinco reglas que no se negocian
 
@@ -819,6 +822,96 @@ Callarse no serviría acá: la sección se quedaría sin encabezado.
 otro rubro. Si "Buscá por rubro" arriba de "Camisas street" suena raro, hace
 falta la versión neutra.
 
+## Dos formas de escribir una plantilla
+
+El catálogo tiene **veintiséis**, y se dividen en dos familias. Antes de
+arrancar una nueva, decidir cuál es.
+
+### A. Con bloque propio (las dieciséis primeras)
+
+Cada una escribe su `if (p.layout === '...')` en `homes.tsx` y declara su
+esquema a mano en `secciones.ts`. Es lo que hay que hacer cuando la plantilla
+tiene una IDEA que ninguna otra tiene: el panel lateral fijo de Circuito, el
+muro de Mosaico, "Comprá el look" de Escaparate.
+
+Cuesta: una sección nueva es JSX + esquema + los dieciocho puntos de abajo.
+
+### B. Con receta (las diez nuevas)
+
+La plantilla declara **qué bloques muestra y en qué orden**, y el render es
+compartido (rama `if (p.receta)` en `homes.tsx`). Cambia el DISEÑO —paleta,
+tipografía, radio, sombra, tipo de hero, forma de las categorías, ritmo de las
+filas— sin inventar funcionalidad.
+
+```ts
+receta: {
+  header: 'centrado',
+  bloques: [
+    { t: 'hero', estilo: 'partido' },
+    { t: 'categorias', estilo: 'altas', cols: 4 },
+    { t: 'fila', id: 'fila', cols: 4 },
+    { t: 'franja', estilo: 'apilada' },
+    { t: 'whatsapp' },
+  ],
+}
+```
+
+El vocabulario sale de lo que el storefront YA genera (regla 3):
+
+| Bloque | Variantes |
+|---|---|
+| `hero` | `pleno` · `partido` · `minimo` · `tarjeta` |
+| `categorias` | `grilla` · `pastillas` · `tira` · `altas` |
+| `fila` | `grilla` · `tira` · `sangre`, con `fuente` destacados/masVendidos/catálogo |
+| `porCategoria` | el nombre de la categoría y productos DE esa categoría |
+| `franja` | `plena` · `filete` · `cartelera` · `apilada` |
+| `parallax` | foto quieta, contenido pasando por encima |
+| `campana` | foto ancha con texto encima |
+| `whatsapp` | el bloque de consulta |
+
+**El editor se genera solo** (`esquemaDeReceta()` en `secciones.ts`): cada
+bloque sabe qué campos necesita. Una plantilla con receta NO agrega nada a
+`SECCIONES_POR_PLANTILLA`.
+
+**Regla: si la plantilla se puede escribir con el vocabulario, va con receta.**
+Un bloque propio se justifica por una idea, no por querer mover un margen.
+
+### El riesgo de B, y cómo se mitiga
+
+La regla 4 sale de un fracaso real: cuatro plantillas que reusaban el
+esqueleto de Vidriera terminaron dándose de baja por parecerse demasiado. Una
+receta corre el mismo riesgo si solo se le cambia el color.
+
+Lo que hace que dos recetas se vean distintas de verdad —y hay que mover
+VARIAS, no una—: el tipo de hero, la forma de las categorías, el ritmo de las
+filas, el radio (0 se ve completamente distinto a 24), la sombra (`none`
+contra una sombra dura tipo `6px 6px 0`), y sobre todo el par de tipografías.
+Una serif fina sobre papel y una condensada en mayúsculas sobre negro no se
+parecen en nada aunque compartan el render.
+
+### Las genéricas
+
+Cuatro de las diez (`base`, `carbon`, `bloque`, `sobrio`) no están pensadas
+para ningún rubro. Eran un hueco del catálogo: las dieciséis viejas son todas
+de un rubro, y ahí aparece el problema del punto 18 —"Buscá por rubro" arriba
+de "Camisas street"—. Una genérica no lo tiene, porque su texto de muestra no
+nombra ningún rubro.
+
+**Al agregar una genérica: ningún texto puede nombrar un rubro.** Ni el
+`cartel`, ni los `links`, ni las categorías de muestra, ni el `tagline`. Si
+hace falta un `porDefectoReal` para que se lea bien en otra tienda, la
+plantilla no era genérica.
+
+### Antes de dar por lista una plantilla con receta
+
+1. `datos.tsx` y `HOME_TEMPLATES_DISPONIBLES` (`set-home-template.dto.ts`)
+   tienen que coincidir **exactamente**. Si no, el panel ofrece una plantilla
+   que la API rechaza con 400. Cruzarlas, no confiar.
+2. Tocar ese DTO es tocar `apps/api/src/`: **necesita `./deploy/deploy.sh`**.
+   Un push a `main` no despliega la API.
+3. Verificar que las fotos de muestra existan en `public/plantillas/` — un
+   nombre inventado no falla en compilación, se ve como un cuadro roto.
+
 ## Errores ya cometidos — no repetirlos
 
 | Error | Por qué pasó | Qué hacer |
@@ -875,6 +968,9 @@ falta la versión neutra.
 | Un botón de WhatsApp que no abría nada | Se dibujó como `<span>` decorativo al maquetar la sección | Que abra `acciones.abrirWhatsapp`; el número sale de Configuración, no se pide en la plantilla |
 
 | "Buscá por rubro" arriba de "Camisas street" | El `porDefecto` estaba escrito para el rubro de la maqueta, y en la vitrina se leía bien | `porDefectoReal` con la versión neutra: la vitrina conserva la sabrosa, la tienda muestra la neutra |
+
+| Una plantilla nueva que pedía editor nuevo | Se escribió su bloque a mano aunque usaba el vocabulario de siempre | Si se puede escribir con `receta`, va con receta: el editor sale solo |
+| El panel ofrecía una plantilla que la API rechazaba con 400 | `datos.tsx` sumó ids y `HOME_TEMPLATES_DISPONIBLES` quedó atrás | Cruzar las dos listas antes de cerrar, y desplegar la API a mano |
 
 ## Convenciones del repo
 
