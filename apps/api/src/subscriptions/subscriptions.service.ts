@@ -79,8 +79,21 @@ const PENDING_REF_PREFIX = 'PEND-';
 // Exportados (no solo de uso interno): subscriptions.controller.ts los
 // necesita para validar el `?plan=` de GET /discount/:code sin duplicar la
 // lista de keys ahí también.
-export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado';
-const PLAN_KEYS: readonly PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado'];
+export type PlanKey =
+  | 'mensual'
+  | 'semestral'
+  | 'anual'
+  | 'mensualAvanzado'
+  | 'semestralAvanzado'
+  | 'anualAvanzado';
+const PLAN_KEYS: readonly PlanKey[] = [
+  'mensual',
+  'semestral',
+  'anual',
+  'mensualAvanzado',
+  'semestralAvanzado',
+  'anualAvanzado',
+];
 
 export function esPlanKey(v: unknown): v is PlanKey {
   return typeof v === 'string' && (PLAN_KEYS as readonly string[]).includes(v);
@@ -88,10 +101,10 @@ export function esPlanKey(v: unknown): v is PlanKey {
 
 // Único punto de verdad para "esta key incluye el paquete Avanzado" — lo usan
 // tanto la elección de tier de bienvenida como el sync de BusinessAddon (ver
-// syncAddonAvanzado). Hoy solo 'mensualAvanzado' lo incluye; si algún día
-// existiera un 'semestralAvanzado', se suma acá y todo lo demás lo hereda.
+// syncAddonAvanzado). Los tres períodos con Avanzado lo heredan de acá: no hay
+// ninguna otra parte del servicio que liste las keys "con Avanzado" a mano.
 function incluyeAvanzado(plan: PlanKey): boolean {
-  return plan === 'mensualAvanzado';
+  return plan === 'mensualAvanzado' || plan === 'semestralAvanzado' || plan === 'anualAvanzado';
 }
 
 type CicloConfig = { amount: number; frequency: number; frequencyType: 'days' | 'months' };
@@ -124,11 +137,27 @@ const BIENVENIDA_TIERS: { base: CicloConfig; avanzado: CicloConfig } = {
 //   Mensual + Avanzado: $20.000 netos/mes  -> $21.700/mes (mismo redondeo que
 //     arriba: 20000/0.9239=21647.36 -> $21.700). UN SOLO cargo combinado —
 //     el paquete Avanzado nunca se factura aparte, ver syncAddonAvanzado.
+//
+// Semestral y Anual CON Avanzado (2026-09-15, decisión del dueño): antes
+// Avanzado existía solo mes a mes, así que quien lo quería no podía aprovechar
+// ningún descuento por período. Los montos salen de aplicarle al mensual con
+// Avanzado el MISMO descuento que ya tiene Base en ese período, y redondear al
+// millar:
+//   Semestral + Avanzado: 21.700 × (14.667/16.500) × 6 = 115.736 -> $116.000
+//                         (≈$19.333/mes, −11% igual que el semestral de Base)
+//   Anual + Avanzado:     21.700 × (13.000/16.500) × 12 = 205.164 -> $205.000
+//                         (≈$17.083/mes, −21% igual que el anual de Base)
+//
+// OJO si se tocan estos números: planDePreapproval() encuentra el plan por
+// (amount, frequency, frequencyType), así que dos planes no pueden compartir
+// esa terna o un cobro de MP se activaría como el plan equivocado.
 const PLANES: Record<PlanKey, CicloConfig> = {
   mensual: { amount: 16500, frequency: 1, frequencyType: 'months' },
   semestral: { amount: 88000, frequency: 6, frequencyType: 'months' },
   anual: { amount: 156000, frequency: 12, frequencyType: 'months' },
   mensualAvanzado: { amount: 21700, frequency: 1, frequencyType: 'months' },
+  semestralAvanzado: { amount: 116000, frequency: 6, frequencyType: 'months' },
+  anualAvanzado: { amount: 205000, frequency: 12, frequencyType: 'months' },
 };
 
 // Lo que se guarda en PendingSignup.payload. La contraseña NO: viaja su hash

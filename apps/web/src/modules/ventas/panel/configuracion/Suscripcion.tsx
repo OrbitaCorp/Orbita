@@ -56,15 +56,33 @@ const ESTADO_META: Record<string, { label: string; color: string; bg: string }> 
 // disponible acá — es el que arma "Activar Avanzado" más abajo, y cualquier
 // cliente puede pasarse a él (o salir) como cualquier otro cambio de plan.
 const PLANES: Record<PlanKey, { nombre: string; precioMes: number; total: number | null; periodo: string }> = {
-    mensual:         { nombre: 'Mensual',           precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
-    semestral:       { nombre: 'Semestral',         precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
-    anual:           { nombre: 'Anual',             precioMes: 13000, total: 156000, periodo: 'por año' },
-    mensualAvanzado: { nombre: 'Mensual + Avanzado', precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
+    mensual:           { nombre: 'Mensual',             precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
+    semestral:         { nombre: 'Semestral',           precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
+    anual:             { nombre: 'Anual',               precioMes: 13000, total: 156000, periodo: 'por año' },
+    mensualAvanzado:   { nombre: 'Mensual + Avanzado',   precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
+    semestralAvanzado: { nombre: 'Semestral + Avanzado', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
+    anualAvanzado:     { nombre: 'Anual + Avanzado',     precioMes: 17083, total: 205000, periodo: 'por año' },
 }
-const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado']
+const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
 
 function esPlanKey(v: string): v is PlanKey {
     return (PLAN_KEYS as string[]).includes(v)
+}
+
+// Los tres planes que traen el paquete Avanzado. Espejo de incluyeAvanzado()
+// en subscriptions.service.ts — si allá se suma una key, acá también.
+const CON_AVANZADO: PlanKey[] = ['mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
+
+/**
+ * El equivalente CON Avanzado del plan que el negocio tiene hoy. Sumar el
+ * paquete no le cambia el período a nadie: quien está en semestral pasa a
+ * semestral + Avanzado, no a mensual (antes "Activar Avanzado" mandaba
+ * siempre a mensualAvanzado porque era el único que existía).
+ */
+function conAvanzado(plan: string | null | undefined): PlanKey {
+    if (plan === 'semestral' || plan === 'semestralAvanzado') return 'semestralAvanzado'
+    if (plan === 'anual' || plan === 'anualAvanzado') return 'anualAvanzado'
+    return 'mensualAvanzado'
 }
 
 function fmtPesos(n: number): string {
@@ -313,8 +331,8 @@ export default function Suscripcion() {
                                 caso normal desde este rediseño); la fecha de vencimiento sola
                                 queda para el caso, todavía posible, de un addon otorgado a
                                 mano por un admin sin el plan combinado. */}
-                            {sub?.plan === 'mensualAvanzado'
-                                ? 'Incluido en tu plan Base + Avanzado'
+                            {sub?.plan && (CON_AVANZADO as string[]).includes(sub.plan)
+                                ? `Incluido en tu plan ${PLANES[sub.plan as PlanKey].nombre}`
                                 : advancedExpiresAt ? `Vence el ${formatFecha(advancedExpiresAt)}` : 'Sin fecha de vencimiento'}
                         </div>
                     </div>
@@ -328,7 +346,10 @@ export default function Suscripcion() {
                         <div>
                             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Paquete Avanzado</div>
                             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
-                                {fmtPesos(PLANES.mensualAvanzado.precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                                {/* El precio del plan que le tocaría a ESTE negocio, no el
+                                    mensual fijo: quien está en semestral/anual pasa al
+                                    combinado de su mismo período (ver conAvanzado). */}
+                                {fmtPesos(PLANES[conAvanzado(sub?.plan)].precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
                             </div>
                         </div>
                     </div>
@@ -343,7 +364,7 @@ export default function Suscripcion() {
                     </div>
 
                     {errorPlan && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
-                    <Button variant="primary" onClick={() => elegirPlan('mensualAvanzado')} disabled={guardandoPlan}>
+                    <Button variant="primary" onClick={() => elegirPlan(conAvanzado(sub?.plan))} disabled={guardandoPlan}>
                         {guardandoPlan ? 'Guardando…' : 'Activar Avanzado'}
                     </Button>
                 </Card>

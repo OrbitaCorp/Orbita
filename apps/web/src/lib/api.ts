@@ -352,7 +352,7 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado'
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado'
 
 // Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
 // (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
