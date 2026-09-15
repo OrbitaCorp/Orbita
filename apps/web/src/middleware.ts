@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { TEMA_SCRIPT, armarCspReportOnly, origenDeUrl, sha256Base64 } from '@/lib/csp'
 
 // ─── Middleware de subdominios + dominios propios (multi-tenant) ───────────
 //
@@ -80,6 +81,34 @@ async function slugFromCustomDomain(hostname: string): Promise<string | null> {
   }
 }
 
+// ─── Content-Security-Policy en modo Report-Only ───────────────────────────
+//
+// Auditoría interna 10/09, hallazgo csp-scripts ("La web no tiene una
+// Content-Security-Policy de scripts"). Se emite desde acá y no desde
+// `headers()` de next.config.ts porque la política lleva el hash del script
+// inline de tema (lib/csp.ts, TEMA_SCRIPT) y next.config.ts no puede
+// importar ese módulo sin tocar el tsconfig — ver el comentario largo en
+// lib/csp.ts. Es SOLO Report-Only: el navegador manda lo que HABRÍA
+// bloqueado a /api/csp-report y no bloquea nada. La CSP bloqueante mínima
+// (frame-ancestors/base-uri/object-src) sigue en next.config.ts.
+//
+// El matcher de abajo excluye /api, /_next/static, /_next/image y archivos
+// con extensión — nada de eso es HTML, así que la cobertura de páginas es
+// completa. Se calcula una sola vez por instancia (el hash es async por Web
+// Crypto) y se cachea la promesa.
+let politicaReportOnly: Promise<string> | null = null
+function cspReportOnly(): Promise<string> {
+  politicaReportOnly ??= sha256Base64(TEMA_SCRIPT).then(hashTema =>
+    armarCspReportOnly({ hashTema, apiOrigin: origenDeUrl(API_BASE) }),
+  )
+  return politicaReportOnly
+}
+
+async function conCsp(res: NextResponse): Promise<NextResponse> {
+  res.headers.set('Content-Security-Policy-Report-Only', await cspReportOnly())
+  return res
+}
+
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? ''
   const hostname = host.split(':')[0].toLowerCase()
@@ -93,7 +122,7 @@ export async function middleware(request: NextRequest) {
 
   // Apex (orbita.local), localhost, o dominio propio no vinculado → sin
   // tenant, se sirve tal cual.
-  if (!slug) return NextResponse.next()
+  if (!slug) return conCsp(NextResponse.next())
 
   const { pathname } = request.nextUrl
 
@@ -102,7 +131,7 @@ export async function middleware(request: NextRequest) {
   if (isPassthrough(pathname)) {
     const res = NextResponse.next()
     res.headers.set('x-orbita-slug', slug)
-    return res
+    return conCsp(res)
   }
 
   const url = request.nextUrl.clone()
@@ -110,7 +139,7 @@ export async function middleware(request: NextRequest) {
 
   const res = NextResponse.rewrite(url)
   res.headers.set('x-orbita-slug', slug)
-  return res
+  return conCsp(res)
 }
 
 export const config = {

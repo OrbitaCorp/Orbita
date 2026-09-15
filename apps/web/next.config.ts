@@ -35,9 +35,12 @@ const nextConfig: NextConfig = {
   // de los negocios, y no nos corresponde forzar HTTPS en sus otros
   // subdominios); anti-framing con SAMEORIGIN (no DENY: las vistas de celular
   // que se usan para revisar responsive son iframes del mismo origen); y una
-  // CSP mínima sin script-src — una CSP completa de scripts (script inline de
-  // _app.tsx, Google Fonts, redirecciones a Mercado Pago) queda como hallazgo
-  // abierto, porque armarla mal voltea la tienda.
+  // CSP mínima sin script-src, porque armarla mal voltea la tienda. La CSP
+  // completa de scripts (hallazgo csp-scripts) existe desde el 15/09 pero en
+  // modo Report-Only y se emite desde src/middleware.ts, no desde acá: lleva
+  // el hash del script inline de tema (src/lib/csp.ts) y este archivo no
+  // puede importar ese módulo sin tocar el tsconfig. Cuando se pase a
+  // bloqueante, la de acá se reemplaza por esa (no se suman).
   async headers() {
     return [
       {
