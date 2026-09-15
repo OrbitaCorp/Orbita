@@ -36,6 +36,12 @@ export interface Producto {
   tag?: string; estrellas?: number; resenas?: number; stock?: string
   colores?: string[]
   img: string; img2?: string
+  // El NOMBRE de su categoría. Solo con datos reales: lo necesita cualquier
+  // sección que arme filas por categoría ("Camisas street" y abajo camisas de
+  // verdad). Sin esto, lo único que se podía hacer era cortar el array de
+  // destacados en pedazos, que es como Atleta terminó mostrando los mismos
+  // productos bajo tres títulos distintos.
+  cat?: string
   // Solo con datos reales (ver plantillaReal.ts): los mismos swatches que
   // dibuja la ProductCard real, para plantillas que arman su PROPIA tarjeta
   // en vez de reusar `renderProducto`/ProductCard (ver Escaparate en

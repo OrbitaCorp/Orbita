@@ -216,6 +216,28 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   }
 
   /**
+   * Las categorías del negocio con productos SUYOS adentro.
+   *
+   * Atleta mostraba tres títulos de categoría y abajo `p.productos.slice(i,
+   * i+3)` — una ventana corrediza sobre los destacados, que no tenía nada que
+   * ver con la categoría de arriba y repetía los mismos productos en las tres
+   * filas (reportado con captura). Sin `Producto.cat` no había forma de hacerlo
+   * bien; ahora sí.
+   *
+   * Una categoría sin productos cargados no se devuelve: un título con una
+   * fila vacía abajo es peor que no mostrar esa categoría.
+   */
+  const porCategoria = (cuantas: number, porFila: number) =>
+    (p.categorias ?? [])
+      .map(([nombre, , slug]) => ({
+        nombre,
+        slug,
+        productos: (p.catalogo ?? p.productos).filter((x) => x.cat === nombre).slice(0, porFila),
+      }))
+      .filter((c) => c.productos.length > 0)
+      .slice(0, cuantas)
+
+  /**
    * Los lugares de una sección de "pasos" (Nocturno: Armá tu setup; Glow: Tu
    * rutina). Lo que el dueño eligió manda; los lugares que no tocó se llenan
    * con el catálogo, igual que cualquier otra fila.
@@ -1484,12 +1506,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // suyos adentro. Antes eran Running/Fuerza/Ciclismo con nueve fotos del
     // repo y un conteo inventado ("18 artículos"), así que una tienda de ropa
     // con Atleta aplicada mostraba disciplinas que no vende.
+    // Cada tira lleva los productos DE ESA categoría. Antes era
+    // `p.productos.slice(i, i + 3)`: una ventana corrediza sobre los
+    // destacados, que repetía los mismos productos bajo los tres títulos.
     const disciplinas: [string, string | undefined, typeof p.productos][] =
-      (p.categorias ?? []).slice(0, 3).map(([nombre, , slug], i) => [
-        nombre,
-        slug,
-        p.productos.slice(i, i + 3).length >= 3 ? p.productos.slice(i, i + 3) : p.productos.slice(0, 3),
-      ])
+      porCategoria(3, 3).map((c) => [c.nombre, c.slug, c.productos])
     const encabezado = (
       <>
         {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}

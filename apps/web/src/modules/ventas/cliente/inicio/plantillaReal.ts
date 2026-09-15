@@ -149,6 +149,7 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
     img: p.imgUrl ?? thumbGradient(p.hue),
     img2: p.imgUrl2 ?? undefined,
     slug: p.id,
+    cat: p.cat || undefined,
     precio: fmt(p.precio),
     antes: p.precioAnt ? fmt(p.precioAnt) : undefined,
     transfer: conTransferencia ? `${fmt(conTransferencia)} con transferencia` : undefined,
