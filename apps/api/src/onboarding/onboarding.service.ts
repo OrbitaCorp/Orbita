@@ -33,6 +33,10 @@ const CATEGORIAS = [
 ] as const;
 
 const TIENDA_SUBRUBROS = [
+  // 'detodo' va primero a pedido: es la opción "no encaja en ninguna de las
+  // otras", y quien vende de todo un poco no debería tener que escanear las
+  // 21 tarjetas restantes para encontrarla al final.
+  { key: 'detodo', icon: 'Store', label: 'De todo un poco', descripcion: 'Tienda variada sin un rubro fijo', tipo: 'simple' },
   { key: 'indumentaria', icon: 'Shirt', label: 'Indumentaria', descripcion: 'Talles, colores y variantes', tipo: 'variantes' },
   { key: 'calzado', icon: 'Footprints', label: 'Calzado', descripcion: 'Numeración y variantes por talle', tipo: 'variantes' },
   { key: 'cosmetica', icon: 'Sparkles', label: 'Perfumería / Cosmética', descripcion: 'Vencimientos y control de lotes', tipo: 'simple' },
@@ -58,7 +62,6 @@ const TIENDA_SUBRUBROS = [
   { key: 'merceria', icon: 'Scissors', label: 'Mercería', descripcion: 'Hilos, telas y variantes de color y medida', tipo: 'variantes' },
   { key: 'pasteleria', icon: 'Cake', label: 'Pastelerías', descripcion: 'Tamaños, sabores y fecha de entrega', tipo: 'variantes' },
   { key: 'insumos', icon: 'Boxes', label: 'Insumos', descripcion: 'Materiales y materias primas variadas, sin rubro fijo', tipo: 'simple' },
-  { key: 'detodo', icon: 'Store', label: 'De todo un poco', descripcion: 'Tienda variada sin un rubro fijo', tipo: 'simple' },
 ] as const;
 
 const RUBROS = [
