@@ -73,9 +73,10 @@ describe('validarDescuentoForm — tipo "Oferta relámpago"', () => {
     expect(e.fechaFin).toMatch(/inicio/i)
   })
 
-  it('el porcentaje se valida como en "% Producto" (1 a 100)', () => {
+  it('el porcentaje se valida como en "% Producto" (1 a 99, tope de d73b5)', () => {
     expect(validarDescuentoForm(estado({ valor: '0' }), false, AHORA).valor).toBeTruthy()
-    expect(validarDescuentoForm(estado({ valor: '120' }), false, AHORA).valor).toMatch(/100/)
+    expect(validarDescuentoForm(estado({ valor: '100' }), false, AHORA).valor).toMatch(/99/)
+    expect(validarDescuentoForm(estado({ valor: '120' }), false, AHORA).valor).toMatch(/99/)
     expect(validarDescuentoForm(estado({ valor: '55' }), false, AHORA).valor).toBeUndefined()
   })
 

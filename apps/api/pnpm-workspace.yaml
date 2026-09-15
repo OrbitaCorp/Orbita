@@ -5,3 +5,25 @@ allowBuilds:
   onnxruntime-node: true
   prisma: true
   unrs-resolver: true
+
+# Overrides de dependencias transitivas vulnerables (auditoría interna,
+# hallazgo `dependencias`, pnpm audit del 15/09). En pnpm 10 van acá, no en
+# package.json#pnpm.overrides (ese campo ya no se lee: multer venía de ahí y
+# por eso se movió). Todas son transitivas: casi todas de herramientas de dev
+# (@nestjs/cli, jest, supertest, prisma CLI); las de runtime son multer
+# (subida de archivos) y adm-zip (script de instalación de onnxruntime-node).
+# Se pinnea el parche mínimo con ^ (un '>=' sin tope hace saltar de major:
+# probado, brace-expansion ^1 terminaba en 5.x y js-yaml ^3 en 5.x).
+overrides:
+  multer: '^2.3.0'
+  adm-zip: '^0.6.0'
+  fast-uri: '^3.1.6'
+  brace-expansion@1: '^1.1.18'
+  brace-expansion@2: '^2.1.4'
+  brace-expansion@5: '^5.0.9'
+  js-yaml@3: '^3.15.2'
+  js-yaml@4: '^4.3.2'
+  deepmerge-ts: '^8.0.0'
+  browserslist: '^4.28.7'
+  baseline-browser-mapping: '^2.11.0'
+  qs: '^6.16.0'
