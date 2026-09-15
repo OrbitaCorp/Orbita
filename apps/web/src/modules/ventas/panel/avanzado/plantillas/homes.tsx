@@ -41,6 +41,9 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
 export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>([
   'premium', 'vera', 'cobijo', 'nitida', 'mosaico', 'atleta', 'patitas', 'bodega', 'crecer',
   'nocturno', 'papeleria', 'corralon', 'glow', 'circuito',
+  // Todas las de receta dibujan su propio header: es un solo valor
+  // porque comparten el layout, no hace falta sumarlas una por una.
+  'receta',
 ])
 
 // Un lugar de una seccion de pasos, ya resuelto: puede venir de algo que el
@@ -492,22 +495,87 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           )
         }
 
-        // ── Franja de color con un mensaje ─────────────────────────────────
+        // ── El espacio de anuncio, en cuatro formas ────────────────────────
+        // Es una AFIRMACIÓN (ver secciones.ts): una tienda que no escribió
+        // nada acá no anuncia nada, y la franja entera no se dibuja.
         case 'franja': {
-          if (!txt('franja', 'titulo')) return null
+          const titulo = txt('franja', 'titulo')
+          if (!titulo) return null
+          const estilo = b.estilo ?? 'plena'
+
+          if (estilo === 'cartelera') {
+            return <div key={i}><Marquee t={t} texto={titulo} /></div>
+          }
+
+          if (estilo === 'filete') {
+            return (
+              <div
+                key={i}
+                onClick={acciones?.irACatalogo}
+                style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, background: t.soft, padding: movil ? '14px 16px' : '18px 40px', textAlign: 'center', cursor: acciones ? 'pointer' : undefined }}
+              >
+                <span style={{ fontSize: movil ? 12.5 : 13.5, letterSpacing: '0.06em', color: t.text, fontWeight: 600 }}>{titulo}</span>
+                {txt('franja', 'cta') && <span style={{ marginLeft: 12, fontSize: 13, color: t.primary, fontWeight: 700 }}>{txt('franja', 'cta')} →</span>}
+              </div>
+            )
+          }
+
+          if (estilo === 'apilada') {
+            return (
+              <Reveal key={i}>
+                <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '34px 18px' : '58px 40px', textAlign: 'center' }}>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 24 : 36, fontWeight: 800, letterSpacing: '-0.03em', maxWidth: 620, margin: '0 auto' }}>{titulo}</div>
+                  {txt('franja', 'bajada') && <div style={{ fontSize: 14.5, color: t.muted, margin: '12px auto 22px', maxWidth: 480, lineHeight: 1.6 }}>{txt('franja', 'bajada')}</div>}
+                  {txt('franja', 'cta') && <Boton t={t} grande onClick={acciones?.irACatalogo}>{txt('franja', 'cta')}</Boton>}
+                </div>
+              </Reveal>
+            )
+          }
+
+          // plena
           return (
             <Reveal key={i}>
               <div style={{ background: t.primary, color: t.onPrimary, padding: movil ? '26px 18px' : '40px', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 230 }}>
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 30, fontWeight: 800, letterSpacing: '-0.025em' }}>{txt('franja', 'titulo')}</div>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 30, fontWeight: 800, letterSpacing: '-0.025em' }}>{titulo}</div>
                   <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 6 }}>{txt('franja', 'bajada')}</div>
                 </div>
-                <span
-                  className="pl-cta" onClick={acciones?.irACatalogo}
-                  style={{ background: t.onPrimary, color: t.primary, padding: '13px 26px', borderRadius: t.radio === 0 ? 0 : 999, fontWeight: 700, fontSize: 13.5, cursor: acciones ? 'pointer' : undefined }}
-                >{txt('franja', 'cta')}</span>
+                {txt('franja', 'cta') && (
+                  <span
+                    className="pl-cta" onClick={acciones?.irACatalogo}
+                    style={{ background: t.onPrimary, color: t.primary, padding: '13px 26px', borderRadius: t.radio === 0 ? 0 : 999, fontWeight: 700, fontSize: 13.5, cursor: acciones ? 'pointer' : undefined }}
+                  >{txt('franja', 'cta')}</span>
+                )}
               </div>
             </Reveal>
+          )
+        }
+
+        // ── Banner parallax ────────────────────────────────────────────────
+        // La foto se queda quieta y el contenido pasa por encima. El efecto
+        // lo hace `.pl-parallax` (piezas.tsx), que además lo apaga solo en
+        // celular y con prefers-reduced-motion.
+        case 'parallax': {
+          const foto = txt('parallax', 'foto')
+          const titulo = txt('parallax', 'titulo')
+          if (!foto || !titulo) return null
+          return (
+            <div
+              key={i} className="pl-parallax"
+              style={{ backgroundImage: `url(${foto})`, minHeight: movil ? 320 : 440, display: 'flex', alignItems: 'center', position: 'relative' }}
+            >
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,0.72), rgba(0,0,0,0.18))' }} />
+              <div style={{ position: 'relative', padding: movil ? '38px 20px' : '60px', maxWidth: 560 }}>
+                {txt('parallax', 'volanta') && (
+                  <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 800, color: t.accent, marginBottom: 12 }}>{txt('parallax', 'volanta')}</div>
+                )}
+                <h2 style={{ fontFamily: t.fh, fontSize: movil ? 26 : 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.12, color: '#fff', margin: 0, textShadow: '0 2px 16px rgba(0,0,0,0.35)' }}>{titulo}</h2>
+                {txt('parallax', 'texto') && (
+                  <p style={{ fontSize: movil ? 14 : 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, margin: '14px 0 24px', maxWidth: 440 }}>{txt('parallax', 'texto')}</p>
+                )}
+                {txt('parallax', 'cta') && <Boton t={t} grande={!movil} onClick={acciones?.irACatalogo}>{txt('parallax', 'cta')}</Boton>}
+              </div>
+            </div>
           )
         }
 

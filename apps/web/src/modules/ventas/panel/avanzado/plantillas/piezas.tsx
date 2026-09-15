@@ -48,6 +48,16 @@ export const CSS = `
 .pl-nav { transition: opacity .2s ease; }
 .pl-nav:hover { opacity: .58; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 
+/* Banner parallax: el fondo se queda quieto y el contenido pasa por encima.
+   Mismas dos guardas que el banner del storefront (ver Inicio.tsx): iOS
+   Safari rompe background-attachment:fixed y en Android de gama baja tilda,
+   así que en pantallas chicas se apaga — el banner se ve igual, solo sin el
+   efecto. Y se respeta prefers-reduced-motion, que para mucha gente no es
+   una preferencia estética sino que le marea. */
+.pl-parallax { background-size: cover; background-position: center; background-attachment: fixed; }
+@media (max-width: 640px) { .pl-parallax { background-attachment: scroll; } }
+@media (prefers-reduced-motion: reduce) { .pl-parallax { background-attachment: scroll; } }
+
 .pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes plMenuIn { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 `

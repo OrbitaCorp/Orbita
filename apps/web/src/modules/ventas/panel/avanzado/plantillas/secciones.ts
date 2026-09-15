@@ -25,7 +25,8 @@
 //  4. `max` es un tope de DISEÑO (el texto desborda la caja a ese tamaño),
 //     no de seguridad.
 
-import type { SeccionPlantilla } from './tipos'
+import type { Receta, SeccionPlantilla } from './tipos'
+import { PLANTILLAS } from './datos'
 import { IMG } from './tipos'
 
 // ─── Premium ─────────────────────────────────────────────────────────────────
@@ -984,9 +985,121 @@ export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
   nitida: NITIDA,
 }
 
+/**
+ * El formulario de una plantilla con receta, armado desde sus bloques.
+ *
+ * Las dieciséis primeras declaran su esquema a mano porque cada una tiene
+ * secciones que ninguna otra tiene. Una plantilla con receta usa el
+ * vocabulario compartido, así que su editor se deduce: cada bloque sabe qué
+ * campos necesita, y el orden del formulario es el orden de la portada.
+ *
+ * Sumar una plantilla nueva no es escribir un editor — es elegir bloques.
+ */
+export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
+  const out: SeccionPlantilla[] = [{
+    id: 'cintillo',
+    nombre: 'Cintillo superior',
+    nota: 'La línea de arriba de todo. Vacía, no se dibuja.',
+    campos: [
+      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, help: 'Ej: envío gratis desde cierto monto, o una promo vigente.', porDefecto: 'Envío gratis en compras superiores a $80.000' },
+      { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch', help: 'En vez de quedarse fijo, el texto corre en loop.' },
+    ],
+  }]
+
+  const encabezado = (id: string, nombre: string, nota: string, vol: string, tit: string, accion?: string): SeccionPlantilla => ({
+    id, nombre, nota,
+    campos: [
+      { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: vol },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: tit },
+      ...(accion !== undefined ? [{ id: 'accion', label: 'Enlace de la derecha', tipo: 'texto' as const, max: 30, porDefecto: accion }] : []),
+    ],
+  })
+
+  for (const b of receta.bloques) {
+    switch (b.t) {
+      case 'hero':
+        out.push({
+          id: 'hero',
+          nombre: 'Hero',
+          nota: 'Las fotos y los textos salen de "Hero", en Apariencia. Acá va el segundo botón.',
+          campos: [
+            { id: 'cta2', label: 'Segundo botón', tipo: 'texto', max: 24, help: 'Abre el WhatsApp de la tienda. Vacío, no se dibuja.' },
+          ],
+        })
+        break
+      case 'categorias':
+        out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', 'Ver todas →'))
+        break
+      case 'fila':
+        out.push(encabezado(b.id, 'Fila de productos', 'El encabezado de esta fila. Los productos salen de tu catálogo.', 'Lo más elegido', 'Destacados', 'Ver todo →'))
+        break
+      case 'franja':
+        out.push({
+          id: 'franja',
+          nombre: 'Espacio de anuncio',
+          nota: 'La franja ancha. Sin título no se dibuja: una tienda que no anuncia nada no muestra una barra vacía.',
+          campos: [
+            { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, afirmacion: true, help: 'Lo que querés anunciar.', porDefecto: 'Envío gratis desde $80.000' },
+            { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' },
+            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
+          ],
+        })
+        break
+      case 'parallax':
+        out.push({
+          id: 'parallax',
+          nombre: 'Banner con parallax',
+          nota: 'Foto ancha que se queda quieta mientras la página scrollea. Sin foto o sin título no se dibuja.',
+          campos: [
+            { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Bien apaisada, 1600px de ancho o más: se ve a pantalla completa.' },
+            { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24 },
+            { id: 'titulo', label: 'Título', tipo: 'texto', max: 50 },
+            { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140 },
+            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
+          ],
+        })
+        break
+      case 'campana':
+        out.push({
+          id: 'campana',
+          nombre: 'Banner de campaña',
+          nota: 'La foto ancha del final, con el texto encima. Sin foto o sin título no se dibuja.',
+          campos: [
+            { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Apaisada, se ve a todo el ancho.' },
+            { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 30 },
+            { id: 'titulo', label: 'Título', tipo: 'texto', max: 50 },
+            { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140 },
+            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
+          ],
+        })
+        break
+      case 'whatsapp':
+        out.push({
+          id: 'whatsapp',
+          nombre: 'Consulta por WhatsApp',
+          nota: 'El bloque del final. El número sale de Configuración, no se carga acá.',
+          campos: [
+            { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, porDefecto: '¿Dudas con tu compra?' },
+            { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 120, porDefecto: 'Escribinos por WhatsApp y te respondemos.' },
+            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 28, porDefecto: 'Escribir por WhatsApp' },
+          ],
+        })
+        break
+      // `porCategoria` no lleva formulario: sus títulos son los nombres de las
+      // categorías del negocio, que ya se editan en Categorías.
+      case 'porCategoria':
+        break
+    }
+  }
+  return out
+}
+
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {
   if (!idPlantilla) return []
-  return SECCIONES_POR_PLANTILLA[idPlantilla] ?? []
+  const propias = SECCIONES_POR_PLANTILLA[idPlantilla]
+  if (propias) return propias
+  const receta = PLANTILLAS.find(x => x.id === idPlantilla)?.receta
+  return receta ? esquemaDeReceta(receta) : []
 }
 
 /**

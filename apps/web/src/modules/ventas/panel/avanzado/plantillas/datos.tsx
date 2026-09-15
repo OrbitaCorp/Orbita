@@ -638,4 +638,132 @@ export const PLANTILLAS: Plantilla[] = [
       { nombre: 'Crema corporal de karité', badge: 'Piel sensible', badgeTono: 'azul', estrellas: 4, resenas: 129, stock: 'Quedan 9', img: `${IMG}/belleza-spa.jpg`, img2: `${IMG}/belleza-maquillaje.jpg`, ...ar('$24.900', '$31.000', '$19.920', '$8.300') },
     ],
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Las diez con RECETA (ver tipos.ts § Recetas).
+  //
+  // No escriben su bloque en homes.tsx: declaran qué muestran y en qué orden,
+  // y el render es compartido. Lo que las hace distintas entre sí es el TEMA
+  // —paleta, tipografía, radio, sombra— y la combinación de bloques: qué hero,
+  // qué forma de categorías, con qué ritmo caen las filas, si llevan anuncio y
+  // de qué tipo.
+  //
+  // Son alternativas de DISEÑO para rubros que ya tienen plantilla: un local
+  // de deco que no se siente identificado con Cobijo tiene Terracota, una
+  // ferretería que quiere algo más limpio que Corralón tiene Roble. Ninguna
+  // inventa funcionalidad ni pide un editor propio.
+  {
+    id: 'lienzo',
+    nombre: 'Lienzo',
+    para: 'Moda, indumentaria, diseño de autor',
+    queCambia: 'Sin foto en el hero: un título enorme en serif sobre papel, y el peso visual lo llevan los productos a sangre. Categorías en pastillas chicas, banner con parallax al medio. Para marcas que prefieren la tipografía antes que la producción de fotos.',
+    secciones: ['Hero tipográfico', 'Pastillas de categoría', 'Fila a sangre', 'Banner parallax', 'WhatsApp'],
+    marca: 'Lienzo', tagline: 'Prendas de autor, series cortas',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'minimo' },
+        { t: 'categorias', estilo: 'pastillas', cols: 6 },
+        { t: 'fila', id: 'fila', estilo: 'sangre', cols: 4 },
+        { t: 'parallax' },
+        { t: 'fila', id: 'fila2', fuente: 'masVendidos', cols: 4 },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Series cortas · Hecho en Argentina',
+    links: ['Inicio', 'Prendas', 'Accesorios', 'Archivo'],
+    categorias: [['Abrigos', `${IMG}/moda-mujer-invierno.jpg`], ['Calzado', `${IMG}/moda-zapato.jpg`], ['Básicos', `${IMG}/vidriera-modelo.jpg`], ['Accesorios', `${IMG}/vidriera-reloj.jpg`]],
+    tema: {
+      bg: '#FAF8F4', surf: '#FFFFFF', soft: '#F1EDE5', text: '#16130F', muted: '#736C61', border: '#E2DBCE',
+      primary: '#16130F', onPrimary: '#FAF8F4', accent: '#A8724A',
+      fh: serif('Cormorant Garamond'), fb: sans('Inter'), radio: 0, oscuro: false,
+      sombra: 'none',
+    },
+    slides: [
+      { img: `${IMG}/moda-mujer-invierno.jpg`, kicker: 'Temporada', titulo: 'Invierno\nen capas', bajada: 'Series cortas, teñidas a mano.', cta: 'Ver la colección' },
+      { img: `${IMG}/vidriera-modelo.jpg`, kicker: 'Archivo', titulo: 'Última\noportunidad', bajada: 'Prendas de temporadas pasadas.', cta: 'Ver archivo' },
+    ],
+    productos: [
+      { nombre: 'Abrigo de lana cruda', estrellas: 5, resenas: 42, img: `${IMG}/moda-mujer-invierno.jpg`, img2: `${IMG}/vidriera-modelo.jpg`, ...ar('$168.000', '$210.000', '$134.400', '$56.000') },
+      { nombre: 'Camisa de algodón lavado', estrellas: 5, resenas: 88, img: `${IMG}/vidriera-modelo.jpg`, img2: `${IMG}/moda-zapato.jpg`, ...ar('$74.500', '$92.000', '$59.600', '$24.833') },
+      { nombre: 'Zapato de cuero natural', estrellas: 4, resenas: 31, img: `${IMG}/moda-zapato.jpg`, img2: `${IMG}/vidriera-reloj.jpg`, ...ar('$139.000', '$175.000', '$111.200', '$46.333') },
+      { nombre: 'Reloj de pulsera fino', estrellas: 5, resenas: 19, img: `${IMG}/vidriera-reloj.jpg`, img2: `${IMG}/moda-mujer-invierno.jpg`, ...ar('$96.000', '$120.000', '$76.800', '$32.000') },
+    ],
+  },
+  {
+    id: 'pulso',
+    nombre: 'Pulso',
+    para: 'Deportes, suplementos, outdoor',
+    queCambia: 'Negra con lima y tipografía condensada en mayúsculas. El cartel corre en loop arriba, el hero va a sangre completa, y abajo cada categoría abre su propia fila con productos DE esa categoría. Más agresiva que Atleta.',
+    secciones: ['Cartel corriendo', 'Hero a sangre', 'Filas por categoría', 'Tira de más vendidos', 'WhatsApp'],
+    marca: 'Pulso', tagline: 'Entrenamiento y suplementación',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      bloques: [
+        { t: 'hero', estilo: 'pleno' },
+        { t: 'franja', estilo: 'cartelera' },
+        { t: 'porCategoria', cuantas: 3, porFila: 4 },
+        { t: 'fila', id: 'fila', fuente: 'masVendidos', estilo: 'tira' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Envío en 48 hs · Cambio de talle sin cargo',
+    links: ['Inicio', 'Entrenamiento', 'Suplementos', 'Outdoor', 'Outlet'],
+    categorias: [['Running', `${IMG}/dep-zapatilla.jpg`], ['Fuerza', `${IMG}/dep-pesas.jpg`], ['Outdoor', `${IMG}/dep-bici.jpg`], ['Indumentaria', `${IMG}/dep-correr.jpg`]],
+    tema: {
+      bg: '#0B0D0C', surf: '#141817', soft: '#101413', text: '#F2F5F3', muted: '#8B9691', border: '#232B29',
+      primary: '#C6F24E', onPrimary: '#0B0D0C', accent: '#C6F24E',
+      fh: sans('Oswald'), fb: sans('Inter'), radio: 4, oscuro: true,
+      sombra: '0 20px 44px -24px rgba(0,0,0,0.8)',
+    },
+    slides: [
+      { img: `${IMG}/dep-zapatilla.jpg`, kicker: 'Nueva temporada', titulo: 'SALÍ\nA ROMPERLA', bajada: 'Calzado y ropa técnica para entrenar todos los días.', cta: 'Ver todo' },
+      { img: `${IMG}/dep-pesas.jpg`, kicker: 'Fuerza', titulo: 'EL GIMNASIO\nEN TU CASA', bajada: 'Discos, mancuernas y accesorios.', cta: 'Ver fuerza' },
+    ],
+    productos: [
+      { nombre: 'Zapatilla de running neutra', badge: 'Más vendido', badgeTono: 'verde', estrellas: 5, resenas: 240, img: `${IMG}/dep-zapatilla.jpg`, img2: `${IMG}/dep-zapatilla-roja.jpg`, ...ar('$142.000', '$178.000', '$113.600', '$47.333') },
+      { nombre: 'Par de mancuernas 10 kg', estrellas: 5, resenas: 96, img: `${IMG}/dep-pesas.jpg`, img2: `${IMG}/dep-press.jpg`, ...ar('$88.000', '$110.000', '$70.400', '$29.333') },
+      { nombre: 'Remera técnica seca', estrellas: 4, resenas: 155, img: `${IMG}/dep-correr.jpg`, img2: `${IMG}/dep-estirar.jpg`, ...ar('$31.500', '$39.000', '$25.200', '$10.500') },
+      { nombre: 'Bicicleta urbana', estrellas: 5, resenas: 28, img: `${IMG}/dep-bici.jpg`, img2: `${IMG}/dep-pista.jpg`, ...ar('$420.000', '$520.000', '$336.000', '$140.000') },
+    ],
+  },
+  {
+    id: 'terracota',
+    nombre: 'Terracota',
+    para: 'Deco, muebles, bazar',
+    queCambia: 'Hero partido en dos: tipografía serif sobre arena a un lado, foto del otro. Categorías en tarjetas altas tipo revista y una campaña ancha al final. Paleta de barro y crema, sin blancos fríos. Más cálida y editorial que Cobijo.',
+    secciones: ['Hero partido', 'Categorías altas', 'Fila de productos', 'Campaña', 'WhatsApp'],
+    marca: 'Terracota', tagline: 'Objetos para la casa',
+    layout: 'receta', headerPropio: true, heroPropio: true, piePropio: true,
+    receta: {
+      header: 'centrado',
+      bloques: [
+        { t: 'hero', estilo: 'partido' },
+        { t: 'categorias', estilo: 'altas', cols: 4 },
+        { t: 'fila', id: 'fila', cols: 4 },
+        { t: 'franja', estilo: 'apilada' },
+        { t: 'campana' },
+        { t: 'whatsapp' },
+      ],
+    },
+    cartel: 'Retiro en showroom · Envíos a todo el país',
+    links: ['Inicio', 'Living', 'Mesa', 'Textiles', 'Iluminación'],
+    categorias: [['Living', `${IMG}/casa-living.jpg`], ['Mesa', `${IMG}/casa-ceramica.jpg`], ['Textiles', `${IMG}/casa-sillon.jpg`], ['Deco', `${IMG}/casa-deco.jpg`]],
+    tema: {
+      bg: '#FBF6EF', surf: '#FFFFFF', soft: '#F2E8DA', text: '#3A2B21', muted: '#8A7460', border: '#E5D7C4',
+      primary: '#B4593A', onPrimary: '#FFFFFF', accent: '#8A6B4F',
+      fh: serif('Libre Baskerville'), fb: sans('Nunito'), radio: 14, oscuro: false,
+      sombra: '0 18px 40px -20px rgba(58,43,33,0.28)',
+    },
+    slides: [
+      { img: `${IMG}/casa-living.jpg`, kicker: 'Nueva colección', titulo: 'La casa\nque abraza', bajada: 'Muebles y objetos de materiales nobles.', cta: 'Ver la colección' },
+      { img: `${IMG}/casa-ceramica.jpg`, kicker: 'Mesa', titulo: 'Para\ncompartir', bajada: 'Vajilla artesanal y textiles de mesa.', cta: 'Ver mesa' },
+    ],
+    productos: [
+      { nombre: 'Sillón de una plaza en lino', estrellas: 5, resenas: 34, img: `${IMG}/casa-sillon.jpg`, img2: `${IMG}/casa-living.jpg`, ...ar('$385.000', '$470.000', '$308.000', '$128.333') },
+      { nombre: 'Juego de platos de gres', estrellas: 5, resenas: 71, img: `${IMG}/casa-ceramica.jpg`, img2: `${IMG}/casa-deco.jpg`, ...ar('$62.000', '$78.000', '$49.600', '$20.666') },
+      { nombre: 'Manta de lana tejida', estrellas: 4, resenas: 52, img: `${IMG}/casa-deco.jpg`, img2: `${IMG}/casa-sofa-naranja.jpg`, ...ar('$48.500', '$61.000', '$38.800', '$16.166') },
+      { nombre: 'Lámpara de pie de madera', estrellas: 5, resenas: 23, img: `${IMG}/casa-interior.jpg`, img2: `${IMG}/casa-living.jpg`, ...ar('$124.000', '$155.000', '$99.200', '$41.333') },
+    ],
+  },
 ]

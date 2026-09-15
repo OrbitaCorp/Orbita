@@ -86,8 +86,15 @@ export type BloqueReceta =
   | { t: 'fila'; id: string; fuente?: 'destacados' | 'masVendidos' | 'catalogo'; estilo?: 'grilla' | 'tira' | 'sangre'; cols?: number }
   // El nombre de una categoría y, abajo, productos DE esa categoría.
   | { t: 'porCategoria'; cuantas?: number; porFila?: number }
-  // La franja de color ancha con un mensaje y un botón al catálogo.
-  | { t: 'franja' }
+  // Un espacio de anuncio. No todas las plantillas llevan uno, y las que sí
+  // no tienen por qué usar la misma forma: `plena` es la franja de color de
+  // punta a punta, `filete` una línea fina con el texto centrado, `cartelera`
+  // el texto corriendo en loop, y `apilada` un bloque centrado con aire.
+  | { t: 'franja'; estilo?: 'plena' | 'filete' | 'cartelera' | 'apilada' }
+  // Banner con la foto quieta y el contenido pasando por encima. Es el mismo
+  // efecto que ofrece Apariencia; acá es un bloque más, para las plantillas
+  // donde pega. En celular y con `prefers-reduced-motion` se apaga solo.
+  | { t: 'parallax' }
   // Una foto ancha con texto encima, al final.
   | { t: 'campana' }
   // El bloque de consulta por WhatsApp.
