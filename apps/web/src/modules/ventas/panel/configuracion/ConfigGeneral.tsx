@@ -237,7 +237,9 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // "Retiro en local" (que sí es un método de pago/entrega) sigue en la
     // sección Pagos; esta dirección se usa ahí, pero se carga desde acá.
     const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '', pickupAddress: '', latLng: BA })
-    const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '' })
+    // cuit y legalName (hallazgo `legales-sin-cuit`) van a Términos y
+    // Privacidad de la tienda; se guardan junto con el contacto.
+    const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '', cuit: '', legalName: '' })
     const [pagos, setPagos]       = useState({
         acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
         pickupPaymentMethods: [] as string[],
@@ -339,7 +341,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         ? [Number(sucursal.latitude), Number(sucursal.longitude)]
                         : BA) as [number, number],
                 }
-                const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
+                const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '', cuit: cfg.cuit ?? '', legalName: cfg.legalName ?? '' }
                 const pagos0 = {
                     acceptsMercadopago: cfg.acceptsMercadopago,
                     acceptsCash: cfg.acceptsCash,
@@ -513,6 +515,8 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         () => panelUpdateBusinessConfig({
             whatsapp: contacto.whatsapp,
             scheduleText: contacto.scheduleText,
+            cuit: contacto.cuit,
+            legalName: contacto.legalName,
             // Si el email está vacío directamente no lo mando: el backend no acepta un email en blanco.
             ...(contacto.email.trim() ? { email: contacto.email.trim() } : {}),
         }),
@@ -815,6 +819,12 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
                         <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
                         <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
+                        <SectionTitle>Datos fiscales</SectionTitle>
+                        <p style={{ margin: '-6px 0 10px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+                            Aparecen en los Términos y la Política de privacidad de tu tienda: la normativa de comercio electrónico pide identificar al vendedor.
+                        </p>
+                        <CfgField label="Razón social" value={contacto.legalName} placeholder="Ej. Zapatos Lorena S.R.L." onChange={v => setContacto(p => ({ ...p, legalName: v }))} />
+                        <CfgField label="CUIT" value={contacto.cuit} placeholder="Ej. 30-71234567-1" onChange={v => setContacto(p => ({ ...p, cuit: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                             <DirtyHint show={cambiado('contacto', contacto)} />
                             <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>

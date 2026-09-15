@@ -31,6 +31,11 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() @MaxLength(30) whatsapp?: string;
   @IsOptional() @IsEmail() @MaxLength(254) email?: string;
   @IsOptional() @IsString() @MaxLength(300) scheduleText?: string;
+  // CUIT y razón social del Comercio (hallazgo `legales-sin-cuit`). El CUIT
+  // se acepta con o sin guiones y se valida con dígito verificador en el
+  // service; vacío = borrar. La razón social es texto libre, vacío = borrar.
+  @IsOptional() @IsString() @MaxLength(20) cuit?: string;
+  @IsOptional() @IsString() @MaxLength(120) legalName?: string;
   @IsOptional() @IsBoolean() acceptsMercadopago?: boolean;
   @IsOptional() @IsBoolean() acceptsCash?: boolean;
   @IsOptional() @IsBoolean() acceptsTransfer?: boolean;

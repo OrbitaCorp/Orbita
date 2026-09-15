@@ -137,6 +137,13 @@ model BusinessConfig {
   whatsapp     String?
   email        String?
   scheduleText String? @map("schedule_text") // "Lun a Vie 9-18"
+  // Identificación fiscal del Comercio para los Términos y la Privacidad de
+  // la tienda (hallazgo `legales-sin-cuit`): la normativa de comercio
+  // electrónico espera ver quién vende. Opcionales: sin ellos, los legales
+  // muestran solo el nombre. El CUIT va sin guiones, validado con dígito
+  // verificador en BusinessesService.updateConfig (common/utils/cuit.ts).
+  cuit      String? @db.VarChar(11)
+  legalName String? @map("legal_name") @db.VarChar(120)
 
   // Pagos habilitados (toggles)
   acceptsMercadopago     Boolean @default(true) @map("accepts_mercadopago")

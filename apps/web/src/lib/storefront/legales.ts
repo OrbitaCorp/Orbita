@@ -12,8 +12,10 @@
 // paréntesis no se publica: era guía para nosotros, no texto para el cliente.
 //
 // Variables que la plantilla pide y hoy la tienda NO tiene como dato:
-//   - {{cuit_comercio}}: no hay campo de CUIT en el negocio → la frase
-//     ", CUIT …" se omite. Cuando exista el campo, se enchufa acá.
+//   - {{cuit_comercio}}: el CUIT de Configuración → Contacto (11 dígitos, se
+//     muestra con guiones). Si el Comercio no lo cargó, la frase ", CUIT …"
+//     se omite. Con razón social cargada, ella es el titular y el nombre
+//     comercial va entre paréntesis.
 //   - {{finalidad_marketing_opcional}}: no hay opt-in de marketing → el
 //     punto se omite (la plantilla ya decía que va solo si está habilitado).
 //   - {{politica_de_cambios_comercial}}: no hay campo propio → va un texto
@@ -43,6 +45,9 @@ export const FECHA_ACTUALIZACION_LEGALES = '8 de septiembre de 2026'
 // partir de la config pública de la tienda; se expone para poder probarlo.
 export type DatosLegales = {
   nombreComercio: string
+  // Razón social (Configuración → Contacto), null si no la cargó.
+  razonSocial: string | null
+  // Con guiones, listo para mostrar; null si no lo cargó.
   cuit: string | null
   email: string | null
   // "WhatsApp +54 9 11 …", "Instagram @tienda", o null si no hay ninguno.
@@ -70,6 +75,9 @@ const fmtPesos = (n: number) => `$${Math.round(n).toLocaleString('es-AR')}`
 export function datosLegalesDe(config: StorefrontConfigResponse): DatosLegales {
   const nombreComercio = config.appearance?.storeName || config.business.name
   const email = config.contact?.email?.trim() || null
+  const razonSocial = config.contact?.legalName?.trim() || null
+  const digitosCuit = config.contact?.cuit?.replace(/\D/g, '') ?? ''
+  const cuit = digitosCuit.length === 11 ? `${digitosCuit.slice(0, 2)}-${digitosCuit.slice(2, 10)}-${digitosCuit.slice(10)}` : null
 
   const wpp = config.contact?.whatsapp?.trim()
   const ig = config.contact?.instagram?.trim()
@@ -100,11 +108,15 @@ export function datosLegalesDe(config: StorefrontConfigResponse): DatosLegales {
     politicaEnvios = partes.join(' ')
   }
 
-  return { nombreComercio, cuit: null, email, canalAlternativo, mediosDePago, politicaEnvios }
+  return { nombreComercio, razonSocial, cuit, email, canalAlternativo, mediosDePago, politicaEnvios }
 }
 
 // "{{nombre_comercio}}, CUIT {{cuit_comercio}}" → sin CUIT queda solo el nombre.
-const conCuit = (d: DatosLegales) => (d.cuit ? `${d.nombreComercio}, CUIT ${d.cuit}` : d.nombreComercio)
+// Con razón social distinta del nombre: "Zapatos Lorena S.R.L. (Zapatos Lorena), CUIT 30-…".
+const conCuit = (d: DatosLegales) => {
+  const titular = d.razonSocial && d.razonSocial !== d.nombreComercio ? `${d.razonSocial} (${d.nombreComercio})` : d.nombreComercio
+  return d.cuit ? `${titular}, CUIT ${d.cuit}` : titular
+}
 
 // "…escribirnos a {{email}} o a través de {{canal}}." con los dos opcionales.
 function contacto(d: DatosLegales, prefijo: string): string {

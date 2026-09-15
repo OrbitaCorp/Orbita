@@ -24,6 +24,16 @@ describe('datosLegalesDe — variables de la plantilla', () => {
     expect(datosLegalesDe(config({ appearance: { storeName: 'Lorena Shoes' } as never })).nombreComercio).toBe('Lorena Shoes')
   })
 
+  it('CUIT y razón social: con guiones para mostrar, null si no los cargó', () => {
+    const d = datosLegalesDe(config({ contact: { cuit: '30712345671', legalName: 'Zapatos Lorena S.R.L.' } as never }))
+    expect(d.cuit).toBe('30-71234567-1')
+    expect(d.razonSocial).toBe('Zapatos Lorena S.R.L.')
+    expect(datosLegalesDe(config()).cuit).toBeNull()
+    expect(datosLegalesDe(config()).razonSocial).toBeNull()
+    // Un CUIT a medio cargar no se muestra roto.
+    expect(datosLegalesDe(config({ contact: { cuit: '3071' } as never })).cuit).toBeNull()
+  })
+
   it('canal alternativo: WhatsApp primero, Instagram después, null si no hay', () => {
     expect(datosLegalesDe(config({ contact: { whatsapp: '+54 9 11 5555-0000', instagram: 'lorena' } as never })).canalAlternativo).toBe('WhatsApp (+54 9 11 5555-0000)')
     expect(datosLegalesDe(config({ contact: { instagram: 'lorena' } as never })).canalAlternativo).toBe('Instagram (@lorena)')
@@ -52,9 +62,19 @@ describe('datosLegalesDe — variables de la plantilla', () => {
 
 describe('armarTerminos / armarPrivacidad', () => {
   const completo: DatosLegales = {
-    nombreComercio: 'Zapatos Lorena', cuit: null, email: 'hola@lorena.com',
+    nombreComercio: 'Zapatos Lorena', razonSocial: null, cuit: null, email: 'hola@lorena.com',
     canalAlternativo: 'WhatsApp (+54 9 11 5555-0000)', mediosDePago: 'Mercado Pago', politicaEnvios: 'Envíos a todo el país.',
   }
+
+  it('con razón social y CUIT, el Comercio queda identificado en Términos y Privacidad', () => {
+    const conFiscal: DatosLegales = { ...completo, razonSocial: 'Zapatos Lorena S.R.L.', cuit: '30-71234567-1' }
+    expect(JSON.stringify(armarTerminos(conFiscal))).toContain('operada por Zapatos Lorena S.R.L. (Zapatos Lorena), CUIT 30-71234567-1 (en adelante')
+    expect(JSON.stringify(armarPrivacidad(conFiscal))).toContain('operada por Zapatos Lorena S.R.L. (Zapatos Lorena), CUIT 30-71234567-1, con contacto en hola@lorena.com')
+    // Solo CUIT: el nombre comercial es el titular.
+    expect(JSON.stringify(armarTerminos({ ...completo, cuit: '30-71234567-1' }))).toContain('operada por Zapatos Lorena, CUIT 30-71234567-1 (en adelante')
+    // Razón social igual al nombre: no se repite entre paréntesis.
+    expect(JSON.stringify(armarTerminos({ ...completo, razonSocial: 'Zapatos Lorena' }))).toContain('operada por Zapatos Lorena (en adelante')
+  })
 
   it('completa nombre, email y canal en las cláusulas de contacto', () => {
     const t = armarTerminos(completo)

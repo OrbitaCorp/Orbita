@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import sharp from 'sharp';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { cuitValido, limpiarCuit } from '../common/utils/cuit';
 import { suspendidoPorPlataforma } from './suspension';
 import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -376,9 +378,22 @@ export class BusinessesService {
       }
     }
 
+    // CUIT y razón social (hallazgo `legales-sin-cuit`): el CUIT llega con o
+    // sin guiones, se guarda solo con los 11 dígitos y se rechaza si el
+    // verificador no cierra; vacío borra. Van a `data` aparte del DTO porque
+    // el valor guardado no es el que vino.
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.cuit !== undefined) {
+      const digitos = limpiarCuit(dto.cuit);
+      if (digitos === '') data.cuit = null;
+      else if (!cuitValido(digitos)) throw new BadRequestException('El CUIT no es válido: son 11 dígitos y el último tiene que ser el verificador');
+      else data.cuit = digitos;
+    }
+    if (dto.legalName !== undefined) data.legalName = dto.legalName.trim() || null;
+
     return this.prisma.businessConfig.update({
       where: { businessId },
-      data: dto,
+      data: data as Prisma.BusinessConfigUpdateInput,
     });
   }
 
