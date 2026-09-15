@@ -240,8 +240,19 @@ export function plantillaReal({
   const fotoDeCategoria = (c: CatReal): string | null =>
     c.imageUrl ?? productos.find(p => p.cat === c.nombre && p.imgUrl)?.imgUrl ?? null
 
+  // Antes se cortaba acá mismo a 4 ("la grilla de la plantilla es de 4") —
+  // supuesto que dejó de ser cierto: con las plantillas de receta (Carbón,
+  // Bloque, Papelería...) el bloque 'categorias' declara su propio `cols`
+  // (hoy hasta 6, ver datos.tsx) y ya hace SU PROPIO colsDe()+slice() en
+  // homes.tsx (skill plantillas-home § "Las categorías son las que son: la
+  // grilla se reparte, no se rellena"). Cortar acá a 4 pisaba ese cálculo:
+  // una tienda con 6 categorías y una plantilla de cols:6 terminaba viendo
+  // solo 4, con hueco vacío a la derecha (reportado con captura en Carbón).
+  // El límite de acá abajo es solo una cota de seguridad (ninguna plantilla
+  // pide más de 6 hoy), no el que decide cuántas se ven — eso es 100% de
+  // cada bloque.
   const cats = categorias
-    .slice(0, 4) // la grilla de la plantilla es de 4
+    .slice(0, 12)
     .map(c => [c.nombre, fotoDeCategoria(c) ?? thumbGradient(c.hue), c.slug] as [string, string, string])
 
   return {
