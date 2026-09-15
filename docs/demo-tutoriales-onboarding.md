@@ -19,28 +19,62 @@ opcional; `resolverAlAbrir` decide qué arranca), `copy.ts` (`TAREAS_CHECKLIST_E
 `tareasDeEtapa`), `VarianteChecklist.tsx`, `TutorialHost.tsx`; en la API,
 `update-tutorial.dto.ts` (`etapa`) y `businesses.service.ts#getTutorial`.
 
+### Ampliación del 15/09: quince tareas en tres bloques
+
+Segundo pedido de Ale, el mismo día: «que el tutorial de segundos pasos abarque todo lo
+que pueda el panel, o sea la mayor parte de todo lo que faltó». La etapa 2 pasó de 7 a
+**15 tareas**, que recorren todo lo que la primera no toca. Para que la lista siga siendo
+legible, cada tarea tiene un campo **`grupo`** y la tarjeta dibuja un encabezado cada vez
+que cambia (versalita chica y apagada, igual que los grupos del menú de Configuración).
+Los tres bloques son tramos contiguos —un grupo que reapareciera más abajo dibujaría dos
+encabezados iguales, y hay un test que lo impide—. La etapa 1 no lleva grupos: son seis
+pasos de una sola tirada.
+
 **Tareas** (rutas y anclas verificadas contra las pantallas) y cómo se tilda cada una:
 
 | # | id | Tarea | Va a | Se tilda sola cuando… |
 |---|----|-------|------|-----------------------|
+| | | **Tu día a día** | | |
 | 1 | `pedidos` | Cargá tu primer pedido (2 pasos: buscar producto → «Registrar venta / Crear pedido») | Pedidos → `?vista=nuevo` | hay algún pedido vivo (`orders.deleted_at IS NULL`) |
-| 2 | `clientes` | Conocé tu base de clientes (búsqueda + «Email masivo») | Clientes | hay algún cliente vivo |
-| 3 | `plantillas` | Armá tus plantillas de respuesta («Nueva plantilla») | Mensajes → `?vista=plantillas` | hay alguna `message_templates`; **o el negocio es SHOWCASE** (Mensajes le da 403, no se lo manda ahí) |
-| 4 | `descuentos` | Creá tu primer descuento o cupón («Crear descuento») | Descuentos | hay algún `discounts` vivo (automático o cupón) |
-| 5 | `equipo` | Invitá a alguien de tu equipo («Invitar miembro») | Configuración → Equipo | `members` > 1 (el dueño ya es uno; PENDING cuenta) |
+| 2 | `estados` | Llevá un pedido hasta «Entregado» | Pedidos | hay algún pedido en `PREPARING`/`SHIPPED`/`DELIVERED`. **No** cuenta `CONFIRMED` (lo pone el pago) ni `COMPLETED` (un pedido de mostrador nace así: se tildaría sola con la tarea 1) |
+| 3 | `clientes` | Conocé tu base de clientes (búsqueda + «Email masivo») | Clientes | hay algún cliente vivo |
+| 4 | `plantillas` | Armá tus plantillas de respuesta («Nueva plantilla») | Mensajes → `?vista=plantillas` | hay alguna `message_templates`; **o el negocio es SHOWCASE** (Mensajes le da 403, no se lo manda ahí) |
+| 5 | `herramientas` | Usá la barra de arriba (buscador, campana, avatar; tip: Orbi con Ctrl+K) | Inicio, ancla `header:buscador` | **nunca**: se tilda a mano |
+| | | **La cara de tu tienda** | | |
 | 6 | `apariencia` | Personalizá cómo se ve tu tienda (tip: Plantillas de Home del paquete Avanzado) | Configuración → Apariencia | `storefront_config.home_template` no es null, **o** `updated_at` − `created_at` > 1 s (la fila la crea el onboarding con defaults) |
-| 7 | `notificaciones` | Elegí qué avisos recibís | Configuración → Notificaciones | `notification_config.updated_at` − `created_at` > 1 s |
+| 7 | `contacto` | Cargá tus datos de contacto | Configuración → Contacto | `business_config` tiene `whatsapp`, `email` u `schedule_text` con algo (no en blanco) |
+| 8 | `redes` | Sumá tus redes sociales | Configuración → Redes sociales | `business_config` tiene `instagram`, `tiktok` o `facebook` |
+| 9 | `descuentos` | Creá tu primer descuento o cupón («Crear descuento») | Descuentos | hay algún `discounts` vivo (automático o cupón) |
+| 10 | `dominio` | Poné tu dirección propia | Configuración → Dominios | hay alguna fila en `custom_domains` (comprada o conectada, en cualquier estado) |
+| | | **Tu negocio** | | |
+| 11 | `equipo` | Invitá a alguien de tu equipo («Invitar miembro») | Configuración → Equipo | `members` > 1 (el dueño ya es uno; PENDING cuenta) |
+| 12 | `notificaciones` | Elegí qué avisos recibís | Configuración → Notificaciones | `notification_config.updated_at` − `created_at` > 1 s |
+| 13 | `postventa` | Definí cambios y devoluciones | Configuración → Cancelaciones y devoluciones | alguno de los seis toggles de postventa quedó distinto del default del schema; **o el negocio es SHOWCASE** (no vende, no tiene devoluciones) |
+| 14 | `reportes` | Mirá tus reportes | Reportes (ancla `.mod-tabs`) | **nunca**: se tilda a mano |
+| 15 | `plan` | Conocé tu plan (y Soporte, ahí al lado) | Configuración → Suscripción | **nunca**: se tilda a mano |
 
-Todo lo demás se marca a mano, como en la primera etapa. Dominios quedó afuera (es una
-compra, no un primer paso); Plantillas de Home es tip y no tarea porque Avanzado es un
-paquete pago aparte (una tarea que lleva a un overlay de upgrade no se puede cumplir).
+Las tres que no se detectan (`herramientas`, `reportes`, `plan`) son las que se cumplen
+mirando una pantalla: eso no deja rastro en la base. Se marcan a mano, como en la primera
+etapa.
+
+`postventa` no puede usar el truco de `updated_at` (a `business_config` la escriben
+también Negocio, Contacto, Pagos y Envíos): se compara contra `POSTVENTA_DEFAULTS` en
+`businesses.service.ts`, que es copia a mano de los defaults de `schema.prisma` — **si
+cambian allá, cambian acá**.
+
+Lo único que queda afuera a propósito: **Avanzado** (paquete pago aparte — una tarea que
+termina en un overlay de «ver qué incluye» no se puede cumplir; va como tip de
+`apariencia`) y la **Zona peligrosa** de Configuración (borrar el negocio no es un paso de
+onboarding). Dominios, que antes estaba afuera por ser una compra, ahora entra: la pantalla
+también sirve para conectar un dominio que ya tenés, y el texto lo aclara.
 
 **Disparo y transición:**
 
 - Al completar las 6 de la primera etapa, el cierre («Tu tienda está lista») ya no dice
   «Listo» sino **«Seguir con la segunda etapa»**: pasa a `etapa: 2` desde cero (por
   `actualizar`, nunca por `terminar`), la tarjeta se remonta y muestra una presentación
-  («Segunda etapa» + «Lo básico ya está… ahora viene sacarle jugo al panel», «Empezar» /
+  («Segunda etapa» + «Lo básico ya está: tu tienda vende. Ahora, el resto del panel, en
+  tres bloques…», «Empezar» /
   «Ahora no»). La presentación se guarda como vista en `paso` (`0` = pendiente, `1` = vista):
   la Checklist no usaba ese campo. En celular la hoja se abre sola esa primera vez.
 - «Ocultar definitivamente» en la etapa 1 → `terminado` + `etapa: 1`: **la segunda NO

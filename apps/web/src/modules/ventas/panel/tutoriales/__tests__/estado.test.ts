@@ -102,9 +102,27 @@ describe('tareas de la segunda etapa', () => {
     it('cubre los módulos que la primera no toca, sin repetir ids', () => {
         const ids1 = TAREAS_CHECKLIST.map(t => t.id)
         const ids2 = TAREAS_CHECKLIST_ETAPA2.map(t => t.id)
-        expect(ids2).toEqual(['pedidos', 'clientes', 'plantillas', 'descuentos', 'equipo', 'apariencia', 'notificaciones'])
+        expect(ids2).toEqual([
+            'pedidos', 'estados', 'clientes', 'plantillas', 'herramientas',
+            'apariencia', 'contacto', 'redes', 'descuentos', 'dominio',
+            'equipo', 'notificaciones', 'postventa', 'reportes', 'plan',
+        ])
         expect(ids2.filter(id => ids1.includes(id))).toEqual([])
         expect(new Set(ids2).size).toBe(ids2.length)
+    })
+
+    it('todas tienen grupo, y cada grupo es un tramo seguido de la lista', () => {
+        const grupos = TAREAS_CHECKLIST_ETAPA2.map(t => t.grupo)
+        expect(grupos.every(g => !!g)).toBe(true)
+        // Un grupo que reaparece después de otro dibujaría dos encabezados
+        // iguales: los tramos tienen que ser contiguos.
+        const tramos = grupos.filter((g, i) => g !== grupos[i - 1])
+        expect(new Set(tramos).size).toBe(tramos.length)
+        expect(tramos).toEqual(['Tu día a día', 'La cara de tu tienda', 'Tu negocio'])
+    })
+
+    it('la primera etapa no lleva grupos: son seis pasos de una sola tirada', () => {
+        expect(TAREAS_CHECKLIST.every(t => t.grupo === undefined)).toBe(true)
     })
 
     it('cada tarea tiene destino coherente con su sección y una guía (ancla o pasos)', () => {

@@ -32,6 +32,25 @@ const BUSINESS_LOGOS_BUCKET = 'business-logos';
 const tocada = (fila: { createdAt: Date; updatedAt: Date }) =>
   fila.updatedAt.getTime() - fila.createdAt.getTime() > 1000;
 
+// Postventa (tarea `postventa` de la segunda etapa del tutorial): son seis
+// toggles que ya nacen con un valor, así que no sirve el truco de updatedAt
+// — business_config la escriben también Negocio, Contacto, Pagos y Envíos.
+// "Tocada" = alguno quedó distinto del default del schema, o sea que alguien
+// entró a esa pantalla y decidió. Los defaults se repiten acá a propósito:
+// si cambian en schema.prisma, cambian acá (no hay forma de leerlos en
+// runtime desde el cliente de Prisma).
+const POSTVENTA_DEFAULTS = {
+  returnsEnabled: true,
+  returnsCreditNoteEnabled: true,
+  returnsMpRefundEnabled: false,
+  cancellationsEnabled: true,
+  cancellationsCreditNoteEnabled: false,
+  cancellationsMpRefundEnabled: true,
+} as const;
+
+const postventaTocada = (config: Record<string, unknown>): boolean =>
+  Object.entries(POSTVENTA_DEFAULTS).some(([campo, valor]) => config[campo] !== valor);
+
 // Set cerrado de eventos y canales válidos para notification_config.matrix.
 // No están enumerados como tabla en MODELO_DATOS_DEFINITIVO.md (es un JSON libre),
 // así que este catálogo es una decisión tomada acá — ver resumen final.
@@ -81,6 +100,7 @@ export class BusinessesService {
     const [
       business, config, mp, nCategorias, nProductos, sucursalConDireccion,
       nPedidos, nClientes, nPlantillas, nDescuentos, nMiembros, storefront, notificaciones,
+      nPedidosMovidos, nDominios,
     ] = await Promise.all([
       this.prisma.business.findUnique({
         where: { id: businessId },
@@ -88,7 +108,14 @@ export class BusinessesService {
       }),
       this.prisma.businessConfig.findUnique({
         where: { businessId },
-        select: { enabledCarriers: true, carrierShippingCosts: true, freeShippingFrom: true, shippingPolicy: true },
+        select: {
+          enabledCarriers: true, carrierShippingCosts: true, freeShippingFrom: true, shippingPolicy: true,
+          // Segunda etapa: contacto, redes y postventa.
+          whatsapp: true, email: true, scheduleText: true,
+          instagram: true, tiktok: true, facebook: true,
+          returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: true,
+          cancellationsEnabled: true, cancellationsCreditNoteEnabled: true, cancellationsMpRefundEnabled: true,
+        },
       }),
       this.prisma.mpCredentials.findUnique({ where: { businessId }, select: { id: true } }),
       this.prisma.category.count({ where: { businessId } }),
@@ -115,6 +142,17 @@ export class BusinessesService {
         select: { homeTemplate: true, createdAt: true, updatedAt: true },
       }),
       this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { createdAt: true, updatedAt: true } }),
+      // "Movió un pedido": estados a los que SOLO se llega cambiándolo a mano
+      // en el panel. CONFIRMED queda afuera (lo pone el pago aprobado) y
+      // COMPLETED también (un pedido de mostrador NACE así, y cargarlo es la
+      // tarea anterior): si no, la tarea se tildaría sola sin haberla hecho.
+      this.prisma.order.count({
+        where: { businessId, deletedAt: null, status: { in: ['PREPARING', 'SHIPPED', 'DELIVERED'] } },
+      }),
+      // Dominio propio: comprado desde el panel o conectado (DomainSource).
+      // Cualquier estado cuenta — la tarea es "ponete tu dirección", no
+      // "esperá a que termine de propagar el DNS".
+      this.prisma.customDomain.count({ where: { businessId } }),
     ]);
     if (!business) throw new NotFoundException('Negocio no encontrado');
 
@@ -133,17 +171,31 @@ export class BusinessesService {
     }
     if (business.isActive && !business.isPaused) cumplidas.push('publicar');
 
-    // Segunda etapa.
+    // ── Segunda etapa ──
+    // En el mismo orden que TAREAS_CHECKLIST_ETAPA2 en copy.ts, para que las
+    // dos listas se puedan leer una al lado de la otra.
     if (nPedidos > 0) cumplidas.push('pedidos');
+    if (nPedidosMovidos > 0) cumplidas.push('estados');
     if (nClientes > 0) cumplidas.push('clientes');
     // Mensajería es solo de modo FULL (BusinessModeGuard responde 403 en
     // SHOWCASE): a una vidriera no se la manda a una pantalla que no puede
     // abrir — la tarea se da por cumplida y no molesta.
     if (nPlantillas > 0 || business.mode === 'SHOWCASE') cumplidas.push('plantillas');
-    if (nDescuentos > 0) cumplidas.push('descuentos');
-    if (nMiembros > 1) cumplidas.push('equipo');
     if (storefront && (storefront.homeTemplate !== null || tocada(storefront))) cumplidas.push('apariencia');
+    if (config?.whatsapp?.trim() || config?.email?.trim() || config?.scheduleText?.trim()) cumplidas.push('contacto');
+    if (config?.instagram?.trim() || config?.tiktok?.trim() || config?.facebook?.trim()) cumplidas.push('redes');
+    if (nDescuentos > 0) cumplidas.push('descuentos');
+    if (nDominios > 0) cumplidas.push('dominio');
+    if (nMiembros > 1) cumplidas.push('equipo');
     if (notificaciones && tocada(notificaciones)) cumplidas.push('notificaciones');
+    // Postventa no tiene un "cargá algo": son seis toggles que ya nacen con
+    // un valor. Cumplida = alguno quedó distinto del default del schema, o
+    // sea que alguien entró y decidió. En SHOWCASE se da por cumplida: una
+    // vidriera no vende, así que no tiene devoluciones que configurar (mismo
+    // criterio que `plantillas`).
+    if (business.mode === 'SHOWCASE' || (config && postventaTocada(config))) cumplidas.push('postventa');
+    // `herramientas`, `reportes` y `plan` no se detectan: mirar una pantalla
+    // no deja rastro en la base. Se tildan a mano desde la tarjeta.
 
     // NULL = nunca se tocó: el panel lo interpreta como "arrancar desde cero".
     return { tutorial: (business.tutorial as TutorialStateDto | null) ?? null, cumplidas };

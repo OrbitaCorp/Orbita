@@ -40,6 +40,7 @@ const SIDEBAR_DE: Record<string, string> = {
     clientes: 'Clientes',
     mensajes: 'Mensajes',
     descuentos: 'Descuentos',
+    reportes: 'Productos',
 }
 
 // Widget NO bloqueante: vive debajo de los modales del panel (300) y lejos del
@@ -439,8 +440,28 @@ export default function VarianteChecklist(props: PropsVariante) {
                 const esAuto = auto.includes(t.id)
                 const hecha = hechas.includes(t.id)
                 const estaAbierta = abierta === t.id
+                // Primera tarea de su bloque: le toca el encabezado, y la
+                // línea divisoria se la queda él (si no, quedarían dos).
+                const abreGrupo = !!t.grupo && t.grupo !== TAREAS[i - 1]?.grupo
                 return (
-                    <div key={t.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--color-border)' }}>
+                    <div key={t.id} style={{ borderTop: i === 0 || abreGrupo ? 'none' : '1px solid var(--color-border)' }}>
+                        {abreGrupo && (
+                            // Mismo tratamiento que los grupos del menú de
+                            // Configuración (ConfigSidebar.tsx): versalita
+                            // chica y apagada — ordena sin competir con los
+                            // títulos de las tareas.
+                            <div
+                                role="heading" aria-level={4}
+                                style={{
+                                    padding: i === 0 ? '10px 16px 4px' : '14px 16px 4px',
+                                    borderTop: i === 0 ? 'none' : '1px solid var(--color-border)',
+                                    fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
+                                    textTransform: 'uppercase', color: 'var(--color-subtle)',
+                                }}
+                            >
+                                {t.grupo}
+                            </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: esMovil ? '12px 16px' : '10px 16px' }}>
                             <button
                                 className={esAuto ? undefined : 'ds-hover'}

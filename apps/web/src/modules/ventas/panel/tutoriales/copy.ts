@@ -177,6 +177,11 @@ export interface TareaChecklist {
         anclaDestino/guiaLabel cuando está): el recuadro y el cursor van al
         primero y, cuando se cumple su condición, saltan al siguiente. */
     pasos?: PasoGuia[]
+    /** Bloque al que pertenece la tarea: se dibuja como encabezado de la
+        lista cuando cambia respecto de la anterior. Solo lo usa la etapa 2
+        (quince tareas corridas no se leen; tres bloques de cinco, sí). La
+        etapa 1 son seis pasos de una sola tirada: no lleva. */
+    grupo?: string
 }
 
 export interface PasoGuia {
@@ -246,24 +251,39 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
     },
 ]
 
-// ─── Checklist, segunda etapa: sacarle jugo al panel ─────────────────────────
+// ─── Checklist, segunda etapa: el resto del panel ────────────────────────────
 //
 // Arranca cuando se termina la primera (o sola, para los negocios que ya la
-// habían terminado: ver ETAPA_2_PARA_QUIEN_YA_TERMINO en estado.ts). Cubre los
-// módulos que la primera no toca. Rutas, vistas y anclas verificadas contra
-// el código real (15/09): Sidebar.tsx (subs con `vista`), ConfigSidebar.tsx
-// (title = label), PedidoNuevo.tsx, ClienteLista.tsx, Plantillas.tsx,
-// DescuentosListado.tsx, Equipo.tsx. Los ids también los conoce la API
-// (businesses.service.ts#getTutorial) para el tildado automático.
+// habían terminado: ver ETAPA_2_PARA_QUIEN_YA_TERMINO en estado.ts). Pedido
+// de Ale (15/09): "que abarque todo lo que pueda el panel, la mayor parte de
+// todo lo que faltó" — así que son quince tareas que recorren lo que la
+// primera etapa no toca, en tres bloques (`grupo`) para que la lista se lea:
 //
-// Plantillas de Home quedó como TIP y no como tarea: vive en Avanzado, que
-// es un paquete pago aparte — una tarea que manda a un overlay de "ver qué
-// incluye" no se puede cumplir. Dominios se dejó afuera a propósito: es una
-// compra, no un primer paso.
+//   · Tu día a día         → pedidos, estados, clientes, plantillas, barra de arriba.
+//   · La cara de tu tienda → apariencia, contacto, redes, promos, dominio.
+//   · Tu negocio           → equipo, avisos, postventa, reportes, plan.
+//
+// Rutas, vistas y anclas verificadas contra el código real (15/09):
+// Sidebar.tsx (subs con `vista`), AdminSeccionShell.tsx (secciones válidas),
+// ConfigSidebar.tsx (title = label exacto de cada ítem), PedidoLista.tsx
+// (.ped-tabs-row), ReporteTabs.tsx (.mod-tabs), anclas.ts (header:*).
+// Los ids también los conoce la API (businesses.service.ts#getTutorial) para
+// el tildado automático; `herramientas`, `reportes` y `plan` son las únicas
+// que NO se pueden detectar (mirar una pantalla no deja rastro en la base):
+// esas se tildan a mano, como siempre.
+//
+// Lo único que queda afuera a propósito: Avanzado (paquete pago aparte — una
+// tarea que termina en un overlay de "ver qué incluye" no se puede cumplir;
+// va como tip de `apariencia`) y la Zona peligrosa de Configuración (borrar
+// el negocio no es un paso de onboarding).
+
+const GRUPO_DIA = 'Tu día a día'
+const GRUPO_TIENDA = 'La cara de tu tienda'
+const GRUPO_NEGOCIO = 'Tu negocio'
 
 export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
     {
-        id: 'pedidos', titulo: 'Cargá tu primer pedido',
+        id: 'pedidos', grupo: GRUPO_DIA, titulo: 'Cargá tu primer pedido',
         detalle: 'Las ventas de la tienda entran solas a Pedidos. Las de mostrador o WhatsApp las cargás vos con "Nuevo pedido": elegís productos, cómo se cobró, y queda contada en tus números.',
         destino: ['ventas', 'pedidos', { vista: 'nuevo' }], destinoLabel: 'Nuevo pedido',
         seccionDestino: 'pedidos',
@@ -279,35 +299,37 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         ],
     },
     {
-        id: 'clientes', titulo: 'Conocé tu base de clientes',
+        id: 'estados', grupo: GRUPO_DIA, titulo: 'Llevá un pedido hasta "Entregado"',
+        detalle: 'Cada pedido avanza por las pestañas de arriba: Pendientes, Confirmados, En prep., Enviados, Entregados. Abrí uno y movelo a medida que pasa de verdad — así tus números y lo que ve el cliente van al día.',
+        tip: 'Se puede en lote: tildás varios de la lista y los confirmás de una.',
+        destino: ['ventas', 'pedidos'], destinoLabel: 'Ir a Pedidos',
+        seccionDestino: 'pedidos', anclaDestino: '.ped-tabs-row',
+        guiaLabel: 'Tus pedidos avanzan por estas pestañas',
+    },
+    {
+        id: 'clientes', grupo: GRUPO_DIA, titulo: 'Conocé tu base de clientes',
         detalle: 'Se arma sola con cada venta: cuántos pedidos hizo cada uno, cuánto gastó y cuándo volvió. Buscá por nombre o email, y con "Email masivo" les escribís a todos los de la lista filtrada.',
         destino: ['ventas', 'clientes'], destinoLabel: 'Ir a Clientes',
         seccionDestino: 'clientes', anclaDestino: 'input[placeholder="Buscar por nombre o email…"] || boton:Email masivo',
         guiaLabel: 'Buscá acá; "Email masivo" les escribe a todos',
     },
     {
-        id: 'plantillas', titulo: 'Armá tus plantillas de respuesta',
-        detalle: 'Lo que te preguntan siempre ("¿hacen envíos?", "¿cuándo llega?") lo respondés con un toque. Se crean en Mensajes → Plantillas y se usan desde el chat.',
+        id: 'plantillas', grupo: GRUPO_DIA, titulo: 'Armá tus plantillas de respuesta',
+        detalle: 'Lo que te preguntan siempre ("¿hacen envíos?", "¿cuándo llega?") lo respondés con un toque. Se crean en Mensajes → Plantillas y se usan desde el chat de la bandeja.',
         destino: ['ventas', 'mensajes', { vista: 'plantillas' }], destinoLabel: 'Ir a Plantillas',
         seccionDestino: 'mensajes', anclaDestino: 'boton:Nueva plantilla || boton:Crear plantilla',
         guiaLabel: 'Creá la primera desde acá',
     },
     {
-        id: 'descuentos', titulo: 'Creá tu primer descuento o cupón',
-        detalle: 'Los descuentos se aplican solos cuando se cumple la condición; los cupones son códigos que el cliente escribe en el checkout. Los dos se comparten por link.',
-        destino: ['ventas', 'descuentos'], destinoLabel: 'Ir a Descuentos',
-        seccionDestino: 'descuentos', anclaDestino: 'boton:Crear descuento',
-        guiaLabel: 'Tu primera promo sale de acá',
+        id: 'herramientas', grupo: GRUPO_DIA, titulo: 'Usá la barra de arriba',
+        detalle: 'Te sigue por todo el panel: el buscador encuentra un pedido, un cliente o un producto desde cualquier pantalla; la campana junta lo que pasó mientras no estabas; y en tu avatar están "Mi perfil", el modo oscuro y "Ir a la tienda".',
+        tip: 'Orbi, el asistente, se abre con Ctrl+K desde donde estés: le preguntás por tu negocio y te ayuda a operar el panel.',
+        destino: ['ventas', 'dashboard'], destinoLabel: 'Ir al Inicio',
+        seccionDestino: 'dashboard', anclaDestino: 'header:buscador || header:usuario',
+        guiaLabel: 'Buscá desde acá, estés donde estés',
     },
     {
-        id: 'equipo', titulo: 'Invitá a alguien de tu equipo',
-        detalle: 'Cada persona entra con su usuario y ve solo lo que su rol permite. Le llega un mail con la invitación.',
-        destino: ['ventas', 'configuracion', { vista: 'equipo' }], destinoLabel: 'Ir a Equipo',
-        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-sidebar-item[title="Equipo"]',
-        guiaLabel: 'Invitá desde acá: elegís el rol y le llega un mail',
-    },
-    {
-        id: 'apariencia', titulo: 'Personalizá cómo se ve tu tienda',
+        id: 'apariencia', grupo: GRUPO_TIENDA, titulo: 'Personalizá cómo se ve tu tienda',
         detalle: 'Logo, colores, tipografía, banner y los textos de la portada. Cambiá algo y tocá "Guardar cambios": la tienda se actualiza al instante.',
         tip: 'Con el paquete Avanzado tenés Plantillas de Home: veinte portadas distintas para tu tienda, en Avanzado → Plantillas de Home.',
         destino: ['ventas', 'configuracion', { vista: 'apariencia' }], destinoLabel: 'Ir a Apariencia',
@@ -315,11 +337,67 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         guiaLabel: 'Logo, colores y textos se cambian acá',
     },
     {
-        id: 'notificaciones', titulo: 'Elegí qué avisos recibís',
+        id: 'contacto', grupo: GRUPO_TIENDA, titulo: 'Cargá tus datos de contacto',
+        detalle: 'WhatsApp, email y tus horarios de atención. Es por donde te escriben los que están por comprar y todavía tienen una duda.',
+        destino: ['ventas', 'configuracion', { vista: 'contacto' }], destinoLabel: 'Ir a Contacto',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Contacto"]',
+        guiaLabel: 'WhatsApp, email y horarios, acá',
+    },
+    {
+        id: 'redes', grupo: GRUPO_TIENDA, titulo: 'Sumá tus redes sociales',
+        detalle: 'Instagram, TikTok y Facebook. Se muestran en tu tienda: el que te compró una vez te sigue, y el que te sigue vuelve.',
+        destino: ['ventas', 'configuracion', { vista: 'redes' }], destinoLabel: 'Ir a Redes sociales',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Redes sociales"]',
+        guiaLabel: 'Tus perfiles se cargan acá',
+    },
+    {
+        id: 'descuentos', grupo: GRUPO_TIENDA, titulo: 'Creá tu primer descuento o cupón',
+        detalle: 'Los descuentos se aplican solos cuando se cumple la condición; los cupones son códigos que el cliente escribe en el checkout. Los dos se comparten por link, y en "Rendimiento" ves cuál funcionó.',
+        destino: ['ventas', 'descuentos'], destinoLabel: 'Ir a Descuentos',
+        seccionDestino: 'descuentos', anclaDestino: 'boton:Crear descuento',
+        guiaLabel: 'Tu primera promo sale de acá',
+    },
+    {
+        id: 'dominio', grupo: GRUPO_TIENDA, titulo: 'Poné tu dirección propia',
+        detalle: 'Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya (tunegocio.com), en Dominios la comprás desde el panel o conectás una que ya tengas.',
+        destino: ['ventas', 'configuracion', { vista: 'dominios' }], destinoLabel: 'Ir a Dominios',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Dominios"] || .cfg-sidebar',
+        guiaLabel: 'Comprá o conectá tu dominio acá',
+    },
+    {
+        id: 'equipo', grupo: GRUPO_NEGOCIO, titulo: 'Invitá a alguien de tu equipo',
+        detalle: 'Cada persona entra con su usuario y ve solo lo que su rol permite. Le llega un mail con la invitación.',
+        destino: ['ventas', 'configuracion', { vista: 'equipo' }], destinoLabel: 'Ir a Equipo',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-sidebar-item[title="Equipo"]',
+        guiaLabel: 'Invitá desde acá: elegís el rol y le llega un mail',
+    },
+    {
+        id: 'notificaciones', grupo: GRUPO_NEGOCIO, titulo: 'Elegí qué avisos recibís',
         detalle: 'Pedido nuevo, pago confirmado, stock crítico, cancelaciones: cada uno por el panel, por mail, o los dos. Ajustá la grilla y guardá.',
         destino: ['ventas', 'configuracion', { vista: 'notificaciones' }], destinoLabel: 'Ir a Notificaciones',
         seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Notificaciones"]',
         guiaLabel: 'Cada aviso, por panel o por mail: se define acá',
+    },
+    {
+        id: 'postventa', grupo: GRUPO_NEGOCIO, titulo: 'Definí cambios y devoluciones',
+        detalle: 'Si aceptás devoluciones y cancelaciones, y con qué reembolso: nota de crédito, plata de vuelta por Mercado Pago, o los dos. Lo que elijas es lo que tu cliente puede pedir — aprobar cada caso sigue siendo tuyo.',
+        destino: ['ventas', 'configuracion', { vista: 'postventa' }], destinoLabel: 'Ir a Cancelaciones',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Cancelaciones y devoluciones"]',
+        guiaLabel: 'Tus reglas de postventa, acá',
+    },
+    {
+        id: 'reportes', grupo: GRUPO_NEGOCIO, titulo: 'Mirá tus reportes',
+        detalle: 'Ventas, productos, clientes, inventario y pagos, por el período que elijas. Es donde ves qué se vende de verdad, qué no se mueve y cuánto te queda después de comisiones.',
+        destino: ['ventas', 'reportes'], destinoLabel: 'Ir a Reportes',
+        seccionDestino: 'reportes', anclaDestino: '.mod-tabs',
+        guiaLabel: 'Cinco reportes, uno por pestaña',
+    },
+    {
+        id: 'plan', grupo: GRUPO_NEGOCIO, titulo: 'Conocé tu plan',
+        detalle: 'En Suscripción ves qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Justo abajo, en Soporte, está cómo escribirnos si algo no cierra.',
+        destino: ['ventas', 'configuracion', { vista: 'suscripcion' }], destinoLabel: 'Ir a Suscripción',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Suscripción"]',
+        guiaLabel: 'Tu plan y tu facturación, acá',
     },
 ]
 
@@ -466,9 +544,9 @@ export const TEXTOS = {
     etapa1Nombre: 'Primeros pasos',
     etapa2Nombre: 'Segunda etapa',
     etapa2IntroTitulo: 'Segunda etapa',
-    etapa2Intro: 'Lo básico ya está: tu tienda vende. Ahora viene sacarle jugo al panel: pedidos, clientes, plantillas de respuesta, promos, equipo y la cara de tu tienda.',
+    etapa2Intro: 'Lo básico ya está: tu tienda vende. Ahora, el resto del panel, en tres bloques: tu día a día, la cara de tu tienda y cómo manejás el negocio. De a una, cuando puedas.',
     etapa2Empezar: 'Empezar',
     etapa2AhoraNo: 'Ahora no',
     cierreEtapa2Titulo: 'Ya le sacás el jugo al panel',
-    cierreEtapa2: 'Pedidos, clientes, plantillas, promos, equipo, apariencia y avisos: recorriste todo lo que hace al día a día. De acá en más, el panel es tuyo.',
+    cierreEtapa2: 'Pedidos, clientes, plantillas, promos, equipo, apariencia, avisos, postventa, reportes y tu plan: ya no te queda rincón del panel sin conocer. De acá en más es todo tuyo.',
 }
