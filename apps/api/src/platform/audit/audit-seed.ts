@@ -5,7 +5,7 @@
 // dejó una auditoría anterior. Trae `foco` (qué mirar) y `checks` (las
 // verificaciones concretas que hay que hacer para darlo por auditado).
 //
-// Se upsertea por `key` al listar (PlatformAuditService.asegurarSeed): lo que
+// Se crea por `key`, solo si falta, al listar (PlatformAuditService.asegurarSeed): lo que
 // el equipo ya cargó nunca se pisa. Para sumar un ítem nuevo alcanza con
 // agregarlo acá; para retirar uno, sacarlo de acá NO lo borra de la base
 // (queda con lo que el equipo cargó) — se borra a mano si hace falta.
@@ -706,7 +706,7 @@ const HALLAZGOS: SeedItem[] = [
     ['Borradas las 5 cuentas demo-tutorial-*@orbita.test (procedimiento en docs/demo-tutoriales-onboarding.md)', 'Borrado el rol "Demo Tutorial" de zapatoslorena'],
     { ruta: 'members (rol Demo Tutorial, negocio zapatoslorena)' }),
   hallazgo('member-email-sin-confirmacion', G_INT, 'BAJA', 'Cambiar el email de un member no manda confirmación',
-    'Desde el 10/09 cambiar el email desde Mi perfil pide la contraseña actual, pero el email nuevo se aplica de inmediato y queda como "sin verificar" sin ningún mail de confirmación (no existe ese flujo para members, y el panel lo prometía hasta el 10/09). Un error de tipeo deja a la persona sin poder recuperar la cuenta por "olvidé mi contraseña". 15/09: postergado; va junto con alta-sin-verificar-email (mismo flujo de confirmación por link). Mientras tanto el cambio pide la contraseña actual. Equipo no permite editar el email de un member: si queda mal tipeado, el owner lo quita y lo vuelve a invitar con el correcto.',
+    'Desde el 10/09 cambiar el email desde Mi perfil pide la contraseña actual, pero el email nuevo se aplica de inmediato y queda como "sin verificar" sin ningún mail de confirmación (no existe ese flujo para members, y el panel lo prometía hasta el 10/09). Un error de tipeo deja a la persona sin poder recuperar la cuenta por "olvidé mi contraseña". 15/09: postergado; va junto con alta-sin-verificar-email (mismo flujo de confirmación por link). Mientras tanto el cambio pide la contraseña actual. Equipo no permite editar el email de un member: si no es owner, se lo quita y se lo vuelve a invitar con el correcto; si es owner (al owner no se lo puede quitar, y al último tampoco degradar), se corrige desde Mi perfil mientras la sesión siga viva o, si no, por soporte con un update manual.',
     ['El email nuevo queda pendiente hasta confirmarlo con un link al correo nuevo (columna pendingEmail + token)', 'Aviso al correo anterior de que se pidió el cambio'],
     { ruta: 'member-profile.service.ts#updateProfile' }),
   hallazgo('cambio-clave-sin-cerrar-sesiones', G_INT, 'BAJA', 'Cambiar la contraseña no cierra las otras sesiones',

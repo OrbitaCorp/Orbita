@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { ConfigService } from '@nestjs/config';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
+import { sumarAniosCalendario } from '../common/utils/fechas';
 import { VercelDomainsService } from './vercel-domains.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
 import { AuditService, CambioAuditoria } from '../audit/audit.service';
@@ -381,9 +382,9 @@ export class DomainPurchaseService {
           registrar: 'vercel',
           status: 'PENDING', // se confirma ACTIVE con el mismo verifyDns() de siempre
           purchasedAt: new Date(),
-          // Años calendario, no 365 días por año: una compra que cruza un 29/02
-          // no queda venciendo un día antes que en el registrador.
-          expiresAt: (() => { const vence = new Date(); vence.setUTCFullYear(vence.getUTCFullYear() + order.years); return vence; })(),
+          // Años calendario, como el registrador (una compra del 29/02 vence el
+          // 28/02 de un año no bisiesto): ver common/utils/fechas.ts.
+          expiresAt: sumarAniosCalendario(new Date(), order.years),
           autoRenew: false,
         },
       });
