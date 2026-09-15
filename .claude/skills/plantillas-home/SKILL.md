@@ -911,6 +911,11 @@ plantilla no era genérica.
    Un push a `main` no despliega la API.
 3. Verificar que las fotos de muestra existan en `public/plantillas/` — un
    nombre inventado no falla en compilación, se ve como un cuadro roto.
+4. **La portada (`slides[0].img`) tiene que ser única entre las veintiséis.**
+   Es la foto de la tarjeta en la galería, y dos vecinas con la misma foto
+   parecen la misma plantilla aunque el diseño de adentro no tenga nada que
+   ver. Adentro (productos, categorías) repetir no molesta: eso es catálogo
+   de muestra. Cruzar la lista entera, no confiar en la memoria.
 
 ## Errores ya cometidos — no repetirlos
 
@@ -969,6 +974,7 @@ plantilla no era genérica.
 
 | "Buscá por rubro" arriba de "Camisas street" | El `porDefecto` estaba escrito para el rubro de la maqueta, y en la vitrina se leía bien | `porDefectoReal` con la versión neutra: la vitrina conserva la sabrosa, la tienda muestra la neutra |
 
+| Dos plantillas idénticas en la galería | Compartían la foto de `slides[0]`, que es la portada de la tarjeta | La portada es única entre las veintiséis; adentro repetir no molesta |
 | Una plantilla nueva que pedía editor nuevo | Se escribió su bloque a mano aunque usaba el vocabulario de siempre | Si se puede escribir con `receta`, va con receta: el editor sale solo |
 | El panel ofrecía una plantilla que la API rechazaba con 400 | `datos.tsx` sumó ids y `HOME_TEMPLATES_DISPONIBLES` quedó atrás | Cruzar las dos listas antes de cerrar, y desplegar la API a mano |
 
