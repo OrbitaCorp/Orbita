@@ -263,6 +263,7 @@ gcloud run deploy "$SERVICE" \
   --min-instances 0 \
   --max-instances 10 \
   --concurrency 40 \
+  --session-affinity \
   --port 8080 \
   --env-vars-file "$ENV_FILE" \
   --set-secrets "$SECRETS" \
