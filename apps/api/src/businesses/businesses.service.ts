@@ -17,6 +17,7 @@ import { cuitValido, limpiarCuit } from '../common/utils/cuit';
 import { suspendidoPorPlataforma } from './suspension';
 import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { R2Service } from '../r2/r2.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto, CARRIERS, MAX_MONTO } from './dto/update-business-config.dto';
@@ -82,6 +83,7 @@ export class BusinessesService {
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
     private readonly backgroundRemoval: BackgroundRemovalService,
+    private readonly r2: R2Service,
     // Registro de auditoría de la zona peligrosa (ítem `api.audit`). Opcional
     // solo para los tests que construyen el service a mano.
     private readonly audit?: AuditService,
@@ -492,39 +494,30 @@ export class BusinessesService {
 
   // Alternativa a pegar un link en la sección de video de Apariencia — y
   // reusado tal cual por products.controller.ts#uploadVideo para el video de
-  // producto, mismo bucket y mismo criterio, no hay nada específico de
+  // producto, mismo criterio en los dos, no hay nada específico de
   // Apariencia acá adentro. Sube el ARCHIVO tal cual, sin reencodear: a
-  // diferencia de una imagen, no hay
-  // forma liviana de transcodificar video en este backend, y no hace falta
-  // (el navegador reproduce cualquiera de los cuatro formatos permitidos
-  // directo, sin plugins). El resultado es una URL de Storage que termina en
-  // .mp4/.webm/etc — el storefront la trata como "archivo directo", exacto
-  // mismo camino que si el dueño hubiera pegado esa URL a mano (ver
-  // parseVideoEmbed, apps/web/src/lib/storefront/utils.ts).
+  // diferencia de una imagen, no hay forma liviana de transcodificar video
+  // en este backend, y no hace falta (el navegador reproduce cualquiera de
+  // los cuatro formatos permitidos directo, sin plugins). El resultado es
+  // una URL que termina en .mp4/.webm/etc — el storefront la trata como
+  // "archivo directo", exacto mismo camino que si el dueño hubiera pegado
+  // esa URL a mano (ver parseVideoEmbed, apps/web/src/lib/storefront/utils.ts).
   //
-  // Mismo bucket que las imágenes: en los hechos ya es "assets públicos del
-  // negocio" (también lo usa el avatar del cliente en me.service.ts), así
-  // que no hace falta crear uno nuevo a mano en Supabase. Si el bucket tiene
-  // configurado un allowedMimeTypes que no incluya video, la subida falla acá
-  // con el 503 de abajo — se resuelve ampliando esa lista desde el dashboard,
-  // no hay nada que tocar en este código.
+  // Cloudflare R2, NO Supabase Storage (a diferencia de las imágenes, que
+  // siguen en Supabase — ver uploadStorefrontImage/uploadToStorage más
+  // abajo): pedido explícito de Ale el 16/09 para manejar mejor la
+  // capacidad de almacenamiento de video, que pesa mucho más que las fotos
+  // y en R2 no se cobra por egress. Cada negocio tiene su propio prefijo
+  // (`${businessId}/...`), igual que ya hacía con Supabase — un negocio
+  // nunca puede pisar ni listar los videos de otro.
   async uploadStorefrontVideo(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
     if (!MIME_VIDEO_PERMITIDOS.includes(file.mimetype)) {
       throw new BadRequestException('El archivo tiene que ser un video (mp4, webm, ogg o mov)');
     }
     const ext = EXTENSION_POR_MIME_VIDEO[file.mimetype] ?? 'mp4';
     const path = `${businessId}/${randomUUID()}.${ext}`;
-
-    const { error: uploadError } = await this.supabase.adminClient.storage
-      .from(BUSINESS_LOGOS_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-    if (uploadError) {
-      this.logger.error(`Subida de video a ${BUSINESS_LOGOS_BUCKET} falló para ${businessId}: ${uploadError.message}`);
-      throw new ServiceUnavailableException('No se pudo subir el video: el almacenamiento no respondió, probá de nuevo en un rato');
-    }
-
-    const { data: publicUrl } = this.supabase.adminClient.storage.from(BUSINESS_LOGOS_BUCKET).getPublicUrl(path);
-    return { url: publicUrl.publicUrl };
+    const url = await this.r2.upload(path, file.buffer, file.mimetype);
+    return { url };
   }
 
   // Todas las imágenes de Apariencia (logo, favicon, slides del hero) se

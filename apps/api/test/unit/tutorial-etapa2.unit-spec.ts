@@ -84,7 +84,7 @@ function prismaDe(c: Conteos = {}) {
   };
 }
 
-const servicio = (prisma: unknown) => new BusinessesService(prisma as any, {} as any, {} as any);
+const servicio = (prisma: unknown) => new BusinessesService(prisma as any, {} as any, {} as any, {} as any);
 const cumplidasDe = async (c: Conteos = {}) => (await servicio(prismaDe(c)).getTutorial(BIZ)).cumplidas;
 
 describe('GET /business/tutorial: cumplidas de la segunda etapa', () => {

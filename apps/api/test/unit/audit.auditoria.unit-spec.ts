@@ -174,7 +174,7 @@ describe('Las acciones sensibles quedan registradas', () => {
       subscription: { findUnique: jest.fn() },
       business: { update: jest.fn().mockResolvedValue({ isPaused: true }) },
     };
-    await new BusinessesService(prisma as any, {} as any, {} as any, audit as any).pause(BIZ, true, 'm-owner');
+    await new BusinessesService(prisma as any, {} as any, {} as any, {} as any, audit as any).pause(BIZ, true, 'm-owner');
     expect(audit.registrar).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'business', action: 'DEACTIVATE', memberId: 'm-owner' }));
   });
 

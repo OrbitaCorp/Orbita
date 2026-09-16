@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { MailModule } from './mail/mail.module';
 import { SupabaseModule } from './supabase/supabase.module';
+import { R2Module } from './r2/r2.module';
 
 import { AuthGuard } from './common/guards/auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -67,6 +68,7 @@ import { SupportModule } from './support/support.module';
     PrismaModule,
     MailModule,
     SupabaseModule,
+    R2Module,
     AuthModule,
     OnboardingModule,
     BusinessesModule,
