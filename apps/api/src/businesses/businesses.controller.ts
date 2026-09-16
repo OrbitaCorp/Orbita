@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Put, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
+import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -120,6 +121,18 @@ export class BusinessesController {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
     return this.businessesService.uploadStorefrontImage(member.businessId, file, dto.removeBackground);
+  }
+
+  // Alternativa a pegar un link en la sección de video de Apariencia — ver
+  // el comentario de uploadStorefrontVideo() en el service para el porqué de
+  // no reencodear.
+  @Post('storefront-config/upload-video')
+  @Roles('owner', 'admin')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_VIDEO))
+  uploadStorefrontVideo(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
+    const member = assertMemberContext(ctx);
+    if (!file) throw new BadRequestException('Falta el archivo "file"');
+    return this.businessesService.uploadStorefrontVideo(member.businessId, file);
   }
 
   @Get('notification-config')

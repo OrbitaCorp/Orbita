@@ -1105,6 +1105,22 @@ export async function panelUploadStorefrontImage(
   return body as { url: string }
 }
 
+// Alternativa a pegar un link en la sección de video de Apariencia — sube el
+// ARCHIVO, sin reencodear (ver businesses.service.ts#uploadStorefrontVideo).
+// La URL que devuelve se guarda en el mismo campo `videoUrl` que el link:
+// parseVideoEmbed ya la reconoce como "archivo directo" por la extensión.
+export async function panelUploadStorefrontVideo(file: Blob, filename: string) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-video`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as { url: string }
+}
+
 // Cambia el modo de la tienda: completa (con carrito) o solo catálogo. Solo el
 // dueño. El backend no deja pasar a solo catálogo con pedidos online sin terminar.
 export function changeBusinessMode(mode: 'FULL' | 'SHOWCASE') {

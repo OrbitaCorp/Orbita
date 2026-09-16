@@ -14,13 +14,14 @@ import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelUploadStorefrontVideo, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { LogoPicker } from './components/apariencia/LogoPicker'
+import { VideoUploader } from './components/apariencia/VideoUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
@@ -48,6 +49,14 @@ const NOMBRE_PLANTILLA: Record<string, string> = { vidriera: 'Vidriera' }
 
 async function subirImagenApariencia(file: File): Promise<string> {
     const r = await panelUploadStorefrontImage(file, file.name)
+    return r.url
+}
+
+// El archivo de la sección de video (VideoUploader) — alternativa a pegar
+// un link. Sube el archivo tal cual, sin recodificar (a diferencia de las
+// imágenes, que siempre pasan por subirImagenApariencia).
+async function subirVideoApariencia(file: File): Promise<string> {
+    const r = await panelUploadStorefrontVideo(file, file.name)
     return r.url
 }
 
@@ -1173,6 +1182,19 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 </p>
                             )}
                         </div>
+                        {/* Alternativa a pegar el link: subir el archivo directo.
+                            Escribe el MISMO campo (ap.videoUrl) — ver
+                            VideoUploader.tsx para el porqué de no tener un campo
+                            aparte. */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 10px' }}>
+                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                            <VideoUploader value={ap.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoApariencia} />
+                        </div>
+                        <Divider />
                         <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} /></div>
                         <div><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
                         {/* Solo tiene efecto con un archivo directo — YouTube/Vimeo

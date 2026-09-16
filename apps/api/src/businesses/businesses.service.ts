@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import sharp from 'sharp';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { MIME_VIDEO_PERMITIDOS, EXTENSION_POR_MIME_VIDEO } from '../common/utils/subida-video';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { cuitValido, limpiarCuit } from '../common/utils/cuit';
@@ -487,6 +488,40 @@ export class BusinessesService {
       : file.buffer;
     const url = await this.uploadToStorage(businessId, { ...file, buffer }, 'No se pudo subir la imagen');
     return { url };
+  }
+
+  // Alternativa a pegar un link en la sección de video de Apariencia — sube
+  // el ARCHIVO tal cual, sin reencodear: a diferencia de una imagen, no hay
+  // forma liviana de transcodificar video en este backend, y no hace falta
+  // (el navegador reproduce cualquiera de los cuatro formatos permitidos
+  // directo, sin plugins). El resultado es una URL de Storage que termina en
+  // .mp4/.webm/etc — el storefront la trata como "archivo directo", exacto
+  // mismo camino que si el dueño hubiera pegado esa URL a mano (ver
+  // parseVideoEmbed, apps/web/src/lib/storefront/utils.ts).
+  //
+  // Mismo bucket que las imágenes: en los hechos ya es "assets públicos del
+  // negocio" (también lo usa el avatar del cliente en me.service.ts), así
+  // que no hace falta crear uno nuevo a mano en Supabase. Si el bucket tiene
+  // configurado un allowedMimeTypes que no incluya video, la subida falla acá
+  // con el 503 de abajo — se resuelve ampliando esa lista desde el dashboard,
+  // no hay nada que tocar en este código.
+  async uploadStorefrontVideo(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
+    if (!MIME_VIDEO_PERMITIDOS.includes(file.mimetype)) {
+      throw new BadRequestException('El archivo tiene que ser un video (mp4, webm, ogg o mov)');
+    }
+    const ext = EXTENSION_POR_MIME_VIDEO[file.mimetype] ?? 'mp4';
+    const path = `${businessId}/${randomUUID()}.${ext}`;
+
+    const { error: uploadError } = await this.supabase.adminClient.storage
+      .from(BUSINESS_LOGOS_BUCKET)
+      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+    if (uploadError) {
+      this.logger.error(`Subida de video a ${BUSINESS_LOGOS_BUCKET} falló para ${businessId}: ${uploadError.message}`);
+      throw new ServiceUnavailableException('No se pudo subir el video: el almacenamiento no respondió, probá de nuevo en un rato');
+    }
+
+    const { data: publicUrl } = this.supabase.adminClient.storage.from(BUSINESS_LOGOS_BUCKET).getPublicUrl(path);
+    return { url: publicUrl.publicUrl };
   }
 
   // Todas las imágenes de Apariencia (logo, favicon, slides del hero) se
