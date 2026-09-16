@@ -81,6 +81,11 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         brands: ap.marcas
             .filter(m => m.name.trim() !== '')
             .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo ? { logoUrl: m.logo } : {}) })),
+        showVideo: ap.mostrarVideo,
+        videoTitle: ap.videoTitulo,
+        videoSubtitle: ap.videoSubtitulo,
+        videoUrl: ap.videoUrl,
+        videoPosterUrl: ap.videoPoster,
         // Sin código no hay cupón: se manda null y la sección desaparece del
         // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
         // vez de eso se mandara el objeto con strings vacíos, el home
@@ -183,6 +188,12 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         // una tienda que borró todas sus marcas tiene que quedar en cero, no
         // recuperar nada. `logo` vuelve a null si no vino.
         marcas: (dto.brands ?? []).map(b => ({ id: b.id, name: b.name, logo: b.logoUrl || null })),
+        // Mismo ?? que showBrands: campo nuevo, misma ventana de deploy.
+        mostrarVideo: dto.showVideo ?? defaults.mostrarVideo,
+        videoTitulo: dto.videoTitle ?? defaults.videoTitulo,
+        videoSubtitulo: dto.videoSubtitle ?? defaults.videoSubtitulo,
+        videoUrl: dto.videoUrl ?? defaults.videoUrl,
+        videoPoster: dto.videoPosterUrl ?? defaults.videoPoster,
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
         seccionesPlantilla: dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla,
