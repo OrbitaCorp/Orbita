@@ -193,7 +193,7 @@ firmado, resolución de negocio, vinculación de cuentas, emisión de sesión) e
   `googleLoginApex()` y `register()` — el segundo caso no necesitó código nuevo, ver
   `PENDIENTES.md` § RBT-287).
 - **El JWT nunca viaja en una URL:** `/auth/google/callback` intercambia un código de un solo
-  uso (60s, en memoria — ver `google-oauth-exchange.store.ts`) que el BFF de Next.js
+  uso (60s, en Postgres — ver `google-oauth-exchange.store.ts`) que el BFF de Next.js
   (`pages/api/auth/google/exchange.ts`) canjea servidor-a-servidor por la sesión real.
 - Ver [`apps/api/src/auth/google-auth.service.ts`](apps/api/src/auth/google-auth.service.ts),
   [`google-auth.controller.ts`](apps/api/src/auth/google-auth.controller.ts) y

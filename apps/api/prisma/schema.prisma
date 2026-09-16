@@ -618,6 +618,23 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+// Handoff de un solo uso entre /auth/google/callback y el BFF de Next.js.
+// Vivía en un Map en memoria: con más de una instancia de Cloud Run el canje
+// caía en otra y el login por Google fallaba (hallazgo
+// `auth-estado-en-memoria` de la auditoría interna). Guarda el SHA-256 del
+// código, nunca el código: la fila sola no sirve para canjear una sesión.
+model GoogleOAuthExchange {
+  id         String    @id @default(uuid())
+  codeHash   String    @unique @map("code_hash") // SHA-256 del código que viaja en la URL del callback
+  payload    Json // LoginResponse o el desafío de segundo factor del super admin
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at") // se setea en el canje: la fila no se borra en el acto para que un reintento dé "inválido" y no "no existe"
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("google_oauth_exchanges")
+}
+
 model Category {
   id         String   @id @default(uuid())
   businessId String   @map("business_id")
