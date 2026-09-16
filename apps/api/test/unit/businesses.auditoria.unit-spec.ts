@@ -41,7 +41,7 @@ function prismaPausa(opts: { ultimaAccion?: string; subStatus?: string }) {
   };
 }
 
-const negocios = (prisma: unknown, supabase: unknown = {}) => new BusinessesService(prisma as any, supabase as any, {} as any);
+const negocios = (prisma: unknown, supabase: unknown = {}, r2: unknown = {}) => new BusinessesService(prisma as any, supabase as any, {} as any, r2 as any);
 
 describe('POST /business/pause: levantar una suspensión no es del dueño', () => {
   it('suspendida por la plataforma: no se puede despausar', async () => {
@@ -377,13 +377,18 @@ describe('Subida de video (sección de video de Apariencia)', () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
-  it('un error de Storage no le muestra al panel el detalle de Supabase', async () => {
-    const upload = jest.fn().mockResolvedValue({ error: { message: 'new row violates row-level security policy for bucket business-logos' } });
-    const supabase = { adminClient: { storage: { from: () => ({ upload }) } } };
-    const err = await negocios({}, supabase)
-      .uploadStorefrontVideo(BIZ, { buffer: Buffer.from('x'), mimetype: 'video/mp4', originalname: 'a.mp4' })
-      .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ServiceUnavailableException);
-    expect((err as Error).message).not.toMatch(/row-level|bucket/);
+  // El error de Storage sin detalle del proveedor para el video ahora se
+  // prueba contra R2Service directo (ver r2.unit-spec.ts) — acá lo que
+  // importa es que uploadStorefrontVideo() prefija el path con el
+  // businessId, para que un negocio nunca pueda pisar ni listar los
+  // videos de otro (pedido explícito de Ale: "cada tienda tiene sus videos").
+  it('sube el video a R2 con el path prefijado por negocio', async () => {
+    const upload = jest.fn().mockResolvedValue('https://pub-test.r2.dev/biz-1/x.mp4');
+    const { url } = await negocios({}, {}, { upload })
+      .uploadStorefrontVideo(BIZ, { buffer: Buffer.from('x'), mimetype: 'video/mp4', originalname: 'a.mp4' });
+    expect(url).toBe('https://pub-test.r2.dev/biz-1/x.mp4');
+    const [path, , mimetype] = upload.mock.calls[0];
+    expect(path).toMatch(new RegExp(`^${BIZ}/.+\\.mp4$`));
+    expect(mimetype).toBe('video/mp4');
   });
 });

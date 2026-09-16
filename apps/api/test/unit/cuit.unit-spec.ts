@@ -36,7 +36,7 @@ describe('Configuración del negocio: CUIT y razón social', () => {
         update: jest.fn(async ({ data }: { data: unknown }) => data),
       },
     };
-    const svc = new BusinessesService(prisma as any, {} as any, {} as any);
+    const svc = new BusinessesService(prisma as any, {} as any, {} as any, {} as any);
     return { svc, prisma };
   }
 

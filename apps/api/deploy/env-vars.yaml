@@ -9,6 +9,16 @@
 
 NODE_ENV: "production"
 FRONTEND_URL: "https://orbita.site"
+# Cloudflare R2 (video de producto y de Apariencia, ver r2.service.ts) — el
+# Account ID y el bucket no son secretos; R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY
+# sí lo son y viven en Secret Manager (ver SECRETS en deploy.sh).
+# R2_PUBLIC_URL es el "Public Development URL" de R2 (pub-xxxx.r2.dev) — el
+# día que haya un dominio propio en Cloudflare (orbita.site hoy vive en
+# Vercel, no en Cloudflare, así que no se pudo usar de entrada) cambia solo
+# este valor, sin tocar código.
+R2_ACCOUNT_ID: "916763f034006cc39e6269a421fedecb"
+R2_BUCKET: "orbita"
+R2_PUBLIC_URL: "https://pub-4c590787fd69461f8d464b91d826c1b4.r2.dev"
 GOOGLE_CLIENT_ID: "271663449184-phgk621gvpo1cdjrknbrmjdo3tljn48q.apps.googleusercontent.com"
 GOOGLE_REDIRECT_URI: "https://api.orbita.site/api/v1/auth/google/callback"
 JWT_EXPIRES_IN: "15m"

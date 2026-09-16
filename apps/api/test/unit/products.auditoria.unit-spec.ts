@@ -84,7 +84,7 @@ describe('Quitar el fondo en Apariencia exige el paquete Avanzado', () => {
       adminClient: { storage: { from: () => ({ upload, getPublicUrl: () => ({ data: { publicUrl: 'https://x/y.webp' } }) }) } },
     };
     const bg = { removeBackground: jest.fn((b: Buffer) => Promise.resolve(b)) };
-    return { svc: new BusinessesService(prisma as any, supabase as any, bg as any), bg, upload };
+    return { svc: new BusinessesService(prisma as any, supabase as any, bg as any, {} as any), bg, upload };
   }
   const png = () => sharp({ create: { width: 2, height: 2, channels: 3, background: '#fff' } }).png().toBuffer();
 
