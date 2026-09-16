@@ -22,6 +22,13 @@ const FONT_NAME = /^[A-Za-z0-9 '-]{1,60}$/;
 // '' = el default.
 const LAYOUT_ID = /^[a-z0-9-]{0,30}$/i;
 
+// Link del video de Apariencia — YouTube, Vimeo, o el archivo directo. A
+// diferencia de URL_IMAGEN, no acepta una ruta propia del sitio ("/..."):
+// no hay ningún video "propio" de Órbita para referenciar, siempre es un
+// link externo. '' se acepta (así el panel limpia el campo).
+const URL_VIDEO = /^(https:\/\/\S*)?$/;
+const URL_VIDEO_MENSAJE = 'El video tiene que ser un link https (YouTube, Vimeo, o el archivo del video)';
+
 // Topes de largo y de cantidad (auditoría interna 10/09): holgados contra lo
 // que hay en producción (nombre de tienda más largo: 32; slides: 4; links: 9).
 export class UpdateStorefrontConfigDto {
@@ -94,6 +101,7 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showStatsBar?: boolean;
   @IsOptional() @IsBoolean() showParallaxBanner?: boolean;
   @IsOptional() @IsBoolean() showBrands?: boolean;
+  @IsOptional() @IsBoolean() showVideo?: boolean;
 
   @IsOptional() @IsString() @MaxLength(200) shippingText?: string;
   @IsOptional() @IsString() @MaxLength(500) whatsappText?: string;
@@ -122,4 +130,12 @@ export class UpdateStorefrontConfigDto {
   @ValidateNested({ each: true })
   @Type(() => BrandItemDto)
   brands?: BrandItemDto[];
+
+  // Sección de video — mismo criterio que el parallax: autocontenida, con
+  // su propio título/subtítulo. `videoPosterUrl` solo se usa cuando el link
+  // es un archivo directo (YouTube/Vimeo traen su propia miniatura).
+  @IsOptional() @IsString() @MaxLength(120) videoTitle?: string;
+  @IsOptional() @IsString() @MaxLength(300) videoSubtitle?: string;
+  @IsOptional() @IsString() @MaxLength(500) @Matches(URL_VIDEO, { message: URL_VIDEO_MENSAJE }) videoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(1000) @Matches(URL_IMAGEN, { message: URL_IMAGEN_MENSAJE }) videoPosterUrl?: string;
 }

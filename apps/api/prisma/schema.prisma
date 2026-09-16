@@ -342,6 +342,12 @@ model StorefrontConfig {
   // nueva, no tiene que aparecer sola en ninguna tienda existente hasta que
   // el dueño cargue sus marcas y la prenda.
   showBrands            Boolean @default(false) @map("show_brands")
+  // Sección de video en el home — YouTube, Vimeo, o el archivo directo.
+  // Autocontenida, mismo criterio que el parallax y las marcas (on/off
+  // propio, false por default: no aparece sola en ninguna tienda existente
+  // hasta que el dueño pegue un link y la prenda). Va después del parallax
+  // y antes del pie — pedido explícito del dueño.
+  showVideo             Boolean @default(false) @map("show_video")
 
   // Textos configurables de la tienda
   shippingText     String? @map("shipping_text") // también es el texto del banner debajo del header
@@ -363,6 +369,16 @@ model StorefrontConfig {
   // que son puras palabras) — ver Inicio.tsx § TIRA DE MARCAS.
   brandsTitle      String? @map("brands_title")
   brands           Json?
+  // Contenido de la sección de video de arriba. `videoUrl` acepta un link
+  // de YouTube, Vimeo, o el archivo del video directo (propio o de un CDN)
+  // — el storefront decide cómo embeberlo según la forma del link (ver
+  // parseVideoEmbed en lib/storefront/utils.ts, apps/web). `videoPosterUrl`
+  // es la miniatura que se ve antes de reproducir — solo aplica al caso de
+  // archivo directo (YouTube/Vimeo ya traen la suya).
+  videoTitle       String? @map("video_title")
+  videoSubtitle    String? @map("video_subtitle")
+  videoUrl         String? @map("video_url")
+  videoPosterUrl   String? @map("video_poster_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -616,6 +632,23 @@ model PasswordResetToken {
   @@index([businessId])
   @@index([email])
   @@map("password_reset_tokens")
+}
+
+// Handoff de un solo uso entre /auth/google/callback y el BFF de Next.js.
+// Vivía en un Map en memoria: con más de una instancia de Cloud Run el canje
+// caía en otra y el login por Google fallaba (hallazgo
+// `auth-estado-en-memoria` de la auditoría interna). Guarda el SHA-256 del
+// código, nunca el código: la fila sola no sirve para canjear una sesión.
+model GoogleOAuthExchange {
+  id         String    @id @default(uuid())
+  codeHash   String    @unique @map("code_hash") // SHA-256 del código que viaja en la URL del callback
+  payload    Json // LoginResponse o el desafío de segundo factor del super admin
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at") // se setea en el canje: la fila no se borra en el acto para que un reintento dé "inválido" y no "no existe"
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("google_oauth_exchanges")
 }
 
 model Category {

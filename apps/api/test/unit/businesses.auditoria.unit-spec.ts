@@ -15,6 +15,7 @@ import { UpdateOnboardingBusinessDto } from '../../src/onboarding/dto/update-onb
 import { PendingWizardDto } from '../../src/subscriptions/dto/start-pending-checkout.dto';
 import { motivoSubdominioInvalido, SUBDOMINIOS_RESERVADOS } from '../../src/common/utils/subdominio';
 import { MAX_IMAGEN_BYTES, MENSAJE_IMAGEN_GRANDE } from '../../src/common/utils/subida-imagen';
+import { MAX_VIDEO_BYTES, MENSAJE_VIDEO_GRANDE } from '../../src/common/utils/subida-video';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 
 // Auditoría interna 2026-09-10, ítem `api.businesses`.
@@ -236,12 +237,16 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
           { id: 'mk1', name: 'Casio', logoUrl: 'https://hhaqlzrcskmwnvhgydon.supabase.co/storage/v1/object/public/business-logos/a/casio.webp' },
           { id: 'mk2', name: 'G-Shock' },
         ],
+        videoTitle: 'Así trabajamos',
+        videoSubtitle: 'Un vistazo detrás de escena.',
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        videoPosterUrl: 'https://hhaqlzrcskmwnvhgydon.supabase.co/storage/v1/object/public/business-logos/a/poster.webp',
       }),
     ).toEqual([]);
   });
 
   it('los campos que el panel limpia con "" siguen pasando', async () => {
-    expect(await errores(UpdateStorefrontConfigDto, { logoUrl: '', faviconUrl: '', parallaxImageUrl: '', headerLayout: '', gridLayout: '' })).toEqual([]);
+    expect(await errores(UpdateStorefrontConfigDto, { logoUrl: '', faviconUrl: '', parallaxImageUrl: '', headerLayout: '', gridLayout: '', videoUrl: '', videoPosterUrl: '' })).toEqual([]);
   });
 
   it.each([
@@ -253,6 +258,10 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
     ['fontScale', 5],
     ['cardRadius', -1],
     ['headerLayout', 'x;}body{display:none'],
+    // Mismos dos casos que parallaxImageUrl: sin https, y un scheme peligroso.
+    ['videoUrl', 'http://sin-tls.com/video.mp4'],
+    ['videoUrl', 'javascript:alert(1)'],
+    ['videoPosterUrl', 'javascript:alert(1)'],
   ])('UpdateStorefrontConfigDto rechaza %s = %j', async (campo, valor) => {
     expect(await errores(UpdateStorefrontConfigDto, { [campo]: valor })).toContain(campo);
   });
@@ -329,6 +338,50 @@ describe('Subidas de imagen', () => {
     const supabase = { adminClient: { storage: { from: () => ({ upload }) } } };
     const err = await negocios({}, supabase)
       .uploadStorefrontImage(BIZ, { buffer: png, mimetype: 'image/png', originalname: 'a.png' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ServiceUnavailableException);
+    expect((err as Error).message).not.toMatch(/row-level|bucket/);
+  });
+});
+
+describe('Subida de video (sección de video de Apariencia)', () => {
+  it('el endpoint tiene su propio tope, distinto del de imagen', () => {
+    const src = readFileSync(join(__dirname, '../../src/businesses/businesses.controller.ts'), 'utf8');
+    expect(src).toMatch(/FileInterceptor\('file', SUBIDA_VIDEO\)/);
+    expect(MAX_VIDEO_BYTES).toBe(40 * 1024 * 1024);
+  });
+
+  it('el 413 de multer en /upload-video dice el tope de VIDEO, no el de imagen', () => {
+    const json = jest.fn();
+    const res = { status: jest.fn(() => ({ json })) };
+    const host = { switchToHttp: () => ({ getResponse: () => res, getRequest: () => ({ url: '/api/v1/business/storefront-config/upload-video' }) }) };
+    new HttpExceptionFilter().catch(new PayloadTooLargeException('File too large'), host as any);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ message: MENSAJE_VIDEO_GRANDE }));
+  });
+
+  it('el 413 de multer en /upload-image sigue diciendo el tope de IMAGEN (no se rompió al agregar video)', () => {
+    const json = jest.fn();
+    const res = { status: jest.fn(() => ({ json })) };
+    const host = { switchToHttp: () => ({ getResponse: () => res, getRequest: () => ({ url: '/api/v1/business/storefront-config/upload-image' }) }) };
+    new HttpExceptionFilter().catch(new PayloadTooLargeException('File too large'), host as any);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ message: MENSAJE_IMAGEN_GRANDE }));
+  });
+
+  it('rechaza un mimetype que no es de video, sin tocar Storage', async () => {
+    const upload = jest.fn();
+    const supabase = { adminClient: { storage: { from: () => ({ upload }) } } };
+    const err = await negocios({}, supabase)
+      .uploadStorefrontVideo(BIZ, { buffer: Buffer.from('x'), mimetype: 'application/pdf', originalname: 'a.pdf' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('un error de Storage no le muestra al panel el detalle de Supabase', async () => {
+    const upload = jest.fn().mockResolvedValue({ error: { message: 'new row violates row-level security policy for bucket business-logos' } });
+    const supabase = { adminClient: { storage: { from: () => ({ upload }) } } };
+    const err = await negocios({}, supabase)
+      .uploadStorefrontVideo(BIZ, { buffer: Buffer.from('x'), mimetype: 'video/mp4', originalname: 'a.mp4' })
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ServiceUnavailableException);
     expect((err as Error).message).not.toMatch(/row-level|bucket/);

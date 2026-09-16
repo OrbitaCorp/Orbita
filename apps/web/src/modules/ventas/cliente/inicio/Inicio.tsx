@@ -15,7 +15,7 @@ import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { openWpp, columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
+import { openWpp, columnasDeGrilla, esGrillaDeLista, parseVideoEmbed } from '@/lib/storefront/utils'
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
@@ -256,6 +256,15 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // más alto que el de categorías porque cada marca ocupa bastante más
     // ancho que una pastilla de categoría.
     const marcasEnMarquee = marcas.length > 5
+
+    // ── Video ──
+    // parseVideoEmbed hace todo el trabajo (qué forma de link es, cómo
+    // embeberlo) — acá solo se resuelve una vez, no en cada render de la
+    // sección. null = el link no matchea YouTube/Vimeo/archivo directo (o
+    // no hay link cargado): la sección no se dibuja, nunca un cuadro roto.
+    const videoEmbed = parseVideoEmbed(config?.appearance?.videoUrl)
+    const tituloVideo = (config?.appearance?.videoTitle ?? '').trim()
+    const subtituloVideo = (config?.appearance?.videoSubtitle ?? '').trim()
 
     // "Grilla de productos" de Apariencia (gridLayout) — hasta acá esta
     // página nunca la leía: los 5 estantes de abajo (Destacados/Nuevos
@@ -826,6 +835,47 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             {marcas.map(m => <MarcaItem key={m.id} m={m} />)}
                         </div>
                     )}
+                </section>
+            )}
+
+            {/* ══ VIDEO ══ — un video del negocio, después de la tira de
+                marcas y antes del pie (pedido explícito del dueño: "después
+                del efecto parallax, antes del footer"). El link decide CÓMO
+                se embebe (YouTube/Vimeo/archivo directo, ver
+                parseVideoEmbed) — un link que no matchea ninguna forma
+                conocida no dibuja nada, nunca un cuadro roto. Editable en
+                Apariencia → "Video en tu tienda". */}
+            {(config?.appearance?.showVideo ?? false) && videoEmbed && (
+                <section className="sf-w" style={{ paddingBottom: 52 }}>
+                    {(tituloVideo || subtituloVideo) && (
+                        <div style={{ textAlign: 'center', maxWidth: 620, margin: '0 auto 28px' }}>
+                            {tituloVideo && <h2 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 10px' }}>{tituloVideo}</h2>}
+                            {subtituloVideo && <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.55, margin: 0 }}>{subtituloVideo}</p>}
+                        </div>
+                    )}
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 20, overflow: 'hidden', background: '#000' }}>
+                        {videoEmbed.tipo === 'file' ? (
+                            // Archivo directo: <video> nativo, con controles y la
+                            // miniatura que el dueño haya cargado (si no cargó
+                            // ninguna, el navegador dibuja el primer frame).
+                            <video controls poster={config?.appearance?.videoPosterUrl ?? undefined} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                                <source src={videoEmbed.src} />
+                            </video>
+                        ) : (
+                            // YouTube/Vimeo: el reproductor de cada plataforma trae
+                            // su propia miniatura y controles — no hace falta nada
+                            // más acá. Sin autoplay: el visitante lo prende cuando
+                            // quiere, no arranca solo.
+                            <iframe
+                                src={videoEmbed.src}
+                                title={tituloVideo || 'Video'}
+                                loading="lazy"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                            />
+                        )}
+                    </div>
                 </section>
             )}
 

@@ -214,6 +214,19 @@ export interface Apariencia {
     mostrarMarcas: boolean
     marcasTitulo:  string
     marcas:        MarcaItem[]
+    // Sección de video — un link (YouTube, Vimeo, o el archivo directo), no
+    // una subida: Órbita no aloja video propio. Mismo gate que el parallax
+    // y las marcas: no alcanza con mostrarVideo, el link tiene que resolver
+    // a un embed reconocido (ver parseVideoEmbed, lib/storefront/utils.ts)
+    // — un link mal pegado no deja un cuadro roto, la sección no se dibuja.
+    // videoPoster solo se usa con un archivo directo (YouTube/Vimeo traen
+    // su propia miniatura). Va después del parallax y antes del pie —
+    // pedido explícito del dueño.
+    mostrarVideo:    boolean
+    videoTitulo:     string
+    videoSubtitulo:  string
+    videoUrl:        string
+    videoPoster:     string | null
     // Contenido que pide UNA plantilla de Home y no existe en el home clásico
     // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
     // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
@@ -287,6 +300,13 @@ export const AP_DEFAULTS: Apariencia = {
     mostrarMarcas: false,
     marcasTitulo: 'Trabajamos con las mejores marcas',
     marcas: [],
+    // Mismo criterio: apagado y sin link de ejemplo. Un video de muestra
+    // sería el video de OTRO negocio precargado en la tienda de este dueño.
+    mostrarVideo: false,
+    videoTitulo: '',
+    videoSubtitulo: '',
+    videoUrl: '',
+    videoPoster: null,
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },

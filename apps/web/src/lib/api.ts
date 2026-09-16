@@ -1040,6 +1040,9 @@ export type ApiAppearanceConfig = {
   // Tira de marcas con las que trabaja el negocio (gris, a color al pasar el
   // mouse) — ver Apariencia.tsx § "Marcas con las que trabajás".
   showBrands: boolean
+  // Sección de video del home (YouTube, Vimeo, o el archivo directo) — ver
+  // Apariencia.tsx § "Video en tu tienda".
+  showVideo: boolean
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null
@@ -1050,6 +1053,10 @@ export type ApiAppearanceConfig = {
   parallaxCtaLink: string | null
   brandsTitle: string | null
   brands: ApiBrandItem[] | null
+  videoTitle: string | null
+  videoSubtitle: string | null
+  videoUrl: string | null
+  videoPosterUrl: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
@@ -1090,6 +1097,22 @@ export async function panelUploadStorefrontImage(
   form.append('file', file, filename)
   if (opts.removeBackground) form.append('removeBackground', 'true')
   const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-image`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as { url: string }
+}
+
+// Alternativa a pegar un link en la sección de video de Apariencia — sube el
+// ARCHIVO, sin reencodear (ver businesses.service.ts#uploadStorefrontVideo).
+// La URL que devuelve se guarda en el mismo campo `videoUrl` que el link:
+// parseVideoEmbed ya la reconoce como "archivo directo" por la extensión.
+export async function panelUploadStorefrontVideo(file: Blob, filename: string) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-video`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const message = mensajeDeError(res.status, body)
@@ -2092,6 +2115,49 @@ export type ApiMember = {
 
 export function getMembers() {
   return panelRequest<ApiMember[]>('/members')
+}
+
+// ── Registro de actividad (audit_logs) ──────────────────────────────────────
+// Hallazgo `auditoria-sin-pantalla` de la auditoría interna: desde el 10/09
+// las acciones sensibles del panel quedan en audit_logs y GET /audit-logs ya
+// responde con el permiso config.audit.view, pero el dueño no tenía dónde
+// verlas. La pantalla es Configuración → Registro de actividad.
+//
+// Solo lectura: el backend no expone ningún endpoint para editar ni borrar el
+// registro, a propósito (ver audit.controller.ts).
+
+export type ApiAuditAction = 'CREATE' | 'UPDATE' | 'ACTIVATE' | 'DEACTIVATE' | 'DELETE'
+
+export type ApiAuditLog = {
+  id: string
+  entityType: string
+  entityId: string
+  action: ApiAuditAction
+  memberId: string | null
+  memberName: string | null
+  changes: { field: string; before?: unknown; after?: unknown }[] | null
+  createdAt: string
+}
+
+export type ApiAuditLogsPage = { data: ApiAuditLog[]; total: number; page: number; limit: number }
+
+export type AuditLogsFiltros = {
+  entityType?: string
+  memberId?: string
+  /** ISO 8601. El backend compara contra created_at. */
+  from?: string
+  to?: string
+  page?: number
+  limit?: number
+}
+
+export function panelListAuditLogs(filtros: AuditLogsFiltros = {}) {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(filtros)) {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  }
+  const qs = q.toString()
+  return panelRequest<ApiAuditLogsPage>(`/audit-logs${qs ? `?${qs}` : ''}`)
 }
 
 export function inviteMember(input: { name: string; email: string; roleId: string }) {

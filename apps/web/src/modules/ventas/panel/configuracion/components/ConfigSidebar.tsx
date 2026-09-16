@@ -12,8 +12,8 @@ import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
-    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Image as ImageIcon,
+    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy, History,
+    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Video, Image as ImageIcon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -50,6 +50,10 @@ const GRUPOS: Grupo[] = [
             { vista: 'apariencia',     label: 'Apariencia',     Icon: Palette, permisos: ['config.edit'] },
             { vista: 'equipo',         label: 'Equipo',         Icon: Users,   permisos: ['config.team.view', 'config.team.manage'] },
             { vista: 'notificaciones', label: 'Notificaciones', Icon: Bell,    permisos: ['config.edit'] },
+            // Registro de actividad: quien hizo que (audit_logs). Permiso propio
+            // (config.audit.view), no config.edit: se puede querer que alguien
+            // LEA el registro sin poder tocar la configuracion.
+            { vista: 'actividad',      label: 'Registro de actividad', Icon: History, permisos: ['config.audit.view'] },
         ],
     },
     {
@@ -90,6 +94,7 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
     { id: 'ap-sec-layout',        label: 'Diseño y layout',          Icon: LayoutGrid },
     { id: 'ap-sec-parallax',      label: 'Banner con efecto parallax', Icon: ImageIcon },
     { id: 'ap-sec-marcas',        label: 'Marcas con las que trabajás', Icon: BadgeCheck },
+    { id: 'ap-sec-video',         label: 'Video en tu tienda',       Icon: Video },
     { id: 'ap-sec-visibilidad',   label: '¿Qué ven tus clientes?',   Icon: Eye },
     { id: 'ap-sec-textos',        label: 'Textos de tu tienda',      Icon: AlignLeft },
     { id: 'ap-sec-estadisticas',  label: 'Barra de estadísticas',    Icon: Hash },

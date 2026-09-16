@@ -4,10 +4,13 @@
 # Compiled output
 /dist
 
-# Env (los valores reales se cargan a mano, nunca a git)
-.env
-.env.local
-.env.*.local
+# Env (los valores reales se cargan a mano, nunca a git).
+# `.env*` y no una lista de nombres: el hallazgo `secretos-tarball-cloud-build`
+# salio de que .env.bak2 no estaba en la lista de tres de antes. El .gitignore
+# de la raiz ya cubre esto; esta copia importa igual porque gcloud lee el
+# .gitignore del directorio que sube (ver .gcloudignore).
+.env*
+!.env.example
 
 # Prisma
 /prisma/migrations/dev.db*

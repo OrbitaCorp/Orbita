@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { MENSAJE_IMAGEN_GRANDE } from '../utils/subida-imagen';
+import { MENSAJE_VIDEO_GRANDE } from '../utils/subida-video';
 
 // Forma mínima de la respuesta HTTP (evita depender de @types/express).
 interface HttpResponseLike {
@@ -51,9 +52,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = (body.message as string) ?? undefined;
         error = (body.error as string) ?? exception.name;
       }
-      // El único 413 que llega acá es el de multer al pasarse del tope de
-      // SUBIDA_IMAGEN, con su texto en inglés ("File too large").
-      if (status === HttpStatus.PAYLOAD_TOO_LARGE) message = MENSAJE_IMAGEN_GRANDE;
+      // El 413 que llega acá es el de multer al pasarse del tope configurado
+      // (SUBIDA_IMAGEN o SUBIDA_VIDEO, según la ruta), con su texto en inglés
+      // ("File too large") — se reemplaza por el mensaje en castellano con el
+      // tope QUE CORRESPONDE: los dos endpoints tienen límites distintos (10
+      // MB imagen, 40 MB video), así que no alcanza un mensaje único.
+      if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+        const request = ctx.getRequest<HttpRequestLike>();
+        message = rutaSinQuery(request?.url).includes('/upload-video') ? MENSAJE_VIDEO_GRANDE : MENSAJE_IMAGEN_GRANDE;
+      }
     } else {
       // Excepción NO controlada (no es un HttpException nuestro) — antes se
       // formateaba en silencio como {error:'INTERNAL_ERROR'} sin dejar

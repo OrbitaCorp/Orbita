@@ -82,7 +82,7 @@ export class GoogleAuthController {
         return;
       }
 
-      const exchangeCode = this.exchangeStore.create(sessionPayload);
+      const exchangeCode = await this.exchangeStore.create(sessionPayload);
       const sufijoReturnTo = statePayload.returnTo ? `&returnTo=${encodeURIComponent(statePayload.returnTo)}` : '';
       res.redirect(`${this.frontendUrl}${CALLBACK_PATH}?code=${exchangeCode}${sufijoReturnTo}`);
     } catch {
@@ -91,11 +91,13 @@ export class GoogleAuthController {
   }
 
   // Server-a-server: lo llama el BFF de Next.js (pages/api/auth/google/exchange.ts),
-  // nunca el browser directo. El código es de un solo uso y expira a los 60s.
+  // nunca el browser directo. El código es de un solo uso y expira a los 60s;
+  // vive en Postgres, así que sirve aunque el callback lo haya atendido otra
+  // instancia de Cloud Run (hallazgo `auth-estado-en-memoria`).
   @Post('exchange')
   @Public()
-  exchange(@Body() dto: GoogleExchangeDto) {
-    const payload = this.exchangeStore.consume(dto.code);
+  async exchange(@Body() dto: GoogleExchangeDto) {
+    const payload = await this.exchangeStore.consume(dto.code);
     if (!payload) throw new UnauthorizedException('Código inválido o expirado');
     return payload;
   }
