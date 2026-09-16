@@ -8,7 +8,7 @@ import { getConversationMessages, sendConversationMessage, getCustomer, type Cha
 interface Props {
   cv:              Conversacion | null
   onToast:         (m: string) => void
-  onPerfil:        () => void
+  onPerfil:        (customerId: string) => void
   onArchivar:      (id: string) => void
   plantillas:      Plantilla[]
   onIrAPlantillas: () => void

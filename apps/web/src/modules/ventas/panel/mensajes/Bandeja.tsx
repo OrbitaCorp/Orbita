@@ -5,6 +5,7 @@ import { BandejaLista } from './components/BandejaLista'
 import { ChatPanel } from './components/ChatPanel'
 import type { Conversacion, Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
 import { listConversations, updateConversation, listMessageTemplates, type ConversationRow, type MessageTemplateRow } from '@/lib/api'
+import { adminPath, currentSlug } from '@/lib/tenant'
 
 // El backend usa el enum en mayúsculas; el resto de esta pantalla trabaja en
 // minúsculas — mismo criterio que Plantillas.tsx.
@@ -104,7 +105,7 @@ interface BandejaProps {
   onCerrar: () => void
   ir:       (v: VistaMensaje) => void
   onToast:  (m: string) => void
-  onPerfil: () => void
+  onPerfil: (customerId: string) => void
 }
 
 function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: BandejaProps) {
@@ -215,9 +216,24 @@ export function MensajesHub() {
     router.push({ query: rest })
   }
 
-  const irPerfil = () => {
-    const { negocioId, moduloPadre } = router.query
-    router.push({ query: { negocioId: negocioId as string, moduloPadre: moduloPadre as string, seccion: 'clientes', vista: 'detalle', id: 'c1' } })
+  // Dos bugs juntos acá. El primero, el que tiraba el error en consola: sin
+  // `pathname`, Next reusa el de esta página (`/admin/[...slug]`) e intenta
+  // interpolar `slug` desde `query` — que nunca lo tenía, así que fallaba
+  // siempre que se abría el perfil desde un mensaje. `adminPath()` arma un
+  // pathname ya resuelto (mismo patrón que `irSeccion` en ClienteLista.tsx),
+  // sin placeholders que interpolar.
+  //
+  // El segundo no tiraba error pero llevaba al cliente equivocado: el id
+  // estaba clavado en 'c1' (un resabio de mensajes.mock.ts, de antes de que
+  // esta pantalla se conectara a la API real) en vez del cliente de la
+  // conversación abierta.
+  const irPerfil = (customerId: string) => {
+    const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+    const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
+    router.push({
+      pathname: adminPath(negocioId, moduloPadre, 'clientes'),
+      query: { vista: 'detalle', id: customerId },
+    })
   }
 
   const esPlantillas = vista === 'plantillas'

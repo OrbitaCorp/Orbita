@@ -6,7 +6,7 @@ import { Avatar } from './Avatar'
 interface Props {
   cv:         Conversacion
   pedidos:    PedidoResumen[]
-  onPerfil:   () => void
+  onPerfil:   (customerId: string) => void
   onArchivar: () => void
 }
 
@@ -70,7 +70,7 @@ export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
             {extras > 0 && (
               <button
                 className="ds-link"
-                onClick={onPerfil}
+                onClick={() => onPerfil(cv.customerId)}
                 style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, fontWeight: 500, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >
                 ver todos ({pedidos.length})
@@ -82,7 +82,7 @@ export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
 
       {/* Acciones */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, paddingTop: 2 }}>
-        <button className="ds-hover" style={btnOutline} onClick={onPerfil}>
+        <button className="ds-hover" style={btnOutline} onClick={() => onPerfil(cv.customerId)}>
           Ver perfil
         </button>
         <MenuContextual items={[
