@@ -46,7 +46,13 @@ describe('SubscriptionsService — cancelación voluntaria (unit)', () => {
       expect(prisma.business.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'biz1' }, data: expect.objectContaining({ isPaused: true }) }),
       );
-      expect(prisma.subscription.updateMany).toHaveBeenCalledWith({ where: { businessId: 'biz1' }, data: { status: 'CANCELLED' } });
+      // `mpPreapprovalId: null` desde el arreglo del hallazgo `businesses-sin-baja`
+      // (RBT-699): la baja ahora también cancela la preapproval en MP. El detalle
+      // de ese corte está en baja-negocio.auditoria.unit-spec.ts.
+      expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+        where: { businessId: 'biz1' },
+        data: { status: 'CANCELLED', mpPreapprovalId: null },
+      });
       expect(mail.sendBusinessCancellationConfirmed).toHaveBeenCalledWith(
         'dueno@test.com',
         expect.objectContaining({ businessName: 'Mi Tienda' }),

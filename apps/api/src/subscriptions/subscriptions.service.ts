@@ -838,6 +838,25 @@ export class SubscriptionsService {
 
   // ── Activación del plan elegido (fin del beneficio / cambio de plan) ─────
 
+  // Da de baja una preapproval en MP. Devuelve si MP confirmó la baja, porque
+  // no todos los que la llaman quieren lo mismo ante un `false`: activatePlan
+  // sigue de largo (va a crear otra igual), pero cancelBusiness NO puede
+  // borrar el `mpPreapprovalId` de la base — ese id es lo único con lo que se
+  // puede reintentar frenar un débito que del lado de MP sigue vivo.
+  private async cancelarPreapproval(mpPreapprovalId: string, businessId: string): Promise<boolean> {
+    if (!this.mpConfigured) {
+      this.logger.warn(`No se canceló la preapproval ${mpPreapprovalId} de ${businessId}: MercadoPago no está configurado en este entorno`);
+      return false;
+    }
+    try {
+      await this.preapproval.update({ id: mpPreapprovalId, body: { status: 'cancelled' } });
+      return true;
+    } catch (err) {
+      this.logger.warn(`No se pudo cancelar la preapproval ${mpPreapprovalId} de ${businessId}: ${this.mpErrorMessage(err)}`);
+      return false;
+    }
+  }
+
   // Arma el link de MP para que el dueño autorice la preapproval de SU plan
   // real — se llama desde el panel una vez que `currentPeriodEnd` ya pasó
   // (el beneficio de bienvenida terminó, o el período del plan anterior si
@@ -884,14 +903,9 @@ export class SubscriptionsService {
     // Si ya había una preapproval activa (esto es un cambio de plan, no la
     // primera activación tras el beneficio de bienvenida), se cancela antes
     // de crear la nueva: MP no permite cambiarle la frecuencia a una ya
-    // autorizada, así que conviven las dos hasta que ésta se cancele.
-    if (sub.mpPreapprovalId) {
-      try {
-        await this.preapproval.update({ id: sub.mpPreapprovalId, body: { status: 'cancelled' } });
-      } catch (err) {
-        this.logger.warn(`No se pudo cancelar la preapproval vieja ${sub.mpPreapprovalId} de ${businessId}: ${this.mpErrorMessage(err)}`);
-      }
-    }
+    // autorizada, así que conviven las dos hasta que ésta se cancele. Acá da
+    // igual si MP no la pudo dar de baja: la nueva se crea lo mismo.
+    if (sub.mpPreapprovalId) await this.cancelarPreapproval(sub.mpPreapprovalId, businessId);
 
     let response;
     try {
@@ -1078,6 +1092,26 @@ export class SubscriptionsService {
     const scheduledDeletionAt = new Date(now);
     scheduledDeletionAt.setDate(scheduledDeletionAt.getDate() + SubscriptionsService.DIAS_VENTANA_CANCELACION);
 
+    // Cortar el débito ANTES de tocar la base (auditoría interna, hallazgo
+    // `businesses-sin-baja` / RBT-699): hasta acá la baja pausaba la tienda y
+    // ponía la suscripción en CANCELLED, pero la preapproval seguía viva en
+    // MercadoPago, así que al que se fue se le seguía cobrando todos los meses
+    // — y cada cobro aprobado volvía a poner la suscripción en ACTIVE.
+    //
+    // El id se borra SOLO si MP confirmó la baja. Si falló, se conserva: es lo
+    // único con lo que se puede reintentar, y mientras tanto el cobro que
+    // llegue igual lo frena la guarda de recordPayment.
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    const preapprovalCancelada = sub?.mpPreapprovalId
+      ? await this.cancelarPreapproval(sub.mpPreapprovalId, businessId)
+      : true;
+    if (!preapprovalCancelada) {
+      this.logger.error(
+        `Baja de ${businessId}: NO se pudo cancelar la preapproval ${sub?.mpPreapprovalId} en MercadoPago. ` +
+          'La tienda queda dada de baja igual, pero hay que cancelarla a mano desde el panel de MP.',
+      );
+    }
+
     // isPaused: true de una vez (no hace falta esperar al cron de esta
     // noche) — mismo criterio que cualquier otra pausa: la tienda deja de
     // verse para los clientes al instante. Subscription.status pasa a
@@ -1088,7 +1122,13 @@ export class SubscriptionsService {
         where: { id: businessId },
         data: { cancelledAt: now, scheduledDeletionAt, isPaused: true, cancellationWarningEmailSentAt: null },
       }),
-      this.prisma.subscription.updateMany({ where: { businessId }, data: { status: 'CANCELLED' } }),
+      this.prisma.subscription.updateMany({
+        where: { businessId },
+        // `planActive` no se toca a propósito: ponerlo en false haría que, si
+        // el dueño reactiva dentro de los 60 días, el cron le mande el aviso
+        // de "tu período de bienvenida está por vencer" (ver PRE_AVISO).
+        data: { status: 'CANCELLED', ...(preapprovalCancelada ? { mpPreapprovalId: null } : {}) },
+      }),
     ]);
 
     const { emails } = await this.destinatarios(businessId);
@@ -1182,6 +1222,25 @@ export class SubscriptionsService {
     if (yaRegistrado) return { recorded: false, duplicated: true };
 
     const aprobado = pago.status === 'approved';
+
+    // Una suscripción dada de baja NO vuelve sola. Si igual llegó un cobro es
+    // que la preapproval sobrevivió a la baja (ver cancelBusiness): se deja
+    // registrado para que quede el rastro de la plata que se le cobró, se
+    // reintenta cancelar la preapproval, y no se renueva el período ni se
+    // despausa la tienda. Antes, este mismo cobro la devolvía a ACTIVE
+    // (auditoría interna, hallazgo `businesses-sin-baja` / RBT-699).
+    const cancelada = sub.status === 'CANCELLED';
+    if (cancelada) {
+      this.logger.error(
+        `Pago ${mpPaymentId} de ${businessId}: llegó un cobro de una suscripción CANCELLED — la preapproval ` +
+          `${sub.mpPreapprovalId ?? '(sin id guardado)'} seguía viva. Se registra sin reactivar.`,
+      );
+      if (sub.mpPreapprovalId) {
+        const ok = await this.cancelarPreapproval(sub.mpPreapprovalId, businessId);
+        if (ok) await this.prisma.subscription.update({ where: { id: sub.id }, data: { mpPreapprovalId: null } });
+      }
+    }
+
     const now = new Date();
     const ciclo = this.cicloDelPlan(plan);
     // El cobro paga el período que arranca cuando vencía el anterior.
@@ -1215,7 +1274,7 @@ export class SubscriptionsService {
       });
 
       // Un cobro aprobado renueva el período y reactiva si estaba en mora.
-      if (aprobado) {
+      if (aprobado && !cancelada) {
         await tx.subscription.update({
           where: { id: sub.id },
           data: { status: 'ACTIVE', currentPeriodStart: periodStart, currentPeriodEnd: periodEnd },
@@ -1228,13 +1287,13 @@ export class SubscriptionsService {
       }
     });
 
-    if (aprobado && veniaEnProblemas) {
+    if (aprobado && !cancelada && veniaEnProblemas) {
       await this.notificarReactivacion(businessId).catch((e) =>
         this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
       );
     }
 
-    return { recorded: true, approved: aprobado };
+    return { recorded: true, approved: aprobado, cancelled: cancelada };
   }
 
   // Mail de "tu tienda está activa de nuevo" — lo dispara tanto un cobro
