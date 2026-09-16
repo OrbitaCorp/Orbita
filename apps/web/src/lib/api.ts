@@ -1040,6 +1040,9 @@ export type ApiAppearanceConfig = {
   // Tira de marcas con las que trabaja el negocio (gris, a color al pasar el
   // mouse) — ver Apariencia.tsx § "Marcas con las que trabajás".
   showBrands: boolean
+  // Sección de video del home (YouTube, Vimeo, o el archivo directo) — ver
+  // Apariencia.tsx § "Video en tu tienda".
+  showVideo: boolean
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null
@@ -1050,6 +1053,10 @@ export type ApiAppearanceConfig = {
   parallaxCtaLink: string | null
   brandsTitle: string | null
   brands: ApiBrandItem[] | null
+  videoTitle: string | null
+  videoSubtitle: string | null
+  videoUrl: string | null
+  videoPosterUrl: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

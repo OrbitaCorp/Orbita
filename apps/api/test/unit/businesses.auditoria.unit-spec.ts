@@ -236,12 +236,16 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
           { id: 'mk1', name: 'Casio', logoUrl: 'https://hhaqlzrcskmwnvhgydon.supabase.co/storage/v1/object/public/business-logos/a/casio.webp' },
           { id: 'mk2', name: 'G-Shock' },
         ],
+        videoTitle: 'Así trabajamos',
+        videoSubtitle: 'Un vistazo detrás de escena.',
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        videoPosterUrl: 'https://hhaqlzrcskmwnvhgydon.supabase.co/storage/v1/object/public/business-logos/a/poster.webp',
       }),
     ).toEqual([]);
   });
 
   it('los campos que el panel limpia con "" siguen pasando', async () => {
-    expect(await errores(UpdateStorefrontConfigDto, { logoUrl: '', faviconUrl: '', parallaxImageUrl: '', headerLayout: '', gridLayout: '' })).toEqual([]);
+    expect(await errores(UpdateStorefrontConfigDto, { logoUrl: '', faviconUrl: '', parallaxImageUrl: '', headerLayout: '', gridLayout: '', videoUrl: '', videoPosterUrl: '' })).toEqual([]);
   });
 
   it.each([
@@ -253,6 +257,10 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
     ['fontScale', 5],
     ['cardRadius', -1],
     ['headerLayout', 'x;}body{display:none'],
+    // Mismos dos casos que parallaxImageUrl: sin https, y un scheme peligroso.
+    ['videoUrl', 'http://sin-tls.com/video.mp4'],
+    ['videoUrl', 'javascript:alert(1)'],
+    ['videoPosterUrl', 'javascript:alert(1)'],
   ])('UpdateStorefrontConfigDto rechaza %s = %j', async (campo, valor) => {
     expect(await errores(UpdateStorefrontConfigDto, { [campo]: valor })).toContain(campo);
   });

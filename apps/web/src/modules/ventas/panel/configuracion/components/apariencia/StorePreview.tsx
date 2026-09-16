@@ -7,6 +7,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Search, ShoppingBag, ShoppingCar
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
+import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { fontStack, CATEGORY_LAYOUT_MAX, type Apariencia } from '../../mock/apariencia.mock'
 
 const DESIGN_W = 1280
@@ -105,6 +106,11 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
     // se dibujan: mismo filtro que hace el mapper al guardar y el storefront
     // al leer, así el preview no muestra un hueco que la tienda no va a tener.
     const marcasVisibles = ap.marcas.filter(m => m.name.trim() !== '')
+
+    // Mismo parser que el storefront real (Inicio.tsx) — un solo lugar
+    // decide qué links entiende Órbita, así el preview nunca muestra algo
+    // distinto de lo que va a mostrar la tienda.
+    const videoEmbed = parseVideoEmbed(ap.videoUrl)
 
     // Identidad de ESTA tienda para el preview. Antes habia dos datos de la
     // tienda ficticia del mock escritos a mano (el subdominio bajo el logo y el
@@ -352,6 +358,32 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                         .ap-marca-prev:hover img  { filter:grayscale(0); opacity:1; }
                         .ap-marca-prev:hover span { color:${prim} !important; }
                     `}</style>
+                </section>
+            )}
+
+            {/* ══ Video ══ — mismo gate que el storefront real (Inicio.tsx):
+                el toggle Y un link que resuelva a un embed reconocido. Va
+                inerte (pointer-events:none), como el resto de esta vista
+                previa — es para ver cómo QUEDA, no para reproducirlo acá
+                adentro (mismo criterio que el CTA del parallax de arriba,
+                que tampoco es clickeable de verdad). */}
+            {ap.mostrarVideo && videoEmbed && (
+                <section style={{ maxWidth: 1280, margin: '0 auto', padding: '8px 32px 52px' }}>
+                    {(ap.videoTitulo.trim() || ap.videoSubtitulo.trim()) && (
+                        <div style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto 22px' }}>
+                            {ap.videoTitulo.trim() && <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: c.text, margin: '0 0 8px', fontFamily: fh }}>{ap.videoTitulo}</h2>}
+                            {ap.videoSubtitulo.trim() && <p style={{ fontSize: 13, color: c.muted, lineHeight: 1.55, margin: 0 }}>{ap.videoSubtitulo}</p>}
+                        </div>
+                    )}
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 16, overflow: 'hidden', background: '#000', pointerEvents: 'none' }}>
+                        {videoEmbed.tipo === 'file' ? (
+                            <video muted poster={ap.videoPoster ?? undefined} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                                <source src={videoEmbed.src} />
+                            </video>
+                        ) : (
+                            <iframe src={videoEmbed.src} title={ap.videoTitulo || 'Video'} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }} />
+                        )}
+                    </div>
                 </section>
             )}
 

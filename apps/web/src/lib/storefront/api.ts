@@ -118,6 +118,11 @@ export type StorefrontConfigResponse = {
     // ver Inicio.tsx § "TIRA DE MARCAS". Mismo gate que el parallax: no
     // alcanza con el toggle, tiene que haber al menos una marca cargada.
     showBrands: boolean
+    // Sección de video del home clásico — ver Inicio.tsx § "VIDEO". Mismo
+    // gate que el parallax: no alcanza con el toggle, el link tiene que
+    // resolver a un embed reconocido (ver parseVideoEmbed en
+    // lib/storefront/utils.ts).
+    showVideo: boolean
     shippingText: string | null
     whatsappText: string | null
     statsBar: StorefrontStatsItem[]
@@ -128,6 +133,10 @@ export type StorefrontConfigResponse = {
     parallaxCtaLink: string | null
     brandsTitle: string | null
     brands: StorefrontBrandItem[]
+    videoTitle: string | null
+    videoSubtitle: string | null
+    videoUrl: string | null
+    videoPosterUrl: string | null
   } | null
   contact: {
     whatsapp: string | null

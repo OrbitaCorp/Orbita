@@ -106,3 +106,34 @@ export function thumbGradientAlt(hue: number): string {
     oklch(0.89 0.08 ${hue}) 0px 32px,
     oklch(0.83 0.06 ${hue}) 32px 64px)`
 }
+
+// Sección de video de Apariencia (Inicio.tsx § "VIDEO", StorePreview.tsx) —
+// el dueño pega CUALQUIER link (YouTube, Vimeo, o el archivo directo), no
+// sube nada: no hay infraestructura propia de Órbita para alojar video, y
+// construirla (storage, límites de tamaño, transcodificación) es un problema
+// aparte. Esta función decide CÓMO embeberlo según la forma del link — un
+// solo lugar, compartido entre el storefront real y el preview del panel,
+// para que los dos entiendan exactamente los mismos links.
+//
+// 'youtube'/'vimeo' devuelven la URL de un <iframe> (con el id sacado del
+// link, así sirve tanto un link "para compartir" como uno "embed" que el
+// dueño haya pegado tal cual); 'file' devuelve el link tal cual, para un
+// <video> nativo. Un link que no matchea ninguna forma conocida (mal
+// pegado, u otro host no soportado) devuelve null — la sección entera no se
+// dibuja en vez de mostrar un cuadro roto.
+const YOUTUBE_ID = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+const VIMEO_ID = /vimeo\.com\/(?:video\/)?(\d+)/
+const ARCHIVO_VIDEO = /\.(mp4|webm|ogg|mov)(\?\S*)?$/i
+
+export type VideoEmbed = { tipo: 'youtube' | 'vimeo'; src: string } | { tipo: 'file'; src: string }
+
+export function parseVideoEmbed(url: string | null | undefined): VideoEmbed | null {
+  const v = url?.trim()
+  if (!v) return null
+  const yt = v.match(YOUTUBE_ID)
+  if (yt) return { tipo: 'youtube', src: `https://www.youtube-nocookie.com/embed/${yt[1]}` }
+  const vm = v.match(VIMEO_ID)
+  if (vm) return { tipo: 'vimeo', src: `https://player.vimeo.com/video/${vm[1]}` }
+  if (ARCHIVO_VIDEO.test(v)) return { tipo: 'file', src: v }
+  return null
+}

@@ -331,6 +331,7 @@ export class StorefrontService {
             showStatsBar: appearance.showStatsBar,
             showParallaxBanner: appearance.showParallaxBanner,
             showBrands: appearance.showBrands,
+            showVideo: appearance.showVideo,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
             statsBar: appearance.statsBar ?? [],
@@ -344,6 +345,10 @@ export class StorefrontService {
             // storefront pregunta por `.length`, no tiene que defenderse
             // además del null de una tienda que nunca cargó ninguna.
             brands: appearance.brands ?? [],
+            videoTitle: appearance.videoTitle,
+            videoSubtitle: appearance.videoSubtitle,
+            videoUrl: appearance.videoUrl,
+            videoPosterUrl: appearance.videoPosterUrl,
           }
         : null,
       contact: contact
