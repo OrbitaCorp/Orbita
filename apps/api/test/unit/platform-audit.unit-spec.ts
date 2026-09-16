@@ -65,7 +65,7 @@ describe('Auditoría interna — helpers', () => {
   });
 
   it('resumir cuenta hechos, en curso, sin responsable y hallazgos abiertos', () => {
-    const base = { id: '', key: '', grupo: '', titulo: '', ruta: null, foco: '', checks: [], checksHechos: 0, orden: 0, esPersonalizado: false, informeUrl: null, notas: null, informe: null, hechoPor: null, hechoAt: null, actualizadoPor: null, updatedAt: new Date() };
+    const base = { id: '', key: '', grupo: '', titulo: '', ruta: null, foco: '', checks: [], checksHechos: 0, orden: 0, esPersonalizado: false, informeUrl: null, notas: null, informe: null, hechoPor: null, hechoAt: null, actualizadoPor: null, decision: null, decisionNota: null, decisionPor: null, decisionAt: null, updatedAt: new Date() };
     const r = resumir([
       { ...base, area: 'BACKEND', severidad: null, estado: 'HECHO', responsable: null },
       { ...base, area: 'BACKEND', severidad: null, estado: 'EN_CURSO', responsable: { id: 'a', name: 'A' } },

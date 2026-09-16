@@ -142,8 +142,8 @@ model BusinessConfig {
   // electrónico espera ver quién vende. Opcionales: sin ellos, los legales
   // muestran solo el nombre. El CUIT va sin guiones, validado con dígito
   // verificador en BusinessesService.updateConfig (common/utils/cuit.ts).
-  cuit      String? @db.VarChar(11)
-  legalName String? @map("legal_name") @db.VarChar(120)
+  cuit         String? @db.VarChar(11)
+  legalName    String? @map("legal_name") @db.VarChar(120)
 
   // Pagos habilitados (toggles)
   acceptsMercadopago     Boolean @default(true) @map("accepts_mercadopago")
@@ -274,21 +274,21 @@ model StorefrontConfig {
   fontScale       Decimal? @map("font_scale") @db.Decimal(3, 2)
 
   // Layout
-  headerLayout String? @map("header_layout")
-  gridLayout   String? @map("grid_layout")
-  cardRadius   Int?    @map("card_radius")
+  headerLayout   String?  @map("header_layout")
+  gridLayout     String?  @map("grid_layout")
+  cardRadius     Int?     @map("card_radius")
   // Estilo de la sección "Comprá por categoría" del home. null = "pills"
   // (el de siempre: ícono + nombre + contador en carrusel). Los otros cinco
   // están en CATEGORY_LAYOUTS (apps/web, apariencia.mock.ts) — dos de ellos
   // ("mosaico"/"tarjetas") dependen de que las categorías tengan FOTO
   // cargada, y el panel los ofrece deshabilitados si no hay ninguna.
-  categoryLayout String? @map("category_layout")
+  categoryLayout String?  @map("category_layout")
   // Categorías elegidas a mano para "índice"/"mosaico"/"tarjetas" — [] (el
   // default) = automático, se resuelve en el storefront (las activas, en
   // "mosaico"/"tarjetas" filtradas a las que tienen foto). IDs de Category,
   // no se valida FK acá (mismo criterio que categoryIds en discounts/coupons):
   // un id borrado después simplemente no matchea nada al filtrar, no rompe.
-  categoryIds String[] @default([]) @map("category_ids")
+  categoryIds    String[] @default([]) @map("category_ids")
 
   // Plantilla de Home (paquete Avanzado) — null = home clásico de siempre.
   // "vidriera" es la única real por ahora (prueba de concepto); el resto del
@@ -1635,11 +1635,11 @@ enum SubscriptionStatus {
 // período, la secuencia de avisos se manda de nuevo entera (no se "gasta" una
 // sola vez de por vida).
 model SubscriptionLifecycleNotice {
-  id             String                       @id @default(uuid())
-  subscriptionId String                       @map("subscription_id")
+  id             String                     @id @default(uuid())
+  subscriptionId String                     @map("subscription_id")
   stage          SubscriptionLifecycleStage
-  periodEnd      DateTime                     @map("period_end")
-  sentAt         DateTime                     @default(now()) @map("sent_at")
+  periodEnd      DateTime                   @map("period_end")
+  sentAt         DateTime                   @default(now()) @map("sent_at")
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
@@ -2054,23 +2054,23 @@ model PlatformDiscountRedemption {
 }
 
 model PlatformAdmin {
-  id                  String            @id @default(uuid())
-  name                String
-  email               String            @unique
-  role                PlatformAdminRole @default(OPERATOR)
-  isActive            Boolean           @default(true) @map("is_active")
+  id                    String            @id @default(uuid())
+  name                  String
+  email                 String            @unique
+  role                  PlatformAdminRole @default(OPERATOR)
+  isActive              Boolean           @default(true) @map("is_active")
   // Credenciales propias (auth password + Google). A diferencia de member/customer,
   // el email es ÚNICO GLOBAL: un super admin no está scopeado a ningún negocio.
-  passwordHash        String?           @map("password_hash")
-  googleId            String?           @unique @map("google_id") // sub del id_token — vincula, no reemplaza el password
-  emailVerified       Boolean           @default(false) @map("email_verified")
-  hasTempPassword     Boolean           @default(false) @map("has_temp_password")
-  tempPasswordExpiresAt DateTime?       @map("temp_password_expires_at")
-  failedLoginAttempts Int               @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime?         @map("locked_until")
-  lastAccessAt        DateTime?         @map("last_access_at")
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
+  passwordHash          String?           @map("password_hash")
+  googleId              String?           @unique @map("google_id") // sub del id_token — vincula, no reemplaza el password
+  emailVerified         Boolean           @default(false) @map("email_verified")
+  hasTempPassword       Boolean           @default(false) @map("has_temp_password")
+  tempPasswordExpiresAt DateTime?         @map("temp_password_expires_at")
+  failedLoginAttempts   Int               @default(0) @map("failed_login_attempts")
+  lockedUntil           DateTime?         @map("locked_until")
+  lastAccessAt          DateTime?         @map("last_access_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
 
   grantedSubscriptions Subscription[]
   grantedAddons        BusinessAddon[]
@@ -2080,6 +2080,7 @@ model PlatformAdmin {
   auditResponsable     PlatformAuditItem[]      @relation("AuditResponsable")
   auditHechos          PlatformAuditItem[]      @relation("AuditHechoPor")
   auditActualizados    PlatformAuditItem[]      @relation("AuditActualizadoPor")
+  auditDecisiones      PlatformAuditItem[]      @relation("AuditDecisionPor")
 
   @@map("platform_admins")
 }
@@ -2169,12 +2170,24 @@ model PlatformAuditItem {
   hechoPorId       String?   @map("hecho_por_id")
   hechoAt          DateTime? @map("hecho_at")
   actualizadoPorId String?   @map("actualizado_por_id")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Qué hacer con un ítem que NO se destraba escribiendo código (los
+  // `decision.*`): lo propone quien revisa — típicamente Mateo — y lo lee Ale
+  // antes de dar la orden final. Es distinto de `estado`: `estado` dice en qué
+  // anda el trabajo, `decision` dice si el trabajo va a existir. null = todavía
+  // nadie opinó.
+  decision      PlatformAuditDecision?
+  decisionNota  String?                @map("decision_nota")
+  decisionPorId String?                @map("decision_por_id")
+  decisionAt    DateTime?              @map("decision_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   responsable    PlatformAdmin? @relation("AuditResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
   hechoPor       PlatformAdmin? @relation("AuditHechoPor", fields: [hechoPorId], references: [id], onDelete: SetNull)
   actualizadoPor PlatformAdmin? @relation("AuditActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+  decisionPor    PlatformAdmin? @relation("AuditDecisionPor", fields: [decisionPorId], references: [id], onDelete: SetNull)
 
   @@index([area, grupo])
   @@index([estado])
@@ -2192,6 +2205,15 @@ enum PlatformAuditEstado {
   PENDIENTE
   EN_CURSO
   HECHO
+}
+
+// Qué se hace con un ítem que no se destraba con código. HABLAR es un estado
+// legítimo y no un "todavía no contesté": quiere decir que hace falta charlarlo
+// entre los dos antes de poder decidir.
+enum PlatformAuditDecision {
+  HACER
+  NO_HACER
+  HABLAR
 }
 
 enum PlatformAuditSeveridad {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, ChevronDown, ChevronRight, ExternalLink, FileText, PencilLine, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, ExternalLink, FileText, PencilLine, Plus, RefreshCw, Scale, Search, Trash2 } from 'lucide-react'
 import {
   platformApi,
   type AuditArea, type AuditEstado, type AuditItemRow, type AuditListado, type AuditSeveridad,
@@ -11,6 +11,7 @@ import {
 } from './ui'
 import { MarkdownInforme, MD_CSS } from './MarkdownInforme'
 import { DocumentoAuditoria } from './DocumentoAuditoria'
+import { DecisionesAuditoria } from './DecisionesAuditoria'
 
 // Auditoría interna del equipo (super admin → Auditoría).
 //
@@ -63,6 +64,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
   const [creando, setCreando] = useState(false)
   const [documento, setDocumento] = useState(false)
+  const [decisiones, setDecisiones] = useState(false)
   const cargandoRef = useRef(false)
   const tieneDatosRef = useRef(false)
 
@@ -146,6 +148,14 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
     return out
   }, [visibles])
 
+  // Cuántas decisiones esperan que alguien elija qué hacer. Va en el badge del
+  // botón: sin el número, la pantalla no se abre nunca. Cuenta sobre TODOS los
+  // ítems, no sobre los visibles — los filtros de arriba no la tienen que tapar.
+  const pendientesDeDecidir = useMemo(
+    () => (data?.items ?? []).filter((i) => i.key.startsWith('decision.') && !i.decision).length,
+    [data],
+  )
+
   if (error && !data) return <ErrorBox msg={error} />
   if (!data) return <Loader />
 
@@ -189,6 +199,18 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         subtitle="Todo lo que hay que revisar de Órbita, quién lo toma y en qué está. Lo que tilda cada uno lo ven todos."
         action={
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setDecisiones(true)} className="ds-hover" style={btnGhost} title="Recorrer lo que no se destraba con código y elegir qué hacer con cada uno">
+              <Scale size={15} strokeWidth={2} /> Decisiones
+              {pendientesDeDecidir > 0 && (
+                <span style={{
+                  minWidth: 19, height: 19, padding: '0 5px', borderRadius: 999,
+                  background: 'var(--color-primary)', color: 'var(--color-on-primary)',
+                  fontSize: 11.5, fontWeight: 700, display: 'inline-grid', placeItems: 'center',
+                }}>
+                  {pendientesDeDecidir}
+                </span>
+              )}
+            </button>
             <button onClick={() => setDocumento(true)} className="ds-hover" style={btnGhost} title="Ver todos los informes juntos y guardarlos como PDF">
               <BookOpen size={15} strokeWidth={2} /> Documento
             </button>
@@ -280,6 +302,13 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
       })}
 
       {documento && <DocumentoAuditoria data={data} onClose={() => setDocumento(false)} />}
+      {decisiones && (
+        <DecisionesAuditoria
+          data={data}
+          onClose={() => setDecisiones(false)}
+          onCambio={(fila) => setData((d) => (d ? { ...d, items: d.items.map((i) => (i.id === fila.id ? fila : i)) } : d))}
+        />
+      )}
 
       {creando && (
         <CrearItemModal

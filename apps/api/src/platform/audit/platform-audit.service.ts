@@ -21,6 +21,7 @@ const ITEM_INCLUDE = {
   responsable: ADMIN_SELECT,
   hechoPor: ADMIN_SELECT,
   actualizadoPor: ADMIN_SELECT,
+  decisionPor: ADMIN_SELECT,
 } as const;
 
 type ItemConInclude = Prisma.PlatformAuditItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
@@ -118,6 +119,26 @@ export class PlatformAuditService {
     if (dto.notas !== undefined) data.notas = dto.notas?.trim() || null;
     if (dto.informe !== undefined) data.informe = dto.informe?.trim() || null;
 
+    // La decisión viaja siempre con quién la tomó y cuándo: sin eso, leer el
+    // tablero después no sirve para nada (no se sabe si opinó Mateo o Ale).
+    // Volver a null limpia los tres campos de una: es un "me retracto".
+    if (dto.decision !== undefined) {
+      data.decision = dto.decision;
+      if (dto.decision === null) {
+        data.decisionPor = { disconnect: true };
+        data.decisionAt = null;
+        data.decisionNota = null;
+      } else {
+        data.decisionPor = { connect: { id: adminId } };
+        data.decisionAt = new Date();
+      }
+    }
+    // La nota se puede editar sin volver a elegir la decisión, pero no se
+    // guarda si el ítem quedó sin decisión (el bloque de arriba ya la borró).
+    if (dto.decisionNota !== undefined && dto.decision !== null) {
+      data.decisionNota = dto.decisionNota?.trim() || null;
+    }
+
     if (dto.estado && dto.estado !== actual.estado) {
       data.estado = dto.estado;
       if (dto.estado === 'HECHO') {
@@ -146,6 +167,7 @@ export class PlatformAuditService {
             ...(dto.informe !== undefined ? { informe: dto.informe ? `${dto.informe.trim().length} caracteres` : null } : {}),
             ...(dto.checks?.length ? { checks: dto.checks.map((c) => ({ id: c.id, hecho: c.hecho })) } : {}),
             ...(dto.nuevosChecks?.length ? { nuevosChecks: dto.nuevosChecks.length } : {}),
+            ...(dto.decision !== undefined ? { decision: dto.decision } : {}),
           } as Prisma.InputJsonObject,
         },
       }),
@@ -221,6 +243,10 @@ export class PlatformAuditService {
       hechoPor: i.hechoPor,
       hechoAt: i.hechoAt,
       actualizadoPor: i.actualizadoPor,
+      decision: i.decision,
+      decisionNota: i.decisionNota,
+      decisionPor: i.decisionPor,
+      decisionAt: i.decisionAt,
       updatedAt: i.updatedAt,
     };
   }

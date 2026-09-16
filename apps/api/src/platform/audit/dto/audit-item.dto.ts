@@ -6,6 +6,9 @@ import {
 export const AUDIT_AREAS = ['BACKEND', 'FRONTEND', 'TRANSVERSAL', 'HALLAZGO'] as const;
 export const AUDIT_ESTADOS = ['PENDIENTE', 'EN_CURSO', 'HECHO'] as const;
 export const AUDIT_SEVERIDADES = ['CRITICA', 'ALTA', 'MEDIA', 'BAJA', 'INFO'] as const;
+// Qué se hace con un ítem que no se destraba con código. Se manda null para
+// volver a "sin decidir" (ver UpdateAuditItemDto.decision).
+export const AUDIT_DECISIONES = ['HACER', 'NO_HACER', 'HABLAR'] as const;
 
 // Solo http(s): el informe se abre con un click desde el panel y un link
 // javascript: o data: sería un XSS servido por nosotros mismos.
@@ -56,6 +59,18 @@ export class UpdateAuditItemDto {
   @ValidateNested({ each: true })
   @Type(() => CheckToggleDto)
   checks?: CheckToggleDto[];
+
+  // Qué se hace con el ítem. `null` lo devuelve a "sin decidir" y borra la
+  // nota, el autor y la fecha: es un "me retracto", no un estado intermedio.
+  @IsOptional()
+  @IsIn([...AUDIT_DECISIONES, null])
+  decision?: (typeof AUDIT_DECISIONES)[number] | null;
+
+  // Por qué se decidió eso. Corta a propósito: si necesita más, va en `notas`.
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  decisionNota?: string | null;
 
   // Verificaciones nuevas que el equipo suma a un ítem (texto libre).
   @IsOptional()

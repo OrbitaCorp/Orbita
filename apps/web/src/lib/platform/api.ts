@@ -416,6 +416,12 @@ export interface AuditItemRow {
   hechoPor: AuditAdminRef | null
   hechoAt: string | null
   actualizadoPor: AuditAdminRef | null
+  // Qué se hace con el ítem: lo propone quien revisa y lo lee Ale antes de dar
+  // la orden final. null = todavía nadie opinó. Ver TabDecisiones.
+  decision: AuditDecision | null
+  decisionNota: string | null
+  decisionPor: AuditAdminRef | null
+  decisionAt: string | null
   updatedAt: string
 }
 
@@ -435,6 +441,8 @@ export interface AuditListado {
   admins: AuditAdminRef[]
 }
 
+export type AuditDecision = 'HACER' | 'NO_HACER' | 'HABLAR'
+
 export interface UpdateAuditItemInput {
   estado?: AuditEstado
   responsableId?: string | null
@@ -443,6 +451,9 @@ export interface UpdateAuditItemInput {
   informe?: string | null
   checks?: { id: string; hecho: boolean }[]
   nuevosChecks?: string[]
+  // null vuelve el ítem a "sin decidir" y borra la nota.
+  decision?: AuditDecision | null
+  decisionNota?: string | null
 }
 
 export interface CreateAuditItemInput {
