@@ -695,6 +695,22 @@ export class SubscriptionsService {
       }
     });
 
+    // Bug encontrado el 16/09: `business.subdomain` es el auto-generado por
+    // registerBusiness() de más arriba — `business` nunca se refresca
+    // después. tareas[0] (updateDraft, siempre el primero, incondicional) es
+    // quien de verdad lo cambia al que el dueño eligió en el wizard. Devolver
+    // el viejo mandaba a la pantalla de vuelta (pago-retorno.tsx) a un
+    // "irAlPanel()" hacia un subdominio que YA NO es el del negocio: el
+    // /api/auth/refresh de esa página detecta el desajuste (RBT-660,
+    // WRONG_TENANT) y rebota al recién registrado al login del apex — justo
+    // después de haber creado la cuenta con éxito, en los dos flujos (pago
+    // real o alta gratis, es el mismo confirmAndCreate para ambos). Si el
+    // update falló (el único caso real donde queda el auto-generado, ver el
+    // warn de arriba), se usa `business.subdomain`, que ahí sí es el vigente.
+    const subdomainFinal = resultados[0].status === 'fulfilled'
+      ? (resultados[0].value as { subdomain: string }).subdomain
+      : business.subdomain;
+
     const now = new Date();
     const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenidaParaPlan(plan);
     const periodEnd = this.periodEnd(now, { frequency, frequencyType });
@@ -770,7 +786,7 @@ export class SubscriptionsService {
 
     return {
       activated: true,
-      subdomain: business.subdomain,
+      subdomain: subdomainFinal,
       // Lo necesita la pantalla de vuelta para entrar al panel por la ruta
       // legacy (/admin/{id}/...) en los entornos donde la sesion no viaja al
       // subdominio — en dev, con ROOT_DOMAIN=localhost, la cookie es host-only.
