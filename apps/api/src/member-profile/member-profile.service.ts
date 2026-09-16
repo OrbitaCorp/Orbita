@@ -6,6 +6,7 @@ import { AuthService } from '../auth/auth.service';
 import { MailService } from '../mail/mail.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { EmailVerificationService } from './email-verification.service';
 
 // (RBT-646) "Mi perfil" del panel — dueño/equipo. No confundir con `me/`, que
 // es la cuenta del CLIENTE del storefront (RBT-630/631): son roles distintos,
@@ -68,9 +69,15 @@ export class MemberProfileService {
         where: { id: memberId },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
-          // Queda "sin verificar". Todavía no existe el mail de confirmación
-          // para members (hallazgo abierto del 10/09): el flag es informativo.
-          ...(cambiaEmail && { email: dto.email, emailVerified: false }),
+          // Queda sin verificar y el reloj arranca de nuevo: el email nuevo
+          // tampoco está probado. Los códigos que hubiera dando vueltas para
+          // el anterior no sirven — EmailVerificationService los busca por el
+          // email ACTUAL, así que quedan muertos solos.
+          ...(cambiaEmail && {
+            email: dto.email,
+            emailVerified: false,
+            emailVerifyDueAt: EmailVerificationService.plazoNuevo(),
+          }),
         },
         include: { role: { select: { name: true } } },
       });
@@ -153,6 +160,7 @@ export class MemberProfileService {
 
   private toResponse(m: {
     id: string; name: string; email: string; emailVerified: boolean;
+    emailVerifyDueAt?: Date | null;
     themePreference: string; role: { name: string };
   }) {
     return {
@@ -160,6 +168,7 @@ export class MemberProfileService {
       name: m.name,
       email: m.email,
       emailVerified: m.emailVerified,
+      emailVerifyDueAt: m.emailVerifyDueAt ?? null,
       role: m.role.name,
       themePreference: m.themePreference,
     };

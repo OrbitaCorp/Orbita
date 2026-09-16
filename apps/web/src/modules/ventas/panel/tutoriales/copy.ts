@@ -152,7 +152,7 @@ export const HERRAMIENTAS: HerramientaCopy[] = [
     { id: 'campana', titulo: 'Notificaciones', texto: 'La campana junta lo que pasó mientras no estabas: pedidos nuevos, avisos del sistema. El número es lo sin leer.' },
     { id: 'tema', titulo: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta.' },
     { id: 'orbi', titulo: 'Orbi, el asistente', texto: 'Orbi responde preguntas sobre tu negocio y te ayuda a operar el panel. Se abre con Ctrl+K desde cualquier lado.' },
-    { id: 'usuario', titulo: 'Tu cuenta', texto: 'Desde tu avatar: "Mi perfil" (tus datos, tema y contraseña), "Ir a la tienda" para verla como cliente, y "Cerrar sesión".' },
+    { id: 'usuario', titulo: 'Tu cuenta', texto: 'Desde tu avatar: "Mi perfil" (tus datos, tema y contraseña), "Ir a la tienda" para verla como cliente, y "Cerrar sesión". En Mi perfil también confirmás tu email, que es lo que nos deja recuperarte la cuenta.' },
 ]
 
 // ─── Variante: Checklist de primeros pasos ───────────────────────────────────
@@ -194,6 +194,17 @@ export interface PasoGuia {
 }
 
 export const TAREAS_CHECKLIST: TareaChecklist[] = [
+    // Primera de todas porque es la única con reloj: son 7 días desde que se
+    // creó el espacio (hallazgo `alta-sin-verificar-email`). No se pide en el
+    // wizard a propósito — ahí suma fricción justo antes de cobrar.
+    {
+        id: 'verificar-email', titulo: 'Confirmá tu email',
+        detalle: 'Es el mail con el que entrás al panel. Te mandamos un código de 6 números y lo pegás en Mi perfil: treinta segundos.',
+        tip: 'Confirmarlo es lo que nos deja devolverte la cuenta si alguna vez perdés el acceso. Tenés 7 días desde que creaste la tienda.',
+        destino: ['ventas', 'perfil'], destinoLabel: 'Ir a Mi perfil',
+        seccionDestino: 'perfil', anclaDestino: 'boton:Enviarme el código || boton:Enviar otro código',
+        guiaLabel: 'Pedí el código desde acá',
+    },
     {
         id: 'negocio', titulo: 'Completá los datos del negocio',
         detalle: 'Nombre, rubro y dirección del local. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.',

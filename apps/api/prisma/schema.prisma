@@ -453,6 +453,11 @@ model Member {
   passwordHash             String?         @map("password_hash")
   googleId                 String?         @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified            Boolean         @default(false) @map("email_verified")
+  // Hasta cuándo tiene tiempo de verificar el email (7 días desde que creó el
+  // espacio, o desde que cambió el email). Decisión del 2026-09-16: la
+  // verificación NO va en el wizard, para no sumarle fricción al alta — se
+  // hace después, desde "Mi perfil" del panel. null = no hay nada pendiente.
+  emailVerifyDueAt         DateTime?       @map("email_verify_due_at")
   failedLoginAttempts      Int             @default(0) @map("failed_login_attempts")
   lockedUntil              DateTime?       @map("locked_until")
   lastAccessAt             DateTime?       @map("last_access_at")
@@ -462,10 +467,11 @@ model Member {
   createdAt                DateTime        @default(now()) @map("created_at")
   updatedAt                DateTime        @updatedAt @map("updated_at")
 
-  business         Business        @relation(fields: [businessId], references: [id])
-  role             Role            @relation(fields: [roleId], references: [id])
-  stockMovements   StockMovement[]
-  verifiedPayments Payment[]
+  business           Business                 @relation(fields: [businessId], references: [id])
+  role               Role                     @relation(fields: [roleId], references: [id])
+  stockMovements     StockMovement[]
+  verifiedPayments   Payment[]
+  emailVerifications EmailVerificationToken[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -612,6 +618,26 @@ model RefreshToken {
   @@index([userId, userType])
   @@index([businessId])
   @@map("refresh_tokens")
+}
+
+// Código de 6 dígitos para que un member verifique su email desde "Mi perfil"
+// (hallazgo `alta-sin-verificar-email`). Guarda el SHA-256, nunca el código.
+// Va contra el `email` además del member: si lo cambia mientras hay un código
+// dando vueltas, el viejo deja de servir solo, sin tener que salir a borrarlo.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  codeHash  String    @map("code_hash")
+  memberId  String    @map("member_id")
+  email     String
+  attempts  Int       @default(0)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("email_verification_tokens")
 }
 
 model PasswordResetToken {
@@ -2017,22 +2043,22 @@ model PendingSignup {
 // un trato puntual. No confundir con Discount/Coupon, que van en la dirección
 // contraria: de un negocio hacia sus propios compradores.
 model PlatformDiscountCode {
-  id         String    @id @default(uuid())
-  code       String    @unique // siempre guardado en MAYÚSCULAS (ver normalizarCodigo)
-  percentOff Int       @map("percent_off") // 1..100
-  maxUses    Int?      @map("max_uses") // null = sin límite de usos
-  usedCount  Int       @default(0) @map("used_count")
-  isActive   Boolean   @default(true) @map("is_active")
-  expiresAt  DateTime? @map("expires_at") // obligatorio si percentOff=100, ver validarVigenciaObligatoria
+  id                    String    @id @default(uuid())
+  code                  String    @unique // siempre guardado en MAYÚSCULAS (ver normalizarCodigo)
+  percentOff            Int       @map("percent_off") // 1..100
+  maxUses               Int?      @map("max_uses") // null = sin límite de usos
+  usedCount             Int       @default(0) @map("used_count")
+  isActive              Boolean   @default(true) @map("is_active")
+  expiresAt             DateTime? @map("expires_at") // obligatorio si percentOff=100, ver validarVigenciaObligatoria
   // Solo tiene efecto en códigos del 100% (alta gratis): además de la cuenta
   // de cortesía, le deja activado el addon Avanzado durante todo el período,
   // sin importar qué plan haya elegido el dueño en el wizard — ver
   // confirmAndCreate()/syncAddonAvanzado() en subscriptions.service.ts.
-  includesAdvancedAddon Boolean @default(false) @map("includes_advanced_addon")
-  note       String? // para qué se creó, queda a la vista del equipo
-  createdBy  String?   @map("created_by")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  includesAdvancedAddon Boolean   @default(false) @map("includes_advanced_addon")
+  note                  String? // para qué se creó, queda a la vista del equipo
+  createdBy             String?   @map("created_by")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   createdByAdmin PlatformAdmin?               @relation(fields: [createdBy], references: [id])
   redemptions    PlatformDiscountRedemption[]
