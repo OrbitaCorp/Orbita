@@ -16,17 +16,25 @@ MAIL_FROM: '"Órbita" <no-reply@orbita-corp.com>'
 MERCADOPAGO_CLIENT_ID: "8070226964676720"
 MERCADOPAGO_REDIRECT_URI: "https://api.orbita.site/api/v1/mercadopago/oauth/callback"
 # OJO - riesgo real de negocio (ver subscriptions.service.ts, comentario del
-# getter `bienvenida`): con esto en "true", el beneficio de bienvenida de
-# CUALQUIER alta real (no solo la de prueba de quien lo prendió) cobra
-# MP_SUBSCRIPTION_AMOUNT en vez de $5.500. Es a propósito, para probar el
-# checkout real gastando poco - pero hay que apagarlo (borrar esta línea o
-# ponerla en "false") y volver a desplegar apenas termine la prueba. Ya pasó
-# una vez que quedó prendido sin querer y le cobró $15 a negocios reales en
-# vez de $5.000.
-MP_PLAN_OVERRIDE: "true"
-MP_SUBSCRIPTION_AMOUNT: "15"
-MP_SUBSCRIPTION_FREQUENCY: "3"
-MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
+# getter `bienvenida`): con MP_PLAN_OVERRIDE en "true", el beneficio de
+# bienvenida de CUALQUIER alta real (no solo la de prueba de quien lo prendió)
+# cobra MP_SUBSCRIPTION_AMOUNT en vez de $5.500. Es a propósito, para probar
+# el checkout real gastando poco - pero hay que apagarlo (borrar las 4 líneas
+# de abajo o poner MP_PLAN_OVERRIDE en "false") y volver a desplegar apenas
+# termine la prueba.
+#
+# Encontrado prendido en vivo el 16/09 (quedó así desde el 28/07 como mínimo,
+# con un "Ale decidió dejarlo en true mientras Mateo lo usa para pruebas" del
+# 15/09 en el hallazgo mp-plan-override-prod de la auditoría interna) — se
+# apagó ese mismo día: primero en el servicio de Cloud Run en vivo
+# (gcloud run services update --remove-env-vars=...), después acá para que el
+# próximo deploy no lo vuelva a prender. Solo negocios de prueba quedaron con
+# el monto de $15 (verificado contra la tabla Subscription); ningún cliente
+# real pagó de menos. Si hace falta repetir la prueba, las 4 variables son:
+# MP_PLAN_OVERRIDE: "true"
+# MP_SUBSCRIPTION_AMOUNT: "15"
+# MP_SUBSCRIPTION_FREQUENCY: "3"
+# MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
 SUBSCRIPTION_ABANDONED_DAYS: "7"
 SUBSCRIPTION_SWEEP_DELETE: "false"
 # Saltos de proxy delante de la API (Firebase Hosting + el balanceador de
