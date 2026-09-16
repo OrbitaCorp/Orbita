@@ -798,6 +798,7 @@ export class PlatformService {
       usedCount: c.usedCount,
       isActive: c.isActive,
       expiresAt: c.expiresAt?.toISOString() ?? null,
+      includesAdvancedAddon: c.includesAdvancedAddon,
       note: c.note,
       createdBy: c.createdByAdmin?.name ?? null,
       createdAt: c.createdAt.toISOString(),
@@ -840,6 +841,7 @@ export class PlatformService {
       usedCount: c.usedCount,
       isActive: c.isActive,
       expiresAt: c.expiresAt?.toISOString() ?? null,
+      includesAdvancedAddon: c.includesAdvancedAddon,
       note: c.note,
       createdBy: c.createdByAdmin?.name ?? null,
       createdAt: c.createdAt.toISOString(),
@@ -950,6 +952,19 @@ export class PlatformService {
     }
   }
 
+  // Mismo criterio que validarTopeDeUsos: un código del 100% deja una cuenta
+  // de cortesía cuyo período de acceso ES esta fecha (ver confirmAndCreate()
+  // en subscriptions.service.ts, que usa expiresAt como currentPeriodEnd en
+  // vez del período de bienvenida por defecto) — sin vigencia, la cortesía
+  // quedaría abierta para siempre.
+  private validarVigenciaObligatoria(percentOff: number, expiresAt: Date | null) {
+    if (percentOff === 100 && !expiresAt) {
+      throw new BadRequestException(
+        'Un código del 100% regala una cuenta gratis: poné una fecha de vencimiento, es el período que va a tener esa cortesía.',
+      );
+    }
+  }
+
   private validarPorcentaje(percentOff: number) {
     if (percentOff === 100) return;
     const { amountBase, minAmount, maxPercentOff } = this.subscriptions.limitesDescuento();
@@ -974,6 +989,11 @@ export class PlatformService {
     if (yaExiste) throw new BadRequestException(`Ya existe un código ${code}`);
 
     const expiresAt = this.parseVencimiento(dto.expiresAt);
+    this.validarVigenciaObligatoria(dto.percentOff, expiresAt);
+    // Solo tiene sentido junto con el 100%: un descuento parcial no regala
+    // ninguna cuenta, así que el campo se ignora en cualquier otro caso en
+    // vez de guardar un estado que nadie va a leer (ver la nota del DTO).
+    const includesAdvancedAddon = dto.percentOff === 100 ? (dto.includesAdvancedAddon ?? true) : false;
 
     const creado = await this.prisma.platformDiscountCode.create({
       data: {
@@ -981,6 +1001,7 @@ export class PlatformService {
         percentOff: dto.percentOff,
         maxUses: dto.maxUses ?? null,
         expiresAt,
+        includesAdvancedAddon,
         note: dto.note?.trim() || null,
         createdBy: adminId,
       },
@@ -991,7 +1012,7 @@ export class PlatformService {
         action: 'create_discount_code',
         targetType: 'discount_code',
         targetId: creado.id,
-        details: { code, percentOff: dto.percentOff, maxUses: dto.maxUses ?? null },
+        details: { code, percentOff: dto.percentOff, maxUses: dto.maxUses ?? null, includesAdvancedAddon },
       },
     });
     return this.getDiscountCode(creado.id);
@@ -1004,10 +1025,8 @@ export class PlatformService {
     // Con los valores que quedarían después de guardar: subir un código al
     // 100% y sacarle el tope son dos ediciones distintas y las dos tienen que
     // chocar contra la misma regla.
-    this.validarTopeDeUsos(
-      dto.percentOff ?? actual.percentOff,
-      dto.maxUses !== undefined ? dto.maxUses : actual.maxUses,
-    );
+    const percentOffFinal = dto.percentOff ?? actual.percentOff;
+    this.validarTopeDeUsos(percentOffFinal, dto.maxUses !== undefined ? dto.maxUses : actual.maxUses);
 
     // Bajar el tope por debajo de lo ya usado dejaría el código en un estado
     // incoherente (usos > máximo), así que se rechaza con un mensaje que dice
@@ -1016,13 +1035,23 @@ export class PlatformService {
       throw new BadRequestException(`El código ya se usó ${actual.usedCount} vece(s): el máximo no puede ser menor`);
     }
 
+    const expiresAtFinal = dto.expiresAt !== undefined ? this.parseVencimiento(dto.expiresAt) : actual.expiresAt;
+    this.validarVigenciaObligatoria(percentOffFinal, expiresAtFinal);
+    // Si la edición baja el código de 100% a un descuento parcial, el flag se
+    // apaga solo — ya no tiene efecto (ver la nota del DTO) y dejarlo prendido
+    // sería un estado guardado que nadie lee.
+    const includesAdvancedAddonFinal = percentOffFinal === 100
+      ? (dto.includesAdvancedAddon ?? actual.includesAdvancedAddon)
+      : false;
+
     await this.prisma.platformDiscountCode.update({
       where: { id },
       data: {
         ...(dto.percentOff !== undefined ? { percentOff: dto.percentOff } : {}),
         ...(dto.maxUses !== undefined ? { maxUses: dto.maxUses } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.expiresAt !== undefined ? { expiresAt: this.parseVencimiento(dto.expiresAt) } : {}),
+        ...(dto.expiresAt !== undefined ? { expiresAt: expiresAtFinal } : {}),
+        includesAdvancedAddon: includesAdvancedAddonFinal,
         ...(dto.note !== undefined ? { note: dto.note?.trim() || null } : {}),
       },
     });

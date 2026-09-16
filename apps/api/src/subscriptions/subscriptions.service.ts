@@ -178,7 +178,19 @@ type PendingPayload = {
   // pedir el link de pago, y viaja acá hasta la confirmación: así el monto que
   // se guarda en Subscription es exactamente el que autorizó el cliente en MP,
   // aunque mientras tanto alguien haya editado o desactivado el código.
-  discount?: { codeId: string; code: string; percentOff: number; amountBase: number; amountFinal: number };
+  // expiresAt/includesAdvancedAddon solo importan para un código del 100%
+  // (ver confirmAndCreate): la cortesía usa expiresAt como currentPeriodEnd
+  // en vez del período de bienvenida por defecto, e includesAdvancedAddon
+  // fuerza el addon Avanzado sin importar el plan elegido.
+  discount?: {
+    codeId: string;
+    code: string;
+    percentOff: number;
+    amountBase: number;
+    amountFinal: number;
+    expiresAt: string | null;
+    includesAdvancedAddon: boolean;
+  };
 };
 
 @Injectable()
@@ -515,7 +527,15 @@ export class SubscriptionsService {
       throw new BadRequestException('Ese código de descuento tiene un porcentaje inválido');
     }
 
-    return { codeId: dc.id, code: dc.code, percentOff: dc.percentOff, amountBase, amountFinal };
+    return {
+      codeId: dc.id,
+      code: dc.code,
+      percentOff: dc.percentOff,
+      amountBase,
+      amountFinal,
+      expiresAt: dc.expiresAt ? dc.expiresAt.toISOString() : null,
+      includesAdvancedAddon: dc.includesAdvancedAddon,
+    };
   }
 
   // Previsualización para el wizard: mismo criterio de validez que el cobro
@@ -713,7 +733,15 @@ export class SubscriptionsService {
 
     const now = new Date();
     const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenidaParaPlan(plan);
-    const periodEnd = this.periodEnd(now, { frequency, frequencyType });
+    // Un alta gratis (código del 100%) usa la vigencia que el superadmin le
+    // puso al código como currentPeriodEnd — no el período de bienvenida por
+    // defecto: la cortesía dura lo que el código diga, no 3 meses fijos (ver
+    // validarVigenciaObligatoria en platform.service.ts, que exige esta fecha
+    // al crear un código del 100%). Fallback al período por defecto solo para
+    // códigos viejos, creados antes de que la vigencia fuera obligatoria.
+    const periodEnd = esGratis && discount?.expiresAt
+      ? new Date(discount.expiresAt)
+      : this.periodEnd(now, { frequency, frequencyType });
     // El monto que se guarda es el que MP realmente autorizó, no el de lista:
     // si hubo descuento, se cobra el rebajado.
     const montoSuscripcion = discount ? discount.amountFinal : montoBienvenida;
@@ -748,8 +776,10 @@ export class SubscriptionsService {
     void subscription;
 
     // Sin condicionar a esGratis: una cortesía con plan 'mensualAvanzado'
-    // también recibe el addon — ver el comentario de syncAddonAvanzado.
-    await this.syncAddonAvanzado(this.prisma, business.id, plan, periodEnd);
+    // también recibe el addon — ver el comentario de syncAddonAvanzado. El
+    // último argumento fuerza el addon cuando el código del 100% lo marcó con
+    // includesAdvancedAddon, sin importar qué plan haya elegido el dueño.
+    await this.syncAddonAvanzado(this.prisma, business.id, plan, periodEnd, esGratis && !!discount?.includesAdvancedAddon);
 
     await this.businessesService.publish(business.id);
 
@@ -827,8 +857,13 @@ export class SubscriptionsService {
     businessId: string,
     plan: PlanKey,
     periodEnd: Date,
+    // Forzado desde confirmAndCreate() cuando el código del 100% usado tenía
+    // includesAdvancedAddon — el resto de las llamadas (activatePlan,
+    // changePlan) no lo pasan y quedan con el criterio de siempre (solo por
+    // el plan elegido).
+    forzarAvanzado = false,
   ): Promise<void> {
-    const activo = incluyeAvanzado(plan);
+    const activo = incluyeAvanzado(plan) || forzarAvanzado;
     await tx.businessAddon.upsert({
       where: { businessId_type: { businessId, type: 'ADVANCED' } },
       create: { businessId, type: 'ADVANCED', isActive: activo, expiresAt: activo ? periodEnd : new Date(), grantedBy: null },

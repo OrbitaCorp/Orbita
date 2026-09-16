@@ -55,6 +55,7 @@ export interface DiscountCodeRow {
   usedCount: number
   isActive: boolean
   expiresAt: string | null
+  includesAdvancedAddon: boolean
   note: string | null
   createdBy: string | null
   createdAt: string
@@ -80,6 +81,7 @@ export interface CreateDiscountCodeInput {
   percentOff: number
   maxUses?: number | null
   expiresAt?: string | null
+  includesAdvancedAddon?: boolean
   note?: string | null
 }
 
@@ -88,6 +90,7 @@ export interface UpdateDiscountCodeInput {
   maxUses?: number | null
   isActive?: boolean
   expiresAt?: string | null
+  includesAdvancedAddon?: boolean
   note?: string | null
 }
 

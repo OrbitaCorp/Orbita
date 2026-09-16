@@ -2017,7 +2017,12 @@ model PlatformDiscountCode {
   maxUses    Int?      @map("max_uses") // null = sin límite de usos
   usedCount  Int       @default(0) @map("used_count")
   isActive   Boolean   @default(true) @map("is_active")
-  expiresAt  DateTime? @map("expires_at")
+  expiresAt  DateTime? @map("expires_at") // obligatorio si percentOff=100, ver validarVigenciaObligatoria
+  // Solo tiene efecto en códigos del 100% (alta gratis): además de la cuenta
+  // de cortesía, le deja activado el addon Avanzado durante todo el período,
+  // sin importar qué plan haya elegido el dueño en el wizard — ver
+  // confirmAndCreate()/syncAddonAvanzado() en subscriptions.service.ts.
+  includesAdvancedAddon Boolean @default(false) @map("includes_advanced_addon")
   note       String? // para qué se creó, queda a la vista del equipo
   createdBy  String?   @map("created_by")
   createdAt  DateTime  @default(now()) @map("created_at")

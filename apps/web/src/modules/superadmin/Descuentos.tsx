@@ -160,9 +160,18 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
   const [sinTope, setSinTope] = useState(false)
   const [maxUses, setMaxUses] = useState('1')
   const [expiresAt, setExpiresAt] = useState('')
+  const [includeAvanzado, setIncludeAvanzado] = useState(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
+
+  // Por default, un código del 100% también regala el paquete Avanzado — el
+  // admin lo puede destildar a mano, pero cada vez que el descuento VUELVE a
+  // ser 100% se vuelve a tildar solo (no persigue al admin si lo destildó y
+  // se quedó en 100%, solo se resetea al pasar por otro valor primero).
+  useEffect(() => {
+    if (Number(percentOff) === 100) setIncludeAvanzado(true)
+  }, [percentOff])
 
   // El 100% queda SIEMPRE permitido aunque el plan valga lo mismo que el
   // minimo: esa alta no pasa por MP, crea el negocio con una cortesia.
@@ -191,6 +200,10 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
     if (!Number.isInteger(pct) || pct < 1 || pct > 100) { setError('El descuento tiene que ser un número entero entre 1 y 100.'); return }
     if (excedeTope) { setError(mensajeTope); return }
     if (!sinTope && (!Number.isInteger(Number(maxUses)) || Number(maxUses) < 1)) { setError('La cantidad de usos tiene que ser 1 o más.'); return }
+    // Un código del 100% deja una cuenta de cortesía: la fecha acá ES el
+    // período que va a tener esa cortesía (ver confirmAndCreate en el
+    // backend), así que sin fecha quedaría abierta para siempre.
+    if (pct === 100 && !expiresAt) { setError('Un código del 100% regala una cuenta gratis: poné hasta cuándo dura.'); return }
 
     setGuardando(true)
     try {
@@ -199,6 +212,7 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
         percentOff: pct,
         maxUses: sinTope ? null : Number(maxUses),
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        includesAdvancedAddon: pct === 100 ? includeAvanzado : false,
         note: note.trim() || null,
       })
       onCreado(code.trim().toUpperCase())
@@ -279,7 +293,8 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
             <span style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
               Con 100% el alta es <strong>gratis</strong>: no pasa por Mercado Pago y el negocio queda con
               una licencia de cortesía. Cada uso disponible de este código regala una cuenta, así que
-              limitá bien los usos y a quién se lo pasás.
+              limitá bien los usos y a quién se lo pasás. La fecha de <strong>"Vence el"</strong> de acá
+              abajo pasa a ser obligatoria: es el período que va a tener esa cortesía.
             </span>
           </div>
         )}
@@ -301,9 +316,27 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
           </div>
         </Field>
 
-        <Field label="Vence el (opcional)" hint="Si lo dejás vacío, no vence nunca.">
-          <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="ds-field" style={inputStyle} />
+        <Field
+          label={pctActual === 100 ? 'Vence el' : 'Vence el (opcional)'}
+          hint={pctActual === 100 ? 'Obligatorio con 100%: es el período de la cuenta de cortesía.' : 'Si lo dejás vacío, no vence nunca.'}
+        >
+          <input
+            type="date"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className="ds-field"
+            style={{ ...inputStyle, ...(pctActual === 100 && !expiresAt ? { borderColor: 'var(--color-error)' } : {}) }}
+          />
         </Field>
+
+        {/* Solo tiene sentido junto con el 100%: en cualquier otro caso el
+            código no regala ninguna cuenta, así que no hay addon que otorgar. */}
+        {pctActual === 100 && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-body)', cursor: 'pointer', marginTop: -6 }}>
+            <input type="checkbox" checked={includeAvanzado} onChange={(e) => setIncludeAvanzado(e.target.checked)} />
+            Incluir el paquete Avanzado durante la cortesía
+          </label>
+        )}
 
         <Field label="Para qué es (opcional)" hint="Queda a la vista del equipo, para acordarse del trato.">
           <input
@@ -319,9 +352,9 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
           <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
           <button
             type="submit"
-            disabled={guardando || excedeTope}
+            disabled={guardando || excedeTope || (pctActual === 100 && !expiresAt)}
             className="ds-hover"
-            style={{ ...btnPrimary, ...(excedeTope ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            style={{ ...btnPrimary, ...(excedeTope || (pctActual === 100 && !expiresAt) ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
           >
             {guardando ? 'Creando…' : 'Crear código'}
           </button>
@@ -373,6 +406,9 @@ function ModalDetalle({ id, onClose, onCambio, onAviso }: {
               <Dato label="Veces usado" valor={data.maxUses === null ? `${data.usedCount} (sin tope)` : `${data.usedCount} de ${data.maxUses}`} />
               <Dato label="Vence" valor={data.expiresAt ? date(data.expiresAt) : 'No vence'} />
               <Dato label="Creado" valor={date(data.createdAt)} />
+              {data.percentOff === 100 && (
+                <Dato label="Incluye Avanzado" valor={data.includesAdvancedAddon ? 'Sí' : 'No'} />
+              )}
             </div>
 
             {data.note && (

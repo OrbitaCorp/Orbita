@@ -32,6 +32,14 @@ export class CreateDiscountCodeDto {
   @IsString()
   expiresAt?: string | null;
 
+  // Solo tiene efecto real cuando percentOff=100 (ver
+  // PlatformService.createDiscountCode) — con un descuento parcial se
+  // ignora, no tiene sentido regalar el addon junto con una suscripción que
+  // sigue cobrando.
+  @IsOptional()
+  @IsBoolean()
+  includesAdvancedAddon?: boolean;
+
   @IsOptional()
   @IsString()
   @Length(0, 200)
@@ -57,6 +65,10 @@ export class UpdateDiscountCodeDto {
   @IsOptional()
   @IsString()
   expiresAt?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  includesAdvancedAddon?: boolean;
 
   @IsOptional()
   @IsString()
