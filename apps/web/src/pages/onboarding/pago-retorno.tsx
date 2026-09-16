@@ -61,6 +61,14 @@ export default function PagoRetornoPage() {
     if (confirmado.current === preapprovalId) return
     confirmado.current = preapprovalId
 
+    // Un alta gratis por código del 100% nunca pasa por MercadoPago (ver el
+    // comentario de arriba de esta misma función) — se sabe desde el prefijo
+    // del id SIN esperar la respuesta del backend, así que la pantalla de
+    // "verificando" ya arranca con el texto correcto en vez de mostrar
+    // "Confirmando con MercadoPago" para algo que nunca le pidió nada a MP.
+    // Pedido explícito: para ese caso no hay nada que "confirmar".
+    if (preapprovalId.startsWith('FREE-')) setGratis(true)
+
     ;(async () => {
       try {
         const res = await fetch('/api/onboarding/confirm-payment', {
@@ -90,6 +98,13 @@ export default function PagoRetornoPage() {
           // como si lo hubiera hecho confunde y suena a que va a llegar un cobro.
           setGratis(!!data.free)
           setEstado('ok')
+        } else if (preapprovalId.startsWith('FREE-')) {
+          // No hay MercadoPago de por medio en este caso — si no se activó es
+          // que el PendingSignup ya no estaba (doble click, o la pestaña
+          // quedó abierta después de confirmarse en otra), no que un pago
+          // esté "pendiente".
+          setEstado('pendiente')
+          setMensaje('No pudimos terminar de crear tu cuenta. Volvé a intentar desde el botón de abajo.')
         } else {
           // MP puede tardar en pasar de "pending" a "authorized".
           setEstado('pendiente')
@@ -134,16 +149,26 @@ export default function PagoRetornoPage() {
       }}>
         {estado === 'verificando' && (
           <>
+            {/* El celeste de MP (#009EE3) es a propósito en el flujo pago: es
+                literalmente lo que se está esperando. En un alta gratis no
+                hay ningún MercadoPago de por medio (ver el comentario de
+                arriba, startsWith('FREE-')) — usa el color propio del sitio
+                para no insinuar una marca que no tiene nada que ver acá.
+                Pedido explícito: para este caso no hay nada que "confirmar
+                con MercadoPago", así que tampoco lo dice el texto de abajo. */}
             <div style={{
               width: 56, height: 56, margin: '0 auto 20px', borderRadius: '50%',
-              border: '3px solid rgba(0,158,227,0.15)', borderTopColor: '#009EE3',
+              border: `3px solid ${gratis ? 'var(--color-primary-bg)' : 'rgba(0,158,227,0.15)'}`,
+              borderTopColor: gratis ? 'var(--color-primary)' : '#009EE3',
               animation: 'prSpin 0.85s linear infinite',
             }} />
             <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>
-              Verificando tu pago
+              {gratis ? 'Creando tu espacio' : 'Verificando tu pago'}
             </h1>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
-              Estamos confirmando la suscripción con MercadoPago. No cierres esta ventana.
+              {gratis
+                ? 'Estamos terminando de armar tu cuenta. No cierres esta ventana.'
+                : 'Estamos confirmando la suscripción con MercadoPago. No cierres esta ventana.'}
             </p>
           </>
         )}

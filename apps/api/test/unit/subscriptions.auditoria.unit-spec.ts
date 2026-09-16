@@ -103,6 +103,80 @@ describe('Alta paga', () => {
   });
 });
 
+// Bug encontrado el 16/09 al investigar "después de crear la cuenta me manda
+// al login en vez de al panel", reportado para los dos flujos (pago real y
+// alta gratis por código del 100%): registerBusiness() arma el negocio con
+// un subdominio AUTO-GENERADO; el updateDraft() de más abajo en
+// confirmAndCreate() lo cambia al que el dueño eligió en el wizard, pero la
+// respuesta seguía devolviendo el auto-generado (la variable `business`
+// nunca se refrescaba). La pantalla de vuelta mandaba a irAlPanel() hacia un
+// subdominio que YA NO era el del negocio, y /api/auth/refresh lo rebotaba
+// al login (RBT-660, WRONG_TENANT) — justo después de haberse creado la
+// cuenta con éxito.
+function altaCompleta(opts: { wizardSubdominio?: string; updateDraftFalla?: boolean } = {}) {
+  const prisma = {
+    pendingSignup: {
+      findUnique: jest.fn().mockResolvedValue({
+        payload: {
+          account: { email: 'ana@x.com', businessName: 'Tienda de Ana' },
+          passwordHash: 'hash-guardado',
+          wizard: { subdominio: opts.wizardSubdominio ?? 'tienda-de-ana' },
+          plan: 'mensual',
+        },
+      }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    subscription: { upsert: jest.fn().mockResolvedValue({}) },
+    businessAddon: { upsert: jest.fn().mockResolvedValue({}) },
+  };
+  const onboarding = {
+    registerBusiness: jest.fn().mockResolvedValue({
+      // El auto-generado de generateUniqueSubdomain() — nunca el elegido.
+      business: { id: BIZ, subdomain: 'tienda-de-ana-f3a9c1' },
+      member: { id: 'member-1' },
+      branch: { id: 'branch-1' },
+    }),
+    updateDraft: opts.updateDraftFalla
+      ? jest.fn().mockRejectedValue(new Error('Ese subdominio ya está en uso'))
+      // El subdominio elegido YA aplicado — esto es lo que devuelve
+      // prisma.business.update() de verdad, el mismo objeto Business.
+      : jest.fn().mockResolvedValue({ id: BIZ, subdomain: opts.wizardSubdominio ?? 'tienda-de-ana' }),
+  };
+  const businesses = { updateConfig: jest.fn().mockResolvedValue({}), publish: jest.fn().mockResolvedValue({}) };
+  const auth = { issueSession: jest.fn().mockResolvedValue({ token: 'acc-1', refreshToken: 'ref-1' }) };
+  // Sin esto, bienvenidaParaPlan()/this.currency (que corren SIEMPRE, no solo
+  // en el camino pago) revientan con "config.get is not a function".
+  const config = { get: () => undefined };
+  const svc = new SubscriptionsService(prisma as any, config as any, onboarding as any, businesses as any, {} as any, auth as any, {} as any);
+  // Solo lo usa el camino PAGO (esGratis=false busca el pago real por
+  // external_reference) — un ref FREE- nunca llega a tocar esto. 5.500 es
+  // BIENVENIDA_TIERS.base.amount, lo que confirmAndCreate espera cobrado
+  // para el plan 'mensual' de este mock.
+  (svc as any)._payment = { search: jest.fn().mockResolvedValue({ results: [{ id: 9, status: 'approved', transaction_amount: 5500, currency_id: 'ARS' }] }) };
+  return { svc, prisma, onboarding, businesses };
+}
+
+describe('Alta — subdominio en la respuesta (bug del 16/09)', () => {
+  it('con el subdominio elegido disponible, la respuesta trae ESE subdominio, no el auto-generado', async () => {
+    const { svc, onboarding } = altaCompleta({ wizardSubdominio: 'tienda-de-ana' });
+    const r = await svc.confirmAndCreate('PEND-abc');
+    expect(r).toMatchObject({ activated: true, subdomain: 'tienda-de-ana', businessId: BIZ });
+    expect(onboarding.updateDraft).toHaveBeenCalledWith(BIZ, expect.objectContaining({ subdomain: 'tienda-de-ana' }));
+  });
+
+  it('mismo caso para un alta gratis (FREE-...), no solo la pagada', async () => {
+    const { svc } = altaCompleta({ wizardSubdominio: 'otra-tienda' });
+    const r = await svc.confirmAndCreate('FREE-xyz');
+    expect(r).toMatchObject({ activated: true, subdomain: 'otra-tienda', free: true });
+  });
+
+  it('si el subdominio elegido ya estaba tomado, se devuelve el auto-generado (el que de verdad quedó)', async () => {
+    const { svc } = altaCompleta({ updateDraftFalla: true });
+    const r = await svc.confirmAndCreate('PEND-abc');
+    expect(r).toMatchObject({ activated: true, subdomain: 'tienda-de-ana-f3a9c1' });
+  });
+});
+
 describe('Webhook, cambios de plan y entradas', () => {
   it('webhook sin MP_WEBHOOK_SECRET: 503', async () => {
     const { svc } = suscripciones();
