@@ -5,9 +5,18 @@ allowBuilds:
 # Overrides de dependencias transitivas vulnerables (auditoría interna,
 # hallazgo `dependencias`, pnpm audit del 15/09). Todas de herramientas de
 # build o lint (eslint, babel, postcss/tailwind) o de exceljs (exportar).
-# Parche mínimo por rango mayor, sin cambiar de major. uuid@8 (exceljs) queda
-# afuera a propósito: el parche está en uuid 11 y exceljs pide 8; la falla es
-# solo en v3/v5/v6 con buffer propio y exceljs usa v4.
+# Parche mínimo por rango mayor, sin cambiar de major.
+#
+# uuid@8 (exceljs) SÍ entra desde el 15/09 a la noche, con salto de major
+# (8 → 11), que es donde está el parche. Antes se había dejado afuera por
+# miedo a romper el export: exceljs pide `^8.3.0` y de uuid usa una sola
+# cosa, `const {v4: uuidv4} = require('uuid')` en
+# xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js, siempre sin buffer propio
+# (que es justo el caso de la falla, y solo en v3/v5/v6). Verificado con el
+# override puesto: uuid resuelto desde exceljs da 11.1.1, `v4()` devuelve un
+# UUID válido, ese xform carga bien por CommonJS y `workbook.xlsx.writeBuffer()`
+# sigue generando el archivo. Con esto `pnpm audit` queda limpio en las dos
+# apps (check c2 del hallazgo `dependencias` en el tablero de auditoría).
 overrides:
   brace-expansion@1: '^1.1.18'
   brace-expansion@2: '^2.1.4'
@@ -18,3 +27,4 @@ overrides:
   browserslist: '^4.28.7'
   baseline-browser-mapping: '^2.11.0'
   '@babel/core': '^7.29.6'
+  uuid@8: '^11.1.1'
