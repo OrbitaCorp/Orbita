@@ -2,7 +2,7 @@
 // Apariencia pública de la tienda: identidad de marca, paleta, tipografía,
 // layout, visibilidad, textos y CSS custom — con vista previa en vivo.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Video, Image as ImageIcon } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
@@ -23,6 +23,11 @@ import { ImgUploader } from './components/apariencia/ImgUploader'
 import { LogoPicker } from './components/apariencia/LogoPicker'
 import { VideoUploader } from './components/apariencia/VideoUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
+// Las explicaciones "qué es / dónde se ve / en qué afecta" de cada tarjeta y
+// de cada interruptor. Hacen falta sobre todo en mobile, donde la vista
+// previa en vivo no se muestra (ver la media query de .ap-preview).
+import { AyudaBoton, AyudaPanel, type Ayuda } from './components/apariencia/AyudaSeccion'
+import { AYUDA_SECCIONES, AYUDA_OPCIONES } from './components/apariencia/ayudas'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
     CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX,
@@ -327,17 +332,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // cada una vive en la pestaña que le corresponde (ver TABS_PLANTILLA),
     // para no volver a apilarlas todas de una en una sola columna larga.
     const secVisibilidad = (
-        <SecCard id="ap-sec-visibilidad" title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
+        <SecCard id="ap-sec-visibilidad" title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye} ayuda={AYUDA_SECCIONES[soloContenido ? 'visibilidadPlantilla' : 'visibilidad']}>
             <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
                 {toggles.map(([k, l]) => (
-                    <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
+                    <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                 ))}
             </div>
         </SecCard>
     )
 
     const secTextos = (
-        <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft}>
+        <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft} ayuda={AYUDA_SECCIONES.textos}>
             <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
             {/* Pedido explícito del dueño: que el banner se pueda
                 mostrar como cartelera (se desliza en loop) en vez
@@ -347,14 +352,19 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 apagado: así se ve que existe la opción, sin
                 confundir con "¿por qué no aparece?". */}
             <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
-                <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
+                <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} ayuda={AYUDA_OPCIONES.bannerDesplazable} />
             </div>
-            {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
+            {/* Decía "Texto del botón de WhatsApp", y no es eso: el botón
+                flotante es solo el ícono verde, sin texto (ver
+                FloatingWhatsapp.tsx). Esto es el mensaje que queda YA ESCRITO
+                en el chat cuando el cliente lo toca — vacío, WhatsApp abre
+                con "Hola! Quería hacer una consulta.". */}
+            {!soloContenido && <div><FieldLabel help="El mensaje que aparece ya escrito en el chat cuando tu cliente toca el botón de WhatsApp. Él lo puede borrar o cambiar antes de enviarlo.">Mensaje del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
         </SecCard>
     )
 
     const secEstadisticas = (
-        <SecCard id="ap-sec-estadisticas" title="Barra de estadísticas" icon={Hash}>
+        <SecCard id="ap-sec-estadisticas" title="Barra de estadísticas" icon={Hash} ayuda={AYUDA_SECCIONES.estadisticas}>
             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
                 Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
             </p>
@@ -403,13 +413,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // diferencia de Identidad/Paleta/Tipografía/Diseño, acá sí tiene sentido
     // seguir editando aunque haya una plantilla activa.
     const secPie = (
-        <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom}>
+        <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom} ayuda={AYUDA_SECCIONES.pie}>
             <div style={{ marginBottom: 14 }}>
                 <FieldLabel help="Aparece debajo de tu logo, en el pie de página de la tienda.">Descripción</FieldLabel>
                 <Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={160} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/160</span>} />
             </div>
-            <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} />
-            <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} />
+            <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} ayuda={AYUDA_OPCIONES.mostrarFooter} />
+            <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} ayuda={AYUDA_OPCIONES.mostrarRedesFooter} />
         </SecCard>
     )
 
@@ -419,7 +429,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // la tenga no muestra esta tarjeta, y una que sí la tenga la muestra
     // sola — sin tocar este archivo.
     const secCupon = soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon ? (
-        <SecCard id="ap-sec-cupon" title="Cupón" icon={Ticket}>
+        <SecCard id="ap-sec-cupon" title="Cupón" icon={Ticket} ayuda={AYUDA_SECCIONES.cupon}>
             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
                 El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
             </p>
@@ -465,7 +475,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // a un home sin tope), solo se dejan de listar mientras el tope aplica.
     const slidersVisibles = heroMax ? ap.sliders.slice(0, heroMax) : ap.sliders
     const heroCard = (
-        <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
+        <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette} ayuda={AYUDA_SECCIONES[soloContenido ? 'hero' : 'identidad']}>
             {!soloContenido && (<>
                 <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
                 <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
@@ -670,7 +680,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // siempre, con el id prefijado `cat:<slug>` — el storefront lo resuelve a
     // /catalogo?cat=slug (ver pathDeLink en StorefrontHeader).
     const headerCard = (
-        <SecCard id="ap-sec-header" title="Header" icon={Menu}>
+        <SecCard id="ap-sec-header" title="Header" icon={Menu} ayuda={AYUDA_SECCIONES.header}>
             {conIconoOpcional && (
                 <>
                     <ToggleRow
@@ -895,7 +905,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
                     {heroCard}
 
-                    <SecCard id="ap-sec-paleta" title="Paleta de colores" icon={Droplets}>
+                    <SecCard id="ap-sec-paleta" title="Paleta de colores" icon={Droplets} ayuda={AYUDA_SECCIONES.paleta}>
                         <FieldLabel>Modo de color de la tienda</FieldLabel>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 }}>
                             {([['claro', 'Claro', Sun], ['oscuro', 'Oscuro', Moon], ['sistema', 'Sistema', Monitor]] as [ModoColor, string, IconT][]).map(([id, l, I]) => {
@@ -914,7 +924,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <FondoTiendaBlock value={ap.colorFondo} colorPrimario={ap.colorPrimario} onChange={v => set('colorFondo', v)} />
                     </SecCard>
 
-                    <SecCard id="ap-sec-tipografia" title="Tipografía" icon={Type}>
+                    <SecCard id="ap-sec-tipografia" title="Tipografía" icon={Type} ayuda={AYUDA_SECCIONES.tipografia}>
                         <FieldLabel>Fuente para títulos</FieldLabel>
                         <FontSelect value={ap.fuenteHeading} onChange={v => set('fuenteHeading', v)} opts={fontOpts} />
                         <div style={{ marginTop: 12, marginBottom: 18, padding: '14px 16px', background: 'var(--color-surface-alt)', borderRadius: 8, fontSize: 24, fontWeight: 700, color: 'var(--color-text)', fontFamily: fontStack(ap.fuenteHeading) }}>{ap.nombreTienda}</div>
@@ -938,7 +948,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         lib/storefront/utils.ts). "Radio de cards" se sacó del todo
                         (mismo reporte): no tenía ningún efecto real, y no valía la
                         pena construírselo — ver el comentario en apariencia.mapper.ts. */}
-                    <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid}>
+                    <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid} ayuda={AYUDA_SECCIONES.layout}>
                         <FieldLabel>Estilo de header</FieldLabel>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
                         <div style={{ marginBottom: 18 }}>
@@ -1057,7 +1067,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         activa (por eso vive acá, no en `tarjetasSecundarias`):
                         mismo motivo que Paleta/Tipografía/Diseño, la portada
                         de la plantilla es asunto suyo. */}
-                    <SecCard id="ap-sec-parallax" title="Banner con efecto parallax" icon={ImageIcon}>
+                    <SecCard id="ap-sec-parallax" title="Banner con efecto parallax" icon={ImageIcon} ayuda={AYUDA_SECCIONES.parallax}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
                             Una imagen grande a todo el ancho, en medio del home, que queda fija mientras el resto de la
                             página se desplaza. Necesita una imagen cargada para mostrarse.
@@ -1088,7 +1098,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         El logo es opcional a propósito (ver LogoPicker y
                         brand-item.dto.ts): sin logo, la tira dibuja el nombre
                         en tipografía, que es justo como se ve la referencia. */}
-                    <SecCard id="ap-sec-marcas" title="Marcas con las que trabajás" icon={BadgeCheck}>
+                    <SecCard id="ap-sec-marcas" title="Marcas con las que trabajás" icon={BadgeCheck} ayuda={AYUDA_SECCIONES.marcas}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
                             Una tira que se desliza sola en el home, con las marcas que vendés. Se ven en gris y toman
                             color cuando el visitante les pasa el mouse por encima. Necesita al menos una marca cargada
@@ -1157,7 +1167,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         vive acá (no en `tarjetasSecundarias`) porque es del
                         home CLÁSICO — con una plantilla activa, la portada es
                         asunto de la plantilla. */}
-                    <SecCard id="ap-sec-video" title="Video en tu tienda" icon={Video}>
+                    <SecCard id="ap-sec-video" title="Video en tu tienda" icon={Video} ayuda={AYUDA_SECCIONES.video}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
                             Un video en el home, después del banner parallax. Pegá el link de YouTube, de Vimeo, o de
                             un archivo de video (.mp4). Necesita un link válido para mostrarse.
@@ -1262,18 +1272,24 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
-function SecCard({ id, title, icon: I, badge, children }: { id?: string; title: string; icon: IconT; badge?: ReactNode; children: ReactNode }) {
+function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: string; title: string; icon: IconT; badge?: ReactNode; ayuda?: Ayuda; children: ReactNode }) {
+    // La explicación de la sección, cerrada por default: el ícono de
+    // exclamación al lado del título la abre (ver AyudaSeccion.tsx).
+    const [ayudaAbierta, setAyudaAbierta] = useState(false)
+    const panelAyudaId = useId()
     return (
         // `id` + `scrollMarginTop`: ancla para el índice de secciones del
         // ConfigSidebar (ver GRUPOS_APARIENCIA ahí) — sin el margen, el
         // scroll-into-view deja el título de la tarjeta pegado contra el
         // borde de arriba de la ventana.
         <div id={id} className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center' }}><I size={16} strokeWidth={1.6} /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: ayudaAbierta ? 12 : 18 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><I size={16} strokeWidth={1.6} /></div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1 }}>{title}</h3>
+                {ayuda && <AyudaBoton nombre={title} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />}
                 {badge}
             </div>
+            {ayuda && ayudaAbierta && <AyudaPanel ayuda={ayuda} id={panelAyudaId} style={{ marginBottom: 18 }} />}
             {children}
         </div>
     )
@@ -1532,14 +1548,44 @@ function SelectorCategorias({ candidatas, seleccionadas, tope, necesitaFoto, onC
     )
 }
 
-function ToggleRow({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
-    return (
-        <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', borderRadius: 6, cursor: 'pointer' }}>
-            <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{label}</div>
-            <button type="button" onClick={() => onChange(!on)} style={{ width: 40, height: 22, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', position: 'relative', flexShrink: 0, cursor: 'pointer', padding: 0 }}>
-                <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.18)', transition: 'left 200ms' }} />
+// Fila de interruptor, con su explicación opcional debajo (`ayuda`).
+//
+// La fila entera es UN <button role="switch"> y ya no un <label> con un
+// botón adentro. El cambio lo forzó el ícono de ayuda: un <button> es un
+// elemento "labelable", así que el <label> le reenviaba el click al primero
+// que encontraba adentro — tocar la explicación prendía o apagaba la opción,
+// o al revés. Como botón único, cada cosa hace lo suyo (el ícono queda
+// afuera del botón), y de paso el interruptor anuncia bien su estado
+// (role/aria-checked) a un lector de pantalla, que antes veía un <button>
+// pelado sin decir si estaba prendido.
+function ToggleRow({ label, on, onChange, ayuda }: { label: string; on: boolean; onChange: (v: boolean) => void; ayuda?: Ayuda }) {
+    const [ayudaAbierta, setAyudaAbierta] = useState(false)
+    const panelAyudaId = useId()
+    const fila = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                aria-label={label}
+                onClick={() => onChange(!on)}
+                className="ds-hover"
+                style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+            >
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{label}</span>
+                <span aria-hidden style={{ display: 'block', width: 40, height: 22, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', position: 'relative', flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.18)', transition: 'left 200ms' }} />
+                </span>
             </button>
-        </label>
+            {ayuda && <AyudaBoton nombre={label} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />}
+        </div>
+    )
+    if (!ayuda) return fila
+    return (
+        <div>
+            {fila}
+            {ayudaAbierta && <AyudaPanel ayuda={ayuda} id={panelAyudaId} style={{ margin: '2px 4px 12px' }} />}
+        </div>
     )
 }
 
