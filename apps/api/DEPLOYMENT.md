@@ -598,6 +598,36 @@ nada fuera de Cloud Run:
 - `roles/artifactregistry.reader` (proyecto)
 - `roles/iam.serviceAccountUser` sobre `681215569277-compute@developer.gserviceaccount.com`
 
+## Backups de la base, RPO y RTO
+
+Decidido el 2026-09-16 (ítem `decision.rpo-rto` del tablero de auditoría;
+hallazgo `backups-sin-verificar`). Los números son deliberadamente
+conservadores: son lo que el backup diario de Supabase **ya** da hoy, no una
+promesa que todavía no se puede cumplir.
+
+| | Objetivo | Qué significa |
+|---|---|---|
+| **RPO** (Recovery Point Objective) | **24 horas** | En el peor caso se pierden hasta 24 h de datos: lo que haya entrado desde el último backup diario. |
+| **RTO** (Recovery Time Objective) | **4 horas** | Desde que se decide restaurar hasta que la API vuelve a servir contra la base restaurada. |
+
+**Se suben cuando, y solo cuando, se cumplan estas dos condiciones** (hoy
+ninguna se cumple, así que prometer menos sería mentira):
+
+1. Existe el proyecto de Supabase de prueba y la restauración está **probada**
+   de punta a punta, no solo documentada (ver `docs/base-de-prueba.md` y el
+   ítem `decision.crear-base-prueba`). Un RTO que nunca se midió es un número
+   inventado.
+2. Hay una copia de `MERCADOPAGO_TOKEN_KEY` y `JWT_SECRET` fuera de Cloud Run
+   (ver § Rotación de secretos). **Sin esas dos claves, un backup íntegro de la
+   base no alcanza:** los datos cifrados con `MERCADOPAGO_TOKEN_KEY` no se
+   pueden descifrar y todas las sesiones firmadas con `JWT_SECRET` quedan
+   muertas. Es el punto que convierte un RTO de 4 h en uno de "no se puede".
+
+**Qué falta para cerrar el hallazgo**, además de lo de arriba: confirmar en el
+dashboard de Supabase qué backups hay realmente y cada cuánto corren
+(`decision.confirmar-backups`). Los números de esta tabla asumen el backup
+diario del plan; si el plan da otra cosa, se corrigen acá.
+
 ## Retención de logs y registros
 
 Hallazgo `logs-sin-retencion` de la auditoría interna (detectado el 10/09,
