@@ -1,5 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsArray, IsIn, ValidateNested, Min, Max, MaxLength, ArrayMaxSize, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsArray, IsIn, ValidateNested, Min, Max, MaxLength, ArrayMaxSize, IsNotEmpty, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
+
+// Mismo criterio y mismo regex que StorefrontConfig.videoUrl (ver
+// update-storefront-config.dto.ts) — un link https (YouTube, Vimeo, o el
+// archivo subido) o vacío.
+const URL_VIDEO = /^(https:\/\/\S*)?$/;
+const URL_VIDEO_MENSAJE = 'El video tiene que ser un link https (YouTube, Vimeo, o el archivo del video)';
 
 // Topes (auditoría interna 10/09, ítem `api.products`): antes nada tenía
 // largo ni cantidad, y un solo POST con miles de variantes armaba una
@@ -57,4 +63,5 @@ export class CreateProductDto {
   // parcial); ausente/vacía = el producto no tiene, el storefront no
   // muestra la tabla de "Características". Tope 30 (la IA sugiere hasta 20).
   @IsOptional() @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => ProductSpecInput) specs?: ProductSpecInput[];
+  @IsOptional() @IsString() @MaxLength(500) @Matches(URL_VIDEO, { message: URL_VIDEO_MENSAJE }) videoUrl?: string;
 }

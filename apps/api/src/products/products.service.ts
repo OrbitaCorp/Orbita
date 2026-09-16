@@ -182,6 +182,7 @@ export class ProductsService {
           cost: dto.cost ?? null,
           status: dto.status ?? 'DRAFT',
           specs: dto.specs ? (dto.specs.map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue) : undefined,
+          videoUrl: dto.videoUrl || null,
         },
       });
 
@@ -340,6 +341,7 @@ export class ProductsService {
           cost: dto.cost ?? null,
           status: dto.status ?? undefined,
           specs: (dto.specs ?? []).map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue,
+          videoUrl: dto.videoUrl || null,
         },
       });
       if (count === 0) throw new NotFoundException('Producto no encontrado');
@@ -862,6 +864,7 @@ export class ProductsService {
       status: p.status,
       isFeatured: p.isFeatured,
       specs: normalizarSpecs(p.specs),
+      videoUrl: p.videoUrl,
       tags: p.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: p.options.map((o) => ({
         id: o.id,

@@ -1,8 +1,9 @@
-// Opciones de multer para el único endpoint que recibe un video (sección de
-// video de Apariencia, alternativa a pegar un link — ver businesses.service.ts
-// #uploadStorefrontVideo). Mismo criterio de límite explícito que
-// subida-imagen.ts (sin `limits`, multer guarda el archivo ENTERO en memoria
-// antes de que el service lo mire).
+// Opciones de multer para los endpoints que reciben un video (sección de
+// video de Apariencia y el video de producto, alternativa a pegar un link en
+// los dos — ver businesses.service.ts#uploadStorefrontVideo, reusado también
+// por products.controller.ts#uploadVideo). Mismo criterio de límite explícito
+// que subida-imagen.ts (sin `limits`, multer guarda el archivo ENTERO en
+// memoria antes de que el service lo mire).
 //
 // El tope es más alto que el de imagen (10 MB): un video corto ya pesa eso
 // solo con la compresión de cualquier celular. Pero acá NO hay reencodeo
