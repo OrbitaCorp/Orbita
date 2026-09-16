@@ -492,9 +492,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 maqueta no contempla slides rotando, así que ni el título ni
                 la ayuda pueden hablar de "sliders"/"carrusel" (pedido
                 explícito, con capturas de la maqueta original). */}
-            <FieldLabel help={heroNoRotativo
-                ? 'Las dos imágenes del hero de esta plantilla. No rotan: quedan fijas, una a cada lado.'
-                : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}>
+            <FieldLabel
+                ayuda={AYUDA_SECCIONES[heroNoRotativo ? 'slidersFijos' : 'sliders']}
+                help={heroNoRotativo
+                    ? 'Las dos imágenes del hero de esta plantilla. No rotan: quedan fijas, una a cada lado.'
+                    : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}
+            >
                 {heroNoRotativo ? 'Imágenes del hero' : 'Sliders del hero'}
             </FieldLabel>
             {heroMax && !heroNoRotativo && (
@@ -1295,11 +1298,36 @@ function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: string; 
     )
 }
 
-function FieldLabel({ children, help }: { children: ReactNode; help?: string }) {
+// El rótulo de un campo. `help` es la línea de siempre, corta y siempre a la
+// vista; `ayuda` es el ícono de exclamación con la explicación larga, para los
+// campos que son una sección entera aunque no tengan su propia tarjeta (los
+// sliders del hero, sin ir más lejos: es el bloque más grande de la pantalla
+// y vive adentro de "Identidad de marca").
+function FieldLabel({ children, help, ayuda }: { children: ReactNode; help?: string; ayuda?: Ayuda }) {
+    const [ayudaAbierta, setAyudaAbierta] = useState(false)
+    const panelAyudaId = useId()
+    // Sin `ayuda` queda EXACTAMENTE como estaba: un div y nada más. Son
+    // decenas de rótulos en esta pantalla, no tiene sentido envolverlos a
+    // todos en un flex por un ícono que no está.
+    if (!ayuda) {
+        return (
+            <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)' }}>{children}</div>
+                {help && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{help}</div>}
+            </div>
+        )
+    }
     return (
         <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)' }}>{children}</div>
+            {/* -6px a la izquierda: el ícono tiene su propio relleno de 30px
+                (40 en mobile), así que sin esto el texto del rótulo queda
+                despegado del margen de la tarjeta respecto de los demás. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: -6 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)' }}>{children}</div>
+                <AyudaBoton nombre={typeof children === 'string' ? children : 'esta sección'} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />
+            </div>
             {help && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{help}</div>}
+            <AyudaPanel ayuda={ayuda} id={panelAyudaId} abierta={ayudaAbierta} style={{ marginTop: 8 }} />
         </div>
     )
 }

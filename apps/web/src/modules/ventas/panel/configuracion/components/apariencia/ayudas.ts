@@ -36,6 +36,20 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
         donde: 'En lo más alto del inicio de tu tienda, arriba de todo lo demás.',
         afecta: 'Es la primera pantalla que ve un visitante. El botón de cada imagen lleva a donde vos digas (el catálogo, una categoría, una promo). Sin ninguna imagen cargada, el bloque no se dibuja.',
     },
+    // Los dos de abajo no son tarjetas: son el campo "Sliders del hero"
+    // dentro de Identidad de marca (ver FieldLabel en Apariencia.tsx). Van
+    // acá igual porque para el dueño es una sección más — es el bloque más
+    // grande y más editable de toda la pantalla.
+    sliders: {
+        que: 'Las imágenes grandes que se turnan arriba del inicio. Cada una lleva su imagen, un título, una bajada y un botón, y se le puede cambiar el estilo: la foto a todo el ancho o al costado, con velo o sin velo, con color o textura de fondo propios.',
+        donde: 'En lo más alto del inicio de tu tienda, arriba de todo lo demás.',
+        afecta: 'Es la primera pantalla que ve alguien que entra. Cambian solas cada 4 segundos, en el orden de esta lista (se frenan mientras el visitante les deja el mouse encima), y el primero es el que ven al llegar — con las flechas de cada slide cambiás ese orden. Con uno solo no rota: queda fijo. Sin ninguno, el bloque no se dibuja y el inicio arranca con las secciones de abajo.',
+    },
+    slidersFijos: {
+        que: 'Las dos imágenes del hero de esta plantilla, cada una con su título, su bajada y su botón.',
+        donde: 'Arriba de todo en la portada, mitad y mitad: la primera de esta lista va a la izquierda y la segunda a la derecha. En el celular se apilan, primera arriba.',
+        afecta: 'No rotan ni se turnan: las dos se ven al mismo tiempo, siempre. Con las flechas cambiás cuál va de cada lado. Si cargás una sola, ocupa todo el ancho en vez de dejar la mitad vacía.',
+    },
     paleta: {
         que: 'Los tres colores de tu marca (primario, secundario y acento), el fondo de las páginas, y si la tienda se ve clara u oscura.',
         donde: 'En toda la tienda, no en una sección sola. El primario pinta botones, links y elementos de acción; el secundario los textos y fondos oscuros; el acento las etiquetas y detalles resaltados.',
