@@ -38,9 +38,13 @@ export function AyudaBoton({ nombre, abierta, onToggle, panelId }: {
     panelId:  string
 }) {
     return (
+        // El ds-hover del design system acá no va: pinta un velo de
+        // currentColor con un ::after en z-index negativo, y encima de eso el
+        // botón ya tiene su propio relleno + escala en hover (globals.css,
+        // .ds-ayuda-btn). Los dos juntos daban un gris embarrado.
         <button
             type="button"
-            className="ds-hover ds-ayuda-btn"
+            className="ds-ayuda-btn"
             onClick={e => { e.preventDefault(); e.stopPropagation(); onToggle() }}
             aria-expanded={abierta}
             aria-controls={panelId}
@@ -52,34 +56,51 @@ export function AyudaBoton({ nombre, abierta, onToggle, panelId }: {
     )
 }
 
-export function AyudaPanel({ ayuda, id, style }: { ayuda: Ayuda; id: string; style?: CSSProperties }) {
+// El panel se renderiza SIEMPRE, abierto o cerrado, y quien lo usa le pasa
+// `abierta`. Es lo que permite que se despliegue en vez de aparecer de golpe:
+// la altura se anima con el truco de grid-template-rows 0fr → 1fr (la única
+// forma de transicionar hasta una altura `auto` sin medirla con JS), y eso
+// necesita que el nodo exista de los dos lados de la transición. Montarlo y
+// desmontarlo, como estaba antes, no deja nada que animar.
+export function AyudaPanel({ ayuda, id, abierta, style }: { ayuda: Ayuda; id: string; abierta: boolean; style?: CSSProperties }) {
     const filas: [string, string | undefined][] = [
         ['Qué es', ayuda.que],
         ['Dónde se ve', ayuda.donde],
         ['En qué afecta', ayuda.afecta],
     ]
     return (
-        <div
-            id={id}
-            role="note"
-            className="ds-ayuda-panel"
-            style={{
-                borderRadius: 10,
-                border: '1px solid color-mix(in srgb, var(--color-primary) 22%, transparent)',
-                background: 'var(--color-primary-bg)',
-                padding: '11px 13px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                ...style,
-            }}
-        >
-            {filas.filter(([, texto]) => !!texto).map(([rotulo, texto]) => (
-                <div key={rotulo}>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-primary)', marginBottom: 2 }}>{rotulo}</div>
-                    <div style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--color-body)' }}>{texto}</div>
+        // Tres nodos y no uno: el de afuera anima la altura, el del medio
+        // recorta lo que todavía no entró (y se come los márgenes del panel
+        // mientras está cerrado, para que no dejen un hueco), y el de adentro
+        // es el panel que se ve.
+        <div className="ds-ayuda-wrap" data-abierta={abierta ? 'true' : 'false'} aria-hidden={!abierta}>
+            <div className="ds-ayuda-clip">
+                <div
+                    id={id}
+                    role="note"
+                    className="ds-ayuda-panel"
+                    style={{
+                        borderRadius: 10,
+                        border: '1px solid color-mix(in srgb, var(--color-primary) 22%, transparent)',
+                        background: 'var(--color-primary-bg)',
+                        padding: '11px 13px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        ...style,
+                    }}
+                >
+                    {filas.filter(([, texto]) => !!texto).map(([rotulo, texto], i) => (
+                        // Cada bloque entra un toque después del anterior
+                        // (--ayuda-i): la explicación se lee como que se va
+                        // escribiendo, en vez de aparecer entera de una.
+                        <div key={rotulo} className="ds-ayuda-fila" style={{ ['--ayuda-i' as string]: i }}>
+                            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-primary)', marginBottom: 2 }}>{rotulo}</div>
+                            <div style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--color-body)' }}>{texto}</div>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            </div>
         </div>
     )
 }

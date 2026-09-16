@@ -1283,13 +1283,13 @@ function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: string; 
         // scroll-into-view deja el título de la tarjeta pegado contra el
         // borde de arriba de la ventana.
         <div id={id} className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: ayudaAbierta ? 12 : 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><I size={16} strokeWidth={1.6} /></div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1 }}>{title}</h3>
                 {ayuda && <AyudaBoton nombre={title} abierta={ayudaAbierta} onToggle={() => setAyudaAbierta(a => !a)} panelId={panelAyudaId} />}
                 {badge}
             </div>
-            {ayuda && ayudaAbierta && <AyudaPanel ayuda={ayuda} id={panelAyudaId} style={{ marginBottom: 18 }} />}
+            {ayuda && <AyudaPanel ayuda={ayuda} id={panelAyudaId} abierta={ayudaAbierta} style={{ marginBottom: 18 }} />}
             {children}
         </div>
     )
@@ -1584,7 +1584,7 @@ function ToggleRow({ label, on, onChange, ayuda }: { label: string; on: boolean;
     return (
         <div>
             {fila}
-            {ayudaAbierta && <AyudaPanel ayuda={ayuda} id={panelAyudaId} style={{ margin: '2px 4px 12px' }} />}
+            <AyudaPanel ayuda={ayuda} id={panelAyudaId} abierta={ayudaAbierta} style={{ margin: '2px 4px 12px' }} />
         </div>
     )
 }
