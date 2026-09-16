@@ -395,6 +395,97 @@ html.light body { background: #eef4ff; color: #0f172a; }
   outline-offset: 2px;
 }
 
+/* ─── Ayuda contextual ("qué es esto") ────────────────────────────────────
+   El ícono de exclamación que abre la descripción de una sección o de una
+   opción — hoy lo usa Apariencia en cada tarjeta y en cada interruptor (ver
+   AyudaSeccion.tsx). El tamaño vive acá y no en estilos inline porque cambia
+   por media query: en mobile ese ícono es el ÚNICO lugar donde el dueño
+   puede entender qué hace cada interruptor (ahí la vista previa en vivo no
+   se muestra), así que tiene que ser cómodo de tocar — 40px, contra 30 en
+   escritorio. */
+.ds-ayuda-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-muted);
+  font-family: inherit;
+  cursor: pointer;
+  /* El rebote del final de la curva es lo que le saca el aire de botón
+     muerto: la escala pasa apenas de largo y vuelve. */
+  transition: color 180ms ease, background-color 180ms ease,
+              transform 260ms cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+.ds-ayuda-btn[aria-expanded='true'] {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+@media (hover: hover) {
+  .ds-ayuda-btn:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-bg);
+    transform: scale(1.14);
+  }
+}
+/* Se hunde al tocarlo — el único feedback que hay en pantalla táctil, donde
+   el hover no existe. */
+.ds-ayuda-btn:active { transform: scale(0.9); transition-duration: 90ms; }
+.ds-ayuda-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 768px) {
+  .ds-ayuda-btn { width: 40px; height: 40px; }
+}
+
+/* El despliegue. `grid-template-rows: 0fr → 1fr` es la única forma de
+   transicionar hasta una altura `auto` sin medirla con JS: la fila crece
+   hasta lo que mide el contenido y el navegador interpola sola. El hijo del
+   medio recorta lo que todavía no entró (y los márgenes del panel con él,
+   así no queda un hueco flotando cuando está cerrado). */
+.ds-ayuda-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ds-ayuda-wrap[data-abierta='true'] { grid-template-rows: 1fr; }
+.ds-ayuda-clip { overflow: hidden; min-height: 0; }
+.ds-ayuda-panel {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 200ms ease, transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ds-ayuda-wrap[data-abierta='true'] .ds-ayuda-panel {
+  opacity: 1;
+  transform: none;
+}
+/* Cada bloque (qué es / dónde se ve / en qué afecta) entra un toque después
+   del anterior, en vez de los tres de golpe. --ayuda-i lo pone el componente
+   (ver AyudaSeccion.tsx). La animación arranca recién cuando el panel se
+   abre, así que se repite en cada apertura. */
+.ds-ayuda-wrap[data-abierta='true'] .ds-ayuda-fila {
+  animation: dsAyudaFila 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(90ms + var(--ayuda-i, 0) * 65ms);
+}
+@keyframes dsAyudaFila {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+/* Con menos animación pedida: se abre y se cierra igual, pero de una. */
+@media (prefers-reduced-motion: reduce) {
+  .ds-ayuda-btn,
+  .ds-ayuda-wrap,
+  .ds-ayuda-panel { transition: none; }
+  .ds-ayuda-btn:hover,
+  .ds-ayuda-btn:active { transform: none; }
+  .ds-ayuda-wrap[data-abierta='true'] .ds-ayuda-fila { animation: none; }
+}
+
 /* ─── Animaciones del design system ─────────────────────────────────────── */
 
 /* ─── Scrollbars con identidad Órbita ─────────────────────────────────────

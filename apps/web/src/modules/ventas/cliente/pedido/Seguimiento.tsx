@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer, Truck, Copy } from 'lucide-react'
+import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, MessageSquare, FileText, Printer, Truck, Copy } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
@@ -107,6 +107,10 @@ export default function SeguimientoPedido() {
     return () => { cancelado = true }
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+  // Vidriera digital: no hay mensajería en el storefront (backend la bloquea,
+  // ver FullModeOnly en conversations.controller.ts) — mismo criterio que
+  // Perfil.tsx para sacar la pestaña de Mensajes.
+  const esVidriera = config?.business?.mode === 'SHOWCASE'
 
   const [pedido, setPedido]       = useState<MeOrderDetail | null>(null)
   const [cargando, setCargando]   = useState(true)
@@ -507,10 +511,25 @@ export default function SeguimientoPedido() {
                     background: 'transparent', color: 'var(--color-text)',
                     border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none',
+                    marginBottom: esVidriera ? 0 : 8,
                   }}
                 >
                   <Mail size={16} strokeWidth={1.5} /> Email
                 </a>
+              )}
+              {!esVidriera && (
+                <button
+                  className="ds-hover"
+                  onClick={() => router.push(`${base}/perfil?tab=mensajes`)}
+                  style={{
+                    width: '100%', height: 44, borderRadius: 10,
+                    background: 'transparent', color: 'var(--color-text)',
+                    border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <MessageSquare size={16} strokeWidth={1.5} /> Mensajería
+                </button>
               )}
             </SideCard>
 

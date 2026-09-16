@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag, Play } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -9,7 +9,7 @@ import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp } from '@/lib/storefront/utils'
+import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp, parseVideoEmbed } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -376,12 +376,23 @@ export default function ProductoDetalle() {
   const idxHover = hoverValorId ? (imagenes?.findIndex(im => im.optionValueId === hoverValorId) ?? -1) : -1
   const idxMostrado = idxHover >= 0 ? idxHover : imgIdx
   const hue = hueFromId(producto.id)
+
+  // Video del producto (opcional) — una pieza más de la galería, siempre AL
+  // FINAL de las fotos (nunca reemplaza la principal): un link que no
+  // matchea ninguna forma conocida (parseVideoEmbed) no agrega nada, en vez
+  // de un cuadro roto. `cantFotos` es el índice que le toca al video en la
+  // navegación conjunta de miniaturas/flechas.
+  const videoEmbed = parseVideoEmbed(producto.videoUrl)
+  const cantFotos = imagenes?.length ?? 0
+  const totalSlides = cantFotos + (videoEmbed ? 1 : 0)
+  const esSlideVideo = !!videoEmbed && idxHover < 0 && idxMostrado === cantFotos
+
   // La tira de miniaturas (76px + 12px de gap) solo ocupa lugar cuando hay
-  // 2+ fotos — si no, la imagen principal arranca pegada al borde y todo lo
-  // de abajo (ficha técnica, envíos/cambios/pago) tiene que alinearse ahí
-  // también, no quedarse angosto contando un espacio de miniaturas que no
-  // existe.
-  const hayMiniaturas = !!imagenes && imagenes.length > 1
+  // 2+ piezas (fotos + video) — si no, la imagen principal arranca pegada al
+  // borde y todo lo de abajo (ficha técnica, envíos/cambios/pago) tiene que
+  // alinearse ahí también, no quedarse angosto contando un espacio de
+  // miniaturas que no existe.
+  const hayMiniaturas = totalSlides > 1
   const anchoMiniaturas = hayMiniaturas ? 88 : 0
 
   // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
@@ -436,9 +447,9 @@ export default function ProductoDetalle() {
 
             <div className="sf-pd-gallery" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
 
-              {imagenes && imagenes.length > 1 && (
+              {hayMiniaturas && (
                 <div className="sf-pd-thumbs" style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-                  {imagenes.map((img, i) => (
+                  {imagenes?.map((img, i) => (
                     <button
                       key={img.url + i}
                       className="ds-hover"
@@ -454,46 +465,106 @@ export default function ProductoDetalle() {
                       <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} />
                     </button>
                   ))}
+                  {/* Miniatura del video — siempre la última, un cuadro
+                      oscuro con un ícono de play (no hay miniatura propia:
+                      YouTube/Vimeo la tienen adentro del reproductor, y un
+                      archivo directo no trae ninguna). */}
+                  {videoEmbed && (
+                    <button
+                      className="ds-hover"
+                      onClick={() => setImgIdx(cantFotos)}
+                      title="Ver video"
+                      style={{
+                        width: 76, height: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
+                        border: `2px solid ${esSlideVideo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        background: '#0F172A', transition: 'border-color 150ms',
+                        display: 'grid', placeItems: 'center', flexShrink: 0,
+                      }}
+                    >
+                      <Play size={22} color="#fff" fill="#fff" strokeWidth={0} />
+                    </button>
+                  )}
                 </div>
               )}
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
-                <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
-                  {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
-                      específico, mismo criterio de prioridad que el badge
-                      del catálogo (toProducto()). */}
-                  {(producto.promoLabel || desc > 0) && (
-                    <div style={{ position: 'absolute', top: 16, left: 16 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                        {producto.promoLabel ? producto.promoLabel : `Oferta · -${desc}%`}
-                      </span>
-                    </div>
-                  )}
-                  {/* Navegación entre la foto principal y las de variante —
-                      antes solo se podía cambiar de foto clickeando un
-                      thumbnail (y ninguno se mostraba con una sola foto). */}
-                  {imagenes && imagenes.length > 1 && (
-                    <>
-                      {/* La pastilla de las flechas es blanca a propósito: va
-                          sobre la foto del producto, que puede ser de cualquier
-                          color. Por eso la tinta también va clavada oscura —
-                          con `var(--color-text)` una plantilla oscura pintaba
-                          el chevron casi blanco sobre blanco y desaparecía. */}
-                      <button
-                        className="ds-hover"
-                        onClick={() => setImgIdx(i => (i - 1 + imagenes.length) % imagenes.length)}
-                        title="Foto anterior"
-                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-                      ><ChevronLeft size={18} /></button>
-                      <button
-                        className="ds-hover"
-                        onClick={() => setImgIdx(i => (i + 1) % imagenes.length)}
-                        title="Foto siguiente"
-                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-                      ><ChevronRight size={18} /></button>
-                    </>
-                  )}
-                </ProdImage>
+                {esSlideVideo && videoEmbed ? (
+                  // Mismo contenedor 560/14 que ProdImage, para que el salto
+                  // entre foto y video no mueva el layout de alrededor.
+                  <div style={{ width: '100%', height: 560, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                    {videoEmbed.tipo === 'file' ? (
+                      <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                        <source src={videoEmbed.src} />
+                      </video>
+                    ) : (
+                      <iframe
+                        src={videoEmbed.src}
+                        title={producto.name}
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                      />
+                    )}
+                    {/* Volver a las fotos sin depender de la tira de
+                        miniaturas — mismas flechas que el modo foto. Solo con
+                        algo más a lo que navegar (hay al menos una foto). */}
+                    {hayMiniaturas && (
+                      <>
+                        <button
+                          className="ds-hover"
+                          onClick={() => setImgIdx(i => (i - 1 + totalSlides) % totalSlides)}
+                          title="Anterior"
+                          style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        ><ChevronLeft size={18} /></button>
+                        <button
+                          className="ds-hover"
+                          onClick={() => setImgIdx(i => (i + 1) % totalSlides)}
+                          title="Siguiente"
+                          style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        ><ChevronRight size={18} /></button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
+                    {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
+                        específico, mismo criterio de prioridad que el badge
+                        del catálogo (toProducto()). */}
+                    {(producto.promoLabel || desc > 0) && (
+                      <div style={{ position: 'absolute', top: 16, left: 16 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          {producto.promoLabel ? producto.promoLabel : `Oferta · -${desc}%`}
+                        </span>
+                      </div>
+                    )}
+                    {/* Navegación entre las piezas de la galería (fotos +
+                        video) — antes solo se podía cambiar de foto
+                        clickeando un thumbnail (y ninguno se mostraba con
+                        una sola foto). */}
+                    {hayMiniaturas && (
+                      <>
+                        {/* La pastilla de las flechas es blanca a propósito: va
+                            sobre la foto del producto, que puede ser de cualquier
+                            color. Por eso la tinta también va clavada oscura —
+                            con `var(--color-text)` una plantilla oscura pintaba
+                            el chevron casi blanco sobre blanco y desaparecía. */}
+                        <button
+                          className="ds-hover"
+                          onClick={() => setImgIdx(i => (i - 1 + totalSlides) % totalSlides)}
+                          title="Anterior"
+                          style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        ><ChevronLeft size={18} /></button>
+                        <button
+                          className="ds-hover"
+                          onClick={() => setImgIdx(i => (i + 1) % totalSlides)}
+                          title="Siguiente"
+                          style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        ><ChevronRight size={18} /></button>
+                      </>
+                    )}
+                  </ProdImage>
+                )}
               </div>
             </div>
 

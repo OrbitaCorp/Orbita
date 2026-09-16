@@ -715,6 +715,12 @@ model Product {
   // BusinessConfig). null/[] = el storefront no muestra la tabla de
   // "Características" en el detalle de producto.
   specs         Json?
+  // Un link (YouTube/Vimeo/archivo) o el resultado de subir el archivo
+  // directo — mismo criterio que StorefrontConfig.videoUrl (ver
+  // parseVideoEmbed, apps/web/src/lib/storefront/utils.ts). Un solo video
+  // por producto, no por imagen: se muestra como una pieza más de la
+  // galería en la ficha, no asociado a ninguna variante.
+  videoUrl      String?       @map("video_url")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   deletedAt     DateTime?     @map("deleted_at") // soft-delete

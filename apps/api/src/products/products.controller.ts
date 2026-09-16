@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
+import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Throttle } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -23,6 +24,7 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ProductsService } from './products.service';
 import { ProductAiService } from './product-ai.service';
+import { BusinessesService } from '../businesses/businesses.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
@@ -43,7 +45,23 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly productAiService: ProductAiService,
+    private readonly businessesService: BusinessesService,
   ) {}
+
+  // Alternativa a pegar un link de video en el producto (Variantes e imágenes)
+  // — mismo bucket de assets públicos del negocio que ya usa el video de
+  // Apariencia, ver el comentario de uploadStorefrontVideo() en
+  // businesses.service.ts. Antes de ':id' porque todavía puede no existir un
+  // producto (alta nueva): el resultado es solo una URL, se manda recién al
+  // crear/actualizar el producto junto con el resto del form.
+  @Post('upload-video')
+  @RequirePermission('catalog.manage')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_VIDEO))
+  uploadVideo(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
+    const member = assertMemberContext(ctx);
+    if (!file) throw new BadRequestException('Falta el archivo "file"');
+    return this.businessesService.uploadStorefrontVideo(member.businessId, file);
+  }
 
   // Antes de ':id' — no es un id real, pero evita cualquier ambigüedad de ruta.
   @Post('ai-assist')

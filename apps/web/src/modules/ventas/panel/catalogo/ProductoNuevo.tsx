@@ -12,17 +12,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { parseVideoEmbed } from '@/lib/storefront/utils'
+import { VideoUploader } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
+    panelUploadProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
@@ -87,6 +90,10 @@ interface ProdForm {
     // tecnología. [] = el producto no tiene, el detalle del storefront no
     // muestra la tabla de "Características".
     specs: EspecTecnica[]
+    // Link (YouTube/Vimeo/archivo) o el resultado de subir el archivo — mismo
+    // criterio que ap.videoUrl en Apariencia (ver parseVideoEmbed). '' = el
+    // producto no tiene video.
+    videoUrl: string
 }
 
 interface EspecTecnica { label: string; value: string }
@@ -174,6 +181,7 @@ const FORM_INICIAL: ProdForm = {
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
     specs: [],
+    videoUrl: '',
 }
 
 // El "Stock mínimo de alerta" casi siempre es el mismo número para todos los
@@ -218,6 +226,14 @@ function generarSKU(nombre: string) {
 // abreviaciones rotas con acentos (ej. "Café" -> "CAF", no un caracter suelto).
 function abreviarValorOpcion(valor: string) {
     return normalizarParaSKU(valor).replace(/\s+/g, '').slice(0, 3)
+}
+
+// Alternativa a pegar un link en "Video del producto" — mismo criterio que
+// subirVideoApariencia() en Apariencia.tsx, pero sin productId: puede subirse
+// antes de que el producto exista (mismo momento del wizard que las fotos).
+async function subirVideoProducto(file: File): Promise<string> {
+    const { url } = await panelUploadProductVideo(file, file.name)
+    return url
 }
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
@@ -334,6 +350,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value), esVisual: o.isVisual }))
                         : FORM_INICIAL.tiposVariante,
                     specs: p.specs,
+                    videoUrl: p.videoUrl ?? '',
                 })
                 setMostrarSpecs(p.specs.length > 0)
                 setFilas(
@@ -803,6 +820,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             status: prod.estado,
             ...(tagIds.length > 0 ? { tagIds } : {}),
             specs,
+            videoUrl: prod.videoUrl.trim() || undefined,
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
@@ -1342,6 +1360,37 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
                                     {avanzado && ' El ✨ quita el fondo con IA al subir la foto.'}
+                                </div>
+                            </div>
+
+                            {/* Video del producto — opcional, un solo video por producto (no por
+                                variante). Mismo mecanismo que la sección de video de Apariencia:
+                                pegar un link (YouTube/Vimeo/archivo) o subir el archivo directo,
+                                los dos escriben el mismo campo `videoUrl`. Se muestra en la ficha
+                                del storefront como una pieza más de la galería (ver
+                                ProductoDetalle.tsx). */}
+                            <div style={{ marginTop: 24 }}>
+                                <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
+                                <input
+                                    className="ds-field"
+                                    value={prod.videoUrl}
+                                    onChange={e => set('videoUrl', e.target.value)}
+                                    placeholder="https://www.youtube.com/watch?v=..."
+                                    style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
+                                />
+                                {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
+                                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
+                                        No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                    </div>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
+                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                </div>
+                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} />
+                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                    Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
                                 </div>
                             </div>
 

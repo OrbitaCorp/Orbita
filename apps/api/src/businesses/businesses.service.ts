@@ -490,8 +490,11 @@ export class BusinessesService {
     return { url };
   }
 
-  // Alternativa a pegar un link en la sección de video de Apariencia — sube
-  // el ARCHIVO tal cual, sin reencodear: a diferencia de una imagen, no hay
+  // Alternativa a pegar un link en la sección de video de Apariencia — y
+  // reusado tal cual por products.controller.ts#uploadVideo para el video de
+  // producto, mismo bucket y mismo criterio, no hay nada específico de
+  // Apariencia acá adentro. Sube el ARCHIVO tal cual, sin reencodear: a
+  // diferencia de una imagen, no hay
   // forma liviana de transcodificar video en este backend, y no hace falta
   // (el navegador reproduce cualquiera de los cuatro formatos permitidos
   // directo, sin plugins). El resultado es una URL de Storage que termina en

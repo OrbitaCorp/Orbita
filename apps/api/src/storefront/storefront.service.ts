@@ -869,6 +869,7 @@ export class StorefrontService {
       promo: promoInfo,
       isFeatured: product.isFeatured,
       specs: normalizarSpecs(product.specs),
+      videoUrl: product.videoUrl,
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: product.options.map((o) => ({
         id: o.id,

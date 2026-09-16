@@ -1729,6 +1729,9 @@ export type ApiProductFull = {
   // Ficha técnica opcional ("RAM" -> "16GB") — [] = el producto no tiene,
   // el detalle del storefront no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
+  // Un link (YouTube/Vimeo/archivo) o el resultado de subirlo — mismo campo
+  // que StorefrontConfig.videoUrl (ver parseVideoEmbed en storefront/utils.ts).
+  videoUrl: string | null
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {
@@ -1760,6 +1763,7 @@ export type UpsertProductInput = {
   status?: ProductStatus
   tagIds?: string[]
   specs?: { label: string; value: string }[]
+  videoUrl?: string
   options?: { name: string; values: string[]; isVisual?: boolean }[]
   variants: {
     id?: string
@@ -1855,6 +1859,22 @@ export async function panelUploadProductImage(
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as ApiProductImage
+}
+
+// Alternativa a pegar un link en el video del producto (mismo criterio que
+// panelUploadStorefrontVideo, arriba) — no pide productId: puede subirse
+// ANTES de crear el producto (misma etapa del wizard que las fotos), la URL
+// resultante recién se manda al crear/actualizar, junto con el resto del form.
+export async function panelUploadProductVideo(file: Blob, filename: string) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/products/upload-video`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as { url: string }
 }
 
 export function panelDeleteProductImage(productId: string, imageId: string) {
