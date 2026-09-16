@@ -11,6 +11,14 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 interface DetalleItem { titulo: string; texto: string }
 
+// Esto NO es una sesión que "expiró" — este paso no es un login, es la
+// continuación del mismo wizard. La contraseña se pierde porque a propósito
+// no se persiste en localStorage (ver useOnboardingStore), así que decir
+// "sesión expiró" confunde: suena a que hay que volver a loguearse en algún
+// lado, cuando lo único que hace falta es volver a escribirla en el paso
+// anterior. Pedido explícito: que no aparezca ese error.
+const MENSAJE_PASSWORD_PERDIDA = 'Por tu seguridad no guardamos la contraseña en este paso. Volvé al paso anterior para volver a escribirla.'
+
 // Lo que ya incluye la tarjeta Base — mismos textos que Cierre.tsx (home) y
 // Modulos.tsx, adaptados al estilo propio de esta pantalla (no se importa
 // nada de la landing: es un sistema visual distinto). Si cambian de un lado,
@@ -1006,7 +1014,7 @@ export default function PlanPage() {
 
   function pagar() {
     if (passwordLost) {
-      setErrorPago('Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.')
+      setErrorPago(MENSAJE_PASSWORD_PERDIDA)
       return
     }
     setErrorPago('')
@@ -1037,7 +1045,7 @@ export default function PlanPage() {
   // cobro. Solo accesible con NEXT_PUBLIC_ALLOW_SKIP_PAYMENT=true.
   function omitirPago() {
     if (passwordLost) {
-      setErrorPago('Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.')
+      setErrorPago(MENSAJE_PASSWORD_PERDIDA)
       return
     }
     setErrorPago('')
@@ -1071,7 +1079,7 @@ export default function PlanPage() {
     <PlanScreen
       onPagar={pagar}
       onOmitir={omitirPago}
-      error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}
+      error={errorPago || (passwordLost ? MENSAJE_PASSWORD_PERDIDA : '')}
       descuento={descuento}
       faltaPassword={passwordLost}
       onVolver={volverAPoner}

@@ -101,7 +101,15 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <div>
       <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', display: 'block', marginBottom: 6 }}>
         {label}
-        {required && <span style={{ color: '#EF4444', marginLeft: 2 }}>*</span>}
+        {required
+          ? <span style={{ color: '#EF4444', marginLeft: 2 }}>*</span>
+          // Mismo criterio que "Agregar LOGO (opcional)" de arriba: un campo
+          // sin asterisco no dejaba claro que no hacía falta completarlo
+          // (reportado con captura, "Descripción" se veía como cualquier otro
+          // campo obligatorio). Se deriva de `required` en vez de un prop
+          // aparte — así no hay forma de que un campo quede sin ninguna de
+          // las dos marcas.
+          : <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-muted)', marginLeft: 5 }}>(opcional)</span>}
       </label>
       {children}
     </div>
