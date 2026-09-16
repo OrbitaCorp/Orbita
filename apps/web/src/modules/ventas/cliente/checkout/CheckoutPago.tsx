@@ -377,6 +377,11 @@ export default function CheckoutPago() {
       faltante?.[1].current?.focus()
       return
     }
+    if (envio === 'DELIVERY' && cliente && !direccionCompleta) {
+      setErrorDir('Agregá una dirección para poder confirmar la compra')
+      setShowNewDir(true)
+      return
+    }
     setEnviando(true)
     setError('')
     try {
@@ -752,6 +757,14 @@ export default function CheckoutPago() {
 
                             {cliente ? (
                               <div>
+                                {direcciones.length === 0 && (
+                                  <div style={{ display: 'flex', gap: 10, padding: 14, borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: 14 }}>
+                                    <AlertTriangle size={16} strokeWidth={1.8} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+                                    <div style={{ fontSize: 12.5, color: 'var(--color-body)' }}>
+                                      Todavía no tenés ninguna dirección guardada. Agregá una para poder confirmar la compra.
+                                    </div>
+                                  </div>
+                                )}
                                 {direcciones.length > 0 && (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                                     {direcciones.map(d => {
