@@ -151,6 +151,68 @@ Para agregar un secret **nuevo** (una env var sensible que no existía):
 3. Dar acceso al runtime SA (una sola vez, ya está hecho para todos los actuales):
    `gcloud projects add-iam-policy-binding orbita-api-corp --member="serviceAccount:681215569277-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"`
 
+### Rotación de secretos y quién tiene el `.env` de producción
+
+Hallazgo `secretos-tarball-cloud-build` de la auditoría interna: 14 tarballs de
+`gs://orbita-api-corp_cloudbuild/source/` (entre el 03/09 y el 10/09/2026)
+incluían `apps/api/.env.bak2`, con `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` y
+`SUPABASE_SERVICE_ROLE_KEY` en claro. La causa fue de una línea: el `.gitignore`
+cubría `.env`, `.env.local` y `.env.*.local`, pero no `.env.bak2`, y el build
+subía el directorio entero. El `.gcloudignore` del commit `8e17c` cortó la
+serie. Para que no vuelva a pasar y para saber qué hacer si pasa:
+
+**Quién tiene el `.env` de producción.** `apps/api/.env` apunta a la base REAL
+(ver el `CLAUDE.md` de la raíz): no es un archivo de desarrollo. Hoy lo tienen,
+en su máquina:
+
+| Quién | Dónde | Desde |
+|---|---|---|
+| Ale (CPO) | `D:\Orbita-2026\Orbita-Frontendppspi\.env` | el inicio del proyecto |
+| Mateo (CTO) | su clon del repo | el inicio del proyecto |
+
+Nadie más. Cuando alguien entre o salga del equipo, se actualiza esta tabla **y**
+se rotan los valores que esa persona tenía (abajo). Una copia en Drive, en un
+chat o en un `.bak` fuera del `.gitignore` no cuenta como "tener el `.env`":
+cuenta como una filtración y se trata como tal.
+
+**Archivos que nunca pueden salir del repo local.** `apps/api/.gcloudignore` es
+lo que decide qué sube `gcloud builds submit`, y excluye `.env` y `.env.*`; el
+`.gitignore` de la raíz y el de `apps/api/` cubren `.env*` con la única
+excepción de `.env.example`. Antes de tocar cualquiera de los tres, correr
+`npx jest -c test/jest-unit.json --testPathPatterns secretos-fuera-del-build` —
+el spec falla si los patrones dejan de cubrir una copia como `.env.bak2`.
+
+**Cómo se rota un valor filtrado**, en este orden (el orden importa: si se
+cambia el valor antes de que Cloud Run lo tome, la API queda con el viejo y
+falla):
+
+1. Generar el valor nuevo **en el proveedor** (Supabase, Mercado Pago, Resend,
+   o `openssl rand -hex 32` para los propios).
+2. Cargarlo como versión nueva del secret (ver arriba) — la anterior queda
+   disponible por si hay que volver.
+3. Forzar una revisión nueva de Cloud Run para que la tome:
+   `gcloud run services update orbita-api --region=southamerica-east1 --project=orbita-api-corp`
+4. Verificar que la revisión nueva sirve el 100% del tráfico y que
+   `GET /api/v1/health` responde 200.
+5. Recién ahí **invalidar el valor viejo** en el proveedor (rotar la clave,
+   revocar el token). Si el valor vive también en Vercel (`BFF_IP_SECRET`) o en
+   el `.env` de alguien, actualizarlo en la misma ventana.
+6. Anotar la rotación en el tablero de Auditoría del super admin (qué valor,
+   cuándo y por qué), que es donde vive el historial.
+
+**Qué NO se rota solo por prolijidad:** `DATABASE_URL`/`DIRECT_URL` llevan la
+contraseña de Postgres del proyecto de Supabase; cambiarla obliga a actualizar
+el secret, el `.env` de cada uno y cualquier script suelto a la vez. Se rota
+cuando hay motivo (una filtración fuera del equipo, alguien que se va), no en
+cada revisión.
+
+**Decisión de Ale del 12/09/2026 sobre los 14 tarballs:** no se rotan los
+valores, no se borran los tarballs y no se borra el archivo. El bucket no es
+público y al proyecto GCP tiene acceso humano una sola cuenta
+(`contacto@orbita-corp.com`); `JWT_SECRET` y `SUPABASE_SERVICE_ROLE_KEY` ya se
+habían rotado en julio por otro motivo. Queda documentado en el tablero, con la
+evidencia completa. No re-proponerlo salvo que él lo pida.
+
 ### `BFF_IP_SECRET` — IP real del cliente detrás del BFF (pendiente de cargar)
 
 Hallazgo `rate-limit-ip-proxy` de la auditoría interna (10/09). `TRUST_PROXY_HOPS`
