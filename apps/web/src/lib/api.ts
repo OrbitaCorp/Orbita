@@ -2597,6 +2597,38 @@ export function createReview(input: CreateReviewInput) {
   return panelRequest<ProductReview>('/reviews', { method: 'POST', body: JSON.stringify(input) })
 }
 
+// ── Moderación de reseñas (panel — dueño/equipo) ─────────────────────────────
+// Se entra por el producto, no por una bandeja general (hallazgo
+// `resenas-sin-moderacion-panel`): una reseña se entiende leyendo el producto
+// al que le pegan. A diferencia del listado público, este trae las ocultas con
+// su motivo y el nombre completo del cliente, para poder contestarle.
+export type ResenaPanel = {
+  id: string
+  text: string
+  status: 'VISIBLE' | 'HIDDEN'
+  hiddenReason: string | null
+  isVerified: boolean
+  createdAt: string
+  orderNumber: number
+  customerName: string
+  customerEmail: string
+}
+export type ResenasDeProducto = {
+  producto: { id: string; name: string }
+  total: number
+  ocultas: number
+  resenas: ResenaPanel[]
+}
+export function panelResenasDeProducto(productId: string) {
+  return panelRequest<ResenasDeProducto>(`/reviews/producto/${productId}`)
+}
+export function panelOcultarResena(id: string, hiddenReason: string) {
+  return panelRequest<{ ok: true }>(`/reviews/${id}/hide`, { method: 'PATCH', body: JSON.stringify({ hiddenReason }) })
+}
+export function panelMostrarResena(id: string) {
+  return panelRequest<{ ok: true }>(`/reviews/${id}/show`, { method: 'PATCH' })
+}
+
 // ── Checkout real del storefront (RBT-617/618/619) ──────────────────────────
 // A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),
 // esto SÍ necesita el token del cliente logueado — por eso vive acá, con el

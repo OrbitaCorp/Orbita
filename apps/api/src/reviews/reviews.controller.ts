@@ -33,11 +33,33 @@ export class ReviewsController {
     return this.reviewsService.eligibleFor(businessId, customerId, query.productId);
   }
 
+  // ── Moderación desde el panel (hallazgo `resenas-sin-moderacion-panel`) ───
+  // Se entra por el producto, no por una bandeja general: la reseña se
+  // entiende leyendo el producto al que le pegan, no en una lista suelta.
+
+  @Get('producto/:productId')
+  @Roles('owner', 'admin')
+  @FullModeOnly()
+  porProducto(@CurrentBusiness() ctx: AuthContext, @Param('productId', ParseUUIDPipe) productId: string) {
+    const member = assertMemberContext(ctx);
+    return this.reviewsService.listForPanel(member.businessId, productId);
+  }
+
   @Patch(':id/hide')
   @Roles('owner', 'admin')
   @FullModeOnly()
   hide(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: HideReviewDto) {
     const member = assertMemberContext(ctx);
-    return this.reviewsService.hide(member.businessId, id, dto);
+    return this.reviewsService.hide(member.businessId, id, dto, member.memberId);
+  }
+
+  // Deshace el ocultamiento: sin esto, moderar era de una sola vía y una
+  // reseña tapada por error no volvía nunca.
+  @Patch(':id/show')
+  @Roles('owner', 'admin')
+  @FullModeOnly()
+  show(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
+    const member = assertMemberContext(ctx);
+    return this.reviewsService.show(member.businessId, id, member.memberId);
   }
 }

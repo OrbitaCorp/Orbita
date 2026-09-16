@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -28,6 +28,7 @@ import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import ProductoNuevo from './ProductoNuevo'
 import type { EstadoProducto } from './types/catalogo.types'
+import { ResenasProducto } from './components/ResenasProducto'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 10
@@ -191,7 +192,7 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
+function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas }: {
     p: ApiProductRow
     upload?: ProductUploadState
     // Producto EXISTENTE guardando cambios en segundo plano (ver
@@ -206,6 +207,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     onDuplicar: () => void
     onBorrar: () => void
     onToggleFeatured: () => void
+    onResenas: () => void
 }) {
     const [indice, setIndice] = useState(0)
     const [menuAbierto, setMenuAbierto] = useState(false)
@@ -359,6 +361,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
                         <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                     </button>
+                    <button onClick={onResenas} title="Reseñas" aria-label={`Reseñas de ${p.name}`} className="prod-card-actbtn" style={cardActBtn}><MessageSquare size={14} /></button>
                     <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
                     <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
 
@@ -474,6 +477,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const createdProductIds = useOrbiStore(s => s.createdProductIds)
 
     const [aBorrar, setABorrar] = useState<ApiProductRow | null>(null)
+    // Producto cuyas reseñas se están moderando (hallazgo
+    // `resenas-sin-moderacion-panel`). Se entra por el ícono de la fila.
+    const [resenasDe, setResenasDe] = useState<string | null>(null)
     const [borrando, setBorrando] = useState(false)
 
     // Productos recién creados cuyas fotos siguen subiendo en segundo plano
@@ -940,6 +946,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onDuplicar={() => {}}
                                 onBorrar={() => {}}
                                 onToggleFeatured={() => {}}
+                                onResenas={() => {}}
                             />
                         ))}
                         {filas.map(p => (
@@ -952,6 +959,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
                                 onToggleFeatured={() => void toggleFeatured(p)}
+                                onResenas={() => setResenasDe(p.id)}
                             />
                         ))}
                     </div>
@@ -1018,6 +1026,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 <button onClick={() => void toggleFeatured(p)} className="prod-list-actbtn" style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
                                     <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                                 </button>
+                                <button onClick={() => setResenasDe(p.id)} className="prod-list-actbtn" style={iconBtn} title="Reseñas" aria-label={`Reseñas de ${p.name}`}><MessageSquare size={15} /></button>
                                 <button onClick={() => irEditar(p.id)} className="prod-list-actbtn" style={iconBtn} title="Editar"><Edit2 size={15} /></button>
                                 <button
                                     onClick={e => {
@@ -1073,6 +1082,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <Button variant="outline" size="sm" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>Siguiente</Button>
                 </div>
             )}
+
+            {/* Moderación de reseñas del producto. Se monta solo cuando hace
+                falta: pide la lista al abrirse, no en cada render de la tabla. */}
+            {resenasDe && <ResenasProducto productId={resenasDe} onClose={() => setResenasDe(null)} />}
 
             {/* Confirmación de borrado */}
             <Modal isOpen={aBorrar !== null} onClose={() => setABorrar(null)} title="Eliminar producto" maxWidth={420}>
