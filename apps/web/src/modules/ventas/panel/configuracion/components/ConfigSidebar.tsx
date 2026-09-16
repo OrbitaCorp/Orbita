@@ -12,7 +12,7 @@ import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
+    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy, History,
     Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Image as ImageIcon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -50,6 +50,10 @@ const GRUPOS: Grupo[] = [
             { vista: 'apariencia',     label: 'Apariencia',     Icon: Palette, permisos: ['config.edit'] },
             { vista: 'equipo',         label: 'Equipo',         Icon: Users,   permisos: ['config.team.view', 'config.team.manage'] },
             { vista: 'notificaciones', label: 'Notificaciones', Icon: Bell,    permisos: ['config.edit'] },
+            // Registro de actividad: quien hizo que (audit_logs). Permiso propio
+            // (config.audit.view), no config.edit: se puede querer que alguien
+            // LEA el registro sin poder tocar la configuracion.
+            { vista: 'actividad',      label: 'Registro de actividad', Icon: History, permisos: ['config.audit.view'] },
         ],
     },
     {

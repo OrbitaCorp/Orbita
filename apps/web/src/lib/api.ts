@@ -2094,6 +2094,49 @@ export function getMembers() {
   return panelRequest<ApiMember[]>('/members')
 }
 
+// ── Registro de actividad (audit_logs) ──────────────────────────────────────
+// Hallazgo `auditoria-sin-pantalla` de la auditoría interna: desde el 10/09
+// las acciones sensibles del panel quedan en audit_logs y GET /audit-logs ya
+// responde con el permiso config.audit.view, pero el dueño no tenía dónde
+// verlas. La pantalla es Configuración → Registro de actividad.
+//
+// Solo lectura: el backend no expone ningún endpoint para editar ni borrar el
+// registro, a propósito (ver audit.controller.ts).
+
+export type ApiAuditAction = 'CREATE' | 'UPDATE' | 'ACTIVATE' | 'DEACTIVATE' | 'DELETE'
+
+export type ApiAuditLog = {
+  id: string
+  entityType: string
+  entityId: string
+  action: ApiAuditAction
+  memberId: string | null
+  memberName: string | null
+  changes: { field: string; before?: unknown; after?: unknown }[] | null
+  createdAt: string
+}
+
+export type ApiAuditLogsPage = { data: ApiAuditLog[]; total: number; page: number; limit: number }
+
+export type AuditLogsFiltros = {
+  entityType?: string
+  memberId?: string
+  /** ISO 8601. El backend compara contra created_at. */
+  from?: string
+  to?: string
+  page?: number
+  limit?: number
+}
+
+export function panelListAuditLogs(filtros: AuditLogsFiltros = {}) {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(filtros)) {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  }
+  const qs = q.toString()
+  return panelRequest<ApiAuditLogsPage>(`/audit-logs${qs ? `?${qs}` : ''}`)
+}
+
 export function inviteMember(input: { name: string; email: string; roleId: string }) {
   return panelRequest<{ id: string; name: string; email: string; status: string; hasTempPassword: boolean; tempPassword: string }>(
     '/members/invite',

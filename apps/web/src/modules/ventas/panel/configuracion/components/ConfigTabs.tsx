@@ -17,3 +17,4 @@
 export type VistaConfig =
     | 'general' | 'negocio' | 'contacto' | 'pagos' | 'envios' | 'redes' | 'postventa' | 'peligro'
     | 'apariencia' | 'equipo' | 'notificaciones' | 'suscripcion' | 'dominios' | 'soporte'
+    | 'actividad'
