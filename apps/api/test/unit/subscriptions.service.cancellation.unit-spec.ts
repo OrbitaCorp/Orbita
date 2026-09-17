@@ -17,8 +17,20 @@ function makeService() {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    member: { findMany: jest.fn().mockResolvedValue([{ email: 'dueno@test.com' }]) },
+    member: { findMany: jest.fn().mockResolvedValue([{ email: 'dueno@test.com' }]), deleteMany: jest.fn() },
     refreshToken: { deleteMany: jest.fn() },
+    // Delegates que toca la purga de datos personales del borrado definitivo
+    // (hallazgo `businesses-sin-baja`, check c1). Acá solo hacen falta para
+    // que armar la transacción no explote; qué borra y qué conserva lo cubre
+    // purga-datos-baja.auditoria.unit-spec.ts.
+    ...Object.fromEntries(
+      [
+        'order', 'onlineOrderDetails', 'payment', 'creditNote', 'cancellationRequest', 'discountRedemption',
+        'stockMovement', 'discount', 'gameSession', 'message', 'conversation', 'review', 'emailLog',
+        'auditLog', 'notification', 'orbiConversation', 'passwordResetToken', 'emailVerificationToken',
+        'mpCredentials', 'address', 'customer',
+      ].map((modelo) => [modelo, { updateMany: jest.fn(), deleteMany: jest.fn() }]),
+    ),
     $transaction: jest.fn((arr: any[]) => Promise.all(arr.map((p) => (typeof p === 'function' ? p() : p)))),
   };
   const mail = {
