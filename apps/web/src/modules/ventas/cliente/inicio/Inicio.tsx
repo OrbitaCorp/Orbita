@@ -855,10 +855,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     )}
                     <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 20, overflow: 'hidden', background: '#000' }}>
                         {videoEmbed.tipo === 'file' ? (
-                            // Archivo directo: <video> nativo, con controles y la
-                            // miniatura que el dueño haya cargado (si no cargó
-                            // ninguna, el navegador dibuja el primer frame).
-                            <video controls poster={config?.appearance?.videoPosterUrl ?? undefined} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                            // Archivo directo: <video> nativo, con controles. La
+                            // miniatura es el primer frame del archivo mismo (antes
+                            // había que cargar una aparte en Apariencia) — el seek a
+                            // 0.1s en onLoadedMetadata es necesario, sin él algunos
+                            // navegadores (Firefox) dejan el cuadro en negro hasta
+                            // que se reproduce (mismo criterio que VideoUploader.tsx
+                            // en el panel y la miniatura de galería del PDP).
+                            <video
+                                controls
+                                preload="metadata"
+                                onLoadedMetadata={e => { const v = e.currentTarget; try { v.currentTime = Math.min(0.1, v.duration || 0) } catch { /* noop */ } }}
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                            >
                                 <source src={videoEmbed.src} />
                             </video>
                         ) : (

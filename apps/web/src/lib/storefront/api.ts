@@ -136,7 +136,6 @@ export type StorefrontConfigResponse = {
     videoTitle: string | null
     videoSubtitle: string | null
     videoUrl: string | null
-    videoPosterUrl: string | null
   } | null
   contact: {
     whatsapp: string | null

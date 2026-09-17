@@ -1189,7 +1189,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <>
                                 <div style={{ marginBottom: 10 }}>
                                     <FieldLabel help="Copiá el link tal cual aparece en la barra de direcciones — no hace falta que sea un link ‘para insertar’.">
-                                        Link del video
+                                        Link del video (opcional)
                                     </FieldLabel>
                                     <Inp value={ap.videoUrl} onChange={v => set('videoUrl', v)} placeholder="https://www.youtube.com/watch?v=..." />
                                     {/* Mismo aviso en vivo que el email del wizard de alta
@@ -1220,15 +1220,6 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <Divider />
                         <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} /></div>
                         <div><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
-                        {/* Solo tiene efecto con un archivo directo — YouTube/Vimeo
-                            ya traen su propia miniatura, así que mostrar el campo
-                            siempre y aclararlo evita un "por qué no cambia nada"
-                            si el dueño lo carga con un link de YouTube puesto. */}
-                        <Divider />
-                        <FieldLabel help="Solo se usa si el video es un archivo directo (.mp4) — YouTube y Vimeo muestran su propia miniatura.">
-                            Miniatura
-                        </FieldLabel>
-                        <ImgUploader value={ap.videoPoster} onChange={v => set('videoPoster', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
                     </SecCard>
 
                     {tarjetasSecundarias}

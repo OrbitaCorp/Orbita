@@ -1066,7 +1066,6 @@ export type ApiAppearanceConfig = {
   videoTitle: string | null
   videoSubtitle: string | null
   videoUrl: string | null
-  videoPosterUrl: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
