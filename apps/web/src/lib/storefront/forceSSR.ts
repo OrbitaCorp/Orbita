@@ -1,5 +1,7 @@
 import type { GetServerSideProps } from 'next'
 import { getStorefrontConfig, StorefrontApiError } from './api'
+import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
+import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -143,6 +145,15 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     }
   }
 
+  // La paleta de esa plantilla, resuelta acá y no en _app.tsx a propósito:
+  // `temaDePlantilla()` cuelga de `plantillas/datos.tsx` (78 KB), y _app.tsx
+  // lo cargan TODAS las páginas — la landing y el panel se comerían ese peso
+  // para nada. Del lado del server no cuesta nada, y el `Tema` es un objeto
+  // plano de strings, serializable tal cual. Lo consume el PageLoader, que se
+  // dibuja afuera de StorefrontChrome y si no arrancaría con la paleta de
+  // Apariencia hasta que hidrate (ver el comentario de `tema` en PageLoader).
+  const temaPlantilla: Tema | null = temaDePlantilla(homeTemplate) ?? null
+
   // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate } }
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla } }
 }

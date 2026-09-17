@@ -11,6 +11,10 @@ import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
 import { getStorefrontConfig } from '@/lib/storefront/api'
 import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
+// Solo el tipo: el módulo de plantillas pesa 78 KB y este archivo lo carga
+// TODA la página de la app. El objeto en sí llega serializado desde el server
+// (ver `__temaPlantilla` en forceSSR.ts).
+import type { Tema as TemaPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import { TiendaPausada } from '@/components/storefront/TiendaPausada'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
 import { TEMA_SCRIPT } from '@/lib/csp'
@@ -164,6 +168,13 @@ export default function App({ Component, pageProps }: AppProps) {
 
   const loading = !minTimeDone || navegando
 
+  // Paleta de la plantilla de Home activa, ya resuelta en el server (ver
+  // forceSSR.ts — se resuelve allá para no meterle `plantillas/datos.tsx` al
+  // bundle de la landing y el panel). El loader se dibuja acá, afuera de
+  // `StorefrontChrome`: sin esto, una tienda con plantilla arranca con el
+  // fondo de Apariencia y recién al hidratar salta al de la plantilla.
+  const temaPlantilla = (pageProps as { __temaPlantilla?: TemaPlantilla | null }).__temaPlantilla ?? null
+
   // Resuelto en el server (forceSSR.ts) — no depende de ningún fetch del
   // cliente, así que se puede usar desde el primer render sin esperar nada.
   const storeStatus = (pageProps as { __storeStatus?: StoreStatusSSR }).__storeStatus ?? 'ok'
@@ -292,7 +303,7 @@ export default function App({ Component, pageProps }: AppProps) {
                   todavía, se pasa `null` (no "Órbita") — PageLoader oculta
                   el texto de marca en ese caso en vez de mostrar la marca
                   equivocada. */}
-              <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} />
+              <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} tema={temaPlantilla} />
               <Component {...pageProps} />
             </>
           )}

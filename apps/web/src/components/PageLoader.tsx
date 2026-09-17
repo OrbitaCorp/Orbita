@@ -1,3 +1,6 @@
+import type { CSSProperties } from 'react'
+import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+
 // `title`: la marca que se muestra debajo del spinner. Por default "Órbita"
 // (panel y checkout de la plataforma) — pero en el storefront de un negocio
 // (subdominio/dominio propio) el visitante no tiene por qué saber qué es
@@ -5,13 +8,41 @@
 // omitir el prop) oculta el texto de marca por completo en vez de caer a
 // "Órbita" — para el instante, muy raro, en que el nombre de la tienda
 // todavía no se resolvió (ver _app.tsx).
-type Props = { visible: boolean; message?: string; title?: string | null }
+//
+// `tema`: el de la plantilla de Home activa, resuelto en el server
+// (`__temaPlantilla`, ver forceSSR.ts). El loader se dibuja en _app.tsx, o
+// sea AFUERA de `StorefrontChrome` — que es quien aplica la paleta de la
+// plantilla al resto de la tienda. Sin esto, una tienda con plantilla
+// arrancaba con el fondo de Apariencia y recién al hidratar saltaba al de la
+// plantilla: un flash de otro color en cada carga. Se aplican solo los
+// colores, no la tipografía: la fuente de la plantilla la baja
+// `cargarFuentes()` en el chrome, así que durante el loader todavía no está
+// y el texto de marca saltaría de fuente a mitad de la transición.
+type Props = { visible: boolean; message?: string; title?: string | null; tema?: Tema | null }
 
-export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
+export function PageLoader({ visible, message, title = 'Órbita', tema = null }: Props) {
+  // El satélite es el punto que gira: tiene que despegarse del fondo, así que
+  // va más oscuro que el primario en una paleta clara y más claro en una
+  // oscura. `--color-primary-h` (el hover del primario) ya es exactamente ese
+  // par —#2563EB en claro, #93C5FD en oscuro, que es el celeste que este
+  // archivo tenía clavado— así que se reusa en vez de inventar otro tono. Con
+  // plantilla no hay clase `.dark` de la que colgarse: el `oscuro` del tema
+  // dice para qué lado mezclar.
+  const vars = (tema
+    ? {
+        '--color-bg':        tema.bg,
+        '--color-text':      tema.text,
+        '--color-muted':     tema.muted,
+        '--color-primary':   tema.primary,
+        '--color-primary-h': `color-mix(in srgb, ${tema.primary} ${tema.oscuro ? '70%, white' : '80%, black'})`,
+      }
+    : {}) as CSSProperties
+
   return (
     <div
       aria-hidden={!visible}
       style={{
+        ...vars,
         position:       'fixed',
         inset:          0,
         zIndex:         9999,
@@ -27,11 +58,13 @@ export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
       }}
     >
 
-      {/* Glow radial de fondo — más visible en dark mode */}
+      {/* Glow radial de fondo — más visible en dark mode. Sale del primario
+          (antes era un azul clavado, que sobre una plantilla de otro color
+          dejaba un halo azulado que no pertenecía a la paleta). */}
       <div style={{
         position:     'absolute',
         inset:        0,
-        background:   'radial-gradient(ellipse 520px 520px at 50% 50%, rgba(59,130,246,0.08) 0%, transparent 70%)',
+        background:   'radial-gradient(ellipse 520px 520px at 50% 50%, color-mix(in srgb, var(--color-primary) 8%, transparent) 0%, transparent 70%)',
         pointerEvents:'none',
       }} />
 
@@ -43,7 +76,7 @@ export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
           position:     'absolute',
           inset:        0,
           borderRadius: '50%',
-          border:       '1.5px solid rgba(59,130,246,0.35)',
+          border:       '1.5px solid color-mix(in srgb, var(--color-primary) 35%, transparent)',
           animation:    'pulseRing 2s ease-out infinite',
         }} />
 
@@ -52,7 +85,7 @@ export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
           position:     'absolute',
           inset:        0,
           borderRadius: '50%',
-          border:       '1.5px solid rgba(59,130,246,0.2)',
+          border:       '1.5px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
           animation:    'pulseRing 2s ease-out infinite 0.75s',
         }} />
 
@@ -74,10 +107,10 @@ export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
           />
 
           {/* Halo suave del satélite */}
-          <circle cx="44" cy="12" r="9" fill="rgba(147,197,253,0.2)" />
+          <circle cx="44" cy="12" r="9" style={{ fill: 'color-mix(in srgb, var(--color-primary-h) 22%, transparent)' }} />
 
-          {/* Satélite */}
-          <circle cx="44" cy="12" r="5.5" fill="#93c5fd" />
+          {/* Satélite — ver el comentario de `--color-primary-h` arriba */}
+          <circle cx="44" cy="12" r="5.5" style={{ fill: 'var(--color-primary-h)' }} />
         </svg>
 
         {/* Capa estática: hub central */}
@@ -87,7 +120,7 @@ export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
         >
           {/* Halo interior del hub */}
-          <circle cx="44" cy="44" r="18" fill="rgba(59,130,246,0.1)" />
+          <circle cx="44" cy="44" r="18" style={{ fill: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }} />
           {/* Hub */}
           <circle cx="44" cy="44" r="10" style={{ fill: 'var(--color-text)' }} />
         </svg>
