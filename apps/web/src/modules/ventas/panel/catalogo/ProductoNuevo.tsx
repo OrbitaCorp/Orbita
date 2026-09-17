@@ -9,7 +9,7 @@
 // con la respuesta —que ya trae los ids de cada valor de opción— se suben las
 // imágenes pendientes. Antes de eso no existe el optionValueId al que apuntan.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
 import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video } from 'lucide-react'
@@ -1124,17 +1124,27 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
 
-            {/* Stepper */}
+            {/* Stepper. Círculo y conector van como hermanos DIRECTOS de la fila
+                (no un <div> por paso envolviendo a los dos): antes cada paso
+                era su propio contenedor `flex: 1`, y como ESE contenedor tenía
+                más ancho asignado que lo que su botón + conector (con tope de
+                34px en celular) llegaban a ocupar, quedaba un tramo sin usar
+                al final de cada paso, antes de que empezara el siguiente
+                círculo — la línea se veía corta y "flotando" en vez de llegar
+                al círculo de al lado, más notorio justo antes del último paso
+                (el único que no crece). Con los conectores como flex:1 sueltos
+                en la fila, son ELLOS los que absorben todo el espacio libre
+                entre un círculo y el siguiente, sin sobrante en el medio. */}
             <div className="pn-stepper" style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
                 {STEPS.map(([n, l], i) => {
                     const a = step === Number(n), dn = done.includes(Number(n)) || step > Number(n)
                     return (
-                        <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none', minWidth: 0 }}>
+                        <Fragment key={n}>
                             <button
                                 className="ds-hover"
                                 data-disabled={!(dn || a) || undefined}
                                 onClick={() => { if (dn || a) setStep(Number(n)) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit', flexShrink: 0 }}
                             >
                                 <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
@@ -1142,7 +1152,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <span className="pn-step-label" style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
                             </button>
                             {i < 3 && <div className="pn-step-conector" style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
-                        </div>
+                        </Fragment>
                     )
                 })}
             </div>
