@@ -692,3 +692,73 @@ gcloud logging buckets update _Default --location=global --project orbita-api-co
 Decisión: se deja en 30 días. Lo que vale más que un mes (quién hizo qué, qué
 mail salió) ya queda en las tablas de arriba, con retención propia y más
 larga; los logs de consola sirven para diagnosticar lo reciente, nada más.
+
+### Baja de un negocio: qué se borra y qué se conserva
+
+Hallazgo `businesses-sin-baja` de la auditoría interna, check c1 (criterio
+decidido por el CEO el 16/09). Cuando el dueño da de baja su tienda arranca una
+ventana de **60 días** reactivable; si nadie la reactiva, el barrido nocturno
+(`processCancellationWindow()` en `src/subscriptions/subscriptions.service.ts`,
+mismo job que el resto del mantenimiento — § Cron jobs) hace el borrado
+**definitivo**: marca `businesses.deleted_at` y **purga los datos personales**
+en la misma transacción.
+
+La regla es **se borra la PERSONA, se conserva el COMPROBANTE**. No se
+anonimiza nada: no quedan filas con "Cliente eliminado" ni mails tipo
+`borrado+123@…`, las filas de cuenta dejan de existir.
+
+**Se conserva (obligación fiscal — AFIP, 10 años):**
+
+| Tabla | Por qué se queda |
+|---|---|
+| `businesses` | ancla de todo lo de abajo; queda con `deleted_at` y para el resto del sistema el negocio ya no existe |
+| `orders`, `order_items` | comprobante de venta |
+| `online_order_details` | el **snapshot** del comprador (nombre, mail, teléfono, DNI, dirección de envío en texto plano) — es parte del comprobante, sin eso la factura no es una factura |
+| `payments` | cómo y cuándo se cobró cada pedido |
+| `returns`, `credit_notes`, `cancellation_requests` | devoluciones y notas de crédito (también son comprobantes) |
+| `subscription`, `subscription_payments` | lo que Órbita le facturó al negocio |
+| `domain_purchase_orders` | compra de dominio con plata de por medio; el contacto WHOIS vive adentro del comprobante, mismo criterio que el snapshot del pedido |
+
+**Se borra (dato de cuenta, no de comprobante):**
+
+| Tabla | Qué se va |
+|---|---|
+| `customers` | mail, teléfono, DNI, fecha de nacimiento, avatar, hash de contraseña, `google_id` |
+| `members` | ídem, del equipo del negocio |
+| `addresses` | direcciones guardadas del cliente (la del pedido queda en el snapshot) |
+| `refresh_tokens`, `password_reset_tokens`, `email_verification_tokens` | sesiones y tokens |
+| `conversations`, `messages` | chat cliente ↔ tienda |
+| `reviews` | opiniones (contenido atado a una persona, no respalda ninguna factura) |
+| `email_logs` | guardan el destinatario de cada mail |
+| `audit_logs` | guardan `member_name`, el nombre del empleado que hizo cada cosa |
+| `notifications`, `orbi_conversations` | pueden citar nombres de clientes / conversaciones del panel |
+| `mp_credentials` | secreto que permite operar sobre la cuenta de MP de alguien que ya se fue |
+
+**El límite exacto:** si el dato personal vive DENTRO del comprobante fiscal,
+se queda; si es un dato de la cuenta (login, contacto, preferencias,
+historial), se va.
+
+Antes de borrar a la persona se sueltan los punteros que le apuntan desde lo
+que se conserva: `orders.customer_id`, `payments.verified_by`,
+`stock_movements.created_by`, `online_order_details.shipping_address_id`,
+`discounts.customer_id`, `game_sessions.customer_id` y las tres columnas que
+**nunca tuvieron foreign key** (`credit_notes.customer_id`,
+`cancellation_requests.customer_id`, `discount_redemptions.customer_id`), que
+si no se nulean a mano quedan apuntando a un cliente inexistente.
+
+Detalles operativos:
+
+- Todo va en **una sola transacción** con el `deleted_at`: o el negocio queda
+  borrado y sin datos personales, o no queda nada hecho y el barrido de mañana
+  lo reintenta.
+- Es **idempotente**: son `updateMany`/`deleteMany` con `where`, nunca un
+  borrado por id. Un segundo pase afecta 0 filas.
+- El mail de "tu tienda fue eliminada" sale **antes** de la purga a propósito:
+  cada envío deja una fila en `email_logs` con el destinatario, y mandándolo
+  antes esa fila cae en la misma purga. Si la transacción falla, el aviso se
+  repite mañana — un mail repetido en un caso de error es preferible a un mail
+  guardado para siempre.
+- No hizo falta migración: las FK involucradas ya son `ON DELETE SET NULL` o
+  `CASCADE`, y todas las columnas que se nulean ya eran nullable.
+- Cobertura: `test/unit/purga-datos-baja.auditoria.unit-spec.ts` (el corte del
+  débito de Mercado Pago lo cubre `baja-negocio.auditoria.unit-spec.ts`).

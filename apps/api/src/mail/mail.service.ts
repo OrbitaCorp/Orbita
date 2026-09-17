@@ -647,6 +647,18 @@ export class MailService {
 
   // ── Members ───────────────────────────────────────────
 
+  // Código de 6 dígitos para confirmar el email desde "Mi perfil" del panel
+  // (hallazgo `alta-sin-verificar-email`). No lleva link de acción a
+  // propósito: el member ya está adentro del panel, y un link es una
+  // superficie de phishing que acá no hace falta.
+  async sendMemberEmailVerification(
+    to: string,
+    data: { code: string; nombre: string; storeName: string; expiresIn: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, 'Confirmá tu email', 'member-email-verification', data, meta);
+  }
+
   async sendMemberInvitation(
     to: string,
     data: {

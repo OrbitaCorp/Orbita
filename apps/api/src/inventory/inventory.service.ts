@@ -13,6 +13,7 @@ import { FindStockQueryDto } from './dto/find-stock-query.dto';
 import { FindMovementsQueryDto } from './dto/find-movements-query.dto';
 import { UpsertSupplierDto } from './dto/upsert-supplier.dto';
 import { AuditService } from '../audit/audit.service';
+import { buscarSucursalPrincipal } from '../common/utils/sucursal-principal';
 
 @Injectable()
 export class InventoryService {
@@ -395,8 +396,11 @@ export class InventoryService {
     return branch;
   }
 
+  // Sin `branch_id` en el body, el stock va a la sucursal principal. Qué es la
+  // principal lo define `buscarSucursalPrincipal()`, una sola vez para todo el
+  // backend (hallazgo `sucursal-principal-doble`).
   private async getDefaultBranch(businessId: string) {
-    const branch = await this.prisma.branch.findFirst({ where: { businessId, isDefault: true } });
+    const branch = await buscarSucursalPrincipal(this.prisma, businessId);
     if (!branch) throw new UnprocessableEntityException('El negocio no tiene una sucursal principal configurada');
     return branch;
   }

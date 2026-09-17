@@ -55,7 +55,11 @@ describe('Inventario: la sucursal del body tiene que ser del negocio del token',
   it('sin branch_id usa la sucursal principal del negocio', async () => {
     const { svc, aplicar, prisma } = inventario();
     await svc.adjustment(BIZ, 'member-1', { variantId: VARIANTE, quantity: 2, reason: 'conteo' });
-    expect(prisma.branch.findFirst).toHaveBeenCalledWith({ where: { businessId: BIZ, isDefault: true } });
+    // La consulta la arma ahora buscarSucursalPrincipal() — única definición
+    // de "principal" para todo el backend (hallazgo `sucursal-principal-doble`,
+    // ver sucursal-principal.auditoria.unit-spec.ts): mismo `where` de antes,
+    // más el `select` del helper.
+    expect(prisma.branch.findFirst).toHaveBeenCalledWith({ where: { businessId: BIZ, isDefault: true }, select: { id: true } });
     expect(aplicar).toHaveBeenCalledWith(BIZ, 'member-1', expect.objectContaining({ branchId: PROPIA }));
   });
 

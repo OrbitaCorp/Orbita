@@ -33,11 +33,12 @@ function svcCon(overrides: { existente?: any } = {}) {
 }
 
 describe('MemberProfileService (unit)', () => {
-  it('getProfile() devuelve nombre/email/rol/tema, sin datos sensibles', async () => {
+  it('getProfile() devuelve nombre/email/rol/tema/plazo de verificación, sin datos sensibles', async () => {
     const { svc } = svcCon();
     const result = await svc.getProfile('m-1');
     expect(result).toEqual({
-      id: 'm-1', name: 'Ana', email: 'ana@negocio.test', emailVerified: true, role: 'owner', themePreference: 'SYSTEM',
+      id: 'm-1', name: 'Ana', email: 'ana@negocio.test', emailVerified: true, emailVerifyDueAt: null,
+      role: 'owner', themePreference: 'SYSTEM',
     });
   });
 

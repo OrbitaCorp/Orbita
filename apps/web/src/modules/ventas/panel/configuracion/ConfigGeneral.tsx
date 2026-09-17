@@ -333,9 +333,15 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 ])
                 if (cancelado) return
                 setMp(mpStatus)
-                // Misma prioridad que sucursalDeVenta() del backend: la marcada
-                // como default, si no la primera activa.
-                const sucursal = branches.find(b => b.isDefault && b.isActive) ?? branches.find(b => b.isActive) ?? branches[0] ?? null
+                // La sucursal principal, y ninguna otra: la misma definición
+                // que usa el backend en buscarSucursalPrincipal() (hallazgo
+                // `sucursal-principal-doble`). Antes acá había un tercer
+                // criterio propio ("la default entre las activas, si no
+                // cualquier activa, si no la primera del listado"), así que
+                // con la principal desactivada el dueño editaba acá la
+                // dirección de una sucursal distinta de aquella contra la que
+                // la tienda vende y el panel carga el stock.
+                const sucursal = branches.find(b => b.isDefault) ?? null
                 setBranchId(sucursal?.id ?? null)
                 const negocio0 = {
                     name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '',

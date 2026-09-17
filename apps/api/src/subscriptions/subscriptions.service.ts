@@ -1647,12 +1647,13 @@ export class SubscriptionsService {
   //      arriba — esto es un evento único por cancelación, no algo que se
   //      repita en cada ciclo de facturación, así que un campo nullable
   //      alcanza sin necesitar la unique de SubscriptionLifecycleNotice).
-  //   2. Borrado definitivo SIMULADO al cumplirse los 60 sin que nadie haya
+  //   2. Borrado definitivo al cumplirse los 60 sin que nadie haya
   //      reactivado — `deletedAt` marca el negocio como "no existe más" en
-  //      todos lados (ver comentario del campo en schema.prisma), pero las
-  //      filas de la base NO se borran físicamente (decisión de esta sesión:
-  //      un borrado físico real chocaría contra el `ON DELETE RESTRICT` de
-  //      prácticamente todas las FK a `businesses`, un proyecto aparte).
+  //      todos lados (ver comentario del campo en schema.prisma) Y se purgan
+  //      los datos personales (ver operacionesDeBorradoDefinitivo). La fila
+  //      de `businesses` en sí NO se borra: es el ancla de los pedidos y
+  //      pagos que hay que conservar por obligación fiscal, y casi todas las
+  //      FK a `businesses` son ON DELETE RESTRICT.
   async processCancellationWindow(): Promise<void> {
     const now = new Date();
 
@@ -1689,19 +1690,128 @@ export class SubscriptionsService {
     });
     for (const b of porBorrar) {
       try {
+        // Los destinatarios se resuelven ANTES de la purga: salen de
+        // `members`, que es justamente una de las tablas que se vacían.
         const { emails } = await this.destinatarios(b.id);
-        await this.prisma.$transaction([
-          this.prisma.business.update({ where: { id: b.id }, data: { deletedAt: now } }),
-          this.prisma.refreshToken.deleteMany({ where: { businessId: b.id } }),
-        ]);
+
+        // Y el mail se manda ANTES de la transacción, no después, aunque sea
+        // contraintuitivo: cada envío deja una fila en `email_logs` con el
+        // mail del destinatario, así que mandarlo después dejaría como último
+        // rastro en la base exactamente el dato personal que prometimos
+        // borrar. Mandándolo antes, esa fila cae en la misma purga. El precio
+        // es que si la transacción falla el dueño recibe el aviso igual y el
+        // barrido de mañana lo vuelve a intentar (y a avisar) — un mail
+        // repetido en un caso de error es preferible a un mail guardado para
+        // siempre.
         for (const email of emails) {
           await this.mail.sendBusinessDeleted(email, { businessName: b.name }, { businessId: b.id });
         }
-        this.logger.log(`Negocio ${b.id} eliminado de forma definitiva (simulada) — venció la ventana de 60 días sin reactivarse`);
+
+        await this.prisma.$transaction(this.operacionesDeBorradoDefinitivo(b.id, now));
+        this.logger.log(`Negocio ${b.id} eliminado de forma definitiva (datos personales purgados) — venció la ventana de 60 días sin reactivarse`);
       } catch (err) {
         this.logger.error(`No se pudo eliminar definitivamente el negocio ${b.id}`, err as Error);
       }
     }
+  }
+
+  // Qué se borra y qué se conserva cuando la baja se hace definitiva (check
+  // c1 del hallazgo `businesses-sin-baja` de la auditoría interna; criterio
+  // decidido por el CEO el 2026-09-16).
+  //
+  // La regla en una línea: **se borra la PERSONA, se conserva el
+  // COMPROBANTE**. Y no se anonimiza nada: no quedan filas con "Cliente
+  // eliminado" ni mails tipo `borrado+123@…`, las filas de cuenta
+  // directamente dejan de existir.
+  //
+  // SE CONSERVA lo que hay obligación de guardar 10 años ante la AFIP
+  // (art. 48 del decreto reglamentario de la Ley 11.683: comprobantes y
+  // registros respaldatorios): `orders` con sus `order_items`, `payments`,
+  // `returns`, `credit_notes`, `cancellation_requests`, y lo que Órbita le
+  // facturó al negocio (`subscription` + `subscription_payments`). La fila de
+  // `businesses` también se conserva, con `deletedAt` seteado: es el ancla de
+  // todo eso.
+  //
+  // La tensión real es que un pedido lleva datos personales ADENTRO: el
+  // snapshot de `online_order_details` (buyerName, buyerEmail, buyerPhone,
+  // buyerDni y la dirección de envío en texto plano). Eso NO se toca, y es a
+  // propósito — es el comprobante mismo, no un dato de cuenta: sin el nombre
+  // y el domicilio del comprador la factura no es una factura. El corte es
+  // ese: si el dato personal vive DENTRO del comprobante fiscal, se queda; si
+  // es de la cuenta (login, contacto, preferencias, historial), se va.
+  //
+  // SE BORRA todo lo que es cuenta o rastro de la persona: `members` y
+  // `customers` (email, teléfono, DNI, fecha de nacimiento, avatar, hash de
+  // contraseña, googleId), sus direcciones guardadas, sus sesiones y tokens,
+  // sus conversaciones con la tienda, sus reseñas, el registro de mails
+  // enviados y los logs de auditoría (que guardan `member_name`, el nombre
+  // del empleado que hizo cada cosa). También las credenciales de Mercado
+  // Pago del negocio: son un secreto que permite operar sobre la cuenta de MP
+  // de alguien que ya se fue, no hay ninguna razón para conservarlas.
+  //
+  // Antes de borrar a una persona hay que soltar los punteros que le apuntan
+  // desde lo que se conserva. Varias FK ya son ON DELETE SET NULL y se
+  // resolverían solas, pero se nulean explícitamente igual por dos motivos:
+  // se lee de una qué queda apuntando a quién, y hay tres columnas
+  // (`credit_notes.customer_id`, `cancellation_requests.customer_id`,
+  // `discount_redemptions.customer_id`) que NUNCA tuvieron FK — esas, si no
+  // se nulean a mano, quedan apuntando a un cliente que ya no existe.
+  //
+  // Todo va en UNA sola transacción junto con el `deletedAt`: o el negocio
+  // queda marcado como borrado Y sin datos personales, o no queda nada hecho
+  // (y el barrido de mañana lo reintenta). Es idempotente por construcción —
+  // son `updateMany`/`deleteMany` con `where`, correrlo de nuevo afecta 0
+  // filas; además el `findMany` de arriba ya filtra por `deletedAt: null`.
+  private operacionesDeBorradoDefinitivo(businessId: string, now: Date): Prisma.PrismaPromise<unknown>[] {
+    const p = this.prisma;
+    const delNegocio = { where: { businessId } };
+
+    return [
+      // 1. La marca de borrado, primero: si algo de lo que sigue falla, la
+      //    transacción vuelve atrás y el negocio no queda a medio borrar.
+      p.business.update({ where: { id: businessId }, data: { deletedAt: now } }),
+
+      // 2. Soltar los punteros a personas desde lo que SE CONSERVA. El pedido
+      //    se queda; deja de estar atado a la ficha del cliente y pasa a
+      //    valerse por su propio snapshot, igual que una venta anónima de
+      //    mostrador (`customerId` null ya significa eso).
+      p.order.updateMany({ ...delNegocio, data: { customerId: null } }),
+      // La dirección guardada se va, pero el envío ya está copiado en texto
+      // plano en las columnas shipping* de la misma fila: el panel y el
+      // comprobante siguen mostrando a dónde se mandó.
+      p.onlineOrderDetails.updateMany({ where: { order: { businessId } }, data: { shippingAddressId: null } }),
+      // Qué cajero confirmó la transferencia deja de importar cuando ya no
+      // hay cajeros; el pago (monto, medio, fecha) queda intacto.
+      p.payment.updateMany({ ...delNegocio, data: { verifiedBy: null } }),
+      p.creditNote.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.cancellationRequest.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.discountRedemption.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.stockMovement.updateMany({ ...delNegocio, data: { createdBy: null } }),
+      // Un descuento personal (premio de un juego) deja de ser de nadie.
+      p.discount.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.gameSession.updateMany({ ...delNegocio, data: { customerId: null } }),
+
+      // 3. Lo que es rastro de la persona y no respalda ninguna factura.
+      //    `messages` y `email_verification_tokens` caerían solos por cascada,
+      //    pero se borran explícitamente para no depender de que nadie le
+      //    saque el `onDelete: Cascade` al schema sin darse cuenta.
+      p.message.deleteMany({ where: { conversation: { businessId } } }),
+      p.conversation.deleteMany(delNegocio),
+      p.review.deleteMany(delNegocio),
+      p.emailLog.deleteMany(delNegocio),
+      p.auditLog.deleteMany(delNegocio),
+      p.notification.deleteMany(delNegocio),
+      p.orbiConversation.deleteMany(delNegocio),
+      p.refreshToken.deleteMany(delNegocio),
+      p.passwordResetToken.deleteMany(delNegocio),
+      p.emailVerificationToken.deleteMany({ where: { member: { businessId } } }),
+      p.mpCredentials.deleteMany(delNegocio),
+
+      // 4. Y recién ahora las personas: ya no queda nada que las referencie.
+      p.address.deleteMany({ where: { customer: { businessId } } }),
+      p.customer.deleteMany(delNegocio),
+      p.member.deleteMany(delNegocio),
+    ];
   }
 
   // Limpieza de altas pendientes vencidas: si nunca se confirmó el pago (el

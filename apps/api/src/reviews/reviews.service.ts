@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { HideReviewDto } from './dto/hide-review.dto';
+import { AuditService } from '../audit/audit.service';
 
 // Reseñas de productos: solo puede dejarla quien de verdad compró el
 // producto y su pedido ya se entregó (isVerified siempre true acá — no hay
@@ -29,7 +30,13 @@ type ReviewConCliente = {
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Moderar una reseña es tocar lo que ve un cliente sobre su propia
+    // compra: tiene que quedar quién la ocultó y por qué. Opcional solo para
+    // los tests, igual que en el resto de los services.
+    private readonly audit?: AuditService,
+  ) {}
 
   // "María G." — nunca el apellido completo ni el email en una reseña pública.
   private nombrePublico(c: { firstName: string; lastName: string | null }): string {
@@ -109,13 +116,90 @@ export class ReviewsService {
   }
 
   // ── Ocultar (panel, owner/admin) ──────────────────────────────────────────
-  async hide(businessId: string, id: string, dto: HideReviewDto) {
+  async hide(businessId: string, id: string, dto: HideReviewDto, memberId?: string) {
     const escrito = await this.prisma.review.updateMany({
       where: { id, businessId },
       data: { status: 'HIDDEN', hiddenReason: dto.hiddenReason },
     });
     if (escrito.count === 0) throw new NotFoundException('Reseña no encontrada');
+
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'review', entityId: id, action: 'UPDATE',
+      changes: [
+        { field: 'status', before: 'VISIBLE', after: 'HIDDEN' },
+        { field: 'hiddenReason', before: null, after: dto.hiddenReason },
+      ],
+    });
     return { ok: true };
+  }
+
+  // Deshace el ocultamiento. Existe porque sin esto moderar era de una sola
+  // vía: una reseña ocultada por error no volvía nunca (hallazgo
+  // `resenas-sin-moderacion-panel`). Limpia el motivo: el que quedó guardado
+  // era el de ESA vez y no aplica si mañana se vuelve a ocultar.
+  async show(businessId: string, id: string, memberId?: string) {
+    const actual = await this.prisma.review.findFirst({
+      where: { id, businessId },
+      select: { hiddenReason: true },
+    });
+    if (!actual) throw new NotFoundException('Reseña no encontrada');
+
+    await this.prisma.review.update({
+      where: { id },
+      data: { status: 'VISIBLE', hiddenReason: null },
+    });
+
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'review', entityId: id, action: 'UPDATE',
+      changes: [
+        { field: 'status', before: 'HIDDEN', after: 'VISIBLE' },
+        { field: 'hiddenReason', before: actual.hiddenReason, after: null },
+      ],
+    });
+    return { ok: true };
+  }
+
+  // ── Listado del panel (dueño/equipo) ──────────────────────────────────────
+  // A diferencia del público, este trae TODAS: las ocultas también, con su
+  // motivo y el nombre completo del cliente. No es la misma vista con un
+  // filtro distinto — es otra audiencia, y por eso no reusa aPublico().
+  async listForPanel(businessId: string, productId: string) {
+    const producto = await this.prisma.product.findFirst({
+      where: { id: productId, businessId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!producto) throw new NotFoundException('Producto no encontrado');
+
+    const rows = await this.prisma.review.findMany({
+      where: { businessId, productId },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: {
+        customer: { select: { firstName: true, lastName: true, email: true } },
+        order: { select: { orderNumber: true } },
+      },
+    });
+
+    return {
+      producto,
+      // El resumen es lo que hace útil abrir esto: de un vistazo se sabe si
+      // hay algo escondido sin tener que contar la lista.
+      total: rows.length,
+      ocultas: rows.filter((r) => r.status === 'HIDDEN').length,
+      resenas: rows.map((r) => ({
+        id: r.id,
+        text: r.text,
+        status: r.status,
+        hiddenReason: r.hiddenReason,
+        isVerified: r.isVerified,
+        createdAt: r.createdAt,
+        orderNumber: r.order.orderNumber,
+        // Nombre completo y email: acá el dueño necesita saber quién escribió
+        // para poder contestarle, no el "María G." del storefront.
+        customerName: [r.customer.firstName, r.customer.lastName].filter(Boolean).join(' '),
+        customerEmail: r.customer.email,
+      })),
+    };
   }
 
   // ── Listado público (storefront, sin login) ───────────────────────────────

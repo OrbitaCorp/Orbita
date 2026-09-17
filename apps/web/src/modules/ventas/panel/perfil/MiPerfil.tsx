@@ -4,6 +4,7 @@ import { Avatar } from '@/design-system/components/Avatar'
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { panelGetProfile, panelUpdateProfile, panelUpdateTheme, panelChangePassword, ApiError, type MemberProfile } from '@/lib/api'
+import { VerificarEmail } from './VerificarEmail'
 
 // "Propietario" en TODOS lados (header, Equipo, invitaciones): una sola palabra
 // por rol, y owner/admin son el mismo rol (acceso total) — decisión del equipo.
@@ -36,6 +37,11 @@ export default function MiPerfil() {
   const [pwGuardando, setPwGuardando] = useState(false)
   const [pwListo, setPwListo] = useState(false)
   const [pwError, setPwError] = useState('')
+
+  // Vuelve a pedir el perfil sin tocar lo que el usuario esté escribiendo: la
+  // llama el aviso de verificación al confirmar el código, para que el chip
+  // pase a "Verificado" sin refrescar la página.
+  const recargarPerfil = () => panelGetProfile().then(setPerfil).catch(() => {})
 
   useEffect(() => {
     panelGetProfile().then((p) => {
@@ -181,6 +187,11 @@ export default function MiPerfil() {
           </div>
         )}
       </div>
+
+      {/* Solo aparece si el email está sin verificar (hallazgo
+          `alta-sin-verificar-email`). Al confirmarlo se recarga el perfil para
+          que el chip de arriba pase a "Verificado" sin refrescar la página. */}
+      <VerificarEmail onVerificado={() => { void recargarPerfil() }} />
 
       {/* ── Tus datos ── */}
       <form onSubmit={handleGuardar} style={cardStyle}>

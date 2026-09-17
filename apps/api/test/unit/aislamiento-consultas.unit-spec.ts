@@ -31,6 +31,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/auth/auth.service.ts': { max: 18, motivo: 'Tokens buscados por su hash (único global), sesiones por userId+tipo, y el perfil propio con el id del token' },
   'src/me/me.service.ts': { max: 5, motivo: 'Perfil del cliente: el id sale del token, no de la URL; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service)' },
   'src/member-profile/member-profile.service.ts': { max: 5, motivo: 'Perfil del miembro: el id sale del token; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service), sin filtrar por businessId porque refresh_tokens.business_id puede venir null' },
+  'src/member-profile/email-verification.service.ts': { max: 3, motivo: 'Verificar el email propio: el memberId sale del token, no de la URL — mismo criterio que member-profile.service.ts. Los tokens de verificación se buscan por memberId + email, que ya acota al member' },
   'src/platform/platform.service.ts': { max: 6, motivo: 'Super admin: es cross-tenant por diseño, detrás de PlatformAdminGuard' },
   'src/subscriptions/subscriptions.service.ts': { max: 4, motivo: 'Crons de reconciliación y de avisos del ciclo de vida: recorren las suscripciones de todos los negocios' },
   'src/onboarding/onboarding.service.ts': { max: 2, motivo: 'Alta: todavía no hay negocio, y el email de dueño es único en toda la plataforma' },

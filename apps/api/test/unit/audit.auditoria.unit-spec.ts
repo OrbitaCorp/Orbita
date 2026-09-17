@@ -101,10 +101,28 @@ describe('El registro es de solo agregado', () => {
   // y nada más — nunca por negocio, entidad, acción ni actor — así que no
   // sirve para hacer desaparecer un rastro puntual: lo que se va, se va parejo
   // para todos y recién pasado el año (AUDIT_LOGS_RETENTION_DAYS, mínimo 30).
+  // Segunda excepción (16/09, hallazgo `businesses-sin-baja` check c1): la
+  // purga de datos personales del borrado definitivo de un negocio, a los 60
+  // días de la baja. OJO CON EL ALCANCE DE LA DECISIÓN: el CEO decidió el
+  // 16/09 que en la baja los datos personales se BORRAN y no se anonimizan;
+  // que eso incluyera a `audit_logs` se dedujo de ahí, no se le preguntó
+  // puntualmente. Si alguien quiere el registro intacto aunque el negocio ya
+  // no exista, se saca esta excepción y listo. Pasa el mismo filtro que la
+  // primera: no sirve para hacer desaparecer un rastro puntual. Borra por
+  // `businessId` y únicamente dentro de la transacción que deja el negocio
+  // como no existente — se va el registro entero junto con los clientes, los
+  // miembros y las sesiones, no una fila incómoda. El motivo de borrarlo es
+  // que `audit_logs` guarda `member_name`: el nombre de cada empleado que
+  // hizo cada cosa, o sea un dato personal de gente que ya no trabaja en una
+  // tienda que ya no existe (ver DEPLOYMENT.md § Baja de un negocio).
+  //
   // Cualquier otro borrado o edición de audit_logs es un bug y este test lo
-  // tiene que agarrar; si aparece una segunda excepción, se discute acá antes
+  // tiene que agarrar; si aparece una tercera excepción, se discute acá antes
   // de sumarla a la lista.
-  const EXCEPCIONES = [join('internal-cron', 'retencion-logs.service.ts')];
+  const EXCEPCIONES = [
+    join('internal-cron', 'retencion-logs.service.ts'),
+    join('subscriptions', 'subscriptions.service.ts'),
+  ];
   const SRC = join(__dirname, '../../src');
   const MUTACION = /auditLog\.(update|updateMany|upsert|delete|deleteMany)\(/;
 

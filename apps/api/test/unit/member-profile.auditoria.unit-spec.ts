@@ -51,10 +51,16 @@ describe('Cambiar el email pide la contraseña actual', () => {
     await expect(svc.updateProfile('m-1', 'biz-1', { email: 'nuevo@x.com', currentPassword: CLAVE })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('con la contraseña correcta cambia y queda sin verificar', async () => {
+  it('con la contraseña correcta cambia, queda sin verificar y el plazo arranca de nuevo', async () => {
     const { svc, prisma } = perfil();
     await svc.updateProfile('m-1', 'biz-1', { email: 'nuevo@x.com', currentPassword: CLAVE });
-    expect(prisma.member.update.mock.calls[0][0].data).toEqual({ email: 'nuevo@x.com', emailVerified: false });
+    const data = prisma.member.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({ email: 'nuevo@x.com', emailVerified: false });
+    // El email nuevo tampoco está probado: se le dan otros 7 días para
+    // confirmarlo desde Mi perfil (hallazgo `alta-sin-verificar-email`).
+    const dias = (data.emailVerifyDueAt.getTime() - Date.now()) / 86_400_000;
+    expect(dias).toBeGreaterThan(6.9);
+    expect(dias).toBeLessThan(7.1);
   });
 
   it('el panel manda el MISMO email con el nombre: eso no es un cambio y no pide contraseña', async () => {
