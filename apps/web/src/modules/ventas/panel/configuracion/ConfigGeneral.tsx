@@ -271,14 +271,14 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
     const [branchId, setBranchId] = useState<string | null>(null)
     const [envios, setEnvios]     = useState({
-        freeShippingFrom: '', shippingPolicy: '', enabledCarriers: [] as string[],
+        freeShippingFrom: '', shippingPolicy: '', shippingEstimateText: '', enabledCarriers: [] as string[],
         // Costo de envío por transportista — todos arrancan vacíos ('' = sin
         // cargar, ese transportista no calcula envío, se sigue coordinando aparte).
         carrierShippingCosts: {} as Record<string, string>,
     })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
     const [postventa, setPostventa] = useState({
-        returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false,
+        returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false, returnsWindowText: '',
         cancellationsEnabled: true, cancellationsCreditNoteEnabled: false, cancellationsMpRefundEnabled: true,
     })
     const [isPaused, setIsPaused] = useState(false)
@@ -372,6 +372,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     // y los paso a número recién en el momento de guardar.
                     freeShippingFrom: cfg.freeShippingFrom != null ? String(cfg.freeShippingFrom) : '',
                     shippingPolicy: cfg.shippingPolicy ?? '',
+                    shippingEstimateText: cfg.shippingEstimateText ?? '',
                     enabledCarriers: cfg.enabledCarriers ?? [],
                     carrierShippingCosts: Object.fromEntries(
                         Object.entries(cfg.carrierShippingCosts ?? {}).map(([k, v]) => [k, String(v)]),
@@ -380,6 +381,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 const redes0 = { instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' }
                 const postventa0 = {
                     returnsEnabled: cfg.returnsEnabled, returnsCreditNoteEnabled: cfg.returnsCreditNoteEnabled, returnsMpRefundEnabled: cfg.returnsMpRefundEnabled,
+                    returnsWindowText: cfg.returnsWindowText ?? '',
                     cancellationsEnabled: cfg.cancellationsEnabled, cancellationsCreditNoteEnabled: cfg.cancellationsCreditNoteEnabled, cancellationsMpRefundEnabled: cfg.cancellationsMpRefundEnabled,
                 }
                 setNegocio(negocio0)
@@ -594,6 +596,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         guardar('envios', () => panelUpdateBusinessConfig({
             ...(envios.freeShippingFrom.trim() !== '' ? { freeShippingFrom: gratis } : {}),
             shippingPolicy: envios.shippingPolicy,
+            shippingEstimateText: envios.shippingEstimateText,
             enabledCarriers: envios.enabledCarriers,
             carrierShippingCosts,
         }), 'Configuración de envíos guardada', envios)
@@ -1142,6 +1145,10 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             en vez de que el dueño tenga que llegar al texto de ayuda para
                             enterarse de que no hace falta completarlo — mismo criterio que ya usa
                             JuegosConfig.tsx con este mismo campo. */}
+                        {/* Cartelito "Envíos" de la ficha de producto (al lado de
+                            "Cambios" y "Pago") — vacío = se sigue mostrando "24-72 hs",
+                            el mismo texto fijo que había antes de que esto existiera. */}
+                        <CfgField label="Tiempo de envío estimado (opcional)" placeholder="Ej: 24-72 hs" value={envios.shippingEstimateText} onChange={v => setEnvios(p => ({ ...p, shippingEstimateText: v }))} />
                         {/* Solo deja escribir números (nada de letras) */}
                         <CfgField label="Envío gratis desde ($) (opcional)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                         {/* Se muestra debajo del resumen del pedido en el checkout, si hay algo escrito. */}
@@ -1244,6 +1251,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Devoluciones</SectionTitle>
+                        {/* Cartelito "Cambios" de la ficha de producto — independiente
+                            del toggle de abajo: es solo el texto que ve el cliente
+                            ANTES de comprar, vacío = se sigue mostrando "30 días
+                            gratis", el mismo texto fijo que había antes. */}
+                        <CfgField label="Ventana de cambios (opcional)" placeholder="Ej: 30 días gratis" value={postventa.returnsWindowText} onChange={v => setPostventa(p => ({ ...p, returnsWindowText: v }))} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Habilitar devoluciones</div>

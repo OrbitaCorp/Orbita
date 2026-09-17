@@ -59,6 +59,36 @@ describe('Catálogo de una tienda no publicada o pausada', () => {
   });
 });
 
+// Cartelitos "Envíos"/"Cambios" de la ficha de producto (antes "24-72 hs" /
+// "30 días gratis" fijos en ProductoDetalle.tsx) — el dueño los carga en
+// Configuración → Envíos/Devoluciones y getConfig() los tiene que pasar tal
+// cual al storefront, null incluido (el frontend cae a su propio default).
+describe('getConfig expone los cartelitos configurables de Envíos/Cambios', () => {
+  it('pasa shippingEstimateText y returnsWindowText tal cual vienen de BusinessConfig', async () => {
+    const { svc, prisma } = tienda({ isActive: true, isPaused: false });
+    (prisma.businessConfig.findUnique as jest.Mock).mockResolvedValue({
+      shippingEstimateText: '48-72 hs', returnsWindowText: '15 días gratis',
+      acceptsMercadopago: false, acceptsCash: false, acceptsTransfer: false, acceptsPickup: false,
+      acceptsCoordinateLater: false, ivaDisabled: true, enabledCarriers: [], pickupPaymentMethods: [],
+    });
+    const cfg = await svc.getConfig('t');
+    expect(cfg.shipping).toMatchObject({ shippingEstimateText: '48-72 hs' });
+    expect(cfg.payment).toMatchObject({ returnsWindowText: '15 días gratis' });
+  });
+
+  it('sin cargar (null): getConfig los pasa igual en null, no inventa un default acá', async () => {
+    const { svc, prisma } = tienda({ isActive: true, isPaused: false });
+    (prisma.businessConfig.findUnique as jest.Mock).mockResolvedValue({
+      shippingEstimateText: null, returnsWindowText: null,
+      acceptsMercadopago: false, acceptsCash: false, acceptsTransfer: false, acceptsPickup: false,
+      acceptsCoordinateLater: false, ivaDisabled: true, enabledCarriers: [], pickupPaymentMethods: [],
+    });
+    const cfg = await svc.getConfig('t');
+    expect(cfg.shipping?.shippingEstimateText).toBeNull();
+    expect(cfg.payment?.returnsWindowText).toBeNull();
+  });
+});
+
 describe('DTOs públicos', () => {
   const errores = async (cls: any, body: object) => (await validate(plainToInstance(cls, body))).map((e) => e.property);
 

@@ -297,6 +297,16 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
     expect(await errores(UpdateBusinessDto, { description: 'x'.repeat(1001) })).toContain('description');
   });
 
+  // Cartelitos "Envíos"/"Cambios" de la ficha de producto (antes fijos en el
+  // código de ProductoDetalle.tsx: "24-72 hs" / "30 días gratis") — 60
+  // caracteres alcanza de sobra, no son un lugar para texto largo.
+  it('shippingEstimateText y returnsWindowText tienen tope de 60 caracteres', async () => {
+    expect(await errores(UpdateBusinessConfigDto, { shippingEstimateText: '24-72 hs' })).toEqual([]);
+    expect(await errores(UpdateBusinessConfigDto, { shippingEstimateText: 'x'.repeat(61) })).toContain('shippingEstimateText');
+    expect(await errores(UpdateBusinessConfigDto, { returnsWindowText: '30 días gratis' })).toEqual([]);
+    expect(await errores(UpdateBusinessConfigDto, { returnsWindowText: 'x'.repeat(61) })).toContain('returnsWindowText');
+  });
+
   it('el costo por transportista también tiene tope (se valida en el service)', async () => {
     const prisma = { businessConfig: { findUnique: jest.fn().mockResolvedValue({}), update: jest.fn() } };
     await expect(negocios(prisma).updateConfig(BIZ, { carrierShippingCosts: { OCA: 5e9 } })).rejects.toBeInstanceOf(BadRequestException);

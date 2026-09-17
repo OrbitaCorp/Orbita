@@ -79,12 +79,17 @@ function hueFromId(id: string): number {
 // de compra (su lugar de siempre) o abajo de la foto (solo cuando no hay
 // specs, para no dejar un hueco vacío en esa columna). Mismo contenido,
 // mismo componente — solo cambia el margen según dónde se use.
-function CajaEnvios({ className, marginLeft = 0, marginBottom = 0 }: { className?: string; marginLeft?: number; marginBottom?: number }) {
+// "Envíos" y "Cambios" son configurables por el dueño (Configuración →
+// Envíos / Cancelaciones y devoluciones, ver ConfigGeneral.tsx) — los
+// defaults de acá son el mismo texto fijo que había antes, para las tiendas
+// que nunca los cargaron. "Pago" queda fijo: no depende de ningún dato del
+// negocio, es una garantía genérica del checkout.
+function CajaEnvios({ className, marginLeft = 0, marginBottom = 0, envioTexto, cambiosTexto }: { className?: string; marginLeft?: number; marginBottom?: number; envioTexto?: string | null; cambiosTexto?: string | null }) {
   return (
     <div className={className} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft, marginBottom }}>
       {([
-        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
-        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
+        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', envioTexto?.trim() || '24-72 hs'],
+        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', cambiosTexto?.trim() || '30 días gratis'],
         [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
       ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
         <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -610,7 +615,14 @@ export default function ProductoDetalle() {
                 — así que acá SOLO aparece cuando no hay specs, para llenar
                 ese hueco. Con specs, ya hay algo abajo de la foto y esto
                 vuelve a su lugar de siempre. */}
-            {producto.specs.length === 0 && <CajaEnvios className="sf-pd-belowimg" marginLeft={anchoMiniaturas} />}
+            {producto.specs.length === 0 && (
+              <CajaEnvios
+                className="sf-pd-belowimg"
+                marginLeft={anchoMiniaturas}
+                envioTexto={config?.shipping?.shippingEstimateText}
+                cambiosTexto={config?.payment?.returnsWindowText}
+              />
+            )}
           </div>
 
           {/* ── Panel de info ── */}
@@ -864,7 +876,13 @@ export default function ProductoDetalle() {
             {/* Con ficha técnica, la columna izquierda ya tiene contenido de
                 sobra debajo de la foto — acá es donde esta caja vive
                 siempre (ver el comentario en la columna izquierda). */}
-            {producto.specs.length > 0 && <CajaEnvios marginBottom={24} />}
+            {producto.specs.length > 0 && (
+              <CajaEnvios
+                marginBottom={24}
+                envioTexto={config?.shipping?.shippingEstimateText}
+                cambiosTexto={config?.payment?.returnsWindowText}
+              />
+            )}
           </div>
         </div>
 

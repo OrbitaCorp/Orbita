@@ -302,6 +302,9 @@ export type UpdateBusinessConfigInput = Partial<{
   legalName: string
   freeShippingFrom: number
   shippingPolicy: string
+  // Cartelito "Envíos" de la ficha de producto (ej: "24-72 hs") — antes era
+  // un texto fijo en ProductoDetalle.tsx.
+  shippingEstimateText: string
   enabledCarriers: string[]
   // Costo de envío por transportista — sin costo general de respaldo, un
   // transportista sin costo acá no calcula envío. Parcial, solo los que el
@@ -310,6 +313,9 @@ export type UpdateBusinessConfigInput = Partial<{
   returnsEnabled: boolean
   returnsCreditNoteEnabled: boolean
   returnsMpRefundEnabled: boolean
+  // Cartelito "Cambios" de la ficha de producto (ej: "30 días gratis") —
+  // mismo criterio que shippingEstimateText de arriba.
+  returnsWindowText: string
   cancellationsEnabled: boolean
   cancellationsCreditNoteEnabled: boolean
   cancellationsMpRefundEnabled: boolean
@@ -333,9 +339,11 @@ export function getBusinessConfig() {
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
+    shippingEstimateText: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    returnsWindowText: string | null
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
@@ -511,9 +519,11 @@ export function panelGetBusinessConfig() {
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
+    shippingEstimateText: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    returnsWindowText: string | null
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
