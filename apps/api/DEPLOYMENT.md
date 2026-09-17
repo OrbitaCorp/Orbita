@@ -382,14 +382,28 @@ Si la lista está vacía, el rollback es seguro sin más. Si hay migraciones,
 abrir cada `migration.sql` y buscar `DROP`, `RENAME`, `ALTER TYPE ... DROP`
 y `SET NOT NULL`.
 
-### Simulacro (pendiente, lo corre Ale)
+### Simulacro (corrido el 17/09)
 
-Check pendiente del hallazgo: "Simulacro de rollback con `gcloud run services
-update-traffic`". Necesita `gcloud` logueado con `contacto@orbita-corp.com`
-(`gcloud auth list` tiene que marcarla como activa) y se hace en un horario
-de poco tráfico: durante uno o dos minutos la API sirve la revisión anterior.
-Elegir la revisión **inmediatamente anterior** y confirmar con el `git log`
-de arriba que entre las dos no hubo migración.
+Ya se corrió: **17/09, 15:47-15:52**, de `orbita-api-00118-7lv` (la actual, con
+el fix de cobros) a `orbita-api-00117-ndg` y de vuelta. Se hizo con **1% del
+tráfico**, no con el 100%: alcanza para probar el mecanismo y ningún cliente
+queda servido por la revisión vieja.
+
+| Paso | Cuánto tardó | Verificación |
+|---|---|---|
+| `--to-revisions=orbita-api-00117-ndg=1,orbita-api-00118-7lv=99` | ~40 s de reenrutado | 20 requests al health por `api.orbita.site` → **20/20 en 200**, media 304 ms, máx 540 ms |
+| `--to-revisions=orbita-api-00118-7lv=100` (la vuelta) | ~20 s | reparto 100% en la actual, 15/15 requests OK |
+
+**El rollback por tráfico se aplica en menos de un minuto, sin build ni
+redeploy.** Lo que este simulacro NO probó: la variante 2 (redesplegar una
+imagen anterior por tag) y el caso de una migración destructiva, que un rollback
+de código no revierte (ver más abajo).
+
+Para repetirlo: necesita `gcloud` logueado con `contacto@orbita-corp.com`
+(`gcloud auth list` tiene que marcarla como activa). Elegir la revisión
+**inmediatamente anterior** y confirmar con el `git log` de arriba que entre las
+dos no hubo migración. Con el 100% del tráfico, hacerlo en un horario de poco
+movimiento; con 1%, como acá, se puede en cualquier momento.
 
 ```bash
 # 0. Cuenta correcta y revisión que sirve ahora (anotarla: es ACTUAL).
@@ -400,17 +414,20 @@ gcloud run services describe orbita-api --region southamerica-east1 --project or
 # 1. Listar revisiones; la segunda de la lista es ANTERIOR. Anotar su nombre.
 gcloud run revisions list --service orbita-api --region southamerica-east1 --project orbita-api-corp --limit 5
 
-# 2. Mover el 100% del tráfico a ANTERIOR.
+# 2. Mover tráfico a ANTERIOR. Con 1% alcanza para probar el mecanismo; poner
+#    100 solo si de verdad hay que sacar de servicio a la revisión actual.
 gcloud run services update-traffic orbita-api --region southamerica-east1 --project orbita-api-corp \
-  --to-revisions ANTERIOR=100
+  --to-revisions ANTERIOR=1,ACTUAL=99
 
 # 3. Verificar que el tráfico cambió y que la API responde por el dominio real.
 gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp \
   --format="yaml(status.traffic)"
 curl -s -o /dev/null -w "%{http_code}\n" https://api.orbita.site/api/v1/health   # tiene que dar 200
 
-# 4. Volver a la actual (con --to-latest, ver el aviso de arriba).
-gcloud run services update-traffic orbita-api --region southamerica-east1 --project orbita-api-corp --to-latest
+# 4. Volver a la actual. Mejor nombrarla que confiar en --to-latest, que apunta
+#    a la última CREADA y no siempre es la que venía sirviendo.
+gcloud run services update-traffic orbita-api --region southamerica-east1 --project orbita-api-corp \
+  --to-revisions ACTUAL=100
 
 # 5. Verificar de nuevo: status.traffic con latestRevision: true y percent: 100, y health en 200.
 gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp \
@@ -418,8 +435,8 @@ gcloud run services describe orbita-api --region southamerica-east1 --project or
 curl -s -o /dev/null -w "%{http_code}\n" https://api.orbita.site/api/v1/health
 ```
 
-Al terminar, anotar acá la fecha, las dos revisiones usadas y cuánto tardó
-cada `update-traffic`, y marcar el check en la pestaña Auditoría.
+Al repetirlo, anotar acá la fecha, las dos revisiones usadas y cuánto tardó
+cada `update-traffic`, como quedó anotado el del 17/09.
 
 ## Recursos configurados y por qué
 
@@ -442,6 +459,37 @@ de costo fijo (instancia de 2vCPU/2GiB corriendo 24/7). Si algún endpoint
 necesita evitar cold starts en el futuro, subir `min-instances` a 1 sí tiene
 sentido — pero **sin** `--no-cpu-throttling` no hace falta pagar la CPU
 completa todo el día, solo mientras esa instancia atiende una request.
+
+## Monitoreo — uptime check y alerta por mail
+
+Configurado el 17/09 por CLI (hasta ese día el proyecto no tenía **ningún**
+uptime check, canal de notificación ni política de alerta: una caída de la API
+no le avisaba a nadie). Cierra el ítem `hallazgo.health-guard` de la auditoría.
+
+| Recurso | Id | Qué hace |
+|---|---|---|
+| Uptime check `orbita-api health` | `projects/orbita-api-corp/uptimeCheckConfigs/orbita-api-health-JxHidDp2xKw` | `GET https://api.orbita.site/api/v1/health` cada 300 s, timeout 10 s, SSL, desde 6 regiones |
+| Canal de notificación | `projects/orbita-api-corp/notificationChannels/3583552617709246352` | mail a `contacto@orbita-corp.com` |
+| Política de alerta `API caida - uptime check api.orbita.site` | `projects/orbita-api-corp/alertPolicies/6792302556596087889` | salta si el check falla en más de una región durante 60 s; auto-cierra a los 30 min |
+
+El check no se conforma con un 200: un **content matcher** exige que el cuerpo
+contenga `"status":"ok"`, así que un 200 vacío de un balanceador o una página de
+error igual dispara la alerta.
+
+```bash
+# Ver el check y si está pasando
+gcloud monitoring uptime list-configs --project orbita-api-corp
+gcloud monitoring uptime describe projects/orbita-api-corp/uptimeCheckConfigs/orbita-api-health-JxHidDp2xKw \
+  --project orbita-api-corp --format=json
+```
+
+**Pendiente:** el canal de mail se creó por API, así que Google manda un correo
+de verificación a `contacto@orbita-corp.com`. Hasta que alguien lo confirme, el
+canal figura sin verificar y puede no entregar la alerta. `gcloud monitoring`
+GA no lista canales: para revisarlos, `curl` a
+`https://monitoring.googleapis.com/v3/projects/orbita-api-corp/notificationChannels`
+con `Authorization: Bearer $(gcloud auth print-access-token)` (los grupos
+`gcloud beta/alpha monitoring` no están instalados en la máquina de Ale).
 
 ## Cron jobs — Cloud Scheduler, no @Cron in-process
 
