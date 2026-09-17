@@ -97,7 +97,12 @@ export const CATEGORIAS_PLANTILLA: { id: CategoriaPlantilla; label: string }[] =
 export const VARIABLES_DISPONIBLES = ['{nombre}', '{id}', '{tracking}', '{tienda}']
 
 export interface PedidoResumen {
-  id:     string
+  // El NÚMERO visible ("#43"), no el id real — eso es lo único que hay para
+  // mostrar en el chip. Para navegar al detalle hace falta el id de verdad
+  // (GET /orders/:id busca por id, no por número), que viaja aparte en
+  // `orderId`: si `id` pasara a ser el real, "#" + un uuid rompería el chip.
+  id:      string
+  orderId: string
   fecha:  string
   // String ancho (no el union original de 4 valores): los pedidos reales
   // tienen más estados (Pendiente, En preparación) que el mock nunca modeló.

@@ -106,9 +106,10 @@ interface BandejaProps {
   ir:       (v: VistaMensaje) => void
   onToast:  (m: string) => void
   onPerfil: (customerId: string) => void
+  onPedido: (orderId: string) => void
 }
 
-function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: BandejaProps) {
+function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onPedido }: BandejaProps) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<ConversationRow[]>([])
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
@@ -182,7 +183,7 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: B
           <BandejaLista conversaciones={conversaciones} activaId={convId} onSelect={handleSelect} onArchivar={handleArchivar} />
         </div>
         <div className="msg-chat">
-          <ChatPanel cv={activaCV} onToast={onToast} onPerfil={onPerfil} onArchivar={handleArchivar} plantillas={plantillas} onIrAPlantillas={() => ir('plantillas')} />
+          <ChatPanel cv={activaCV} onToast={onToast} onPerfil={onPerfil} onPedido={onPedido} onArchivar={handleArchivar} plantillas={plantillas} onIrAPlantillas={() => ir('plantillas')} />
         </div>
       </div>
     </>
@@ -227,12 +228,21 @@ export function MensajesHub() {
   // estaba clavado en 'c1' (un resabio de mensajes.mock.ts, de antes de que
   // esta pantalla se conectara a la API real) en vez del cliente de la
   // conversación abierta.
+  const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+  const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
   const irPerfil = (customerId: string) => {
-    const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
-    const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
     router.push({
       pathname: adminPath(negocioId, moduloPadre, 'clientes'),
       query: { vista: 'detalle', id: customerId },
+    })
+  }
+
+  // Los chips "#43" del header y las menciones dentro de los mensajes eran
+  // puro adorno: `cursor: pointer` prometiendo un click que no hacía nada.
+  const irPedido = (orderId: string) => {
+    router.push({
+      pathname: adminPath(negocioId, moduloPadre, 'pedidos'),
+      query: { vista: 'detalle', id: orderId },
     })
   }
 
@@ -243,7 +253,7 @@ export function MensajesHub() {
       <style>{`@media (max-width: 768px) { .msg-hub { padding: 16px !important; } }`}</style>
       {esPlantillas
         ? <PlantillasInline onToast={setToast} />
-        : <BandejaMensajes convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} />
+        : <BandejaMensajes convId={convId} onAbrir={abrirConv} onCerrar={cerrarConv} ir={ir} onToast={setToast} onPerfil={irPerfil} onPedido={irPedido} />
       }
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, background: 'var(--color-text)', color: 'var(--color-bg)', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,.2)', whiteSpace: 'nowrap' }}>
