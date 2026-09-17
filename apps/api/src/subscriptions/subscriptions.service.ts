@@ -6,6 +6,10 @@ import {
   PreApproval,
   Payment,
   Preference,
+  // `Invoice` es el cliente de /authorized_payments: cada cobro recurrente que
+  // genera una preapproval. NO es un pago: trae adentro el id del pago real
+  // (ver el comentario de `resolverIdDePago` en el webhook).
+  Invoice,
   WebhookSignatureValidator,
   InvalidWebhookSignatureError,
 } from 'mercadopago';
@@ -199,6 +203,7 @@ export class SubscriptionsService {
   private _preapproval: PreApproval | undefined;
   private _payment: Payment | undefined;
   private _preference: Preference | undefined;
+  private _invoice: Invoice | undefined;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -245,6 +250,11 @@ export class SubscriptionsService {
   private get preference(): Preference {
     if (!this._preference) this._preference = new Preference(this.mpConfig());
     return this._preference;
+  }
+
+  private get invoice(): Invoice {
+    if (!this._invoice) this._invoice = new Invoice(this.mpConfig());
+    return this._invoice;
   }
 
   private get currency(): string {
@@ -1243,26 +1253,42 @@ export class SubscriptionsService {
     // Es nuestro anclaje para saber de qué negocio es.
     const businessId = pago.external_reference;
     if (!businessId) {
-      this.logger.warn(`Pago ${mpPaymentId} sin external_reference — se ignora`);
-      return { recorded: false };
+      this.logger.warn(
+        `Pago ${mpPaymentId} (estado ${pago.status ?? '?'}, ${pago.transaction_amount ?? '?'}) sin external_reference — no hay a qué negocio imputarlo, se ignora`,
+      );
+      return { recorded: false, reason: 'sin_external_reference' };
     }
 
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) {
-      this.logger.warn(`Pago ${mpPaymentId}: no hay suscripción para business ${businessId}`);
-      return { recorded: false };
+      this.logger.warn(`Pago ${mpPaymentId}: no hay suscripción para business ${businessId} — se ignora`);
+      return { recorded: false, reason: 'sin_suscripcion' };
     }
-    if (!esPlanKey(sub.plan)) {
-      this.logger.warn(`Pago ${mpPaymentId}: la suscripción de ${businessId} tiene un plan desconocido (${sub.plan}) — se ignora`);
-      return { recorded: false };
+    // Plan desconocido (las filas viejas traen el 'standard' del @default del
+    // schema, o el 'starter' que escribía el alta anterior) — el cobro se
+    // registra IGUAL. La plata se movió, y el historial de facturación es
+    // justamente lo que tiene que quedar; descartarlo era perder el único
+    // rastro del cobro (hallazgo `decision.webhook-cobros-vacio`). Lo único
+    // que no se puede hacer sin un plan conocido es calcular el ciclo, así
+    // que más abajo NO se renueva el período ni se toca el addon: queda el
+    // cobro anotado y un error en el log para acomodarlo a mano.
+    const plan = esPlanKey(sub.plan) ? sub.plan : undefined;
+    if (!plan) {
+      this.logger.error(
+        `Pago ${mpPaymentId}: la suscripción de ${businessId} tiene un plan desconocido (${sub.plan}) — se registra el cobro pero NO se renueva el período`,
+      );
     }
-    const plan = sub.plan; // ya angostado a PlanKey por el esPlanKey de arriba
 
     // Idempotencia: si ya registramos este pago de MP, no lo duplicamos.
     const yaRegistrado = await this.prisma.subscriptionPayment.findFirst({
       where: { subscriptionId: sub.id, mpPaymentId },
     });
-    if (yaRegistrado) return { recorded: false, duplicated: true };
+    if (yaRegistrado) {
+      // Log explícito: "no se registró" sin motivo visible era indistinguible
+      // de un webhook perdido cuando se revisa por qué falta un cobro.
+      this.logger.log(`Pago ${mpPaymentId} de ${businessId}: ya estaba registrado (reintento de MP) — no se duplica`);
+      return { recorded: false, duplicated: true, reason: 'duplicado' };
+    }
 
     const aprobado = pago.status === 'approved';
 
@@ -1285,10 +1311,16 @@ export class SubscriptionsService {
     }
 
     const now = new Date();
-    const ciclo = this.cicloDelPlan(plan);
     // El cobro paga el período que arranca cuando vencía el anterior.
     const periodStart = sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now;
-    const periodEnd = this.periodEnd(periodStart, ciclo);
+    // Sin plan conocido no hay ciclo que sumar: se deja el vencimiento que ya
+    // tenía la suscripción (o el propio arranque si ya venció), para que la
+    // fila del historial exista igual con fechas que no inventan nada.
+    const periodEnd = plan
+      ? this.periodEnd(periodStart, this.cicloDelPlan(plan))
+      : sub.currentPeriodEnd > periodStart
+        ? sub.currentPeriodEnd
+        : periodStart;
 
     // Un cobro aprobado vuelve a poner en línea SOLO una tienda que estaba
     // suspendida por mora. Antes despausaba siempre: si el dueño la había
@@ -1317,7 +1349,9 @@ export class SubscriptionsService {
       });
 
       // Un cobro aprobado renueva el período y reactiva si estaba en mora.
-      if (aprobado && !cancelada) {
+      // Con el plan desconocido no se renueva nada (ver arriba): el cobro
+      // queda registrado, la suscripción sin tocar.
+      if (aprobado && !cancelada && plan) {
         await tx.subscription.update({
           where: { id: sub.id },
           data: { status: 'ACTIVE', currentPeriodStart: periodStart, currentPeriodEnd: periodEnd },
@@ -1330,13 +1364,13 @@ export class SubscriptionsService {
       }
     });
 
-    if (aprobado && !cancelada && veniaEnProblemas) {
+    if (aprobado && !cancelada && plan && veniaEnProblemas) {
       await this.notificarReactivacion(businessId).catch((e) =>
         this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
       );
     }
 
-    return { recorded: true, approved: aprobado, cancelled: cancelada };
+    return { recorded: true, approved: aprobado, cancelled: cancelada, renewed: aprobado && !cancelada && !!plan };
   }
 
   // Mail de "tu tienda está activa de nuevo" — lo dispara tanto un cobro
@@ -1395,7 +1429,15 @@ export class SubscriptionsService {
         });
       } catch (err) {
         if (err instanceof InvalidWebhookSignatureError) {
-          this.logger.warn(`Webhook con firma inválida (${err.reason}) — se ignora`);
+          // Con contexto: un aviso real descartado por firma es exactamente lo
+          // que dejó el historial de cobros vacío entre el 27/07 y el 18/08
+          // (bug de `toleranceSeconds` del SDK, ver más arriba), y el log de
+          // entonces no decía ni de qué tipo ni de qué id era.
+          this.logger.warn(
+            `Webhook de suscripciones con firma inválida (${err.reason}) — se ignora. ` +
+              `type=${String(body?.type ?? body?.action ?? '?')} dataId=${String(query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id ?? '?')} ` +
+              `xSignaturePresente=${!!headers['x-signature']} xRequestId=${String(headers['x-request-id'] ?? '?')}`,
+          );
           // 200 igual: no le damos pistas a un atacante ni gatillamos reintentos.
           return { received: true };
         }
@@ -1413,7 +1455,26 @@ export class SubscriptionsService {
     }
 
     try {
-      if (type.includes('payment')) {
+      if (type.includes('authorized_payment')) {
+        // `subscription_authorized_payment` es el aviso de un cobro recurrente
+        // de una preapproval — el tipo que MP usa para avisar la facturación
+        // de una suscripción. OJO: el `data.id` de este tipo NO es un id de
+        // pago, es el id del "authorized payment" (/authorized_payments/{id},
+        // 10 dígitos) y adentro trae el id del pago real (12 dígitos).
+        // Pedírselo a /v1/payments devuelve 404 y el cobro nunca se
+        // registraba (hallazgo `decision.webhook-cobros-vacio`): cae en el
+        // catch de abajo y queda solo un error en el log.
+        const factura = await this.invoice.get({ id: String(id) });
+        const pagoId = factura.payment?.id;
+        if (!pagoId) {
+          this.logger.error(
+            `Webhook de cobro recurrente ${id} (preapproval ${factura.preapproval_id ?? '?'}, estado ${factura.status ?? '?'}): MP todavía no le asoció un pago — no hay nada que registrar`,
+          );
+        } else {
+          const result = await this.recordPayment(String(pagoId));
+          this.logger.log(`Webhook de cobro recurrente ${id} → pago ${pagoId}: ${JSON.stringify(result)}`);
+        }
+      } else if (type.includes('payment')) {
         // Un pago puede ser el beneficio de bienvenida de un alta que
         // todavía no existe como negocio (external_reference = nuestra
         // referencia PEND-, ver startCheckoutPending) o un cobro recurrente
@@ -1439,8 +1500,13 @@ export class SubscriptionsService {
       }
     } catch (err) {
       // Nunca devolvemos error a MP: si respondemos != 2xx reintenta en loop.
-      // Queda logueado para revisarlo a mano.
-      this.logger.error(`Webhook de MP ${id} (${type}) falló`, err as Error);
+      // Queda logueado para revisarlo a mano — con el motivo en el propio
+      // mensaje, porque el stack solo no alcanzaba para saber si el problema
+      // fue MP, la base o un id que no existe.
+      this.logger.error(
+        `Webhook de MP ${id} (${type}) falló: ${(err as Error)?.message ?? String(err)} — NO se registró nada`,
+        err as Error,
+      );
     }
     return { received: true };
   }
