@@ -52,6 +52,9 @@ export default function TutorialHost() {
     const { user } = useAuth()
     const [estado, setEstado] = useState<EstadoTutorial | null>(null)
     const [hechasAuto, setHechasAuto] = useState<string[]>([])
+    // Con ?limpio=1: no se tilda solo nada, ni al abrir ni en el re-chequeo en
+    // vivo. Solo para probar; un dueño real nunca entra por acá.
+    const [sinAutotilde, setSinAutotilde] = useState(false)
 
     const negocioId = user?.type === 'member' ? user.business.id : ''
     const nombreUsuario = user?.type === 'member' ? user.member.name?.split(' ')[0] : undefined
@@ -67,6 +70,12 @@ export default function TutorialHost() {
     // Sin guards por ref: en dev React monta/desmonta/monta el effect y un
     // guard así descartaba la respuesta del GET. La bandera `vigente` alcanza.
     const queryTutorial = typeof router.query.tutorial === 'string' ? router.query.tutorial : null
+    // ?limpio=1 junto con ?tutorial=... arranca SIN tildar lo que el negocio ya
+    // tiene hecho. Existe para poder probar el tutorial en una tienda con datos:
+    // sin esto, en un negocio real que ya cargó productos, conectó Mercado Pago
+    // y publicó, la tarjeta abre con todo tildado y parece que no arrancó.
+    // No cambia nada para un dueño de verdad, que nunca lleva esta query.
+    const limpio = router.query.limpio === '1'
     useEffect(() => {
         if (!router.isReady || !negocioId) return
         let vigente = true
@@ -76,7 +85,7 @@ export default function TutorialHost() {
         // nuevo: al cambiar la query este effect vuelve a correr y relee.
         const sacarQuery = () => {
             if (!vigente) return
-            const { tutorial: _t, ...resto } = router.query
+            const { tutorial: _t, limpio: _l, ...resto } = router.query
             void router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
         }
         if (queryTutorial === 'off') {
@@ -94,6 +103,7 @@ export default function TutorialHost() {
             // Segunda etapa de la Checklist desde cero, para probarla sin
             // pasar por la primera.
             const nuevo = inicial('checklist', 2)
+            if (limpio) setSinAutotilde(true)
             setEstado(nuevo)
             panelSetTutorial(nuevo)
                 .catch(() => { /* idem */ })
@@ -102,6 +112,7 @@ export default function TutorialHost() {
         }
         if (queryTutorial && (VARIANTES as readonly string[]).includes(queryTutorial)) {
             const nuevo = inicial(queryTutorial as Variante)
+            if (limpio) setSinAutotilde(true)
             setEstado(nuevo)
             panelSetTutorial(nuevo)
                 .catch(() => { /* idem */ })
@@ -127,7 +138,7 @@ export default function TutorialHost() {
             })
         return () => { vigente = false }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router.isReady, queryTutorial, negocioId])
+    }, [router.isReady, queryTutorial, limpio, negocioId])
 
     // Re-chequeo en vivo de las cumplidas: al cambiar de sección (creó el
     // producto y volvió a la lista, volvió del OAuth de MP...) y al volver a
@@ -136,9 +147,10 @@ export default function TutorialHost() {
     const activo = !!estado && estado.fase === 'activo'
     const ultimoChequeo = useRef(0)
     useEffect(() => {
-        if (!activo || !negocioId) return
+        if (!activo || !negocioId || sinAutotilde) return
         let vigente = true
         const chequear = () => {
+            if (sinAutotilde) return
             const ahora = Date.now()
             if (ahora - ultimoChequeo.current < 3000) return
             ultimoChequeo.current = ahora
@@ -166,7 +178,7 @@ export default function TutorialHost() {
             window.removeEventListener('focus', chequear)
             document.removeEventListener('visibilitychange', alVolver)
         }
-    }, [path, activo, negocioId, guardar])
+    }, [path, activo, negocioId, sinAutotilde, guardar])
 
     const actualizar = useCallback((parcial: Partial<EstadoTutorial>) => {
         setEstado(prev => {

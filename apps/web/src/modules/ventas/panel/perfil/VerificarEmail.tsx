@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MailCheck, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, MailCheck, ShieldAlert } from 'lucide-react'
 import {
   panelEstadoVerificacionEmail, panelEnviarCodigoVerificacion, panelConfirmarEmail,
   ApiError, type EstadoVerificacionEmail,
@@ -25,6 +25,10 @@ export function VerificarEmail({ onVerificado }: { onVerificado: () => void }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [espera, setEspera] = useState(0)
+  // Se queda en pantalla después de confirmar. Antes el aviso simplemente
+  // desaparecía y no quedaba claro si había andado: el éxito tiene que
+  // decirse, no deducirse de que algo dejó de estar.
+  const [verificado, setVerificado] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const cargar = useCallback(async () => {
@@ -66,6 +70,7 @@ export function VerificarEmail({ onVerificado }: { onVerificado: () => void }) {
     setConfirmando(true); setError(''); setAviso('')
     try {
       await panelConfirmarEmail(valor)
+      setVerificado(true)
       onVerificado()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo confirmar el código')
@@ -74,6 +79,29 @@ export function VerificarEmail({ onVerificado }: { onVerificado: () => void }) {
     } finally {
       setConfirmando(false)
     }
+  }
+
+  if (verificado) {
+    return (
+      <section
+        role="status"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 11,
+          border: '1px solid var(--color-success)', borderRadius: 14,
+          background: 'var(--color-success-bg)', padding: '14px 18px', marginBottom: 16,
+        }}
+      >
+        <CheckCircle2 size={19} strokeWidth={2.2} color="var(--color-success)" style={{ flexShrink: 0 }} aria-hidden />
+        <div>
+          <strong style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>
+            Listo, tu email quedó verificado
+          </strong>
+          <span style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>
+            {estado?.email ? `Confirmamos ${estado.email}. ` : ''}Si alguna vez perdés el acceso, ahora podemos devolverte la cuenta.
+          </span>
+        </div>
+      </section>
+    )
   }
 
   if (!estado || estado.emailVerified) return null
@@ -120,10 +148,15 @@ export function VerificarEmail({ onVerificado }: { onVerificado: () => void }) {
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '').slice(0, 6)
                   setCode(v)
-                  // Se confirma solo al sexto dígito: nadie quiere tipear seis
-                  // números y después buscar un botón.
+                  setError('')
+                  // Se confirma solo al sexto dígito, porque tipear seis
+                  // números y después buscar un botón es un paso al pedo. Pero
+                  // el botón EXISTE igual (abajo): si el intento automático
+                  // falla, o si el código se pega de una, tiene que haber algo
+                  // visible para tocar — si no, el campo queda lleno y mudo.
                   if (v.length === 6 && !confirmando) void confirmar(v)
                 }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && code.length === 6 && !confirmando) void confirmar(code) }}
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 placeholder="000000"
@@ -139,6 +172,25 @@ export function VerificarEmail({ onVerificado }: { onVerificado: () => void }) {
                 }}
               />
             </label>
+
+            {/* El auto-confirmado al sexto dígito no alcanza como única
+                salida: si falla, o si el código se pega, el campo queda lleno
+                y sin nada que tocar. */}
+            <button
+              type="button"
+              onClick={() => void confirmar(code)}
+              disabled={code.length !== 6 || confirmando}
+              className="ds-hover"
+              style={{
+                height: 40, padding: '0 18px', borderRadius: 10, fontFamily: 'inherit',
+                fontSize: 13.5, fontWeight: 600, border: 'none',
+                background: code.length === 6 && !confirmando ? 'var(--color-primary)' : 'var(--color-surface-alt)',
+                color: code.length === 6 && !confirmando ? 'var(--color-on-primary)' : 'var(--color-subtle)',
+                cursor: code.length === 6 && !confirmando ? 'pointer' : 'default',
+              }}
+            >
+              {confirmando ? 'Confirmando…' : 'Confirmar'}
+            </button>
 
             <button
               type="button"
