@@ -30,6 +30,16 @@ function safeHex(v: string | null): string | null {
     return HEX_COLOR.test(v) ? (v.startsWith('#') ? v : `#${v}`) : null
 }
 
+// Mismo criterio que safeHex: el backend ya valida fontScale entre 0.5 y 2
+// (update-storefront-config.dto.ts), pero se vuelve a chequear antes de
+// interpolarlo en el <style> de abajo — no confiar nunca en un valor que
+// termina sin escapar en HTML/CSS. 1 (o afuera de rango) no se aplica: es el
+// tamaño de siempre, no hace falta ningún zoom.
+function safeScale(v: number | null): number | null {
+    if (v == null || !Number.isFinite(v) || v < 0.5 || v > 2 || v === 1) return null
+    return v
+}
+
 // Piso de tiempo que se muestra el loader — puramente estético (evita un
 // parpadeo si todo resuelve casi instantáneo), no depende de datos.
 const MIN_LOADER_MS = 500
@@ -122,6 +132,16 @@ export default function App({ Component, pageProps }: AppProps) {
   const ssrFontHeading     = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamily ?? null
   const ssrFontBody        = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamilyBody ?? null
   const ssrFontsHref = googleFontsHref([ssrFontHeading, ssrFontBody])
+  // "Escala de texto" (Pequeño/Mediano/Grande, Apariencia → Tipografía) — se
+  // guardaba desde siempre pero no se aplicaba en ningún lado (a diferencia
+  // de fontFamily, unas líneas arriba): el storefront entero está armado con
+  // font-size en PX inline (no rem), así que agrandar el font-size de :root
+  // no mueve nada de eso. `zoom` sí escala todo lo que cuelga de `body`
+  // (texto, íconos, paddings) sin necesidad de reescribir cada componente a
+  // rem — un poco más que "solo texto", pero es la única forma real de que
+  // el selector haga algo con la base de código actual. null/1 = sin elegir
+  // todavía, no se inyecta nada (mismo criterio que los demás campos).
+  const ssrFontScale = safeScale((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontScale ?? null)
   // Modo de color elegido por el dueño — solo se usa en el script
   // pre-hidratación de más abajo (define el default para un visitante que
   // nunca tocó el toggle); acá no hace falta más que leerlo tal cual.
@@ -161,13 +181,13 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
       </Head>
 
-      {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody) && (
+      {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody || ssrFontScale) && (
         <Head>
           {ssrFavicon && <link rel="icon" href={ssrFavicon} />}
           {/* Preconnects a fonts.googleapis.com/gstatic.com ya están en
               _document.tsx para toda la app — no hace falta repetirlos acá. */}
           {ssrFontsHref && <link rel="stylesheet" href={ssrFontsHref} />}
-          {(ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody) && (
+          {(ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody || ssrFontScale) && (
             <style dangerouslySetInnerHTML={{ __html: `
               ${ssrColorPrimary ? `
               /* !important acá a propósito: esta regla y la de globals.css
@@ -211,6 +231,16 @@ export default function App({ Component, pageProps }: AppProps) {
               ${ssrFontBody ? `
               :root { --font-body: ${fontStack(ssrFontBody)}; }
               body { font-family: var(--font-body); }
+              ` : ''}
+              ${ssrFontScale ? `
+              /* Ver el comentario de ssrFontScale más arriba: zoom, no
+                 font-size de :root, porque el storefront está armado en PX
+                 inline. Va en <html>, no en <body>, para que el header
+                 sticky (position:fixed/sticky referenciado contra el
+                 viewport en algunas pantallas) escale junto con el resto en
+                 vez de quedar con un tamaño de "viewport sin zoomear" que no
+                 coincide con el body ya escalado debajo. */
+              html { zoom: ${ssrFontScale}; }
               ` : ''}
             `}} />
           )}
