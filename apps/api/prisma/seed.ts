@@ -12,8 +12,14 @@ const prisma = new PrismaClient();
 
 const TEST_PASSWORD = 'Test1234!';
 
-// ── Catálogo global de permisos (7 grupos, ~19 permisos — ver CONTRATO_API.md §1) ──
-
+// ── Catálogo global de permisos (9 grupos, ~24 permisos — ver CONTRATO_API.md §1) ──
+//
+// Duplicado deliberado con onboarding.service.ts#PERMISSIONS (ese comentario
+// explica por qué: seed.ts no es parte del grafo de Nest). Si se agrega un
+// permiso acá, agregarlo ahí también — y si el negocio para el que hace
+// falta ya existe, escribir además la migración de backfill (ver
+// 20260818230000_reports_dashboard_permission como referencia, o
+// 20260917_mensajes_avanzado_permisos para el agregado de Mensajes/Avanzado).
 const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Pedidos', code: 'orders.view', label: 'Ver pedidos' },
   { group: 'Pedidos', code: 'orders.manage', label: 'Gestionar pedidos' },
@@ -22,6 +28,13 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Clientes', code: 'customers.manage', label: 'Gestionar clientes' },
   { group: 'Reportes', code: 'reports.view', label: 'Ver reportes' },
   { group: 'Reportes', code: 'reports.export', label: 'Exportar reportes' },
+  // Separado de reports.view: el dashboard es LA foto de la facturación y un
+  // rol puede necesitar reportes puntuales sin ver la caja completa (o al
+  // revés). Faltaba acá — estaba solo en onboarding.service.ts y llegó a los
+  // negocios existentes por la migración reports_dashboard_permission; este
+  // archivo había quedado desactualizado (hallazgo 17/09, ítem
+  // equipo-permisos-catalogo).
+  { group: 'Reportes', code: 'reports.dashboard', label: 'Ver dashboard' },
   { group: 'Inventario', code: 'inventory.view', label: 'Ver inventario' },
   { group: 'Inventario', code: 'inventory.manage', label: 'Gestionar inventario' },
   { group: 'Catálogo', code: 'catalog.view', label: 'Ver catálogo' },
@@ -33,15 +46,27 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Configuración', code: 'config.team.manage', label: 'Gestionar equipo' },
   { group: 'Configuración', code: 'config.audit.view', label: 'Ver auditoría' },
   { group: 'Configuración', code: 'config.domains.manage', label: 'Gestionar dominios' },
+  // Mensajes y Avanzado — antes sin permiso propio (Mensajes: abierto a
+  // cualquier miembro; Avanzado: gate de @Roles('owner','admin') a secas).
+  // Pedido explícito de Ale (17/09): poder darle Mensajes o Avanzado a un
+  // empleado puntual sin ascenderlo a Propietario. Los negocios existentes
+  // los reciben por la migración 20260917_mensajes_avanzado_permisos.
+  { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
+  { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
+  { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
 ];
 
-// Permisos por rol default. empleado suma *.view de catálogo/equipo para no
-// perder acceso de lectura que ya tenía cuando los GET solo chequeaban membership
-// (ver PermissionsGuard) — los *.manage siguen exclusivos de owner/admin.
+// Permisos por rol default. empleado suma *.view de catálogo/equipo (y ahora
+// Mensajes) para no perder acceso que ya tenía cuando esas rutas solo
+// chequeaban membership — los *.manage y Avanzado siguen exclusivos de
+// owner/admin.
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code), // todo
   admin: PERMISSIONS.map((p) => p.code), // todo (los casos owner-only usan @Roles('owner') directo)
-  empleado: ['orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view'],
+  empleado: [
+    'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
+    'messages.view', 'messages.manage',
+  ],
 };
 
 async function main() {

@@ -1,6 +1,5 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -83,28 +82,28 @@ export class DiscountsController {
   }
 
   @Post()
-  @Roles('owner', 'admin')
+  @RequirePermission('discounts.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertDiscountDto) {
     const member = assertMemberContext(ctx);
     return this.discountsService.create(member.businessId, member.memberId, dto);
   }
 
   @Put(':id')
-  @Roles('owner', 'admin')
+  @RequirePermission('discounts.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertDiscountDto) {
     const member = assertMemberContext(ctx);
     return this.discountsService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Patch(':id/toggle')
-  @Roles('owner', 'admin')
+  @RequirePermission('discounts.manage')
   toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
     return this.discountsService.toggle(member.businessId, id, member.memberId);
   }
 
   @Delete(':id')
-  @Roles('owner', 'admin')
+  @RequirePermission('discounts.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
     return this.discountsService.remove(member.businessId, id, member.memberId);

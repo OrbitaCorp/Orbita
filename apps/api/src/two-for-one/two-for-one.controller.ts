@@ -1,12 +1,17 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { TwoForOneService } from './two-for-one.service';
 import { UpsertTwoForOneDto } from './dto/upsert-two-for-one.dto';
 
+// Gate de escritura: antes @Roles('owner','admin') a secas, ahora
+// @RequirePermission('advanced.manage') — mismo universo de acceso hoy
+// (los roles owner/admin de fábrica ya lo tienen, ver la migración
+// 20260917_mensajes_avanzado_permisos), pero delegable: el dueño puede
+// darle Avanzado a un rol personalizado sin ascenderlo (pedido 17/09).
 // "2x1 y 3x2" (paquete Avanzado, RBT-675) — gateado por AddonGuard en todos
 // los endpoints, mismo patrón que PromoModalController/DiscountsController
 // (toggle/remove siguen el mismo shape que este último). Panel únicamente:
@@ -30,7 +35,7 @@ export class TwoForOneController {
   // del 09/09 (ítem `api.common`, verificación 2) alcanzaba con ser miembro
   // del negocio, así que cualquier empleado lo podía cambiar.
   @Post()
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertTwoForOneDto) {
     const member = assertMemberContext(ctx);
@@ -38,7 +43,7 @@ export class TwoForOneController {
   }
 
   @Put(':id')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertTwoForOneDto) {
     const member = assertMemberContext(ctx);
@@ -46,7 +51,7 @@ export class TwoForOneController {
   }
 
   @Patch(':id/toggle')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
@@ -54,7 +59,7 @@ export class TwoForOneController {
   }
 
   @Delete(':id')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);

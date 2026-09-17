@@ -2,7 +2,7 @@
 // agrupada por módulo, búsqueda y resumen con barras de progreso.
 
 import { useState } from 'react'
-import { Search, Check, Package, Users, LayoutGrid, Tag, Settings, ShoppingBag } from 'lucide-react'
+import { Search, Check, Package, Users, LayoutGrid, Tag, Settings, ShoppingBag, MessageSquare, Sparkles } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
@@ -10,9 +10,12 @@ import { Lbl, Inp, Toggle } from './FormBits'
 import { ROL_COLORS } from '../../mock/equipo.mock'
 import type { Rol, Permiso, GrupoPermiso } from '../../types/equipo.types'
 
+// Mismos íconos que Sidebar.tsx usa para cada módulo — así el grupo de acá
+// se reconoce como el módulo real del menú.
 const MODULE_ICONS: Record<GrupoPermiso, ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>> = {
     'Pedidos': Package, 'Clientes': Users, 'Reportes': LayoutGrid, 'Inventario': Package,
     'Descuentos': Tag, 'Configuración': Settings, 'Catálogo': ShoppingBag,
+    'Mensajes': MessageSquare, 'Avanzado': Sparkles,
 }
 
 interface ModalRolProps {

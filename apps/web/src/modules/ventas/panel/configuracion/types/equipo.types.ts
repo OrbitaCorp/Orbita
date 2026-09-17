@@ -9,6 +9,8 @@ export type GrupoPermiso =
     | 'Descuentos'
     | 'Configuración'
     | 'Catálogo'   // agregado en Fase 1: el backend también tiene permisos de catálogo
+    | 'Mensajes'   // agregado 17/09: messages.view / messages.manage
+    | 'Avanzado'   // agregado 17/09: advanced.manage
 
 export interface Permiso {
     id:    string

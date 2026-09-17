@@ -1,12 +1,17 @@
 import { Body, Controller, Get, Patch, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { PromoModalService } from './promo-modal.service';
 import { UpsertPromoModalDto } from './dto/upsert-promo-modal.dto';
 
+// Gate de escritura: antes @Roles('owner','admin') a secas, ahora
+// @RequirePermission('advanced.manage') — mismo universo de acceso hoy
+// (los roles owner/admin de fábrica ya lo tienen, ver la migración
+// 20260917_mensajes_avanzado_permisos), pero delegable: el dueño puede
+// darle Avanzado a un rol personalizado sin ascenderlo (pedido 17/09).
 // Paquete "Avanzado" — gateado por AddonGuard en los tres endpoints, mismo
 // patrón que GamesController. Estos son del PANEL (dueño configurando); el
 // consumo desde el storefront va por StorefrontPromoModalController, público.
@@ -26,7 +31,7 @@ export class PromoModalController {
   // del 09/09 (ítem `api.common`, verificación 2) alcanzaba con ser miembro
   // del negocio, así que cualquier empleado lo podía cambiar.
   @Put()
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   upsertPromoModal(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertPromoModalDto) {
     const member = assertMemberContext(ctx);
@@ -36,7 +41,7 @@ export class PromoModalController {
   // Botón "mostrar de nuevo a quienes lo cerraron" — mismo criterio que
   // GamesController#relanzar.
   @Patch('relanzar')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   relanzar(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);

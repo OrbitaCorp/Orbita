@@ -1,12 +1,17 @@
 import { Body, Controller, Get, Param, Patch, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { GamesService } from './games.service';
 import { UpsertGameDto } from './dto/upsert-game.dto';
 
+// Gate de escritura: antes @Roles('owner','admin') a secas, ahora
+// @RequirePermission('advanced.manage') — mismo universo de acceso hoy
+// (los roles owner/admin de fábrica ya lo tienen, ver la migración
+// 20260917_mensajes_avanzado_permisos), pero delegable: el dueño puede
+// darle Avanzado a un rol personalizado sin ascenderlo (pedido 17/09).
 // Paquete "Avanzado" — gateado por AddonGuard en los dos endpoints (mismo
 // patrón que el resto de rutas de panel que requieren el add-on). Estos
 // endpoints son del PANEL (dueño configurando), no del storefront — el
@@ -30,7 +35,7 @@ export class GamesController {
   // endpoints solo pedían el add-on, así que cualquier empleado del negocio
   // los podía tocar.
   @Put(':type')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   upsertGame(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string, @Body() dto: UpsertGameDto) {
     const member = assertMemberContext(ctx);
@@ -41,7 +46,7 @@ export class GamesController {
   // Lleva nombre y email de los clientes: dueño o admin, no cualquier
   // empleado (auditoría interna 10/09, ítem api.games).
   @Get(':type/winners')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   getWinners(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
     const member = assertMemberContext(ctx);
@@ -59,7 +64,7 @@ export class GamesController {
   // Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la
   // campaña (campaignVersion), sin tocar ninguna otra config.
   @Patch(':type/relanzar')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
   relanzar(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
     const member = assertMemberContext(ctx);

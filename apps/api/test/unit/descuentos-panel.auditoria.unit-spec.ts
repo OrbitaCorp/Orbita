@@ -1,5 +1,4 @@
 import { PERMISSION_KEY } from '../../src/common/decorators/require-permission.decorator';
-import { ROLES_KEY } from '../../src/common/decorators/roles.decorator';
 import { DiscountsController } from '../../src/discounts/discounts.controller';
 import { DiscountsService } from '../../src/discounts/discounts.service';
 import { CouponsService } from '../../src/coupons/coupons.service';
@@ -44,7 +43,11 @@ describe('Permisos de /discounts', () => {
     expect(meta(PERMISSION_KEY, metodo)).toBe('discounts.view');
   });
 
-  it('las escrituras siguen siendo de owner/admin', () => {
-    expect(meta(ROLES_KEY, 'create')).toEqual(['owner', 'admin']);
+  // Hasta el 17/09 esto era @Roles('owner','admin') a secas — decorativo:
+  // discounts.manage ya existía en el catálogo de "Crear nuevo rol" pero no
+  // protegía nada acá (hallazgo 17/09, ítem equipo-permisos-catalogo). Ahora
+  // sí es discounts.manage de verdad, delegable a un rol personalizado.
+  it('las escrituras piden discounts.manage', () => {
+    expect(meta(PERMISSION_KEY, 'create')).toBe('discounts.manage');
   });
 });
