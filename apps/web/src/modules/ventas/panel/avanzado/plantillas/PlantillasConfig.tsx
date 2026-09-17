@@ -193,6 +193,26 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                     bajada="Veintiséis portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— mantiene su estructura y su funcionalidad con cualquiera de ellas."
                 />
 
+                {/* Con una plantilla activa, volver al home clásico antes solo se
+                    podía hacer entrando al detalle de ESA plantilla (el botón
+                    "Desactivar" de ahí abajo) — acá arriba, en la galería, no
+                    había ninguna salida visible. Mismo criterio que la barra
+                    de "Plantilla activa" del detalle, pero a la vista apenas
+                    se entra a la pantalla. */}
+                {homeTemplate && (
+                    <Card style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px', marginBottom: 18, maxWidth: 1180 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '4px 12px', flexShrink: 0 }}>
+                            <Check size={12} strokeWidth={3} /> Plantilla activa
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--color-muted)', flex: 1, minWidth: 240 }}>
+                            Tu tienda está usando &ldquo;{VISIBLES.find(x => x.id === homeTemplate)?.nombre ?? 'una plantilla'}&rdquo;.
+                        </span>
+                        <Button variant="secondary" size="sm" loading={desactivando} onClick={() => setModalDesactivar(true)}>
+                            Volver a plantilla original
+                        </Button>
+                    </Card>
+                )}
+
                 <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
                     {([['todas', 'Todas'], ['claras', 'Claras'], ['oscuras', 'Oscuras']] as const).map(([f, label]) => (
                         <button
@@ -272,6 +292,14 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                             </Card>
                     ))}
                 </div>
+
+                <ModalVolverOriginal
+                    isOpen={modalDesactivar}
+                    onClose={() => setModalDesactivar(false)}
+                    onConfirm={desactivarPlantilla}
+                    desactivando={desactivando}
+                    nombre={VISIBLES.find(x => x.id === homeTemplate)?.nombre}
+                />
 
                 {toast && (
                     <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
@@ -451,22 +479,13 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 </div>
             </Modal>
 
-            <Modal
+            <ModalVolverOriginal
                 isOpen={modalDesactivar}
                 onClose={() => setModalDesactivar(false)}
-                title={`¿Desactivar la plantilla ${p.nombre}?`}
-                footer={<>
-                    <Button variant="secondary" onClick={() => setModalDesactivar(false)}>Cancelar</Button>
-                    <Button variant="primary" loading={desactivando} onClick={desactivarPlantilla}>Sí, volver a Apariencia</Button>
-                </>}
-            >
-                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
-                    Tu home vuelve al diseño de siempre y <strong>Configuración → Apariencia se desbloquea</strong>:
-                    los colores, la tipografía y el resto del diseño vuelven a editarse desde ahí.
-                    {' '}<strong>No se borra nada</strong> — el anuncio, el hero y la barra de confianza que cargaste
-                    quedan guardados igual, y si volvés a activar la plantilla los vas a encontrar tal cual.
-                </div>
-            </Modal>
+                onConfirm={desactivarPlantilla}
+                desactivando={desactivando}
+                nombre={p.nombre}
+            />
 
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
@@ -509,6 +528,30 @@ function MiniViva({ p }: { p: Plantilla }) {
                 En vivo
             </span>
         </div>
+    )
+}
+
+// Confirmación de "volver al home clásico" — misma para la galería (banner de
+// arriba, sin `p`) y el detalle de la plantilla activa (botón "Desactivar"),
+// para que las dos entradas digan exactamente lo mismo.
+function ModalVolverOriginal({ isOpen, onClose, onConfirm, desactivando, nombre }: { isOpen: boolean; onClose: () => void; onConfirm: () => void; desactivando: boolean; nombre?: string }) {
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={nombre ? `¿Desactivar la plantilla ${nombre}?` : '¿Volver a la plantilla original?'}
+            footer={<>
+                <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+                <Button variant="primary" loading={desactivando} onClick={onConfirm}>Sí, volver a Apariencia</Button>
+            </>}
+        >
+            <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                Tu home vuelve al diseño de siempre y <strong>Configuración → Apariencia se desbloquea</strong>:
+                los colores, la tipografía y el resto del diseño vuelven a editarse desde ahí.
+                {' '}<strong>No se borra nada</strong> — el anuncio, el hero y la barra de confianza que cargaste
+                quedan guardados igual, y si volvés a activar la plantilla los vas a encontrar tal cual.
+            </div>
+        </Modal>
     )
 }
 
