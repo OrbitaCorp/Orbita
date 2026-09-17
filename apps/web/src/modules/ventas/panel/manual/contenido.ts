@@ -16,6 +16,7 @@ import {
     Tag, BarChart3, Settings, Sparkles, UserCircle, LifeBuoy,
 } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
+import type { IlustracionId } from './ilustraciones'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string; style?: CSSProperties }>
 
@@ -45,6 +46,10 @@ export interface Tema {
     id: string
     titulo: string
     bloques: Bloque[]
+    /** Esquema de la pantalla. Solo en los temas donde la FORMA de la
+     *  pantalla es parte de la explicación — no uno por tema, que convierte
+     *  el manual en un álbum de figuritas. */
+    ilustracion?: IlustracionId
     /** Botón "Ir a…" al pie del tema. */
     ir?: Destino
 }
@@ -55,7 +60,8 @@ export interface Capitulo {
     /** Una frase: de qué va el capítulo. Se lee en el índice y en la portada. */
     resumen: string
     Icon: IconType
-    accent: string
+    /** Esquema de la pantalla del capítulo, arriba de todo. */
+    ilustracion?: IlustracionId
     ir?: Destino
     temas: Tema[]
 }
@@ -66,7 +72,7 @@ export const CAPITULOS: Capitulo[] = [
 // 1 · Arranque
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'arranque', titulo: 'Arranque', Icon: Rocket, accent: '#2563EB',
+    id: 'arranque', titulo: 'Arranque', Icon: Rocket, ilustracion: 'panel-tienda',
     resumen: 'Qué es el panel, qué es tu tienda, y los siete pasos para salir a vender.',
     temas: [
         {
@@ -114,7 +120,7 @@ export const CAPITULOS: Capitulo[] = [
 // 2 · Moverte por el panel
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'navegacion', titulo: 'Moverte por el panel', Icon: Compass, accent: '#0EA5E9',
+    id: 'navegacion', titulo: 'Moverte por el panel', Icon: Compass, ilustracion: 'layout-panel',
     resumen: 'El menú de la izquierda, la barra de arriba y por qué no todos ven lo mismo.',
     temas: [
         {
@@ -158,7 +164,7 @@ export const CAPITULOS: Capitulo[] = [
 // 3 · Inicio (Dashboard)
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'inicio', titulo: 'Inicio', Icon: LayoutDashboard, accent: '#3B82F6',
+    id: 'inicio', titulo: 'Inicio', Icon: LayoutDashboard, ilustracion: 'kpis',
     resumen: 'Los cinco números grandes, las alertas, el gráfico de la semana y el top de productos.',
     ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
     temas: [
@@ -184,7 +190,7 @@ export const CAPITULOS: Capitulo[] = [
             ],
         },
         {
-            id: 'alertas', titulo: 'Alertas: lo que hay que resolver hoy',
+            id: 'alertas', titulo: 'Alertas: lo que hay que resolver hoy', ilustracion: 'alertas',
             bloques: [
                 { tipo: 'parrafo', texto: 'Debajo de los números aparece una tira de alertas **solo si hay algo que resolver**. Si tu negocio está al día, no aparece nada: no es una sección vacía esperándote, es un aviso.' },
                 { tipo: 'campos', items: [
@@ -231,7 +237,7 @@ export const CAPITULOS: Capitulo[] = [
 // 4 · Pedidos
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'pedidos', titulo: 'Pedidos', Icon: ShoppingBag, accent: '#10B981',
+    id: 'pedidos', titulo: 'Pedidos', Icon: ShoppingBag, ilustracion: 'pedidos',
     resumen: 'El día a día: estados, confirmar pagos, ventas manuales, historial y devoluciones.',
     ir: { label: 'Ir a Pedidos', seccion: 'pedidos' },
     temas: [
@@ -309,7 +315,7 @@ export const CAPITULOS: Capitulo[] = [
 // 5 · Clientes
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'clientes', titulo: 'Clientes', Icon: Users, accent: '#F59E0B',
+    id: 'clientes', titulo: 'Clientes', Icon: Users, ilustracion: 'clientes',
     resumen: 'La base que se arma sola con cada venta, y cómo escribirles.',
     ir: { label: 'Ir a Clientes', seccion: 'clientes' },
     temas: [
@@ -350,7 +356,7 @@ export const CAPITULOS: Capitulo[] = [
 // 6 · Productos
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'productos', titulo: 'Productos', Icon: Package, accent: '#8B5CF6',
+    id: 'productos', titulo: 'Productos', Icon: Package, ilustracion: 'productos',
     resumen: 'Tu catálogo: alta de productos, fotos, variantes, stock y categorías.',
     ir: { label: 'Ir a Productos', seccion: 'catalogo' },
     temas: [
@@ -421,7 +427,7 @@ export const CAPITULOS: Capitulo[] = [
 // 7 · Mensajes
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'mensajes', titulo: 'Mensajes', Icon: MessageSquare, accent: '#EC4899',
+    id: 'mensajes', titulo: 'Mensajes', Icon: MessageSquare, ilustracion: 'chat',
     resumen: 'El chat con tus clientes, con el contexto de sus pedidos a mano.',
     ir: { label: 'Ir a Mensajes', seccion: 'mensajes' },
     temas: [
@@ -457,7 +463,7 @@ export const CAPITULOS: Capitulo[] = [
 // 8 · Descuentos y cupones
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'descuentos', titulo: 'Descuentos y cupones', Icon: Tag, accent: '#DC2626',
+    id: 'descuentos', titulo: 'Descuentos y cupones', Icon: Tag, ilustracion: 'cupon',
     resumen: 'Promos que se aplican solas, códigos para el checkout, cómo compartirlos y cómo medirlos.',
     ir: { label: 'Ir a Descuentos', seccion: 'descuentos' },
     temas: [
@@ -523,7 +529,7 @@ export const CAPITULOS: Capitulo[] = [
             ir: { label: 'Ir a Cupones', seccion: 'cupones' },
         },
         {
-            id: 'compartir', titulo: 'Compartir un cupón: link y envío por email',
+            id: 'compartir', titulo: 'Compartir un cupón: link y envío por email', ilustracion: 'compartir',
             bloques: [
                 { tipo: 'parrafo', texto: 'Esta es la parte que más se aprovecha poco. En el menú de tres puntitos de cualquier cupón, **"Compartir"** abre una ventana con dos formas de hacerlo llegar.' },
                 { tipo: 'campos', titulo: '1 · El link', items: [
@@ -556,7 +562,7 @@ export const CAPITULOS: Capitulo[] = [
 // 9 · Reportes
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'reportes', titulo: 'Reportes', Icon: BarChart3, accent: '#7C3AED',
+    id: 'reportes', titulo: 'Reportes', Icon: BarChart3, ilustracion: 'reportes',
     resumen: 'Cinco miradas largas de tu negocio, por el período que elijas.',
     ir: { label: 'Ir a Reportes', seccion: 'reportes' },
     temas: [
@@ -581,7 +587,7 @@ export const CAPITULOS: Capitulo[] = [
 // 10 · Configuración
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'configuracion', titulo: 'Configuración', Icon: Settings, accent: '#64748B',
+    id: 'configuracion', titulo: 'Configuración', Icon: Settings, ilustracion: 'config',
     resumen: 'Todo lo que hace funcionar la tienda: datos, pagos, envíos, apariencia, equipo y tu plan.',
     ir: { label: 'Ir a Configuración', seccion: 'configuracion' },
     temas: [
@@ -738,7 +744,7 @@ export const CAPITULOS: Capitulo[] = [
 // 11 · Avanzado
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'avanzado', titulo: 'Avanzado', Icon: Sparkles, accent: '#DB2777',
+    id: 'avanzado', titulo: 'Avanzado', Icon: Sparkles, ilustracion: 'avanzado',
     resumen: 'El paquete pago aparte: juegos con premio, anuncios, 2x1, plantillas de portada y prueba social.',
     ir: { label: 'Ir a Avanzado', seccion: 'avanzado' },
     temas: [
@@ -769,7 +775,7 @@ export const CAPITULOS: Capitulo[] = [
 // 12 · Tu cuenta
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'cuenta', titulo: 'Tu cuenta', Icon: UserCircle, accent: '#059669',
+    id: 'cuenta', titulo: 'Tu cuenta', Icon: UserCircle, ilustracion: 'perfil',
     resumen: 'Mi perfil, confirmar el email, cambiar la contraseña y ver la tienda como cliente.',
     ir: { label: 'Ir a Mi perfil', seccion: 'perfil' },
     temas: [
@@ -798,7 +804,7 @@ export const CAPITULOS: Capitulo[] = [
 // 13 · Si te trabás
 // ═══════════════════════════════════════════════════════════════════════════
 {
-    id: 'ayuda', titulo: 'Si te trabás', Icon: LifeBuoy, accent: '#0891B2',
+    id: 'ayuda', titulo: 'Si te trabás', Icon: LifeBuoy, ilustracion: 'orbi',
     resumen: 'Orbi, el tutorial guiado y cómo escribirnos.',
     temas: [
         {
