@@ -1,8 +1,15 @@
 // Piezas de presentación del Manual — dibujan los bloques de contenido.ts.
 //
 // Ninguna tiene texto propio: todo el copy vive en contenido.ts. Acá solo
-// está la forma. Mismo criterio de estilo que el resto del panel (inline
-// styles + variables de globals.css, así el modo oscuro sale gratis).
+// está la forma.
+//
+// Criterio visual (vale para todo el módulo): esto es un documento, no un
+// tablero. La jerarquía la hace la TIPOGRAFÍA y el aire — no las cajas de
+// colores. Dos únicos colores con significado: el gris del texto y el azul
+// de marca, y el azul solo donde se puede hacer clic. Nada de tarjetas con
+// ícono tintado, badges en mayúscula ni una paleta distinta por capítulo:
+// trece acentos distintos en una misma página no jerarquizan nada, solo
+// hacen ruido.
 
 import { useRouter } from 'next/router'
 import { ArrowRight, Lightbulb, AlertTriangle, Info } from 'lucide-react'
@@ -25,8 +32,10 @@ export function TextoRico({ texto }: { texto: string }) {
     )
 }
 
-// ─── Botón "Ir a…" ───────────────────────────────────────────────────────────
-export function BotonIr({ destino, compacto }: { destino: Destino; compacto?: boolean }) {
+// ─── Enlace "Ir a…" ──────────────────────────────────────────────────────────
+// Un enlace, no un botón: en un documento, "andá a esta pantalla" es una
+// remisión, y un botón con borde compite con el texto que lo rodea.
+export function EnlaceIr({ destino }: { destino: Destino }) {
     const router = useRouter()
 
     function ir() {
@@ -39,48 +48,35 @@ export function BotonIr({ destino, compacto }: { destino: Destino; compacto?: bo
     }
 
     return (
-        <button
-            className="ds-hover man-ir"
-            onClick={ir}
-            style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                // 36px de alto + padding generoso: entra cómodo el dedo en celular.
-                minHeight: compacto ? 34 : 38, padding: compacto ? '0 12px' : '0 14px',
-                borderRadius: 9, border: '1px solid var(--color-border)',
-                background: 'var(--color-bg)', color: 'var(--color-primary)',
-                fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-                transition: 'background 180ms ease, border-color 180ms ease',
-            }}
-        >
+        <button type="button" className="man-ir" onClick={ir}>
             {destino.label}
-            <ArrowRight size={14} strokeWidth={2.2} />
+            <ArrowRight size={13} strokeWidth={2} aria-hidden="true" />
         </button>
     )
 }
 
 // ─── Bloques ─────────────────────────────────────────────────────────────────
 
-const TEXTO_BASE: React.CSSProperties = {
-    fontSize: 14, lineHeight: 1.7, color: 'var(--color-body)',
-    // 68ch: el largo de renglón que se lee sin perder el hilo (línea del
-    // design system; en pantallas anchas la columna no se estira sola).
-    maxWidth: '68ch',
+const TEXTO: React.CSSProperties = {
+    fontSize: 14, lineHeight: 1.72, color: 'var(--color-body)',
 }
 
 function Parrafo({ texto }: { texto: string }) {
-    return <p style={{ ...TEXTO_BASE, margin: 0 }}><TextoRico texto={texto} /></p>
+    return <p style={{ ...TEXTO, margin: 0 }}><TextoRico texto={texto} /></p>
 }
 
 function Lista({ items }: { items: string[] }) {
     return (
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map((t, i) => (
-                <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <li key={i} style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                    {/* Raya al margen en vez de viñeta de color: marca el ítem
+                        sin sumar un punto de color por renglón. */}
                     <span aria-hidden="true" style={{
-                        width: 5, height: 5, borderRadius: '50%', background: 'var(--color-primary)',
-                        flexShrink: 0, marginTop: 9,
+                        width: 7, height: 1, background: 'var(--color-muted)', opacity: 0.45,
+                        flexShrink: 0, transform: 'translateY(-4px)',
                     }} />
-                    <span style={TEXTO_BASE}><TextoRico texto={t} /></span>
+                    <span style={TEXTO}><TextoRico texto={t} /></span>
                 </li>
             ))}
         </ul>
@@ -89,18 +85,17 @@ function Lista({ items }: { items: string[] }) {
 
 function Pasos({ items }: { items: { titulo: string; texto: string }[] }) {
     return (
-        <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 13 }}>
             {items.map((p, i) => (
-                <li key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <li key={i} style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
                     <span style={{
-                        flexShrink: 0, width: 24, height: 24, borderRadius: '50%',
-                        display: 'grid', placeItems: 'center',
-                        background: 'var(--color-primary-bg)', color: 'var(--color-primary)',
-                        fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                    }}>{i + 1}</span>
+                        flexShrink: 0, width: 16, textAlign: 'right',
+                        fontSize: 12.5, fontWeight: 500, color: 'var(--color-muted)',
+                        fontVariantNumeric: 'tabular-nums', lineHeight: 1.75,
+                    }}>{i + 1}.</span>
                     <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.5 }}>{p.titulo}</div>
-                        <div style={{ ...TEXTO_BASE, fontSize: 13.5, marginTop: 2 }}><TextoRico texto={p.texto} /></div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.55 }}>{p.titulo}</div>
+                        <div style={{ ...TEXTO, marginTop: 1 }}><TextoRico texto={p.texto} /></div>
                     </div>
                 </li>
             ))}
@@ -112,20 +107,15 @@ function Campos({ titulo, items }: { titulo?: string; items: { label: string; te
     return (
         <div>
             {titulo && (
-                <div style={{
-                    fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-                    color: 'var(--color-muted)', marginBottom: 10,
-                }}>{titulo}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>
+                    {titulo}
+                </div>
             )}
-            <dl className="man-campos" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <dl className="man-campos" style={{ margin: 0 }}>
                 {items.map((c, i) => (
-                    <div key={i} style={{
-                        display: 'grid', gridTemplateColumns: 'minmax(140px, 200px) 1fr', gap: 16,
-                        padding: '11px 0',
-                        borderTop: i === 0 ? 'none' : '1px solid var(--color-border)',
-                    }}>
-                        <dt style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.5 }}>{c.label}</dt>
-                        <dd style={{ ...TEXTO_BASE, fontSize: 13.5, margin: 0 }}><TextoRico texto={c.texto} /></dd>
+                    <div key={i}>
+                        <dt>{c.label}</dt>
+                        <dd style={TEXTO}><TextoRico texto={c.texto} /></dd>
                     </div>
                 ))}
             </dl>
@@ -135,51 +125,46 @@ function Campos({ titulo, items }: { titulo?: string; items: { label: string; te
 
 function Estados({ items }: { items: { label: string; color: string; texto: string }[] }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <dl className="man-campos" style={{ margin: 0 }}>
             {items.map((e, i) => (
-                <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                        height: 24, padding: '0 10px', borderRadius: 9999,
-                        background: `color-mix(in srgb, ${e.color} 13%, transparent)`,
-                        // El color no es el único indicador: el chip también
-                        // lleva su nombre escrito (regla de accesibilidad).
-                        border: `1px solid color-mix(in srgb, ${e.color} 35%, transparent)`,
-                        color: e.color, fontSize: 12, fontWeight: 600, minWidth: 96, justifyContent: 'center',
-                    }}>
-                        <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor' }} />
+                <div key={i}>
+                    <dt style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        {/* El punto lleva el color REAL que ese estado tiene en
+                            la pantalla: es el dato, no decoración. El nombre
+                            va escrito al lado, así el color nunca es el único
+                            indicador. */}
+                        <span aria-hidden="true" style={{
+                            width: 6, height: 6, borderRadius: '50%', background: e.color, flexShrink: 0,
+                        }} />
                         {e.label}
-                    </span>
-                    <span style={{ ...TEXTO_BASE, fontSize: 13.5, flex: '1 1 260px' }}><TextoRico texto={e.texto} /></span>
+                    </dt>
+                    <dd style={TEXTO}><TextoRico texto={e.texto} /></dd>
                 </div>
             ))}
-        </div>
+        </dl>
     )
 }
 
 const NOTA_META = {
-    tip:   { Icon: Lightbulb,     color: '#2563EB', label: 'Consejo' },
-    aviso: { Icon: AlertTriangle, color: '#D97706', label: 'Ojo' },
-    dato:  { Icon: Info,          color: '#0891B2', label: 'Dato' },
+    tip:   { Icon: Lightbulb,     regla: 'var(--color-border)', label: 'Consejo' },
+    // El único color del set: un aviso que se ve igual que un consejo no es
+    // un aviso. Va en la raya, sin fondo teñido.
+    aviso: { Icon: AlertTriangle, regla: '#D97706',             label: 'Ojo' },
+    dato:  { Icon: Info,          regla: 'var(--color-border)', label: 'Dato' },
 } as const
 
 function Nota({ variante, texto }: { variante: 'tip' | 'aviso' | 'dato'; texto: string }) {
-    const { Icon, color, label } = NOTA_META[variante]
+    const { Icon, regla, label } = NOTA_META[variante]
     return (
         <div style={{
             display: 'flex', gap: 11, alignItems: 'flex-start',
-            padding: '12px 14px', borderRadius: 10,
-            background: `color-mix(in srgb, ${color} 7%, var(--color-surface))`,
-            // Barra lateral además del fondo: en modo oscuro un fondo teñido
-            // al 7% casi no se distingue, la barra sí.
-            borderLeft: `3px solid ${color}`,
-            border: '1px solid var(--color-border)', borderLeftWidth: 3, borderLeftColor: color,
+            padding: '2px 0 2px 14px', borderLeft: `2px solid ${regla}`,
         }}>
-            <Icon size={16} strokeWidth={2} color={color} style={{ flexShrink: 0, marginTop: 2 }} />
-            <div style={{ minWidth: 0 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color, marginRight: 8 }}>{label}</span>
-                <span style={{ ...TEXTO_BASE, fontSize: 13.5, display: 'inline' }}><TextoRico texto={texto} /></span>
-            </div>
+            <Icon size={15} strokeWidth={1.7} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 4 }} aria-hidden="true" />
+            <p style={{ ...TEXTO, margin: 0, fontSize: 13.5 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{label}. </span>
+                <TextoRico texto={texto} />
+            </p>
         </div>
     )
 }
