@@ -44,7 +44,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/:path*',
+        // En desarrollo se excluye /_next/static/development/*: ahí vive
+        // `_clientMiddlewareManifest.js`, que Next sirve con Content-Type
+        // `application/json` aunque su propio cliente lo carga con un
+        // <script>. Con `nosniff` el navegador se niega a ejecutarlo
+        // ("Refused to execute script... MIME type is not executable") y se
+        // cae el bootstrap entero: ninguna página del panel llega a hidratar
+        // y lo que se ve es el HTML crudo. Ese archivo NO existe en un build
+        // de producción (es un artefacto del dev server), así que la
+        // excepción no afloja ningún header del sitio real.
+        source: process.env.NODE_ENV === 'production'
+          ? '/:path*'
+          : '/((?!_next/static/development).*)',
         headers: [
           { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
