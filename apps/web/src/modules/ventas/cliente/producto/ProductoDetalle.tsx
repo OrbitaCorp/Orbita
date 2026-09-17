@@ -79,12 +79,17 @@ function hueFromId(id: string): number {
 // de compra (su lugar de siempre) o abajo de la foto (solo cuando no hay
 // specs, para no dejar un hueco vacío en esa columna). Mismo contenido,
 // mismo componente — solo cambia el margen según dónde se use.
-function CajaEnvios({ className, marginLeft = 0, marginBottom = 0 }: { className?: string; marginLeft?: number; marginBottom?: number }) {
+// "Envíos" y "Cambios" son configurables por el dueño (Configuración →
+// Envíos / Cancelaciones y devoluciones, ver ConfigGeneral.tsx) — los
+// defaults de acá son el mismo texto fijo que había antes, para las tiendas
+// que nunca los cargaron. "Pago" queda fijo: no depende de ningún dato del
+// negocio, es una garantía genérica del checkout.
+function CajaEnvios({ className, marginLeft = 0, marginBottom = 0, envioTexto, cambiosTexto }: { className?: string; marginLeft?: number; marginBottom?: number; envioTexto?: string | null; cambiosTexto?: string | null }) {
   return (
     <div className={className} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft, marginBottom }}>
       {([
-        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
-        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
+        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', envioTexto?.trim() || '24-72 hs'],
+        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', cambiosTexto?.trim() || '30 días gratis'],
         [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
       ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
         <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -187,9 +192,9 @@ export default function ProductoDetalle() {
       const nueva = await createReview({ productId: id, orderId: elegibilidad.orderId, text: textoResenia.trim() })
       setResenas(prev => [nueva, ...prev])
       setTextoResenia('')
-      // Esta orden puntual ya se usó — reviso si queda OTRO pedido entregado
-      // con este producto todavía sin reseñar (compró el mismo producto más
-      // de una vez, cada compra habilita su propia reseña).
+      // Una reseña por cliente y producto (sin importar el pedido) — esto
+      // siempre da eligible:false a partir de acá. Se vuelve a pedir en vez
+      // de asumirlo a mano, por si el backend cambia el criterio.
       reviewEligibility(id).then(setElegibilidad).catch(() => setElegibilidad({ eligible: false, orderId: null }))
     } catch (err) {
       setErrorResenia(err instanceof ApiError ? err.message : 'No se pudo publicar la reseña. Probá de nuevo.')
@@ -465,10 +470,15 @@ export default function ProductoDetalle() {
                       <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} />
                     </button>
                   ))}
-                  {/* Miniatura del video — siempre la última, un cuadro
-                      oscuro con un ícono de play (no hay miniatura propia:
-                      YouTube/Vimeo la tienen adentro del reproductor, y un
-                      archivo directo no trae ninguna). */}
+                  {/* Miniatura del video — siempre la última. Un archivo
+                      directo (R2) sí tiene de dónde sacar una miniatura real
+                      (el primer frame, mismo truco que VideoUploader.tsx:
+                      seek a 0.1s en onLoadedMetadata porque algunos
+                      navegadores dejan el cuadro en negro hasta reproducir);
+                      YouTube/Vimeo quedan con el cuadro oscuro + ícono de
+                      play, no traen una miniatura propia sin pegarle a su
+                      API. El ícono de play se muestra siempre encima, para
+                      que se note que es un video y no una foto más. */}
                   {videoEmbed && (
                     <button
                       className="ds-hover"
@@ -478,10 +488,20 @@ export default function ProductoDetalle() {
                         width: 76, height: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
                         border: `2px solid ${esSlideVideo ? 'var(--color-primary)' : 'var(--color-border)'}`,
                         background: '#0F172A', transition: 'border-color 150ms',
-                        display: 'grid', placeItems: 'center', flexShrink: 0,
+                        display: 'grid', placeItems: 'center', flexShrink: 0, position: 'relative',
                       }}
                     >
-                      <Play size={22} color="#fff" fill="#fff" strokeWidth={0} />
+                      {videoEmbed.tipo === 'file' && (
+                        <video
+                          src={videoEmbed.src}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          onLoadedMetadata={e => { const v = e.currentTarget; try { v.currentTime = Math.min(0.1, v.duration || 0) } catch { /* noop */ } }}
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      )}
+                      <Play size={22} color="#fff" fill="#fff" strokeWidth={0} style={{ position: 'relative', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
                     </button>
                   )}
                 </div>
@@ -595,7 +615,14 @@ export default function ProductoDetalle() {
                 — así que acá SOLO aparece cuando no hay specs, para llenar
                 ese hueco. Con specs, ya hay algo abajo de la foto y esto
                 vuelve a su lugar de siempre. */}
-            {producto.specs.length === 0 && <CajaEnvios className="sf-pd-belowimg" marginLeft={anchoMiniaturas} />}
+            {producto.specs.length === 0 && (
+              <CajaEnvios
+                className="sf-pd-belowimg"
+                marginLeft={anchoMiniaturas}
+                envioTexto={config?.shipping?.shippingEstimateText}
+                cambiosTexto={config?.payment?.returnsWindowText}
+              />
+            )}
           </div>
 
           {/* ── Panel de info ── */}
@@ -849,7 +876,13 @@ export default function ProductoDetalle() {
             {/* Con ficha técnica, la columna izquierda ya tiene contenido de
                 sobra debajo de la foto — acá es donde esta caja vive
                 siempre (ver el comentario en la columna izquierda). */}
-            {producto.specs.length > 0 && <CajaEnvios marginBottom={24} />}
+            {producto.specs.length > 0 && (
+              <CajaEnvios
+                marginBottom={24}
+                envioTexto={config?.shipping?.shippingEstimateText}
+                cambiosTexto={config?.payment?.returnsWindowText}
+              />
+            )}
           </div>
         </div>
 

@@ -297,6 +297,16 @@ describe('DTOs del módulo: tipos, rangos y largos', () => {
     expect(await errores(UpdateBusinessDto, { description: 'x'.repeat(1001) })).toContain('description');
   });
 
+  // Cartelitos "Envíos"/"Cambios" de la ficha de producto (antes fijos en el
+  // código de ProductoDetalle.tsx: "24-72 hs" / "30 días gratis") — 60
+  // caracteres alcanza de sobra, no son un lugar para texto largo.
+  it('shippingEstimateText y returnsWindowText tienen tope de 60 caracteres', async () => {
+    expect(await errores(UpdateBusinessConfigDto, { shippingEstimateText: '24-72 hs' })).toEqual([]);
+    expect(await errores(UpdateBusinessConfigDto, { shippingEstimateText: 'x'.repeat(61) })).toContain('shippingEstimateText');
+    expect(await errores(UpdateBusinessConfigDto, { returnsWindowText: '30 días gratis' })).toEqual([]);
+    expect(await errores(UpdateBusinessConfigDto, { returnsWindowText: 'x'.repeat(61) })).toContain('returnsWindowText');
+  });
+
   it('el costo por transportista también tiene tope (se valida en el service)', async () => {
     const prisma = { businessConfig: { findUnique: jest.fn().mockResolvedValue({}), update: jest.fn() } };
     await expect(negocios(prisma).updateConfig(BIZ, { carrierShippingCosts: { OCA: 5e9 } })).rejects.toBeInstanceOf(BadRequestException);
@@ -390,5 +400,29 @@ describe('Subida de video (sección de video de Apariencia)', () => {
     const [path, , mimetype] = upload.mock.calls[0];
     expect(path).toMatch(new RegExp(`^${BIZ}/.+\\.mp4$`));
     expect(mimetype).toBe('video/mp4');
+  });
+
+  // presignStorefrontVideo es el camino directo-a-R2 (ver R2Service.presignUpload):
+  // comparte la misma validación de mimetype y el mismo prefijo por negocio que
+  // uploadStorefrontVideo, solo que nunca toca el buffer del archivo.
+  it('presignStorefrontVideo rechaza un mimetype que no es de video, sin pedir la firma', async () => {
+    const presignUpload = jest.fn();
+    const err = await negocios({}, {}, { presignUpload })
+      .presignStorefrontVideo(BIZ, 'application/pdf')
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BadRequestException);
+    expect(presignUpload).not.toHaveBeenCalled();
+  });
+
+  it('presignStorefrontVideo devuelve la URL firmada y la pública, con el path prefijado por negocio', async () => {
+    const presignUpload = jest.fn().mockResolvedValue('https://acc-1.r2.cloudflarestorage.com/orbita/biz-1/x.mp4?signed');
+    const publicUrlDe = jest.fn().mockReturnValue('https://pub-test.r2.dev/biz-1/x.mp4');
+    const { uploadUrl, publicUrl } = await negocios({}, {}, { presignUpload, publicUrlDe }).presignStorefrontVideo(BIZ, 'video/mp4');
+    expect(uploadUrl).toBe('https://acc-1.r2.cloudflarestorage.com/orbita/biz-1/x.mp4?signed');
+    expect(publicUrl).toBe('https://pub-test.r2.dev/biz-1/x.mp4');
+    const [pathFirmado, mimetype] = presignUpload.mock.calls[0];
+    expect(pathFirmado).toMatch(new RegExp(`^${BIZ}/.+\\.mp4$`));
+    expect(mimetype).toBe('video/mp4');
+    expect(publicUrlDe).toHaveBeenCalledWith(pathFirmado);
   });
 });

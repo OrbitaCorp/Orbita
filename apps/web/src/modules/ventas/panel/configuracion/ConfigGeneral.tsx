@@ -271,14 +271,14 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
     const [branchId, setBranchId] = useState<string | null>(null)
     const [envios, setEnvios]     = useState({
-        freeShippingFrom: '', shippingPolicy: '', enabledCarriers: [] as string[],
+        freeShippingFrom: '', shippingPolicy: '', shippingEstimateText: '', enabledCarriers: [] as string[],
         // Costo de envío por transportista — todos arrancan vacíos ('' = sin
         // cargar, ese transportista no calcula envío, se sigue coordinando aparte).
         carrierShippingCosts: {} as Record<string, string>,
     })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
     const [postventa, setPostventa] = useState({
-        returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false,
+        returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false, returnsWindowText: '',
         cancellationsEnabled: true, cancellationsCreditNoteEnabled: false, cancellationsMpRefundEnabled: true,
     })
     const [isPaused, setIsPaused] = useState(false)
@@ -372,6 +372,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     // y los paso a número recién en el momento de guardar.
                     freeShippingFrom: cfg.freeShippingFrom != null ? String(cfg.freeShippingFrom) : '',
                     shippingPolicy: cfg.shippingPolicy ?? '',
+                    shippingEstimateText: cfg.shippingEstimateText ?? '',
                     enabledCarriers: cfg.enabledCarriers ?? [],
                     carrierShippingCosts: Object.fromEntries(
                         Object.entries(cfg.carrierShippingCosts ?? {}).map(([k, v]) => [k, String(v)]),
@@ -380,6 +381,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 const redes0 = { instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' }
                 const postventa0 = {
                     returnsEnabled: cfg.returnsEnabled, returnsCreditNoteEnabled: cfg.returnsCreditNoteEnabled, returnsMpRefundEnabled: cfg.returnsMpRefundEnabled,
+                    returnsWindowText: cfg.returnsWindowText ?? '',
                     cancellationsEnabled: cfg.cancellationsEnabled, cancellationsCreditNoteEnabled: cfg.cancellationsCreditNoteEnabled, cancellationsMpRefundEnabled: cfg.cancellationsMpRefundEnabled,
                 }
                 setNegocio(negocio0)
@@ -594,6 +596,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         guardar('envios', () => panelUpdateBusinessConfig({
             ...(envios.freeShippingFrom.trim() !== '' ? { freeShippingFrom: gratis } : {}),
             shippingPolicy: envios.shippingPolicy,
+            shippingEstimateText: envios.shippingEstimateText,
             enabledCarriers: envios.enabledCarriers,
             carrierShippingCosts,
         }), 'Configuración de envíos guardada', envios)
@@ -764,9 +767,12 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 {(vista === 'negocio' || vista === 'general') && (
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Información del negocio</SectionTitle>
+                        {/* "Nombre del negocio" NO es opcional: es obligatorio desde el alta
+                            (register-business.dto.ts, @IsNotEmpty) y este campo siempre llega
+                            precargado con el que ya tiene — dejarlo vacío rompería la tienda. */}
                         <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
-                        <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
-                        <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
+                        <CfgField label="Rubro (opcional)" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
+                        <CfgField label="Descripción corta (opcional)" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
                         {/* Mismo widget que "¿Dónde operás?" del wizard de onboarding
                             (SetupUnificado.tsx): buscar por texto, GPS, o arrastrar el
                             pin — las tres formas escriben el mismo par lat/lng. */}
@@ -827,15 +833,20 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 {vista === 'contacto' && (
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Datos de contacto</SectionTitle>
-                        <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
-                        <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
-                        <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
+                        <CfgField label="WhatsApp de atención (opcional)" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
+                        <CfgField label="Email de contacto (opcional)" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
+                        <CfgField label="Horario de atención (opcional)" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
                         {soportaFiscal && (
                             <>
                                 <SectionTitle>Datos fiscales</SectionTitle>
                                 <p style={{ margin: '-6px 0 10px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
                                     Aparecen en los Términos y la Política de privacidad de tu tienda: la normativa de comercio electrónico pide identificar al vendedor.
                                 </p>
+                                {/* Sin "(opcional)" a propósito: no bloquean el guardado (la
+                                    validación los deja vacíos, y sin CUIT el documento legal
+                                    queda solo con la razón social), pero el párrafo de arriba ya
+                                    avisa que la normativa los pide — ponerles "opcional" al lado
+                                    contradiría esa advertencia. */}
                                 <CfgField label="Razón social" value={contacto.legalName} placeholder="Ej. Zapatos Lorena S.R.L." onChange={v => setContacto(p => ({ ...p, legalName: v }))} />
                                 <CfgField label="CUIT" value={contacto.cuit} placeholder="Ej. 30-71234567-1" onChange={v => setContacto(p => ({ ...p, cuit: v }))} />
                             </>
@@ -993,7 +1004,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 {/* RBT-692 — mismo campo que el de Efectivo, generalizado. */}
                                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)' }}>
                                     <CfgField
-                                        label="Descuento por pagar con Mercado Pago (%)"
+                                        label="Descuento por pagar con Mercado Pago (%) (opcional)"
                                         placeholder="Ej: 5"
                                         value={pagos.mercadopagoDiscountPercent}
                                         onChange={v => setPagos(p => ({ ...p, mercadopagoDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
@@ -1015,7 +1026,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     arriba conecta ambos nombres para el dueño. */}
                                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
                                     <CfgField
-                                        label="Descuento por transferencia / WhatsApp (%)"
+                                        label="Descuento por transferencia / WhatsApp (%) (opcional)"
                                         placeholder="Ej: 15"
                                         value={pagos.transferDiscountPercent}
                                         onChange={v => setPagos(p => ({ ...p, transferDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
@@ -1049,7 +1060,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 {pagos.acceptsCash && (
                                     <div style={{ padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
                                         <CfgField
-                                            label="Descuento por pagar en efectivo (%)"
+                                            label="Descuento por pagar en efectivo (%) (opcional)"
                                             placeholder="Ej: 10"
                                             value={pagos.cashDiscountPercent}
                                             onChange={v => setPagos(p => ({ ...p, cashDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
@@ -1127,13 +1138,24 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 {vista === 'envios' && (
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Envíos</SectionTitle>
+                        {/* Ningún campo de esta pantalla es obligatorio — vacío, cada uno cae a
+                            un comportamiento razonable (sin umbral de envío gratis, sin política
+                            propia, todos los transportistas visibles, ese transportista se sigue
+                            coordinando por WhatsApp). "(opcional)" en el label lo dice de entrada,
+                            en vez de que el dueño tenga que llegar al texto de ayuda para
+                            enterarse de que no hace falta completarlo — mismo criterio que ya usa
+                            JuegosConfig.tsx con este mismo campo. */}
+                        {/* Cartelito "Envíos" de la ficha de producto (al lado de
+                            "Cambios" y "Pago") — vacío = se sigue mostrando "24-72 hs",
+                            el mismo texto fijo que había antes de que esto existiera. */}
+                        <CfgField label="Tiempo de envío estimado (opcional)" placeholder="Ej: 24-72 hs" value={envios.shippingEstimateText} onChange={v => setEnvios(p => ({ ...p, shippingEstimateText: v }))} />
                         {/* Solo deja escribir números (nada de letras) */}
-                        <CfgField label="Envío gratis desde ($)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
+                        <CfgField label="Envío gratis desde ($) (opcional)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                         {/* Se muestra debajo del resumen del pedido en el checkout, si hay algo escrito. */}
-                        <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
+                        <CfgField label="Texto de política de envíos (opcional)" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
                         <div style={{ marginTop: 14 }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
-                                Transportistas que ofrecés
+                                Transportistas que ofrecés <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>(opcional)</span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
                                 Ninguno marcado = se muestran todos en el checkout.
@@ -1169,7 +1191,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         </div>
                         <div style={{ marginTop: 18 }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
-                                Costo de envío por transportista
+                                Costo de envío por transportista <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>(opcional)</span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
                                 Vacío = ese transportista no calcula envío (se sigue coordinando aparte por WhatsApp).
@@ -1212,9 +1234,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -6, marginBottom: 14 }}>
                             Solo tu usuario (sin @) — también podés pegar el link completo si preferís, las dos formas andan.
                         </div>
-                        <CfgField label="Instagram" placeholder="mi_negocio" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
-                        <CfgField label="TikTok" placeholder="mi_negocio" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
-                        <CfgField label="Facebook" placeholder="mi.negocio" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
+                        {/* Ninguna red es obligatoria — un negocio puede no tener las tres, o
+                            ninguna. Mismo criterio que Envíos: "(opcional)" en el label. */}
+                        <CfgField label="Instagram (opcional)" placeholder="mi_negocio" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
+                        <CfgField label="TikTok (opcional)" placeholder="mi_negocio" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
+                        <CfgField label="Facebook (opcional)" placeholder="mi.negocio" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                             <DirtyHint show={cambiado('redes', redes)} />
                             <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
@@ -1227,6 +1251,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Devoluciones</SectionTitle>
+                        {/* Cartelito "Cambios" de la ficha de producto — independiente
+                            del toggle de abajo: es solo el texto que ve el cliente
+                            ANTES de comprar, vacío = se sigue mostrando "30 días
+                            gratis", el mismo texto fijo que había antes. */}
+                        <CfgField label="Ventana de cambios (opcional)" placeholder="Ej: 30 días gratis" value={postventa.returnsWindowText} onChange={v => setPostventa(p => ({ ...p, returnsWindowText: v }))} />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Habilitar devoluciones</div>

@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, X, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Search, ChevronDown, Check, Plus, Store, X, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
@@ -90,13 +90,22 @@ const MODULOS: Modulo[] = [
         // decisión del dueño, igual que los descuentos.
         id: 'avanzado', label: 'Avanzado', Icon: Sparkles, seccion: 'avanzado',
     },
+    {
+        // Manual de uso: el panel entero explicado, con índice y buscador.
+        // Va último y SIN gate de permiso ni de rol a propósito — es
+        // documentación, no una acción sobre el negocio: cualquiera que
+        // entre al panel puede leerla (mismo criterio que Soporte en
+        // ConfigSidebar.tsx). Cada uno igual solo puede ENTRAR a las
+        // secciones que su rol permite; el manual las explica todas.
+        id: 'manual', label: 'Manual', Icon: BookOpen, seccion: 'manual',
+    },
 ]
 
 const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
     catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
     mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
-    avanzado: 'avanzado',
+    avanzado: 'avanzado', manual: 'manual',
 }
 
 // Qué permiso necesita cada módulo para APARECER en el menú (alcanza con

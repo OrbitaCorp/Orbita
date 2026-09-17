@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Cloudflare R2 — almacenamiento de los VIDEOS (de producto y del storefront
 // de Apariencia, ver businesses.service.ts#uploadStorefrontVideo). Las
@@ -63,7 +64,46 @@ export class R2Service {
       this.logger.error(`Subida a R2 (${bucket}/${path}) falló: ${(err as Error).message}`);
       throw new ServiceUnavailableException('No se pudo subir el video: el almacenamiento no respondió, probá de nuevo en un rato');
     }
+    return this.publicUrlDe(path);
+  }
+
+  // El nombre público, sin firmar nada — lo usa `presignUpload()` de acá
+  // abajo y `businesses.service.ts` cuando arma la URL final para guardar en
+  // el negocio/producto (el mismo cálculo de `upload()`, sin subir nada).
+  publicUrlDe(path: string): string {
     const publicUrl = this.config.get<string>('R2_PUBLIC_URL') ?? '';
     return `${publicUrl.replace(/\/$/, '')}/${path}`;
+  }
+
+  // URL firmada para que el NAVEGADOR suba el video directo a R2, sin pasar
+  // por este backend. Existe porque el camino de arriba (`upload()`) recibe
+  // el archivo entero ya bufferizado en memoria por multer — un video de
+  // verdad (no solo la foto de un celular) puede tirar abajo la instancia de
+  // Cloud Run antes de llegar acá, que es exactamente por qué había un tope
+  // de 40 MB (ver MAX_VIDEO_BYTES en subida-video.ts). Con esto el archivo
+  // nunca toca la memoria del backend: el navegador hace el PUT directo
+  // contra `uploadUrl`, con el `Content-Type` exacto que se firmó acá.
+  //
+  // Sin `content-length-range`: una URL prefirmada de PutObject no puede
+  // limitar el tamaño del lado del proveedor (eso requiere una POST policy,
+  // bastante más código para un endpoint que ya exige sesión de dueño/admin
+  // o el permiso de catálogo — no vale la pena la complejidad extra acá). El
+  // tope real de tamaño lo sigue poniendo el frontend (VideoUploader.tsx,
+  // `maxMB`) antes de pedir esta URL.
+  async presignUpload(path: string, contentType: string): Promise<string> {
+    const bucket = this.config.get<string>('R2_BUCKET') ?? 'orbita';
+    try {
+      return await getSignedUrl(
+        this.client,
+        new PutObjectCommand({ Bucket: bucket, Key: path, ContentType: contentType }),
+        // 10 minutos para EMPEZAR la subida, no para terminarla — la firma
+        // se valida una sola vez, al recibir el request; una vez que arrancó
+        // el PUT, R2 no la vuelve a chequear a mitad de transferencia.
+        { expiresIn: 600 },
+      );
+    } catch (err) {
+      this.logger.error(`No se pudo firmar la subida a R2 (${bucket}/${path}): ${(err as Error).message}`);
+      throw new ServiceUnavailableException('No se pudo preparar la subida: probá de nuevo en un rato');
+    }
   }
 }

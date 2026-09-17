@@ -34,6 +34,7 @@ const componentMap: Record<string, Record<string, ComponentType>> = {
         mensajes:       dynamic(() => import('@/modules/ventas/panel/mensajes/Bandeja').then(m => ({ default: m.MensajesHub })), { ssr: false }),
         perfil:         dynamic(() => import('@/modules/ventas/panel/perfil/MiPerfil'), { ssr: false }),
         avanzado:       dynamic(() => import('@/modules/ventas/panel/avanzado/Avanzado'), { ssr: false }),
+        manual:         dynamic(() => import('@/modules/ventas/panel/manual/Manual'), { ssr: false }),
     },
 }
 

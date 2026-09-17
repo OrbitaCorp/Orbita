@@ -511,13 +511,36 @@ export class BusinessesService {
   // (`${businessId}/...`), igual que ya hacía con Supabase — un negocio
   // nunca puede pisar ni listar los videos de otro.
   async uploadStorefrontVideo(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
-    if (!MIME_VIDEO_PERMITIDOS.includes(file.mimetype)) {
-      throw new BadRequestException('El archivo tiene que ser un video (mp4, webm, ogg o mov)');
-    }
-    const ext = EXTENSION_POR_MIME_VIDEO[file.mimetype] ?? 'mp4';
-    const path = `${businessId}/${randomUUID()}.${ext}`;
+    const path = this.pathDeVideo(businessId, file.mimetype);
     const url = await this.r2.upload(path, file.buffer, file.mimetype);
     return { url };
+  }
+
+  // Mismo `${businessId}/${uuid}.${ext}` que uploadStorefrontVideo(), pero sin
+  // recibir el archivo: acá el que va a existir todavía no llegó al backend,
+  // así que solo se valida el mimetype QUE EL NAVEGADOR DICE que va a subir.
+  // No es una garantía — el navegador podría mentir sobre el Content-Type del
+  // PUT directo a R2 — pero es la misma confianza que ya existía: el
+  // multer/FileInterceptor de uploadStorefrontVideo tampoco mira los bytes,
+  // valida `file.mimetype`, que también lo arma el navegador.
+  private pathDeVideo(businessId: string, mimetype: string): string {
+    if (!MIME_VIDEO_PERMITIDOS.includes(mimetype)) {
+      throw new BadRequestException('El archivo tiene que ser un video (mp4, webm, ogg o mov)');
+    }
+    const ext = EXTENSION_POR_MIME_VIDEO[mimetype] ?? 'mp4';
+    return `${businessId}/${randomUUID()}.${ext}`;
+  }
+
+  // La URL firmada para que el navegador suba el video DIRECTO a R2 (ver
+  // R2Service.presignUpload — por qué existe, junto a uploadStorefrontVideo
+  // de arriba: ese camino buferiza el archivo entero en la memoria del
+  // backend, y un tope de 40 MB existía justamente para no tirar abajo la
+  // instancia con eso). `publicUrl` ya viene resuelta: el frontend no
+  // necesita un segundo viaje al backend para enterarse de dónde quedó.
+  async presignStorefrontVideo(businessId: string, mimetype: string) {
+    const path = this.pathDeVideo(businessId, mimetype);
+    const uploadUrl = await this.r2.presignUpload(path, mimetype);
+    return { uploadUrl, publicUrl: this.r2.publicUrlDe(path) };
   }
 
   // Todas las imágenes de Apariencia (logo, favicon, slides del hero) se

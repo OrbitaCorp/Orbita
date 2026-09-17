@@ -136,7 +136,6 @@ export type StorefrontConfigResponse = {
     videoTitle: string | null
     videoSubtitle: string | null
     videoUrl: string | null
-    videoPosterUrl: string | null
   } | null
   contact: {
     whatsapp: string | null
@@ -188,10 +187,17 @@ export type StorefrontConfigResponse = {
     cancellationsEnabled: boolean
     cancellationsCreditNoteEnabled: boolean
     cancellationsMpRefundEnabled: boolean
+    // Cartelito "Cambios" de la ficha de producto (ver CajaEnvios en
+    // ProductoDetalle.tsx) — null = el frontend muestra su propio default
+    // ("30 días gratis"), no viene resuelto del backend.
+    returnsWindowText: string | null
   } | null
   shipping: {
     freeShippingFrom: number | null
     shippingPolicy: string | null
+    // Cartelito "Envíos" de la ficha de producto — mismo criterio que
+    // returnsWindowText de arriba.
+    shippingEstimateText: string | null
     // Con cuáles de los transportistas el negocio coordina de verdad los
     // envíos — vacío = todos habilitados (retrocompatible).
     enabledCarriers: string[]

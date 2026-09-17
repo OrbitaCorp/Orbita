@@ -61,6 +61,10 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() ivaDisabled?: boolean;
   @IsOptional() @IsNumber() @Min(0) @Max(MAX_MONTO) freeShippingFrom?: number;
   @IsOptional() @IsString() @MaxLength(3000) shippingPolicy?: string;
+  // Texto corto del cartelito "Envíos" de la ficha de producto (ej: "24-72
+  // hs") — 60 caracteres alcanza de sobra para un cartelito, no es un lugar
+  // para explicar la política completa (eso es shippingPolicy, arriba).
+  @IsOptional() @IsString() @MaxLength(60) shippingEstimateText?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(CARRIERS.length) @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
   // Costo de envío por transportista — sin costo general de respaldo: un
   // transportista sin costo acá no calcula envío. Parcial, solo los que el
@@ -71,6 +75,9 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() returnsEnabled?: boolean;
   @IsOptional() @IsBoolean() returnsCreditNoteEnabled?: boolean;
   @IsOptional() @IsBoolean() returnsMpRefundEnabled?: boolean;
+  // Texto corto del cartelito "Cambios" de la ficha de producto (ej: "30
+  // días gratis") — mismo criterio que shippingEstimateText de arriba.
+  @IsOptional() @IsString() @MaxLength(60) returnsWindowText?: string;
   @IsOptional() @IsBoolean() cancellationsEnabled?: boolean;
   @IsOptional() @IsBoolean() cancellationsCreditNoteEnabled?: boolean;
   @IsOptional() @IsBoolean() cancellationsMpRefundEnabled?: boolean;

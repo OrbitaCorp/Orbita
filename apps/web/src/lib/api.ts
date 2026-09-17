@@ -302,6 +302,9 @@ export type UpdateBusinessConfigInput = Partial<{
   legalName: string
   freeShippingFrom: number
   shippingPolicy: string
+  // Cartelito "Envíos" de la ficha de producto (ej: "24-72 hs") — antes era
+  // un texto fijo en ProductoDetalle.tsx.
+  shippingEstimateText: string
   enabledCarriers: string[]
   // Costo de envío por transportista — sin costo general de respaldo, un
   // transportista sin costo acá no calcula envío. Parcial, solo los que el
@@ -310,6 +313,9 @@ export type UpdateBusinessConfigInput = Partial<{
   returnsEnabled: boolean
   returnsCreditNoteEnabled: boolean
   returnsMpRefundEnabled: boolean
+  // Cartelito "Cambios" de la ficha de producto (ej: "30 días gratis") —
+  // mismo criterio que shippingEstimateText de arriba.
+  returnsWindowText: string
   cancellationsEnabled: boolean
   cancellationsCreditNoteEnabled: boolean
   cancellationsMpRefundEnabled: boolean
@@ -333,9 +339,11 @@ export function getBusinessConfig() {
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
+    shippingEstimateText: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    returnsWindowText: string | null
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
@@ -511,9 +519,11 @@ export function panelGetBusinessConfig() {
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
+    shippingEstimateText: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    returnsWindowText: string | null
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
@@ -1056,7 +1066,6 @@ export type ApiAppearanceConfig = {
   videoTitle: string | null
   videoSubtitle: string | null
   videoUrl: string | null
-  videoPosterUrl: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
@@ -1109,6 +1118,8 @@ export async function panelUploadStorefrontImage(
 // ARCHIVO, sin reencodear (ver businesses.service.ts#uploadStorefrontVideo).
 // La URL que devuelve se guarda en el mismo campo `videoUrl` que el link:
 // parseVideoEmbed ya la reconoce como "archivo directo" por la extensión.
+// Se mantiene por compatibilidad con pestañas viejas ya abiertas — el flujo
+// nuevo es panelPresignStorefrontVideo, ver más abajo.
 export async function panelUploadStorefrontVideo(file: Blob, filename: string) {
   const form = new FormData()
   form.append('file', file, filename)
@@ -1119,6 +1130,27 @@ export async function panelUploadStorefrontVideo(file: Blob, filename: string) {
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as { url: string }
+}
+
+// Subida directa a R2 desde el navegador (ver R2Service.presignUpload y
+// businessesService.presignStorefrontVideo en el backend): en vez de mandar
+// el archivo a este backend, que lo buffer­iza entero en memoria antes de
+// tocarlo (de ahí el tope de 40 MB, ver MAX_VIDEO_BYTES en
+// subida-video.ts), pide una URL firmada y hace el PUT directo contra R2 —
+// el archivo nunca pasa por acá, así que el límite real pasa a ser el que
+// pone VideoUploader.tsx (`maxMB`), no la memoria de Cloud Run.
+async function subirVideoDirectoAR2(file: Blob, presignPath: string): Promise<string> {
+  const { uploadUrl, publicUrl } = await panelRequest<{ uploadUrl: string; publicUrl: string }>(presignPath, {
+    method: 'POST',
+    body: JSON.stringify({ mimetype: file.type }),
+  })
+  const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+  if (!put.ok) throw new ApiError(put.status, 'No se pudo subir el video: probá de nuevo en un rato')
+  return publicUrl
+}
+
+export function panelPresignStorefrontVideo(file: Blob) {
+  return subirVideoDirectoAR2(file, '/business/storefront-config/video-upload-url')
 }
 
 // Cambia el modo de la tienda: completa (con carrito) o solo catálogo. Solo el
@@ -1865,6 +1897,8 @@ export async function panelUploadProductImage(
 // panelUploadStorefrontVideo, arriba) — no pide productId: puede subirse
 // ANTES de crear el producto (misma etapa del wizard que las fotos), la URL
 // resultante recién se manda al crear/actualizar, junto con el resto del form.
+// Se mantiene por compatibilidad con pestañas viejas ya abiertas — el flujo
+// nuevo es panelPresignProductVideo, ver más abajo.
 export async function panelUploadProductVideo(file: Blob, filename: string) {
   const form = new FormData()
   form.append('file', file, filename)
@@ -1875,6 +1909,13 @@ export async function panelUploadProductVideo(file: Blob, filename: string) {
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as { url: string }
+}
+
+// Subida directa a R2 desde el navegador — ver el comentario de
+// subirVideoDirectoAR2/panelPresignStorefrontVideo más arriba, mismo
+// mecanismo, acá con el endpoint de catálogo.
+export function panelPresignProductVideo(file: Blob) {
+  return subirVideoDirectoAR2(file, '/products/video-upload-url')
 }
 
 export function panelDeleteProductImage(productId: string, imageId: string) {

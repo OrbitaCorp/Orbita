@@ -377,7 +377,14 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                     )}
                     <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 16, overflow: 'hidden', background: '#000', pointerEvents: 'none' }}>
                         {videoEmbed.tipo === 'file' ? (
-                            <video muted poster={ap.videoPoster ?? undefined} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                            // Miniatura = primer frame del archivo (mismo criterio
+                            // que Inicio.tsx, el storefront real) — sin poster manual.
+                            <video
+                                muted
+                                preload="metadata"
+                                onLoadedMetadata={e => { const v = e.currentTarget; try { v.currentTime = Math.min(0.1, v.duration || 0) } catch { /* noop */ } }}
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                            >
                                 <source src={videoEmbed.src} />
                             </video>
                         ) : (

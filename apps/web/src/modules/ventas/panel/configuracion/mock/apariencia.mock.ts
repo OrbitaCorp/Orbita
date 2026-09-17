@@ -214,19 +214,19 @@ export interface Apariencia {
     mostrarMarcas: boolean
     marcasTitulo:  string
     marcas:        MarcaItem[]
-    // Sección de video — un link (YouTube, Vimeo, o el archivo directo), no
-    // una subida: Órbita no aloja video propio. Mismo gate que el parallax
-    // y las marcas: no alcanza con mostrarVideo, el link tiene que resolver
-    // a un embed reconocido (ver parseVideoEmbed, lib/storefront/utils.ts)
-    // — un link mal pegado no deja un cuadro roto, la sección no se dibuja.
-    // videoPoster solo se usa con un archivo directo (YouTube/Vimeo traen
-    // su propia miniatura). Va después del parallax y antes del pie —
-    // pedido explícito del dueño.
+    // Sección de video — un link (YouTube, Vimeo) o un archivo subido directo
+    // a Cloudflare R2 (ver panelPresignStorefrontVideo, lib/api.ts). Mismo
+    // gate que el parallax y las marcas: no alcanza con mostrarVideo, el
+    // link tiene que resolver a un embed reconocido (ver parseVideoEmbed,
+    // lib/storefront/utils.ts) — un link mal pegado no deja un cuadro roto,
+    // la sección no se dibuja. Va después del parallax y antes del pie —
+    // pedido explícito del dueño. Sin miniatura manual: un archivo directo
+    // muestra su propio primer frame (ver Inicio.tsx/StorePreview.tsx),
+    // YouTube/Vimeo traen la suya.
     mostrarVideo:    boolean
     videoTitulo:     string
     videoSubtitulo:  string
     videoUrl:        string
-    videoPoster:     string | null
     // Contenido que pide UNA plantilla de Home y no existe en el home clásico
     // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
     // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
@@ -306,7 +306,6 @@ export const AP_DEFAULTS: Apariencia = {
     videoTitulo: '',
     videoSubtitulo: '',
     videoUrl: '',
-    videoPoster: null,
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },

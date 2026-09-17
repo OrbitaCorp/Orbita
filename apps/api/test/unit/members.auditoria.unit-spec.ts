@@ -144,7 +144,9 @@ describe('Login de un member invitado', () => {
     };
     const prisma = {
       business: { findUnique: jest.fn().mockResolvedValue(NEGOCIO) },
-      member: { findFirst: jest.fn().mockResolvedValue(member), update: jest.fn().mockResolvedValue({}) },
+      // findMany: el login sin slug (apex) prueba TODAS las membresías de ese
+      // email — ver AuthService.login(). Acá alcanza con envolver la única.
+      member: { findFirst: jest.fn().mockResolvedValue(member), findMany: jest.fn().mockResolvedValue([member]), update: jest.fn().mockResolvedValue({}) },
       customer: { findFirst: jest.fn().mockResolvedValue(null) },
       platformAdmin: { findUnique: jest.fn().mockResolvedValue(null) },
       refreshToken: { create: jest.fn().mockResolvedValue({}) },

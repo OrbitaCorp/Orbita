@@ -427,6 +427,10 @@ export class StorefrontService {
             cancellationsEnabled: contact.cancellationsEnabled,
             cancellationsCreditNoteEnabled: contact.cancellationsCreditNoteEnabled,
             cancellationsMpRefundEnabled: contact.cancellationsMpRefundEnabled,
+            // Cartelito "Cambios" de la ficha de producto — null = el
+            // frontend cae a su propio default ("30 días gratis"), no se
+            // resuelve acá para no atarlo a un texto fijo del backend.
+            returnsWindowText: contact.returnsWindowText,
           }
         : null,
       // Campos vacíos se mandan tal cual (null) — el criterio de "si no está
@@ -435,6 +439,10 @@ export class StorefrontService {
         ? {
             freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
             shippingPolicy: contact.shippingPolicy,
+            // Cartelito "Envíos" de la ficha de producto — mismo criterio que
+            // returnsWindowText de arriba: null = el frontend cae a su
+            // propio default ("24-72 hs").
+            shippingEstimateText: contact.shippingEstimateText,
             // Vacío = todos habilitados (retrocompatible, ver BusinessConfig).
             enabledCarriers: contact.enabledCarriers ?? [],
             // Costo de envío por transportista — el checkout lo usa para

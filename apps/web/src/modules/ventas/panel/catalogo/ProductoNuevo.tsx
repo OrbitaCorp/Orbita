@@ -9,7 +9,7 @@
 // con la respuesta —que ya trae los ids de cada valor de opción— se suben las
 // imágenes pendientes. Antes de eso no existe el optionValueId al que apuntan.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
 import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video } from 'lucide-react'
@@ -19,13 +19,13 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
-import { VideoUploader } from '../configuracion/components/apariencia/VideoUploader'
+import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
-    panelUploadProductVideo,
+    panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
@@ -229,11 +229,12 @@ function abreviarValorOpcion(valor: string) {
 }
 
 // Alternativa a pegar un link en "Video del producto" — mismo criterio que
-// subirVideoApariencia() en Apariencia.tsx, pero sin productId: puede subirse
-// antes de que el producto exista (mismo momento del wizard que las fotos).
+// subirVideoApariencia() en Apariencia.tsx: sube directo a Cloudflare R2
+// desde el navegador (ver panelPresignProductVideo en lib/api.ts), sin pasar
+// por este backend. Sin productId: puede subirse antes de que el producto
+// exista (mismo momento del wizard que las fotos).
 async function subirVideoProducto(file: File): Promise<string> {
-    const { url } = await panelUploadProductVideo(file, file.name)
-    return url
+    return panelPresignProductVideo(file)
 }
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
@@ -1124,17 +1125,27 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
 
-            {/* Stepper */}
+            {/* Stepper. Círculo y conector van como hermanos DIRECTOS de la fila
+                (no un <div> por paso envolviendo a los dos): antes cada paso
+                era su propio contenedor `flex: 1`, y como ESE contenedor tenía
+                más ancho asignado que lo que su botón + conector (con tope de
+                34px en celular) llegaban a ocupar, quedaba un tramo sin usar
+                al final de cada paso, antes de que empezara el siguiente
+                círculo — la línea se veía corta y "flotando" en vez de llegar
+                al círculo de al lado, más notorio justo antes del último paso
+                (el único que no crece). Con los conectores como flex:1 sueltos
+                en la fila, son ELLOS los que absorben todo el espacio libre
+                entre un círculo y el siguiente, sin sobrante en el medio. */}
             <div className="pn-stepper" style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
                 {STEPS.map(([n, l], i) => {
                     const a = step === Number(n), dn = done.includes(Number(n)) || step > Number(n)
                     return (
-                        <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none', minWidth: 0 }}>
+                        <Fragment key={n}>
                             <button
                                 className="ds-hover"
                                 data-disabled={!(dn || a) || undefined}
                                 onClick={() => { if (dn || a) setStep(Number(n)) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit', flexShrink: 0 }}
                             >
                                 <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
@@ -1142,7 +1153,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <span className="pn-step-label" style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
                             </button>
                             {i < 3 && <div className="pn-step-conector" style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
-                        </div>
+                        </Fragment>
                     )
                 })}
             </div>
@@ -1371,24 +1382,33 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 ProductoDetalle.tsx). */}
                             <div style={{ marginTop: 24 }}>
                                 <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
-                                <input
-                                    className="ds-field"
-                                    value={prod.videoUrl}
-                                    onChange={e => set('videoUrl', e.target.value)}
-                                    placeholder="https://www.youtube.com/watch?v=..."
-                                    style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
-                                />
-                                {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
-                                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
-                                        No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
-                                    </div>
+                                {/* El input de link solo tiene sentido si NO hay ya un
+                                    archivo subido — con un archivo, ese link es el
+                                    de R2 (armado por el uploader, no algo que el
+                                    usuario deba tocar); se vuelve a mostrar si
+                                    quita el video con la papelera de abajo. */}
+                                {!esVideoArchivo(prod.videoUrl) && (
+                                    <>
+                                        <input
+                                            className="ds-field"
+                                            value={prod.videoUrl}
+                                            onChange={e => set('videoUrl', e.target.value)}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                            style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
+                                        />
+                                        {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
+                                                No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                        </div>
+                                    </>
                                 )}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                </div>
-                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} />
+                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
                                 </div>

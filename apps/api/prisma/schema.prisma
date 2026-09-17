@@ -202,6 +202,11 @@ model BusinessConfig {
   // Envíos
   freeShippingFrom     Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
   shippingPolicy       String?  @map("shipping_policy")
+  // Texto corto del cartelito "Envíos" de la ficha de producto (ver
+  // CajaEnvios en ProductoDetalle.tsx) — antes era un "24-72 hs" fijo en el
+  // código, sin forma de que el negocio lo cambie. null = se sigue mostrando
+  // ese default en el storefront (storefront.service.ts lo resuelve, no acá).
+  shippingEstimateText String?  @map("shipping_estimate_text") @db.VarChar(60)
   // Costo de envío por transportista — antes había además un costo "general"
   // (shippingBase) que aplicaba a cualquier transportista sin costo propio
   // cargado; se sacó a pedido (el costo de envío ahora es SIEMPRE por
@@ -232,6 +237,10 @@ model BusinessConfig {
   // cliente) — arranca apagado para no cambiarle el comportamiento a nadie
   // de un día para el otro; el vendedor lo prende si quiere ofrecérselo.
   returnsMpRefundEnabled   Boolean @default(false) @map("returns_mp_refund_enabled")
+  // Texto corto del cartelito "Cambios" de la ficha de producto (mismo
+  // criterio que shippingEstimateText de arriba) — antes era un "30 días
+  // gratis" fijo en el código. null = se sigue mostrando ese default.
+  returnsWindowText        String? @map("returns_window_text") @db.VarChar(60)
 
   cancellationsEnabled           Boolean @default(true) @map("cancellations_enabled")
   // Funcionalidad nueva (antes cancelación no tenía nota de crédito como
@@ -1517,7 +1526,12 @@ model Review {
   customer Customer @relation(fields: [customerId], references: [id])
   order    Order    @relation(fields: [orderId], references: [id])
 
-  @@unique([customerId, productId, orderId]) // una opinión por compra
+  // Una sola reseña por cliente y producto, sin importar en qué pedido lo
+  // compró — antes era @@unique([customerId, productId, orderId]) ("una
+  // opinión por compra"), así que comprar el mismo producto dos veces
+  // dejaba reseñar dos veces. Pedido explícito de Ale (17/09): una sola
+  // reseña por usuario y producto en el storefront.
+  @@unique([customerId, productId])
   @@index([businessId])
   @@index([productId])
   @@map("reviews")

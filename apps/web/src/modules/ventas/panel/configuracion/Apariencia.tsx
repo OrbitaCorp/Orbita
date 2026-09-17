@@ -14,14 +14,14 @@ import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelUploadStorefrontVideo, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelPresignStorefrontVideo, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { LogoPicker } from './components/apariencia/LogoPicker'
-import { VideoUploader } from './components/apariencia/VideoUploader'
+import { VideoUploader, esVideoArchivo } from './components/apariencia/VideoUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 // Las explicaciones "qué es / dónde se ve / en qué afecta" de cada tarjeta y
 // de cada interruptor. Hacen falta sobre todo en mobile, donde la vista
@@ -58,11 +58,12 @@ async function subirImagenApariencia(file: File): Promise<string> {
 }
 
 // El archivo de la sección de video (VideoUploader) — alternativa a pegar
-// un link. Sube el archivo tal cual, sin recodificar (a diferencia de las
-// imágenes, que siempre pasan por subirImagenApariencia).
+// un link. Sube directo a Cloudflare R2 desde el navegador (ver
+// panelPresignStorefrontVideo en lib/api.ts), sin recodificar y sin pasar
+// por este backend — por eso el tope real ya no son los 40 MB de
+// panelUploadStorefrontVideo (que se mantiene solo por compatibilidad).
 async function subirVideoApariencia(file: File): Promise<string> {
-    const r = await panelUploadStorefrontVideo(file, file.name)
-    return r.url
+    return panelPresignStorefrontVideo(file)
 }
 
 // Variante para la imagen de un slide: además de subir, puede pedirle al
@@ -1179,46 +1180,46 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarVideo} onChange={v => set('mostrarVideo', v)} />
                         </div>
                         <Divider />
-                        <div style={{ marginBottom: 10 }}>
-                            <FieldLabel help="Copiá el link tal cual aparece en la barra de direcciones — no hace falta que sea un link ‘para insertar’.">
-                                Link del video
-                            </FieldLabel>
-                            <Inp value={ap.videoUrl} onChange={v => set('videoUrl', v)} placeholder="https://www.youtube.com/watch?v=..." />
-                            {/* Mismo aviso en vivo que el email del wizard de alta
-                                (checkEmail): confirmar ANTES de guardar, no dejar
-                                que el dueño se entere en la tienda real de que el
-                                link no sirve. Vacío no avisa nada — recién
-                                escribiendo algo que no matchea ninguna forma. */}
-                            {ap.videoUrl.trim() !== '' && !parseVideoEmbed(ap.videoUrl) && (
-                                <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
-                                    No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
-                                </p>
-                            )}
-                        </div>
-                        {/* Alternativa a pegar el link: subir el archivo directo.
-                            Escribe el MISMO campo (ap.videoUrl) — ver
-                            VideoUploader.tsx para el porqué de no tener un campo
-                            aparte. */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 10px' }}>
-                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                        </div>
+                        {/* El input de link y el "O" solo tienen sentido si NO hay
+                            ya un archivo subido — con un archivo, ese link es el
+                            de R2 (armado por el uploader, no algo que el dueño
+                            deba tocar); vuelven a aparecer si lo quita con la
+                            papelera del uploader de abajo. */}
+                        {!esVideoArchivo(ap.videoUrl) && (
+                            <>
+                                <div style={{ marginBottom: 10 }}>
+                                    <FieldLabel help="Copiá el link tal cual aparece en la barra de direcciones — no hace falta que sea un link ‘para insertar’.">
+                                        Link del video (opcional)
+                                    </FieldLabel>
+                                    <Inp value={ap.videoUrl} onChange={v => set('videoUrl', v)} placeholder="https://www.youtube.com/watch?v=..." />
+                                    {/* Mismo aviso en vivo que el email del wizard de alta
+                                        (checkEmail): confirmar ANTES de guardar, no dejar
+                                        que el dueño se entere en la tienda real de que el
+                                        link no sirve. Vacío no avisa nada — recién
+                                        escribiendo algo que no matchea ninguna forma. */}
+                                    {ap.videoUrl.trim() !== '' && !parseVideoEmbed(ap.videoUrl) && (
+                                        <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
+                                            No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                        </p>
+                                    )}
+                                </div>
+                                {/* Alternativa a pegar el link: subir el archivo directo.
+                                    Escribe el MISMO campo (ap.videoUrl) — ver
+                                    VideoUploader.tsx para el porqué de no tener un campo
+                                    aparte. */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 10px' }}>
+                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                </div>
+                            </>
+                        )}
                         <div style={{ marginBottom: 14 }}>
-                            <VideoUploader value={ap.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoApariencia} />
+                            <VideoUploader value={ap.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoApariencia} maxMB={500} />
                         </div>
                         <Divider />
                         <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} /></div>
                         <div><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
-                        {/* Solo tiene efecto con un archivo directo — YouTube/Vimeo
-                            ya traen su propia miniatura, así que mostrar el campo
-                            siempre y aclararlo evita un "por qué no cambia nada"
-                            si el dueño lo carga con un link de YouTube puesto. */}
-                        <Divider />
-                        <FieldLabel help="Solo se usa si el video es un archivo directo (.mp4) — YouTube y Vimeo muestran su propia miniatura.">
-                            Miniatura
-                        </FieldLabel>
-                        <ImgUploader value={ap.videoPoster} onChange={v => set('videoPoster', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
                     </SecCard>
 
                     {tarjetasSecundarias}

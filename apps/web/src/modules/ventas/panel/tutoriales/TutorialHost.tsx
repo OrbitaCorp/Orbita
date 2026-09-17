@@ -58,6 +58,12 @@ export default function TutorialHost() {
 
     const negocioId = user?.type === 'member' ? user.business.id : ''
     const nombreUsuario = user?.type === 'member' ? user.member.name?.split(' ')[0] : undefined
+    // El tutorial de primeros pasos es cosa del dueño (o de un rol "admin",
+    // mismo criterio que ROLES_MODULO.avanzado en Sidebar.tsx) — un empleado
+    // no configura Mercado Pago ni publica el primer producto, así que
+    // guiarlo por esos pasos no tiene sentido. Pedido explícito de Ale
+    // (17/09): ocultarle la pestaña a cualquier rol que no sea ese.
+    const esAdmin = user?.type === 'member' && (user.role === 'owner' || user.role === 'admin')
 
     // Guardado en la base, fire-and-forget: el tutorial no puede trabar el
     // panel. Si un PUT falla, el siguiente avance vuelve a mandar el estado
@@ -77,7 +83,7 @@ export default function TutorialHost() {
     // No cambia nada para un dueño de verdad, que nunca lleva esta query.
     const limpio = router.query.limpio === '1'
     useEffect(() => {
-        if (!router.isReady || !negocioId) return
+        if (!router.isReady || !negocioId || !esAdmin) return
         let vigente = true
         // La query es un disparador de una sola vez: se consume y se saca de
         // la URL, así recargar o compartir el link no vuelve a arrancar el
@@ -138,7 +144,7 @@ export default function TutorialHost() {
             })
         return () => { vigente = false }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [router.isReady, queryTutorial, limpio, negocioId])
+    }, [router.isReady, queryTutorial, limpio, negocioId, esAdmin])
 
     // Re-chequeo en vivo de las cumplidas: al cambiar de sección (creó el
     // producto y volvió a la lista, volvió del OAuth de MP...) y al volver a
