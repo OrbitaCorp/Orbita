@@ -21,6 +21,7 @@ import {
     toTiendaConfig, toCategoria, toProducto,
     type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type StorefrontBrandItem, type ActiveGame, type ActivePromoModal,
 } from '@/lib/storefront/api'
+import { conOverrides, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
@@ -79,7 +80,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     }
 
     const [cargando, setCargando] = useState(true)
-    const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+    const [configReal, setConfig] = useState<StorefrontConfigResponse | null>(null)
+    // Preview de Apariencia (iframe del panel): el borrador sin guardar que
+    // manda el panel se pisa acá arriba de lo que trajo el backend, así los
+    // toggles, textos y layouts se ven al toque sin recargar ni guardar. En
+    // una visita real `conOverrides` devuelve el mismo objeto — ver
+    // lib/storefront/previewBridge.ts.
+    const config = conOverrides(configReal, usarOverridesPreview())
     const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
     const [productos, setProductos] = useState<Producto[]>([])
     const [destacados, setDestacados] = useState<Producto[]>([])

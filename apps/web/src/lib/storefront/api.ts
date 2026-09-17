@@ -9,6 +9,7 @@
 import type { Categoria, Cupon, Oferta, Producto, TiendaConfig } from './types'
 import { mensajeDeError, type MeOrderDetail } from '@/lib/api'
 import { tokenStore } from '@/lib/auth/authClient'
+import { conOverrides, overridesPreview } from './previewBridge'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.site'
@@ -208,8 +209,12 @@ export type StorefrontConfigResponse = {
   } | null
 }
 
-export function getStorefrontConfig(slug: string) {
-  return storefrontRequest<StorefrontConfigResponse>(`/${slug}`)
+export async function getStorefrontConfig(slug: string) {
+  const cfg = await storefrontRequest<StorefrontConfigResponse>(`/${slug}`)
+  // Preview de Apariencia (iframe del panel): el borrador sin guardar pisa lo
+  // que vino del backend. Fuera del preview devuelve el MISMO objeto — ver
+  // previewBridge.ts.
+  return conOverrides(cfg, overridesPreview())
 }
 
 // ─── Productos ──────────────────────────────────────────────────────────────
