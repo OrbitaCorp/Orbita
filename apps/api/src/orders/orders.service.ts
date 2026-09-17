@@ -14,6 +14,7 @@ import { AuditService } from '../audit/audit.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
+import { buscarSucursalPrincipal } from '../common/utils/sucursal-principal';
 
 // (Fase 2 — Alex) El corazón de los pedidos: acá viven las reglas de cómo nace
 // un pedido y cómo va cambiando de estado hasta entregarse o cancelarse.
@@ -597,10 +598,15 @@ export class OrdersService {
       throw new BadRequestException('Los pagos de un pedido online se registran al confirmar el pedido.');
     }
 
-    // La sucursal: si no viene una, uso la principal del negocio.
+    // La sucursal: si no viene una, uso la principal del negocio — la marcada
+    // con `isDefault`, misma definición que productos, inventario y la tienda
+    // (hallazgo `sucursal-principal-doble`). Antes acá era "la más antigua por
+    // createdAt": hoy da la misma fila, pero con la principal reasignada el
+    // pedido del panel descontaba stock de una sucursal distinta de aquella
+    // donde el panel lo carga y contra la que la tienda vende.
     const branch = dto.branch_id
       ? await this.prisma.branch.findFirst({ where: { id: dto.branch_id, businessId } })
-      : await this.prisma.branch.findFirst({ where: { businessId }, orderBy: { createdAt: 'asc' } });
+      : await buscarSucursalPrincipal(this.prisma, businessId);
     if (!branch) throw new NotFoundException('Sucursal no encontrada');
 
     // El cliente es opcional, pero si viene tiene que ser de este negocio.

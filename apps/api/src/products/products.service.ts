@@ -19,6 +19,7 @@ const MAX_IMAGENES_POR_PRODUCTO = 30;
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
+import { buscarSucursalPrincipal } from '../common/utils/sucursal-principal';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
@@ -1059,8 +1060,11 @@ export class ProductsService {
     }
   }
 
+  // La sucursal contra la que se carga el stock de un producto nuevo o editado.
+  // La definición de "principal" es una sola para todo el backend y vive en
+  // `buscarSucursalPrincipal()` — ver ahí el porqué de `isDefault`.
   private async getDefaultBranch(businessId: string) {
-    const branch = await this.prisma.branch.findFirst({ where: { businessId, isDefault: true } });
+    const branch = await buscarSucursalPrincipal(this.prisma, businessId);
     if (!branch) throw new UnprocessableEntityException('El negocio no tiene una sucursal principal configurada');
     return branch;
   }

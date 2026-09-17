@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, UnprocessableEntityException } from '@ne
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
+import { buscarSucursalPrincipal, whereSucursalPrincipal } from '../common/utils/sucursal-principal';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
 import { DiscountsService } from '../discounts/discounts.service';
@@ -172,18 +173,20 @@ export class StorefrontService {
   }
 
   // La MISMA sucursal contra la que OrdersService.create() valida stock al
-  // comprar (la más antigua del negocio — el checkout público no manda
+  // comprar (la principal del negocio — el checkout público no manda
   // branch_id). Antes el storefront sumaba el stock de TODAS las sucursales
   // para decidir qué mostrar, mientras que comprar solo miraba esta — con más
   // de una sucursal, un producto podía verse disponible acá y rechazarse al
   // pagar. Se centraliza acá para que lo que se muestra y lo que se valida
   // sean siempre el mismo número.
+  //
+  // Cuál es la principal lo decide `buscarSucursalPrincipal()` y nada más
+  // (hallazgo `sucursal-principal-doble`): acá antes era "la más antigua por
+  // createdAt" mientras el panel cargaba el stock en la marcada `isDefault`,
+  // así que con la principal reasignada la tienda vendía contra una sucursal
+  // vacía y mostraba "sin stock" productos que sí tenían.
   private async sucursalDeVenta(businessId: string): Promise<{ id: string }> {
-    const branch = await this.prisma.branch.findFirst({
-      where: { businessId },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    });
+    const branch = await buscarSucursalPrincipal(this.prisma, businessId);
     if (!branch) throw new NotFoundException('Este negocio todavía no tiene una sucursal configurada');
     return branch;
   }
@@ -268,12 +271,15 @@ export class StorefrontService {
     const [appearance, contact, pickupBranch] = await Promise.all([
       this.prisma.storefrontConfig.findUnique({ where: { businessId: business.id } }),
       this.prisma.businessConfig.findUnique({ where: { businessId: business.id } }),
-      // Solo se usa si "Retiro en local" está activo — la sucursal por
-      // defecto es la única dirección de retiro que el negocio tiene hoy
-      // (no hay todavía UI para elegir sucursal en el checkout).
+      // Solo se usa si "Retiro en local" está activo — la sucursal principal
+      // es la única dirección de retiro que el negocio tiene hoy (no hay
+      // todavía UI para elegir sucursal en el checkout). Es a propósito la
+      // MISMA que sucursalDeVenta(): se retira donde está el stock que se
+      // vendió. Antes esto era "la default entre las activas, si no cualquier
+      // activa", un tercer criterio que con la principal desactivada mandaba
+      // al comprador a retirar a una sucursal que no había vendido nada.
       this.prisma.branch.findFirst({
-        where: { businessId: business.id, isActive: true },
-        orderBy: { isDefault: 'desc' },
+        where: whereSucursalPrincipal(business.id),
         select: { name: true, address: true },
       }),
     ]);
