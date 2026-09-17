@@ -142,6 +142,29 @@ export default function VarianteChecklist(props: PropsVariante) {
         props.actualizar({ paso: 1, minimizado: true })
     }
 
+    // Terminada la primera etapa, la segunda arranca SOLA (pedido de Ale,
+    // 16/09). Antes hacían falta dos clicks para llegar a la lista de la
+    // segunda —"Seguir con la segunda etapa" y después "Empezar"— y el que
+    // no los daba se quedaba sin enterar de que había una segunda parte.
+    //
+    // El festejo del cierre igual se muestra: se ganó, y pasar de largo por
+    // encima sería sacarle el único momento de "listo, ya está" que tiene el
+    // tutorial. Por eso no es instantáneo — se ve el cierre y a los 3
+    // segundos la tarjeta pasa sola a la presentación de la segunda. El botón
+    // "Seguir" sigue estando para el que no quiere esperar.
+    //
+    // No corre si el usuario tocó "Ver la lista" (está leyendo lo que hizo y
+    // moverle la tarjeta abajo del cursor es hostil) ni en la etapa 2, donde
+    // terminar es terminar de verdad.
+    useEffect(() => {
+        if (etapa === 2 || !todasHechas || verLista) return
+        const id = window.setTimeout(seguirEtapa2, 3000)
+        return () => window.clearTimeout(id)
+        // seguirEtapa2 se rearma en cada render; las dependencias reales son
+        // estas tres.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [etapa, todasHechas, verLista])
+
     const reiniciar = () => {
         // El componente no se remonta al reiniciar: el acordeón se resetea acá.
         setAbierta(TAREAS.find(t => !auto.includes(t.id))?.id ?? TAREAS[0]?.id ?? null)
