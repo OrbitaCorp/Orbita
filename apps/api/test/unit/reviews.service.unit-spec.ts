@@ -13,6 +13,7 @@ function svcCon(overrides: { order?: any; orderItem?: any } = {}) {
     },
     review: {
       findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({
         id: 'rev-1', productId: 'prod-1', orderId: 'order-1', text: 'Buenísimo',
         status: 'VISIBLE', hiddenReason: null, isVerified: true, createdAt: new Date(),
@@ -49,24 +50,29 @@ describe('ReviewsService — elegibilidad y alta (unit)', () => {
 
   it('eligibleFor() no elegible si no hay pedidos entregados con ese producto', async () => {
     const { svc, prisma } = svcCon();
-    prisma.orderItem.findMany.mockResolvedValue([]);
+    prisma.orderItem.findFirst.mockResolvedValue(null);
     const result = await svc.eligibleFor('biz-1', 'cust-1', 'prod-1');
     expect(result).toEqual({ eligible: false, orderId: null });
   });
 
-  it('eligibleFor() elegible cuando hay un pedido entregado sin reseñar todavía', async () => {
+  it('eligibleFor() elegible cuando hay un pedido entregado y todavía no reseñó el producto', async () => {
     const { svc, prisma } = svcCon();
-    prisma.orderItem.findMany.mockResolvedValue([{ orderId: 'order-1', order: { createdAt: new Date() } }]);
-    prisma.review.findMany.mockResolvedValue([]); // todavía no reseñó ese pedido
+    prisma.review.findUnique.mockResolvedValue(null); // todavía no reseñó este producto
+    prisma.orderItem.findFirst.mockResolvedValue({ orderId: 'order-1' });
     const result = await svc.eligibleFor('biz-1', 'cust-1', 'prod-1');
     expect(result).toEqual({ eligible: true, orderId: 'order-1' });
   });
 
-  it('eligibleFor() no elegible si ya reseñó el único pedido entregado', async () => {
+  // Una sola reseña por cliente y producto (ver @@unique([customerId,
+  // productId]) en el schema): ya no importa si compró el producto en OTRO
+  // pedido más — sigue sin ser elegible.
+  it('eligibleFor() no elegible si ya reseñó este producto, aunque haya otro pedido entregado sin reseñar', async () => {
     const { svc, prisma } = svcCon();
-    prisma.orderItem.findMany.mockResolvedValue([{ orderId: 'order-1', order: { createdAt: new Date() } }]);
-    prisma.review.findMany.mockResolvedValue([{ orderId: 'order-1' }]); // ya reseñado
+    prisma.review.findUnique.mockResolvedValue({ id: 'rev-1' }); // ya reseñó este producto
+    prisma.orderItem.findFirst.mockResolvedValue({ orderId: 'order-2' }); // otra compra del mismo producto
     const result = await svc.eligibleFor('biz-1', 'cust-1', 'prod-1');
     expect(result).toEqual({ eligible: false, orderId: null });
+    // Ni hace falta ir a buscar pedidos si ya sabemos que no es elegible.
+    expect(prisma.orderItem.findFirst).not.toHaveBeenCalled();
   });
 });

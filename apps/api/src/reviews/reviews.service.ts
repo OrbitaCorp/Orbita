@@ -56,30 +56,29 @@ export class ReviewsService {
   }
 
   // ── Elegibilidad (storefront, cliente logueado) ───────────────────────────
-  // ¿Hay algún pedido entregado con este producto que este cliente todavía no
-  // reseñó? Si hay más de uno, devuelve el más viejo primero (FIFO) — no
-  // importa cuál, cualquiera sirve como `orderId` para crear la reseña.
+  // Una sola reseña por cliente y producto (sin importar en qué pedido lo
+  // compró — ver @@unique([customerId, productId]) en el schema): si ya
+  // dejó una, no es elegible, punto. Si no, alcanza con CUALQUIER pedido
+  // entregado que tenga el producto — se devuelve el más viejo (FIFO), pero
+  // cualquiera sirve como `orderId` para crear la reseña.
   async eligibleFor(businessId: string, customerId: string, productId: string) {
-    const items = await this.prisma.orderItem.findMany({
+    const yaReseniado = await this.prisma.review.findUnique({
+      where: { customerId_productId: { customerId, productId } },
+      select: { id: true },
+    });
+    if (yaReseniado) return { eligible: false, orderId: null };
+
+    const item = await this.prisma.orderItem.findFirst({
       where: {
         isConcept: false,
         variant: { productId },
         order: { businessId, customerId, deletedAt: null, status: { in: [...ENTREGADOS] } },
       },
-      select: { orderId: true, order: { select: { createdAt: true } } },
+      select: { orderId: true },
       orderBy: { order: { createdAt: 'asc' } },
     });
-    const orderIds = [...new Set(items.map((i) => i.orderId))];
-    if (orderIds.length === 0) return { eligible: false, orderId: null };
 
-    const yaReseniados = await this.prisma.review.findMany({
-      where: { customerId, productId, orderId: { in: orderIds } },
-      select: { orderId: true },
-    });
-    const reseniadosSet = new Set(yaReseniados.map((r) => r.orderId));
-    const pendiente = orderIds.find((id) => !reseniadosSet.has(id)) ?? null;
-
-    return { eligible: pendiente !== null, orderId: pendiente };
+    return { eligible: !!item, orderId: item?.orderId ?? null };
   }
 
   // ── Alta (storefront, cliente logueado) ───────────────────────────────────
@@ -106,10 +105,11 @@ export class ReviewsService {
       });
       return this.aPublico(r);
     } catch (e) {
-      // (customerId, productId, orderId) es @@unique — ya dejó una reseña de
-      // este producto para este pedido puntual.
+      // (customerId, productId) es @@unique — ya dejó una reseña de este
+      // producto, sin importar en qué pedido (una sola por cliente y
+      // producto, ver el comentario en el schema).
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-        throw new ConflictException('Ya dejaste una reseña de este producto para este pedido.');
+        throw new ConflictException('Ya dejaste una reseña de este producto.');
       }
       throw e;
     }

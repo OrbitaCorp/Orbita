@@ -192,9 +192,9 @@ export default function ProductoDetalle() {
       const nueva = await createReview({ productId: id, orderId: elegibilidad.orderId, text: textoResenia.trim() })
       setResenas(prev => [nueva, ...prev])
       setTextoResenia('')
-      // Esta orden puntual ya se usó — reviso si queda OTRO pedido entregado
-      // con este producto todavía sin reseñar (compró el mismo producto más
-      // de una vez, cada compra habilita su propia reseña).
+      // Una reseña por cliente y producto (sin importar el pedido) — esto
+      // siempre da eligible:false a partir de acá. Se vuelve a pedir en vez
+      // de asumirlo a mano, por si el backend cambia el criterio.
       reviewEligibility(id).then(setElegibilidad).catch(() => setElegibilidad({ eligible: false, orderId: null }))
     } catch (err) {
       setErrorResenia(err instanceof ApiError ? err.message : 'No se pudo publicar la reseña. Probá de nuevo.')
