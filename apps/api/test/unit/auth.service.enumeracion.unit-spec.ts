@@ -34,7 +34,14 @@ const BUSINESS = { id: 'biz-1', subdomain: 'tienda', name: 'Tienda', mode: 'FULL
 function svcCon(overrides: { member?: any; customer?: any; business?: any } = {}) {
   const prisma = {
     business: { findUnique: jest.fn().mockResolvedValue(overrides.business ?? BUSINESS) },
-    member: { findFirst: jest.fn().mockResolvedValue(overrides.member ?? null), update: jest.fn().mockResolvedValue({}) },
+    member: {
+      findFirst: jest.fn().mockResolvedValue(overrides.member ?? null),
+      // El login sin slug (apex) prueba TODAS las membresías de ese email —
+      // ver el comentario en AuthService.login(). Un solo overrides.member
+      // sigue alcanzando para estos tests: se envuelve en un array de 0 o 1.
+      findMany: jest.fn().mockResolvedValue(overrides.member ? [overrides.member] : []),
+      update: jest.fn().mockResolvedValue({}),
+    },
     customer: { findFirst: jest.fn().mockResolvedValue(overrides.customer ?? null), update: jest.fn().mockResolvedValue({}) },
     platformAdmin: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
     passwordResetToken: { create: jest.fn().mockResolvedValue({}) },

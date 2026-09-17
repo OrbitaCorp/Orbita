@@ -371,27 +371,52 @@ export class AuthService implements OnModuleInit {
       return { type: 'platform_admin_mfa_required', email: admin.email };
     }
 
-    // No es super admin → buscar member por email en cualquier negocio.
-    const member = await this.prisma.member.findFirst({
+    // No es super admin → buscar member por email en cualquier negocio. El
+    // mismo email puede ser member de VARIOS negocios a la vez (ej. dueño de
+    // uno y vendedor de otro, cada uno con su propia contraseña — el
+    // aislamiento entre negocios es a propósito, ver CLAUDE.md § Auth) y acá
+    // no hay slug que diga en cuál está intentando entrar. `findFirst` se
+    // quedaba con UNO cualquiera (orden no garantizado por Postgres sin
+    // `orderBy`) y probaba la contraseña solo contra ESE — con dos negocios,
+    // la contraseña correcta del OTRO tiraba "Credenciales inválidas" según
+    // qué fila devolviera la base ese día (bug real, encontrado 17/09
+    // probando exactamente este escenario). Ahora se prueba contra CADA
+    // membresía de ese email hasta encontrar la que coincide.
+    const candidatos = await this.prisma.member.findMany({
       where: { email: dto.email },
       include: {
         business: true,
         role: { include: { rolePermissions: { include: { permission: true } } } },
       },
     });
+    const conPassword = candidatos.filter((c) => c.passwordHash);
 
-    if (!member || !member.passwordHash) {
+    if (conPassword.length === 0) {
       await this.fakeVerify(dto.password);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    await this.checkLockout(member.lockedUntil);
+    let member: (typeof conPassword)[number] | undefined;
+    for (const candidato of conPassword) {
+      if (await argon2.verify(candidato.passwordHash!, dto.password)) {
+        member = candidato;
+        break;
+      }
+    }
 
-    const valid = await argon2.verify(member.passwordHash, dto.password);
-    if (!valid) {
-      await this.handleFailedLogin('member', member.id, member.failedLoginAttempts);
+    if (!member) {
+      // Un intento fallido cuenta contra CADA negocio de ese email — no hay
+      // forma de saber cuál de los dos quiso, así que los dos acumulan.
+      await Promise.all(
+        conPassword.map((c) => this.handleFailedLogin('member', c.id, c.failedLoginAttempts)),
+      );
       throw new UnauthorizedException('Credenciales inválidas');
     }
+
+    // Recién acá, sobre la membresía que sí coincidió: si ese negocio puntual
+    // está bloqueado, gana el bloqueo aunque la contraseña haya sido correcta
+    // (mismo criterio que el flujo con slug — ver más arriba).
+    await this.checkLockout(member.lockedUntil);
     this.assertInvitacionVigente(member);
     this.assertTemporalVigente('member', member);
 
