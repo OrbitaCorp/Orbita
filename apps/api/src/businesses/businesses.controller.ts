@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -31,7 +32,7 @@ export class BusinessesController {
   }
 
   @Put()
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   updateBusiness(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateBusinessDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.updateMe(member.businessId, dto);
@@ -60,7 +61,7 @@ export class BusinessesController {
   }
 
   @Put('config')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   updateConfig(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateBusinessConfigDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.updateConfig(member.businessId, dto);
@@ -73,7 +74,7 @@ export class BusinessesController {
   }
 
   @Put('storefront-config')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   updateStorefrontConfig(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: UpdateStorefrontConfigDto,
@@ -84,9 +85,13 @@ export class BusinessesController {
 
   // Enganche real de plantilla de Home (Avanzado → Plantillas). Separado del
   // PUT general de arriba a propósito — ver el comentario en
-  // businesses.service.ts#setHomeTemplate.
+  // businesses.service.ts#setHomeTemplate. Va con advanced.manage, no
+  // config.edit: aunque vive en este controller junto al resto de
+  // Apariencia, la acción es del módulo Avanzado (mismo criterio que
+  // games/promo-modal/social-proof/two-for-one/countdown-settings
+  // .controller.ts).
   @Post('storefront-config/home-template')
-  @Roles('owner', 'admin')
+  @RequirePermission('advanced.manage')
   // Las plantillas de Home son una funcion del paquete Avanzado (panel ->
   // Avanzado -> Plantillas), pero el endpoint no lo exigia: cualquier negocio
   // en plan Base podia dejarse una plantilla paga aplicada de forma
@@ -100,7 +105,7 @@ export class BusinessesController {
   // Sube el archivo a Supabase Storage y guarda la URL en storefrontConfig.logoUrl
   // — mismo patrón que POST /products/:id/images (ver products.service.ts).
   @Post('storefront-config/logo')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   uploadLogo(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
     const member = assertMemberContext(ctx);
@@ -112,7 +117,7 @@ export class BusinessesController {
   // Apariencia que no sea el logo (que tiene su propio endpoint de arriba,
   // usado también por el wizard de onboarding, no se toca).
   @Post('storefront-config/upload-image')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   uploadStorefrontImage(
     @CurrentBusiness() ctx: AuthContext,
@@ -128,7 +133,7 @@ export class BusinessesController {
   // el comentario de uploadStorefrontVideo() en el service para el porqué de
   // no reencodear.
   @Post('storefront-config/upload-video')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   @UseInterceptors(FileInterceptor('file', SUBIDA_VIDEO))
   uploadStorefrontVideo(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
     const member = assertMemberContext(ctx);
@@ -141,7 +146,7 @@ export class BusinessesController {
   // multer tiene un tope de 40 MB). Mismos roles que el endpoint de arriba:
   // esto reemplaza a esa subida, no es un permiso nuevo.
   @Post('storefront-config/video-upload-url')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   presignStorefrontVideo(@CurrentBusiness() ctx: AuthContext, @Body() dto: PresignVideoUploadDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.presignStorefrontVideo(member.businessId, dto.mimetype);
@@ -154,7 +159,7 @@ export class BusinessesController {
   }
 
   @Put('notification-config')
-  @Roles('owner', 'admin')
+  @RequirePermission('config.edit')
   updateNotificationConfig(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: UpdateNotificationConfigDto,

@@ -82,12 +82,13 @@ const MODULOS: Modulo[] = [
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
     },
     {
-        // Paquete "Avanzado" (add-on pago aparte de la suscripción). Sin gate
-        // en PERMISOS_MODULO porque no hay un permiso propio para esto: el
+        // Paquete "Avanzado" (add-on pago aparte de la suscripción). El
         // bloqueo por plan lo hace cada sección adentro (contenido real u
-        // overlay de upgrade según GET /business/addons), y el de rol es
-        // ROLES_MODULO — configurar juegos, 2x1, anuncios o prueba social es
-        // decisión del dueño, igual que los descuentos.
+        // overlay de upgrade según GET /business/addons); el de rol vive en
+        // PERMISOS_MODULO con advanced.manage — antes era ROLES_MODULO fijo
+        // a owner/admin, pero eso no se podía delegar a un rol personalizado
+        // (pedido de Ale, 17/09: poder darle Avanzado a un empleado puntual
+        // sin ascenderlo a Propietario).
         id: 'avanzado', label: 'Avanzado', Icon: Sparkles, seccion: 'avanzado',
     },
     {
@@ -108,27 +109,33 @@ const SECCION_MODULO: Record<string, string> = {
     avanzado: 'avanzado', manual: 'manual',
 }
 
+// Módulos que piden un ROL fijo (nombre literal), no un permiso — hoy
+// ninguno: "avanzado" vivía acá (owner/admin a secas) hasta que se le dio
+// su propio permiso delegable (advanced.manage, ver PERMISOS_MODULO). Queda
+// el mecanismo por si aparece otro caso genuinamente no delegable (ver
+// Zona peligrosa en ConfigSidebar.tsx, que sigue siendo owner puro del
+// lado del backend aunque no pase por acá).
+const ROLES_MODULO: Record<string, string[]> = {}
+
 // Qué permiso necesita cada módulo para APARECER en el menú (alcanza con
 // tener alguno de la lista). La autoridad es el backend — sus endpoints ya
 // piden permiso —; esto evita mostrarle a un empleado secciones enteras
 // donde todo le daría "sin permiso". Un módulo sin entrada acá se muestra
 // siempre. El dashboard es facturación: pide reports.view como los reportes.
-// Módulos que además piden un ROL, no un permiso. El backend de las funciones
-// del paquete Avanzado pide owner/admin desde la auditoría interna del 09/09
-// (ver games/promo-modal/social-proof/two-for-one .controller.ts): sin esto,
-// un empleado veía el menú y cada guardado le daba "sin permiso".
-const ROLES_MODULO: Record<string, string[]> = {
-    avanzado: ['owner', 'admin'],
-}
-
 const PERMISOS_MODULO: Record<string, string[]> = {
     dashboard: ['reports.dashboard'],
     pedidos: ['orders.view'],
     clientes: ['customers.view'],
     productos: ['catalog.view', 'inventory.view'],
-    mensajes: ['orders.view', 'customers.view'], // atención al cliente
+    // Antes proxy con orders.view/customers.view ("atención al cliente", sin
+    // permiso propio: Mensajes no tenía ningún gate en el backend). Ahora
+    // messages.view es un permiso real — ver conversations.controller.ts y
+    // la migración 20260917_mensajes_avanzado_permisos.
+    mensajes: ['messages.view'],
     descuentos: ['discounts.view', 'discounts.manage'],
     config: ['config.edit', 'config.team.view', 'config.team.manage', 'config.audit.view', 'config.domains.manage'],
+    // Ver el comentario del ítem 'avanzado' en MODULOS más arriba.
+    avanzado: ['advanced.manage'],
 }
 
 interface Props { isOpen: boolean; onClose: () => void }

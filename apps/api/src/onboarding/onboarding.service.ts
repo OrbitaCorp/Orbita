@@ -124,6 +124,14 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Configuración', code: 'config.domains.manage', label: 'Gestionar dominios' },
   { group: 'Catálogo', code: 'catalog.view', label: 'Ver catálogo' },
   { group: 'Catálogo', code: 'catalog.manage', label: 'Gestionar catálogo' },
+  // Mensajes y Avanzado — antes sin permiso propio (Mensajes: abierto a
+  // cualquier miembro; Avanzado: gate de @Roles('owner','admin') a secas).
+  // Pedido explícito de Ale (17/09): poder darle Mensajes o Avanzado a un
+  // empleado puntual sin ascenderlo a Propietario. Los negocios existentes
+  // los reciben por la migración 20260917_mensajes_avanzado_permisos.
+  { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
+  { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
+  { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
 ];
 
 // El negocio arranca con DOS roles nada más: Propietario (acceso total) y
@@ -132,7 +140,14 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
 // una sola palabra ("Propietario") para el acceso total en toda la app.
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code),
-  empleado: ['orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view'],
+  // Mensajes iba abierto a cualquier miembro sin permiso — el Empleado lo
+  // suma acá para no perder ese acceso ahora que sí se verifica. Avanzado NO
+  // se suma: eso ya era exclusivo de owner/admin, y sigue siéndolo por
+  // default (el dueño lo habilita a mano en un rol si quiere delegarlo).
+  empleado: [
+    'orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view',
+    'messages.view', 'messages.manage',
+  ],
 };
 
 const ROLE_DEFS = [
