@@ -19,7 +19,7 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
-import { VideoUploader } from '../configuracion/components/apariencia/VideoUploader'
+import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
@@ -1382,23 +1382,32 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 ProductoDetalle.tsx). */}
                             <div style={{ marginTop: 24 }}>
                                 <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
-                                <input
-                                    className="ds-field"
-                                    value={prod.videoUrl}
-                                    onChange={e => set('videoUrl', e.target.value)}
-                                    placeholder="https://www.youtube.com/watch?v=..."
-                                    style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
-                                />
-                                {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
-                                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
-                                        No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
-                                    </div>
+                                {/* El input de link solo tiene sentido si NO hay ya un
+                                    archivo subido — con un archivo, ese link es el
+                                    de R2 (armado por el uploader, no algo que el
+                                    usuario deba tocar); se vuelve a mostrar si
+                                    quita el video con la papelera de abajo. */}
+                                {!esVideoArchivo(prod.videoUrl) && (
+                                    <>
+                                        <input
+                                            className="ds-field"
+                                            value={prod.videoUrl}
+                                            onChange={e => set('videoUrl', e.target.value)}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                            style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
+                                        />
+                                        {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
+                                                No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                        </div>
+                                    </>
                                 )}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                </div>
                                 <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.

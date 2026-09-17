@@ -465,10 +465,15 @@ export default function ProductoDetalle() {
                       <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} />
                     </button>
                   ))}
-                  {/* Miniatura del video — siempre la última, un cuadro
-                      oscuro con un ícono de play (no hay miniatura propia:
-                      YouTube/Vimeo la tienen adentro del reproductor, y un
-                      archivo directo no trae ninguna). */}
+                  {/* Miniatura del video — siempre la última. Un archivo
+                      directo (R2) sí tiene de dónde sacar una miniatura real
+                      (el primer frame, mismo truco que VideoUploader.tsx:
+                      seek a 0.1s en onLoadedMetadata porque algunos
+                      navegadores dejan el cuadro en negro hasta reproducir);
+                      YouTube/Vimeo quedan con el cuadro oscuro + ícono de
+                      play, no traen una miniatura propia sin pegarle a su
+                      API. El ícono de play se muestra siempre encima, para
+                      que se note que es un video y no una foto más. */}
                   {videoEmbed && (
                     <button
                       className="ds-hover"
@@ -478,10 +483,20 @@ export default function ProductoDetalle() {
                         width: 76, height: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
                         border: `2px solid ${esSlideVideo ? 'var(--color-primary)' : 'var(--color-border)'}`,
                         background: '#0F172A', transition: 'border-color 150ms',
-                        display: 'grid', placeItems: 'center', flexShrink: 0,
+                        display: 'grid', placeItems: 'center', flexShrink: 0, position: 'relative',
                       }}
                     >
-                      <Play size={22} color="#fff" fill="#fff" strokeWidth={0} />
+                      {videoEmbed.tipo === 'file' && (
+                        <video
+                          src={videoEmbed.src}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          onLoadedMetadata={e => { const v = e.currentTarget; try { v.currentTime = Math.min(0.1, v.duration || 0) } catch { /* noop */ } }}
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      )}
+                      <Play size={22} color="#fff" fill="#fff" strokeWidth={0} style={{ position: 'relative', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
                     </button>
                   )}
                 </div>

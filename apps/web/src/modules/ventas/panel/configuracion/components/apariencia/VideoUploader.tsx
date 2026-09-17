@@ -22,16 +22,22 @@ interface VideoUploaderProps {
     maxMB?: number
 }
 
+// Distingue "hay un archivo subido" de "hay un link de YouTube/Vimeo pegado"
+// — MISMA regla que parseVideoEmbed, así el estado de este control coincide
+// siempre con lo que el storefront va a dibujar. Exportada para que
+// Apariencia.tsx/ProductoNuevo.tsx puedan ocultar el input de link cuando ya
+// hay un archivo subido (no tiene sentido editar un link que no se usa).
+export function esVideoArchivo(url: string): boolean {
+    return /\.(mp4|webm|ogg|mov)(\?\S*)?$/i.test(url)
+}
+
 export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [subiendo, setSubiendo] = useState(false)
     const [error, setError] = useState('')
     const [drag, setDrag] = useState(false)
 
-    // Distingue "hay un archivo subido" de "hay un link de YouTube/Vimeo
-    // pegado" — MISMA regla que parseVideoEmbed, así el estado de este
-    // control coincide siempre con lo que el storefront va a dibujar.
-    const esArchivo = /\.(mp4|webm|ogg|mov)(\?\S*)?$/i.test(value)
+    const esArchivo = esVideoArchivo(value)
 
     async function handle(file: File | undefined | null) {
         if (!file || subiendo) return
@@ -63,9 +69,25 @@ export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUp
                     cursor: subiendo ? 'default' : 'pointer',
                 }}
             >
-                {subiendo
-                    ? <Loader2 size={18} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite', flexShrink: 0 }} />
-                    : <FileVideo size={18} color="var(--color-muted)" style={{ flexShrink: 0 }} />}
+                {subiendo ? (
+                    <Loader2 size={18} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite', flexShrink: 0 }} />
+                ) : esArchivo ? (
+                    // Miniatura real del video (primer frame) en vez del ícono
+                    // genérico — sin controles ni autoplay, solo para reconocer
+                    // de un vistazo cuál archivo quedó subido. El seek a 0.1s en
+                    // onLoadedMetadata es necesario: sin él, algunos navegadores
+                    // (Firefox) dejan el cuadro en negro hasta que se reproduce.
+                    <video
+                        src={value}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        onLoadedMetadata={e => { const v = e.currentTarget; try { v.currentTime = Math.min(0.1, v.duration || 0) } catch { /* noop */ } }}
+                        style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', flexShrink: 0, background: 'var(--color-border)' }}
+                    />
+                ) : (
+                    <FileVideo size={18} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                )}
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                     {esArchivo ? (
