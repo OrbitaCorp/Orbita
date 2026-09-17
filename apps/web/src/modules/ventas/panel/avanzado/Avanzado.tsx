@@ -94,6 +94,13 @@ const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-
 // para que un salto de línea de más no la deje corta.
 const ALTURA_MIN_TARJETA = 372
 
+// Un solo ancho para todo lo que se apila en esta pantalla. El aviso de
+// "Todavía no tenés el paquete" cortaba en 820 mientras la grilla llegaba a
+// 1080: el borde derecho del aviso quedaba a mitad de la tercera columna y se
+// leía como un error de alineación. Compartiendo la constante no se pueden
+// volver a desincronizar.
+const ANCHO_CONTENIDO = 1080
+
 export default function Avanzado() {
     const router = useRouter()
     const [advanced, setAdvanced] = useState(false)
@@ -173,13 +180,13 @@ export default function Avanzado() {
             </div>
 
             {errorCarga && (
-                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, maxWidth: 820, fontSize: 13, color: 'var(--color-error)' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, maxWidth: ANCHO_CONTENIDO, fontSize: 13, color: 'var(--color-error)' }}>
                     {errorCarga}
                 </div>
             )}
 
             {!cargando && !advanced && !errorCarga && (
-                <Card padding="md" style={{ marginBottom: 20, maxWidth: 820, display: 'flex', alignItems: 'center', gap: 16, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)' }}>
+                <Card padding="md" style={{ marginBottom: 20, maxWidth: ANCHO_CONTENIDO, display: 'flex', alignItems: 'center', gap: 16, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)' }}>
                     <Crown size={22} strokeWidth={1.8} color="var(--color-primary)" style={{ flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Todavía no tenés el paquete Avanzado</div>
@@ -189,7 +196,7 @@ export default function Avanzado() {
                 </Card>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18, maxWidth: 1080, alignItems: 'stretch' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18, maxWidth: ANCHO_CONTENIDO, alignItems: 'stretch' }}>
                 {cargando ? (
                     Array.from({ length: 4 }).map((_, i) => (
                         <Card key={i} padding="md">
