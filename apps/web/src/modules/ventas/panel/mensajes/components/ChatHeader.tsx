@@ -7,6 +7,7 @@ interface Props {
   cv:         Conversacion
   pedidos:    PedidoResumen[]
   onPerfil:   (customerId: string) => void
+  onPedido:   (orderId: string) => void
   onArchivar: () => void
 }
 
@@ -21,7 +22,7 @@ const btnOutline: React.CSSProperties = {
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
 
-export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
+export function ChatHeader({ cv, pedidos, onPerfil, onPedido, onArchivar }: Props) {
   const visibles = pedidos.slice(0, 3)
   const extras   = pedidos.length - 3
 
@@ -51,6 +52,7 @@ export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
               <button
                 key={p.id}
                 title={`Pedido #${p.id} · ${p.estado}`}
+                onClick={() => onPedido(p.orderId)}
                 style={{
                   display: 'inline-flex', alignItems: 'center',
                   height: 20, padding: '0 8px', borderRadius: 6,

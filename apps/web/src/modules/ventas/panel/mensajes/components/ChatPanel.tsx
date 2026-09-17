@@ -9,6 +9,7 @@ interface Props {
   cv:              Conversacion | null
   onToast:         (m: string) => void
   onPerfil:        (customerId: string) => void
+  onPedido:        (orderId: string) => void
   onArchivar:      (id: string) => void
   plantillas:      Plantilla[]
   onIrAPlantillas: () => void
@@ -28,38 +29,47 @@ const ESTADO_LABEL: Record<string, string> = {
 // cambiar a otra.
 const POLL_MS = 2500
 
-/** Renderiza texto con chips inline para patrones #XXXX */
-function BurbujaTxt({ txt, me }: { txt: string; me: boolean }) {
+/**
+ * Renderiza texto con chips inline para patrones #XXXX. Antes el chip era
+ * puro adorno — `cursor: pointer` y `title="Ver pedido"` prometiendo un click
+ * que no hacía nada. `#XXXX` es el NÚMERO del pedido, no su id real (`GET
+ * /orders/:id` busca por id) — hace falta resolverlo contra `pedidos`, que es
+ * lo único que trae los dos juntos. Si el número mencionado no es de un
+ * pedido de este cliente (mensaje viejo, typeo), no pasa nada al click en vez
+ * de mandar a un id que no existe.
+ */
+function BurbujaTxt({ txt, me, pedidos, onPedido }: { txt: string; me: boolean; pedidos: PedidoResumen[]; onPedido: (orderId: string) => void }) {
   const partes = txt.split(/(#\d+)/g)
   return (
     <>
-      {partes.map((p, i) =>
-        /^#\d+$/.test(p) ? (
+      {partes.map((p, i) => {
+        if (!/^#\d+$/.test(p)) return <span key={i}>{p}</span>
+        const pedido = pedidos.find((x) => x.id === p.slice(1))
+        return (
           <span
             key={i}
             title="Ver pedido"
+            onClick={pedido ? () => onPedido(pedido.orderId) : undefined}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '1px 7px', borderRadius: 9999,
               background: me ? 'rgba(255,255,255,.22)' : 'var(--color-primary-bg)',
               color: me ? '#fff' : 'var(--color-primary)',
               fontSize: 12, fontWeight: 700, fontFamily: MONO,
-              cursor: 'pointer', verticalAlign: 'middle',
+              cursor: pedido ? 'pointer' : 'default', verticalAlign: 'middle',
               border: me ? '1px solid rgba(255,255,255,.3)' : '1px solid var(--color-primary)',
             }}
           >
             <Package size={9} />
             {p}
           </span>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
-      )}
+        )
+      })}
     </>
   )
 }
 
-export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrAPlantillas }: Props) {
+export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantillas, onIrAPlantillas }: Props) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([])
   const [pedidos, setPedidos] = useState<PedidoResumen[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -96,6 +106,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
       if (cancelado) return
       setPedidos(c.orders.map(o => ({
         id: String(o.orderNumber),
+        orderId: o.id,
         fecha: new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         estado: ESTADO_LABEL[o.status] ?? o.status,
         total: o.total,
@@ -141,6 +152,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
         cv={cv}
         pedidos={pedidos}
         onPerfil={onPerfil}
+        onPedido={onPedido}
         onArchivar={() => onArchivar(cv.id)}
       />
 
@@ -170,7 +182,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
                 borderBottomRightRadius: me ? 4 : 12,
                 borderBottomLeftRadius: me ? 12 : 4,
               }}>
-                <BurbujaTxt txt={m.text} me={me} />
+                <BurbujaTxt txt={m.text} me={me} pedidos={pedidos} onPedido={onPedido} />
               </div>
               <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>
                 {hora}
