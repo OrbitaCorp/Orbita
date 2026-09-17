@@ -18,6 +18,7 @@ import { PauseBusinessDto } from './dto/pause-business.dto';
 import { AllowWhenPaused } from '../common/decorators/allow-when-paused.decorator';
 import { ChangeModeDto } from './dto/change-mode.dto';
 import { UpdateTutorialDto } from './dto/update-tutorial.dto';
+import { PresignVideoUploadDto } from './dto/presign-video-upload.dto';
 
 @Controller('business')
 export class BusinessesController {
@@ -133,6 +134,17 @@ export class BusinessesController {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
     return this.businessesService.uploadStorefrontVideo(member.businessId, file);
+  }
+
+  // Subida directa a R2 desde el navegador (ver R2Service.presignUpload y el
+  // comentario de uploadStorefrontVideo de arriba sobre por qué el camino de
+  // multer tiene un tope de 40 MB). Mismos roles que el endpoint de arriba:
+  // esto reemplaza a esa subida, no es un permiso nuevo.
+  @Post('storefront-config/video-upload-url')
+  @Roles('owner', 'admin')
+  presignStorefrontVideo(@CurrentBusiness() ctx: AuthContext, @Body() dto: PresignVideoUploadDto) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.presignStorefrontVideo(member.businessId, dto.mimetype);
   }
 
   @Get('notification-config')

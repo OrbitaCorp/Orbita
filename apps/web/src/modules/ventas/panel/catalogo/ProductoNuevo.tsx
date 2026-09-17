@@ -25,7 +25,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
-    panelUploadProductVideo,
+    panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
@@ -229,11 +229,12 @@ function abreviarValorOpcion(valor: string) {
 }
 
 // Alternativa a pegar un link en "Video del producto" — mismo criterio que
-// subirVideoApariencia() en Apariencia.tsx, pero sin productId: puede subirse
-// antes de que el producto exista (mismo momento del wizard que las fotos).
+// subirVideoApariencia() en Apariencia.tsx: sube directo a Cloudflare R2
+// desde el navegador (ver panelPresignProductVideo en lib/api.ts), sin pasar
+// por este backend. Sin productId: puede subirse antes de que el producto
+// exista (mismo momento del wizard que las fotos).
 async function subirVideoProducto(file: File): Promise<string> {
-    const { url } = await panelUploadProductVideo(file, file.name)
-    return url
+    return panelPresignProductVideo(file)
 }
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
@@ -1398,7 +1399,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
                                     <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
                                 </div>
-                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} />
+                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
                                 </div>

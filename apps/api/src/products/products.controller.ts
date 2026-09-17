@@ -32,6 +32,7 @@ import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
+import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
 
 // Cada ayuda de IA es una llamada paga al modelo, y solo tenía el throttle de
 // 20 por minuto: sin tope por día (auditoría interna 10/09, ítem trans.gasto-ia).
@@ -61,6 +62,17 @@ export class ProductsController {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
     return this.businessesService.uploadStorefrontVideo(member.businessId, file);
+  }
+
+  // Subida directa a R2 desde el navegador — ver el comentario de
+  // presignStorefrontVideo en businesses.controller.ts (mismo mecanismo,
+  // reusado acá con el permiso de catálogo en vez de owner/admin, igual que
+  // el endpoint de arriba respecto al suyo).
+  @Post('video-upload-url')
+  @RequirePermission('catalog.manage')
+  presignVideo(@CurrentBusiness() ctx: AuthContext, @Body() dto: PresignVideoUploadDto) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.presignStorefrontVideo(member.businessId, dto.mimetype);
   }
 
   // Antes de ':id' — no es un id real, pero evita cualquier ambigüedad de ruta.
