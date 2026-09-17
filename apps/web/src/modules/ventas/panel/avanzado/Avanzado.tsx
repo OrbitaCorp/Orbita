@@ -35,6 +35,7 @@ import PromoModalConfig from './PromoModalConfig'
 import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
+import { ModalQueIncluye, type FeatureKey } from './queIncluye'
 import { Toggle } from '../configuracion/components/ConfigControls'
 import { useCountdownSettings, useSetCountdownEnabled } from '../descuentos/hooks/useCountdownSettings'
 import { fmtFechaHora } from '../descuentos/utils'
@@ -42,37 +43,37 @@ import { useAhora } from '@/hooks/useAhora'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
-// `accent` — un color propio por feature (en vez del gris uniforme de
-// antes) para que la grilla se lea de un vistazo, mismo criterio que otras
-// grillas de "tarjetas de función" ya usadas en el diseño del panel.
-interface Feature { key: string; label: string; desc: string; Icon: IconType; accent: string }
+// Sin color propio por tarjeta a propósito: seis acentos distintos en una
+// misma grilla no jerarquizan nada, y el panel se mira todos los días. El
+// ícono va en gris y el azul queda reservado para lo que se puede clickear.
+interface Feature { key: FeatureKey; label: string; desc: string; Icon: IconType }
 
 const FEATURES: Feature[] = [
     {
-        key: 'juegos', label: 'Juegos con premio', Icon: Trophy, accent: '#7C3AED',
+        key: 'juegos', label: 'Juegos con premio', Icon: Trophy,
         desc: 'Mini-juegos de habilidad (encestar, meter un gol, etc.): vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin tocar el módulo de Descuentos.',
     },
     {
-        key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText, accent: '#2563EB',
+        key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText,
         desc: 'Bienvenida con descuento y anuncios que aparecen en el momento justo del storefront.',
     },
     {
-        key: 'dos-por-uno', label: '2x1 y 3x2', Icon: Tag, accent: '#DC2626',
+        key: 'dos-por-uno', label: '2x1 y 3x2', Icon: Tag,
         desc: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito — sin código — y muestra un cartel en la card del producto.',
     },
     {
-        key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate, accent: '#DB2777',
+        key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate,
         desc: 'Diseños alternativos solo para la portada de tu tienda. El resto del storefront (catálogo, checkout, perfil) queda igual.',
     },
     {
-        key: 'prueba-social', label: 'Prueba social', Icon: ShoppingBag, accent: '#059669',
+        key: 'prueba-social', label: 'Prueba social', Icon: ShoppingBag,
         desc: 'Notificaciones tipo "Fulano compró tal producto" armadas con pedidos reales de tu tienda — nunca con datos inventados.',
     },
     {
         // La única tarjeta sin pantalla propia: acá solo se prende o apaga
         // (ver TarjetaOfertaRelampago). La oferta se crea y configura en
         // Descuentos como un tipo más, igual que "% Producto".
-        key: 'oferta-relampago', label: 'Oferta relámpago', Icon: Timer, accent: '#D97706',
+        key: 'oferta-relampago', label: 'Oferta relámpago', Icon: Timer,
         desc: 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta. Lo armás en Descuentos, como cualquier otro descuento.',
     },
 ]
@@ -99,6 +100,10 @@ export default function Avanzado() {
     const [cargando, setCargando] = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
     const [proximamente, setProximamente] = useState<Feature | null>(null)
+    // La ficha "qué incluye" de una función, para quien todavía no tiene el
+    // paquete: antes el botón de la tarjeta bloqueada iba derecho a la
+    // pantalla de precios, sin explicar nunca qué hacía esa función.
+    const [detalle, setDetalle] = useState<Feature | null>(null)
 
     useEffect(() => {
         let cancelado = false
@@ -205,12 +210,7 @@ export default function Avanzado() {
                             style={{ position: 'relative', overflow: 'hidden', height: '100%', minHeight: ALTURA_MIN_TARJETA, display: 'flex', flexDirection: 'column' }}
                         >
                             <div style={{ opacity: advanced ? 1 : 0.4, filter: advanced ? 'none' : 'blur(2px)', transition: 'opacity 160ms, filter 160ms', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                <div style={{
-                                    width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center',
-                                    background: `color-mix(in srgb, ${f.accent} 14%, transparent)`,
-                                }}>
-                                    <f.Icon size={19} strokeWidth={1.8} color={f.accent} />
-                                </div>
+                                <f.Icon size={20} strokeWidth={1.7} color="var(--color-muted)" />
                                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginTop: 14, letterSpacing: '-0.01em' }}>{f.label}</div>
                                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 5, lineHeight: 1.55, flex: 1 }}>{f.desc}</div>
 
@@ -241,7 +241,7 @@ export default function Avanzado() {
                                     <div style={{ width: 38, height: 38, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-surface)', boxShadow: 'var(--shadow-card-hover)', border: '1px solid var(--color-border)' }}>
                                         <Lock size={16} strokeWidth={1.8} color="var(--color-muted)" />
                                     </div>
-                                    <Button variant="primary" size="sm" icon={<ArrowRight size={14} strokeWidth={2} />} onClick={irASuscripcion}>
+                                    <Button variant="primary" size="sm" icon={<ArrowRight size={14} strokeWidth={2} />} onClick={() => setDetalle(f)}>
                                         Ver qué incluye
                                     </Button>
                                 </div>
@@ -250,6 +250,15 @@ export default function Avanzado() {
                     ))
                 )}
             </div>
+
+            {detalle && (
+                <ModalQueIncluye
+                    featureKey={detalle.key}
+                    label={detalle.label}
+                    onClose={() => setDetalle(null)}
+                    onActivar={irASuscripcion}
+                />
+            )}
 
             {proximamente && (
                 <Modal isOpen onClose={() => setProximamente(null)} title={proximamente.label}>
