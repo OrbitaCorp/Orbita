@@ -39,7 +39,12 @@ const CATEGORIAS = [
 const TIENDA_SUBRUBROS = [
   // 'detodo' va primero a pedido: es la opción "no encaja en ninguna de las
   // otras", y quien vende de todo un poco no debería tener que escanear las
-  // 21 tarjetas restantes para encontrarla al final.
+  // demás tarjetas para encontrarla al final.
+  //
+  // La `key` es la que usa el alta de producto para sugerir variantes y
+  // especificaciones (ver PRESETS en apps/web/src/modules/ventas/panel/
+  // catalogo/presetsVariantes.ts): un subrubro nuevo acá necesita su entrada
+  // allá, o el negocio que lo elija cae a los modelos genéricos.
   { key: 'detodo', icon: 'Store', label: 'De todo un poco', descripcion: 'Tienda variada sin un rubro fijo', tipo: 'simple' },
   { key: 'indumentaria', icon: 'Shirt', label: 'Indumentaria', descripcion: 'Talles, colores y variantes', tipo: 'variantes' },
   { key: 'calzado', icon: 'Footprints', label: 'Calzado', descripcion: 'Numeración y variantes por talle', tipo: 'variantes' },
@@ -66,6 +71,18 @@ const TIENDA_SUBRUBROS = [
   { key: 'merceria', icon: 'Scissors', label: 'Mercería', descripcion: 'Hilos, telas y variantes de color y medida', tipo: 'variantes' },
   { key: 'pasteleria', icon: 'Cake', label: 'Pastelerías', descripcion: 'Tamaños, sabores y fecha de entrega', tipo: 'variantes' },
   { key: 'insumos', icon: 'Boxes', label: 'Insumos', descripcion: 'Materiales y materias primas variadas, sin rubro fijo', tipo: 'simple' },
+  // Tanda del 2026-09-18: rubros comunes de tienda online que no tenían una
+  // tarjeta propia y caían en "De todo un poco". Las descripciones nombran
+  // solo lo que el alta de producto sugiere de verdad (variantes y ficha
+  // técnica) — nada de "venta por metro" ni "IMEI por unidad", que el
+  // producto todavía no tiene.
+  { key: 'pesca', icon: 'Fish', label: 'Artículos de pesca', descripcion: 'Largo de caña, diámetro de línea y número de anzuelo', tipo: 'variantes' },
+  { key: 'deportes', icon: 'Dumbbell', label: 'Deportes / Fitness', descripcion: 'Talles, pesos y equipamiento', tipo: 'variantes' },
+  { key: 'bebes', icon: 'Baby', label: 'Bebés / Maternidad', descripcion: 'Talles por edad y pañales por tamaño', tipo: 'variantes' },
+  { key: 'alimentos', icon: 'Apple', label: 'Almacén / Dietética', descripcion: 'Peso, sabor y presentación', tipo: 'variantes' },
+  { key: 'celulares', icon: 'Headphones', label: 'Accesorios de celular', descripcion: 'Fundas por modelo, cargadores y conectores', tipo: 'variantes' },
+  { key: 'hogar', icon: 'Lamp', label: 'Hogar / Deco / Bazar', descripcion: 'Medidas de cama, capacidad y colores', tipo: 'variantes' },
+  { key: 'bicicleteria', icon: 'Bike', label: 'Bicicletería', descripcion: 'Rodado, talle de cuadro y repuestos', tipo: 'variantes' },
 ] as const;
 
 const RUBROS = [

@@ -21,7 +21,9 @@ export class UpdateOnboardingBusinessDto {
   @IsOptional() @IsIn(['FULL', 'SHOWCASE']) mode?: 'FULL' | 'SHOWCASE';
 
   // Wizard RBT-293 — pasos posteriores al modelo básico de negocio
-  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(60, { each: true }) subrubros?: string[];
+  // Tope por encima del tamaño del catálogo (hoy 28): con 20 fijos, elegir
+  // más de veinte tarjetas del paso 1 rebotaba el alta con un 400.
+  @IsOptional() @IsArray() @ArrayMaxSize(40) @IsString({ each: true }) @MaxLength(60, { each: true }) subrubros?: string[];
   @IsOptional() @IsIn(['solo', 'mini', 'medio', 'grande']) teamSize?: string;
   @IsOptional() @IsBoolean() operatesPhysical?: boolean;
   @IsOptional() @IsBoolean() operatesOnline?: boolean;

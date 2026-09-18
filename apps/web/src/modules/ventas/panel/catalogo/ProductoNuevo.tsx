@@ -27,9 +27,11 @@ import {
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
     panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
+    panelGetBusiness, getRubrosCatalog,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
+import { presetsDelNegocio, specsDelNegocio, type GrupoPresets, type PresetVariantes } from './presetsVariantes'
 import {
     beginProductCreation, markProductCreated, markImageUploaded,
     markProductCreationFailed, finishProductUpload,
@@ -43,7 +45,23 @@ import { Volver } from '../_shared/Volver'
 // Siempre opt-in — el vendedor lo activa a mano con "activar"/"cambiar",
 // nunca se asume por default aunque haya una sola opción definida (ver
 // `opcionVisual` más abajo).
-interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean }
+// `sugeridos`: los valores que ofrece el modelo de rubro del que salió esta
+// opción (ver presetsVariantes.ts) — se muestran para agregar con un clic los
+// que no estén tildados. Solo vive en el formulario, nunca se guarda.
+interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean; sugeridos?: string[] }
+
+// Un modelo de rubro convertido a las opciones del formulario. Los ids llevan
+// el índice además del timestamp: las opciones de un mismo modelo se crean en
+// el mismo milisegundo y el id tiene que ser único (es la `key` de React).
+function desdePreset(preset: PresetVariantes): TipoVariante[] {
+    const t = Date.now()
+    return preset.opciones.map((o, i) => ({
+        id: `v${t}-${i}`,
+        nombre: o.nombre,
+        opciones: o.pre ?? o.valores,
+        sugeridos: o.valores,
+    }))
+}
 
 // Una fila de la tabla de precio/stock. `id` solo existe si la variante ya está
 // en la base (edición) — el backend lo usa para reconciliar en vez de recrear.
@@ -291,6 +309,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // galería de fotos. false por default: mejor no mostrar el botón un
     // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
     const [avanzado, setAvanzado] = useState(false)
+    // Modelos de variantes y especificaciones sugeridas según lo que el negocio
+    // eligió que vende en el wizard (ver presetsVariantes.ts). Vacíos hasta
+    // que resuelve el negocio — y si falla, el formulario queda como siempre.
+    const [gruposPresets, setGruposPresets] = useState<GrupoPresets[]>([])
+    const [specsSugeridas, setSpecsSugeridas] = useState<string[]>([])
+    // Nombre visible de cada subrubro ("Calzado"), para titular los grupos de
+    // modelos. Sale del mismo catálogo que el wizard, no de una lista aparte.
+    const [nombresRubro, setNombresRubro] = useState<Record<string, string>>({})
+    const [presetAplicado, setPresetAplicado] = useState<string | null>(null)
+    // true = el producto que se está editando ya tiene opciones guardadas.
+    // Ahí no se ofrecen modelos: aplicar uno reemplaza las opciones, y al
+    // guardar se borrarían las variantes que hoy tienen stock cargado.
+    const [opcionesGuardadas, setOpcionesGuardadas] = useState(false)
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
@@ -312,6 +343,63 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         panelGetTags().then(setTagsUsadas).catch(() => setTagsUsadas([]))
         panelGetAddons().then(r => setAvanzado(r.advanced)).catch(() => setAvanzado(false))
     }, [])
+
+    // Qué vende el negocio → qué modelos de variantes y qué especificaciones
+    // ofrecer. Las dos llamadas son independientes: sin el catálogo los grupos
+    // igual se arman, solo pierden el título.
+    useEffect(() => {
+        let vigente = true
+        panelGetBusiness()
+            .then(b => {
+                if (!vigente) return
+                const grupos = presetsDelNegocio(b.subrubros)
+                setGruposPresets(grupos)
+                setSpecsSugeridas(specsDelNegocio(b.subrubros))
+                // Un producto nuevo arranca con el primer modelo del primer
+                // rubro del negocio, en vez del "Talle S/M/L" fijo de antes —
+                // que para una ferretería o una librería no tenía sentido.
+                // Solo si nadie tocó las opciones todavía: la comparación es
+                // por referencia, y cualquier edición crea un array nuevo.
+                const primero = grupos[0]?.variantes[0]
+                if (!editando && primero) {
+                    setProd(p => p.tiposVariante === FORM_INICIAL.tiposVariante ? { ...p, tiposVariante: desdePreset(primero) } : p)
+                    setPresetAplicado(actual => actual ?? primero.id)
+                }
+            })
+            .catch(() => { /* sin negocio, el formulario queda como siempre */ })
+        getRubrosCatalog()
+            .then(({ rubros }) => {
+                if (!vigente) return
+                const tienda = rubros.find(r => r.key === 'tienda')
+                setNombresRubro(Object.fromEntries((tienda?.subrubros ?? []).map(s => [s.key, s.label])))
+            })
+            .catch(() => { /* los grupos se muestran sin título */ })
+        return () => { vigente = false }
+    }, [editando])
+
+    // Aplicar un modelo reemplaza las opciones: es un punto de partida, no
+    // algo que se suma a lo que ya había (un zapato no lleva además talle de
+    // remera). Los valores que no vinieron tildados quedan como sugerencias.
+    const aplicarPreset = (preset: PresetVariantes) => {
+        set('tiposVariante', desdePreset(preset))
+        setPresetAplicado(preset.id)
+    }
+
+    // Las especificaciones sugeridas que todavía no están en el producto. Se
+    // comparan sin mayúsculas: "garantía" y "Garantía" son la misma.
+    const specsPorSugerir = specsSugeridas.filter(
+        l => !prod.specs.some(s => s.label.trim().toLowerCase() === l.toLowerCase()),
+    )
+
+    // Suma una especificación sugerida con su etiqueta ya puesta. Si había
+    // renglones vacíos (el que se agrega solo al prender la sección), se
+    // descartan: si no, quedaba uno en blanco arriba de la sugerida.
+    const agregarSpecSugerida = (label: string) => {
+        setProd(p => ({
+            ...p,
+            specs: [...p.specs.filter(s => s.label.trim() || s.value.trim()), { label, value: '' }],
+        }))
+    }
 
     const agregarTag = (nombre: string) => {
         const limpio = nombre.trim()
@@ -335,6 +423,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             .then((p: ApiProductFull) => {
                 if (!vigente) return
                 const conVariantes = p.options.length > 0
+                setOpcionesGuardadas(conVariantes)
                 setProd({
                     nombre: p.name,
                     descripcion: p.description ?? '',
@@ -1282,6 +1371,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 {orbiSpecsGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
                                             </button>
                                         </div>
+                                        {/* Lo que suele llevar la ficha en los rubros del
+                                            negocio (autor e ISBN en una librería, garantía
+                                            en electrónica). Suma el renglón con la etiqueta
+                                            puesta; un renglón sin valor no se guarda. */}
+                                        {specsPorSugerir.length > 0 && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                                                <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Suelen llevar:</span>
+                                                {specsPorSugerir.map(l => (
+                                                    <button key={l} className="ds-hover" onClick={() => agregarSpecSugerida(l)} style={chipSugerido}>
+                                                        + {l}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1316,6 +1419,50 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {prod.tieneVariantes && (
                                 <div style={{ marginTop: 16 }}>
+                                    {/* Modelos según lo que el negocio vende. Con varios
+                                        rubros (ropa + calzado) se ofrecen separados:
+                                        un producto es UNA de esas cosas, así que se
+                                        elige desde cuál arrancar — nunca se mezclan. */}
+                                    {!opcionesGuardadas && gruposPresets.length > 0 && (
+                                        <div style={{ marginBottom: 16 }}>
+                                            <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-body)', marginBottom: 8 }}>
+                                                Empezá desde un modelo
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                {gruposPresets.map(g => (
+                                                    <div key={g.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                        {gruposPresets.length > 1 && (
+                                                            <span style={{ fontSize: 11.5, color: 'var(--color-muted)', minWidth: 96 }}>
+                                                                {nombresRubro[g.key] ?? g.key}
+                                                            </span>
+                                                        )}
+                                                        {g.variantes.map(pr => {
+                                                            const activo = presetAplicado === pr.id
+                                                            return (
+                                                                <button
+                                                                    key={pr.id}
+                                                                    className="ds-hover"
+                                                                    onClick={() => aplicarPreset(pr)}
+                                                                    aria-pressed={activo}
+                                                                    title={pr.opciones.map(o => o.nombre).join(' · ')}
+                                                                    style={{
+                                                                        height: 28, padding: '0 11px', borderRadius: 9999,
+                                                                        border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                        background: 'transparent',
+                                                                        color: activo ? 'var(--color-primary)' : 'var(--color-body)',
+                                                                        fontSize: 12, fontWeight: activo ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {pr.nombre}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {prod.tiposVariante.map((tp, ti) => (
                                         <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -1338,6 +1485,33 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 ))}
                                                 <OpInput tipo={tp.nombre} onAdd={v => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: [...new Set([...x.opciones, v])] } : x))} />
                                             </div>
+                                            {/* Los valores del modelo que no vinieron tildados
+                                                (o que se sacaron): a un clic, sin tipearlos. Se
+                                                agregan en el orden del modelo, no al final, así
+                                                la tabla de combinaciones queda S, M, L y no
+                                                S, L, M. */}
+                                            {(() => {
+                                                const restantes = (tp.sugeridos ?? []).filter(v => !tp.opciones.includes(v))
+                                                if (restantes.length === 0) return null
+                                                const conOrden = (nuevas: string[]) => (tp.sugeridos ?? []).filter(v => nuevas.includes(v))
+                                                    .concat(nuevas.filter(v => !(tp.sugeridos ?? []).includes(v)))
+                                                const agregar = (vals: string[]) => set('tiposVariante', prod.tiposVariante.map((x, j) =>
+                                                    j === ti ? { ...x, opciones: conOrden([...x.opciones, ...vals]) } : x))
+                                                return (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 10 }}>
+                                                        {restantes.map(v => (
+                                                            <button key={v} className="ds-hover" onClick={() => agregar([v])} style={chipSugerido}>
+                                                                + {v}
+                                                            </button>
+                                                        ))}
+                                                        {restantes.length > 1 && (
+                                                            <button className="ds-link" onClick={() => agregar(restantes)} style={{ background: 'none', border: 'none', padding: '0 4px', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                                                Agregar todos
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
                                         </div>
                                     ))}
                                     {prod.tiposVariante.length < 3 && (
@@ -2374,4 +2548,7 @@ const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, b
 const celda: React.CSSProperties = { ...inputBase, height: 28, padding: '0 8px', fontSize: 11, fontFamily: '"Geist Mono", monospace', width: '100%' }
 const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500 }
 const chipX: React.CSSProperties = { background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-primary)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }
+// Algo sugerido que todavía no está puesto — mismo borde punteado que las
+// etiquetas "Ya usaste" del paso 1, así se lee igual en todo el formulario.
+const chipSugerido: React.CSSProperties = { height: 24, padding: '0 9px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 11.5, fontFamily: 'inherit', cursor: 'pointer' }
 const btnSobreImg: React.CSSProperties = { position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 5, border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }

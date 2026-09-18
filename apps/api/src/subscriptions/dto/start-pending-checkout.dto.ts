@@ -26,7 +26,8 @@ import { EsSubdominio } from '../../common/utils/subdominio';
 // guarda tal cual en pending_signups hasta 48 h.
 export class PendingWizardDto {
   @IsOptional() @IsString() @MaxLength(80) rubro?: string;
-  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(80, { each: true }) subrubros?: string[];
+  // Mismo tope que UpdateOnboardingBusinessDto: por encima del catálogo.
+  @IsOptional() @IsArray() @ArrayMaxSize(40) @IsString({ each: true }) @MaxLength(80, { each: true }) subrubros?: string[];
   @IsOptional() @IsString() @MaxLength(2000) descripcion?: string;
   @IsOptional() @IsString() @MaxLength(40) telefono?: string;
 
