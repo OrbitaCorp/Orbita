@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { esPreview } from '@/lib/storefront/previewBridge'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
 // se ven salen del catálogo del negocio, de sus categorías, o de una sección
 // editable cuyo `porDefecto` vive en secciones.ts.
@@ -81,8 +82,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // son ramas de ESTE componente y un hook adentro de un `if` no es válido.
   const [iHero, setIHero] = useState(0)
   const nSlides = p.slides.length
+  // Quieto en la vista previa del panel (ver HeroCarousel en Inicio.tsx).
   useEffect(() => {
-    if (nSlides < 2) return
+    if (nSlides < 2 || esPreview()) return
     const id = setInterval(() => setIHero((v) => (v + 1) % nSlides), 5200)
     return () => clearInterval(id)
   }, [nSlides])

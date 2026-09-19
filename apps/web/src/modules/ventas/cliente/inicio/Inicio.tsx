@@ -21,7 +21,7 @@ import {
     toTiendaConfig, toCategoria, toProducto,
     type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type StorefrontBrandItem, type ActiveGame, type ActivePromoModal,
 } from '@/lib/storefront/api'
-import { conOverrides, usarOverridesPreview } from '@/lib/storefront/previewBridge'
+import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
@@ -1191,8 +1191,10 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     const [paused, setPaused] = useState(false)
     const n = slides.length
 
+    // En la vista previa del panel no rota: el dueño está editando un slide y
+    // que se le vaya a otro a los pocos segundos no deja ver el cambio.
     useEffect(() => {
-        if (paused || n <= 1) return
+        if (paused || n <= 1 || esPreview()) return
         const id = setInterval(() => setIdx(i => (i + 1) % n), 4000)
         return () => clearInterval(id)
     }, [paused, n])

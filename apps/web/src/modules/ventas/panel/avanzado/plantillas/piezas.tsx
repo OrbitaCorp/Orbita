@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { esPreview } from '@/lib/storefront/previewBridge'
 import { User, ShoppingBag } from 'lucide-react'
 import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
@@ -478,8 +479,9 @@ export function HeaderLateral({ t, marca, links, conBuscador, movil, acciones }:
 // intervalo (no tiene a dónde ir) y los dots no se dibujan.
 export function Carrusel({ t, slides, movil, alto }: { t: Tema; slides: Slide[]; movil?: boolean; alto: number }) {
   const [i, setI] = useState(0)
+  // Quieto en la vista previa del panel (ver HeroCarousel en Inicio.tsx).
   useEffect(() => {
-    if (slides.length < 2) return
+    if (slides.length < 2 || esPreview()) return
     const id = setInterval(() => setI((v) => (v + 1) % slides.length), 4200)
     return () => clearInterval(id)
   }, [slides.length])
