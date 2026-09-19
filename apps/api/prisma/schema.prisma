@@ -357,6 +357,16 @@ model StorefrontConfig {
   // hasta que el dueño pegue un link y la prenda). Va después del parallax
   // y antes del pie — pedido explícito del dueño.
   showVideo             Boolean @default(false) @map("show_video")
+  // Los cuatro estantes de productos del home clásico, cada uno con su
+  // interruptor (Ale, 19/09). true por default: son los que ya se veían.
+  // Cada uno muestra lo que dice su nombre (ver Inicio.tsx): destacados =
+  // isFeatured; nuevos = lo último cargado; recomendados = con reseñas o en
+  // oferta (sort 'recommended'); top ventas = con al menos una venta
+  // (sort 'bestselling' + soldOnly).
+  showFeaturedSection    Boolean @default(true) @map("show_featured_section")
+  showNewArrivalsSection Boolean @default(true) @map("show_new_arrivals_section")
+  showRecommendedSection Boolean @default(true) @map("show_recommended_section")
+  showBestSellersSection Boolean @default(true) @map("show_best_sellers_section")
 
   // Textos configurables de la tienda
   shippingText     String? @map("shipping_text") // también es el texto del banner debajo del header

@@ -157,6 +157,26 @@ export const AYUDA_OPCIONES: Partial<Record<keyof Apariencia, Ayuda>> = {
         donde: 'En el inicio, entre el hero y los productos.',
         afecta: 'Es el atajo para quien todavía no sabe qué quiere. Cómo se ve (pastillas, mosaico, tarjetas…) se elige en "Diseño y layout". Apagado, tus categorías se siguen pudiendo navegar desde el header y el catálogo.',
     },
+    mostrarDestacados: {
+        que: 'Una fila con los productos que marcaste como destacados en el catálogo.',
+        donde: 'En el inicio, debajo de las categorías.',
+        afecta: 'Se marcan con la estrella "Destacado" de cada producto. Sin ninguno marcado, la fila no aparece aunque esto esté prendido.',
+    },
+    mostrarNuevos: {
+        que: 'Una fila con lo último que cargaste al catálogo.',
+        donde: 'En el inicio, después de los destacados.',
+        afecta: 'Se actualiza sola: cada producto nuevo que publicás entra primero.',
+    },
+    mostrarRecomendados: {
+        que: 'Una fila con los productos que tus clientes reseñaron y los que están en oferta. Primero van los que tienen más opiniones.',
+        donde: 'En el inicio, después de los nuevos ingresos.',
+        afecta: 'Se arma sola con reseñas y ofertas reales. Sin productos reseñados ni en oferta, la fila no aparece.',
+    },
+    mostrarTopVentas: {
+        que: 'Una fila con tus productos más vendidos, según las unidades vendidas de verdad.',
+        donde: 'En el inicio, después de los recomendados.',
+        afecta: 'Solo entran productos que se vendieron al menos una vez. Si todavía no tenés ventas, la fila no aparece.',
+    },
     mostrarBannerEnvio: {
         que: 'La franja finita de color con un aviso corto — "Envío gratis a partir de $50.000", por ejemplo.',
         donde: 'Arriba del header, en el borde de arriba de todas las páginas.',

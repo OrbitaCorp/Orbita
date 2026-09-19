@@ -20,7 +20,7 @@ import { openWpp, columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/uti
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
-    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type StorefrontBrandItem, type ActiveGame, type ActivePromoModal,
+    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type StorefrontBrandItem, type StorefrontProductItem, type ActiveGame, type ActivePromoModal,
 } from '@/lib/storefront/api'
 import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
@@ -91,6 +91,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
     const [productos, setProductos] = useState<Producto[]>([])
     const [destacados, setDestacados] = useState<Producto[]>([])
+    // Estantes que piden un orden propio al backend (ver el efecto de abajo).
+    // Crudos: se pasan por toProducto al dibujar, con los badges del config
+    // (que puede llegar después que estos).
+    const [recomendados, setRecomendados] = useState<StorefrontProductItem[]>([])
+    const [topVentas, setTopVentas] = useState<StorefrontProductItem[]>([])
     const [juegosActivos, setJuegosActivos] = useState<ActiveGame[]>([])
     const [modalJuego, setModalJuego] = useState(false)
     // Cuál de los juegos elegibles se está mostrando adentro del modal — solo
@@ -126,6 +131,23 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             setDestacados(feat.data.map(p => toProducto(p, badges)))
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
+        return () => { cancelado = true }
+    }, [slug])
+
+    // "Recomendados" y "Top ventas" aparte del Promise.all de arriba: si
+    // alguno falla (o la API todavía no conoce el orden 'recommended', en la
+    // ventana entre el deploy del frontend y el de la API), ese estante no
+    // aparece y el resto del home carga igual. Los badges se toman del config
+    // al dibujar (ver `estanteRecomendados` más abajo).
+    useEffect(() => {
+        if (!slug) return
+        let cancelado = false
+        getStorefrontProducts(slug, { sort: 'recommended', limit: 8 })
+            .then(r => { if (!cancelado) setRecomendados(r.data) })
+            .catch(() => { /* sin estante */ })
+        getStorefrontProducts(slug, { sort: 'bestselling', soldOnly: true, limit: 8 })
+            .then(r => { if (!cancelado) setTopVentas(r.data) })
+            .catch(() => { /* sin estante */ })
         return () => { cancelado = true }
     }, [slug])
 
@@ -286,13 +308,23 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // así que se mantiene el corte de a 4 de siempre.
     const porEstante = gridLayoutCfg === '3col' ? 3 : 4
 
-    // Mismo criterio de "estantes" que tenía el mock (slices de una misma
-    // lista) pero ahora sobre productos reales, ya ordenados por más nuevo
-    // primero (así "nuevos ingresos" es directamente la primera tanda).
+    // ── Estantes de productos ──
+    // Cuatro, cada uno con su interruptor en Apariencia y cada uno con lo que
+    // dice su nombre (Ale, 19/09 — antes "Más vendidos", "Lanzamientos" y
+    // "Más para vos" eran tandas de la misma lista de lo más nuevo):
+    //   - Destacados:      los marcados con la estrella (isFeatured).
+    //   - Nuevos ingresos: lo último cargado (`productos` ya viene así).
+    //   - Recomendados:    con reseñas o en oferta (sort 'recommended').
+    //   - Top ventas:      con al menos una venta, por unidades vendidas.
+    const ap = config?.appearance
     const nuevosIngresos = productos.slice(0, porEstante)
-    const masVendidos     = productos.slice(porEstante, porEstante * 2)
-    const lanzamientos    = productos.slice(porEstante * 2, porEstante * 3)
-    const masParaVos      = productos.slice(porEstante * 3, porEstante * 4)
+    const badgesEstante = { showNew: ap?.showNewBadge, showOffer: ap?.showOfferBadge, showLowStock: ap?.showLowStock }
+    const estanteRecomendados = recomendados.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
+    const estanteTopVentas = topVentas.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
+    // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
+    // (la segunda tanda de lo más nuevo): sus filas se configuran en la
+    // pestaña Secciones de cada plantilla, no con estos interruptores.
+    const masVendidos = productos.slice(porEstante, porEstante * 2)
 
     // ── Plantilla de Home (paquete Avanzado) ────────────────────────────────
     // Sin plantilla elegida (`homeTemplate` null) todo lo de abajo queda igual
@@ -743,27 +775,32 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 />
             )}
 
-            {/* ══ DESTACADOS ══ */}
-            {destacados.length > 0 && (
+            {/* ══ ESTANTES ══ — ver "Estantes de productos" arriba. */}
+            {(ap?.showFeaturedSection ?? true) && destacados.length > 0 && (
                 <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={destacados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
-            {/* ══ NUEVOS INGRESOS ══ */}
-            {nuevosIngresos.length > 0 && (
+            {(ap?.showNewArrivalsSection ?? true) && nuevosIngresos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
                     <EstanteProductos productos={nuevosIngresos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
-            {/* ══ MÁS VENDIDOS ══ */}
-            {masVendidos.length > 0 && (
+            {(ap?.showRecommendedSection ?? true) && estanteRecomendados.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
-                    <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
-                    <EstanteProductos productos={masVendidos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
+                    <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Recomendados para vos" onVer={() => go('/catalogo')} />
+                    <EstanteProductos productos={estanteRecomendados} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
+                </section>
+            )}
+
+            {(ap?.showBestSellersSection ?? true) && estanteTopVentas.length > 0 && (
+                <section className="sf-w" style={{ paddingBottom: 36 }}>
+                    <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo?sort=bestselling')} />
+                    <EstanteProductos productos={estanteTopVentas} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 
@@ -791,22 +828,6 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             </button>
                         </div>
                     </div>
-                </section>
-            )}
-
-            {/* ══ LANZAMIENTOS ══ */}
-            {lanzamientos.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 36 }}>
-                    <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
-                    <EstanteProductos productos={lanzamientos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
-                </section>
-            )}
-
-            {/* ══ MÁS PARA VOS ══ */}
-            {masParaVos.length > 0 && (
-                <section className="sf-w" style={{ paddingBottom: 44 }}>
-                    <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
-                    <EstanteProductos productos={masParaVos} modoLista={modoListaEstante} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                 </section>
             )}
 

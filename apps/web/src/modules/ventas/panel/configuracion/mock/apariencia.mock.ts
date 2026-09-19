@@ -194,6 +194,12 @@ export interface Apariencia {
     mostrarWhatsapp:    boolean
     mostrarBuscador:    boolean
     mostrarCategorias:  boolean
+    // Los cuatro estantes de productos del home clásico — cada uno muestra lo
+    // que dice su nombre (ver Inicio.tsx § ESTANTES).
+    mostrarDestacados:   boolean
+    mostrarNuevos:       boolean
+    mostrarRecomendados: boolean
+    mostrarTopVentas:    boolean
     // Estilo de esa sección, cuando está encendida (ver CATEGORY_LAYOUTS).
     estiloCategorias:   CategoryLayout
     // Categorías elegidas a mano, solo para índice/mosaico/tarjetas — [] =
@@ -305,7 +311,8 @@ export const AP_DEFAULTS: Apariencia = {
     ],
     layoutGrid: '4col',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
-    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, estiloCategorias: 'pills', categoriasIds: [], mostrarFooter: true, mostrarRedesFooter: true,
+    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true,
+    mostrarDestacados: true, mostrarNuevos: true, mostrarRecomendados: true, mostrarTopVentas: true, estiloCategorias: 'pills', categoriasIds: [], mostrarFooter: true, mostrarRedesFooter: true,
     mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
     stats: [
         { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },

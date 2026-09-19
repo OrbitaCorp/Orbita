@@ -1070,6 +1070,10 @@ export type ApiAppearanceConfig = {
   // Opcionales por la ventana de deploy (la API sale a mano, después).
   videoLayout?: 'cine' | 'alternado' | 'reels' | 'lista' | null
   videos?: ApiVideoItem[] | null
+  showFeaturedSection?: boolean
+  showNewArrivalsSection?: boolean
+  showRecommendedSection?: boolean
+  showBestSellersSection?: boolean
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

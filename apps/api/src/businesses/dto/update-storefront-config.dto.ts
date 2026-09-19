@@ -103,6 +103,11 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showParallaxBanner?: boolean;
   @IsOptional() @IsBoolean() showBrands?: boolean;
   @IsOptional() @IsBoolean() showVideo?: boolean;
+  // Estantes de productos del home clásico — ver schema.prisma.
+  @IsOptional() @IsBoolean() showFeaturedSection?: boolean;
+  @IsOptional() @IsBoolean() showNewArrivalsSection?: boolean;
+  @IsOptional() @IsBoolean() showRecommendedSection?: boolean;
+  @IsOptional() @IsBoolean() showBestSellersSection?: boolean;
 
   @IsOptional() @IsString() @MaxLength(200) shippingText?: string;
   @IsOptional() @IsString() @MaxLength(500) whatsappText?: string;

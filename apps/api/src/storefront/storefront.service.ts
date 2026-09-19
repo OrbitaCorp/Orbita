@@ -338,6 +338,10 @@ export class StorefrontService {
             showParallaxBanner: appearance.showParallaxBanner,
             showBrands: appearance.showBrands,
             showVideo: appearance.showVideo,
+            showFeaturedSection: appearance.showFeaturedSection,
+            showNewArrivalsSection: appearance.showNewArrivalsSection,
+            showRecommendedSection: appearance.showRecommendedSection,
+            showBestSellersSection: appearance.showBestSellersSection,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
             statsBar: appearance.statsBar ?? [],
@@ -706,12 +710,35 @@ export class StorefrontService {
         const key = it.variant.productId;
         unidadesPorProducto.set(key, (unidadesPorProducto.get(key) ?? 0) + it.quantity);
       }
+      if (query.soldOnly) filtrados = filtrados.filter((p) => (unidadesPorProducto!.get(p.id) ?? 0) > 0);
+    }
+
+    // "Recomendados" del home: lo que los clientes reseñaron (reseñas
+    // visibles, las ocultadas por el dueño no cuentan) o lo que está en
+    // oferta — mismo criterio de oferta que `onSale` de arriba. Las reseñas
+    // de Órbita son solo texto, sin estrellas: "más reseñado" es la señal
+    // más honesta que hay de "a la gente le gustó".
+    let resenasPorProducto: Map<string, number> | null = null;
+    const enOferta = (p: (typeof candidatos)[number]) =>
+      (p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice)) || descuentosPorClave.has(claveDescuento(p));
+    if (query.sort === 'recommended') {
+      const grupos = await this.prisma.review.groupBy({
+        by: ['productId'],
+        where: { businessId: business.id, status: 'VISIBLE' },
+        _count: { _all: true },
+      });
+      resenasPorProducto = new Map(grupos.map((g) => [g.productId, g._count._all]));
+      filtrados = filtrados.filter((p) => (resenasPorProducto!.get(p.id) ?? 0) > 0 || enOferta(p));
     }
 
     const ordenados = filtrados.slice().sort((a, b) => {
       if (query.sort === 'precio-asc') return Number(a.basePrice) - Number(b.basePrice);
       if (query.sort === 'precio-desc') return Number(b.basePrice) - Number(a.basePrice);
       if (query.sort === 'bestselling') return (unidadesPorProducto!.get(b.id) ?? 0) - (unidadesPorProducto!.get(a.id) ?? 0);
+      if (query.sort === 'recommended') {
+        const porResenas = (resenasPorProducto!.get(b.id) ?? 0) - (resenasPorProducto!.get(a.id) ?? 0);
+        return porResenas !== 0 ? porResenas : Number(enOferta(b)) - Number(enOferta(a));
+      }
       return 0; // 'relevancia' (default): se queda con el orden del WHERE (createdAt desc)
     });
 

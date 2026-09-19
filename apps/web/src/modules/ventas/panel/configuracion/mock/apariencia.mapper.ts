@@ -58,6 +58,10 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showWhatsapp: ap.mostrarWhatsapp,
         showSearch: ap.mostrarBuscador,
         showCategoriesSection: ap.mostrarCategorias,
+        showFeaturedSection: ap.mostrarDestacados,
+        showNewArrivalsSection: ap.mostrarNuevos,
+        showRecommendedSection: ap.mostrarRecomendados,
+        showBestSellersSection: ap.mostrarTopVentas,
         showFooter: ap.mostrarFooter,
         showSocialFooter: ap.mostrarRedesFooter,
         showAnnouncementBar: ap.mostrarBannerEnvio,
@@ -174,6 +178,11 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarWhatsapp: dto.showWhatsapp,
         mostrarBuscador: dto.showSearch,
         mostrarCategorias: dto.showCategoriesSection,
+        // ?? por la ventana de deploy (la API sale después, a mano).
+        mostrarDestacados: dto.showFeaturedSection ?? defaults.mostrarDestacados,
+        mostrarNuevos: dto.showNewArrivalsSection ?? defaults.mostrarNuevos,
+        mostrarRecomendados: dto.showRecommendedSection ?? defaults.mostrarRecomendados,
+        mostrarTopVentas: dto.showBestSellersSection ?? defaults.mostrarTopVentas,
         // null en la base (negocio que nunca tocó la opción) = 'pills', que es
         // exactamente lo que venía viendo — ver AP_DEFAULTS.
         estiloCategorias: (dto.categoryLayout as Ap['estiloCategorias']) ?? defaults.estiloCategorias,

@@ -330,6 +330,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const usaAnuncio = soloContenido ? !plantillaActiva?.headerPropio : true
     const usaStats = soloContenido ? plantillaActiva?.usaStats !== false : true
 
+    const ESTANTES: [keyof Ap, string][] = [
+        ['mostrarDestacados', 'Destacados'],
+        ['mostrarNuevos', 'Nuevos ingresos'],
+        ['mostrarRecomendados', 'Recomendados'],
+        ['mostrarTopVentas', 'Top ventas'],
+    ]
+
     const toggles: [keyof Ap, string][] = soloContenido
         ? ([
             ...(usaAnuncio ? [['mostrarBannerEnvio', 'Anuncio arriba del header'] as [keyof Ap, string]] : []),
@@ -354,6 +361,21 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                 ))}
             </div>
+            {/* Los estantes de productos del home clásico (Ale, 19/09): cada
+                uno muestra lo que dice su nombre, y cada uno se puede apagar.
+                Con plantilla activa no aplican — las filas de productos las
+                define la plantilla (pestaña Secciones). */}
+            {!soloContenido && (
+                <>
+                    <Divider />
+                    <FieldLabel help="Las filas de productos del inicio. Cada una se arma sola con datos reales; si no hay productos para mostrar, no aparece.">Filas de productos en el inicio</FieldLabel>
+                    <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                        {ESTANTES.map(([k, l]) => (
+                            <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
+                        ))}
+                    </div>
+                </>
+            )}
         </SecCard>
     )
 

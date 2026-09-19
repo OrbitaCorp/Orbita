@@ -46,7 +46,14 @@ export class StorefrontProductsQueryDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) minPrice?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) maxPrice?: number;
   // 'bestselling' = "Más vendidos" del header (unidades históricas vendidas).
-  @IsOptional() @IsIn(['relevancia', 'precio-asc', 'precio-desc', 'bestselling']) sort?: string;
+  // 'recommended' = estante "Recomendados" del home: solo productos con
+  // reseñas visibles o en oferta, primero los más reseñados.
+  @IsOptional() @IsIn(['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']) sort?: string;
+  // Con sort 'bestselling': deja afuera los productos que nunca se
+  // vendieron. El catálogo no lo usa (ahí "Más vendidos" es un ORDEN y tiene
+  // que seguir mostrando todo); el estante "Top ventas" del home sí — sin
+  // esto, una tienda sin ventas mostraría cualquier producto como top.
+  @IsOptional() @Type(() => Boolean) @IsBoolean() soldOnly?: boolean;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

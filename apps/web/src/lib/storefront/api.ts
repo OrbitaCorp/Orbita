@@ -148,6 +148,12 @@ export type StorefrontConfigResponse = {
     // unos minutos en que la API todavía no los manda.
     videoLayout?: VideoLayout | null
     videos?: StorefrontVideoItem[]
+    // Los cuatro estantes de productos del home clásico. Opcionales por la
+    // ventana de deploy: sin el campo, el estante se muestra (default true).
+    showFeaturedSection?: boolean
+    showNewArrivalsSection?: boolean
+    showRecommendedSection?: boolean
+    showBestSellersSection?: boolean
   } | null
   contact: {
     whatsapp: string | null
@@ -269,7 +275,8 @@ export type StorefrontProductItem = {
   createdAt: string
 }
 
-export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling'
+// 'recommended' = estante "Recomendados" del home (con reseñas o en oferta).
+export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling' | 'recommended'
 
 // Faceta de filtro genérica (talle, color, o cualquier otra variación que el
 // negocio haya definido — ver ProductOption en el backend). `count` es
@@ -299,6 +306,9 @@ export type StorefrontProductsFilters = {
   minPrice?: number
   maxPrice?: number
   sort?: StorefrontSort
+  // Con sort 'bestselling': solo productos con al menos una venta (estante
+  // "Top ventas" del home; el catálogo no lo usa).
+  soldOnly?: boolean
   page?: number
   limit?: number
 }
@@ -316,6 +326,7 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   if (filters.minPrice !== undefined) qs.set('minPrice', String(filters.minPrice))
   if (filters.maxPrice !== undefined) qs.set('maxPrice', String(filters.maxPrice))
   if (filters.sort && filters.sort !== 'relevancia') qs.set('sort', filters.sort)
+  if (filters.soldOnly) qs.set('soldOnly', 'true')
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
   const query = qs.toString()
