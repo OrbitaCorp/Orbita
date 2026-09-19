@@ -355,6 +355,10 @@ export class StorefrontService {
             videoSubtitle: appearance.videoSubtitle,
             videoUrl: appearance.videoUrl,
             videoPosterUrl: appearance.videoPosterUrl,
+            // null = 'cine'; [] = la tienda usa el `videoUrl` de siempre
+            // como único video (ver SeccionVideos.tsx en apps/web).
+            videoLayout: appearance.videoLayout,
+            videos: appearance.videos ?? [],
           }
         : null,
       contact: contact

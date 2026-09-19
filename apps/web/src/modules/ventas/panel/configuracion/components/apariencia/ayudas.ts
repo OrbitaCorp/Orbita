@@ -76,9 +76,9 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
         afecta: 'Da confianza: muestra con qué trabajás sin que el visitante tenga que buscarlo. Los logos se ven en gris y toman color cuando les pasan el mouse por encima. El logo de cada marca es opcional (sin logo se muestra el nombre escrito), el nombre nunca. No se muestra si no cargaste al menos una marca.',
     },
     video: {
-        que: 'Un video en el inicio, con su título y su bajada. Puede ser un link de YouTube o de Vimeo, o un archivo .mp4 que subas.',
+        que: 'Uno o varios videos en el inicio, en el diseño que elijas: grande, alternado con texto, verticales en fila, o uno grande con la lista al costado. Cada video puede ser un link de YouTube o de Vimeo, o un archivo .mp4 que subas.',
         donde: 'En el inicio, después del banner parallax y antes del pie de página.',
-        afecta: 'Sirve para mostrar el local, cómo se usa un producto, o una campaña. No se muestra si el link no es válido: si el campo avisa en rojo que no lo reconocemos, en la tienda no va a aparecer nada.',
+        afecta: 'Sirve para mostrar el local, cómo se usa un producto, o una campaña. Un video con un link que no reconocemos (el campo avisa en rojo) no aparece en la tienda; si ninguno es válido, la sección entera no se muestra.',
     },
     visibilidad: {
         que: 'Los interruptores de lo que se muestra y lo que no en tu tienda: etiquetas de los productos, buscador, opiniones, WhatsApp y algunas secciones del inicio.',

@@ -989,6 +989,7 @@ export type ApiStatsBarItem = { id: string; value: string; label: string }
 // tipografía, no un hueco — por eso es opcional, igual que en el DTO del
 // backend (ver brand-item.dto.ts en apps/api).
 export type ApiBrandItem = { id: string; name: string; logoUrl?: string }
+export type ApiVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string }
 
 export type ApiAppearanceConfig = {
   storeName: string | null
@@ -1066,6 +1067,9 @@ export type ApiAppearanceConfig = {
   videoTitle: string | null
   videoSubtitle: string | null
   videoUrl: string | null
+  // Opcionales por la ventana de deploy (la API sale a mano, después).
+  videoLayout?: 'cine' | 'alternado' | 'reels' | 'lista' | null
+  videos?: ApiVideoItem[] | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

@@ -388,6 +388,17 @@ model StorefrontConfig {
   videoSubtitle    String? @map("video_subtitle")
   videoUrl         String? @map("video_url")
   videoPosterUrl   String? @map("video_poster_url")
+  // Varios videos y cómo se muestran (pedido de Ale, 19/09: "no solo es un
+  // video sino también varios, y diferentes diseños"). `videos` es
+  // [{ id, url, title?, text?, ctaText?, ctaLink? }] — JSON por el mismo
+  // criterio que `brands`: una lista corta de presentación. `videoLayout`:
+  // 'cine' (uno grande, el de siempre) | 'alternado' (video y texto a los
+  // costados, alternando) | 'reels' (verticales en fila) | 'lista' (uno
+  // grande con la lista para elegir al costado); null = 'cine'. Una tienda
+  // que nunca cargó `videos` sigue mostrando `videoUrl` de arriba como
+  // único video (ver SeccionVideos.tsx en apps/web).
+  videoLayout      String? @map("video_layout")
+  videos           Json?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

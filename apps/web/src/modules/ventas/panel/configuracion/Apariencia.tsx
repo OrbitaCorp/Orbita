@@ -3,7 +3,7 @@
 // layout, visibilidad, textos y CSS custom — con vista previa en vivo.
 
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Video, Image as ImageIcon } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
@@ -30,11 +30,12 @@ import { AyudaBoton, AyudaPanel, type Ayuda } from './components/apariencia/Ayud
 import { AYUDA_SECCIONES, AYUDA_OPCIONES } from './components/apariencia/ayudas'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
-    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX,
+    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX, VIDEO_LAYOUTS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type CategoryLayout as CategoryLayoutT, type HeroSlide,
     type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
+    type VideoItem, type VideoLayout,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
 
@@ -1187,53 +1188,26 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         asunto de la plantilla. */}
                     <SecCard id="ap-sec-video" title="Video en tu tienda" icon={Video} ayuda={AYUDA_SECCIONES.video}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
-                            Un video en el home, después del banner parallax. Pegá el link de YouTube, de Vimeo, o de
-                            un archivo de video (.mp4). Necesita un link válido para mostrarse.
+                            Uno o varios videos en el home, después del banner parallax. Cada uno puede ser un link de
+                            YouTube o de Vimeo, o un archivo de video que subas. Necesita al menos un video válido para mostrarse.
                         </p>
                         <div style={{ marginBottom: 14 }}>
                             <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarVideo} onChange={v => set('mostrarVideo', v)} />
                         </div>
                         <Divider />
-                        {/* El input de link y el "O" solo tienen sentido si NO hay
-                            ya un archivo subido — con un archivo, ese link es el
-                            de R2 (armado por el uploader, no algo que el dueño
-                            deba tocar); vuelven a aparecer si lo quita con la
-                            papelera del uploader de abajo. */}
-                        {!esVideoArchivo(ap.videoUrl) && (
-                            <>
-                                <div style={{ marginBottom: 10 }}>
-                                    <FieldLabel help="Copiá el link tal cual aparece en la barra de direcciones — no hace falta que sea un link ‘para insertar’.">
-                                        Link del video (opcional)
-                                    </FieldLabel>
-                                    <Inp value={ap.videoUrl} onChange={v => set('videoUrl', v)} placeholder="https://www.youtube.com/watch?v=..." />
-                                    {/* Mismo aviso en vivo que el email del wizard de alta
-                                        (checkEmail): confirmar ANTES de guardar, no dejar
-                                        que el dueño se entere en la tienda real de que el
-                                        link no sirve. Vacío no avisa nada — recién
-                                        escribiendo algo que no matchea ninguna forma. */}
-                                    {ap.videoUrl.trim() !== '' && !parseVideoEmbed(ap.videoUrl) && (
-                                        <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
-                                            No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
-                                        </p>
-                                    )}
-                                </div>
-                                {/* Alternativa a pegar el link: subir el archivo directo.
-                                    Escribe el MISMO campo (ap.videoUrl) — ver
-                                    VideoUploader.tsx para el porqué de no tener un campo
-                                    aparte. */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 10px' }}>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                </div>
-                            </>
-                        )}
-                        <div style={{ marginBottom: 14 }}>
-                            <VideoUploader value={ap.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoApariencia} maxMB={500} />
+                        <div style={{ marginBottom: 10 }}><FieldLabel help="Va arriba de los videos. Opcional.">Título de la sección</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} placeholder="Mirá cómo funciona" /></div>
+                        <div><FieldLabel>Bajada</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
+                        <Divider />
+                        <FieldLabel help="Cómo se acomodan los videos en el home.">Diseño</FieldLabel>
+                        <div style={{ marginBottom: 4 }}>
+                            <VisualPick
+                                value={ap.videoLayout}
+                                onChange={v => set('videoLayout', v as VideoLayout)}
+                                options={VIDEO_LAYOUTS.map(op => ({ id: op.id, label: op.label, ayuda: op.desc, svg: MINIATURA_VIDEO[op.id] }))}
+                            />
                         </div>
                         <Divider />
-                        <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} /></div>
-                        <div><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
+                        <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} />
                     </SecCard>
 
                     {tarjetasSecundarias}
@@ -1484,6 +1458,131 @@ const MINIATURA_CATEGORIA: Record<CategoryLayoutT, ReactNode> = {
             <rect x={cx - 4.5} y="23" width="9" height="2.5" rx="1.25" fill="var(--color-muted)" />
         </g>)}
     </g>),
+}
+
+// Miniaturas de los 4 diseños de la sección de video — mismo criterio que
+// las de categorías: que se lea el layout sin texto. El triangulito es el
+// play; el bloque primario, el video.
+function miniVideo(x: number, y: number, w: number, h: number, key?: string) {
+    const cx = x + w / 2, cy = y + h / 2, t = Math.min(w, h) * 0.18
+    return <g key={key}>
+        <rect x={x} y={y} width={w} height={h} rx="2.5" fill="var(--color-primary)" opacity="0.75" />
+        <path d={`M${cx - t * 0.6} ${cy - t} L${cx + t} ${cy} L${cx - t * 0.6} ${cy + t} Z`} fill="var(--color-bg)" />
+    </g>
+}
+const MINIATURA_VIDEO: Record<VideoLayout, ReactNode> = {
+    // Grande: un video a lo ancho y el título debajo.
+    cine: hline(<g>
+        {miniVideo(8, 3, 44, 22)}
+        <rect x="8" y="28" width="20" height="2.5" rx="1.25" fill="var(--color-muted)" />
+    </g>),
+    // Alternado: dos filas, el video cambia de lado.
+    alternado: hline(<g>
+        {miniVideo(4, 2, 24, 14, 'a')}
+        <rect x="32" y="6" width="18" height="2.5" rx="1.25" fill="var(--color-text)" />
+        <rect x="32" y="10.5" width="22" height="2" rx="1" fill="var(--color-border)" />
+        <rect x="6" y="22" width="18" height="2.5" rx="1.25" fill="var(--color-text)" />
+        <rect x="6" y="26.5" width="22" height="2" rx="1" fill="var(--color-border)" />
+        {miniVideo(32, 18, 24, 14, 'b')}
+    </g>),
+    // Verticales: cuatro rectángulos parados.
+    reels: hline(<g>
+        {[5, 19, 33, 47].map(x => miniVideo(x, 3, 11, 25, String(x)))}
+    </g>),
+    // Con lista: uno grande a la izquierda y renglones a la derecha.
+    lista: hline(<g>
+        {miniVideo(3, 5, 34, 20)}
+        {[6, 13, 20].map(y => <g key={y}>
+            <rect x="40" y={y} width="7" height="5" rx="1" fill="var(--color-border)" />
+            <rect x="49" y={y + 1.5} width="9" height="2" rx="1" fill="var(--color-muted)" />
+        </g>)}
+    </g>),
+}
+
+// Editor de la lista de videos de la sección. Cada video es un bloque con su
+// link (o archivo subido) y, abajo, el texto que lo acompaña. Mismo tope que
+// el DTO del backend (ArrayMaxSize(12)).
+const MAX_VIDEOS = 12
+function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layout: VideoLayout; onChange: (v: VideoItem[]) => void }) {
+    const upd = (i: number, cambio: Partial<VideoItem>) => onChange(videos.map((x, j) => j === i ? { ...x, ...cambio } : x))
+    const mover = (i: number, d: -1 | 1) => {
+        const j = i + d
+        if (j < 0 || j >= videos.length) return
+        const copia = [...videos]
+        ;[copia[i], copia[j]] = [copia[j], copia[i]]
+        onChange(copia)
+    }
+    // 'reels' solo muestra el título debajo de cada video: no se piden
+    // texto ni botón que no se van a ver.
+    const usaTexto = layout !== 'reels'
+    const btnIcono: CSSProperties = { width: 30, height: 30, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+    return (
+        <>
+            <FieldLabel help={layout === 'reels' ? 'Para este diseño quedan mejor los videos filmados con el celular parado (9:16), como reels o TikToks.' : 'El título y el texto acompañan a cada video. El botón es opcional.'}>
+                Videos
+            </FieldLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+                {videos.map((v, i) => {
+                    const primero = i === 0
+                    const ultimo = i === videos.length - 1
+                    return (
+                        <div key={v.id} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+                                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Video {i + 1}</span>
+                                <button onClick={() => mover(i, -1)} disabled={primero} className="ds-hover" aria-label="Subir" title="Subir" style={{ ...btnIcono, opacity: primero ? 0.35 : 1, cursor: primero ? 'default' : 'pointer' }}><ArrowUp size={14} /></button>
+                                <button onClick={() => mover(i, 1)} disabled={ultimo} className="ds-hover" aria-label="Bajar" title="Bajar" style={{ ...btnIcono, opacity: ultimo ? 0.35 : 1, cursor: ultimo ? 'default' : 'pointer' }}><ArrowDown size={14} /></button>
+                                <button
+                                    onClick={() => onChange(videos.filter((_, j) => j !== i))}
+                                    aria-label={`Quitar video ${i + 1}`} title="Quitar"
+                                    style={btnIcono}
+                                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                                ><Trash2 size={14} /></button>
+                            </div>
+                            {/* Con un archivo ya subido, el link es el de R2
+                                (armado por el uploader): el campo se oculta
+                                hasta que lo quite con la papelera del uploader.
+                                Con un link pegado, el uploader no aparece. */}
+                            {!esVideoArchivo(v.url) && (
+                                <div style={{ marginBottom: 10 }}>
+                                    <Inp value={v.url} onChange={x => upd(i, { url: x })} placeholder="Link de YouTube, Vimeo o .mp4" />
+                                    {v.url.trim() !== '' && !parseVideoEmbed(v.url) && (
+                                        <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
+                                            No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                            {(esVideoArchivo(v.url) || v.url.trim() === '') && (
+                                <div style={{ marginBottom: 12 }}>
+                                    <VideoUploader value={v.url} onChange={x => upd(i, { url: x })} onUpload={subirVideoApariencia} maxMB={500} />
+                                </div>
+                            )}
+                            <div style={{ marginBottom: usaTexto ? 8 : 0 }}><Inp value={v.titulo} onChange={x => upd(i, { titulo: x })} maxLength={120} placeholder="Título (opcional)" /></div>
+                            {usaTexto && (
+                                <>
+                                    <div style={{ marginBottom: 8 }}><Inp value={v.texto} onChange={x => upd(i, { texto: x })} maxLength={400} placeholder="Texto (opcional)" /></div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8 }}>
+                                        <Inp value={v.ctaTexto} onChange={x => upd(i, { ctaTexto: x })} maxLength={40} placeholder="Botón: Ver más" />
+                                        <Inp value={v.ctaLink} onChange={x => upd(i, { ctaLink: x })} maxLength={500} placeholder="Link: /catalogo" />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+            {videos.length < MAX_VIDEOS && (
+                <button
+                    onClick={() => onChange([...videos, { id: 'vd' + Date.now(), url: '', titulo: '', texto: '', ctaTexto: '', ctaLink: '' }])}
+                    className="ds-hover"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                >
+                    <Plus size={14} strokeWidth={2} /> Agregar video
+                </button>
+            )}
+        </>
+    )
 }
 
 // `disabled` + `motivo`: para opciones que dependen de un dato que la tienda

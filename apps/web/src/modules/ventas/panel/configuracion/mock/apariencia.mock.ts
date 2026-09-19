@@ -149,6 +149,27 @@ export interface MarcaItem {
     logo: string | null
 }
 
+// Un video de la sección de video del home. Solo el link es obligatorio; el
+// resto acompaña al video en los diseños que lo muestran.
+export interface VideoItem {
+    id:        string
+    url:       string
+    titulo:    string
+    texto:     string
+    ctaTexto:  string
+    ctaLink:   string
+}
+
+export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'
+
+// Diseños de la sección de video (ver SeccionVideos.tsx, apps/web/src/components/storefront).
+export const VIDEO_LAYOUTS: { id: VideoLayout; label: string; desc: string }[] = [
+    { id: 'cine',      label: 'Grande',     desc: 'Cada video a todo el ancho, con su título debajo.' },
+    { id: 'alternado', label: 'Alternado',  desc: 'Video de un lado y texto del otro, cambiando de lado.' },
+    { id: 'reels',     label: 'Verticales', desc: 'Videos parados en fila, como reels o TikToks.' },
+    { id: 'lista',     label: 'Con lista',  desc: 'Uno grande y al costado la lista para elegir otro.' },
+]
+
 export interface Apariencia {
     nombreTienda: string
     tagline:      string
@@ -227,6 +248,11 @@ export interface Apariencia {
     videoTitulo:     string
     videoSubtitulo:  string
     videoUrl:        string
+    // Varios videos (ver VideoItem) y el diseño con que se muestran. Una
+    // tienda con el video único de antes lo ve cargado acá como el primero
+    // (ver fromApiAppearance) — `videoUrl` queda como copia del primero.
+    videoLayout:     VideoLayout
+    videos:          VideoItem[]
     // Contenido que pide UNA plantilla de Home y no existe en el home clásico
     // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
     // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
@@ -306,6 +332,8 @@ export const AP_DEFAULTS: Apariencia = {
     videoTitulo: '',
     videoSubtitulo: '',
     videoUrl: '',
+    videoLayout: 'cine',
+    videos: [],
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },

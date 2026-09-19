@@ -46,6 +46,12 @@ export type StorefrontStatsItem = { id: string; value: string; label: string }
 // nombres (ver brand-item.dto.ts en apps/api).
 export type StorefrontBrandItem = { id: string; name: string; logoUrl?: string | null }
 
+// Un video de la sección de video del home (ver `videos` en schema.prisma).
+export type StorefrontVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string }
+// Cómo se muestran: uno grande, alternado con texto, verticales en fila, o
+// uno grande con la lista al costado. null = 'cine'.
+export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'
+
 // Contenido propio de una plantilla de Home. Cada clave la usa UNA plantilla
 // (`cupon` de Vidriera, `mostrarIconoLogo` de Escaparate) — se van sumando
 // acá a medida que una plantilla nueva necesite algo que las demás no
@@ -137,6 +143,11 @@ export type StorefrontConfigResponse = {
     videoTitle: string | null
     videoSubtitle: string | null
     videoUrl: string | null
+    // Varios videos y el diseño con que se muestran — ver SeccionVideos.tsx.
+    // Opcionales: entre el deploy del frontend y el de la API a mano hay
+    // unos minutos en que la API todavía no los manda.
+    videoLayout?: VideoLayout | null
+    videos?: StorefrontVideoItem[]
   } | null
   contact: {
     whatsapp: string | null

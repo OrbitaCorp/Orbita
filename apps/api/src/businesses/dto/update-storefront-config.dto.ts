@@ -4,6 +4,7 @@ import { HeroSlideDto } from './hero-slide.dto';
 import { HeaderLinkDto } from './header-link.dto';
 import { StatsBarItemDto } from './stats-bar-item.dto';
 import { BrandItemDto } from './brand-item.dto';
+import { VideoItemDto } from './video-item.dto';
 import { HomeTemplateDataDto } from './home-template-data.dto';
 import { URL_IMAGEN, URL_IMAGEN_MENSAJE } from './url-imagen';
 
@@ -138,4 +139,18 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsString() @MaxLength(300) videoSubtitle?: string;
   @IsOptional() @IsString() @MaxLength(500) @Matches(URL_VIDEO, { message: URL_VIDEO_MENSAJE }) videoUrl?: string;
   @IsOptional() @IsString() @MaxLength(1000) @Matches(URL_IMAGEN, { message: URL_IMAGEN_MENSAJE }) videoPosterUrl?: string;
+
+  // Varios videos y el diseño con que se muestran — ver `videos` y
+  // `videoLayout` en schema.prisma. Lista cerrada por el mismo motivo que
+  // categoryLayout: el storefront switchea sobre este valor. Tope de 12
+  // videos: más que eso deja de ser una sección del home.
+  @IsOptional() @IsIn(['cine', 'alternado', 'reels', 'lista'])
+  videoLayout?: 'cine' | 'alternado' | 'reels' | 'lista';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => VideoItemDto)
+  videos?: VideoItemDto[];
 }
