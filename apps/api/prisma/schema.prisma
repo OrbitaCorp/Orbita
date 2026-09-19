@@ -777,6 +777,13 @@ model Product {
   // por producto, no por imagen: se muestra como una pieza más de la
   // galería en la ficha, no asociado a ninguna variante.
   videoUrl      String?       @map("video_url")
+  // Contenido de la ficha (Ale, 19/09): bloques de video + texto que se
+  // muestran alternados debajo de Características y antes de las reseñas,
+  // estilo "landing de producto". [{ id, url, eyebrow?, title?,
+  // text?, ctaText? }]. Opcional y aparte del wizard de alta a propósito: se
+  // edita desde Productos → ⋮ → "Contenido de la ficha" (PUT :id/content),
+  // así crear un producto no se alarga. null/[] = la ficha queda como siempre.
+  contentBlocks Json?         @map("content_blocks")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   deletedAt     DateTime?     @map("deleted_at") // soft-delete

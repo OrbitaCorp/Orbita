@@ -1772,6 +1772,8 @@ export type ApiProductFull = {
   // Un link (YouTube/Vimeo/archivo) o el resultado de subirlo — mismo campo
   // que StorefrontConfig.videoUrl (ver parseVideoEmbed en storefront/utils.ts).
   videoUrl: string | null
+  // Contenido de la ficha — se edita aparte (panelUpdateProductContent).
+  contentBlocks?: ApiProductContentBlock[]
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {
@@ -1853,6 +1855,17 @@ export function panelDeleteProduct(id: string) {
 // La copia nace como borrador y con stock en 0.
 export function panelDuplicateProduct(id: string) {
   return panelRequest<ApiProductFull>(`/products/${id}/duplicate`, { method: 'POST' })
+}
+
+// Contenido de la ficha (videos alternados con texto, debajo de
+// Características) — su propio endpoint, fuera del wizard de alta, para que
+// crear un producto no se alargue (ver ContenidoFichaModal.tsx).
+export type ApiProductContentBlock = { id: string; url: string; eyebrow?: string; title?: string; text?: string; ctaText?: string }
+export function panelUpdateProductContent(id: string, blocks: ApiProductContentBlock[]) {
+  return panelRequest<{ contentBlocks: ApiProductContentBlock[] }>(`/products/${id}/content`, {
+    method: 'PUT',
+    body: JSON.stringify({ blocks }),
+  })
 }
 
 // Estrella de "destacado" en la grilla/tabla — no está en el wizard de

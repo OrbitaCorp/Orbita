@@ -47,7 +47,10 @@ export type StorefrontStatsItem = { id: string; value: string; label: string }
 export type StorefrontBrandItem = { id: string; name: string; logoUrl?: string | null }
 
 // Un video de la sección de video del home (ver `videos` en schema.prisma).
-export type StorefrontVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string; posterUrl?: string }
+export type StorefrontVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string; posterUrl?: string; eyebrow?: string }
+// Un bloque del contenido de la ficha de producto (videos alternados con
+// texto, debajo de Características) — ver ContenidoFicha en SeccionVideos.tsx.
+export type StorefrontContentBlock = { id: string; url: string; eyebrow?: string; title?: string; text?: string; ctaText?: string }
 // Cómo se muestran: uno grande, alternado con texto, verticales en fila, o
 // uno grande con la lista al costado. null = 'cine'.
 export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'
@@ -367,6 +370,8 @@ export type StorefrontProductDetail = {
   // Link (YouTube/Vimeo/archivo) o archivo subido — ver parseVideoEmbed.
   // null = el producto no tiene video, la galería solo muestra fotos.
   videoUrl: string | null
+  // Opcional por la ventana de deploy (la API sale a mano, después).
+  contentBlocks?: StorefrontContentBlock[]
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {

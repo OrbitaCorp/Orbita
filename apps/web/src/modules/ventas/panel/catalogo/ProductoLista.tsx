@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -29,6 +29,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import ProductoNuevo from './ProductoNuevo'
 import type { EstadoProducto } from './types/catalogo.types'
 import { ResenasProducto } from './components/ResenasProducto'
+import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 import { StockRapidoModal } from './components/StockRapido'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
@@ -193,7 +194,7 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas, onEditarStock }: {
+function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas, onEditarStock, onContenido }: {
     p: ApiProductRow
     upload?: ProductUploadState
     // Producto EXISTENTE guardando cambios en segundo plano (ver
@@ -210,6 +211,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     onToggleFeatured: () => void
     onResenas: () => void
     onEditarStock: () => void
+    onContenido?: () => void
 }) {
     const [indice, setIndice] = useState(0)
     const [menuAbierto, setMenuAbierto] = useState(false)
@@ -379,6 +381,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                             <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
                             <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
                                 <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                                {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
                                 <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                                 <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
                             </div>
@@ -493,6 +496,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // Producto cuyas reseñas se están moderando (hallazgo
     // `resenas-sin-moderacion-panel`). Se entra por el ícono de la fila.
     const [resenasDe, setResenasDe] = useState<string | null>(null)
+    // Contenido de la ficha (videos alternados con texto) — su propio editor,
+    // fuera del wizard de alta. Ver ContenidoFichaModal.tsx.
+    const [contenidoDe, setContenidoDe] = useState<string | null>(null)
     const [borrando, setBorrando] = useState(false)
 
     // Producto cuyo stock se está editando rápido, sin entrar al editor
@@ -991,6 +997,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onToggleFeatured={() => void toggleFeatured(p)}
                                 onResenas={() => setResenasDe(p.id)}
                                 onEditarStock={() => setStockDe(p)}
+                                onContenido={() => setContenidoDe(p.id)}
                             />
                         ))}
                     </div>
@@ -1084,6 +1091,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                         <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180 }}>
                                             <button className="ds-hover" onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
+                                            <button className="ds-hover" onClick={() => { setMenu(null); setContenidoDe(p.id) }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>
                                             <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                                             <button className="ds-hover" onClick={() => { setMenu(null); setABorrar(p) }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
                                         </div>
@@ -1124,6 +1132,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* Moderación de reseñas del producto. Se monta solo cuando hace
                 falta: pide la lista al abrirse, no en cada render de la tabla. */}
             {resenasDe && <ResenasProducto productId={resenasDe} onClose={() => setResenasDe(null)} />}
+            {contenidoDe && <ContenidoFichaModal productId={contenidoDe} onClose={() => setContenidoDe(null)} onGuardado={() => onToast('Contenido de la ficha guardado')} />}
 
             {/* Edición rápida de stock — ver components/StockRapido.tsx. Al
                 guardar se refresca la lista (cambia totalStock, y puede

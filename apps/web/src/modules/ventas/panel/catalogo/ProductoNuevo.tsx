@@ -38,6 +38,7 @@ import {
     beginProductEdit, finishProductEdit, markProductEditFailed,
 } from '@/lib/productUploadTracker'
 import { Volver } from '../_shared/Volver'
+import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
@@ -257,6 +258,7 @@ async function subirVideoProducto(file: File): Promise<string> {
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
+    const [contenidoAbierto, setContenidoAbierto] = useState(false)
     const router = useRouter()
     const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
@@ -1884,6 +1886,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 8 }}>
                                     Falta {faltaNombre ? 'el nombre del producto' : faltaCategoria ? 'seleccionar una categoría' : prod.tieneVariantes ? 'el precio de alguna variante activa' : 'el precio de venta'}.
                                 </div>
+                            )}
+                            {/* Acceso opcional al contenido de la ficha (videos
+                                con texto) — solo editando: es un paso aparte a
+                                propósito, no un paso más del alta. Mismo
+                                editor que Productos → ⋮ → "Contenido de la
+                                ficha"; guarda solo, sin tocar este formulario. */}
+                            {editando && editarId && (
+                                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', textAlign: 'center', margin: '14px 0 0' }}>
+                                    ¿Querés sumar videos con texto a la ficha?{' '}
+                                    <button type="button" onClick={() => setContenidoAbierto(true)} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--color-primary)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                        Contenido de la ficha →
+                                    </button>
+                                </p>
+                            )}
+                            {contenidoAbierto && editarId && (
+                                <ContenidoFichaModal productId={editarId} onClose={() => setContenidoAbierto(false)} onGuardado={() => onToast?.('Contenido de la ficha guardado')} />
                             )}
                         </div>
                     )}

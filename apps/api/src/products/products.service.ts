@@ -25,6 +25,7 @@ import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
+import { UpdateProductContentDto } from './dto/update-product-content.dto';
 
 const PRODUCT_IMAGES_BUCKET = 'product-images';
 
@@ -39,6 +40,21 @@ function normalizarSpecs(raw: Prisma.JsonValue | null): { label: string; value: 
       typeof s === 'object' && s !== null && !Array.isArray(s) &&
       typeof (s as Record<string, unknown>).label === 'string' && typeof (s as Record<string, unknown>).value === 'string',
   );
+}
+
+// Mismo criterio que normalizarSpecs: `contentBlocks` es Json? y una fila con
+// forma inesperada no tiene que romper la ficha — se descartan los bloques
+// sin link y se quedan solo los campos conocidos.
+type BloqueContenido = { id: string; url: string; eyebrow?: string; title?: string; text?: string; ctaText?: string };
+function normalizarBloques(raw: Prisma.JsonValue | null): BloqueContenido[] {
+  if (!Array.isArray(raw)) return [];
+  const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
+  return raw.flatMap((b) => {
+    if (typeof b !== 'object' || b === null || Array.isArray(b)) return [];
+    const o = b as Record<string, unknown>;
+    if (typeof o.id !== 'string' || typeof o.url !== 'string' || !o.url) return [];
+    return [{ id: o.id, url: o.url, eyebrow: texto(o.eyebrow), title: texto(o.title), text: texto(o.text), ctaText: texto(o.ctaText) }];
+  });
 }
 
 const productDetailInclude = {
@@ -767,6 +783,26 @@ export class ProductsService {
     return { ok: true };
   }
 
+  // Contenido de la ficha — separado de PUT :id por el mismo motivo que
+  // toggleFeatured(): se edita desde su propio editor, y un guardado normal
+  // del wizard (que no lo manda) no tiene que borrarlo.
+  async updateContent(businessId: string, id: string, dto: UpdateProductContentDto) {
+    const blocks = dto.blocks.map((b) => ({
+      id: b.id,
+      url: b.url.trim(),
+      ...(b.eyebrow?.trim() ? { eyebrow: b.eyebrow.trim() } : {}),
+      ...(b.title?.trim() ? { title: b.title.trim() } : {}),
+      ...(b.text?.trim() ? { text: b.text.trim() } : {}),
+      ...(b.ctaText?.trim() ? { ctaText: b.ctaText.trim() } : {}),
+    }));
+    const { count } = await this.prisma.product.updateMany({
+      where: { id, businessId, deletedAt: null },
+      data: { contentBlocks: blocks.length > 0 ? (blocks as Prisma.InputJsonValue) : Prisma.DbNull },
+    });
+    if (count === 0) throw new NotFoundException('Producto no encontrado');
+    return { contentBlocks: blocks };
+  }
+
   async reorderImages(businessId: string, productId: string, dto: ReorderImagesDto) {
     await this.findOneRaw(businessId, productId);
 
@@ -866,6 +902,7 @@ export class ProductsService {
       isFeatured: p.isFeatured,
       specs: normalizarSpecs(p.specs),
       videoUrl: p.videoUrl,
+      contentBlocks: normalizarBloques(p.contentBlocks),
       tags: p.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: p.options.map((o) => ({
         id: o.id,

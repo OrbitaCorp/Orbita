@@ -89,20 +89,40 @@ function Cine({ videos, go }: { videos: Video[]; go: Props['go'] }) {
   )
 }
 
-function Alternado({ videos, go }: { videos: Video[]; go: Props['go'] }) {
+function Alternado({ videos, go, onCta }: { videos: Video[]; go: Props['go']; onCta?: () => void }) {
   return (
     <div className="sf-vd-alt">
       {videos.map((v, i) => (
         <article key={v.id} className={`sf-vd-alt-fila${i % 2 === 1 ? ' sf-vd-alt-fila--inv' : ''}`}>
           <Reproductor video={v} className="sf-vd-alt-video" />
           <div className="sf-vd-alt-copy">
+            {v.eyebrow && <p className="sf-vd-alt-volanta">{v.eyebrow}</p>}
             {v.title && <h3 className="sf-vd-alt-h3">{v.title}</h3>}
             {v.text && <p className="sf-vd-texto">{v.text}</p>}
-            <Cta video={v} go={go} boton />
+            <Cta video={v} go={go} onCta={onCta} boton />
           </div>
         </article>
       ))}
     </div>
+  )
+}
+
+// Contenido de la ficha de producto: los bloques de video + texto que el
+// dueño carga en Productos → ⋮ → "Contenido de la ficha", en el diseño
+// Alternado (Ale, 19/09 — solo ese, como la referencia). Va debajo de
+// Características y antes de las reseñas. El botón de cada bloque no lleva a
+// ningún link: vuelve a la compra de este mismo producto (`onCta`).
+export function ContenidoFicha({ bloques, onCta }: { bloques: StorefrontVideoItem[] | undefined; onCta: () => void }) {
+  const lista: Video[] = (bloques ?? []).flatMap(v => {
+    const embed = parseVideoEmbed(v.url)
+    return embed ? [{ ...v, embed }] : []
+  })
+  if (lista.length === 0) return null
+  return (
+    <section className="sf-vd sf-vd--ficha" aria-label="Más sobre este producto">
+      <style>{ESTILOS}</style>
+      <Alternado videos={lista} go={() => onCta()} onCta={onCta} />
+    </section>
   )
 }
 
@@ -177,8 +197,10 @@ function ConLista({ videos, go }: { videos: Video[]; go: Props['go'] }) {
 
 // ── Piezas ───────────────────────────────────────────────────────────────────
 
-function Cta({ video, go, boton }: { video: Video; go: Props['go']; boton?: boolean }) {
+function Cta({ video, go, boton, onCta }: { video: Video; go: Props['go']; boton?: boolean; onCta?: () => void }) {
   if (!video.ctaText) return null
+  const cls0 = boton ? 'sf-vd-cta sf-vd-cta--boton' : 'sf-vd-cta'
+  if (onCta) return <button type="button" className={cls0} onClick={onCta}>{video.ctaText} <ArrowRight size={15} strokeWidth={2.2} aria-hidden="true" /></button>
   const link = video.ctaLink?.trim() || '/catalogo'
   const externo = /^https?:\/\//i.test(link)
   const cls = boton ? 'sf-vd-cta sf-vd-cta--boton' : 'sf-vd-cta'
@@ -340,6 +362,8 @@ const ESTILOS = `
 .sf-vd-alt-fila--inv .sf-vd-alt-video { order: 2; }
 .sf-vd-alt-video { border-radius: 0; height: 100%; min-height: 100%; }
 .sf-vd-alt-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 40px 44px; }
+.sf-vd--ficha { padding: 0; margin-bottom: 64px; }
+.sf-vd-alt-volanta { margin: 0 0 6px; font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; color: var(--color-muted); }
 .sf-vd-alt-h3 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: var(--color-text); }
 .sf-vd-alt-copy .sf-vd-texto { margin-top: 10px; font-size: 15px; }
 

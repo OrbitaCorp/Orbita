@@ -37,6 +37,21 @@ function normalizarSpecs(raw: Prisma.JsonValue | null): { label: string; value: 
   );
 }
 
+// Mismo criterio que normalizarSpecs: `contentBlocks` es Json? y una fila con
+// forma inesperada no tiene que romper la ficha — se descartan los bloques
+// sin link y se quedan solo los campos conocidos.
+type BloqueContenido = { id: string; url: string; eyebrow?: string; title?: string; text?: string; ctaText?: string };
+function normalizarBloques(raw: Prisma.JsonValue | null): BloqueContenido[] {
+  if (!Array.isArray(raw)) return [];
+  const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v : undefined);
+  return raw.flatMap((b) => {
+    if (typeof b !== 'object' || b === null || Array.isArray(b)) return [];
+    const o = b as Record<string, unknown>;
+    if (typeof o.id !== 'string' || typeof o.url !== 'string' || !o.url) return [];
+    return [{ id: o.id, url: o.url, eyebrow: texto(o.eyebrow), title: texto(o.title), text: texto(o.text), ctaText: texto(o.ctaText) }];
+  });
+}
+
 // Techo de lo que se puede comprar/mostrar de una sola variante en el
 // storefront público. Con esto el número exacto de stock SOLO es observable
 // cuando queda poco (que es justo cuando el comprador necesita verlo) — una
@@ -915,6 +930,9 @@ export class StorefrontService {
       isFeatured: product.isFeatured,
       specs: normalizarSpecs(product.specs),
       videoUrl: product.videoUrl,
+      // Videos alternados con texto, debajo de Características (ver
+      // ContenidoFicha en ProductoDetalle.tsx). [] = la ficha como siempre.
+      contentBlocks: normalizarBloques(product.contentBlocks),
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: product.options.map((o) => ({
         id: o.id,

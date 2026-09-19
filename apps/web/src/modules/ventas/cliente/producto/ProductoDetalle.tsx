@@ -20,6 +20,7 @@ import {
 } from '@/lib/storefront/api'
 import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
+import { ContenidoFicha } from '@/components/storefront/SeccionVideos'
 
 // Responsive de la ficha. Vive acá arriba, en una constante, y NO inline en
 // el return: esta pantalla tiene dos returns (el skeleton de carga y la
@@ -1014,6 +1015,14 @@ export default function ProductoDetalle() {
         {fichaAbierta && (
           <FichaTecnicaModal nombre={producto.name} specs={producto.specs} onClose={() => setFichaAbierta(false)} />
         )}
+
+        {/* ══ CONTENIDO DE LA FICHA ══ — videos alternados con texto que el
+            dueño carga en Productos → ⋮ → "Contenido de la ficha". Sin
+            bloques no dibuja nada. El botón de cada bloque sube a la compra. */}
+        <ContenidoFicha
+          bloques={producto.contentBlocks}
+          onCta={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        />
 
         {/* ══ RESEÑAS ══ — se sacan enteras en vidriera digital, el backend
             las bloquea (FullModeOnly). */}

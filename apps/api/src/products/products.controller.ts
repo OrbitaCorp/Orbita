@@ -30,6 +30,7 @@ import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
+import { UpdateProductContentDto } from './dto/update-product-content.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
@@ -176,5 +177,14 @@ export class ProductsController {
   toggleFeatured(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ToggleFeaturedDto) {
     const member = assertMemberContext(ctx);
     return this.productsService.toggleFeatured(member.businessId, id, dto);
+  }
+
+  // Contenido de la ficha (videos alternados con texto) — separado de PUT :id
+  // por el mismo motivo que la estrella: tiene su propio editor en el panel.
+  @Put(':id/content')
+  @RequirePermission('catalog.manage')
+  updateContent(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpdateProductContentDto) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.updateContent(member.businessId, id, dto);
   }
 }
