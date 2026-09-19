@@ -16,6 +16,11 @@
 // propia config (ver lib/storefront/previewBridge.ts), así los cambios se
 // siguen viendo en vivo sin apretar "Guardar cambios".
 //
+// Con cambios sin guardar aparece "Publicado / Con tus cambios" arriba: el
+// mismo iframe recibe lo guardado en vez del borrador, así se compara el
+// antes y el después sin recargar ni guardar nada. Tocar cualquier campo
+// vuelve solo a "Con tus cambios" — si no, se editaría a ciegas.
+//
 // Si el dueño clickea un link adentro del preview, navega de verdad: esa
 // página pierde el `?preview=1` y muestra lo guardado. Es correcto — sigue
 // siendo su tienda real, solo sin el borrador encima.
@@ -31,9 +36,17 @@ const DESIGN_W = 1280
 // postMessage por tecla (los slides pueden llevar URLs largas adentro).
 const DEBOUNCE_MS = 120
 
-interface StorePreviewProps { ap: Apariencia; full?: boolean; subdomain?: string }
+type Vista = 'cambios' | 'publicado'
 
-export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
+interface StorePreviewProps {
+    ap: Apariencia
+    /** Lo que la tienda muestra hoy. null = no hay cambios que comparar. */
+    publicado?: Apariencia | null
+    full?: boolean
+    subdomain?: string
+}
+
+export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewProps) {
     const wrapRef = useRef<HTMLDivElement>(null)
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const [scale, setScale] = useState(0.5)
@@ -69,7 +82,10 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
 
     // Exactamente lo que se mandaría al guardar: así el preview no puede
     // divergir de lo que va a quedar en la tienda.
-    const borrador = useMemo(() => apToUpdateDto(ap), [ap])
+    const [vista, setVista] = useState<Vista>('cambios')
+    useEffect(() => { setVista('cambios') }, [ap])
+    const verPublicado = vista === 'publicado' && !!publicado
+    const borrador = useMemo(() => apToUpdateDto(verPublicado ? publicado! : ap), [ap, publicado, verPublicado])
     const borradorRef = useRef(borrador)
     useEffect(() => { borradorRef.current = borrador }, [borrador])
 
@@ -103,7 +119,8 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
         <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: full ? 'none' : '0 8px 32px rgba(15,23,42,0.12)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', height: frameHeight }}>
             {/* Solo el favicon y el subdominio real de ESTE negocio — sin los
                 puntitos de macOS ni una URL de mentira. */}
-            <div style={{ height: 36, flexShrink: 0, borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px' }}>
+            <div style={{ height: 36, flexShrink: 0, borderBottom: '1px solid var(--color-border)', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8, padding: '0 8px' }}>
+                <span />
                 <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280, overflow: 'hidden' }}>
                     {ap.favicon
                         ? <img src={ap.favicon} alt="" style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
@@ -111,6 +128,9 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {subdomain ? `${subdomain}.${ROOT_DOMAIN}` : (ap.nombreTienda || 'tu-tienda')}
                     </span>
+                </div>
+                <div style={{ justifySelf: 'end' }}>
+                    {publicado && <ToggleVista vista={vista} onChange={setVista} />}
                 </div>
             </div>
 
@@ -131,6 +151,38 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                     </div>
                 )}
             </div>
+        </div>
+    )
+}
+
+const OPCIONES_VISTA: [Vista, string][] = [['publicado', 'Publicado'], ['cambios', 'Con tus cambios']]
+
+function ToggleVista({ vista, onChange }: { vista: Vista; onChange: (v: Vista) => void }) {
+    return (
+        <div role="radiogroup" aria-label="Qué mostrar en la vista previa" style={{ display: 'inline-flex', padding: 2, gap: 2, borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            {OPCIONES_VISTA.map(([id, label]) => {
+                const activa = vista === id
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={activa}
+                        onClick={() => onChange(id)}
+                        className="ds-hover"
+                        style={{
+                            height: 24, padding: '0 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            fontSize: 11.5, fontWeight: activa ? 600 : 500, whiteSpace: 'nowrap',
+                            background: activa ? 'var(--color-bg)' : 'transparent',
+                            color: activa ? 'var(--color-text)' : 'var(--color-muted)',
+                            boxShadow: activa ? '0 1px 2px rgba(15,23,42,0.12)' : 'none',
+                            transition: 'background 150ms, color 150ms',
+                        }}
+                    >
+                        {label}
+                    </button>
+                )
+            })}
         </div>
     )
 }

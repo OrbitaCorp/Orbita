@@ -168,6 +168,10 @@ const TABS_PLANTILLA: [TabPlantilla, string][] = [
 export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
+    // Lo que la tienda muestra HOY (lo último cargado o guardado). La vista
+    // previa lo usa para el "Publicado / Con tus cambios", y "Descartar"
+    // vuelve el formulario a esto sin tocar el backend.
+    const [publicado, setPublicado] = useState<Ap | null>(null)
     const [fullPreview, setFullPreview] = useState(false)
     const [cargando, setCargando] = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
@@ -233,7 +237,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         ])
             .then(([dto, biz]) => {
                 if (cancelado) return
-                setApRaw(dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }))
+                const cargado = dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda })
+                setApRaw(cargado)
+                setPublicado(cargado)
                 setHomeTemplateLocal(dto.homeTemplate)
                 if (biz?.subdomain) setSubdomain(biz.subdomain)
             })
@@ -276,7 +282,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         setErrorGuardado(null)
         try {
             const actualizado = await panelUpdateAppearance(apToUpdateDto(ap))
-            setApRaw(dtoToAp(actualizado, AP_DEFAULTS))
+            const guardado = dtoToAp(actualizado, AP_DEFAULTS)
+            setApRaw(guardado)
+            setPublicado(guardado)
             setDirty(false)
             onToast('Cambios guardados y publicados')
         } catch (e) {
@@ -284,6 +292,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         } finally {
             setGuardando(false)
         }
+    }
+    function descartar() {
+        if (!publicado) return
+        setApRaw(publicado)
+        setDirty(false)
+        setErrorGuardado(null)
     }
     const fontOpts = Object.keys(GOOGLE_FONTS)
 
@@ -1227,7 +1241,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 </div>
 
                 <div className="ap-preview">
-                    <StorePreview ap={ap} subdomain={subdomain} />
+                    <StorePreview ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} />
                 </div>
             </div>
             )}
@@ -1240,7 +1254,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}><ExternalLink size={16} strokeWidth={1.6} /> Vista previa{subdomain ? ` · ${subdomain}.${ROOT_DOMAIN}` : ''}</span>
                             <button onClick={() => setFullPreview(false)} className="ds-hover" style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><X size={18} /></button>
                         </div>
-                        <div style={{ flex: 1, overflowY: 'auto', borderRadius: 12, background: 'var(--color-bg)' }}><StorePreview ap={ap} subdomain={subdomain} full /></div>
+                        <div style={{ flex: 1, overflowY: 'auto', borderRadius: 12, background: 'var(--color-bg)' }}><StorePreview ap={ap} publicado={dirty ? publicado : null} subdomain={subdomain} full /></div>
                     </div>
                 </div>
             )}
@@ -1267,6 +1281,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     {errorGuardado && (
                         <span style={{ fontSize: 12, color: 'var(--color-error)', whiteSpace: 'nowrap' }}>{errorGuardado}</span>
                     )}
+                    {publicado && <Button variant="ghost" disabled={guardando} onClick={descartar}>Descartar</Button>}
                     <Button variant="primary" loading={guardando} onClick={guardar}>Guardar cambios</Button>
                 </div>
             )}
