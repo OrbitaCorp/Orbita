@@ -29,6 +29,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import ProductoNuevo from './ProductoNuevo'
 import type { EstadoProducto } from './types/catalogo.types'
 import { ResenasProducto } from './components/ResenasProducto'
+import { StockRapidoModal } from './components/StockRapido'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 10
@@ -192,7 +193,7 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas }: {
+function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas, onEditarStock }: {
     p: ApiProductRow
     upload?: ProductUploadState
     // Producto EXISTENTE guardando cambios en segundo plano (ver
@@ -208,6 +209,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     onBorrar: () => void
     onToggleFeatured: () => void
     onResenas: () => void
+    onEditarStock: () => void
 }) {
     const [indice, setIndice] = useState(0)
     const [menuAbierto, setMenuAbierto] = useState(false)
@@ -338,7 +340,14 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}>{p.totalStock} u.</span>
+                    <button
+                        onClick={e => { e.stopPropagation(); onEditarStock() }}
+                        title="Editar stock"
+                        className="prod-stock-btn"
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
+                    >
+                        {p.totalStock} u.
+                    </button>
                 </div>
                 {p.variantCount > 1 && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 10.5, fontWeight: 600, width: 'fit-content', marginTop: 2 }}>
@@ -383,7 +392,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
 // ─── Card mobile ─────────────────────────────────────────────────────────────
 
-function ProductoCard({ p, upload, editando, onEditar }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void }) {
+function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void; onEditarStock: () => void }) {
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
@@ -408,10 +417,14 @@ function ProductoCard({ p, upload, editando, onEditar }: { p: ApiProductRow; upl
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Precio</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</div>
                 </div>
-                <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
+                <button
+                    onClick={e => { e.stopPropagation(); onEditarStock() }}
+                    title="Editar stock"
+                    style={{ background: 'var(--color-surface)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', textAlign: 'left' }}
+                >
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Stock</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace' }}>{p.totalStock}</div>
-                </div>
+                </button>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Variantes</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{p.variantCount}</div>
@@ -481,6 +494,11 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // `resenas-sin-moderacion-panel`). Se entra por el ícono de la fila.
     const [resenasDe, setResenasDe] = useState<string | null>(null)
     const [borrando, setBorrando] = useState(false)
+
+    // Producto cuyo stock se está editando rápido, sin entrar al editor
+    // completo (ver components/StockRapido.tsx) — se entra clickeando el
+    // número de stock de la fila/card.
+    const [stockDe, setStockDe] = useState<ApiProductRow | null>(null)
 
     // Productos recién creados cuyas fotos siguen subiendo en segundo plano
     // (ver ProductoNuevo.tsx guardar() + lib/productUploadTracker.ts) — un
@@ -810,6 +828,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 .prod-list-actbtn { transition: background 120ms, color 120ms; }
                 .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
+                /* Números de stock clickeables (tabla, grilla y card mobile,
+                   ver StockRapido.tsx) — el único indicio de que son
+                   accionables es este subrayado al hover, sin ícono
+                   agregado ni color extra (mismo criterio del resto del
+                   panel: el color ya lo lleva el propio dato). */
+                @media (hover: hover) {
+                    .prod-stock-btn:hover, .prod-table-row button[title="Editar stock"]:hover { text-decoration: underline; text-underline-offset: 2px; }
+                }
                 /* Hover del módulo — antes las cards/filas de producto no
                    daban ningún feedback al pasar el mouse, solo los botones
                    de acción sueltos (de arriba); después, el único cambio
@@ -947,6 +973,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onBorrar={() => {}}
                                 onToggleFeatured={() => {}}
                                 onResenas={() => {}}
+                                onEditarStock={() => {}}
                             />
                         ))}
                         {filas.map(p => (
@@ -960,6 +987,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onBorrar={() => setABorrar(p)}
                                 onToggleFeatured={() => void toggleFeatured(p)}
                                 onResenas={() => setResenasDe(p.id)}
+                                onEditarStock={() => setStockDe(p)}
                             />
                         ))}
                     </div>
@@ -1019,7 +1047,13 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             </div>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.categoryName ?? 'Sin categoría'}</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(p.basePrice)}</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{p.totalStock}</span>
+                            <button
+                                onClick={() => setStockDe(p)}
+                                title="Editar stock"
+                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}
+                            >
+                                {p.totalStock}
+                            </button>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
                             {editandoFila ? <EditandoTag e={editandoFila} /> : <ProductoEstadoBadge estado={estadoVisual(p)} />}
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative', opacity: editandoFila ? 0.4 : 1, pointerEvents: editandoFila ? 'none' : 'auto' }}>
@@ -1064,10 +1098,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
                     : <>
                         {uploads.map(u => (
-                            <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} />
+                            <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} onEditarStock={() => {}} />
                         ))}
                         {filas.map(p => (
-                            <ProductoCard key={p.id} p={p} editando={editsPorId.get(p.id)} onEditar={() => irEditar(p.id)} />
+                            <ProductoCard key={p.id} p={p} editando={editsPorId.get(p.id)} onEditar={() => irEditar(p.id)} onEditarStock={() => setStockDe(p)} />
                         ))}
                     </>
                 }
@@ -1086,6 +1120,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* Moderación de reseñas del producto. Se monta solo cuando hace
                 falta: pide la lista al abrirse, no en cada render de la tabla. */}
             {resenasDe && <ResenasProducto productId={resenasDe} onClose={() => setResenasDe(null)} />}
+
+            {/* Edición rápida de stock — ver components/StockRapido.tsx. Al
+                guardar se refresca la lista (cambia totalStock, y puede
+                cambiar el estado visual si pasó a/de "sin stock"). */}
+            {stockDe && (
+                <StockRapidoModal
+                    productoId={stockDe.id}
+                    productoNombre={stockDe.name}
+                    onClose={() => setStockDe(null)}
+                    onGuardado={m => { onToast(m); if (!toastEsError(m)) void cargar() }}
+                />
+            )}
 
             {/* Confirmación de borrado */}
             <Modal isOpen={aBorrar !== null} onClose={() => setABorrar(null)} title="Eliminar producto" maxWidth={420}>
