@@ -219,21 +219,28 @@ export default function ProductoDetalle() {
       const medicion = specsMedicionRef.current
       const header = specsHeaderRef.current
       if (!colDerecha || !medicion || !header) return
-      // OJO: nunca leer colDerecha.getBoundingClientRect().height a secas —
-      // es un item de este mismo grid (.sf-pd-main), y CSS Grid por default
-      // estira ambas columnas a la altura de la MÁS ALTA de las dos. Si la
-      // ficha técnica (sin recortar todavía, primera pasada) es más alta que
-      // el contenido real de la derecha, ESE alto estirado terminaría
-      // reflejando el propio alto de la ficha, no el de la columna derecha —
-      // la cuenta se muerde la cola y nunca recorta nada. Midiendo desde el
-      // techo de la columna hasta el PISO de su último hijo (la caja de
-      // envíos) se obtiene el alto real de su contenido, inmune a ese
-      // estiramiento.
       const ultimoHijo = colDerecha.lastElementChild as HTMLElement | null
-      const altoColDerecha = ultimoHijo
-        ? ultimoHijo.getBoundingClientRect().bottom - colDerecha.getBoundingClientRect().top
-        : colDerecha.getBoundingClientRect().height
-      const disponible = altoColDerecha - header.getBoundingClientRect().height
+      if (!ultimoHijo) return
+      // El presupuesto para las FILAS es lo que queda entre el pie del
+      // encabezado "Características" (ahí arrancan) y el pie del último
+      // elemento de la columna derecha (la caja de envíos). OJO con dos
+      // errores fáciles de cometer acá:
+      // 1) NO restar contra el techo de colDerecha: la tarjeta de specs
+      //    arranca bien más abajo que ese techo (debajo de la foto/galería
+      //    de la columna izquierda) — medir desde ahí infla el presupuesto
+      //    con una altura que la tarjeta ni siquiera puede usar (bug real,
+      //    encontrado al verificar contra producción: nunca recortaba nada
+      //    porque el "disponible" resultante casi siempre daba de sobra).
+      // 2) NO leer colDerecha.getBoundingClientRect().height a secas — es un
+      //    item de este mismo grid (.sf-pd-main), y CSS Grid por default
+      //    estira ambas columnas a la altura de la MÁS ALTA de las dos; si la
+      //    ficha (sin recortar todavía, primera pasada) fuera más alta que
+      //    el contenido real de la derecha, ese alto estirado reflejaría el
+      //    propio alto de la ficha, no el de la columna — la cuenta se
+      //    muerde la cola. Comparando el PISO del último hijo contra el PISO
+      //    del encabezado (ambos ancenados en el documento, no en el grid
+      //    estirado) se esquivan los dos problemas de una.
+      const disponible = ultimoHijo.getBoundingClientRect().bottom - header.getBoundingClientRect().bottom
       const filas = Array.from(medicion.children) as HTMLElement[]
       const altoTotal = filas.reduce((acc, f) => acc + f.getBoundingClientRect().height, 0)
       if (altoTotal <= disponible) { setSpecsVisibles(filas.length); return }
@@ -256,7 +263,17 @@ export default function ProductoDetalle() {
     // desalineado contra la columna derecha.
     document.fonts?.ready.then(recalcular).catch(() => {})
     return () => window.removeEventListener('resize', recalcular)
-  }, [producto])
+    // `cargando` entra a propósito: `producto` ya puede estar seteado
+    // mientras todavía se está pidiendo la página de relacionados (ver el
+    // useEffect de arriba, cargando recién pasa a false en el .finally() de
+    // ESE fetch) — en ese momento el componente devuelve el SKELETON (early
+    // return de más abajo), que no tiene ninguno de los refs que este efecto
+    // necesita, y el guard de arriba corta en silencio. Sin `cargando` acá,
+    // este efecto no vuelve a correr cuando el contenido real recién se
+    // monta (la referencia de `producto` no cambia entre esos dos renders),
+    // y specsVisibles se queda en null para siempre (bug real, encontrado
+    // verificando contra producción: nunca recortaba nada).
+  }, [producto, cargando])
 
   async function enviarResenia() {
     if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
