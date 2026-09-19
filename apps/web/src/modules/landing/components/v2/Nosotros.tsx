@@ -43,8 +43,8 @@ interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string
 
 const EQUIPO: Miembro[] = [
     { nombre: 'Mateo Rojas',       sigla: 'CEO', puesto: 'Fundador y director ejecutivo',               foto: '/nosotros/ceo.jpg', zoom: 1.35, foco: '43% 35%' },
-    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Cofundador y director de producto',           foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
-    { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Cofundador y director de tecnología',         foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
+    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Fundador y director de producto',             foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
+    { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Fundador y director de tecnología',           foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
     { nombre: 'Milagros Lucchi',   sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.55, foco: '55% 41%' },
 ];
 
