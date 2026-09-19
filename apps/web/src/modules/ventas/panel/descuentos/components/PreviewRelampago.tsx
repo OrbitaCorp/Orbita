@@ -8,7 +8,6 @@
 // al preview de ticket (PreviewPOS) porque lo que el dueño quiere ver de esta
 // promo no es el subtotal del carrito sino cómo queda en la portada.
 
-import { Timer } from 'lucide-react'
 import { useAhora } from '@/hooks/useAhora'
 import { localAInstante } from '../utils'
 
@@ -19,8 +18,6 @@ interface Props {
   horaFin: string
   cantidadProductos: number
 }
-
-const MONO = '"Geist Mono", "Fira Code", monospace'
 
 function partes(ms: number) {
   const seg = Math.max(0, Math.floor(ms / 1000))
@@ -45,23 +42,20 @@ export function PreviewRelampago({ nombre, valor, fechaFin, horaFin, cantidadPro
       </p>
 
       <div className="prl-cartel" aria-hidden="true">
-        <div className="prl-eyebrow">
-          <Timer size={11} strokeWidth={2.4} />
-          Oferta por tiempo limitado
-          {pct > 0 && <span className="prl-off">{pct}% OFF</span>}
-        </div>
+        <div className="prl-kicker">Oferta relámpago</div>
         <div className="prl-titulo">{nombre.trim() || 'Nombre de la oferta'}</div>
+        {pct > 0 && <div className="prl-off">{pct}% OFF</div>}
         <div className="prl-reloj">
           {t ? (
             <>
-              {t.dias > 0 && <Casilla n={t.dias} label={t.dias === 1 ? 'día' : 'días'} />}
-              <Casilla n={t.horas} label="hs" />
+              {t.dias > 0 && <Casilla n={t.dias} label={t.dias === 1 ? 'día' : 'días'} primera />}
+              <Casilla n={t.horas} label="horas" primera={t.dias === 0} />
               <Casilla n={t.min} label="min" />
               <Casilla n={t.seg} label="seg" />
             </>
           ) : (
             <>
-              <Casilla n={null} label="hs" />
+              <Casilla n={null} label="horas" primera />
               <Casilla n={null} label="min" />
               <Casilla n={null} label="seg" />
             </>
@@ -72,7 +66,7 @@ export function PreviewRelampago({ nombre, valor, fechaFin, horaFin, cantidadPro
       <div className="prl-grid" aria-hidden="true">
         {Array.from({ length: tarjetas }).map((_, i) => (
           <div key={i} className="prl-card">
-            <div className="prl-img" />
+            <div className="prl-img">{pct > 0 && <span className="prl-pct">−{pct}%</span>}</div>
             <div className="prl-linea" style={{ width: '70%' }} />
             <div className="prl-precio">
               <span className="prl-tachado" />
@@ -93,27 +87,32 @@ export function PreviewRelampago({ nombre, valor, fechaFin, horaFin, cantidadPro
   )
 }
 
-function Casilla({ n, label }: { n: number | null; label: string }) {
+function Casilla({ n, label, primera }: { n: number | null; label: string; primera?: boolean }) {
   return (
-    <span className="prl-casilla">
-      <b style={{ fontFamily: MONO }}>{n === null ? '--' : pad(n)}</b>
-      <span>{label}</span>
-    </span>
+    <>
+      {!primera && <span className="prl-sep">:</span>}
+      <span className="prl-casilla">
+        <b>{n === null ? '--' : pad(n)}</b>
+        <span>{label}</span>
+      </span>
+    </>
   )
 }
 
 const ESTILOS = `
-.prl-cartel { padding: 12px 14px; border-radius: 12px; background: linear-gradient(100deg, var(--color-primary-h), var(--color-primary)); color: var(--color-on-primary); }
-.prl-eyebrow { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9; }
-.prl-off { padding: 1px 6px; border-radius: 999px; letter-spacing: 0.04em; background: color-mix(in srgb, var(--color-on-primary) 20%, transparent); }
-.prl-titulo { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prl-reloj { display: flex; gap: 5px; margin-top: 10px; }
-.prl-casilla { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; padding: 6px 4px; border-radius: 8px; background: color-mix(in srgb, var(--color-on-primary) 16%, transparent); }
-.prl-casilla b { font-size: 15px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.prl-casilla span { font-size: 8px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
-.prl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
-.prl-card { padding: 6px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface-alt); display: flex; flex-direction: column; gap: 5px; }
-.prl-img { width: 100%; aspect-ratio: 1; border-radius: 6px; background: var(--color-border); }
+.prl-cartel { padding: 14px 16px; border-radius: 12px 12px 0 0; background: var(--color-primary); color: var(--color-on-primary); }
+.prl-kicker { font-size: 10.5px; opacity: 0.8; }
+.prl-titulo { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prl-off { margin-top: 8px; font-size: 26px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+.prl-reloj { display: flex; align-items: flex-start; margin-top: 12px; }
+.prl-casilla { display: flex; flex-direction: column; align-items: center; min-width: 2ch; }
+.prl-casilla b { font-size: 18px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.prl-casilla span { margin-top: 3px; font-size: 9px; opacity: 0.75; }
+.prl-sep { padding: 0 4px; font-size: 15px; line-height: 1.1; opacity: 0.5; }
+.prl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; border: 1px solid var(--color-border); border-top: 0; border-radius: 0 0 12px 12px; background: var(--color-surface); }
+.prl-card { display: flex; flex-direction: column; gap: 5px; }
+.prl-img { position: relative; width: 100%; aspect-ratio: 1; border-radius: 6px; background: var(--color-border); }
+.prl-pct { position: absolute; top: 4px; left: 4px; padding: 1px 4px; border-radius: 4px; background: var(--color-primary); color: var(--color-on-primary); font-size: 8.5px; font-weight: 700; }
 .prl-linea { height: 6px; border-radius: 3px; background: var(--color-border); }
 .prl-linea--fuerte { background: var(--color-border-strong); height: 7px; }
 .prl-precio { display: flex; align-items: center; gap: 5px; }

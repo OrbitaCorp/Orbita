@@ -734,8 +734,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 <SeccionCategorias cats={catsVisual} go={go} estilo={config?.appearance?.categoryLayout} categoryIds={config?.appearance?.categoryIds} />
             )}
 
-            {/* ══ OFERTA CON CUENTA REGRESIVA (paquete Avanzado) ══ — la
-                "cartelera": el reloj grande más los productos que están en
+            {/* ══ OFERTA CON CUENTA REGRESIVA (paquete Avanzado) ══ — el
+                cartel con el reloj y, al lado, los productos que están en
                 oferta de verdad. Va ARRIBA de Destacados a propósito: es lo
                 único de la portada que se vence, y abajo de tres secciones de
                 catálogo la urgencia no se ve. Sin countdown con descuento (el
@@ -743,10 +743,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {slug && (
                 <CountdownOfertaSection
                     slug={slug}
-                    mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'}
-                    transferPct={transferPct}
                     badges={{ showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }}
-                    onVerTodo={() => go('/catalogo')}
                 />
             )}
 
