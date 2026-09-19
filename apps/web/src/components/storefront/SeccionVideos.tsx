@@ -164,7 +164,7 @@ function ConLista({ videos, go }: { videos: Video[]; go: Props['go'] }) {
                 aria-current={i === activo ? 'true' : undefined}
                 onClick={() => { setActivo(i); setElegido(true) }}
               >
-                <span className="sf-vd-lista-thumb"><Miniatura embed={x.embed} /></span>
+                <span className="sf-vd-lista-thumb"><Miniatura video={x} /></span>
                 <span className="sf-vd-lista-nombre">{x.title || `Video ${i + 1}`}</span>
               </button>
             </li>
@@ -192,21 +192,61 @@ function youtubeId(src: string): string | null {
   return src.match(/\/embed\/([A-Za-z0-9_-]{11})/)?.[1] ?? null
 }
 
-// Lo que se ve antes de reproducir: la miniatura de YouTube, el primer
-// cuadro del archivo, o un fondo liso para Vimeo (su miniatura pide una API).
-function Miniatura({ embed, vertical }: { embed: VideoEmbed; vertical?: boolean }) {
+// Lo que se ve antes de reproducir. En orden: la portada que cargó el dueño,
+// la miniatura de YouTube, el primer cuadro del archivo, o un fondo liso para
+// Vimeo (su miniatura pide una API).
+//
+// En un marco vertical (diseño 'reels') con un video HORIZONTAL, llenar el
+// cuadro lo recortaba a una franja del medio (Ale, 19/09: "se ve cortado").
+// Ahí el video va entero, centrado, y el espacio que sobra se rellena con el
+// mismo cuadro desenfocado — el recurso de Instagram/TikTok para un video
+// apaisado en un formato parado. Un Short de YouTube o un archivo vertical
+// sí llenan el cuadro.
+function Miniatura({ video, vertical }: { video: Video; vertical?: boolean }) {
+  const { embed } = video
+  // null = todavía no se sabe (archivo sin metadata cargada).
+  const [horizontal, setHorizontal] = useState<boolean | null>(
+    embed.tipo === 'youtube' ? !/youtube\.com\/shorts\//i.test(video.url) : null,
+  )
   const cubrir: CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
+  const contener: CSSProperties = { ...cubrir, objectFit: 'contain' }
+  const fondo: CSSProperties = { ...cubrir, filter: 'blur(22px) brightness(0.75)', transform: 'scale(1.25)' }
+
+  if (video.posterUrl) return <img src={video.posterUrl} alt="" loading="lazy" style={cubrir} />
+
   if (embed.tipo === 'youtube') {
     const id = youtubeId(embed.src)
-    // hqdefault es 4:3 con bandas negras arriba y abajo (el 16:9 va en el
-    // medio). En un marco 16:9 el `cover` ya las recorta; en uno vertical
-    // no, así que ahí se agranda 4/3 para sacarlas.
-    return id ? <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" style={vertical ? { ...cubrir, transform: 'scale(1.34)' } : cubrir} /> : null
+    if (!id) return null
+    // hqdefault es 4:3 con bandas negras arriba y abajo; mqdefault es 16:9
+    // limpio (más chica, pero alcanza para ir centrada en un marco angosto).
+    if (vertical && horizontal) {
+      return <>
+        <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" style={fondo} />
+        <img src={`https://i.ytimg.com/vi/${id}/mqdefault.jpg`} alt="" loading="lazy" style={contener} />
+      </>
+    }
+    // En un marco 16:9 el `cover` ya recorta las bandas de hqdefault; en uno
+    // vertical (un Short), se agranda 4/3 para sacarlas.
+    return <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy" style={vertical ? { ...cubrir, transform: 'scale(1.34)' } : cubrir} />
   }
   if (embed.tipo === 'file') {
     // #t=0.1: sin él algunos navegadores (Firefox) dejan el cuadro en negro
     // hasta reproducir — mismo criterio que VideoUploader.tsx.
-    return <video src={`${embed.src}#t=0.1`} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" style={cubrir} />
+    const src = `${embed.src}#t=0.1`
+    const medir = (v: HTMLVideoElement | null) => {
+      if (v && v.videoWidth && v.videoHeight) setHorizontal(v.videoWidth > v.videoHeight)
+    }
+    if (vertical && horizontal) {
+      return <>
+        <video src={src} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" style={fondo} />
+        <video src={src} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" style={contener} />
+      </>
+    }
+    return <video src={src} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" onLoadedMetadata={vertical ? e => medir(e.currentTarget) : undefined}
+      // Si la metadata llegó antes de que React enganchara el evento (video
+      // en caché, hidratación), se mide apenas se monta.
+      ref={vertical ? el => { if (el && el.readyState >= 1) medir(el) } : undefined}
+      style={cubrir} />
   }
   return null
 }
@@ -236,7 +276,7 @@ function Reproductor({ video, vertical, autoplay = false, className }: {
   } else {
     contenido = (
       <button type="button" className="sf-vd-poster" onClick={() => setJugando(true)} aria-label={`Reproducir: ${nombre}`}>
-        <Miniatura embed={embed} vertical={vertical} />
+        <Miniatura video={video} vertical={vertical} />
         <span className="sf-vd-play" aria-hidden="true"><Play size={vertical ? 20 : 24} fill="currentColor" strokeWidth={0} /></span>
       </button>
     )

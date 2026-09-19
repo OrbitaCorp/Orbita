@@ -989,7 +989,7 @@ export type ApiStatsBarItem = { id: string; value: string; label: string }
 // tipografía, no un hueco — por eso es opcional, igual que en el DTO del
 // backend (ver brand-item.dto.ts en apps/api).
 export type ApiBrandItem = { id: string; name: string; logoUrl?: string }
-export type ApiVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string }
+export type ApiVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string; posterUrl?: string }
 
 export type ApiAppearanceConfig = {
   storeName: string | null

@@ -1,4 +1,5 @@
 import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { URL_IMAGEN, URL_IMAGEN_MENSAJE } from './url-imagen';
 
 // Un video de la sección de video del home (ver `videos` en schema.prisma).
 //
@@ -20,4 +21,9 @@ export class VideoItemDto {
   @IsOptional() @IsString() @MaxLength(400) text?: string;
   @IsOptional() @IsString() @MaxLength(40) ctaText?: string;
   @IsOptional() @IsString() @MaxLength(500) ctaLink?: string;
+
+  // Portada opcional: la imagen que se ve antes de reproducir, en vez del
+  // primer cuadro del video. Sirve sobre todo en el diseño 'reels' con un
+  // video horizontal (Ale, 19/09: "se ve cortado").
+  @IsOptional() @IsString() @MaxLength(1000) @Matches(URL_IMAGEN, { message: URL_IMAGEN_MENSAJE }) posterUrl?: string;
 }

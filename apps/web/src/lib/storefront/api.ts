@@ -47,7 +47,7 @@ export type StorefrontStatsItem = { id: string; value: string; label: string }
 export type StorefrontBrandItem = { id: string; name: string; logoUrl?: string | null }
 
 // Un video de la sección de video del home (ver `videos` en schema.prisma).
-export type StorefrontVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string }
+export type StorefrontVideoItem = { id: string; url: string; title?: string; text?: string; ctaText?: string; ctaLink?: string; posterUrl?: string }
 // Cómo se muestran: uno grande, alternado con texto, verticales en fila, o
 // uno grande con la lista al costado. null = 'cine'.
 export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'

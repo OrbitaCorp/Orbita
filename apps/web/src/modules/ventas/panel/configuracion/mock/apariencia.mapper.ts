@@ -103,6 +103,9 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
                 ...(v.texto.trim() ? { text: v.texto.trim() } : {}),
                 ...(v.ctaTexto.trim() ? { ctaText: v.ctaTexto.trim() } : {}),
                 ...(v.ctaLink.trim() ? { ctaLink: v.ctaLink.trim() } : {}),
+                // Un data: es la vista previa de una subida que falló — no
+                // se manda (el DTO lo rechazaría y fallaría todo el guardado).
+                ...(v.portada && !v.portada.startsWith('data:') ? { posterUrl: v.portada } : {}),
             })),
         // Sin código no hay cupón: se manda null y la sección desaparece del
         // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
@@ -220,9 +223,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         // Tienda con el video único de antes (sin `videos`): se lo muestra
         // como el primero de la lista, así el dueño lo ve y lo puede editar.
         videos: dto.videos && dto.videos.length > 0
-            ? dto.videos.map(v => ({ id: v.id, url: v.url, titulo: v.title ?? '', texto: v.text ?? '', ctaTexto: v.ctaText ?? '', ctaLink: v.ctaLink ?? '' }))
+            ? dto.videos.map(v => ({ id: v.id, url: v.url, titulo: v.title ?? '', texto: v.text ?? '', ctaTexto: v.ctaText ?? '', ctaLink: v.ctaLink ?? '', portada: v.posterUrl ?? null }))
             : dto.videoUrl
-                ? [{ id: 'vd-legado', url: dto.videoUrl, titulo: '', texto: '', ctaTexto: '', ctaLink: '' }]
+                ? [{ id: 'vd-legado', url: dto.videoUrl, titulo: '', texto: '', ctaTexto: '', ctaLink: '', portada: null }]
                 : [],
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,

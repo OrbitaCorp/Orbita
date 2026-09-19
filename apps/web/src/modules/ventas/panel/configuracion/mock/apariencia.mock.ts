@@ -158,6 +158,8 @@ export interface VideoItem {
     texto:     string
     ctaTexto:  string
     ctaLink:   string
+    // Imagen que se ve antes de reproducir, en vez del primer cuadro.
+    portada:   string | null
 }
 
 export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'

@@ -1580,6 +1580,13 @@ function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layou
                                     <VideoUploader value={v.url} onChange={x => upd(i, { url: x })} onUpload={subirVideoApariencia} maxMB={500} />
                                 </div>
                             )}
+                            {/* Portada opcional. En Verticales se pide parada
+                                (9:16): con un video horizontal es lo que evita
+                                que el cuadro se vea recortado. */}
+                            <div style={{ marginBottom: 12 }}>
+                                <FieldLabel help={layout === 'reels' ? 'Opcional. Una imagen parada (9:16) queda mejor en este diseño, sobre todo si el video es horizontal.' : 'Opcional. Se ve antes de darle play, en vez del primer cuadro del video.'}>Portada</FieldLabel>
+                                <ImgUploader value={v.portada} onChange={x => upd(i, { portada: x })} onUpload={subirImagenApariencia} shape="square" size={64} formats="JPG, PNG · máx 4MB" />
+                            </div>
                             <div style={{ marginBottom: usaTexto ? 8 : 0 }}><Inp value={v.titulo} onChange={x => upd(i, { titulo: x })} maxLength={120} placeholder="Título (opcional)" /></div>
                             {usaTexto && (
                                 <>
@@ -1596,7 +1603,7 @@ function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layou
             </div>
             {videos.length < MAX_VIDEOS && (
                 <button
-                    onClick={() => onChange([...videos, { id: 'vd' + Date.now(), url: '', titulo: '', texto: '', ctaTexto: '', ctaLink: '' }])}
+                    onClick={() => onChange([...videos, { id: 'vd' + Date.now(), url: '', titulo: '', texto: '', ctaTexto: '', ctaLink: '', portada: null }])}
                     className="ds-hover"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
                 >
