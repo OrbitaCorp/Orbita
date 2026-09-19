@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag, Play } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
@@ -7,6 +7,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { FichaTecnicaModal } from '@/components/storefront/FichaTecnicaModal'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp, parseVideoEmbed } from '@/lib/storefront/utils'
@@ -132,6 +133,16 @@ export default function ProductoDetalle() {
   const [enviandoResenia, setEnviandoResenia] = useState(false)
   const [errorResenia, setErrorResenia] = useState('')
 
+  // Ficha técnica vs. columna derecha (título/precio/botones/envíos): ver el
+  // useLayoutEffect de más abajo — null = sin recortar (mobile, o todavía no
+  // se pudo medir), un número = cuántas filas entran antes de necesitar el
+  // link "Ver más detalles".
+  const [specsVisibles, setSpecsVisibles] = useState<number | null>(null)
+  const [fichaAbierta, setFichaAbierta] = useState(false)
+  const colDerechaRef = useRef<HTMLDivElement>(null)
+  const specsHeaderRef = useRef<HTMLDivElement>(null)
+  const specsMedicionRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!slug) return
     let cancelado = false
@@ -183,6 +194,69 @@ export default function ProductoDetalle() {
     reviewEligibility(id).then(r => { if (!cancelado) setElegibilidad(r) }).catch(() => {})
     return () => { cancelado = true }
   }, [id, authStatus, cliente, config?.business?.mode])
+
+  // La ficha técnica vive al lado del título/precio/botones/envíos (columna
+  // derecha) — sin este ajuste, un producto con muchas specs (electrónica,
+  // sobre todo) estiraba esa tabla mucho más abajo que el resto de la
+  // columna derecha, dejando la ficha "flotando" sola contra el pie de
+  // página (reportado con captura). Se mide el alto REAL de la columna
+  // derecha (varía según el largo del nombre, si hay WhatsApp, etc.) contra
+  // el alto REAL de cada fila (varía: specs con etiqueta o valor largo
+  // ocupan dos líneas, ej. "ALMACENAMIENTO INTERNO") y se recorta la lista a
+  // lo que entra, sumando un link al pie que abre el resto en un modal.
+  //
+  // La medición de las filas se hace sobre un clon oculto con TODAS las
+  // specs (nunca sobre la lista visible, que puede estar ya recortada) —
+  // así un resize que agranda la ventana puede volver a mostrar más filas,
+  // no solo achicar.
+  useLayoutEffect(() => {
+    if (!producto || producto.specs.length === 0) return
+    function recalcular() {
+      // Layout de una sola columna (celular/tablet, ver CSS_FICHA en @768px):
+      // la ficha ya no está al lado de nada, se ve completa siempre.
+      if (window.innerWidth <= 768) { setSpecsVisibles(null); return }
+      const colDerecha = colDerechaRef.current
+      const medicion = specsMedicionRef.current
+      const header = specsHeaderRef.current
+      if (!colDerecha || !medicion || !header) return
+      // OJO: nunca leer colDerecha.getBoundingClientRect().height a secas —
+      // es un item de este mismo grid (.sf-pd-main), y CSS Grid por default
+      // estira ambas columnas a la altura de la MÁS ALTA de las dos. Si la
+      // ficha técnica (sin recortar todavía, primera pasada) es más alta que
+      // el contenido real de la derecha, ESE alto estirado terminaría
+      // reflejando el propio alto de la ficha, no el de la columna derecha —
+      // la cuenta se muerde la cola y nunca recorta nada. Midiendo desde el
+      // techo de la columna hasta el PISO de su último hijo (la caja de
+      // envíos) se obtiene el alto real de su contenido, inmune a ese
+      // estiramiento.
+      const ultimoHijo = colDerecha.lastElementChild as HTMLElement | null
+      const altoColDerecha = ultimoHijo
+        ? ultimoHijo.getBoundingClientRect().bottom - colDerecha.getBoundingClientRect().top
+        : colDerecha.getBoundingClientRect().height
+      const disponible = altoColDerecha - header.getBoundingClientRect().height
+      const filas = Array.from(medicion.children) as HTMLElement[]
+      const altoTotal = filas.reduce((acc, f) => acc + f.getBoundingClientRect().height, 0)
+      if (altoTotal <= disponible) { setSpecsVisibles(filas.length); return }
+      const ALTO_LINK = 41 // similar a una fila, para no romper el ritmo visual del corte
+      let usado = 0
+      let visibles = 0
+      for (const fila of filas) {
+        const alto = fila.getBoundingClientRect().height
+        if (usado + alto > disponible - ALTO_LINK) break
+        usado += alto
+        visibles++
+      }
+      setSpecsVisibles(Math.max(visibles, 1))
+    }
+    recalcular()
+    window.addEventListener('resize', recalcular)
+    // Un webfont que termina de cargar después del primer layout puede
+    // cambiar el alto real de las filas (aunque sea un pixel) — recalcular
+    // una vez más cuando eso pasa evita quedar con un corte levemente
+    // desalineado contra la columna derecha.
+    document.fonts?.ready.then(recalcular).catch(() => {})
+    return () => window.removeEventListener('resize', recalcular)
+  }, [producto])
 
   async function enviarResenia() {
     if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
@@ -590,22 +664,56 @@ export default function ProductoDetalle() {
 
             {/* Ficha técnica: la carga el vendedor (a mano o con Orbi) al crear
                 el producto — si no cargó ninguna, la tabla entera no se
-                muestra (no hay nada genérico/mock que rellenar acá). */}
-            {producto.specs.length > 0 && (
-              <div className="sf-pd-belowimg" style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', marginLeft: anchoMiniaturas }}>
-                <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
-                  Características
-                </div>
-                <div style={{ padding: '4px 0' }}>
-                  {producto.specs.map((c, i) => (
-                    <div key={`${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px', borderBottom: i < producto.specs.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
-                      <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.value}</span>
+                muestra (no hay nada genérico/mock que rellenar acá). Su
+                altura se recorta para no superar la de la columna derecha —
+                ver el useLayoutEffect de arriba — con un link al fondo que
+                abre el resto en un modal (FichaTecnicaModal). */}
+            {producto.specs.length > 0 && (() => {
+              const specsAMostrar = producto.specs.slice(0, specsVisibles ?? producto.specs.length)
+              const hayMas = specsVisibles !== null && specsVisibles < producto.specs.length
+              return (
+                <div className="sf-pd-belowimg" style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', marginLeft: anchoMiniaturas }}>
+                  <div ref={specsHeaderRef} style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
+                    Características
+                  </div>
+                  <div style={{ padding: '4px 0' }}>
+                    {specsAMostrar.map((c, i) => (
+                      <div key={`${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px', borderBottom: (i < specsAMostrar.length - 1 || hayMas) ? '1px solid var(--color-border)' : 'none' }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
+                        <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {hayMas && (
+                    <button
+                      className="ds-hover"
+                      onClick={() => setFichaAbierta(true)}
+                      style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, textAlign: 'left', cursor: 'pointer' }}
+                    >
+                      Ver más detalles →
+                    </button>
+                  )}
+
+                  {/* Clon invisible con TODAS las specs (nunca recortado),
+                      usado solo para medir el alto real de cada fila — mismo
+                      ancho que la tarjeta real (mismo padre en columna, mismo
+                      criterio de stretch), overflow:hidden + height:0 lo saca
+                      de la vista sin sacarlo del layout. Así un resize que
+                      agranda la ventana puede volver a mostrar más filas, no
+                      solo recortar de más. */}
+                  <div aria-hidden style={{ height: 0, overflow: 'hidden', visibility: 'hidden' }}>
+                    <div ref={specsMedicionRef}>
+                      {producto.specs.map((c, i) => (
+                        <div key={`m-${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px' }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
+                          <span style={{ fontSize: 13 }}>{c.value}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Envíos/cambios/pago — su lugar "de siempre" es la columna
                 derecha, pegado a los botones de compra (ver más abajo). Pero
@@ -626,7 +734,7 @@ export default function ProductoDetalle() {
           </div>
 
           {/* ── Panel de info ── */}
-          <div>
+          <div ref={colDerechaRef}>
             {producto.categoryName && (
               <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
                 {producto.categoryName}
@@ -885,6 +993,10 @@ export default function ProductoDetalle() {
             )}
           </div>
         </div>
+
+        {fichaAbierta && (
+          <FichaTecnicaModal nombre={producto.name} specs={producto.specs} onClose={() => setFichaAbierta(false)} />
+        )}
 
         {/* ══ RESEÑAS ══ — se sacan enteras en vidriera digital, el backend
             las bloquea (FullModeOnly). */}

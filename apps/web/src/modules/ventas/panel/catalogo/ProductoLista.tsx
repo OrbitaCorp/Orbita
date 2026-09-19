@@ -344,7 +344,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                         onClick={e => { e.stopPropagation(); onEditarStock() }}
                         title="Editar stock"
                         className="prod-stock-btn"
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
+                        style={{ background: 'none', border: 'none', borderBottom: '1.5px dashed currentColor', padding: '0 0 1px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
                     >
                         {p.totalStock} u.
                     </button>
@@ -423,7 +423,7 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: Api
                     style={{ background: 'var(--color-surface)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', textAlign: 'left' }}
                 >
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Stock</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace' }}>{p.totalStock}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', borderBottom: '1.5px dashed currentColor', width: 'fit-content', paddingBottom: 1 }}>{p.totalStock}</div>
                 </button>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Variantes</div>
@@ -829,12 +829,15 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-list-actbtn { transition: background 120ms, color 120ms; }
                 .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 /* Números de stock clickeables (tabla, grilla y card mobile,
-                   ver StockRapido.tsx) — el único indicio de que son
-                   accionables es este subrayado al hover, sin ícono
-                   agregado ni color extra (mismo criterio del resto del
-                   panel: el color ya lo lleva el propio dato). */
+                   ver StockRapido.tsx) — el guión bajo punteado permanente
+                   (aplicado inline en cada uno) es lo que avisa "esto se
+                   puede tocar" sin agregar ningún ícono ni cambiar el color
+                   semántico del stock (rojo sin stock / verde con stock).
+                   Al pasar el mouse se vuelve línea sólida, mismo lenguaje
+                   que un link. */
+                .prod-stock-btn, .prod-mobile-card button[title="Editar stock"] { transition: border-color 120ms; }
                 @media (hover: hover) {
-                    .prod-stock-btn:hover, .prod-table-row button[title="Editar stock"]:hover { text-decoration: underline; text-underline-offset: 2px; }
+                    .prod-stock-btn:hover, .prod-mobile-card button[title="Editar stock"]:hover > div:last-child { border-bottom-style: solid !important; }
                 }
                 /* Hover del módulo — antes las cards/filas de producto no
                    daban ningún feedback al pasar el mouse, solo los botones
@@ -1050,7 +1053,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <button
                                 onClick={() => setStockDe(p)}
                                 title="Editar stock"
-                                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}
+                                className="prod-stock-btn"
+                                style={{ background: 'none', border: 'none', borderBottom: '1.5px dashed currentColor', padding: '0 0 1px', justifySelf: 'end', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
                             >
                                 {p.totalStock}
                             </button>
