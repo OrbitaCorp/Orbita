@@ -5,9 +5,9 @@ import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
 import {
-    ApiError, panelSearch, panelGetProfile,
+    ApiError, panelSearch, panelGetProfile, panelUpdateTheme,
     panelGetUnreadNotificationsCount, panelGetNotifications, panelMarkNotificationRead, panelMarkAllNotificationsRead,
-    type ApiSearchResults, type ApiNotification,
+    type ApiSearchResults, type ApiNotification, type MemberProfile,
 } from '@/lib/api'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
@@ -70,7 +70,7 @@ const iniciales = (nombre: string) =>
 interface Props { onMenuClick: () => void }
 
 export default function Header({ onMenuClick }: Props) {
-    const { isDark, toggle, tema, setTema } = useDarkMode()
+    const { isDark, tema, setTema } = useDarkMode()
 
     // (Alex) El botón "Cerrar sesión" ya andaba; ahora además los datos del menú
     // (nombre, rol, email, iniciales) salen de la sesión real en vez de estar
@@ -81,17 +81,36 @@ export default function Header({ onMenuClick }: Props) {
     // guardada distinta a la de este navegador (por ejemplo, la cambió desde
     // otro dispositivo), se aplica la del servidor. Solo para member — no
     // tiene sentido para platform_admin/customer, que no tienen esta pantalla.
+    //
+    // `eligioAhora`: si la persona ya tocó el botón de acá al lado mientras el
+    // perfil venía en camino, gana lo que acaba de elegir — si no, la
+    // respuesta del servidor le pisaba el cambio recién hecho.
+    const eligioAhora = useRef(false)
     useEffect(() => {
         if (user?.type !== 'member') return
         let cancelado = false
         panelGetProfile().then((p) => {
-            if (cancelado) return
+            if (cancelado || eligioAhora.current) return
             const t = p.themePreference.toLowerCase() as TemaPreferencia
             if (t !== tema) setTema(t)
         }).catch(() => {})
         return () => { cancelado = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.type])
+
+    // El botón de tema del header tiene que guardar la preferencia en el
+    // servidor, igual que el selector de Mi Perfil (handleCambiarTema ahí).
+    // Sin esto el cambio quedaba SOLO en localStorage y, al recargar, el
+    // efecto de arriba leía el valor viejo del perfil y lo revertía: "pongo
+    // tema blanco y cuando reinicio vuelve al oscuro" (Ale, 20/09).
+    const cambiarTema = (t: TemaPreferencia) => {
+        eligioAhora.current = true
+        setTema(t)
+        if (user?.type !== 'member') return
+        // Falla de red: el tema igual quedó aplicado y guardado en este
+        // navegador — mismo criterio que Mi Perfil, no se interrumpe a nadie.
+        panelUpdateTheme(t.toUpperCase() as MemberProfile['themePreference']).catch(() => {})
+    }
 
     // (RBT-645) Polling del contador de no leídas — solo para member, cada
     // 15s (mismo intervalo que usa el Sidebar para mensajes). Corta el
@@ -315,7 +334,7 @@ export default function Header({ onMenuClick }: Props) {
 
                     {/* Dark mode toggle */}
                     <button
-                        onClick={toggle}
+                        onClick={() => cambiarTema(isDark ? 'light' : 'dark')}
                         aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
                         className="ds-hover grid place-items-center rounded-lg"
                         style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0 }}
