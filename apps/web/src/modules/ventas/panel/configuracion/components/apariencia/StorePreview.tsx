@@ -153,27 +153,43 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
                 </div>
             </div>
 
-            <div ref={wrapRef} style={{ flex: 1, overflow: 'hidden', background: esMovil ? 'var(--color-surface-alt)' : 'var(--color-bg)', display: esMovil ? 'grid' : 'block', placeItems: 'center' }}>
+            <div ref={wrapRef} style={esMovil
+                ? { flex: 1, overflow: 'hidden', background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center' }
+                : { flex: 1, overflow: 'hidden', background: 'var(--color-bg)' }}
+            >
                 {src ? (
-                    // En celular el iframe va adentro de una caja del tamaño ya
-                    // escalado: sin eso, el `transform` no ocupa lugar en el
-                    // layout y el teléfono no queda centrado.
-                    <div style={esMovil
-                        ? { width: MOVIL_W * scale, height: MOVIL_H * scale, borderRadius: 22 * scale, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: '0 8px 28px rgba(15,23,42,0.16)', background: 'var(--color-bg)' }
-                        : undefined}
-                    >
+                    // Escritorio: el iframe es hijo DIRECTO del marco, como
+                    // siempre. Con un div en el medio, ese div se estiraba al
+                    // ancho de diseño (1280) y corría la tienda fuera del
+                    // marco — se veía cortada de los dos lados (Ale, 20/09).
+                    //
+                    // Celular: ahí sí hace falta la caja, del tamaño YA
+                    // escalado, porque `transform` no ocupa lugar en el layout
+                    // y sin ella el teléfono no queda centrado. Como tiene
+                    // medidas propias, no se estira.
+                    esMovil ? (
+                        <div style={{ width: MOVIL_W * scale, height: MOVIL_H * scale, borderRadius: 22 * scale, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: '0 8px 28px rgba(15,23,42,0.16)', background: 'var(--color-bg)', flexShrink: 0 }}>
+                            <iframe
+                                ref={iframeRef}
+                                src={src}
+                                title="Vista previa de tu tienda"
+                                style={{
+                                    width: MOVIL_W, height: MOVIL_H, border: 'none', display: 'block',
+                                    transformOrigin: 'top left', transform: `scale(${scale})`, background: 'var(--color-bg)',
+                                }}
+                            />
+                        </div>
+                    ) : (
                         <iframe
                             ref={iframeRef}
                             src={src}
                             title="Vista previa de tu tienda"
                             style={{
-                                width: esMovil ? MOVIL_W : DESIGN_W,
-                                height: esMovil ? MOVIL_H : wrapH / (scale || 1),
-                                border: 'none', display: 'block',
+                                width: DESIGN_W, height: wrapH / (scale || 1), border: 'none', display: 'block',
                                 transformOrigin: 'top left', transform: `scale(${scale})`, background: 'var(--color-bg)',
                             }}
                         />
-                    </div>
+                    )
                 ) : (
                     <div style={{ height: '100%', display: 'grid', placeItems: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
                         Cargando tu tienda…
