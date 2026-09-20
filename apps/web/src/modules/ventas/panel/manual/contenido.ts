@@ -389,10 +389,27 @@ export const CAPITULOS: Capitulo[] = [
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
         {
+            id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
+                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con "+ Agregar característica", en el orden en que querés que aparezcan.' },
+                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link **"Ver más detalles →"** que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si no cargás ninguna, la sección de Características directamente no aparece en la tienda: no hay nada genérico que rellenar de más.' },
+            ],
+        },
+        {
             id: 'variantes', titulo: 'Variantes y stock',
             bloques: [
                 { tipo: 'parrafo', texto: 'Si el mismo producto viene en talles o colores, se cargan como **variantes**: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.' },
                 { tipo: 'parrafo', texto: 'También podés definir un **stock mínimo**: cuando un producto baja de ahí, dispara la alerta de "stock crítico" en el Inicio y, si lo activaste, el aviso por la campana o por mail.' },
+            ],
+        },
+        {
+            id: 'stock-rapido', titulo: 'Editar el stock rápido, sin abrir el producto',
+            bloques: [
+                { tipo: 'parrafo', texto: 'En la lista de Productos (grilla, tabla o las cards del celular), el número de stock tiene un subrayado punteado: es clickeable. Tocalo y se abre una ventana chica para actualizarlo ahí mismo, sin entrar al editor completo.' },
+                { tipo: 'parrafo', texto: 'Si el producto tiene **variantes**, la ventana lista cada una con su propio campo — no hay un stock único para pisar, cada combinación mantiene el suyo.' },
+                { tipo: 'nota', variante: 'dato', texto: 'El cambio queda guardado igual que si lo hubieras editado desde el producto completo: afecta al mismo stock que ven el Inicio, los Reportes y la tienda.' },
             ],
         },
         {
