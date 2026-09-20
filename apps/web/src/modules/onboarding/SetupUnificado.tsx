@@ -4,10 +4,11 @@ import { useRouter } from 'next/router'
 import {
   Check, ChevronLeft, ChevronRight,
   Camera, Info, MapPin, Globe, LocateFixed,
-  ShoppingCart, Eye, AlertTriangle,
+  ShoppingCart, Eye, AlertTriangle, CircleAlert,
   type LucideIcon,
 } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
+import { Modal } from '@/design-system/components/Modal'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
@@ -28,6 +29,7 @@ import {
   track, trackPaso, trackVolverAtras, trackFoco, trackDesenfoque,
   trackErrorDeCampo, trackDisponibilidad, flush as flushAnalitica,
 } from '@/lib/analytics/wizardTracker'
+import type { Ayuda } from '@/modules/ventas/panel/configuracion/components/apariencia/AyudaSeccion'
 import { useOnboardingStore, useOnboardingHidratado } from './useOnboardingStore'
 import { BarraPasos, pasosOnboarding } from './BarraPasos'
 import { LegalModal } from './LegalModal'
@@ -165,12 +167,28 @@ function SugeridoPorOrbiTag() {
   )
 }
 
-function SelectCard({ sel, Icon, label, desc, onClick }: {
+function SelectCard({ sel, Icon, label, desc, onClick, onAyuda }: {
   sel: boolean; Icon: LucideIcon; label: string; desc: string; onClick: () => void
+  // Abre el detalle en un modal (ver AyudaModal más abajo) — para opciones
+  // difíciles de deshacer una vez que el negocio ya tiene productos y
+  // pedidos cargados (ecommerce vs. vidriera digital). Pedido explícito:
+  // nada que agrande la card ni empuje el layout, un modal aparte. Las
+  // demás cards (ej. "Local físico" / "Online") no lo necesitan y quedan
+  // exactamente igual que antes.
+  onAyuda?: () => void
 }) {
   return (
-    <button
+    // div con role="button" y no un <button> real: el ícono de ayuda de
+    // abajo YA es un <button>, y un <button> adentro de otro <button> es
+    // HTML inválido — el navegador lo "rompe" sacándolo afuera del padre,
+    // así que ni el click ni el foco quedaban donde se los esperaba.
+    // tabIndex + onKeyDown reponen lo que un <button> nativo daba gratis
+    // (activarse con Enter/Espacio, orden de tabulación).
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       style={{
         position: 'relative', textAlign: 'left', padding: '20px 18px 18px', borderRadius: 14,
         border:     `2px solid ${sel ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -186,12 +204,51 @@ function SelectCard({ sel, Icon, label, desc, onClick }: {
           <Check size={10} color="white" strokeWidth={3} />
         </div>
       )}
+      {/* El botón de ayuda vive en su propia esquina (no en la fila del
+          ícono): así nunca se superpone con el círculo de "seleccionado"
+          de arriba, esté o no visible. */}
+      {onAyuda && (
+        <button
+          type="button"
+          className="ds-ayuda-btn"
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onAyuda() }}
+          aria-label={`Qué es ${label}`}
+          title={`Qué es ${label}`}
+          style={{ position: 'absolute', top: 6, right: sel ? 34 : 6 }}
+        >
+          <CircleAlert size={16} strokeWidth={1.9} />
+        </button>
+      )}
       <div style={{ width: 40, height: 40, borderRadius: 10, marginBottom: 12, background: sel ? 'rgba(59,130,246,0.12)' : 'rgba(59,130,246,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={20} strokeWidth={1.75} color={sel ? 'var(--color-primary)' : '#3B82F6'} />
       </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.45 }}>{desc}</div>
-    </button>
+    </div>
+  )
+}
+
+// Detalle de una opción de "¿Cómo vas a vender?" — se abre en un modal
+// (Modal del design system, misma animación de entrada que el resto del
+// panel) en vez de desplegarse inline: la card no puede cambiar de alto al
+// tocar el ícono de ayuda, se veía desprolijo (pedido explícito).
+function AyudaModal({ titulo, ayuda, onClose }: { titulo: string; ayuda: Ayuda; onClose: () => void }) {
+  const filas: [string, string | undefined][] = [
+    ['Qué es', ayuda.que],
+    ['Dónde se ve', ayuda.donde],
+    ['En qué afecta', ayuda.afecta],
+  ]
+  return (
+    <Modal isOpen onClose={onClose} title={`Qué es "${titulo}"`} maxWidth={420}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {filas.filter(([, texto]) => !!texto).map(([rotulo, texto]) => (
+          <div key={rotulo}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-primary)', marginBottom: 3 }}>{rotulo}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--color-body)' }}>{texto}</div>
+          </div>
+        ))}
+      </div>
+    </Modal>
   )
 }
 
@@ -229,6 +286,9 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
   }
 
   const setModoVenta = (v: ModoVenta) => setNegocio(prev => ({ ...prev, modoVenta: v }))
+
+  // Modal de "qué es" para "¿Cómo vas a vender?" — null = cerrado.
+  const [modalAyuda, setModalAyuda] = useState<{ titulo: string; detalle: Ayuda } | null>(null)
 
   function handleLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -349,14 +409,34 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
               label="Tienda online"
               desc="Catálogo con carrito, checkout y cobro online completo"
               onClick={() => setModoVenta('ecommerce')}
+              onAyuda={() => setModalAyuda({
+                titulo: 'Tienda online',
+                detalle: {
+                  que: 'Tu tienda tiene catálogo, carrito de compras y checkout — el cliente arma su pedido y paga online (tarjeta, transferencia, efectivo o Mercado Pago) sin salir de tu sitio.',
+                  donde: 'En toda tu tienda: cada producto tiene botón de "Agregar al carrito" y el cliente completa la compra solo, de punta a punta.',
+                  afecta: 'Sumás pedidos, módulo de clientes, cupones, mensajes y opiniones de compradores — el panel completo. Podés pasar a vidriera digital más adelante si preferís simplificar.',
+                },
+              })}
             />
             <SelectCard
               sel={negocio.modoVenta === 'vidriera'} Icon={Eye}
               label="Vidriera digital"
               desc="Solo mostrás tu catálogo. Los clientes te consultan por WhatsApp"
               onClick={() => setModoVenta('vidriera')}
+              onAyuda={() => setModalAyuda({
+                titulo: 'Vidriera digital',
+                detalle: {
+                  que: 'Mostrás tu catálogo como una vidriera — sin carrito ni cobro online. El cliente ve tus productos, pero cierra la compra hablando con vos.',
+                  donde: 'En toda tu tienda: cada producto tiene un botón para consultar por WhatsApp en vez de "Agregar al carrito".',
+                  afecta: 'No vas a tener checkout, carrito, módulo de clientes/pedidos, cupones, mensajes ni opiniones — solo catálogo y descuentos. Podés pasar a tienda online más adelante.',
+                },
+              })}
             />
           </div>
+
+          {modalAyuda && (
+            <AyudaModal titulo={modalAyuda.titulo} ayuda={modalAyuda.detalle} onClose={() => setModalAyuda(null)} />
+          )}
 
           {negocio.modoVenta === 'vidriera' && (
             <div style={{
