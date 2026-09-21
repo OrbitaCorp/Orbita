@@ -61,6 +61,16 @@ export class ImageStudioService {
    * BackgroundRemovalService — el producto queda pixel-perfecto, la IA
    * nunca lo toca. Validado a mano con una foto de producto real (remera
    * MLB) contra varios estilos del catálogo — ver resumen de la tarea.
+   *
+   * Sombra de contacto (feedback real: sin esto el producto "flota" sobre
+   * el fondo) — también determinística, no generativa: se difumina la
+   * silueta del alfa del recorte y se usa como canal alfa de un negro semi-
+   * transparente, desplazada unos px (luz simulada desde arriba-izquierda).
+   * Se probó primero pedirle a la IA que ajustara luz/sombra sobre la
+   * imagen YA compuesta con una consigna ultra conservadora ("no cambies
+   * nada más") — igual reinventó la prenda (remera distinta, logo
+   * distinto). Ni con el pedido más chico posible es confiable tocar la
+   * imagen con este modelo, así que la sombra queda 100% del lado de sharp.
    */
   async generateBackground(
     businessId: string,
@@ -87,8 +97,32 @@ export class ImageStudioService {
         .resize(width, height, { fit: 'cover' })
         .toBuffer();
 
+      // Silueta del producto difuminada y atenuada al 45%, usada como canal
+      // alfa de un negro transparente — no un negro sólido tapando todo el
+      // fondo (ese fue el bug de la primera versión: 'multiply' con una
+      // máscara sin atenuar ennegrecía TODA el área fuera del producto).
+      const sombraAlfa = await sharp(cutout, ENTRADA_IMAGEN)
+        .ensureAlpha()
+        .extractChannel('alpha')
+        .blur(18)
+        .linear(0.45, 0)
+        .raw()
+        .toBuffer();
+      const sombra = await sharp({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .joinChannel(sombraAlfa, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer();
+
+      // Desplazada unos px hacia abajo/derecha (luz simulada desde arriba-
+      // izquierda) — el recorte crudo va encima tapando la sombra que cae
+      // debajo suyo; solo asoma el borde, como una sombra de contacto real.
+      const desplazamiento = Math.round(height * 0.012);
+
       composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
-        .composite([{ input: cutout }])
+        .composite([
+          { input: sombra, top: desplazamiento, left: desplazamiento },
+          { input: cutout, top: 0, left: 0 },
+        ])
         .png()
         .toBuffer();
     } catch (error) {
