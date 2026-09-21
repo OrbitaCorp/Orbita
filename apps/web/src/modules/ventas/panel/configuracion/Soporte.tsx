@@ -40,10 +40,10 @@ import {
 
 // Promesa PÚBLICA de soporte: la lee todo el que abre la pantalla y aparece
 // también en el mail de confirmación, así que es un compromiso del equipo.
-// Ale tiene que confirmar el tiempo y el horario antes de que salga a
-// producción; si cambia, se cambia acá y en ningún otro lado.
+// Confirmada por Ale el 21/09/2026 (48 horas hábiles, no 24); si cambia,
+// se cambia acá y en ningún otro lado.
 export const PROMESA_SOPORTE = {
-    texto: 'Menos de 24 horas hábiles',
+    texto: 'Menos de 48 horas hábiles',
     horario: 'Lunes a viernes de 9 a 18 (hora de Argentina)',
 }
 
