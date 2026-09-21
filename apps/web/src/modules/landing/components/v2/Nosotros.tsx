@@ -59,7 +59,7 @@ const FOTOS = [
     { src: '/nosotros/equipo-2.jpg', alt: 'Órbita en el día a día',         encuadre: '50% 45%' },
 ];
 
-const MISION = 'Que cualquier negocio chico pueda vender online en serio, con catálogo, stock y cobros de verdad, sin pagar comisiones por venta y sin depender de alguien que sepa de tecnología.';
+const MISION = 'Que cualquier negocio pueda vender online en serio, con catálogo, stock y cobros de verdad, sin pagar comisiones por venta y sin depender de alguien que sepa de tecnología.';
 const VISION = 'Que abrir la tienda de tu negocio sea tan simple como abrir una cuenta en una red social, y que el panel donde la manejás entienda tu rubro en vez de obligarte a adaptarte vos.';
 
 const ICONO_MISION = (
@@ -76,7 +76,7 @@ export function Nosotros() {
                 eyebrow="Sobre nosotros"
                 titulo="Detrás de Órbita"
                 resalte="hay gente que también emprende."
-                bajada="No somos una empresa grande vendiéndole software a comercios. Somos un equipo chico que se cansó de ver a los negocios de al lado perder ventas por no tener dónde mostrarlas."
+                bajada="No somos una empresa grande vendiéndole software a comercios. Empezamos como compañeros de la facultad y hoy somos el equipo detrás de Órbita. Nos cansamos de ver a los negocios de al lado perder ventas por no tener dónde mostrarlas."
             />
 
             {/* Misión y visión: lo primero y lo más grande de la sección. */}
