@@ -1914,6 +1914,47 @@ export async function panelUploadProductImage(
   return body as ApiProductImage
 }
 
+// ── Estudio de imágenes con IA (paquete "Avanzado") — fondos para fotos de
+// producto. No toca el catálogo: opera sobre el archivo ANTES de subirlo
+// (reemplaza el File pendiente en el estado del wizard), el upload real
+// sigue siendo panelUploadProductImage de arriba, como si el vendedor
+// hubiera elegido esa foto ya con el fondo puesto.
+export type ApiBackgroundStyle = { key: string; label: string; previewUrl: string }
+
+// Pide sesión de member (como cualquier otra ruta del panel) pero NO el
+// add-on Avanzado — es catálogo estático, no gasta nada, y el panel lo
+// necesita para poder mostrarlo como upsell aunque el negocio todavía no
+// tenga el paquete.
+export function panelListBackgroundStyles() {
+  return panelRequest<ApiBackgroundStyle[]>('/image-studio/background-styles')
+}
+
+export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string }
+
+export async function panelGenerateProductBackground(
+  file: Blob,
+  filename: string,
+  opts: { estilo?: string; descripcion?: string } = {},
+) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  if (opts.estilo) form.append('estilo', opts.estilo)
+  if (opts.descripcion) form.append('descripcion', opts.descripcion)
+
+  const res = await authedFetch(`${API_BASE}/image-studio/background`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    // ADDON_REQUIRED:ADVANCED puede llegar acá (mismo formato que el resto
+    // de AddonGuard) pero no debería pasar en uso normal: el botón que
+    // dispara esto ya está gateado por el mismo `avanzado` que "Quitar
+    // fondo" en ProductoNuevo.tsx — mensajeDeError NO lo traduce, devuelve
+    // el string crudo tal cual.
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ApiImageStudioResult
+}
+
 // Alternativa a pegar un link en el video del producto (mismo criterio que
 // panelUploadStorefrontVideo, arriba) — no pide productId: puede subirse
 // ANTES de crear el producto (misma etapa del wizard que las fotos), la URL

@@ -22,6 +22,7 @@ import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
+import { EstudioFondoModal } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
@@ -311,6 +312,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // galería de fotos. false por default: mejor no mostrar el botón un
     // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
     const [avanzado, setAvanzado] = useState(false)
+    // "Fondo con IA" — mismo gate (avanzado) que el toggle de arriba, ver
+    // EstudioFondoModal.tsx.
+    const [modalFondoIA, setModalFondoIA] = useState(false)
     // Modelos de variantes y especificaciones sugeridas según lo que el negocio
     // eligió que vende en el wizard (ver presetsVariantes.ts). Vacíos hasta
     // que resuelve el negocio — y si falla, el formulario queda como siempre.
@@ -761,6 +765,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // backend recién al subir (ver panelUploadProductImage más abajo).
     function alternarQuitarFondo(key: string) {
         setImagenes(prev => prev.map(i => i.key === key ? { ...i, quitarFondo: !i.quitarFondo } : i))
+    }
+
+    // "Fondo con IA" (ver EstudioFondoModal) — reemplaza el File/preview de
+    // una pendiente por el resultado ya compuesto con el fondo elegido. La
+    // preview vieja (URL.createObjectURL) se revoca: si no, cada foto que
+    // se prueba con varios estilos deja un blob colgado en memoria.
+    function reemplazarImagenPendiente(key: string, file: File, preview: string) {
+        setImagenes(prev => prev.map(i => {
+            if (i.key !== key) return i
+            URL.revokeObjectURL(i.preview)
+            return { ...i, file, preview }
+        }))
     }
 
     // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
@@ -1531,7 +1547,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {/* Imagen principal + galería general */}
                             <div style={{ marginTop: 24 }}>
-                                <label style={lbl}>Fotos del producto</label>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                                    <label style={lbl}>Fotos del producto</label>
+                                    {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
+                                        al menos una foto pendiente (no tiene sentido elegir un
+                                        estilo sin nada para probarlo). Ya guardadas quedan afuera
+                                        (ver comentario de EstudioFondoModal). */}
+                                    {avanzado && imagenes.some(i => !i.valorOpcion) && (
+                                        <Button
+                                            variant="outline" size="sm"
+                                            icon={<Sparkles size={13} strokeWidth={2.2} />}
+                                            onClick={() => setModalFondoIA(true)}
+                                        >
+                                            Fondo con IA
+                                        </Button>
+                                    )}
+                                </div>
                                 <GaleriaImagenes
                                     pendientes={imagenes.filter(i => !i.valorOpcion)}
                                     guardadas={guardadas.filter(g => !g.optionValueId)}
@@ -1958,6 +1989,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     </Card>
                 </div>
             </div>
+
+            <EstudioFondoModal
+                isOpen={modalFondoIA}
+                onClose={() => setModalFondoIA(false)}
+                imagenes={imagenes.filter(i => !i.valorOpcion).map(i => ({ key: i.key, file: i.file, preview: i.preview }))}
+                onAplicar={reemplazarImagenPendiente}
+                onToast={onToast}
+            />
         </div>
     )
 }
