@@ -63,8 +63,8 @@ async function subirImagenApariencia(file: File): Promise<string> {
 // panelPresignStorefrontVideo en lib/api.ts), sin recodificar y sin pasar
 // por este backend — por eso el tope real ya no son los 40 MB de
 // panelUploadStorefrontVideo (que se mantiene solo por compatibilidad).
-async function subirVideoApariencia(file: File): Promise<string> {
-    return panelPresignStorefrontVideo(file)
+async function subirVideoApariencia(file: File, onProgress?: (pct: number) => void): Promise<string> {
+    return panelPresignStorefrontVideo(file, onProgress)
 }
 
 // Variante para la imagen de un slide: además de subir, puede pedirle al

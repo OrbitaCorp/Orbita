@@ -26,8 +26,8 @@ const desdeApi = (b: ApiProductContentBlock): Bloque => ({
   id: b.id, url: b.url, eyebrow: b.eyebrow ?? '', title: b.title ?? '', text: b.text ?? '', ctaText: b.ctaText ?? '',
 })
 
-async function subirVideo(file: File): Promise<string> {
-  return panelPresignProductVideo(file)
+async function subirVideo(file: File, onProgress?: (pct: number) => void): Promise<string> {
+  return panelPresignProductVideo(file, onProgress)
 }
 
 export function ContenidoFichaModal({ productId, onClose, onGuardado }: { productId: string; onClose: () => void; onGuardado?: () => void }) {

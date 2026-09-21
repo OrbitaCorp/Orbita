@@ -1147,18 +1147,35 @@ export async function panelUploadStorefrontVideo(file: Blob, filename: string) {
 // subida-video.ts), pide una URL firmada y hace el PUT directo contra R2 —
 // el archivo nunca pasa por acá, así que el límite real pasa a ser el que
 // pone VideoUploader.tsx (`maxMB`), no la memoria de Cloud Run.
-async function subirVideoDirectoAR2(file: Blob, presignPath: string): Promise<string> {
+// `onProgress` (0-100) viene de xhr.upload.onprogress — es la razón de ser
+// del XMLHttpRequest acá en vez de fetch(), que no expone progreso de subida
+// para el body saliente (solo de la respuesta que baja). Para un archivo de
+// hasta 500MB sin esto el uploader se queda mostrando "Subiendo…" fijo un
+// buen rato, como colgado, aunque vaya perfecto (ver VideoUploader.tsx).
+async function subirVideoDirectoAR2(file: Blob, presignPath: string, onProgress?: (pct: number) => void): Promise<string> {
   const { uploadUrl, publicUrl } = await panelRequest<{ uploadUrl: string; publicUrl: string }>(presignPath, {
     method: 'POST',
     body: JSON.stringify({ mimetype: file.type }),
   })
-  const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
-  if (!put.ok) throw new ApiError(put.status, 'No se pudo subir el video: probá de nuevo en un rato')
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new ApiError(xhr.status, 'No se pudo subir el video: probá de nuevo en un rato'))
+    }
+    xhr.onerror = () => reject(new ApiError(0, 'No se pudo subir el video: probá de nuevo en un rato'))
+    xhr.send(file)
+  })
   return publicUrl
 }
 
-export function panelPresignStorefrontVideo(file: Blob) {
-  return subirVideoDirectoAR2(file, '/business/storefront-config/video-upload-url')
+export function panelPresignStorefrontVideo(file: Blob, onProgress?: (pct: number) => void) {
+  return subirVideoDirectoAR2(file, '/business/storefront-config/video-upload-url', onProgress)
 }
 
 // Cambia el modo de la tienda: completa (con carrito) o solo catálogo. Solo el
@@ -1935,8 +1952,8 @@ export async function panelUploadProductVideo(file: Blob, filename: string) {
 // Subida directa a R2 desde el navegador — ver el comentario de
 // subirVideoDirectoAR2/panelPresignStorefrontVideo más arriba, mismo
 // mecanismo, acá con el endpoint de catálogo.
-export function panelPresignProductVideo(file: Blob) {
-  return subirVideoDirectoAR2(file, '/products/video-upload-url')
+export function panelPresignProductVideo(file: Blob, onProgress?: (pct: number) => void) {
+  return subirVideoDirectoAR2(file, '/products/video-upload-url', onProgress)
 }
 
 export function panelDeleteProductImage(productId: string, imageId: string) {

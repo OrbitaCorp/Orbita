@@ -252,8 +252,8 @@ function abreviarValorOpcion(valor: string) {
 // desde el navegador (ver panelPresignProductVideo en lib/api.ts), sin pasar
 // por este backend. Sin productId: puede subirse antes de que el producto
 // exista (mismo momento del wizard que las fotos).
-async function subirVideoProducto(file: File): Promise<string> {
-    return panelPresignProductVideo(file)
+async function subirVideoProducto(file: File, onProgress?: (pct: number) => void): Promise<string> {
+    return panelPresignProductVideo(file, onProgress)
 }
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
