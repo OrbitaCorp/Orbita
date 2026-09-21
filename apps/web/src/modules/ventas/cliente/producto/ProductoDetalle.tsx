@@ -364,11 +364,11 @@ export default function ProductoDetalle() {
             (ver CSS_FICHA arriba): este es un return aparte, así que sin
             esto se quedaba con las dos columnas de escritorio en celular. */}
         <style>{CSS_FICHA}</style>
-        <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+        <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
-          <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
+          <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <Skeleton width="100%" height={560} radius={14} className="sf-pd-sk-img" />
+              <Skeleton width="100%" height={620} radius={14} className="sf-pd-sk-img" />
               <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <SkeletonText width={110} height={12} />
                 {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${70 - i * 6}%`} height={11} delay={i * 60} />)}
@@ -528,7 +528,7 @@ export default function ProductoDetalle() {
   return (
     <StorefrontChrome tienda={tienda} config={config}>
       <style>{CSS_FICHA}</style>
-      <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
+      <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
           { label: 'Catálogo', href: `${base}/catalogo` },
@@ -537,7 +537,7 @@ export default function ProductoDetalle() {
         ]} />
 
         {/* ══ GRILLA PRINCIPAL ══ */}
-        <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56, marginBottom: 72 }}>
+        <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60, marginBottom: 72 }}>
 
           {/* ── Galería + Características ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -601,9 +601,9 @@ export default function ProductoDetalle() {
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
                 {esSlideVideo && videoEmbed ? (
-                  // Mismo contenedor 560/14 que ProdImage, para que el salto
+                  // Mismo contenedor 620/14 que ProdImage, para que el salto
                   // entre foto y video no mueva el layout de alrededor.
-                  <div style={{ width: '100%', height: 560, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                  <div style={{ width: '100%', height: 620, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
                     {videoEmbed.tipo === 'file' ? (
                       <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
                         <source src={videoEmbed.src} />
@@ -639,7 +639,7 @@ export default function ProductoDetalle() {
                     )}
                   </div>
                 ) : (
-                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
+                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={620} radius={14}>
                     {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
                         específico, mismo criterio de prioridad que el badge
                         del catálogo (toProducto()). */}
@@ -759,12 +759,12 @@ export default function ProductoDetalle() {
               </span>
             )}
 
-            <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--color-text)', margin: '0 0 10px', lineHeight: 1.15 }}>
+            <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--color-text)', margin: '0 0 10px', lineHeight: 1.15 }}>
               {producto.name}
             </h1>
 
             {producto.description && (
-              <p style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.65, margin: '0 0 20px', borderBottom: '1px solid var(--color-border)', paddingBottom: 20 }}>
+              <p style={{ fontSize: 14.5, color: 'var(--color-body)', lineHeight: 1.65, margin: '0 0 20px', borderBottom: '1px solid var(--color-border)', paddingBottom: 20 }}>
                 {producto.description}
               </p>
             )}
