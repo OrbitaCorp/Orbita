@@ -80,10 +80,16 @@ describe('OrbiController', () => {
     controller = module.get(OrbiController);
   });
 
-  it('no muestra el texto que el modelo dijo ANTES de llamar una tool (manda text_reset)', async () => {
+  it('el texto que el modelo dice ANTES de llamar una tool NUNCA llega al cliente', async () => {
     // Gemini 3.x manda un mensaje completo al usuario ANTES del functionCall, y
-    // otro DESPUÉS de tener el resultado. Sin el reset, el front concatena los
-    // dos en la misma burbuja (el bug del saludo repetido).
+    // otro DESPUÉS de tener el resultado. Ese preámbulo hay que descartarlo (si
+    // no, el front concatena los dos en la misma burbuja — el bug del saludo
+    // repetido).
+    //
+    // Antes se streameaba y se pisaba con un text_reset: el usuario veía
+    // aparecer un texto que después desaparecía. Ahora, con herramientas
+    // disponibles, la vuelta se bufferea y el preámbulo se tira sin haber
+    // salido: no hace falta ningún reset porque nunca se mandó nada.
     registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
     registry.execute.mockResolvedValue({ success: true, label: 'Elegir: Tienda' });
     let vuelta = 0;
@@ -106,10 +112,34 @@ describe('OrbiController', () => {
     );
 
     const all = res.chunks.join('');
-    expect(all).toContain('event: text_reset\ndata: {}\n\n');
-    // El texto post-tool sí se manda; el preámbulo también se streameó pero el
-    // front lo descarta con el reset.
+    expect(all).not.toContain('Hola, elegí la opción de abajo:');
+    expect(all).not.toContain('event: text_reset');
+    // La respuesta de verdad sí sale, y sale entera de una sola vez.
     expect(all).toContain('Listo, tocá el botón de Tienda.');
+  });
+
+  it('sin herramientas en el paso, el texto se streamea chunk por chunk', async () => {
+    // El buffering es SOLO para las vueltas con tools. En un paso sin
+    // herramientas (ej. "cuenta") no hay preámbulo que descartar, así que se
+    // sigue streameando en vivo, que es donde el streaming se nota.
+    registry.getTools.mockReturnValue([]);
+    mockLlm.streamChat = async function* () {
+      yield { type: 'text' as const, chunk: 'Una ' };
+      yield { type: 'text' as const, chunk: 'contraseña ' };
+      yield { type: 'text' as const, chunk: 'larga.' };
+      yield { type: 'done' as const };
+    };
+
+    const res = createMockResponse();
+    await controller.chatWizard(
+      { message: 'que contraseña pongo?', context: { surface: OrbiSurface.WIZARD, stepName: 'cuenta' } } as any,
+      res as any,
+    );
+
+    const all = res.chunks.join('');
+    expect(all).toContain(JSON.stringify({ chunk: 'Una ' }));
+    expect(all).toContain(JSON.stringify({ chunk: 'contraseña ' }));
+    expect(all).toContain(JSON.stringify({ chunk: 'larga.' }));
   });
 
   it('en un turno con tool, la segunda vuelta pide el MISMO modelo que la primera', async () => {
