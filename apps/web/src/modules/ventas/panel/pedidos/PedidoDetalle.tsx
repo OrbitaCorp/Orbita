@@ -18,7 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
-import { fmtMoney, toastEsError } from '@/lib/utils'
+import { fmtMoney, toastEsError, normalizarWhatsApp } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, updateOrderShipping, type ApiOrderDetail, type ApiOrderStatus, type ApiCarrier } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
@@ -395,7 +395,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             `\nTotal: ${fmtMoney(pedido.total)}`,
         ].filter(l => l !== null).join('\n')
     })()
-    const linkWpp = telefono ? `https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWpp)}` : null
+    const linkWpp = telefono ? `https://wa.me/${normalizarWhatsApp(telefono)}?text=${encodeURIComponent(mensajeWpp)}` : null
 
     async function copiarResumen() {
         try {
