@@ -255,9 +255,9 @@ export default function AdminLogin() {
 
         {!mfaEmail && (
           <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--color-muted)' }}>
-            ¿No tenés un negocio?{' '}
+            ¿Todavía no tenés tu negocio en Órbita?{' '}
             <a href="/onboarding/rubro" className="ds-link" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-              Creá el tuyo
+              Empezá acá
             </a>
           </div>
         )}
