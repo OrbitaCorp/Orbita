@@ -1,3 +1,5 @@
+import { normalizarWhatsApp } from '@/lib/utils'
+
 export function fmt(n: number): string {
   return '$ ' + Number(n).toLocaleString('es-AR')
 }
@@ -25,7 +27,7 @@ export function esGrillaDeLista(gridLayout: string | null | undefined): boolean 
 }
 
 export function openWpp(wpp: string, msg?: string) {
-  const url = `https://wa.me/${wpp}` + (msg ? `?text=${encodeURIComponent(msg)}` : '')
+  const url = `https://wa.me/${normalizarWhatsApp(wpp)}` + (msg ? `?text=${encodeURIComponent(msg)}` : '')
   window.open(url, '_blank', 'noopener')
 }
 
