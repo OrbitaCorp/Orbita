@@ -3,8 +3,9 @@ import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
+import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
-import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE } from './background-styles';
+import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, type BackgroundStyle } from './background-styles';
 
 export interface ImageStudioResult {
   /** Imagen resultante en base64, lista para <img src="data:{mimeType};base64,...">. */
@@ -32,6 +33,7 @@ export class ImageStudioService {
     private readonly businesses: BusinessesService,
     private readonly backgroundRemoval: BackgroundRemovalService,
     private readonly cloudflareImage: CloudflareImageService,
+    private readonly r2: R2Service,
   ) {}
 
   // Mismo helper que ya usan games/social-proof/promo-modal/two-for-one/
@@ -42,6 +44,24 @@ export class ImageStudioService {
   private async requireAddonAvanzado(businessId: string): Promise<void> {
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) {
       throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+    }
+  }
+
+  // Elige una de las variantes pre-generadas al azar (no siempre la misma,
+  // para que no todos los productos con el mismo estilo se vean idénticos)
+  // y la baja de R2. Si R2 no responde (caso raro, no el camino feliz), cae
+  // a generar en vivo con Flux en vez de romper el pedido del vendedor —
+  // más lento pero mejor que un 500.
+  private async obtenerFondoCacheado(style: BackgroundStyle, businessId: string): Promise<Buffer> {
+    const key = style.backgroundKeys[Math.floor(Math.random() * style.backgroundKeys.length)];
+    const url = this.r2.publicUrlDe(key);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (error) {
+      this.logger.warn(`No se pudo bajar el fondo cacheado (${url}) para negocio ${businessId}, generando en vivo: ${error}`);
+      return (await this.cloudflareImage.generateImage(style.prompt)).buffer;
     }
   }
 
@@ -71,6 +91,14 @@ export class ImageStudioService {
    * nada más") — igual reinventó la prenda (remera distinta, logo
    * distinto). Ni con el pedido más chico posible es confiable tocar la
    * imagen con este modelo, así que la sombra queda 100% del lado de sharp.
+   *
+   * El fondo NO se genera en vivo por default: cada estilo trae 3 variantes
+   * ya generadas y subidas a R2 (scripts/image-studio/seed-backgrounds.ts)
+   * — se elige una al azar y se compone, sin llamar a Flux ni gastar cuota.
+   * Tiene sentido porque el fondo es genérico (centro vacío a propósito, no
+   * depende del producto del vendedor) — no hacía falta generarlo de nuevo
+   * en cada uso. Si el vendedor escribe una `descripcion` personalizada, ahí
+   * sí se genera en vivo (es un pedido que el catálogo pre-armado no cubre).
    */
   async generateBackground(
     businessId: string,
@@ -88,12 +116,13 @@ export class ImageStudioService {
     const width = meta.width ?? 1024;
     const height = meta.height ?? 1024;
 
-    const prompt = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
-    const background = await this.cloudflareImage.generateImage(prompt);
+    const backgroundBuffer = descripcion
+      ? (await this.cloudflareImage.generateImage(`${style.prompt} Additional style note: ${descripcion}.`)).buffer
+      : await this.obtenerFondoCacheado(style, businessId);
 
     let composedBuffer: Buffer;
     try {
-      const backgroundResized = await sharp(background.buffer, ENTRADA_IMAGEN)
+      const backgroundResized = await sharp(backgroundBuffer, ENTRADA_IMAGEN)
         .resize(width, height, { fit: 'cover' })
         .toBuffer();
 

@@ -8,7 +8,10 @@ import { ImageStudioService } from '../../src/image-studio/image-studio.service'
 // sharp, llamadas reales a Workers AI) se probó a mano — ver resumen de la
 // tarea — porque mockear sharp/fetch acá no agrega cobertura real.
 
-const FAKE_JPEG = Buffer.from('fake-image-bytes');
+// PNG 1x1 real (no un buffer de texto cualquiera) — así sharp() no explota
+// al leer metadata/componer, y se puede probar el camino de éxito completo
+// de generateBackground() sin mockear sharp.
+const FAKE_JPEG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 function makeService(hasActiveAddon: boolean) {
   const businesses = { hasActiveAddon: jest.fn().mockResolvedValue(hasActiveAddon) };
@@ -17,8 +20,11 @@ function makeService(hasActiveAddon: boolean) {
     generateImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/jpeg' }),
     editImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/jpeg' }),
   };
-  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any);
-  return { svc, businesses, backgroundRemoval, cloudflareImage };
+  // publicUrlDe() alcanza para estos tests: ninguno llega a bajar el fondo
+  // cacheado de verdad (los de "sin add-on"/"estilo inválido" cortan antes).
+  const r2 = { publicUrlDe: jest.fn((key: string) => `https://cdn.test/${key}`) };
+  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any, r2 as any);
+  return { svc, businesses, backgroundRemoval, cloudflareImage, r2 };
 }
 
 describe('ImageStudioService — gate de "Avanzado"', () => {
@@ -55,5 +61,45 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
       svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(backgroundRemoval.removeBackground).not.toHaveBeenCalled();
+  });
+
+  describe('generateBackground — fondo cacheado vs. en vivo', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('sin descripción: baja una de las variantes cacheadas de R2, no llama a Flux', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => FAKE_JPEG } as unknown as Response);
+      jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+      const { svc, cloudflareImage, r2 } = makeService(true);
+
+      const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera');
+
+      expect(cloudflareImage.generateImage).not.toHaveBeenCalled();
+      expect(r2.publicUrlDe).toHaveBeenCalledWith(expect.stringContaining('image-studio/backgrounds/madera/'));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.mimeType).toBe('image/png');
+    });
+
+    it('con descripción: genera en vivo con Flux (no usa la caché de R2)', async () => {
+      const fetchMock = jest.fn();
+      jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+      const { svc, cloudflareImage, r2 } = makeService(true);
+
+      await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera', 'tonos más fríos');
+
+      expect(cloudflareImage.generateImage).toHaveBeenCalledTimes(1);
+      expect(cloudflareImage.generateImage.mock.calls[0][0]).toContain('tonos más fríos');
+      expect(r2.publicUrlDe).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('si R2 falla al bajar el fondo cacheado, cae a generar en vivo en vez de romper el pedido', async () => {
+      jest.spyOn(global, 'fetch').mockRejectedValue(new Error('R2 no responde'));
+      const { svc, cloudflareImage } = makeService(true);
+
+      const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera');
+
+      expect(cloudflareImage.generateImage).toHaveBeenCalledTimes(1);
+      expect(result.mimeType).toBe('image/png');
+    });
   });
 });
