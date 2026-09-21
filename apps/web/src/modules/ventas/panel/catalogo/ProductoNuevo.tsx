@@ -12,7 +12,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -22,6 +22,7 @@ import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
+import { EstudioFondoModal, type ImagenParaFondo } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
@@ -311,6 +312,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // galería de fotos. false por default: mejor no mostrar el botón un
     // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
     const [avanzado, setAvanzado] = useState(false)
+    // "Fondo con IA" — mismo gate (avanzado) que el toggle de arriba, ver
+    // EstudioFondoModal.tsx.
+    const [modalFondoIA, setModalFondoIA] = useState(false)
     // Modelos de variantes y especificaciones sugeridas según lo que el negocio
     // eligió que vende en el wizard (ver presetsVariantes.ts). Vacíos hasta
     // que resuelve el negocio — y si falla, el formulario queda como siempre.
@@ -761,6 +765,35 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // backend recién al subir (ver panelUploadProductImage más abajo).
     function alternarQuitarFondo(key: string) {
         setImagenes(prev => prev.map(i => i.key === key ? { ...i, quitarFondo: !i.quitarFondo } : i))
+    }
+
+    // "Fondo con IA" (ver EstudioFondoModal) — reemplaza el File/preview de
+    // una pendiente por el resultado ya compuesto con el fondo elegido. La
+    // preview vieja (URL.createObjectURL) se revoca: si no, cada foto que
+    // se prueba con varios estilos deja un blob colgado en memoria.
+    function reemplazarImagenPendiente(key: string, file: File, preview: string) {
+        setImagenes(prev => prev.map(i => {
+            if (i.key !== key) return i
+            URL.revokeObjectURL(i.preview)
+            return { ...i, file, preview }
+        }))
+    }
+
+    // Handler que pasa el modal: una pendiente se reemplaza en el lugar (de
+    // arriba); una GUARDADA no se toca — el resultado se agrega como una
+    // foto pendiente nueva, general (sin valorOpcion), porque la guardada
+    // original sigue siendo válida y el vendedor puede querer conservarla.
+    function aplicarFondoIA(origen: ImagenParaFondo, file: File, preview: string) {
+        if (origen.tipo === 'pendiente') {
+            reemplazarImagenPendiente(origen.key, file, preview)
+            return
+        }
+        setImagenes(prev => [...prev, {
+            key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
+            file,
+            preview,
+            principal: false,
+        }])
     }
 
     // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
@@ -1531,7 +1564,24 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {/* Imagen principal + galería general */}
                             <div style={{ marginTop: 24 }}>
-                                <label style={lbl}>Fotos del producto</label>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                                    <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
+                                        Fotos del producto
+                                        {avanzado && <TipQuitarFondo />}
+                                    </label>
+                                    {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
+                                        al menos una foto general (pendiente o ya guardada, no tiene
+                                        sentido elegir un estilo sin nada para probarlo). */}
+                                    {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
+                                        <Button
+                                            variant="outline" size="sm"
+                                            icon={<Sparkles size={13} strokeWidth={2.2} />}
+                                            onClick={() => setModalFondoIA(true)}
+                                        >
+                                            Fondo con IA
+                                        </Button>
+                                    )}
+                                </div>
                                 <GaleriaImagenes
                                     pendientes={imagenes.filter(i => !i.valorOpcion)}
                                     guardadas={guardadas.filter(g => !g.optionValueId)}
@@ -1546,7 +1596,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
-                                    {avanzado && ' El ✨ quita el fondo con IA al subir la foto.'}
                                 </div>
                             </div>
 
@@ -1958,6 +2007,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     </Card>
                 </div>
             </div>
+
+            <EstudioFondoModal
+                isOpen={modalFondoIA}
+                onClose={() => setModalFondoIA(false)}
+                imagenes={[
+                    ...imagenes.filter(i => !i.valorOpcion).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
+                    ...guardadas.filter(g => !g.optionValueId).map((g): ImagenParaFondo => ({ key: g.id, tipo: 'guardada', url: g.url, preview: g.url })),
+                ]}
+                onAplicar={aplicarFondoIA}
+                onToast={onToast}
+            />
         </div>
     )
 }
@@ -2140,6 +2200,63 @@ type ItemGaleria =
     | { tipo: 'guardada'; id: string; url: string; principal: boolean }
     | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean }
 
+// Tip de "quitar fondo con IA" — vive una sola vez junto al título de la
+// sección (no repetido por foto, es una recomendación de cómo sacar la
+// foto en general, no de una imagen puntual). Ventanita liviana, no un
+// Modal: no puede cambiar el alto de la card al abrirse. Se abre con
+// hover en desktop y con un tap en mobile (donde no hay hover), y se
+// cierra al sacar el mouse o al tocar afuera.
+function TipQuitarFondo() {
+    const [abierto, setAbierto] = useState(false)
+    const ref = useRef<HTMLSpanElement>(null)
+
+    useEffect(() => {
+        if (!abierto) return
+        function alTocarAfuera(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+        }
+        document.addEventListener('mousedown', alTocarAfuera)
+        return () => document.removeEventListener('mousedown', alTocarAfuera)
+    }, [abierto])
+
+    return (
+        <span
+            ref={ref}
+            style={{ position: 'relative', display: 'inline-flex', marginLeft: 6 }}
+            onMouseEnter={() => setAbierto(true)}
+            onMouseLeave={() => setAbierto(false)}
+        >
+            <button
+                type="button"
+                onClick={() => setAbierto(a => !a)}
+                aria-label="Tip para quitar el fondo con IA"
+                title="Tip para quitar el fondo con IA"
+                style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 16, height: 16, borderRadius: '50%', border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)', color: 'var(--color-muted)', cursor: 'pointer',
+                    padding: 0, flexShrink: 0,
+                }}
+            >
+                <Info size={11} strokeWidth={2.25} />
+            </button>
+            {abierto && (
+                <div
+                    role="tooltip"
+                    style={{
+                        position: 'absolute', bottom: '100%', left: 0, marginBottom: 6, width: 224,
+                        background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8,
+                        boxShadow: '0 8px 24px rgba(15,23,42,0.16)', padding: '10px 12px', fontSize: 11.5,
+                        color: 'var(--color-body)', lineHeight: 1.45, fontWeight: 400, zIndex: 20,
+                    }}
+                >
+                    Para mejores resultados quitando el fondo, sacá la foto del producto con un <strong>fondo liso</strong> (una pared o mesa de un solo color).
+                </div>
+            )}
+        </span>
+    )
+}
+
 function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, onQuitarFondo, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
@@ -2178,65 +2295,77 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     }
 
     return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
             {items.map((it, i) => (
-                <div
-                    key={`${it.tipo}-${it.id}`}
-                    draggable={!!onReorder}
-                    onDragStart={() => setArrastrando(i)}
-                    onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
-                    onDragLeave={() => setSobre(s => (s === i ? null : s))}
-                    onDrop={e => { e.preventDefault(); soltar(i) }}
-                    onDragEnd={() => { setArrastrando(null); setSobre(null) }}
-                    title={onReorder ? 'Arrastrá para cambiar el orden' : undefined}
-                    style={{
-                        position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
-                        border: it.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                        cursor: onReorder ? 'grab' : 'default',
-                        opacity: arrastrando === i ? 0.4 : 1,
-                        outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
-                        outlineOffset: 2,
-                        transition: 'opacity 120ms ease',
-                    }}
-                >
-                    <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                    {/* Número de orden — en qué lugar se ve esta foto en el
-                        catálogo (1 = primera). Siempre visible, no solo al
-                        arrastrar, para que se entienda de un vistazo. */}
-                    {onReorder && (
-                        <span style={{
-                            position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
-                            borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
-                            fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
-                            fontFamily: '"Geist Mono", monospace',
-                        }}>
-                            {i + 1}
-                        </span>
-                    )}
-                    {/* El toggle de estrella solo aplica a las pendientes (mismo
-                        comportamiento de siempre) — una ya guardada solo se
-                        marca principal al subir una nueva, no hay endpoint
-                        acá para cambiarla en una ya existente. */}
-                    {permitePrincipal && it.tipo === 'pendiente' && (
-                        <button className="ds-hover" onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
-                            <Star size={12} fill={it.principal ? '#fff' : 'none'} />
-                        </button>
-                    )}
-                    {it.tipo === 'guardada'
-                        ? <button className="ds-hover" onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
-                        : <button className="ds-hover" onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
+                <div key={`${it.tipo}-${it.id}`} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: alto }}>
+                    <div
+                        draggable={!!onReorder}
+                        onDragStart={() => setArrastrando(i)}
+                        onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                        onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                        onDrop={e => { e.preventDefault(); soltar(i) }}
+                        onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                        title={onReorder ? 'Arrastrá para cambiar el orden' : undefined}
+                        style={{
+                            position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
+                            border: it.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                            cursor: onReorder ? 'grab' : 'default',
+                            opacity: arrastrando === i ? 0.4 : 1,
+                            outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
+                            outlineOffset: 2,
+                            transition: 'opacity 120ms ease',
+                        }}
+                    >
+                        <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        {/* Número de orden — en qué lugar se ve esta foto en el
+                            catálogo (1 = primera). Siempre visible, no solo al
+                            arrastrar, para que se entienda de un vistazo. */}
+                        {onReorder && (
+                            <span style={{
+                                position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
+                                borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
+                                fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
+                                fontFamily: '"Geist Mono", monospace',
+                            }}>
+                                {i + 1}
+                            </span>
+                        )}
+                        {/* El toggle de estrella solo aplica a las pendientes (mismo
+                            comportamiento de siempre) — una ya guardada solo se
+                            marca principal al subir una nueva, no hay endpoint
+                            acá para cambiarla en una ya existente. */}
+                        {permitePrincipal && it.tipo === 'pendiente' && (
+                            <button className="ds-hover" onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
+                                <Star size={12} fill={it.principal ? '#fff' : 'none'} />
+                            </button>
+                        )}
+                        {it.tipo === 'guardada'
+                            ? <button className="ds-hover" onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
+                            : <button className="ds-hover" onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
+                    </div>
                     {/* Paquete "Avanzado" — solo en pendientes: el fondo se
                         quita recién al subir la foto (ver comentario del
                         prop). El toggle marca la intención; el procesado
-                        real pasa en el backend. */}
+                        real pasa en el backend. Antes era un ícono flotante
+                        sobre la miniatura (bajo contraste, difícil de ver con
+                        ciertas fotos) — ahora es un botón explícito debajo. */}
                     {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
                         <button
+                            type="button"
                             className="ds-hover"
                             onClick={() => onQuitarFondo(it.id)}
                             title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
-                            style={{ ...btnSobreImg, top: 'auto', bottom: 3, left: 3, right: 'auto', background: it.quitarFondo ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                                width: '100%', padding: compacta ? '3px 4px' : '4px 6px', borderRadius: 6,
+                                border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
+                                background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
+                                color: it.quitarFondo ? '#fff' : 'var(--color-text)',
+                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                            }}
                         >
-                            <Sparkles size={12} fill={it.quitarFondo ? '#fff' : 'none'} />
+                            <Sparkles size={compacta ? 10 : 11} fill={it.quitarFondo ? '#fff' : 'none'} />
+                            {it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
                         </button>
                     )}
                 </div>

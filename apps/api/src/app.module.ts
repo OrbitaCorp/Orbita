@@ -58,6 +58,7 @@ import { OrbiModule } from './orbi/orbi.module';
 import { InternalCronModule } from './internal-cron/internal-cron.module';
 import { WizardAnalyticsModule } from './wizard-analytics/wizard-analytics.module';
 import { SupportModule } from './support/support.module';
+import { ImageStudioModule } from './image-studio/image-studio.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { SupportModule } from './support/support.module';
     InternalCronModule,
     WizardAnalyticsModule,
     SupportModule,
+    ImageStudioModule,
   ],
   controllers: [AppController],
   providers: [

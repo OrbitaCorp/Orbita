@@ -30,5 +30,5 @@
     "esModuleInterop": true,
     "moduleResolution": "node"
   },
-  "exclude": ["node_modules", "dist", "prisma"]
+  "exclude": ["node_modules", "dist", "prisma", "scripts"]
 }
