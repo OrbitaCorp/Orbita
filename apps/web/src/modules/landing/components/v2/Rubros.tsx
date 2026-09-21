@@ -1,5 +1,12 @@
 // Rubros y "próximamente".
 //
+// Nombre visible: "Qué vendés" (navbar, footer y eyebrow de abajo), NO
+// "Rubros". En el onboarding "rubro" es el tipo de negocio (Tienda Online,
+// Barbería...) y lo que muestra esta sección son los tipos de producto de la
+// tienda (los subrubros). El id="rubros" se dejó igual a propósito: es el
+// ancla que usan el navbar, el footer, el link del hero y las URLs con
+// "/#rubros" que ya circulan.
+//
 // Los rubros NO son inventados: son exactamente los subrubros de Tienda que
 // ofrece el onboarding real (TIENDA_SUBRUBROS en
 // apps/api/src/onboarding/onboarding.service.ts), con su misma descripción. Eso
@@ -44,7 +51,7 @@ export function Rubros() {
     return (
         <Seccion id="rubros">
             <Encabezado
-                eyebrow="Rubros"
+                eyebrow="Qué vendés"
                 titulo="No es un molde genérico:"
                 resalte="el panel se arma según lo que vendés."
                 bajada="Elegís tu rubro al empezar y Órbita configura las variantes, el control de stock y la ficha de producto que ese negocio necesita."

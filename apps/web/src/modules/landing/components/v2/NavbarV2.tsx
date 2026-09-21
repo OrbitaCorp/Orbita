@@ -36,7 +36,7 @@ import { tenantUrl } from '@/lib/tenant';
 const LINKS = [
     { label: 'Qué incluye',   href: '#modulos'       },
     { label: 'Cómo funciona', href: '#como-funciona' },
-    { label: 'Rubros',        href: '#rubros'        },
+    { label: 'Qué vendés',    href: '#rubros'        },
     { label: 'Precio',        href: '#precios'       },
     { label: 'Preguntas',     href: '#faq'           },
     { label: 'Nosotros',      href: '/nosotros'      },
