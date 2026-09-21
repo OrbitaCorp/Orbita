@@ -11,6 +11,9 @@
 // personalizada (ver comentario en ese archivo).
 //
 // Uso: npx ts-node -P tsconfig.json scripts/image-studio/seed-backgrounds.ts
+// [estilo1 estilo2 ...] — con argumentos, solo regenera esos estilos (para
+// ampliar el catálogo sin re-pagar/re-esperar los que ya están en R2); sin
+// argumentos, corre para TODOS (uso original, primera siembra).
 // Necesita las mismas env vars que el resto (CF_WORKERS_AI_API_TOKEN,
 // R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET) — correr
 // con `node -r dotenv/config` o exportadas a mano, según cómo se cargue el
@@ -29,8 +32,12 @@ async function main() {
   const r2 = new R2Service(config);
 
   const resultado: Record<string, string[]> = {};
+  const filtro = process.argv.slice(2);
+  const entradas = filtro.length
+    ? Object.entries(BACKGROUND_STYLES).filter(([key]) => filtro.includes(key))
+    : Object.entries(BACKGROUND_STYLES);
 
-  for (const [key, style] of Object.entries(BACKGROUND_STYLES)) {
+  for (const [key, style] of entradas) {
     resultado[key] = [];
     for (let i = 0; i < VARIANTES_POR_ESTILO; i++) {
       process.stdout.write(`${key} [${i + 1}/${VARIANTES_POR_ESTILO}]... `);

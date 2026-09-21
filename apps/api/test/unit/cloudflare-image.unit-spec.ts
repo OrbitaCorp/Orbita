@@ -1,5 +1,5 @@
 import { InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
-import { CloudflareImageService } from '../../src/cloudflare/cloudflare-image.service';
+import { CloudflareImageService, CloudflareQuotaExhaustedException } from '../../src/cloudflare/cloudflare-image.service';
 
 // Cubre lo que se descubrió a mano probando contra la API real de Workers AI
 // (no documentado con precisión por Cloudflare, ver resumen de la tarea):
@@ -73,6 +73,25 @@ describe('CloudflareImageService', () => {
 
     const svc = makeService(CONFIG_OK);
     await expect(svc.generateImage('algo')).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  // Se agotó (o se agotará mañana) — confirmado a mano el 21/09/2026: 12
+  // llamadas seguidas de seed-backgrounds.ts contra la cuenta real tiraron
+  // exactamente este texto de error. No es hipotético.
+  it('cuota diaria de Neurons agotada: 503 con mensaje claro (no el texto crudo de Cloudflare), sin reintentar', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        success: false,
+        errors: [{ message: 'AiError: AiError: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare\'s Workers Paid plan if you would like to continue usage.', code: 3040 }],
+      }),
+    } as Response);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    await expect(svc.generateImage('madera')).rejects.toBeInstanceOf(CloudflareQuotaExhaustedException);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('cualquier otro error de Workers AI es un 500 genérico (no expone detalles internos)', async () => {

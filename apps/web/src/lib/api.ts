@@ -1936,7 +1936,10 @@ export async function panelUploadProductImage(
 // (reemplaza el File pendiente en el estado del wizard), el upload real
 // sigue siendo panelUploadProductImage de arriba, como si el vendedor
 // hubiera elegido esa foto ya con el fondo puesto.
-export type ApiBackgroundStyle = { key: string; label: string; previewUrl: string }
+// previewUrl null: el estilo "sin_fondo" (no compone nada, ver
+// ImageStudioController.listBackgroundStyles) — el panel le da un
+// tratamiento visual propio (checkerboard) en vez de un <img>.
+export type ApiBackgroundStyle = { key: string; label: string; previewUrl: string | null }
 
 // Pide sesión de member (como cualquier otra ruta del panel) pero NO el
 // add-on Avanzado — es catálogo estático, no gasta nada, y el panel lo
@@ -1948,13 +1951,21 @@ export function panelListBackgroundStyles() {
 
 export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string }
 
+// `{ file, filename }` para una foto pendiente (recién elegida, todavía no
+// subida) o `{ imageUrl }` para una YA GUARDADA de un producto en edición —
+// el backend la baja server-side (resolverImagenPorUrl, con chequeo de que
+// sea de nuestro propio storage) para no pegarle a CORS del storage desde
+// el navegador.
 export async function panelGenerateProductBackground(
-  file: Blob,
-  filename: string,
+  origen: { file: Blob; filename: string } | { imageUrl: string },
   opts: { estilo?: string; descripcion?: string } = {},
 ) {
   const form = new FormData()
-  form.append('file', file, filename)
+  if ('imageUrl' in origen) {
+    form.append('imageUrl', origen.imageUrl)
+  } else {
+    form.append('file', origen.file, origen.filename)
+  }
   if (opts.estilo) form.append('estilo', opts.estilo)
   if (opts.descripcion) form.append('descripcion', opts.descripcion)
 

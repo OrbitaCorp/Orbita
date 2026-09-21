@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
-import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, type BackgroundStyle } from './background-styles';
+import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, SIN_FONDO_KEY, type BackgroundStyle } from './background-styles';
 
 export interface ImageStudioResult {
   /** Imagen resultante en base64, lista para <img src="data:{mimeType};base64,...">. */
@@ -34,7 +35,32 @@ export class ImageStudioService {
     private readonly backgroundRemoval: BackgroundRemovalService,
     private readonly cloudflareImage: CloudflareImageService,
     private readonly r2: R2Service,
+    private readonly config: ConfigService,
   ) {}
+
+  // Fotos YA GUARDADAS de un producto (edición, no alta) llegan como URL, no
+  // como archivo — bajarlas desde el NAVEGADOR pega contra CORS del storage;
+  // servidor a servidor no hay ese problema. Lo que sí hay que cuidar es
+  // SSRF: solo se permite bajar de nuestro propio storage (Supabase o R2),
+  // nunca una URL arbitraria que mande el cliente — si no, este endpoint
+  // sería un proxy para pegarle a cualquier host desde nuestra IP.
+  private async resolverImagenPorUrl(imageUrl: string): Promise<{ buffer: Buffer; mimetype: string }> {
+    const supabaseUrl = this.config.get<string>('SUPABASE_URL');
+    const r2PublicUrl = this.config.get<string>('R2_PUBLIC_URL');
+    const permitido = [supabaseUrl, r2PublicUrl].some((base) => !!base && imageUrl.startsWith(base));
+    if (!permitido) throw new BadRequestException('La URL de la imagen no pertenece a este negocio');
+
+    let res: Response;
+    try {
+      res = await fetch(imageUrl);
+    } catch (error) {
+      this.logger.error(`No se pudo bajar la imagen guardada (${imageUrl}): ${error}`);
+      throw new BadRequestException('No se pudo leer la foto guardada. Probá de nuevo.');
+    }
+    if (!res.ok) throw new BadRequestException('No se pudo leer la foto guardada. Probá de nuevo.');
+
+    return { buffer: Buffer.from(await res.arrayBuffer()), mimetype: res.headers.get('content-type') || 'image/jpeg' };
+  }
 
   // Mismo helper que ya usan games/social-proof/promo-modal/two-for-one/
   // countdown (BusinessesService.hasActiveAddon) — auditoría interna 09/09
@@ -99,22 +125,56 @@ export class ImageStudioService {
    * depende del producto del vendedor) — no hacía falta generarlo de nuevo
    * en cada uso. Si el vendedor escribe una `descripcion` personalizada, ahí
    * sí se genera en vivo (es un pedido que el catálogo pre-armado no cubre).
+   *
+   * `file` o `imageUrl`, uno de los dos: `file` para una foto pendiente
+   * recién subida (alta), `imageUrl` para una YA GUARDADA de un producto en
+   * edición — ver resolverImagenPorUrl().
    */
   async generateBackground(
     businessId: string,
-    file: { buffer: Buffer; mimetype: string },
+    file?: { buffer: Buffer; mimetype: string },
     estilo?: string,
     descripcion?: string,
+    imageUrl?: string,
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
+
+    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
+    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
+
+    // "Sin fondo": no compone nada, devuelve directo el recorte transparente
+    // — mismo motor que el toggle "Quitar fondo" de siempre (que solo aplica
+    // recién al subir la foto, sin preview) pero con resultado inmediato acá.
+    if (estilo === SIN_FONDO_KEY) {
+      const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
+      return { base64: cutout.toString('base64'), mimeType: 'image/png' };
+    }
 
     const style = BACKGROUND_STYLES[estilo ?? DEFAULT_BACKGROUND_STYLE];
     if (!style) throw new BadRequestException('Estilo de fondo inválido');
 
-    const cutout = await this.backgroundRemoval.removeBackground(file.buffer, businessId);
+    const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
-    const width = meta.width ?? 1024;
-    const height = meta.height ?? 1024;
+    const cutoutWidth = meta.width ?? 1024;
+    const cutoutHeight = meta.height ?? 1024;
+
+    // El canvas del compuesto NO hereda el aspect ratio de la foto tal cual
+    // la subió el vendedor (arbitraria) — se fuerza a 3:4, el mismo aspect
+    // ratio que usa ProductCard.tsx en la tienda (contenedor con
+    // aspectRatio:'3/4' + object-fit:contain). Feedback real: un compuesto
+    // con OTRO aspect ratio quedaba "chico" en la tarjeta — contain no
+    // recorta, deja franjas vacías donde el aspect ratio no coincide con el
+    // del contenedor (ver comparación en el resumen de la tarea: mismo tipo
+    // de fondo, uno lleno de borde a borde y otro con letterboxing). El
+    // producto NO se estira ni se recorta acá — va centrado a tamaño
+    // natural, y el fondo (una textura genérica pensada para extenderse) se
+    // agranda para llenar el resto del canvas.
+    const ASPECT_OBJETIVO = 3 / 4;
+    const productoEsMasAnchoQueElObjetivo = cutoutWidth / cutoutHeight > ASPECT_OBJETIVO;
+    const width = productoEsMasAnchoQueElObjetivo ? cutoutWidth : Math.round(cutoutHeight * ASPECT_OBJETIVO);
+    const height = productoEsMasAnchoQueElObjetivo ? Math.round(cutoutWidth / ASPECT_OBJETIVO) : cutoutHeight;
+    const left = Math.round((width - cutoutWidth) / 2);
+    const top = Math.round((height - cutoutHeight) / 2);
 
     const backgroundBuffer = descripcion
       ? (await this.cloudflareImage.generateImage(`${style.prompt} Additional style note: ${descripcion}.`)).buffer
@@ -129,7 +189,9 @@ export class ImageStudioService {
       // Silueta del producto difuminada y atenuada al 45%, usada como canal
       // alfa de un negro transparente — no un negro sólido tapando todo el
       // fondo (ese fue el bug de la primera versión: 'multiply' con una
-      // máscara sin atenuar ennegrecía TODA el área fuera del producto).
+      // máscara sin atenuar ennegrecía TODA el área fuera del producto). Al
+      // tamaño natural del recorte (cutoutWidth/cutoutHeight), no del canvas
+      // — se posiciona centrada al componer, igual que el recorte.
       const sombraAlfa = await sharp(cutout, ENTRADA_IMAGEN)
         .ensureAlpha()
         .extractChannel('alpha')
@@ -137,20 +199,20 @@ export class ImageStudioService {
         .linear(0.45, 0)
         .raw()
         .toBuffer();
-      const sombra = await sharp({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .joinChannel(sombraAlfa, { raw: { width, height, channels: 1 } })
+      const sombra = await sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .joinChannel(sombraAlfa, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
         .png()
         .toBuffer();
 
       // Desplazada unos px hacia abajo/derecha (luz simulada desde arriba-
       // izquierda) — el recorte crudo va encima tapando la sombra que cae
       // debajo suyo; solo asoma el borde, como una sombra de contacto real.
-      const desplazamiento = Math.round(height * 0.012);
+      const desplazamiento = Math.round(cutoutHeight * 0.012);
 
       composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
         .composite([
-          { input: sombra, top: desplazamiento, left: desplazamiento },
-          { input: cutout, top: 0, left: 0 },
+          { input: sombra, top: top + desplazamiento, left: left + desplazamiento },
+          { input: cutout, top, left },
         ])
         .png()
         .toBuffer();

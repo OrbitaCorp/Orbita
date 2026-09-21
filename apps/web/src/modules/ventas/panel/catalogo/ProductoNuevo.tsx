@@ -22,7 +22,7 @@ import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
-import { EstudioFondoModal } from './EstudioFondoModal'
+import { EstudioFondoModal, type ImagenParaFondo } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
@@ -777,6 +777,23 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             URL.revokeObjectURL(i.preview)
             return { ...i, file, preview }
         }))
+    }
+
+    // Handler que pasa el modal: una pendiente se reemplaza en el lugar (de
+    // arriba); una GUARDADA no se toca — el resultado se agrega como una
+    // foto pendiente nueva, general (sin valorOpcion), porque la guardada
+    // original sigue siendo válida y el vendedor puede querer conservarla.
+    function aplicarFondoIA(origen: ImagenParaFondo, file: File, preview: string) {
+        if (origen.tipo === 'pendiente') {
+            reemplazarImagenPendiente(origen.key, file, preview)
+            return
+        }
+        setImagenes(prev => [...prev, {
+            key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
+            file,
+            preview,
+            principal: false,
+        }])
     }
 
     // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
@@ -1553,10 +1570,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         {avanzado && <TipQuitarFondo />}
                                     </label>
                                     {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
-                                        al menos una foto pendiente (no tiene sentido elegir un
-                                        estilo sin nada para probarlo). Ya guardadas quedan afuera
-                                        (ver comentario de EstudioFondoModal). */}
-                                    {avanzado && imagenes.some(i => !i.valorOpcion) && (
+                                        al menos una foto general (pendiente o ya guardada, no tiene
+                                        sentido elegir un estilo sin nada para probarlo). */}
+                                    {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
                                         <Button
                                             variant="outline" size="sm"
                                             icon={<Sparkles size={13} strokeWidth={2.2} />}
@@ -1995,8 +2011,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             <EstudioFondoModal
                 isOpen={modalFondoIA}
                 onClose={() => setModalFondoIA(false)}
-                imagenes={imagenes.filter(i => !i.valorOpcion).map(i => ({ key: i.key, file: i.file, preview: i.preview }))}
-                onAplicar={reemplazarImagenPendiente}
+                imagenes={[
+                    ...imagenes.filter(i => !i.valorOpcion).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
+                    ...guardadas.filter(g => !g.optionValueId).map((g): ImagenParaFondo => ({ key: g.id, tipo: 'guardada', url: g.url, preview: g.url })),
+                ]}
+                onAplicar={aplicarFondoIA}
                 onToast={onToast}
             />
         </div>

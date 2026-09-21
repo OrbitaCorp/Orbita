@@ -33,6 +33,36 @@ const MODEL_EDIT = '@cf/black-forest-labs/flux-2-klein-4b';
 // error nuestro, es que ese modelo puntual requiere upgrade de plan.
 const CODIGO_MODELO_NO_DISPONIBLE_EN_FREE = 5035;
 
+// Cloudflare no expone un código propio para esto (viene en el texto del
+// mensaje, no en `code`) — el free tier son 10.000 Neurons/día COMPARTIDOS
+// entre generateImage() y editImage() (misma cuenta), así que agotarlo
+// afecta a las dos funciones del paquete "Avanzado" por igual.
+const CUOTA_AGOTADA_RE = /daily free allocation|used up your daily/i;
+
+/**
+ * Se lanza cuando Cloudflare devuelve "se acabaron los 10.000 Neurons
+ * gratis de hoy" — distinto de "modelo no disponible en este plan" (ese es
+ * un problema de configuración nuestro; esto es un límite de uso que se
+ * resuelve solo al otro día). Pedido explícito: que el vendedor vea un
+ * aviso claro con cuándo vuelve a estar disponible, no un 500 genérico.
+ * Los estilos YA cacheados en R2 (ver ImageStudioService.obtenerFondoCacheado)
+ * y "sin fondo" (BackgroundRemovalService, corre local, no pega a Cloudflare)
+ * NO se ven afectados por este límite — solo la descripción personalizada y
+ * los estilos del catálogo que todavía no tienen variantes en R2.
+ */
+export class CloudflareQuotaExhaustedException extends ServiceUnavailableException {
+  constructor() {
+    const ahora = new Date();
+    const proximoResetUtc = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate() + 1, 0, 0, 0));
+    const horasRestantes = Math.max(1, Math.ceil((proximoResetUtc.getTime() - ahora.getTime()) / 3_600_000));
+    super(
+      'Se acabó la cuota gratis de generación de imágenes con IA por hoy (10.000 Neurons de Cloudflare). ' +
+        `Se renueva a las 00:00 UTC / 21:00 hora Argentina — quedan aprox. ${horasRestantes}h. ` +
+        'Mientras tanto, los estilos ya guardados del catálogo y "Sin fondo" siguen funcionando normalmente.',
+    );
+  }
+}
+
 /**
  * Cliente de Cloudflare Workers AI para generación/edición de imágenes
  * (Flux). Deliberadamente SIN capacidad de chat/texto — Orbi sigue con su
@@ -80,9 +110,16 @@ export class CloudflareImageService {
     return !!json?.errors?.some((e) => /nsfw/i.test(e.message));
   }
 
+  private esCuotaAgotada(json: WorkersAiErrorBody | null): boolean {
+    return !!json?.errors?.some((e) => CUOTA_AGOTADA_RE.test(e.message));
+  }
+
   private manejarError(model: string, status: number, json: WorkersAiErrorBody | null): never {
     const detalle = json?.errors?.[0]?.message ?? `HTTP ${status}`;
     this.logger.error(`Workers AI (${model}) rechazó la request: ${detalle}`);
+    if (this.esCuotaAgotada(json)) {
+      throw new CloudflareQuotaExhaustedException();
+    }
     if (json?.errors?.some((e) => e.code === CODIGO_MODELO_NO_DISPONIBLE_EN_FREE)) {
       throw new ServiceUnavailableException('Este modelo de imagen no está disponible en el plan actual de Cloudflare');
     }

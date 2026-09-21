@@ -2,35 +2,46 @@
 // wizard de producto ("Variantes e imágenes").
 //
 // Flujo: el vendedor elige un estilo del catálogo (GET /image-studio/
-// background-styles, con thumbnail real de R2) → se genera un preview
-// contra la PRIMERA foto pendiente (POST /image-studio/background) → si
-// confirma, "Aplicar a todas las imágenes" corre lo mismo contra el resto
-// de las fotos generales del producto, reusando el resultado del preview
-// para la primera (no la vuelve a pedir).
+// background-styles, con thumbnail real de R2 — incluye "Sin fondo" como
+// primera opción, con tratamiento visual propio, ver checkerboard abajo) →
+// se genera un preview contra la PRIMERA foto elegida (POST /image-studio/
+// background) → si confirma, "Aplicar a todas las imágenes" corre lo mismo
+// contra el resto de las fotos generales del producto, reusando el
+// resultado del preview para la primera (no la vuelve a pedir).
 //
-// A propósito NO toca imágenes ya guardadas (subidas a un producto que se
-// está editando) — solo las pendientes de esta sesión del wizard, que ya
-// están en memoria como File. Ampliarlo a guardadas necesitaría bajar esa
-// imagen de su URL primero (CORS entre dominios, sin resolver todavía).
+// Acepta tanto fotos PENDIENTES (recién elegidas en esta sesión, en memoria
+// como File) como YA GUARDADAS (un producto en edición) — para estas
+// últimas se manda `imageUrl` en vez de `file`, el backend la baja server-
+// side (ver ImageStudioService.resolverImagenPorUrl, con chequeo de que sea
+// de nuestro propio storage). Una guardada NUNCA se reemplaza in-place: el
+// resultado se agrega como una foto pendiente NUEVA (ver `onAplicar` — el
+// caller decide qué hacer según `origen.tipo`), porque la original ya
+// guardada sigue siendo válida y el vendedor puede querer conservarla.
+//
+// "Sin fondo" (SIN_FONDO_KEY en el catálogo) no depende de Cloudflare en
+// absoluto — corre el mismo recorte local (ONNX) que el toggle "Quitar
+// fondo" de siempre — así que sigue disponible incluso si la cuota gratis
+// de Neurons de Cloudflare se agotó para el resto de los estilos (ver
+// CloudflareQuotaExhaustedException en el backend: ese error viene con un
+// mensaje ya armado para mostrar tal cual, no hace falta traducirlo acá).
 import { useEffect, useState } from 'react'
-import { Sparkles, Check, AlertCircle } from 'lucide-react'
+import { Sparkles, Check, AlertCircle, Scissors } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, type ApiBackgroundStyle } from '@/lib/api'
 
-export interface ImagenParaFondo {
-    key: string
-    file: File
-    preview: string
-}
+export type ImagenParaFondo =
+    | { key: string; tipo: 'pendiente'; file: File; preview: string }
+    | { key: string; tipo: 'guardada'; url: string; preview: string }
 
 interface Props {
     isOpen: boolean
     onClose: () => void
     imagenes: ImagenParaFondo[]
-    /** Reemplaza el File/preview de una imagen pendiente por el resultado ya compuesto. */
-    onAplicar: (key: string, file: File, preview: string) => void
+    /** El caller decide qué hacer según `origen.tipo`: reemplazar en el lugar
+     *  (pendiente) o agregar como una foto pendiente nueva (guardada). */
+    onAplicar: (origen: ImagenParaFondo, file: File, preview: string) => void
     onToast: (m: string) => void
 }
 
@@ -39,6 +50,15 @@ function base64AFile(base64: string, mimeType: string, nombre: string): File {
     const arr = new Uint8Array(bytes.length)
     for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
     return new File([arr], nombre, { type: mimeType })
+}
+
+function origenParaApi(img: ImagenParaFondo): { file: Blob; filename: string } | { imageUrl: string } {
+    return img.tipo === 'pendiente' ? { file: img.file, filename: img.file.name } : { imageUrl: img.url }
+}
+
+function nombreDeImagen(img: ImagenParaFondo): string {
+    if (img.tipo === 'pendiente') return img.file.name
+    return img.url.split('/').pop()?.split('?')[0] || 'foto.jpg'
 }
 
 export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToast }: Props) {
@@ -86,8 +106,8 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         if (!primera) return
         setGenerandoPreview(true)
         try {
-            const r = await panelGenerateProductBackground(primera.file, primera.file.name, { estilo: key })
-            const file = base64AFile(r.base64, r.mimeType, primera.file.name)
+            const r = await panelGenerateProductBackground(origenParaApi(primera), { estilo: key })
+            const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(primera))
             setPreview({ file, url: URL.createObjectURL(file) })
         } catch (e) {
             setErrorPreview(e instanceof ApiError ? e.message : 'No se pudo generar el preview. Probá de nuevo.')
@@ -102,18 +122,18 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         setProgreso({ hecho: 0, total: imagenes.length })
         try {
             // La primera ya está resuelta (es el preview) — no se vuelve a pedir.
-            onAplicar(primera.key, preview.file, preview.url)
+            onAplicar(primera, preview.file, preview.url)
             setProgreso({ hecho: 1, total: imagenes.length })
 
             for (const img of imagenes.slice(1)) {
                 try {
-                    const r = await panelGenerateProductBackground(img.file, img.file.name, { estilo: estiloElegido })
-                    const file = base64AFile(r.base64, r.mimeType, img.file.name)
-                    onAplicar(img.key, file, URL.createObjectURL(file))
+                    const r = await panelGenerateProductBackground(origenParaApi(img), { estilo: estiloElegido })
+                    const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
+                    onAplicar(img, file, URL.createObjectURL(file))
                 } catch {
                     // Una foto puntual puede fallar (red, filtro de contenido) sin
                     // frenar el resto — mejor aplicar 3 de 4 que ninguna.
-                    onToast(`No se pudo generar el fondo para "${img.file.name}"`)
+                    onToast(`No se pudo generar el fondo para "${nombreDeImagen(img)}"`)
                 }
                 setProgreso(p => ({ ...p, hecho: p.hecho + 1 }))
             }
@@ -186,8 +206,23 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                         width: '100%', aspectRatio: '1', borderRadius: 8, overflow: 'hidden',
                                         border: elegido ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                                         outline: elegido ? '2px solid var(--color-primary-bg)' : 'none', outlineOffset: 1,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        // previewUrl null = "Sin fondo" (no compone nada, ver
+                                        // ImageStudioController) — checkerboard estándar para
+                                        // indicar transparencia, en vez de un thumbnail real.
+                                        ...(e.previewUrl ? {} : {
+                                            backgroundImage:
+                                                'linear-gradient(45deg, var(--color-border) 25%, transparent 25%), ' +
+                                                'linear-gradient(-45deg, var(--color-border) 25%, transparent 25%), ' +
+                                                'linear-gradient(45deg, transparent 75%, var(--color-border) 75%), ' +
+                                                'linear-gradient(-45deg, transparent 75%, var(--color-border) 75%)',
+                                            backgroundSize: '12px 12px',
+                                            backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                                        }),
                                     }}>
-                                        <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                        {e.previewUrl
+                                            ? <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                            : <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />}
                                     </div>
                                     <span style={{
                                         fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',

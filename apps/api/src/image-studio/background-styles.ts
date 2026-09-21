@@ -127,7 +127,35 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
     prompt: `${VISTA_CENITAL} A soft pastel-colored textured paper surface (light pink or mint), even soft studio light, minimalist playful style, subtle paper grain. ${CENTRO_VACIO}`,
     backgroundKeys: ['image-studio/backgrounds/papel_pastel/0.jpg', 'image-studio/backgrounds/papel_pastel/1.jpg', 'image-studio/backgrounds/papel_pastel/2.jpg'],
   },
+  ropa_infantil: {
+    label: 'Infantil (indumentaria de niños)',
+    prompt: `${VISTA_CENITAL} A soft pastel yellow or mint textured fabric surface, a few small wooden toy blocks scattered only at the corners, playful gentle lighting, no large objects. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/ropa_infantil/0.jpg', 'image-studio/backgrounds/ropa_infantil/1.jpg', 'image-studio/backgrounds/ropa_infantil/2.jpg'],
+  },
+  denim_vintage: {
+    label: 'Denim vintage (indumentaria, segunda mano)',
+    prompt: `${VISTA_CENITAL} A raw denim fabric texture, faded indigo blue, natural stitching detail, warm nostalgic lighting, thrift-store editorial style, no large objects. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/denim_vintage/0.jpg', 'image-studio/backgrounds/denim_vintage/1.jpg', 'image-studio/backgrounds/denim_vintage/2.jpg'],
+  },
+  joyeria_terciopelo: {
+    label: 'Terciopelo (joyería, productos finos)',
+    prompt: `${VISTA_CENITAL} A deep emerald green velvet fabric texture, soft directional light creating gentle sheen, luxury jewelry display style, subtle rich folds. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/joyeria_terciopelo/0.jpg', 'image-studio/backgrounds/joyeria_terciopelo/1.jpg', 'image-studio/backgrounds/joyeria_terciopelo/2.jpg'],
+  },
+  industrial_metal: {
+    label: 'Metal industrial (ferretería, electrónica, herramientas)',
+    prompt: `${VISTA_CENITAL} A brushed steel metal surface texture, cool neutral tones, subtle diagonal brushed pattern, clean industrial lighting, no large objects. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/industrial_metal/0.jpg', 'image-studio/backgrounds/industrial_metal/1.jpg', 'image-studio/backgrounds/industrial_metal/2.jpg'],
+  },
 };
 
 export const BACKGROUND_STYLE_KEYS = Object.keys(BACKGROUND_STYLES);
 export const DEFAULT_BACKGROUND_STYLE = 'estudio_neutro';
+
+// "Sin fondo": no es un estilo del catálogo (no compone nada contra un fondo
+// generado, ver ImageStudioService.generateBackground()) — es un atajo para
+// llegar al mismo resultado que el toggle "Quitar fondo" de siempre, pero
+// con preview inmediato acá mismo. Pedido explícito: que quien no repare en
+// ese botón (ya existente, en cada miniatura) pueda llegar a lo mismo desde
+// el selector de "Fondo con IA".
+export const SIN_FONDO_KEY = 'sin_fondo';

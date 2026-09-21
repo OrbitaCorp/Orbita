@@ -23,8 +23,9 @@ function makeService(hasActiveAddon: boolean) {
   // publicUrlDe() alcanza para estos tests: ninguno llega a bajar el fondo
   // cacheado de verdad (los de "sin add-on"/"estilo inválido" cortan antes).
   const r2 = { publicUrlDe: jest.fn((key: string) => `https://cdn.test/${key}`) };
-  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any, r2 as any);
-  return { svc, businesses, backgroundRemoval, cloudflareImage, r2 };
+  const config = { get: jest.fn((key: string) => (key === 'SUPABASE_URL' ? 'https://proj.supabase.co' : undefined)) };
+  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any, r2 as any, config as any);
+  return { svc, businesses, backgroundRemoval, cloudflareImage, r2, config };
 }
 
 describe('ImageStudioService — gate de "Avanzado"', () => {
@@ -53,6 +54,45 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     await svc.generateModelWearing('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'modelo mujer, fondo urbano');
     const [prompt] = cloudflareImage.editImage.mock.calls[0];
     expect(prompt).toContain('modelo mujer, fondo urbano');
+  });
+
+  it('generateBackground: "sin_fondo" devuelve el recorte directo, sin componer ni llamar a Flux', async () => {
+    const { svc, backgroundRemoval, cloudflareImage } = makeService(true);
+    const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'sin_fondo');
+    expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
+    expect(cloudflareImage.generateImage).not.toHaveBeenCalled();
+    expect(result.base64).toBe(FAKE_JPEG.toString('base64'));
+    expect(result.mimeType).toBe('image/png');
+  });
+
+  it('generateBackground: imageUrl de nuestro propio storage se baja y procesa igual que un file', async () => {
+    const { svc } = makeService(true);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () => FAKE_JPEG,
+    } as unknown as Response);
+
+    const result = await svc.generateBackground('biz-1', undefined, 'sin_fondo', undefined, 'https://proj.supabase.co/storage/v1/object/public/orbita/foto.jpg');
+
+    expect(fetchMock).toHaveBeenCalledWith('https://proj.supabase.co/storage/v1/object/public/orbita/foto.jpg');
+    expect(result.base64).toBe(FAKE_JPEG.toString('base64'));
+    fetchMock.mockRestore();
+  });
+
+  it('generateBackground: imageUrl que NO es de nuestro storage se rechaza (SSRF)', async () => {
+    const { svc } = makeService(true);
+    const fetchMock = jest.spyOn(global, 'fetch');
+    await expect(
+      svc.generateBackground('biz-1', undefined, 'sin_fondo', undefined, 'https://evil.example.com/foto.jpg'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('generateBackground: sin file ni imageUrl, 400', async () => {
+    const { svc } = makeService(true);
+    await expect(svc.generateBackground('biz-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('generateBackground: estilo que no existe en el catálogo, 400 y no llama al quita-fondos', async () => {
