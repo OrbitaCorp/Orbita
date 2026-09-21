@@ -6,7 +6,7 @@
 // aparte para que el hilo no importe la pantalla entera (y viceversa).
 
 import { Globe, Wallet, Wrench, UserCog, HelpCircle } from 'lucide-react'
-import type { SupportCategory, SupportRequestStatus } from '@/lib/api'
+import { ApiError, type SupportCategory, type SupportRequestStatus } from '@/lib/api'
 
 export const CATEGORIAS: { value: SupportCategory; label: string; Icon: typeof Globe }[] = [
     { value: 'DOMINIO',      label: 'Dominios',            Icon: Globe },
@@ -123,4 +123,16 @@ export function pesoLegible(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Qué le mostramos al negocio cuando una llamada falla. Solo dejamos pasar el
+// texto de la API cuando es una validación (4xx) escrita para una persona
+// ("El asunto es obligatorio"); un 404 de ruta ("Cannot GET /api/v1/support",
+// mientras el backend desplegado es más viejo que el frontend), un 5xx o un
+// fallo de red muestran nuestro texto. Nunca jerga de servidor en producción.
+export function mensajeParaElNegocio(e: unknown, fallback: string): string {
+    if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 404 && !/^Cannot (GET|POST|PUT|DELETE)/.test(e.message)) {
+        return e.message
+    }
+    return fallback
 }

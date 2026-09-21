@@ -28,7 +28,7 @@ import { Button } from '@/design-system/components/Button'
 import { useAuth } from '@/hooks/useAuth'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import {
-    ApiError, panelListSupportRequests, panelSendSupportRequest, panelUploadSupportAttachment,
+    panelListSupportRequests, panelSendSupportRequest, panelUploadSupportAttachment,
     type SupportAttachment, type SupportCategory, type SupportRequestDetail, type SupportRequestRow,
 } from '@/lib/api'
 import { CAPITULOS, textoPlano } from '@/modules/ventas/panel/manual/contenido'
@@ -36,6 +36,7 @@ import { SoporteAdjuntos, agregarAdjuntos, type AdjuntoLocal } from './SoporteAd
 import { SoporteHilo } from './SoporteHilo'
 import {
     CATEGORIAS, EstadoPill, categoriaDe, fechaRelativa, hhmm, leerVistos, marcarVisto, normalizar, sinLeer, type Vistos,
+    mensajeParaElNegocio,
 } from './SoporteComun'
 
 // Promesa PÚBLICA de soporte: la lee todo el que abre la pantalla y aparece
@@ -162,7 +163,11 @@ export default function Soporte() {
             setConsultas(r.data)
             setErrorLista(null)
         } catch (e) {
-            setErrorLista(e instanceof ApiError ? e.message : 'No pudimos cargar tus consultas.')
+            // Nunca el texto crudo de la API ("Cannot GET /api/v1/support" mientras
+            // el backend viejo no tiene el endpoint): el negocio no tiene que leer
+            // eso. El detalle va a la consola para quien depure.
+            console.error('[soporte] no se pudo cargar la lista', e)
+            setErrorLista('No pudimos cargar tus consultas. Probá de nuevo en un rato.')
         }
     }
 
@@ -306,7 +311,7 @@ export default function Soporte() {
             limpiarFormulario()
             void cargarLista()
         } catch (e) {
-            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo enviar tu consulta. Probá de nuevo en un momento.')
+            setErrorEnvio(mensajeParaElNegocio(e, 'No se pudo enviar tu consulta. Probá de nuevo en un momento.'))
         } finally {
             setEnviando(false)
             setProgreso(null)

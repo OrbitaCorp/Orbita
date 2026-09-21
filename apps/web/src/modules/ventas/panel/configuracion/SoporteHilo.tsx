@@ -15,11 +15,11 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Volver } from '../_shared/Volver'
 import {
-    ApiError, panelGetSupportRequest, panelReplySupportRequest, panelUploadSupportAttachment,
+    panelGetSupportRequest, panelReplySupportRequest, panelUploadSupportAttachment,
     type SupportAttachment, type SupportMessage, type SupportRequestDetail,
 } from '@/lib/api'
 import { SoporteAdjuntos, agregarAdjuntos, type AdjuntoLocal } from './SoporteAdjuntos'
-import { EstadoPill, categoriaDe, fechaCompleta } from './SoporteComun'
+import { EstadoPill, categoriaDe, fechaCompleta, mensajeParaElNegocio } from './SoporteComun'
 
 export function SoporteHilo({
     id,
@@ -59,7 +59,7 @@ export function SoporteHilo({
             })
             .catch(e => {
                 if (!vivo) return
-                setErrorCarga(e instanceof ApiError ? e.message : 'No pudimos abrir la consulta. Probá de nuevo en un momento.')
+                setErrorCarga('No pudimos abrir esta consulta. Probá de nuevo en un rato.')
             })
         return () => { vivo = false }
         // onDetalle cambia con cada render del padre; volver a pedir el hilo
@@ -115,7 +115,7 @@ export function SoporteHilo({
             setErrorAdjuntos(null)
             onDetalle(nuevo, 'respuesta')
         } catch (e) {
-            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo enviar tu respuesta. Probá de nuevo en un momento.')
+            setErrorEnvio(mensajeParaElNegocio(e, 'No se pudo enviar tu respuesta. Probá de nuevo en un momento.'))
         } finally {
             setEnviando(false)
             setProgreso(null)
