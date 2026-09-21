@@ -11,6 +11,7 @@ import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { BACKGROUND_STYLES } from './background-styles';
+import { R2Service } from '../r2/r2.service';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
 // Workers AI, pero eso puede cambiar) — mismo criterio que
@@ -27,15 +28,25 @@ export const IMAGE_STUDIO_DIA_NEGOCIO = 30;
 export class ImageStudioController {
   private readonly cuota = new CuotaDiaria();
 
-  constructor(private readonly imageStudio: ImageStudioService) {}
+  constructor(
+    private readonly imageStudio: ImageStudioService,
+    private readonly r2: R2Service,
+  ) {}
 
   // Sin RequiresAddon a propósito: es solo el catálogo (metadata estática),
   // no gasta nada — el panel lo necesita para armar el selector aunque el
   // negocio todavía no tenga el paquete Avanzado (para poder mostrárselo
-  // como upsell). El gate real está en POST /background.
+  // como upsell). El gate real está en POST /background. previewUrl es la
+  // primera de las 3 variantes cacheadas en R2 (ver background-styles.ts) —
+  // el panel la usa como thumbnail del selector, no hace falta pedirle nada
+  // a Flux para mostrar de qué se trata cada estilo.
   @Get('background-styles')
   listBackgroundStyles() {
-    return Object.entries(BACKGROUND_STYLES).map(([key, { label }]) => ({ key, label }));
+    return Object.entries(BACKGROUND_STYLES).map(([key, { label, backgroundKeys }]) => ({
+      key,
+      label,
+      previewUrl: this.r2.publicUrlDe(backgroundKeys[0]),
+    }));
   }
 
   @Post('background')
