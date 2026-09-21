@@ -169,10 +169,23 @@ export class ImageStudioService {
     // producto NO se estira ni se recorta acá — va centrado a tamaño
     // natural, y el fondo (una textura genérica pensada para extenderse) se
     // agranda para llenar el resto del canvas.
+    // Margen: el recorte NO ocupa el lienzo de punta a punta — antes, un
+    // producto cuyo propio recorte ya era ~3:4 terminaba con el canvas
+    // pegado a su silueta (cero aire alrededor), así que el fondo quedaba
+    // recortado justo al contorno de la prenda en vez de notarse como
+    // fondo. Pedido explícito (21/09/2026, ver ficha real con fondo de
+    // madera): "que todo el cuadrado sea fondo, la prenda en el medio". Se
+    // agranda el lienzo un 60% en las DOS direcciones ANTES de ajustar el
+    // aspect ratio — el producto queda ocupando ~2/3 del cuadro, con fondo
+    // real visible arriba/abajo/costados, no solo lo mínimo indispensable.
+    const MARGEN_FONDO = 1.6;
+    const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
+    const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
+
     const ASPECT_OBJETIVO = 3 / 4;
-    const productoEsMasAnchoQueElObjetivo = cutoutWidth / cutoutHeight > ASPECT_OBJETIVO;
-    const width = productoEsMasAnchoQueElObjetivo ? cutoutWidth : Math.round(cutoutHeight * ASPECT_OBJETIVO);
-    const height = productoEsMasAnchoQueElObjetivo ? Math.round(cutoutWidth / ASPECT_OBJETIVO) : cutoutHeight;
+    const productoEsMasAnchoQueElObjetivo = anchoConMargen / altoConMargen > ASPECT_OBJETIVO;
+    const width = productoEsMasAnchoQueElObjetivo ? anchoConMargen : Math.round(altoConMargen * ASPECT_OBJETIVO);
+    const height = productoEsMasAnchoQueElObjetivo ? Math.round(anchoConMargen / ASPECT_OBJETIVO) : altoConMargen;
     const left = Math.round((width - cutoutWidth) / 2);
     const top = Math.round((height - cutoutHeight) / 2);
 
