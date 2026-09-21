@@ -85,4 +85,49 @@ describe('CloudflareImageService', () => {
     const svc = makeService(CONFIG_OK);
     await expect(svc.generateImage('algo')).rejects.toBeInstanceOf(InternalServerErrorException);
   });
+
+  // Confirmado a mano contra la API real (09/2026): el filtro de contenido
+  // de Workers AI rechaza prompts totalmente inocuos ("papel kraft", "piedra
+  // clara") como falso positivo de NSFW, y el mismo prompt exacto funciona
+  // al reintentar. No es un caso hipotético — reintentar de verdad soluciona
+  // el problema la mayoría de las veces.
+  it('falso positivo NSFW: reintenta y devuelve la imagen si el segundo intento sale bien', async () => {
+    const base64 = Buffer.from('img-bytes').toString('base64');
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ success: false, errors: [{ message: 'AiError: Input prompt contains NSFW content.', code: 3030 }] }) } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true, result: { image: base64 } }) } as Response);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    const result = await svc.generateImage('papel kraft');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.buffer.toString()).toBe('img-bytes');
+  });
+
+  it('falso positivo NSFW persistente: agota los reintentos y tira 500 (no un loop infinito)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ success: false, errors: [{ message: 'AiError: Input prompt contains NSFW content.', code: 3030 }] }),
+    } as Response);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    await expect(svc.generateImage('algo')).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('un error que NO es NSFW no se reintenta (solo 1 llamada)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ success: false, errors: [{ message: 'not available on the Workers Free plan', code: 5035 }] }),
+    } as Response);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    await expect(svc.generateImage('algo')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

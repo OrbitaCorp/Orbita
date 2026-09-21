@@ -86,6 +86,18 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
     label: 'Abrigo/invierno (indumentaria de invierno)',
     prompt: `${VISTA_CENITAL} A cozy chunky-knit cream blanket texture, warm ambient light, a few out-of-focus dried pine sprigs at the edges only, warm inviting editorial style. ${CENTRO_VACIO}`,
   },
+  papel_kraft: {
+    label: 'Papel kraft (uso general, packaging/artesanal)',
+    prompt: `${VISTA_CENITAL} A textured warm brown kraft paper surface, soft natural light, subtle paper grain and gentle creases, minimalist artisanal style. ${CENTRO_VACIO}`,
+  },
+  piedra_clara: {
+    label: 'Piedra clara (uso general, cosmética/hogar)',
+    prompt: `${VISTA_CENITAL} A light beige travertine stone surface texture, soft natural light, subtle organic stone veining, clean minimalist style. ${CENTRO_VACIO}`,
+  },
+  papel_pastel: {
+    label: 'Papel color pastel (uso general, juvenil/colorido)',
+    prompt: `${VISTA_CENITAL} A soft pastel-colored textured paper surface (light pink or mint), even soft studio light, minimalist playful style, subtle paper grain. ${CENTRO_VACIO}`,
+  },
 };
 
 export const BACKGROUND_STYLE_KEYS = Object.keys(BACKGROUND_STYLES);
