@@ -516,7 +516,7 @@ function Proximamente() {
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <Chip color={C.warning} style={{ marginBottom: 14 }}><Zap size={12} /> Próximamente</Chip>
         <h2 style={{ ...h2, fontSize: 'clamp(34px, 5vw, 54px)' }}>Lo que viene para<br /><span style={{ color: C.primaryLight }}>Órbita.</span></h2>
-        <p style={{ ...parrafo, maxWidth: 620, margin: '0 auto' }}>Estamos construyendo el futuro del management para pequeñas empresas. Acá está el roadmap.</p>
+        <p style={{ ...parrafo, maxWidth: 620, margin: '0 auto' }}>Estamos construyendo el futuro del management para todo tipo de negocios. Acá está el roadmap.</p>
       </div>
       <div style={{ position: 'relative' }}>
         <div className="nh-traza" style={{ position: 'absolute', left: '8%', right: '8%', top: 34, height: 2, background: `linear-gradient(90deg, ${C.primary}, ${C.orbi}, ${C.success})`, opacity: .5 }} />

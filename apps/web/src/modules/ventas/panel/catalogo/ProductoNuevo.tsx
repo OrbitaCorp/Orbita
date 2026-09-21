@@ -92,6 +92,10 @@ interface ImagenPendiente {
     // sin costo por llamada externa) recién al subir la foto de verdad; el
     // preview de acá arriba sigue mostrando la original tal cual se cargó.
     quitarFondo?: boolean
+    // true si `file` ya viene compuesto por "Fondo con IA" (ver
+    // EstudioFondoModal/aplicarFondoIA) — se manda al subir para que el
+    // storefront la muestre con object-fit:cover, ver ProductImage.hasAiBackground.
+    fondoIA?: boolean
 }
 
 interface ImagenGuardada {
@@ -99,6 +103,7 @@ interface ImagenGuardada {
     url: string
     principal: boolean
     optionValueId: string | null
+    hasAiBackground: boolean
 }
 
 interface ProdForm {
@@ -484,7 +489,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             ?? p.variants.find(v => v.stock.some(s => s.quantity > 0))
                             ?? p.variants[0])?.id,
                 )
-                setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId })))
+                setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId, hasAiBackground: img.hasAiBackground })))
                 // BUG encontrado 2026-08-16: la sección "Fotos por talle/color"
                 // filtraba `guardadas` por optionValueId, pero nada armaba esa
                 // correspondencia — `valoresParaImagen` solo tiene el STRING
@@ -775,7 +780,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setImagenes(prev => prev.map(i => {
             if (i.key !== key) return i
             URL.revokeObjectURL(i.preview)
-            return { ...i, file, preview }
+            return { ...i, file, preview, fondoIA: true }
         }))
     }
 
@@ -793,6 +798,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             file,
             preview,
             principal: false,
+            fondoIA: true,
         }])
     }
 
@@ -1016,6 +1022,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         isPrimary: img.principal,
                                         optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
                                         removeBackground: img.quitarFondo,
+                                        hasAiBackground: img.fondoIA,
                                     })
                                     markImageUploaded(tempId, true)
                                     return { key: img.key, id: subida.id }
@@ -1091,6 +1098,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 isPrimary: img.principal,
                                 optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
                                 removeBackground: img.quitarFondo,
+                                hasAiBackground: img.fondoIA,
                             })
                             return { key: img.key, id: subida.id }
                         } finally {
@@ -1192,6 +1200,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         url: guardadas.find(g => g.optionValueId === valorIds.get(valor))?.url
             ?? imagenes.find(i => i.valorOpcion === valor)?.preview,
     }))
+    // URLs (guardada real o blob de una pendiente) con fondo compuesto por
+    // "Fondo con IA" — PreviewProducto las muestra con object-fit:cover en
+    // vez de contain, mismo criterio que la ficha real del storefront.
+    const urlsConFondoIA = new Set([
+        ...guardadas.filter(g => g.hasAiBackground).map(g => g.url),
+        ...imagenes.filter(i => i.fondoIA).map(i => i.preview),
+    ])
 
     if (cargando) {
         return <ProductoNuevoSkeleton />
@@ -2003,6 +2018,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             fotosPorValor={fotosPorValorPreview}
                             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
                             stockTotal={stockTotal}
+                            urlsConFondoIA={urlsConFondoIA}
                         />
                     </Card>
                 </div>
@@ -2037,7 +2053,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -2049,6 +2065,10 @@ function PreviewProducto({
     nombreOpcionVisual?: string
     fotosPorValor: { valor: string; url?: string }[]
     variantes: TipoVariante[]; stockTotal: number
+    // URLs con fondo compuesto por "Fondo con IA" — esas se muestran con
+    // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
+    // comentario largo más abajo, sigue aplicando a las fotos comunes.
+    urlsConFondoIA: Set<string>
 }) {
     const p = Number(precio) || 0
 
@@ -2089,9 +2109,13 @@ function PreviewProducto({
                     card real de la grilla (ProductoLista.tsx) y el
                     storefront: esta vista previa tiene que mostrar
                     honestamente cómo va a quedar la foto ahí, no una que se
-                    ve distinta acá que en la lista. */}
+                    ve distinta acá que en la lista. Excepto las de "Fondo con
+                    IA" (urlsConFondoIA) — esas sí van con cover, mismo
+                    criterio que la ficha real (ver ProdImage/Thumb.tsx). */}
                 {imagenMostrada
-                    ? <img src={imagenMostrada} alt={nombre} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
+                    ? (urlsConFondoIA.has(imagenMostrada)
+                        ? <img src={imagenMostrada} alt={nombre} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        : <img src={imagenMostrada} alt={nombre} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />)
                     : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-subtle)' }}>
                         <div style={{ textAlign: 'center' }}>
                             <ImageIcon size={28} strokeWidth={1.4} />

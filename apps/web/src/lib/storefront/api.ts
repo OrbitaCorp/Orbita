@@ -388,7 +388,7 @@ export type StorefrontProductDetail = {
     // se puede agregar más que esto de una variante.
     maxQty: number
   }[]
-  images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
+  images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean }[]
 }
 
 export function getStorefrontProduct(slug: string, id: string) {

@@ -158,6 +158,11 @@ export class OrbiController {
 
       let fullResponse = '';
 
+      // Ver la nota en chatWizard: con herramientas en juego el texto de la
+      // vuelta se BUFEREA en vez de streamearse, para que el preámbulo que
+      // Gemini dice antes de llamar la tool nunca llegue a la pantalla.
+      const hayTools = tools.length > 0;
+
       let continueLoop = true;
       let vueltas = 0;
       while (continueLoop) {
@@ -166,17 +171,18 @@ export class OrbiController {
           break;
         }
         continueLoop = false;
-        // Ver la nota en chatWizard: Gemini 3.x habla antes Y después de la
-        // tool; el preámbulo se streamea pero se descarta con text_reset si la
-        // vuelta termina llamando una tool.
         let textoVuelta = '';
         let resetEnviado = false;
         for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
-            if (!resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
+            if (!hayTools && !resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
-            if (textoVuelta.trim() && !resetEnviado) {
+            // Si se bufereó, no hay nada que resetear: el preámbulo se descarta
+            // acá sin que el usuario lo haya visto nunca.
+            if (hayTools) {
+              textoVuelta = '';
+            } else if (textoVuelta.trim() && !resetEnviado) {
               res.write(`event: text_reset\ndata: {}\n\n`);
               resetEnviado = true;
             }
@@ -256,6 +262,11 @@ export class OrbiController {
             continueLoop = true;
           } else if (event.type === 'done') {
             if (!continueLoop) {
+              // Vuelta final: si se bufereó, recién acá sale el texto — de una,
+              // y solo el de la respuesta de verdad.
+              if (hayTools && textoVuelta) {
+                res.write(`event: text\ndata: ${JSON.stringify({ chunk: textoVuelta })}\n\n`);
+              }
               fullResponse += textoVuelta;
               res.write(`event: done\ndata: {}\n\n`);
             }
@@ -399,6 +410,21 @@ export class OrbiController {
         availableOptions: dto.context.availableOptions,
       };
 
+      // Gemini 3.x manda un mensaje completo al usuario ANTES del functionCall
+      // y otro DESPUÉS de tener el resultado. Ese preámbulo hay que tirarlo (si
+      // no, el front concatenaba los dos en la misma burbuja — el bug del
+      // saludo repetido).
+      //
+      // Antes se streameaba igual y se pisaba con un text_reset: el usuario
+      // veía aparecer un texto que después desaparecía, y encima esperaba
+      // tokens que no iba a leer. Ahora, cuando la vuelta tiene herramientas
+      // disponibles, el texto se BUFEREA: si termina llamando una tool el búfer
+      // se descarta sin haber llegado a la pantalla (el front muestra el
+      // indicador de "pensando" mientras tanto), y si termina sin tool se manda
+      // entero de una. En los pasos SIN herramientas (ej. "cuenta") se streamea
+      // como siempre, que es donde el streaming se nota de verdad.
+      const hayTools = tools.length > 0;
+
       let continueLoop = true;
       let vueltas = 0;
       while (continueLoop) {
@@ -407,20 +433,16 @@ export class OrbiController {
           break;
         }
         continueLoop = false;
-        // Gemini 3.x manda un mensaje completo al usuario ANTES del functionCall
-        // y otro DESPUÉS de tener el resultado. Se streamea el primero igual
-        // (Orbi "pensando en voz alta"), pero si la vuelta termina llamando una
-        // tool, se manda un text_reset para que el front descarte ese preámbulo
-        // y quede solo la respuesta final. Sin esto el front concatenaba los dos
-        // en la misma burbuja (bug del saludo repetido).
         let textoVuelta = '';
         let resetEnviado = false;
         for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
-            if (!resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
+            if (!hayTools && !resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
-            if (textoVuelta.trim() && !resetEnviado) {
+            if (hayTools) {
+              textoVuelta = '';
+            } else if (textoVuelta.trim() && !resetEnviado) {
               res.write(`event: text_reset\ndata: {}\n\n`);
               resetEnviado = true;
             }
@@ -445,8 +467,11 @@ export class OrbiController {
             completionTokens += event.usage.completionTokens;
           } else if (event.type === 'done') {
             // Solo la vuelta final (sin tool) cuenta como la respuesta de Orbi:
-            // el preámbulo de las vueltas con tool ya se descartó con el reset.
+            // el preámbulo de las vueltas con tool ya se descartó.
             if (!continueLoop) {
+              if (hayTools && textoVuelta) {
+                res.write(`event: text\ndata: ${JSON.stringify({ chunk: textoVuelta })}\n\n`);
+              }
               respuesta += textoVuelta;
               res.write(`event: done\ndata: {}\n\n`);
             }

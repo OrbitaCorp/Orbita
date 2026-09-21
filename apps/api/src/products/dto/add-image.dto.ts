@@ -16,4 +16,12 @@ export class AddImageDto {
   @Transform(({ value }) => (typeof value === 'string' ? value === 'true' : value))
   @IsBoolean()
   removeBackground?: boolean;
+  // La imagen ya viene compuesta por ImageStudioService ("Fondo con IA",
+  // resuelto client-side ANTES de este endpoint — acá solo se guarda la
+  // marca). El storefront usa esto para elegir object-fit:cover en vez de
+  // contain, ver comentario en el modelo ProductImage.
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value === 'true' : value))
+  @IsBoolean()
+  hasAiBackground?: boolean;
 }

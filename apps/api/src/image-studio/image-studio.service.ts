@@ -169,10 +169,35 @@ export class ImageStudioService {
     // producto NO se estira ni se recorta acá — va centrado a tamaño
     // natural, y el fondo (una textura genérica pensada para extenderse) se
     // agranda para llenar el resto del canvas.
+    // Margen alrededor del producto — historia completa (21/09/2026):
+    // 1) Primer intento: 60% de margen en las dos direcciones. Con
+    //    object-fit:contain (lo que usaba el storefront en ese momento) eso
+    //    ACHICABA la prenda en pantalla: contain escala la imagen COMPLETA
+    //    para que entre en su recuadro, así que si la prenda ocupa el 62%
+    //    del lienzo, se ve al 62% de grande — sin importar los píxeles del
+    //    archivo. Se revirtió a MARGEN_FONDO=1 (sin margen).
+    // 2) Con el margen en 1 (cero slack), al pasar las imágenes de "Fondo
+    //    con IA" a object-fit:cover (ver ProductImage.hasAiBackground) el
+    //    problema cambió de signo: cover SÍ recorta lo que sobra para
+    //    llenar el recuadro, y sin margen no hay nada de fondo para
+    //    recortar — recorta directo la prenda si el recuadro real no
+    //    coincide exacto con el 3:4 del lienzo (confirmado a mano: una
+    //    camisa quedó con los costados cortados en la ficha real).
+    // Con cover, a diferencia de contain, el margen NO achica la prenda en
+    // pantalla — cover siempre escala hasta llenar el recuadro, así que el
+    // margen es pura "tela de sobra" para recortar, nunca visible como
+    // reducción de tamaño. Por eso se puede volver a agregar sin reabrir el
+    // problema del punto 1. 1.35 (35% extra por eje) es un valor moderado:
+    // no tan grande como el primer intento, pensado para absorber el rango
+    // normal de formas de recuadro entre escritorio y laptop.
+    const MARGEN_FONDO = 1.35;
+    const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
+    const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
+
     const ASPECT_OBJETIVO = 3 / 4;
-    const productoEsMasAnchoQueElObjetivo = cutoutWidth / cutoutHeight > ASPECT_OBJETIVO;
-    const width = productoEsMasAnchoQueElObjetivo ? cutoutWidth : Math.round(cutoutHeight * ASPECT_OBJETIVO);
-    const height = productoEsMasAnchoQueElObjetivo ? Math.round(cutoutWidth / ASPECT_OBJETIVO) : cutoutHeight;
+    const productoEsMasAnchoQueElObjetivo = anchoConMargen / altoConMargen > ASPECT_OBJETIVO;
+    const width = productoEsMasAnchoQueElObjetivo ? anchoConMargen : Math.round(altoConMargen * ASPECT_OBJETIVO);
+    const height = productoEsMasAnchoQueElObjetivo ? Math.round(anchoConMargen / ASPECT_OBJETIVO) : altoConMargen;
     const left = Math.round((width - cutoutWidth) / 2);
     const top = Math.round((height - cutoutHeight) / 2);
 

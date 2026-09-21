@@ -974,6 +974,7 @@ export class StorefrontService {
         position: img.position,
         isPrimary: img.isPrimary,
         optionValueId: img.optionValueId,
+        hasAiBackground: img.hasAiBackground,
       })),
     };
   }

@@ -24,8 +24,8 @@
 // de Neurons de Cloudflare se agotó para el resto de los estilos (ver
 // CloudflareQuotaExhaustedException en el backend: ese error viene con un
 // mensaje ya armado para mostrar tal cual, no hace falta traducirlo acá).
-import { useEffect, useState } from 'react'
-import { Sparkles, Check, AlertCircle, Scissors } from 'lucide-react'
+import { Fragment, useEffect, useState } from 'react'
+import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -75,7 +75,44 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
     const [aplicando, setAplicando] = useState(false)
     const [progreso, setProgreso] = useState({ hecho: 0, total: 0 })
 
-    const primera = imagenes[0]
+    // El thumbnail del preview es chico (120px) y recortado (object-fit:
+    // cover) — no alcanza para juzgar si el fondo generado realmente queda
+    // bien antes de aplicarlo a las demás fotos. Pedido real: poder verlo
+    // completo. Un lightbox propio (sin librería nueva) que muestra la
+    // imagen entera, sin recortar (contain).
+    const [zoomAbierto, setZoomAbierto] = useState(false)
+
+    // Qué fotos de la tira de arriba se van a transformar — pedido real: no
+    // forzar "todas o ninguna", poder elegir una sola o un subconjunto. Por
+    // default entran todas (mismo comportamiento que antes, para quien no
+    // toque nada), y cada miniatura funciona como un checkbox.
+    const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
+    useEffect(() => {
+        if (isOpen) setSeleccionadas(new Set(imagenes.map(i => i.key)))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen])
+
+    function toggleSeleccion(key: string) {
+        setSeleccionadas(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
+    }
+
+    const imagenesElegidas = imagenes.filter(i => seleccionadas.has(i.key))
+    // La preview se genera contra la primera SELECCIONADA, no siempre
+    // imagenes[0] — si el vendedor destildó esa, el preview tiene que seguir
+    // a lo que realmente se va a aplicar.
+    const primera = imagenesElegidas[0]
+
+    useEffect(() => {
+        if (!zoomAbierto) return
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoomAbierto(false) }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [zoomAbierto])
 
     useEffect(() => {
         if (!isOpen) return
@@ -96,6 +133,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             setErrorPreview(null)
             setAplicando(false)
             setProgreso({ hecho: 0, total: 0 })
+            setZoomAbierto(false)
         }
     }, [isOpen])
 
@@ -103,7 +141,11 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         setEstiloElegido(key)
         setPreview(null)
         setErrorPreview(null)
-        if (!primera) return
+        setZoomAbierto(false)
+        if (!primera) {
+            setErrorPreview('Elegí al menos una foto arriba para probar este estilo.')
+            return
+        }
         setGenerandoPreview(true)
         try {
             const r = await panelGenerateProductBackground(origenParaApi(primera), { estilo: key })
@@ -116,16 +158,16 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         }
     }
 
-    async function aplicarATodas() {
+    async function aplicarASeleccionadas() {
         if (!estiloElegido || !preview || !primera) return
         setAplicando(true)
-        setProgreso({ hecho: 0, total: imagenes.length })
+        setProgreso({ hecho: 0, total: imagenesElegidas.length })
         try {
             // La primera ya está resuelta (es el preview) — no se vuelve a pedir.
             onAplicar(primera, preview.file, preview.url)
-            setProgreso({ hecho: 1, total: imagenes.length })
+            setProgreso({ hecho: 1, total: imagenesElegidas.length })
 
-            for (const img of imagenes.slice(1)) {
+            for (const img of imagenesElegidas.slice(1)) {
                 try {
                     const r = await panelGenerateProductBackground(origenParaApi(img), { estilo: estiloElegido })
                     const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
@@ -137,7 +179,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                 }
                 setProgreso(p => ({ ...p, hecho: p.hecho + 1 }))
             }
-            onToast('Fondo aplicado a las fotos del producto')
+            onToast(imagenesElegidas.length === 1 ? 'Fondo aplicado a la foto' : 'Fondo aplicado a las fotos elegidas')
             onClose()
         } finally {
             setAplicando(false)
@@ -145,6 +187,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
     }
 
     return (
+        <Fragment>
         <Modal
             isOpen={isOpen}
             onClose={aplicando ? () => {} : onClose}
@@ -157,25 +200,68 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                     <Button
                         variant="primary" size="sm"
                         icon={<Check size={14} strokeWidth={2.2} />}
-                        onClick={aplicarATodas}
-                        disabled={!preview || generandoPreview}
+                        onClick={aplicarASeleccionadas}
+                        disabled={!preview || generandoPreview || imagenesElegidas.length === 0}
                         loading={aplicando}
                     >
-                        {aplicando ? `Aplicando ${progreso.hecho}/${progreso.total}...` : `Aplicar a las ${imagenes.length} fotos`}
+                        {aplicando
+                            ? `Aplicando ${progreso.hecho}/${progreso.total}...`
+                            : imagenesElegidas.length === 1 ? 'Aplicar a esta foto' : `Aplicar a ${imagenesElegidas.length} fotos`}
                     </Button>
                 </div>
             }
         >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.55 }}>
-                    Elegí un estilo de fondo — se prueba primero en una foto; si te convence, lo aplicás a las {imagenes.length} fotos del producto de una.
+                    Elegí un estilo de fondo — se prueba primero en una foto; si te convence, lo aplicás a las fotos que tildaste abajo (una sola, algunas, o todas).
                 </div>
 
-                {/* Tira de fotos que se van a transformar (solo referencia, no clickeable). */}
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-                    {imagenes.map(img => (
-                        <img key={img.key} src={img.preview} alt="" style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)' }} />
-                    ))}
+                {/* Tira de fotos: cada una es un checkbox — tocarla la
+                    suma/saca de lo que se va a aplicar. Por default entran
+                    todas. */}
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>
+                            {imagenesElegidas.length} de {imagenes.length} foto{imagenes.length === 1 ? '' : 's'} elegida{imagenesElegidas.length === 1 ? '' : 's'}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSeleccionadas(seleccionadas.size === imagenes.length ? new Set() : new Set(imagenes.map(i => i.key)))}
+                            disabled={aplicando}
+                            style={{ fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', padding: 0, cursor: aplicando ? 'default' : 'pointer', fontWeight: 600 }}
+                        >
+                            {seleccionadas.size === imagenes.length ? 'Ninguna' : 'Todas'}
+                        </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+                        {imagenes.map(img => {
+                            const elegida = seleccionadas.has(img.key)
+                            return (
+                                <button
+                                    key={img.key}
+                                    type="button"
+                                    onClick={() => toggleSeleccion(img.key)}
+                                    disabled={aplicando}
+                                    title={elegida ? 'Sacar de la selección' : 'Sumar a la selección'}
+                                    style={{
+                                        position: 'relative', width: 44, height: 44, padding: 0, flexShrink: 0,
+                                        borderRadius: 6, overflow: 'hidden', cursor: aplicando ? 'default' : 'pointer',
+                                        border: elegida ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                    }}
+                                >
+                                    <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: elegida ? 1 : 0.4 }} />
+                                    {elegida && (
+                                        <span style={{
+                                            position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%',
+                                            background: 'var(--color-primary)', color: '#fff', display: 'grid', placeItems: 'center',
+                                        }}>
+                                            <Check size={10} strokeWidth={3} />
+                                        </span>
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
                 </div>
 
                 {/* Selector de estilo */}
@@ -253,10 +339,27 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                         )}
                         {preview && !generandoPreview && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <img src={preview.url} alt="Preview con el nuevo fondo" style={{ width: 120, height: 120, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--color-border)' }} />
+                                <button
+                                    type="button"
+                                    onClick={() => setZoomAbierto(true)}
+                                    title="Ver completo"
+                                    style={{
+                                        position: 'relative', width: 160, height: 160, padding: 0, flexShrink: 0,
+                                        borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border)',
+                                        cursor: 'pointer', background: 'none',
+                                    }}
+                                >
+                                    <img src={preview.url} alt="Preview con el nuevo fondo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                    <span style={{
+                                        position: 'absolute', bottom: 6, right: 6, width: 28, height: 28, borderRadius: 8,
+                                        background: 'rgba(15,23,42,0.65)', color: '#fff', display: 'grid', placeItems: 'center',
+                                    }}>
+                                        <Maximize2 size={14} strokeWidth={2.2} />
+                                    </span>
+                                </button>
                                 <div style={{ fontSize: 12.5, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <Sparkles size={14} fill="var(--color-primary)" color="var(--color-primary)" />
-                                    Así queda — si te gusta, aplicalo a las demás fotos.
+                                    Así queda — tocá la foto para verla completa. Si te gusta, aplicalo a las demás.
                                 </div>
                             </div>
                         )}
@@ -264,5 +367,41 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                 )}
             </div>
         </Modal>
+
+        {/* Lightbox: imagen entera, SIN recortar (contain) — el punto de esto
+            es justamente ver lo que el thumbnail recortado no deja ver.
+            z-index 400, por encima del Modal (300, ver Modal.tsx). */}
+        {zoomAbierto && preview && (
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Preview del fondo, tamaño completo"
+                onClick={() => setZoomAbierto(false)}
+                style={{
+                    position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(15,23,42,0.85)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+                }}
+            >
+                <img
+                    src={preview.url}
+                    alt="Preview con el nuevo fondo, tamaño completo"
+                    onClick={e => e.stopPropagation()}
+                    style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 10, display: 'block' }}
+                />
+                <button
+                    type="button"
+                    onClick={() => setZoomAbierto(false)}
+                    aria-label="Cerrar"
+                    style={{
+                        position: 'absolute', top: 16, right: 16, width: 44, height: 44, borderRadius: '50%',
+                        border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff',
+                        display: 'grid', placeItems: 'center', cursor: 'pointer',
+                    }}
+                >
+                    <X size={20} strokeWidth={2.2} />
+                </button>
+            </div>
+        )}
+        </Fragment>
     )
 }

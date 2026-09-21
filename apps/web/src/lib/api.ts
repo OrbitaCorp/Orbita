@@ -1877,7 +1877,7 @@ export type ApiProductFull = {
     optionValues: { optionValueId: string; value: string }[]
     stock: { branchId: string; quantity: number; stockMin: number }[]
   }[]
-  images: { id: string; url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
+  images: { id: string; url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean }[]
 }
 
 export function panelGetProductFull(id: string) {
@@ -1980,13 +1980,16 @@ export type ApiProductImage = {
   position: number
   isPrimary: boolean
   optionValueId: string | null
+  // Compuesta por "Fondo con IA" (ver EstudioFondoModal) — el storefront la
+  // muestra con object-fit:cover en vez de contain, ver ProdImage/Thumb.tsx.
+  hasAiBackground: boolean
 }
 
 export async function panelUploadProductImage(
   productId: string,
   file: Blob,
   filename: string,
-  opts: { isPrimary?: boolean; optionValueId?: string; removeBackground?: boolean } = {},
+  opts: { isPrimary?: boolean; optionValueId?: string; removeBackground?: boolean; hasAiBackground?: boolean } = {},
 ) {
   const form = new FormData()
   form.append('file', file, filename)
@@ -1995,6 +1998,7 @@ export async function panelUploadProductImage(
   // Paquete "Avanzado" — el backend rechaza esto (ADDON_REQUIRED:ADVANCED) si
   // el negocio no tiene el add-on activo, ver products.service.ts#addImage.
   if (opts.removeBackground) form.append('removeBackground', 'true')
+  if (opts.hasAiBackground) form.append('hasAiBackground', 'true')
 
   const res = await authedFetch(`${API_BASE}/products/${productId}/images`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)

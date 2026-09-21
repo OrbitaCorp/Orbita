@@ -894,13 +894,21 @@ model VariantOptionValue {
 }
 
 model ProductImage {
-  id            String   @id @default(uuid())
-  productId     String   @map("product_id")
-  optionValueId String?  @map("option_value_id") // FK → product_option_values (ej: valor "Negro")
-  url           String // Supabase Storage
-  position      Int      @default(0)
-  isPrimary     Boolean  @default(false) @map("is_primary")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  productId       String   @map("product_id")
+  optionValueId   String?  @map("option_value_id") // FK → product_option_values (ej: valor "Negro")
+  url             String // Supabase Storage
+  position        Int      @default(0)
+  isPrimary       Boolean  @default(false) @map("is_primary")
+  // Compuesta por ImageStudioService ("Fondo con IA"), no una foto tal cual
+  // la subió el vendedor — el storefront usa esto para mostrarla con
+  // object-fit:cover (llena el recuadro, sin franjas) en vez de contain: acá
+  // el fondo se generó a propósito con margen para poder recortarse sin
+  // tocar nunca el producto, algo que NO se puede asumir de una foto
+  // cualquiera del vendedor (ver comentario de ProductCard.tsx/Thumb.tsx
+  // sobre por qué esas usan contain).
+  hasAiBackground Boolean  @default(false) @map("has_ai_background")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   optionValue ProductOptionValue? @relation(fields: [optionValueId], references: [id])

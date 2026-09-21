@@ -146,6 +146,32 @@ export class BackgroundRemovalService {
       maskBytes[i] = Math.round(((maskData[i] - maskMin) / range) * 255);
     }
 
+    // Endurece la transición de la máscara Y corre el punto medio hacia
+    // arriba (a la 320x320 reducida, más barato que en la resolución final).
+    // Sin esto, dos problemas relacionados pero distintos: (1) los píxeles
+    // de alfa intermedio conservan el color de fondo ORIGINAL de la foto
+    // (blanco/claro de estudio) en su RGB, no el del producto; (2) incluso
+    // subiendo el contraste nomás (probado a mano: factor 3 y 5, mismo
+    // resultado), un anillo de píxeles de confianza MEDIA-ALTA — no
+    // exactamente en el 50%, pero tampoco 100% seguros — quedan marcados
+    // como opacos igual, y esos son justo los que en la foto original están
+    // en la zona de antialiasing (RGB ya mezclado, grisáceo). Ningún
+    // contraste sobre el alfa arregla eso si el pixel igual termina opaco:
+    // hay que exigirle más confianza al modelo para contar como "producto",
+    // no solo una transición más dura en el mismo punto. Corriendo el punto
+    // medio de 127 a 150 ese anillo pasa a NO contar como opaco (se recorta
+    // un poco el contorno hacia adentro, imperceptible a simple vista) — es
+    // el mismo truco de "choke/shrink matte" de cualquier herramienta de
+    // recorte. Confirmado a mano el 21/09/2026: con esto el halo
+    // gris/blancuzco alrededor de una remera negra sobre fondo "denim
+    // vintage" desapareció por completo (antes, con centro en 127, se
+    // notaba un resto fino aunque el contraste ya estuviera en 5).
+    const CENTRO_BORDE = 150;
+    const CONTRASTE_BORDE = 4;
+    for (let i = 0; i < chwSize; i++) {
+      maskBytes[i] = Math.max(0, Math.min(255, Math.round((maskBytes[i] - CENTRO_BORDE) * CONTRASTE_BORDE + 127)));
+    }
+
     // Máscara 320×320 → tamaño ORIGINAL real (no el reducido de arriba).
     // Dos trampas de sharp acá, las dos confirmadas con un repro mínimo:
     // (1) .resize() sobre una entrada raw de 1 canal la promueve en silencio
@@ -154,11 +180,23 @@ export class BackgroundRemovalService {
     // (2) .raw() antes de toBuffer() es obligatorio — sin él, toBuffer()
     //     codifica a PNG y joinChannel() de abajo interpretaría esos bytes
     //     codificados como si fueran píxeles crudos.
-    const maskResized = await sharp(maskBytes, { raw: { width: MODEL_SIZE, height: MODEL_SIZE, channels: 1 } })
+    const maskResizedSuave = await sharp(maskBytes, { raw: { width: MODEL_SIZE, height: MODEL_SIZE, channels: 1 } })
       .resize(origWidth, origHeight, { fit: 'fill' })
       .toColourspace('b-w')
       .raw()
       .toBuffer();
+
+    // El resize de arriba (320px → resolución real, típicamente ~7-8x) es
+    // interpolado: vuelve a meter grises intermedios en el borde aunque la
+    // máscara de 320px ya haya quedado dura ahí (cada píxel de la máscara
+    // chica se reparte suavizado entre varios píxeles reales). Sin este
+    // segundo endurecido, el halo seguía notándose (más fino, pero
+    // presente) incluso con CENTRO_BORDE/CONTRASTE_BORDE altos arriba —
+    // confirmado a mano el 21/09/2026 comparando un recorte 1:1 sin reescalar.
+    const maskResized = Buffer.alloc(maskResizedSuave.length);
+    for (let i = 0; i < maskResizedSuave.length; i++) {
+      maskResized[i] = Math.max(0, Math.min(255, Math.round((maskResizedSuave[i] - CENTRO_BORDE) * CONTRASTE_BORDE + 127)));
+    }
 
     // Compone: RGB original + la máscara como canal alfa. joinChannel() sobre
     // un sharp() todavía "encoded" (recién decodificado de PNG/JPEG, sin pasar

@@ -34,7 +34,7 @@ export function Upcoming() {
             Lo que viene para <span className="text-blue-500">Órbita.</span>
           </h2>
           <p data-aos="fade-up" data-aos-delay="220" className="mt-4 text-base text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Estamos construyendo el futuro del management para pequeñas empresas. Acá está el roadmap.
+            Estamos construyendo el futuro del management para todo tipo de negocios. Acá está el roadmap.
           </p>
         </div>
 
