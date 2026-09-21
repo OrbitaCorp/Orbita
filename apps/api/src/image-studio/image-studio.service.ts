@@ -169,16 +169,16 @@ export class ImageStudioService {
     // producto NO se estira ni se recorta acá — va centrado a tamaño
     // natural, y el fondo (una textura genérica pensada para extenderse) se
     // agranda para llenar el resto del canvas.
-    // Margen: el recorte NO ocupa el lienzo de punta a punta — antes, un
-    // producto cuyo propio recorte ya era ~3:4 terminaba con el canvas
-    // pegado a su silueta (cero aire alrededor), así que el fondo quedaba
-    // recortado justo al contorno de la prenda en vez de notarse como
-    // fondo. Pedido explícito (21/09/2026, ver ficha real con fondo de
-    // madera): "que todo el cuadrado sea fondo, la prenda en el medio". Se
-    // agranda el lienzo un 60% en las DOS direcciones ANTES de ajustar el
-    // aspect ratio — el producto queda ocupando ~2/3 del cuadro, con fondo
-    // real visible arriba/abajo/costados, no solo lo mínimo indispensable.
-    const MARGEN_FONDO = 1.6;
+    // Margen alrededor del producto: REVERTIDO (21/09/2026) — un intento
+    // anterior agrandaba el lienzo 60% en las dos direcciones para que se
+    // viera más fondo alrededor, pero eso ACHICA la prenda en pantalla: el
+    // navegador siempre escala la imagen COMPLETA para que entre en su
+    // recuadro (object-fit:contain), así que si la prenda ocupa el 62% del
+    // lienzo, se ve al 62% de grande en la ficha — no importa cuántos
+    // píxeles tenga el archivo. Pedido explícito: la prenda NO puede perder
+    // tamaño respecto a la foto original, el fondo tiene que rellenar solo
+    // lo que sobra por el aspect ratio (3:4), sin agregar margen a propósito.
+    const MARGEN_FONDO = 1;
     const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
     const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
 
