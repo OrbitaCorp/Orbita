@@ -95,3 +95,11 @@ ALTER TABLE "manual_feedback" ADD CONSTRAINT "manual_feedback_business_id_fkey" 
 -- AddForeignKey
 ALTER TABLE "manual_feedback" ADD CONSTRAINT "manual_feedback_member_id_fkey" FOREIGN KEY ("member_id") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+-- RLS como el resto de public (hallazgo `api.supabase`, migración
+-- 20260910110000): sin esto la API REST de Supabase con la clave anon podría
+-- leer las consultas de soporte de todos los negocios. Los grants ya los
+-- revocan los default privileges; acá solo falta prender RLS.
+ALTER TABLE "support_requests" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "support_messages" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "manual_feedback" ENABLE ROW LEVEL SECURITY;
