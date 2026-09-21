@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ImageStudioService } from '../../src/image-studio/image-studio.service';
 
 // ImageStudioService (fondos de producto + "prenda en modelo", paquete
@@ -47,5 +47,13 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     await svc.generateModelWearing('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'modelo mujer, fondo urbano');
     const [prompt] = cloudflareImage.editImage.mock.calls[0];
     expect(prompt).toContain('modelo mujer, fondo urbano');
+  });
+
+  it('generateBackground: estilo que no existe en el catálogo, 400 y no llama al quita-fondos', async () => {
+    const { svc, backgroundRemoval } = makeService(true);
+    await expect(
+      svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(backgroundRemoval.removeBackground).not.toHaveBeenCalled();
   });
 });

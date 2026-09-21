@@ -1,9 +1,10 @@
-import { ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE } from './background-styles';
 
 export interface ImageStudioResult {
   /** Imagen resultante en base64, lista para <img src="data:{mimeType};base64,...">. */
@@ -12,9 +13,6 @@ export interface ImageStudioResult {
   /** Solo en generateModelWearing(): el resultado no es determinístico, avisar antes de publicar. */
   advertencia?: string;
 }
-
-const PROMPT_FONDO_DEFAULT =
-  'a professional studio product photography background, softly lit, seamless backdrop, no text, no watermark, no objects, no people';
 
 const PROMPT_MODELO_DEFAULT =
   'a photorealistic person wearing this exact garment, natural studio lighting, e-commerce fashion photography, neutral background';
@@ -48,29 +46,39 @@ export class ImageStudioService {
   }
 
   /**
-   * Genera un fondo nuevo para una foto de producto.
+   * Genera un fondo nuevo para una foto de producto, eligiendo un estilo del
+   * catálogo curado (ver background-styles.ts — madera, mármol con plantas,
+   * calle urbana, lino con flores, etc., cada uno pensado para un rubro
+   * distinto: no es lo mismo perfumería que ropa urbana o joyería).
    *
    * A PROPÓSITO no le pide a la IA que edite la foto completa: en pruebas,
    * pedirle a Flux "cambiá el fondo, dejá el producto igual" a veces
    * devolvía un producto distinto (mismo prompt, dos corridas, dos prendas
-   * diferentes — no es determinístico). Acá el fondo se genera aparte
-   * (texto → imagen, sin el producto de por medio) y se compone LOCALMENTE
-   * con sharp sobre el recorte que ya da BackgroundRemovalService — el
-   * producto queda pixel-perfecto, la IA nunca lo toca.
+   * diferentes — no es determinístico; con un prompt de estilo editorial
+   * "lino + flores" convirtió unos aros en un colgante). Acá el fondo se
+   * genera aparte (texto → imagen, con el tercio central vacío a propósito)
+   * y se compone LOCALMENTE con sharp sobre el recorte que ya da
+   * BackgroundRemovalService — el producto queda pixel-perfecto, la IA
+   * nunca lo toca. Validado a mano con una foto de producto real (remera
+   * MLB) contra varios estilos del catálogo — ver resumen de la tarea.
    */
   async generateBackground(
     businessId: string,
     file: { buffer: Buffer; mimetype: string },
+    estilo?: string,
     descripcion?: string,
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
+
+    const style = BACKGROUND_STYLES[estilo ?? DEFAULT_BACKGROUND_STYLE];
+    if (!style) throw new BadRequestException('Estilo de fondo inválido');
 
     const cutout = await this.backgroundRemoval.removeBackground(file.buffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
     const width = meta.width ?? 1024;
     const height = meta.height ?? 1024;
 
-    const prompt = descripcion ? `${PROMPT_FONDO_DEFAULT}, ${descripcion}` : PROMPT_FONDO_DEFAULT;
+    const prompt = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
     const background = await this.cloudflareImage.generateImage(prompt);
 
     let composedBuffer: Buffer;

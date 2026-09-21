@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -10,6 +10,7 @@ import { ImageStudioService } from './image-studio.service';
 import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
+import { BACKGROUND_STYLES } from './background-styles';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
 // Workers AI, pero eso puede cambiar) — mismo criterio que
@@ -28,6 +29,15 @@ export class ImageStudioController {
 
   constructor(private readonly imageStudio: ImageStudioService) {}
 
+  // Sin RequiresAddon a propósito: es solo el catálogo (metadata estática),
+  // no gasta nada — el panel lo necesita para armar el selector aunque el
+  // negocio todavía no tenga el paquete Avanzado (para poder mostrárselo
+  // como upsell). El gate real está en POST /background.
+  @Get('background-styles')
+  listBackgroundStyles() {
+    return Object.entries(BACKGROUND_STYLES).map(([key, { label }]) => ({ key, label }));
+  }
+
   @Post('background')
   @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
@@ -40,7 +50,7 @@ export class ImageStudioController {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
     this.consumirCuota(member.businessId);
-    return this.imageStudio.generateBackground(member.businessId, file, dto.descripcion);
+    return this.imageStudio.generateBackground(member.businessId, file, dto.estilo, dto.descripcion);
   }
 
   @Post('model')

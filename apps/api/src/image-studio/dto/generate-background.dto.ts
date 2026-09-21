@@ -1,9 +1,16 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { BACKGROUND_STYLE_KEYS } from '../background-styles';
 
 export class GenerateBackgroundDto {
-  // Descripción libre del fondo deseado (ej. "fondo de estudio con luz cálida",
-  // "sobre una mesada de madera clara"). Si viene vacío, se usa un fondo de
-  // estudio neutro por default — ver PROMPT_FONDO_DEFAULT en el service.
+  // Key del catálogo curado (ver background-styles.ts) — "madera",
+  // "marmol_plantas", "lino_flores", etc. Si viene vacío, se usa
+  // DEFAULT_BACKGROUND_STYLE (estudio neutro).
+  @IsOptional()
+  @IsIn(BACKGROUND_STYLE_KEYS)
+  estilo?: string;
+
+  // Ajuste libre ADEMÁS del estilo elegido (ej. "con tonos más fríos", "sin
+  // sombras tan marcadas") — no reemplaza al catálogo, lo afina.
   @IsOptional()
   @IsString()
   @MaxLength(300)
