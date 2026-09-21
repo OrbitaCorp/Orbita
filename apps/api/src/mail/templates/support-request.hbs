@@ -1,9 +1,10 @@
 {{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs.
       Configuración → Soporte: formulario genérico, negocio → Órbita. Reply-To
       ya apunta al email de quien escribió (ver MailService#sendSupportRequest) —
-      esto es solo el contenido. --}}
-<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">{{subject}}</h2>
-<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Nueva consulta desde el panel de <strong style="color:#1a1f36;">{{businessName}}</strong> ({{businessSlug}}).</p>
+      esto es solo el contenido. Desde el 21/09 la consulta vive en la base con
+      su número: el mail es el aviso, el hilo se sigue en el superadmin. --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Consulta #{{number}} — {{subject}}</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">{{#if isReply}}<strong style="color:#1a1f36;">{{businessName}}</strong> ({{businessSlug}}) volvió a escribir en una consulta que ya existía.{{else}}Nueva consulta desde el panel de <strong style="color:#1a1f36;">{{businessName}}</strong> ({{businessSlug}}).{{/if}}</p>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
   <tr>
@@ -27,4 +28,17 @@
   <div style="font-size:13.5px; color:#1a1f36; line-height:1.7; white-space:pre-wrap;">{{message}}</div>
 </div>
 
-<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Respondé este mail directo — el Reply-To ya apunta a {{memberEmail}}.</p>
+{{#if hasAttachments}}
+<div style="margin-top:14px;">
+  <div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Adjuntos</div>
+  {{#each attachments}}
+  <div style="font-size:13px; line-height:1.7;"><a href="{{url}}" style="color:#2563eb; text-decoration:none;">{{name}}</a></div>
+  {{/each}}
+</div>
+{{/if}}
+
+{{#if adminUrl}}
+{{> cta-button this url=adminUrl label="Responder desde el panel"}}
+{{/if}}
+
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">La respuesta desde el panel le llega al negocio por mail y queda en su historial. Si respondés este mail directo (el Reply-To apunta a {{memberEmail}}), esa respuesta no queda registrada en la consulta.</p>

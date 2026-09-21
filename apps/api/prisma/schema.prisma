@@ -99,6 +99,8 @@ model Business {
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
   orbiConversations    OrbiConversation[]
+  supportRequests      SupportRequest[]
+  manualFeedback       ManualFeedback[]
 
   @@map("businesses")
 }
@@ -502,6 +504,9 @@ model Member {
   stockMovements     StockMovement[]
   verifiedPayments   Payment[]
   emailVerifications EmailVerificationToken[]
+  supportRequests    SupportRequest[]
+  supportMessages    SupportMessage[]
+  manualFeedback     ManualFeedback[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -2155,6 +2160,7 @@ model PlatformAdmin {
   auditHechos          PlatformAuditItem[]      @relation("AuditHechoPor")
   auditActualizados    PlatformAuditItem[]      @relation("AuditActualizadoPor")
   auditDecisiones      PlatformAuditItem[]      @relation("AuditDecisionPor")
+  supportMessages      SupportMessage[]
 
   @@map("platform_admins")
 }
@@ -2509,4 +2515,111 @@ model WizardAiTurn {
   @@index([createdAt])
   @@index([topic])
   @@map("wizard_ai_turns")
+}
+
+// ── Soporte (Configuración → Soporte del panel ↔ pestaña Soporte del superadmin) ──
+//
+// Hasta el 21/09 el formulario de Soporte solo mandaba un mail a
+// soporte@orbita.site: si el mail no salía la consulta se perdía, y el negocio
+// no tenía dónde ver qué preguntó ni qué le contestaron. Ahora cada consulta es
+// una fila con su hilo de mensajes (el negocio escribe, Órbita responde desde el
+// superadmin, el negocio puede repreguntar) y el mail pasa a ser un aviso.
+
+enum SupportCategory {
+  DOMINIO
+  FACTURACION
+  TECNICO
+  CUENTA
+  OTRO
+}
+
+// OPEN = le toca a Órbita (nueva o el negocio volvió a escribir), ANSWERED =
+// Órbita ya contestó y espera, CLOSED = la cerró un admin. El orden de
+// declaración importa: el listado del superadmin ordena por este enum para
+// que las abiertas queden primero.
+enum SupportRequestStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+enum SupportMessageAuthor {
+  MEMBER
+  ADMIN
+}
+
+model SupportRequest {
+  id            String               @id @default(uuid())
+  // Correlativo global y corto ("Consulta #12"): es lo que va en el asunto del
+  // mail y lo que el negocio nombra cuando vuelve a escribir. El uuid no sirve
+  // para eso.
+  number        Int                  @unique @default(autoincrement())
+  businessId    String               @map("business_id")
+  memberId      String               @map("member_id")
+  category      SupportCategory
+  subject       String
+  contactPhone  String?              @map("contact_phone")
+  status        SupportRequestStatus @default(OPEN)
+  // Fecha del último mensaje de cualquiera de los dos lados: ordena las listas
+  // sin tener que mirar la tabla de mensajes.
+  lastMessageAt DateTime             @map("last_message_at")
+  answeredAt    DateTime?            @map("answered_at")
+  closedAt      DateTime?            @map("closed_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  // Cascade en los dos: si se elimina el negocio (subscriptions.service borra
+  // los miembros a mano en la misma transacción) o se saca a un empleado del
+  // equipo, la consulta se va con él en vez de bloquear el borrado.
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  member   Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@index([businessId, createdAt])
+  @@index([status, lastMessageAt])
+  @@map("support_requests")
+}
+
+model SupportMessage {
+  id          String               @id @default(uuid())
+  requestId   String               @map("request_id")
+  author      SupportMessageAuthor
+  // Quién lo escribió, según el lado: memberId para MEMBER, adminId para ADMIN.
+  // Los dos opcionales y con SetNull para que el hilo sobreviva a que esa
+  // persona deje de existir (se muestra con un nombre genérico).
+  memberId    String?              @map("member_id")
+  adminId     String?              @map("admin_id")
+  body        String
+  // [{ url, name, size?, type? }] — capturas de pantalla subidas a Storage
+  // (bucket business-logos, carpeta soporte/ del negocio). JSON y no tabla:
+  // son a lo sumo 3 por mensaje y nunca se consultan sueltos.
+  attachments Json                 @default("[]")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  request SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  member  Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  admin   PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+  @@map("support_messages")
+}
+
+// Pulgar arriba/abajo de cada capítulo del Manual del panel, con comentario
+// opcional. Un voto por miembro y capítulo (upsert): cambiar de opinión pisa
+// el anterior, no suma otro.
+model ManualFeedback {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  memberId   String   @map("member_id")
+  chapterId  String   @map("chapter_id")
+  helpful    Boolean
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  member   Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, chapterId])
+  @@map("manual_feedback")
 }

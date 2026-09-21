@@ -59,11 +59,12 @@ describe('MailService: envíos', () => {
   it('sendSupportRequest (usa sendOrLog) limpia el asunto que escribe el miembro', async () => {
     const { svc, send } = servicio(prismaConLog());
     await svc.sendSupportRequest('soporte@orbita.site', {
-      businessName: 'Tienda', businessSlug: 't', memberName: 'Ana', memberEmail: 'ana@x.com',
+      number: 12, businessName: 'Tienda', businessSlug: 't', memberName: 'Ana', memberEmail: 'ana@x.com',
       category: 'OTRO', subject: 'Ayuda\r\nX-Otro: 1', message: 'mensaje largo de prueba',
     });
     const enviado = send.mock.calls[0][0] as { subject: string; replyTo?: string };
-    expect(enviado.subject).toBe('[Soporte] OTRO — Tienda: Ayuda X-Otro: 1');
+    // Desde el 21/09 el asunto lleva el número de la consulta guardada.
+    expect(enviado.subject).toBe('[Soporte] #12 OTRO — Tienda: Ayuda X-Otro: 1');
     expect(enviado.replyTo).toBe('ana@x.com');
   });
 

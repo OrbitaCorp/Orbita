@@ -1,0 +1,17 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs.
+      Órbita → negocio: el equipo respondió una consulta de Soporte desde el
+      superadmin. Branding de plataforma (ver PLATFORM_BRANDED_TEMPLATES) y
+      Reply-To al buzón de soporte (ver MailService#sendSupportReply). --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Te respondimos la consulta #{{number}}</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Hola {{memberName}}: {{adminName}}, del equipo de Órbita, respondió tu consulta <strong style="color:#1a1f36;">{{subject}}</strong>.</p>
+
+{{!-- pre-wrap: la respuesta se escribe en un textarea, con párrafos y listas
+     a mano; sin esto el mail la aplasta en una sola línea. --}}
+<div style="margin-top:18px; padding:14px 16px; background:{{colorPrimaryTint}}; border-radius:8px; border:1px solid #e3e8ee;">
+  <div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Respuesta</div>
+  <div style="font-size:13.5px; color:#1a1f36; line-height:1.7; white-space:pre-wrap;">{{message}}</div>
+</div>
+
+{{> cta-button this url=panelUrl label="Ver en el panel"}}
+
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Podés responder este mail o desde el panel (Configuración → Soporte). Lo que escribas desde el panel queda en el historial de la consulta.</p>

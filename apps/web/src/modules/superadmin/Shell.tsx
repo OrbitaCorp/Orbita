@@ -16,6 +16,9 @@ export interface ItemNav<T extends string> {
   label: string
   Icono: LucideIcon
   grupo: string
+  // Contador pendiente (hoy: consultas de soporte abiertas). Solo se dibuja
+  // si es mayor a cero: un "0" al lado del label sería ruido permanente.
+  badge?: number
 }
 
 interface Props<T extends string> {
@@ -120,6 +123,24 @@ export function SuperAdminShell<T extends string>({
                     >
                       <it.Icono size={16} strokeWidth={1.6} />
                       <span className="flex-1 text-left">{it.label}</span>
+                      {/* Ámbar y no primary: el activo ya usa primary-bg, y
+                          "hay algo esperando" es un aviso, no una selección.
+                          El aria-label hace que el botón se lea "Soporte, 3
+                          abiertas" en vez de "Soporte 3". */}
+                      {it.badge !== undefined && it.badge > 0 && (
+                        <span
+                          aria-label={`${it.badge} abiertas`}
+                          style={{
+                            display: 'inline-grid', placeItems: 'center',
+                            minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
+                            background: 'var(--color-warning-bg)', color: 'var(--color-warning)',
+                            fontSize: 11, fontWeight: 700, lineHeight: 1,
+                            fontFamily: '"Geist Mono", monospace', flexShrink: 0,
+                          }}
+                        >
+                          {it.badge > 99 ? '99+' : it.badge}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

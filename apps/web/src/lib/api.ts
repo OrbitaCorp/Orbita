@@ -907,12 +907,86 @@ export function panelGetDomainPurchaseOrder(orderId: string) {
 }
 
 // ─── Panel: Soporte (Configuración → Soporte) ────────────────────────────────
-// Formulario genérico de contacto — no solo dominios, cualquier consulta.
-// Manda un mail real a contacto@orbita-corp.com (ver support.service.ts del
-// backend) con Reply-To al email de quien escribe.
+// Consultas al equipo de Órbita con historial: cada consulta es un hilo de
+// mensajes (del miembro y del equipo) que el panel lista, abre y responde. A
+// quién y cómo se avisa por mail lo decide el backend (support.service.ts);
+// acá no se asume ninguna casilla concreta.
 export type SupportCategory = 'DOMINIO' | 'FACTURACION' | 'TECNICO' | 'CUENTA' | 'OTRO'
-export function panelSendSupportRequest(input: { category: SupportCategory; subject: string; message: string; contactPhone?: string }) {
-  return panelRequest<{ ok: true }>('/support', { method: 'POST', body: JSON.stringify(input) })
+export type SupportRequestStatus = 'OPEN' | 'ANSWERED' | 'CLOSED'
+export type SupportAttachment = { url: string; name: string; size?: number; type?: string }
+export type SupportMessage = {
+  id: string
+  author: 'MEMBER' | 'ADMIN'
+  authorName: string
+  body: string
+  attachments: SupportAttachment[]
+  createdAt: string
+}
+export type SupportRequestRow = {
+  id: string
+  number: number
+  category: SupportCategory
+  subject: string
+  status: SupportRequestStatus
+  createdAt: string
+  lastMessageAt: string
+  messagesCount: number
+  member: { id: string; name: string }
+  lastMessage: { author: 'MEMBER' | 'ADMIN'; excerpt: string; createdAt: string } | null
+}
+export type SupportRequestDetail = SupportRequestRow & { contactPhone: string | null; messages: SupportMessage[] }
+
+// Sube una captura ANTES de crear la consulta o la respuesta: el mensaje viaja
+// después con las URLs que devuelve esto. Multipart, como el resto de las
+// subidas del panel (panelUploadStorefrontImage). Solo imágenes, ≤10MB.
+export async function panelUploadSupportAttachment(file: Blob, filename: string) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/support/attachments`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as SupportAttachment
+}
+
+// Crea la consulta (primer mensaje del hilo). Devuelve el detalle completo
+// para que la pantalla muestre el número asignado sin volver a pedirlo.
+export function panelSendSupportRequest(input: {
+  category: SupportCategory
+  subject: string
+  message: string
+  contactPhone?: string
+  attachments?: SupportAttachment[]
+}) {
+  return panelRequest<SupportRequestDetail>('/support', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// Todas las consultas del negocio (no solo las del miembro logueado), de la
+// más reciente a la más vieja por última actividad.
+export function panelListSupportRequests() {
+  return panelRequest<{ data: SupportRequestRow[] }>('/support')
+}
+
+export function panelGetSupportRequest(id: string) {
+  return panelRequest<SupportRequestDetail>(`/support/${id}`)
+}
+
+// Responde en el hilo. Si la consulta estaba respondida o cerrada, el backend
+// la vuelve a abrir: por eso devuelve el detalle entero y no solo el mensaje.
+export function panelReplySupportRequest(id: string, input: { message: string; attachments?: SupportAttachment[] }) {
+  return panelRequest<SupportRequestDetail>(`/support/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// "¿Te sirvió?" al pie de cada tema del manual. Un voto por tema y miembro:
+// mandar de nuevo pisa el anterior, por eso el GET devuelve solo el estado.
+export function panelSendManualFeedback(input: { chapterId: string; helpful: boolean; comment?: string }) {
+  return panelRequest<{ ok: true }>('/support/manual-feedback', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelGetManualFeedback() {
+  return panelRequest<{ data: { chapterId: string; helpful: boolean }[] }>('/support/manual-feedback')
 }
 
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en

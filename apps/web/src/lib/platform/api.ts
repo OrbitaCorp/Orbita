@@ -466,6 +466,88 @@ export interface CreateAuditItemInput {
   checks: string[]
 }
 
+// ─── Soporte (super admin → Soporte) ────────────────────────────────────────
+// Las consultas que un negocio manda desde Configuración → Soporte de su
+// panel, con el hilo de idas y vueltas con el equipo de Órbita. Mismos nombres
+// que el DTO del backend (support module) y que el cliente del panel
+// (lib/api.ts): si cambia uno, cambian los tres.
+export type SupportCategory = 'DOMINIO' | 'FACTURACION' | 'TECNICO' | 'CUENTA' | 'OTRO'
+export type SupportRequestStatus = 'OPEN' | 'ANSWERED' | 'CLOSED'
+export type SupportMessageAuthor = 'MEMBER' | 'ADMIN'
+
+export interface SupportAttachment {
+  url: string
+  name: string
+  size?: number
+  type?: string
+}
+
+export interface SupportMessageDto {
+  id: string
+  author: SupportMessageAuthor
+  authorName: string
+  body: string
+  attachments: SupportAttachment[]
+  createdAt: string
+}
+
+export interface AdminSupportRow {
+  id: string
+  // Correlativo global ("Consulta #12"): es lo que el negocio ve en el mail y
+  // lo que va a nombrar cuando escriba de nuevo.
+  number: number
+  category: SupportCategory
+  subject: string
+  status: SupportRequestStatus
+  createdAt: string
+  lastMessageAt: string
+  messagesCount: number
+  business: { id: string; name: string; subdomain: string }
+  member: { id: string; name: string; email: string }
+  lastMessage: { author: SupportMessageAuthor; excerpt: string; createdAt: string } | null
+}
+
+export interface AdminSupportDetail extends AdminSupportRow {
+  contactPhone: string | null
+  messages: SupportMessageDto[]
+}
+
+export interface SupportList {
+  data: AdminSupportRow[]
+  total: number
+  page: number
+  limit: number
+  openCount: number
+}
+
+export interface SupportManualChapter {
+  chapterId: string
+  helpful: number
+  notHelpful: number
+  comments: { businessName: string; comment: string; helpful: boolean; createdAt: string }[]
+}
+
+export interface SupportSummary {
+  open: number
+  answered: number
+  closed: number
+  // Qué opinan los negocios de cada capítulo del manual (pulgar arriba/abajo
+  // con comentario opcional). Se muestra al pie de Soporte porque es la otra
+  // mitad de "en qué se traban": lo que preguntan y lo que no entendieron.
+  manual: SupportManualChapter[]
+}
+
+// Arma "?a=1&b=2" salteando lo vacío, para no mandar `status=` cuando el
+// filtro está en "Todas".
+function toQuery(params: Record<string, string | number | undefined | null>): string {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && v !== null) qs.set(k, String(v))
+  })
+  const q = qs.toString()
+  return q ? `?${q}` : ''
+}
+
 export const platformApi = {
   overview: () => getJSON<Overview>('/platform/overview'),
   businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; page?: number; limit?: number } = {}) => {
@@ -528,4 +610,15 @@ export const platformApi = {
   discountCode: (id: string) => getJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`),
   createDiscountCode: (input: CreateDiscountCodeInput) => sendJSON<DiscountCodeDetail>('/platform/discount-codes', 'POST', input),
   updateDiscountCode: (id: string, input: UpdateDiscountCodeInput) => sendJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`, 'PUT', input),
+
+  // El backend devuelve las OPEN primero y después por última actividad: lo
+  // que espera respuesta nunca queda enterrado bajo lo ya contestado.
+  supportRequests: (params: { status?: string; category?: string; businessId?: string; q?: string; page?: number; limit?: number } = {}) =>
+    getJSON<SupportList>(`/platform/support${toQuery(params)}`),
+  supportSummary: () => getJSON<SupportSummary>('/platform/support/summary'),
+  supportRequest: (id: string) => getJSON<AdminSupportDetail>(`/platform/support/${id}`),
+  // Responder deja la consulta en ANSWERED y le manda el mail al negocio; no
+  // hay forma de contestar "en silencio" y está bien que así sea.
+  supportReply: (id: string, message: string) => sendJSON<AdminSupportDetail>(`/platform/support/${id}/reply`, 'POST', { message }),
+  supportStatus: (id: string, status: 'OPEN' | 'CLOSED') => sendJSON<AdminSupportDetail>(`/platform/support/${id}/status`, 'PUT', { status }),
 }

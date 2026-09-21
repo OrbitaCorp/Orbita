@@ -25,6 +25,7 @@ const seccionLabels: Record<string, string> = {
     mensajes: 'Mensajes',
     configuracion: 'Configuración',
     perfil: 'Mi perfil',
+    manual: 'Manual',
 }
 
 const DESCUENTOS_VISTA_LABELS: Record<string, string> = {
@@ -226,6 +227,15 @@ export default function Header({ onMenuClick }: Props) {
             return [
                 { label: 'Descuentos', onClick: () => irA('descuentos') },
                 { label: 'Cupones' },
+            ]
+        }
+        if (seccion === 'configuracion' && vista === 'soporte') {
+            // Soporte es la única pantalla de Configuración con miga propia:
+            // se llega desde el manual y desde el menú del avatar, y sin el
+            // "Configuración ›" adelante no se entiende dónde quedó uno.
+            return [
+                { label: 'Configuración', onClick: () => irA('configuracion') },
+                { label: 'Soporte' },
             ]
         }
         return [{ label: seccionLabels[seccion] ?? seccion }]

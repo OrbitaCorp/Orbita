@@ -10,6 +10,16 @@
 // (Dashboard.tsx, PedidoLista.tsx, ProductoLista.tsx, ConfigGeneral.tsx,
 // ConfigSidebar.tsx, Avanzado.tsx, LinkCompartibleModal.tsx, etc.). Si se
 // renombra algo en una pantalla, se renombra acá también.
+//
+// Dos marcas en el texto, y nada más (las resuelve TextoRico en piezas.tsx):
+//   **negrita**         para la palabra que importa del renglón.
+//   [[Publicar tienda]] para el NOMBRE DE UN BOTÓN o acción concreta de la
+//                       pantalla: se dibuja como un chip que se parece al
+//                       botón real, así el lector lo reconoce de un vistazo.
+//                       Solo para botones y acciones — los estados
+//                       ("publicado"), los nombres de sección
+//                       ("Configuración → Pagos"), los interruptores y los
+//                       ejemplos van en texto plano o entre comillas.
 
 import {
     Rocket, Compass, LayoutDashboard, ShoppingBag, Users, Package, MessageSquare,
@@ -29,7 +39,7 @@ export interface Destino {
 }
 
 export type Bloque =
-    /** Texto corrido. Admite **negrita** (la resuelve piezas.tsx). */
+    /** Texto corrido. Admite **negrita** y [[botón]] (los resuelve piezas.tsx). */
     | { tipo: 'parrafo'; texto: string }
     /** Bullets sueltos. */
     | { tipo: 'lista'; items: string[] }
@@ -83,8 +93,8 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'El panel (acá)', texto: 'Tu trastienda. Entrás con tu usuario y contraseña, y es donde cargás productos, atendés pedidos, respondés mensajes y mirás tus números. No lo ve nadie más que vos y tu equipo.' },
                     { label: 'La tienda', texto: 'Lo que ve tu cliente: la portada, el catálogo, el carrito y el checkout. Vive en tu dirección web y es pública.' },
                 ] },
-                { tipo: 'parrafo', texto: 'Todo lo que tocás en el panel se refleja en la tienda **al instante**: no hay que publicar cambios uno por uno. Para verla como la ve un cliente, abrí tu avatar arriba a la derecha y tocá "Ir a la tienda".' },
-                { tipo: 'nota', variante: 'aviso', texto: 'La única excepción es la primera vez: hasta que no toques "Publicar tienda" en el Inicio, tu tienda no está online y nadie te puede comprar.' },
+                { tipo: 'parrafo', texto: 'Todo lo que tocás en el panel se refleja en la tienda **al instante**: no hay que publicar cambios uno por uno. Para verla como la ve un cliente, abrí tu avatar arriba a la derecha y tocá [[Ir a la tienda]].' },
+                { tipo: 'nota', variante: 'aviso', texto: 'La única excepción es la primera vez: hasta que no toques [[Publicar tienda]] en el Inicio, tu tienda no está online y nadie te puede comprar.' },
             ],
         },
         {
@@ -94,11 +104,11 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'pasos', items: [
                     { titulo: 'Confirmá tu email', texto: 'Mi perfil → te mandamos un código de 6 números y lo pegás ahí. Es lo que nos deja devolverte la cuenta si alguna vez perdés el acceso. Tenés 7 días desde que creaste la tienda.' },
                     { titulo: 'Completá los datos del negocio', texto: 'Configuración → Negocio: nombre, rubro y dirección. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.' },
-                    { titulo: 'Conectá Mercado Pago', texto: 'Configuración → Pagos → "Conectar cuenta". Sin esto la tienda no puede cobrar online. Son dos minutos.' },
+                    { titulo: 'Conectá Mercado Pago', texto: 'Configuración → Pagos → [[Conectar cuenta]]. Sin esto la tienda no puede cobrar online. Son dos minutos.' },
                     { titulo: 'Armá tus categorías', texto: 'Productos → Categorías. Con 2 a 6 alcanza. Hacelo ANTES del primer producto, así cada uno nace en su lugar y no queda todo en "Sin categoría".' },
-                    { titulo: 'Cargá tu primer producto', texto: 'Productos → "Crear producto": fotos, precio, stock y categoría. Es el paso que hace que la tienda exista.' },
+                    { titulo: 'Cargá tu primer producto', texto: 'Productos → [[Crear producto]]: fotos, precio, stock y categoría. Es el paso que hace que la tienda exista.' },
                     { titulo: 'Definí cómo entregás', texto: 'Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.' },
-                    { titulo: 'Publicá la tienda', texto: 'Inicio → botón "Publicar tienda", arriba a la derecha. Ahí recién estás online.' },
+                    { titulo: 'Publicá la tienda', texto: 'Inicio → botón [[Publicar tienda]], arriba a la derecha. Ahí recién estás online.' },
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'Si preferís que te lleven de la mano, el tutorial de Primeros pasos hace exactamente esta lista con el cursor guiándote pantalla por pantalla. Aparece solo la primera vez, y cuando lo terminás se abre una segunda tanda que recorre el resto del panel.' },
             ],
@@ -107,8 +117,8 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'publicar', titulo: 'Publicar la tienda',
             bloques: [
-                { tipo: 'parrafo', texto: 'El botón vive arriba a la derecha del **Inicio**. Mientras diga "Publicar tienda", tu tienda está apagada: podés cargar todo tranquilo sin que nadie vea un catálogo a medio armar.' },
-                { tipo: 'parrafo', texto: 'Cuando lo tocás, pasa a decir **"✓ Tienda online"** y tu dirección web empieza a responder. Podés seguir editando todo lo que quieras después: publicar no congela nada.' },
+                { tipo: 'parrafo', texto: 'El botón vive arriba a la derecha del **Inicio**. Mientras diga [[Publicar tienda]], tu tienda está apagada: podés cargar todo tranquilo sin que nadie vea un catálogo a medio armar.' },
+                { tipo: 'parrafo', texto: 'Cuando lo tocás, pasa a decir [[✓ Tienda online]] y tu dirección web empieza a responder. Podés seguir editando todo lo que quieras después: publicar no congela nada.' },
                 { tipo: 'nota', variante: 'dato', texto: 'Tu tienda ya tiene su dirección de Órbita desde el primer día y funciona perfecto. Comprar un dominio propio (tunegocio.com) es opcional y se hace desde Configuración → Dominios.' },
             ],
             ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
@@ -145,7 +155,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Campana', texto: 'Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.' },
                     { label: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.' },
                     { label: 'Orbi', texto: 'El asistente. Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.' },
-                    { label: 'Tu avatar', texto: 'Mi perfil, "Ir a la tienda" para verla como cliente, y Cerrar sesión.' },
+                    { label: 'Tu avatar', texto: 'Mi perfil, [[Ir a la tienda]] para verla como cliente, y Cerrar sesión.' },
                 ] },
             ],
         },
@@ -171,8 +181,8 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'periodo', titulo: 'Elegir el período',
             bloques: [
-                { tipo: 'parrafo', texto: 'Arriba de todo hay una tira de botones: **Hoy, 7 días, 30 días, 90 días** y **Personalizado**. Todo lo que ves abajo — los números, el gráfico, el top, las alertas — responde a ese período.' },
-                { tipo: 'parrafo', texto: '"Personalizado" abre un calendario donde elegís un desde y un hasta a mano. Sirve para mirar una fecha puntual: un fin de semana largo, el día de una promo, el mes pasado completo.' },
+                { tipo: 'parrafo', texto: 'Arriba de todo hay una tira de botones: **Hoy, Semana, Mes** y **Personalizado**. Todo lo que ves abajo — los números, el gráfico, el top, las alertas — responde a ese período.' },
+                { tipo: 'parrafo', texto: '[[Personalizado]] abre un calendario donde elegís un desde y un hasta a mano. Sirve para mirar una fecha puntual: un fin de semana largo, el día de una promo, el mes pasado completo.' },
                 { tipo: 'nota', variante: 'dato', texto: 'Cada número se compara SIEMPRE contra el período anterior del mismo largo. Si estás mirando 7 días, la flechita verde o roja compara contra los 7 días previos.' },
             ],
         },
@@ -199,7 +209,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Productos con stock crítico', texto: 'Llegaron al mínimo que definiste en el producto. Te lleva a Productos para reponer.' },
                     { label: 'Pagos por confirmar', texto: 'Transferencias o pagos coordinados que todavía no validaste.' },
                 ] },
-                { tipo: 'parrafo', texto: 'Cada alerta tiene su botón **"Ir →"** que te deja parado en la pantalla donde se resuelve. Y si ya las viste todas, "Limpiar todas" las saca de la vista hasta que vuelva a pasar algo.' },
+                { tipo: 'parrafo', texto: 'Cada alerta tiene su botón [[Ir →]] que te deja parado en la pantalla donde se resuelve. Y si ya las viste todas, [[Limpiar todas]] las saca de la vista hasta que vuelva a pasar algo.' },
             ],
             ir: { label: 'Ir a Pedidos', seccion: 'pedidos' },
         },
@@ -226,7 +236,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'actividad', titulo: 'Actividad reciente',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista de abajo: los últimos pedidos, con número, cliente, qué compró, monto y estado. Clickeás cualquier fila y caés directo en el detalle de ese pedido.' },
-                { tipo: 'parrafo', texto: '"Ver todos →" te lleva a la lista completa de Pedidos.' },
+                { tipo: 'parrafo', texto: '[[Ver todos →]] te lleva a la lista completa de Pedidos.' },
             ],
             ir: { label: 'Ir a Pedidos', seccion: 'pedidos' },
         },
@@ -267,7 +277,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'nuevo-pedido', titulo: 'Cargar una venta a mano',
             bloques: [
-                { tipo: 'parrafo', texto: 'El botón **"Nuevo pedido"** sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
+                { tipo: 'parrafo', texto: 'El botón [[Nuevo pedido]] sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
                     { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás; si no, lo creás ahí mismo y queda para siempre en tu base.' },
@@ -329,7 +339,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Ticket promedio', texto: 'Cuánto gasta por compra. El que compra seguido pero poco necesita otra promo que el que compra una vez y fuerte.' },
                     { label: 'Última compra', texto: 'Cuándo fue la última vez. Es tu lista de "a quién hay que despertar".' },
                 ] },
-                { tipo: 'parrafo', texto: 'La flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a **"Ver perfil completo →"**.' },
+                { tipo: 'parrafo', texto: 'La flechita de cada fila despliega sus últimos pedidos sin salir de la lista, y desde ahí entrás a [[Ver perfil completo →]].' },
             ],
         },
         {
@@ -345,7 +355,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'exportar-clientes', titulo: 'Exportar la base',
             bloques: [
-                { tipo: 'parrafo', texto: '**"Exportar"** baja toda tu base en CSV, con los datos de contacto. Es tuya: la abrís en Excel, la subís a una herramienta de mailing, la guardás de respaldo.' },
+                { tipo: 'parrafo', texto: '[[Exportar]] baja toda tu base en CSV, con los datos de contacto. Es tuya: la abrís en Excel, la subís a una herramienta de mailing, la guardás de respaldo.' },
                 { tipo: 'nota', variante: 'aviso', texto: 'Son datos personales de gente real. Tratá el archivo con el mismo cuidado que tratarías una agenda de clientes en papel.' },
             ],
         },
@@ -375,7 +385,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'crear-producto', titulo: 'Crear un producto',
             bloques: [
-                { tipo: 'parrafo', texto: 'El botón **"Crear producto"** abre el alta. Lo importante, en orden:' },
+                { tipo: 'parrafo', texto: 'El botón [[Crear producto]] abre el alta. Lo importante, en orden:' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Nombre', texto: 'Cómo lo busca tu cliente, no cómo lo llamás vos internamente.' },
                     { titulo: 'Fotos', texto: 'Lo que más vende. La primera es la que se ve en el catálogo; el resto, al abrir el producto.' },
@@ -384,7 +394,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Categoría', texto: 'Dónde vive dentro de tu catálogo.' },
                     { titulo: 'Publicado o borrador', texto: 'Borrador lo deja invisible hasta que esté listo.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá "Generar con Orbi": te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Generar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
             ],
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
@@ -392,8 +402,8 @@ export const CAPITULOS: Capitulo[] = [
             id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
             bloques: [
                 { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
-                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con "+ Agregar característica", en el orden en que querés que aparezcan.' },
-                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link **"Ver más detalles →"** que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
+                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[+ Agregar característica]], en el orden en que querés que aparezcan.' },
+                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link [[Ver más detalles →]] que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Si no cargás ninguna, la sección de Características directamente no aparece en la tienda: no hay nada genérico que rellenar de más.' },
             ],
         },
@@ -426,7 +436,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'categorias', titulo: 'Categorías',
             bloques: [
-                { tipo: 'parrafo', texto: 'Es el árbol con el que tu cliente navega la tienda. Se arman con **"Nueva categoría"**, admiten subcategorías, y cada una lleva su ícono y su color.' },
+                { tipo: 'parrafo', texto: 'Es el árbol con el que tu cliente navega la tienda. Se arman con [[Nueva categoría]], admiten subcategorías, y cada una lleva su ícono y su color.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Menos es más: 2 a 6 categorías bien pensadas se navegan mejor que veinte. Siempre podés abrir subcategorías después, cuando el catálogo crezca.' },
             ],
             ir: { label: 'Ir a Categorías', seccion: 'categorias' },
@@ -434,7 +444,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'exportar-catalogo', titulo: 'Exportar el catálogo',
             bloques: [
-                { tipo: 'parrafo', texto: '**"Exportar Excel"** baja el catálogo completo en .xlsx: sirve para revisar precios en planilla, pasarle la lista a alguien, o tener un respaldo antes de un cambio grande.' },
+                { tipo: 'parrafo', texto: '[[Exportar Excel]] baja el catálogo completo en .xlsx: sirve para revisar precios en planilla, pasarle la lista a alguien, o tener un respaldo antes de un cambio grande.' },
             ],
         },
     ],
@@ -548,10 +558,10 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'compartir', titulo: 'Compartir un cupón: link y envío por email', ilustracion: 'compartir',
             bloques: [
-                { tipo: 'parrafo', texto: 'Esta es la parte que más se aprovecha poco. En el menú de tres puntitos de cualquier cupón, **"Compartir"** abre una ventana con dos formas de hacerlo llegar.' },
+                { tipo: 'parrafo', texto: 'Esta es la parte que más se aprovecha poco. En el menú de tres puntitos de cualquier cupón, [[Compartir]] abre una ventana con dos formas de hacerlo llegar.' },
                 { tipo: 'campos', titulo: '1 · El link', items: [
-                    { label: 'URL del link', texto: 'Una dirección propia del cupón. El que la abre entra a tu tienda **con el descuento ya aplicado**: no tiene que acordarse del código ni tipearlo. El botón "Copiar" te la deja en el portapapeles para pegarla en Instagram, en un story, en WhatsApp o donde quieras.' },
-                    { label: 'Activo / Inactivo', texto: 'El link tiene su propio interruptor, aparte del cupón. Si está inactivo, tocá **"Activar link"** y queda funcionando. Apagarlo después corta el link sin tener que dar de baja el cupón.' },
+                    { label: 'URL del link', texto: 'Una dirección propia del cupón. El que la abre entra a tu tienda **con el descuento ya aplicado**: no tiene que acordarse del código ni tipearlo. El botón [[Copiar]] te la deja en el portapapeles para pegarla en Instagram, en un story, en WhatsApp o donde quieras.' },
+                    { label: 'Activo / Inactivo', texto: 'El link tiene su propio interruptor, aparte del cupón. Si está inactivo, tocá [[Activar link]] y queda funcionando. Apagarlo después corta el link sin tener que dar de baja el cupón.' },
                 ] },
                 { tipo: 'campos', titulo: '2 · Enviar por email', items: [
                     { label: 'Email del destinatario', texto: 'Ponés la dirección — **una casilla de Gmail, de Outlook, la que sea**, no hace falta que la persona sea cliente registrado tuyo — y Órbita le manda el mail.' },
@@ -559,7 +569,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Enviar', texto: 'Listo. El mail sale con el valor del cupón, el saludo y un botón que lleva directo a tu tienda con el descuento puesto.' },
                 ] },
                 { tipo: 'nota', variante: 'dato', texto: 'El mail lo arma y lo manda Órbita: no se abre tu Gmail ni hace falta que configures nada. Vos solo escribís la dirección.' },
-                { tipo: 'nota', variante: 'tip', texto: 'Para mandarle el mismo cupón a MUCHA gente de una, no uses esta ventana una por una: creá el cupón, andá a Clientes, filtrá la lista que querés y usá "Email masivo" con el código adentro.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Para mandarle el mismo cupón a MUCHA gente de una, no uses esta ventana una por una: creá el cupón, andá a Clientes, filtrá la lista que querés y usá [[Email masivo]] con el código adentro.' },
                 { tipo: 'parrafo', texto: 'Los descuentos también se comparten por link, con la misma ventana, salvo los que aplican sobre el ticket completo: esos no tienen una página propia a la que llevar.' },
             ],
             ir: { label: 'Ir a Cupones', seccion: 'cupones' },
@@ -611,7 +621,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'como-se-navega', titulo: 'Cómo se navega',
             bloques: [
-                { tipo: 'parrafo', texto: 'Configuración tiene **su propio menú adentro**, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón "Guardar cambios".' },
+                { tipo: 'parrafo', texto: 'Configuración tiene **su propio menú adentro**, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón [[Guardar cambios]].' },
             ],
         },
         {
@@ -633,7 +643,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Qué medios de pago acepta tu tienda.' },
                 { tipo: 'campos', items: [
-                    { label: 'Mercado Pago', texto: 'Pagos online con tarjeta, débito y cuotas. Se conecta con **"Conectar cuenta"**: te lleva a Mercado Pago, autorizás, y volvés. Sin esto la tienda no cobra online.' },
+                    { label: 'Mercado Pago', texto: 'Pagos online con tarjeta, débito y cuotas. Se conecta con [[Conectar cuenta]]: te lleva a Mercado Pago, autorizás, y volvés. Sin esto la tienda no cobra online.' },
                     { label: 'Coordinar por WhatsApp', texto: 'El cliente cierra la compra y vos arreglás el pago por WhatsApp. No se le muestra ningún CBU ni alias en la tienda.' },
                     { label: 'Retiro en local', texto: 'Si lo activás, el cliente puede retirar. Ahí se habilitan los medios de pago que aceptás en el mostrador: efectivo, débito, crédito o Mercado Pago.' },
                     { label: 'Descuento por pagar con Mercado Pago', texto: 'Un % opcional para empujar el pago online.' },
@@ -768,7 +778,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'que-es-avanzado', titulo: 'Qué es el paquete Avanzado',
             bloques: [
-                { tipo: 'parrafo', texto: 'Es un paquete de herramientas que **se paga aparte de tu suscripción mensual**. Si todavía no lo tenés, vas a ver las tarjetas con un candado y un botón "Ver qué incluye" que te lleva a Suscripción.' },
+                { tipo: 'parrafo', texto: 'Es un paquete de herramientas que **se paga aparte de tu suscripción mensual**. Si todavía no lo tenés, vas a ver las tarjetas con un candado y un botón [[Ver qué incluye]] que te lleva a Suscripción.' },
                 { tipo: 'parrafo', texto: 'Configurar estas funciones es decisión del propietario: a un Empleado no le aparece el módulo.' },
             ],
         },
@@ -779,7 +789,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.' },
                     { label: 'Modales de anuncios', texto: 'Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.' },
                     { label: '2x1 y 3x2', texto: 'La promo "llevá X, pagá Y" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.' },
-                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con "Ver cómo queda" antes de aplicar.' },
+                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar.' },
                     { label: 'Prueba social', texto: 'Notificaciones tipo "Fulano compró tal producto", armadas con pedidos **reales** de tu tienda. Nunca con datos inventados.' },
                     { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.' },
                 ] },
@@ -801,7 +811,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Se abre desde tu avatar, arriba a la derecha. Ahí están tus datos, el tema claro u oscuro y tu contraseña.' },
                 { tipo: 'campos', items: [
-                    { label: 'Confirmar tu email', texto: 'Tocás "Enviarme el código", te llega uno de 6 números y lo pegás. Es lo que nos deja devolverte la cuenta si perdés el acceso. Tenés 7 días desde que creaste la tienda.' },
+                    { label: 'Confirmar tu email', texto: 'Tocás [[Enviarme el código]], te llega uno de 6 números y lo pegás. Es lo que nos deja devolverte la cuenta si perdés el acceso. Tenés 7 días desde que creaste la tienda.' },
                     { label: 'Cambiar la contraseña', texto: 'Desde la misma pantalla, sin pasar por "olvidé mi contraseña".' },
                     { label: 'Tema', texto: 'Claro u oscuro. Queda guardado en tu cuenta, no en el navegador: te sigue a cualquier dispositivo.' },
                 ] },
@@ -811,7 +821,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'ver-tienda', titulo: 'Ver tu tienda como cliente',
             bloques: [
-                { tipo: 'parrafo', texto: 'En el mismo menú del avatar, **"Ir a la tienda"** te abre el storefront tal cual lo ve un comprador. Es el chequeo que conviene hacer cada vez que tocás precios, fotos o apariencia.' },
+                { tipo: 'parrafo', texto: 'En el mismo menú del avatar, [[Ir a la tienda]] te abre el storefront tal cual lo ve un comprador. Es el chequeo que conviene hacer cada vez que tocás precios, fotos o apariencia.' },
             ],
         },
     ],
@@ -827,7 +837,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
             bloques: [
-                { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, o desde su botón en la barra de arriba.' },
+                { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, o desde el botón **Orbi AI** al pie del menú de la izquierda.' },
                 { tipo: 'parrafo', texto: 'No es un buscador de ayuda genérica: contesta con los datos de **tu** negocio. "¿Cuánto vendí esta semana?", "¿qué pedidos tengo pendientes?", "¿cómo creo un cupón?" son todas preguntas válidas.' },
             ],
         },
@@ -854,7 +864,9 @@ export const CAPITULOS: Capitulo[] = [
 /** Total de temas: lo usa la portada del manual ("N temas, M capítulos"). */
 export const TOTAL_TEMAS = CAPITULOS.reduce((n, c) => n + c.temas.length, 0)
 
-/** Texto plano de un tema — para el buscador del índice. */
+/** Texto plano de un tema — para el buscador del índice (y el de Soporte).
+ *  Sin las marcas de negrita ni de botón: buscar "publicar tienda" tiene que
+ *  matchear aunque en el texto esté escrito [[Publicar tienda]]. */
 export function textoPlano(tema: Tema): string {
     const partes: string[] = [tema.titulo]
     for (const b of tema.bloques) {
@@ -864,5 +876,5 @@ export function textoPlano(tema: Tema): string {
         else if (b.tipo === 'campos') partes.push(b.titulo ?? '', ...b.items.map(i => `${i.label} ${i.texto}`))
         else if (b.tipo === 'estados') partes.push(...b.items.map(i => `${i.label} ${i.texto}`))
     }
-    return partes.join(' ')
+    return partes.join(' ').replace(/\*\*|\[\[|\]\]/g, '')
 }

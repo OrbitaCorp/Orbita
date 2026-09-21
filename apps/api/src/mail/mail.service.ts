@@ -174,6 +174,9 @@ export class MailService {
     // HACIA Órbita, no tiene sentido que vaya con el branding de ESE
     // negocio (nadie del negocio lo va a leer, lo lee el equipo de Órbita).
     'support-request',
+    // La respuesta va al revés (Órbita → negocio), pero la firma Órbita como
+    // plataforma, no la tienda: el que la recibe es el dueño de esa tienda.
+    'support-reply',
   ]);
 
   // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
@@ -305,6 +308,10 @@ export class MailService {
     // LifeBuoy — formulario de Soporte.
     'support-request': this.svgIcon(
       '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
+    ),
+    // MessageCircle — Órbita respondió una consulta de soporte.
+    'support-reply': this.svgIcon(
+      '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
     ),
   };
 
@@ -879,9 +886,16 @@ export class MailService {
   // contacto del negocio, ni sin Reply-To como el resto de avisos de
   // plataforma): así quien lo lee en Órbita puede tocar "Responder" y le
   // llega directo a esa persona, sin tener que copiar su email a mano.
+  //
+  // Desde el 21/09 la consulta se guarda en la base (SupportRequest) y este
+  // mail es un aviso: lleva el número correlativo para que el equipo la ubique
+  // en el superadmin, los adjuntos como links y, si `isReply`, el asunto
+  // arranca con "Re:" porque es el negocio volviendo a escribir en un hilo
+  // que ya existía.
   async sendSupportRequest(
     to: string,
     data: {
+      number: number;
       businessName: string;
       businessSlug: string;
       memberName: string;
@@ -890,10 +904,35 @@ export class MailService {
       subject: string;
       message: string;
       contactPhone?: string;
+      attachments?: { url: string; name: string }[];
+      isReply?: boolean;
+      // Link al hilo en el superadmin, para responder desde ahí y no por mail.
+      adminUrl?: string;
     },
     meta?: MailMeta,
   ): Promise<boolean> {
-    return this.sendOrLog(to, `[Soporte] ${data.category} — ${data.businessName}: ${data.subject}`, 'support-request', data, meta, data.memberEmail);
+    const asunto = `[Soporte] ${data.isReply ? 'Re: ' : ''}#${data.number} ${data.category} — ${data.businessName}: ${data.subject}`;
+    return this.sendOrLog(to, asunto, 'support-request', { ...data, hasAttachments: (data.attachments?.length ?? 0) > 0 }, meta, data.memberEmail);
+  }
+
+  // Órbita le respondió al negocio desde el superadmin (SupportService#reply).
+  // Va al email del miembro que abrió la consulta. Reply-To al buzón de
+  // soporte: si contesta el mail en vez de entrar al panel, le llega al equipo
+  // igual (la respuesta por mail no queda en el hilo — de ahí el botón).
+  async sendSupportReply(
+    to: string,
+    data: {
+      number: number;
+      subject: string;
+      memberName: string;
+      adminName: string;
+      message: string;
+      panelUrl: string;
+      supportEmail: string;
+    },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `Respuesta a tu consulta #${data.number}: ${data.subject}`, 'support-reply', data, meta, data.supportEmail);
   }
 
   // ── Subscriptions (negocio → Orbita) ──────────────────

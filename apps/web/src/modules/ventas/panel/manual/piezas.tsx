@@ -16,18 +16,28 @@ import { ArrowRight, Lightbulb, AlertTriangle, Info } from 'lucide-react'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import type { Bloque, Destino } from './contenido'
 
-// ─── Texto con **negrita** ───────────────────────────────────────────────────
+// ─── Texto con **negrita** y [[botón]] ───────────────────────────────────────
 // El contenido se escribe en texto plano para que se pueda editar sin tocar
-// JSX; los dobles asteriscos son lo único que interpreta el manual.
+// JSX; el manual interpreta solo dos marcas: **negrita** y [[Nombre]] para
+// el rótulo de un botón o acción de la pantalla, que se dibuja como un chip
+// parecido al botón real (.man-btn, en el CSS de Manual.tsx). Un solo split
+// con las dos marcas en el mismo regex: así una negrita y un chip pueden
+// convivir en el mismo renglón sin que uno se coma al otro.
+const MARCAS = /(\*\*[^*]+\*\*|\[\[[^\]]+\]\])/g
+
 export function TextoRico({ texto }: { texto: string }) {
-    const partes = texto.split(/(\*\*[^*]+\*\*)/g)
+    const partes = texto.split(MARCAS)
     return (
         <>
-            {partes.map((p, i) =>
-                p.startsWith('**') && p.endsWith('**') && p.length > 4
-                    ? <strong key={i} style={{ fontWeight: 600, color: 'var(--color-text)' }}>{p.slice(2, -2)}</strong>
-                    : <span key={i}>{p}</span>
-            )}
+            {partes.map((p, i) => {
+                if (p.length > 4 && p.startsWith('**') && p.endsWith('**')) {
+                    return <strong key={i} style={{ fontWeight: 600, color: 'var(--color-text)' }}>{p.slice(2, -2)}</strong>
+                }
+                if (p.length > 4 && p.startsWith('[[') && p.endsWith(']]')) {
+                    return <span key={i} className="man-btn">{p.slice(2, -2)}</span>
+                }
+                return <span key={i}>{p}</span>
+            })}
         </>
     )
 }

@@ -10,13 +10,14 @@ import {
   type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
-  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2, ClipboardCheck,
+  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2, ClipboardCheck, LifeBuoy,
   Search, Plus,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
 import { TabWizard } from './Wizard'
 import { TabAuditoria } from './Auditoria'
+import { TabSoporte } from './Soporte'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -39,13 +40,35 @@ export function SuperAdminDashboard() {
   // "volver" de la ficha de un negocio aterriza en Negocios y no en Resumen.
   const tab: Tab = ES_TAB(router.query.seccion) ? router.query.seccion : 'resumen'
   const setTab = (t: Tab) => void router.push(`/superadmin?seccion=${t}`, undefined, { shallow: true })
+
+  // Consultas de soporte abiertas, para la pastilla del sidebar: es lo único
+  // del panel que espera una acción del equipo, así que tiene que verse desde
+  // cualquier sección, no solo entrando a Soporte. Se vuelve a pedir cada
+  // minuto (solo con la pestaña visible) y cada vez que Soporte avisa que
+  // respondió o cerró algo, para que el número no quede viejo un minuto.
+  const esAdmin = !!user && user.type === 'platform_admin'
+  const [tickSoporte, setTickSoporte] = useState(0)
+  const refrescarSoporte = () => setTickSoporte((k) => k + 1)
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') setTickSoporte((k) => k + 1)
+    }, 60_000)
+    return () => clearInterval(t)
+  }, [])
+  const { data: resumenSoporte } = useFetch(
+    () => (esAdmin ? platformApi.supportSummary() : Promise.resolve(null)),
+    [esAdmin, tickSoporte],
+  )
+  const abiertas = resumenSoporte?.open ?? 0
+  const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n))
+
   if (!user || user.type !== 'platform_admin') return null
 
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
 
   return (
     <SuperAdminShell
-      items={NAV}
+      items={items}
       activo={tab}
       onNavegar={setTab}
       usuario={{ nombre: user.admin.name, rol: ROLE_LABELS[user.admin.role] ?? user.admin.role }}
@@ -54,6 +77,7 @@ export function SuperAdminDashboard() {
       {tab === 'resumen' && <TabResumen />}
       {tab === 'wizard' && <TabWizard />}
       {tab === 'negocios' && <TabNegocios />}
+      {tab === 'soporte' && <TabSoporte currentAdminId={user.admin.id} onCambio={refrescarSoporte} />}
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
       {tab === 'descuentos' && <TabDescuentos />}
@@ -65,7 +89,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -76,6 +100,9 @@ export const NAV: ItemNav<Tab>[] = [
   // gestión de clientes que ya entraron.
   { id: 'wizard', label: 'Wizard', Icono: Wand2, grupo: 'General' },
   { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
+  // Pegado a Negocios: las consultas son de los clientes y se responden
+  // mirando su ficha. La pastilla con las abiertas la pone el dashboard.
+  { id: 'soporte', label: 'Soporte', Icono: LifeBuoy, grupo: 'Clientes' },
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },

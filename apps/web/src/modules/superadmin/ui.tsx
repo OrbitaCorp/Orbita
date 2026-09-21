@@ -29,6 +29,26 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_code_failed: 'Código de acceso rechazado',
   mfa_code_blocked: 'Código de acceso bloqueado',
   send_mail_test: 'Enviar mail de prueba',
+  // Soporte: los escribe el módulo support (support-admin.controller.ts).
+  support_reply: 'Responder consulta de soporte',
+  support_status: 'Cambiar estado de consulta',
+}
+
+// Estados y categorías de una consulta de soporte. Claves = enums
+// SupportRequestStatus y SupportCategory de Prisma. Las categorías se leen
+// igual que en el formulario que ve el negocio (Configuración → Soporte): si
+// acá dijera otra cosa, el admin y el cliente hablarían de dos rubros distintos.
+export const SUPPORT_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Abierta',
+  ANSWERED: 'Respondida',
+  CLOSED: 'Cerrada',
+}
+export const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
+  DOMINIO: 'Dominios',
+  FACTURACION: 'Facturación / pagos',
+  TECNICO: 'Problema técnico',
+  CUENTA: 'Cuenta / plan',
+  OTRO: 'Otra consulta',
 }
 
 // ─── Diccionarios de jerga ────────────────────────────────────────────────────
