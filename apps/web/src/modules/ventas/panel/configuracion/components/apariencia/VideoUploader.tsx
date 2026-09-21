@@ -12,14 +12,49 @@
 // quitar) — mismo criterio que "sabés que está, no hace falta verlo".
 
 import { useRef, useState } from 'react'
-import { Upload, Trash2, Loader2, FileVideo } from 'lucide-react'
+import { Upload, Trash2, FileVideo } from 'lucide-react'
 
 interface VideoUploaderProps {
     /** El mismo ap.videoUrl — puede ser un link pegado a mano o el resultado de una subida anterior. */
     value:    string
     onChange: (v: string) => void
-    onUpload: (file: File) => Promise<string>
+    /** `onProgress` (0-100) es opcional a propósito: lo llenan las variantes
+     *  que suben directo a R2 (panelPresignStorefrontVideo/ProductVideo, ver
+     *  lib/api.ts) — si algún caller viejo lo ignora, el uploader igual
+     *  funciona, solo se queda mostrando 0% mientras dura la subida. */
+    onUpload: (file: File, onProgress?: (pct: number) => void) => Promise<string>
     maxMB?: number
+}
+
+// Anillo circular de progreso — mismo tamaño (36px) que la miniatura/ícono
+// que reemplaza mientras sube, así el layout de la fila no salta entre
+// estados. `stroke-dashoffset` es lo único que se anima; con
+// prefers-reduced-motion la transición se saca en globals.css (regla
+// genérica `*`, no hace falta una acá).
+function AnilloProgreso({ pct }: { pct: number }) {
+    const size = 36, grosor = 3, r = (size - grosor) / 2, circ = 2 * Math.PI * r
+    return (
+        <div
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Subiendo video"
+            style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}
+        >
+            <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--color-border)" strokeWidth={grosor} fill="none" />
+                <circle
+                    cx={size / 2} cy={size / 2} r={r} stroke="var(--color-primary)" strokeWidth={grosor} fill="none"
+                    strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 200ms ease' }}
+                />
+            </svg>
+            <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                {pct}
+            </span>
+        </div>
+    )
 }
 
 // Distingue "hay un archivo subido" de "hay un link de YouTube/Vimeo pegado"
@@ -34,6 +69,10 @@ export function esVideoArchivo(url: string): boolean {
 export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [subiendo, setSubiendo] = useState(false)
+    // 0 mientras dura el presign (round-trip chico, pide la URL firmada) y
+    // recién arranca a moverse cuando el PUT grande contra R2 empieza a
+    // mandar bytes — ver xhr.upload.onprogress en subirVideoDirectoAR2.
+    const [progreso, setProgreso] = useState(0)
     const [error, setError] = useState('')
     const [drag, setDrag] = useState(false)
 
@@ -46,7 +85,8 @@ export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUp
         if (file.size > maxMB * 1024 * 1024) { setError(`El archivo supera el máximo de ${maxMB} MB`); return }
         try {
             setSubiendo(true)
-            onChange(await onUpload(file))
+            setProgreso(0)
+            onChange(await onUpload(file, setProgreso))
         } catch (e) {
             setError(e instanceof Error ? e.message : 'No se pudo subir el video')
         } finally {
@@ -70,7 +110,7 @@ export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUp
                 }}
             >
                 {subiendo ? (
-                    <Loader2 size={18} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite', flexShrink: 0 }} />
+                    <AnilloProgreso pct={progreso} />
                 ) : esArchivo ? (
                     // Miniatura real del video (primer frame) en vez del ícono
                     // genérico — sin controles ni autoplay, solo para reconocer
@@ -92,12 +132,12 @@ export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUp
                 <div style={{ flex: 1, minWidth: 0 }}>
                     {esArchivo ? (
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>
-                            {subiendo ? 'Subiendo…' : 'Video subido'}
+                            {subiendo ? `Subiendo… ${progreso}%` : 'Video subido'}
                         </div>
                     ) : (
                         <>
                             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>
-                                {subiendo ? 'Subiendo…' : 'Arrastrá un video acá, o elegilo'}
+                                {subiendo ? `Subiendo… ${progreso}%` : 'Arrastrá un video acá, o elegilo'}
                             </div>
                             {!subiendo && (
                                 <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', marginTop: 2 }}>
@@ -125,7 +165,6 @@ export function VideoUploader({ value, onChange, onUpload, maxMB = 40 }: VideoUp
                     </>
                 )}
             </div>
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
             {error && <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>{error}</p>}
 
