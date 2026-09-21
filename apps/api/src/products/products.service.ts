@@ -633,6 +633,7 @@ export class ProductsService {
             url: img.url,
             position: img.position,
             isPrimary: img.isPrimary,
+            hasAiBackground: img.hasAiBackground,
           },
         });
       }
@@ -736,6 +737,7 @@ export class ProductsService {
         url: publicUrl.publicUrl,
         position: (maxPosition._max.position ?? -1) + 1,
         isPrimary,
+        hasAiBackground: dto.hasAiBackground ?? false,
       },
     });
 
@@ -745,6 +747,7 @@ export class ProductsService {
       position: image.position,
       isPrimary: image.isPrimary,
       optionValueId: image.optionValueId,
+      hasAiBackground: image.hasAiBackground,
     };
   }
 
@@ -930,6 +933,7 @@ export class ProductsService {
         position: img.position,
         isPrimary: img.isPrimary,
         optionValueId: img.optionValueId,
+        hasAiBackground: img.hasAiBackground,
       })),
     };
   }

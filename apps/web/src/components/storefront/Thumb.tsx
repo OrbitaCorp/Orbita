@@ -24,9 +24,15 @@ type ProdImageProps = {
   radius?: number
   style?:  React.CSSProperties
   children?: React.ReactNode
+  // true solo para imágenes compuestas por "Fondo con IA" (ver comentario de
+  // ProductImage.hasAiBackground en el schema) — esas SÍ se pueden llenar de
+  // borde a borde sin riesgo: el fondo se generó a propósito con margen para
+  // recortarse, nunca toca al producto. Una foto común del vendedor sigue en
+  // `contain` (ver el comentario largo de acá abajo, sigue aplicando).
+  cover?: boolean
 }
 
-export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children }: ProdImageProps) {
+export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children, cover = false }: ProdImageProps) {
   // El gradiente rayado es placeholder — solo tiene sentido SIN foto real.
   // Antes se pintaba siempre, así que un PNG con transparencia (fondo
   // recortado) dejaba ver las rayas de color por detrás/alrededor del
@@ -56,7 +62,9 @@ export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, child
         <img
           src={imgUrl}
           alt=""
-          style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }}
+          style={cover
+            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
+            : { position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }}
         />
       )}
       {children}

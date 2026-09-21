@@ -559,7 +559,7 @@ export default function ProductoDetalle() {
                         flexShrink: 0,
                       }}
                     >
-                      <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} />
+                      <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} cover={img.hasAiBackground} />
                     </button>
                   ))}
                   {/* Miniatura del video — siempre la última. Un archivo
@@ -639,7 +639,7 @@ export default function ProductoDetalle() {
                     )}
                   </div>
                 ) : (
-                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={620} radius={14}>
+                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={620} radius={14} cover={imagenes?.[idxMostrado]?.hasAiBackground}>
                     {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
                         específico, mismo criterio de prioridad que el badge
                         del catálogo (toProducto()). */}
