@@ -30,6 +30,14 @@ const CENTRO_VACIO =
   'no jewelry, no product of any kind, no text, no watermark, no people — just the background ' +
   'surface, ready for a product photo to be placed on top of later.';
 
+// Regla dura #2 (feedback real): objetos "grandes" en las esquinas (zapatillas,
+// auriculares, reloj, sombrero) compiten con el producto en el mismo plano —
+// como el producto ocupa casi todo el cuadro, termina tapándolos de forma
+// rara, como si "flotara por encima" de la escena. Los estilos que SÍ
+// funcionan bien (madera, mármol, lino, invierno) solo tienen detalles
+// CHICOS y sutiles (una hoja, una ramita, una flor seca), nunca objetos
+// grandes tipo producto. Cualquier estilo nuevo debe seguir ese criterio.
+
 export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
   estudio_neutro: {
     label: 'Estudio neutro',
@@ -45,10 +53,7 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
   },
   calle_urbana: {
     label: 'Urbano retro (streetwear)',
-    prompt:
-      `${VISTA_CENITAL} A gray felt or concrete textured surface, with retro urban props scattered ONLY ` +
-      'at the corners (white headphones, vintage magazines, sunglasses, a small clapperboard), moody ' +
-      `neutral gray tones, gritty streetwear editorial style. ${CENTRO_VACIO}`,
+    prompt: `${VISTA_CENITAL} A gray felt or weathered concrete textured surface, moody neutral gray tones, a few subtle scattered paint flecks or chalk marks, gritty streetwear editorial style, no large objects. ${CENTRO_VACIO}`,
   },
   lino_flores: {
     label: 'Lino con flores secas (joyería, productos delicados)',
@@ -64,10 +69,7 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
   },
   ropa_deportiva: {
     label: 'Deportivo urbano (indumentaria deportiva)',
-    prompt:
-      `${VISTA_CENITAL} A matte gray rubber gym flooring or concrete texture, with sport props scattered ` +
-      'ONLY at the corners (white sneakers, a stopwatch, a vintage analog clock), bold energetic sportswear ' +
-      `editorial style, neutral gray tones. ${CENTRO_VACIO}`,
+    prompt: `${VISTA_CENITAL} A matte gray rubber gym flooring texture, subtle chalk dust marks, bold energetic sportswear editorial style, neutral gray tones, no large objects. ${CENTRO_VACIO}`,
   },
   ropa_elegante: {
     label: 'Elegante (indumentaria formal/de gala)',
@@ -75,7 +77,10 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
   },
   ropa_playa: {
     label: 'Playa/verano (indumentaria de verano, trajes de baño)',
-    prompt: `${VISTA_CENITAL} A flat beige sand texture background, warm sunny natural light, a straw sun hat and a pair of sunglasses placed ONLY at the corners, relaxed summer editorial style — no ocean, no horizon, sand texture only. ${CENTRO_VACIO}`,
+    // Ojo con el wording acá: una versión anterior ("close-up sand texture,
+    // seashells") disparó el filtro de contenido de Workers AI como falso
+    // positivo NSFW (ver historial). Evitar "seashells"/"close-up" juntos.
+    prompt: `${VISTA_CENITAL} A flat beige sand texture background with natural sand ripple patterns, warm sunny natural light, relaxed summer editorial style — no ocean, no horizon, no large objects, sand texture only. ${CENTRO_VACIO}`,
   },
   ropa_invierno: {
     label: 'Abrigo/invierno (indumentaria de invierno)',
