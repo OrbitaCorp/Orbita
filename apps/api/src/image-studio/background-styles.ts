@@ -86,10 +86,15 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
     label: 'Abrigo/invierno (indumentaria de invierno)',
     prompt: `${VISTA_CENITAL} A cozy chunky-knit cream blanket texture, warm ambient light, a few out-of-focus dried pine sprigs at the edges only, warm inviting editorial style. ${CENTRO_VACIO}`,
   },
-  papel_kraft: {
-    label: 'Papel kraft (uso general, packaging/artesanal)',
-    prompt: `${VISTA_CENITAL} A textured warm brown kraft paper surface, soft natural light, subtle paper grain and gentle creases, minimalist artisanal style. ${CENTRO_VACIO}`,
-  },
+  // "papel_kraft" se sacó del catálogo (09/2026): medido a mano, el filtro
+  // de contenido de Workers AI rechaza esta textura puntual como falso
+  // positivo NSFW ~83% de las veces (5 de 6 intentos), pase lo que pase en
+  // el wording exacto ("creases", "grain", con o sin ellas) — no es un
+  // problema de una palabra específica, es la textura semántica en sí. Ni
+  // con el reintento de CloudflareImageService (3 intentos) da una tasa de
+  // éxito aceptable. No vale la pena seguir peleándolo — si hace falta un
+  // fondo tipo packaging/artesanal, mejor una foto real (ver conversación
+  // sobre bancos de fotos con licencia) que este prompt.
   piedra_clara: {
     label: 'Piedra clara (uso general, cosmética/hogar)',
     prompt: `${VISTA_CENITAL} A light beige travertine stone surface texture, soft natural light, subtle organic stone veining, clean minimalist style. ${CENTRO_VACIO}`,
