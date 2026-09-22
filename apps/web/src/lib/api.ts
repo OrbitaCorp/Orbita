@@ -918,6 +918,8 @@ export type SupportMessage = {
   id: string
   author: 'MEMBER' | 'ADMIN'
   authorName: string
+  // Cargo del admin que firma (CEO, CTO...); null si no cargó uno.
+  authorTitle: string | null
   body: string
   attachments: SupportAttachment[]
   createdAt: string

@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LifeBuoy, Check, Mail, Clock, Activity, BookOpen, ArrowRight, Send, Lightbulb, Inbox } from 'lucide-react'
+import { LifeBuoy, Check, Mail, BookOpen, ArrowRight, Send, Inbox } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { useAuth } from '@/hooks/useAuth'
@@ -31,11 +31,10 @@ import {
     panelListSupportRequests, panelSendSupportRequest, panelUploadSupportAttachment,
     type SupportAttachment, type SupportCategory, type SupportRequestDetail, type SupportRequestRow,
 } from '@/lib/api'
-import { CAPITULOS, textoPlano } from '@/modules/ventas/panel/manual/contenido'
 import { SoporteAdjuntos, agregarAdjuntos, type AdjuntoLocal } from './SoporteAdjuntos'
 import { SoporteHilo } from './SoporteHilo'
 import {
-    CATEGORIAS, EstadoPill, categoriaDe, fechaRelativa, hhmm, leerVistos, marcarVisto, normalizar, sinLeer, type Vistos,
+    CATEGORIAS, EstadoPill, categoriaDe, fechaRelativa, leerVistos, marcarVisto, sinLeer, type Vistos,
     mensajeParaElNegocio,
 } from './SoporteComun'
 
@@ -43,15 +42,17 @@ import {
 // también en el mail de confirmación, así que es un compromiso del equipo.
 // Confirmada por Ale el 21/09/2026 (48 horas hábiles, no 24); si cambia,
 // se cambia acá y en ningún otro lado.
+// Casilla oficial de soporte: la misma a la que la API manda cada consulta
+// (SUPPORT_EMAIL fijo en support.service.ts). El link abre Gmail con el
+// destinatario cargado (pedido de Ale, 22/09/2026): la mayoría de los
+// negocios usa Gmail y un mailto: en Windows suele caer en una app vacía.
+export const CORREO_SOPORTE = 'soporte@orbita.site'
+const LINK_GMAIL_SOPORTE = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(CORREO_SOPORTE)}&su=${encodeURIComponent('Consulta desde el panel de Órbita')}`
+
 export const PROMESA_SOPORTE = {
     texto: 'Menos de 48 horas hábiles',
     horario: 'Lunes a viernes de 9 a 18 (hora de Argentina)',
 }
-
-// Misma base que lib/api.ts (que no la exporta). /health es público y se
-// pide sin sesión: no pasa por authedFetch a propósito, para que un 401 de
-// una sesión vencida no se confunda con "el sistema está caído".
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 // Los temas del manual que más consultas evitan. Los ids son los de
 // contenido.ts (capítulo → tema); si se renombra uno allá, se renombra acá.
@@ -62,46 +63,11 @@ const ATAJOS_MANUAL: { capId: string; temaId: string; label: string }[] = [
     { capId: 'arranque',      temaId: 'publicar',     label: 'Publicar la tienda' },
 ]
 
-// ─── Buscador del manual para "¿Es esto lo que buscás?" ─────────────────────
-// Índice a nivel de módulo: se arma una vez por carga, no por tecla. Título y
-// texto plano sin tildes ni mayúsculas (normalizar), para que "envio" dé con
-// "Envíos" y "mercadopago" no, porque nadie lo escribe igual dos veces.
-const INDICE_MANUAL = CAPITULOS.flatMap(cap => cap.temas.map(t => ({
-    capId: cap.id, capTitulo: cap.titulo, temaId: t.id, titulo: t.titulo,
-    tituloN: normalizar(t.titulo), textoN: normalizar(textoPlano(t)),
-})))
-type TemaIndexado = (typeof INDICE_MANUAL)[number]
-
-// Palabras que aparecen en todos los temas y no dicen nada de la consulta.
-const VACIAS = new Set(['de', 'la', 'el', 'los', 'las', 'un', 'una', 'en', 'mi', 'que', 'no', 'se', 'por', 'para', 'con', 'del', 'al', 'es', 'me', 'lo', 'le', 'su', 'tengo', 'quiero', 'como', 'puedo', 'hay'])
-
-function buscarEnManual(consulta: string): TemaIndexado[] {
-    // Raíz de 5 letras en vez de la palabra entera: "comprar" encuentra
-    // "comprás", "dominio" encuentra "dominios". Barato y alcanza para esto.
-    const raices = normalizar(consulta).split(/[^a-z0-9]+/)
-        .filter(p => p.length >= 3 && !VACIAS.has(p))
-        .map(p => (p.length > 5 ? p.slice(0, 5) : p))
-    if (raices.length === 0) return []
-    const minimo = raices.length >= 2 ? 2 : 1
-    const puntuados: { t: TemaIndexado; puntos: number }[] = []
-    for (const t of INDICE_MANUAL) {
-        let puntos = 0
-        for (const r of raices) {
-            if (t.tituloN.includes(r)) puntos += 3
-            else if (t.textoN.includes(r)) puntos += 1
-        }
-        if (puntos >= minimo) puntuados.push({ t, puntos })
-    }
-    return puntuados.sort((a, b) => b.puntos - a.puntos).slice(0, 3).map(x => x.t)
-}
-
-type Salud = { estado: 'cargando' } | { estado: 'ok' | 'sin-verificar'; hora: string }
 type Errores = { categoria?: string; asunto?: string; mensaje?: string }
 
 export default function Soporte() {
     const router = useRouter()
     const { user } = useAuth()
-    const email = user?.type === 'member' ? user.member.email : null
     // El registro de "visto" es por negocio: el mismo miembro puede tener
     // acceso a dos negocios con consultas distintas.
     const businessId = user && 'business' in user ? user.business.id : 'sin-negocio'
@@ -120,7 +86,6 @@ export default function Soporte() {
     const [enviando, setEnviando] = useState(false)
     const [progreso, setProgreso] = useState<string | null>(null)
     const [enviada, setEnviada] = useState<SupportRequestDetail | null>(null)
-    const [asuntoBuscado, setAsuntoBuscado] = useState('')
 
     const chipRefs = useRef<(HTMLButtonElement | null)[]>([])
     const asuntoRef = useRef<HTMLInputElement>(null)
@@ -129,13 +94,11 @@ export default function Soporte() {
     const errCatId = useId()
     const errAsuntoId = useId()
     const errMensajeId = useId()
-    const sugerenciasId = useId()
 
     // ── Lista y lateral ──
     const [consultas, setConsultas] = useState<SupportRequestRow[] | null>(null)
     const [errorLista, setErrorLista] = useState<string | null>(null)
     const [vistos, setVistos] = useState<Vistos>({})
-    const [salud, setSalud] = useState<Salud>({ estado: 'cargando' })
 
     // Precarga de categoría por query param — se limpia apenas se captura,
     // mismo criterio que otras vueltas con query param en el proyecto
@@ -178,29 +141,6 @@ export default function Soporte() {
         void cargarLista()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router.isReady, consultaId])
-
-    // Estado del sistema: un ping a /health con tope de 5s. Si falla, NO se
-    // dice que está caído: lo más probable es la red de quien mira, y un
-    // "caído" falso genera justo las consultas que esta columna quiere evitar.
-    useEffect(() => {
-        let vivo = true
-        const ctrl = new AbortController()
-        const timer = window.setTimeout(() => ctrl.abort(), 5000)
-        fetch(`${API_BASE}/health`, { signal: ctrl.signal, cache: 'no-store' })
-            .then(r => { if (vivo) setSalud({ estado: r.ok ? 'ok' : 'sin-verificar', hora: hhmm(new Date()) }) })
-            .catch(() => { if (vivo) setSalud({ estado: 'sin-verificar', hora: hhmm(new Date()) }) })
-            .finally(() => window.clearTimeout(timer))
-        return () => { vivo = false; window.clearTimeout(timer); ctrl.abort() }
-    }, [])
-
-    // Sugerencias del manual: el asunto se "asienta" 250ms después de la
-    // última tecla y recién ahí se busca. La búsqueda en sí es derivada.
-    useEffect(() => {
-        const q = asunto.trim()
-        const t = window.setTimeout(() => setAsuntoBuscado(q), 250)
-        return () => window.clearTimeout(t)
-    }, [asunto])
-    const sugerencias = asuntoBuscado.length >= 3 ? buscarEnManual(asuntoBuscado) : []
 
     // ── Navegación ──
     function abrirConsulta(id: string) {
@@ -327,7 +267,6 @@ export default function Soporte() {
         setErrorAdjuntos(null)
         setErrores({})
         setErrorEnvio(null)
-        setAsuntoBuscado('')
     }
 
     const abiertas = consultas?.filter(c => c.status === 'OPEN').length ?? 0
@@ -386,7 +325,6 @@ export default function Soporte() {
                        asunto abajo a todo el ancho, fecha al pie. */
                     .sop-fila { grid-template-areas: "num estado" "main main" "fecha fecha" !important; grid-template-columns: minmax(0,1fr) auto !important; row-gap: 6px !important; }
                     .sop-fila-fecha { text-align: left !important; }
-                    .sop-sugerencia { min-height: 44px !important; }
                 }
             `}</style>
 
@@ -424,7 +362,7 @@ export default function Soporte() {
                                         </div>
                                         <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)' }}>Consulta #{enviada.number} recibida</div>
                                         <div style={{ fontSize: 13.5, color: 'var(--color-muted)', maxWidth: 400, lineHeight: 1.6 }}>
-                                            Te respondemos en {PROMESA_SOPORTE.texto.toLowerCase()}{email ? <> a <strong style={{ color: 'var(--color-body)', fontWeight: 600 }}>{email}</strong></> : ' al correo de tu cuenta'}. La respuesta también queda en esta pantalla.
+                                            Te respondemos en {PROMESA_SOPORTE.texto.toLowerCase()}. La respuesta queda en esta pantalla, en Tus consultas.
                                         </div>
                                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
                                             <Button variant="primary" size="sm" onClick={() => abrirConsulta(enviada.id)}>Ver la consulta</Button>
@@ -490,33 +428,6 @@ export default function Soporte() {
                                             {errores.asunto && <div id={errAsuntoId} style={{ fontSize: 12.5, color: 'var(--color-error)', marginTop: 6 }}>{errores.asunto}</div>}
                                         </div>
 
-                                        {/* Sugerencias del manual: aparecen mientras se escribe el asunto */}
-                                        <div id={sugerenciasId} aria-live="polite">
-                                            {sugerencias.length > 0 && (
-                                                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--color-info-bg)' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--color-info)', marginBottom: 6 }}>
-                                                        <Lightbulb size={13} strokeWidth={2} aria-hidden="true" /> ¿Es esto lo que buscás?
-                                                    </div>
-                                                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                        {sugerencias.map(s => (
-                                                            <li key={`${s.capId}-${s.temaId}`}>
-                                                                <button
-                                                                    type="button"
-                                                                    className="sop-link sop-sugerencia"
-                                                                    onClick={() => irAlManual(s.capId, s.temaId)}
-                                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '2px 0', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', cursor: 'pointer', textAlign: 'left' }}
-                                                                >
-                                                                    <span style={{ fontWeight: 500 }}>{s.titulo}</span>
-                                                                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>· {s.capTitulo}</span>
-                                                                    <ArrowRight size={13} strokeWidth={2} aria-hidden="true" style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-                                                                </button>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
-
                                         {/* Detalle */}
                                         <div style={{ marginTop: 14 }}>
                                             <label htmlFor="sop-mensaje" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Contanos el detalle</label>
@@ -564,9 +475,12 @@ export default function Soporte() {
                                             <Button type="submit" variant="primary" className="sop-enviar" loading={enviando} icon={enviando ? undefined : <Send size={14} strokeWidth={2} aria-hidden="true" />}>
                                                 {progreso ?? 'Enviar consulta'}
                                             </Button>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--color-subtle)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-muted)', overflowWrap: 'anywhere' }}>
                                                 <Mail size={12} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0 }} />
-                                                <span>Te respondemos al correo de tu cuenta{email ? ` (${email})` : ''}.</span>
+                                                <span>
+                                                    También podés mandar un mail a{' '}
+                                                    <a href={LINK_GMAIL_SOPORTE} target="_blank" rel="noopener noreferrer" className="sop-link" style={{ fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none' }}>{CORREO_SOPORTE}</a>
+                                                </span>
                                             </div>
                                         </div>
                                     </form>
@@ -600,29 +514,6 @@ export default function Soporte() {
 
                 {/* ── Lateral ── */}
                 <aside className="sop-lateral" aria-label="Información de soporte">
-                    <BloqueLateral Icon={Clock} titulo="Tiempo de respuesta">
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{PROMESA_SOPORTE.texto}</div>
-                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{PROMESA_SOPORTE.horario}</div>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12.5, color: 'var(--color-body)', marginTop: 10, overflowWrap: 'anywhere' }}>
-                            <Mail size={13} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-muted)' }} />
-                            <span>Te respondemos a {email ? <strong style={{ fontWeight: 600 }}>{email}</strong> : 'tu correo'}</span>
-                        </div>
-                    </BloqueLateral>
-
-                    <BloqueLateral Icon={Activity} titulo="Estado del sistema">
-                        {/* El punto de color nunca va solo: el texto dice lo mismo. */}
-                        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
-                            <span aria-hidden="true" style={{
-                                width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
-                                background: salud.estado === 'ok' ? 'var(--color-success)' : salud.estado === 'sin-verificar' ? 'var(--color-warning)' : 'var(--color-border-strong)',
-                            }} />
-                            {salud.estado === 'cargando' ? 'Revisando…' : salud.estado === 'ok' ? 'Todo funcionando' : 'No pudimos verificar el estado'}
-                        </div>
-                        {salud.estado !== 'cargando' && (
-                            <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginTop: 4 }}>Revisado {salud.hora}</div>
-                        )}
-                    </BloqueLateral>
-
                     <BloqueLateral Icon={BookOpen} titulo="Antes de escribir">
                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>Lo que más nos preguntan ya está explicado en el manual:</div>
                         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -658,7 +549,7 @@ export default function Soporte() {
 
 // ─── Piezas ──────────────────────────────────────────────────────────────────
 
-function BloqueLateral({ Icon, titulo, children }: { Icon: typeof Clock; titulo: string; children: React.ReactNode }) {
+function BloqueLateral({ Icon, titulo, children }: { Icon: typeof BookOpen; titulo: string; children: React.ReactNode }) {
     return (
         <Card padding="sm">
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>

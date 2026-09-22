@@ -10,6 +10,8 @@ export type SupportMessageDto = {
   id: string;
   author: SupportMessageAuthor;
   authorName: string;
+  // Cargo del admin que firma (CEO, CTO...). Null para MEMBER o sin cargo.
+  authorTitle: string | null;
   body: string;
   attachments: SupportAttachment[];
   createdAt: string;

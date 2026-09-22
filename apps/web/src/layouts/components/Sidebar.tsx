@@ -263,7 +263,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             </div>
 
             {/* Nav */}
-            <nav className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-0.5">
+            <nav className="flex-1 overflow-y-auto px-2 pt-2 pb-3 flex flex-col gap-0.5">
                 {modulosVisibles.map(m => {
                     const activo = moduloActivo === m.id
                     const open   = abierto === m.id

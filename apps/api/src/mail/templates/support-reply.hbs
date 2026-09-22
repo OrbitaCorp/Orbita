@@ -3,7 +3,7 @@
       superadmin. Branding de plataforma (ver PLATFORM_BRANDED_TEMPLATES) y
       Reply-To al buzón de soporte (ver MailService#sendSupportReply). --}}
 <h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Te respondimos la consulta #{{number}}</h2>
-<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Hola {{memberName}}: {{adminName}}, del equipo de Órbita, respondió tu consulta <strong style="color:#1a1f36;">{{subject}}</strong>.</p>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Hola {{memberName}}: {{adminName}}, {{#if adminTitle}}{{adminTitle}} de Órbita{{else}}del equipo de Órbita{{/if}}, respondió tu consulta <strong style="color:#1a1f36;">{{subject}}</strong>.</p>
 
 {{!-- pre-wrap: la respuesta se escribe en un textarea, con párrafos y listas
      a mano; sin esto el mail la aplasta en una sola línea. --}}
