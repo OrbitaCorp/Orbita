@@ -24,9 +24,16 @@ const MODEL_GENERATE = '@cf/black-forest-labs/flux-1-schnell';
 
 // Flux 2 [klein] 4B: unifica generación y edición (imagen + texto → imagen),
 // también dentro del free tier. Probado 09/2026: NO acepta JSON — el request
-// tiene que ser multipart/form-data real (campos "prompt" y "image"), un
-// body JSON tira 400 "required properties at '/' are 'multipart'" pase lo
-// que pase en el JSON.
+// tiene que ser multipart/form-data real (campos "prompt" e "input_image_0"),
+// un body JSON tira 400 "required properties at '/' are 'multipart'" pase lo
+// que pase en el JSON. IMPORTANTE: el campo de la imagen de referencia es
+// "input_image_0" (así nombra Cloudflare sus campos de multi-referencia,
+// hasta input_image_3 para hasta 4 imágenes) — un campo "image" a secas NO
+// es válido, la API lo ignora en silencio (sigue devolviendo success:true)
+// y el modelo genera de cero solo a partir del prompt de texto, sin mirar
+// la foto real. Encontrado 22/09/2026 comparando contra ejemplos de curl
+// reales de la doc de Cloudflare — esto explicaba resultados que antes
+// parecían "el modelo reinterpreta demasiado la imagen".
 const MODEL_EDIT = '@cf/black-forest-labs/flux-2-klein-4b';
 
 // code 5035 = "Model X is not available on the Workers Free plan" — no es un
@@ -69,14 +76,22 @@ export class CloudflareQuotaExhaustedException extends ServiceUnavailableExcepti
  * propio LLM (ver orbi/llm/), esto es solo para las funciones de imagen del
  * paquete "Avanzado" (ver ImageStudioService).
  *
- * IMPORTANTE sobre editImage(): el modelo NO garantiza preservar el producto
- * de la foto original — en pruebas, la misma consigna ("cambiá el fondo,
- * dejá la prenda igual") a veces devolvió una prenda completamente distinta.
- * Por eso ImageStudioService.generateBackground() NO usa editImage() sobre
- * la foto real del producto — genera el fondo aparte y compone localmente
- * con sharp. editImage() queda para casos donde sí hace falta que la IA
- * reinterprete la imagen a propósito (ej. "prenda en un modelo"), con la
- * advertencia clara de que el resultado hay que revisarlo antes de publicar.
+ * IMPORTANTE sobre editImage() — bug de campo encontrado y corregido
+ * (22/09/2026): la imagen de referencia va en el campo "input_image_0", NO
+ * en "image" — este último no es un campo real de la API de Flux 2 klein
+ * (multi-referencia: "input_image_0".."input_image_3"), así que con "image"
+ * el modelo probablemente ignoraba la foto de entrada por completo y
+ * generaba una imagen nueva solo a partir del prompt de texto. Eso explica
+ * las pruebas anteriores donde "cambiá el fondo, dejá la prenda igual"
+ * devolvía una prenda completamente distinta — no era el modelo
+ * reinterpretando de más, era que nunca vio la foto real. Con el campo
+ * corregido, la fidelidad al producto real mejora muchísimo (ver comparación
+ * en el resumen de la tarea), pero SIGUE sin haber garantía formal de
+ * preservación exacta (no es inpainting con máscara) — por eso
+ * ImageStudioService.generateBackground() sigue sin usar editImage() sobre
+ * la foto real del producto para el catálogo (genera el fondo aparte y
+ * compone localmente con sharp), y generateModelWearing() sigue devolviendo
+ * la advertencia de revisar el resultado antes de publicar.
  *
  * El filtro de contenido de Workers AI tira falsos positivos de NSFW con
  * cierta frecuencia sobre prompts completamente inocuos (confirmado 09/2026:
@@ -165,7 +180,10 @@ export class CloudflareImageService {
   /**
    * Edita una imagen existente según una instrucción en texto. Real
    * multipart/form-data — ver comentario de MODEL_EDIT arriba, un body JSON
-   * no funciona con este modelo aunque el resto de la API sí use JSON.
+   * no funciona con este modelo aunque el resto de la API sí use JSON. La
+   * imagen de referencia va en "input_image_0" (así es como Flux 2 klein
+   * nombra sus campos de multi-referencia, hasta input_image_3) — NO existe
+   * un campo genérico "image" en este modelo.
    */
   async editImage(prompt: string, image: Buffer, mimeType: string): Promise<CloudflareGeneratedImage> {
     const { accountId, apiToken } = this.getCreds();
@@ -181,7 +199,7 @@ export class CloudflareImageService {
       // .buffer como ArrayBufferLike (podría ser SharedArrayBuffer), y BlobPart
       // exige ArrayBuffer puntual. Se arma de nuevo en cada intento: un
       // FormData ya usado en un fetch no se puede reenviar tal cual.
-      form.append('image', new Blob([new Uint8Array(image)], { type: mimeType }), 'input');
+      form.append('input_image_0', new Blob([new Uint8Array(image)], { type: mimeType }), 'input');
 
       let res: Response;
       try {
