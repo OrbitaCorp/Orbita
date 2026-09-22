@@ -62,6 +62,9 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   // al entrar. Lo demás está a un select de distancia.
   const [estado, setEstado] = useState<SupportRequestStatus | ''>('OPEN')
   const [categoria, setCategoria] = useState<SupportCategory | ''>('')
+  // Con cuenta / sin cuenta: lo que llega por el formulario de la web puede
+  // ser de alguien que no es cliente (o todavía no).
+  const [cuenta, setCuenta] = useState<'' | 'with' | 'without'>('')
   const [busqueda, setBusqueda] = useState('')
   const [debounced, setDebounced] = useState('')
   const [page, setPage] = useState(1)
@@ -80,6 +83,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   }, [busqueda])
   const cambiarEstado = (v: SupportRequestStatus | '') => { setEstado(v); setPage(1) }
   const cambiarCategoria = (v: SupportCategory | '') => { setCategoria(v); setPage(1) }
+  const cambiarCuenta = (v: '' | 'with' | 'without') => { setCuenta(v); setPage(1) }
 
   const { data: resumen, error: errorResumen, status: statusResumen } = useFetch(() => platformApi.supportSummary(), [reloadKey])
 
@@ -102,11 +106,12 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
     () => platformApi.supportRequests({
       status: estado || undefined,
       category: categoria || undefined,
+      account: cuenta || undefined,
       q: debounced || undefined,
       page,
       limit: POR_PAGINA,
     }),
-    [estado, categoria, debounced, page, reloadKey],
+    [estado, categoria, cuenta, debounced, page, reloadKey],
   )
 
   // Si se respondió la última abierta de la página 2, esa página queda vacía:
@@ -125,7 +130,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   const total = lista?.total ?? 0
   const desde = total === 0 ? 0 : (page - 1) * POR_PAGINA + 1
   const hasta = lista ? Math.min(page * POR_PAGINA, total) : 0
-  const hayFiltros = estado !== '' || categoria !== '' || debounced !== ''
+  const hayFiltros = estado !== '' || categoria !== '' || cuenta !== '' || debounced !== ''
 
   // 404 en cualquiera de los dos pedidos = la API que está sirviendo no tiene
   // este módulo (frontend desplegado antes que la API). No es una caída: se
@@ -216,13 +221,24 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
           <option value="">Todas las categorías</option>
           {CATEGORIAS.map((c) => <option key={c} value={c}>{SUPPORT_CATEGORY_LABELS[c]}</option>)}
         </select>
+        <select
+          value={cuenta}
+          onChange={(e) => cambiarCuenta(e.target.value as '' | 'with' | 'without')}
+          aria-label="Cuenta en Órbita"
+          className="ds-field"
+          style={{ ...inputStyle, minWidth: 150 }}
+        >
+          <option value="">Con y sin cuenta</option>
+          <option value="with">Con cuenta</option>
+          <option value="without">Sin cuenta</option>
+        </select>
         <div style={{ position: 'relative', flex: 1, minWidth: 220, maxWidth: 380 }}>
           <Search size={16} strokeWidth={1.75} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
           <input
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por asunto o negocio…"
+            placeholder="Buscar por asunto, negocio o email…"
             aria-label="Buscar por asunto o negocio"
             className="ds-field"
             style={{ ...inputStyle, width: '100%', paddingLeft: 38 }}
@@ -242,12 +258,12 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
           <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 150ms ease' }} aria-busy={loading || undefined}>
             {lista.data.length === 0 ? (
               hayFiltros ? (
-                <Empty text={estado === 'OPEN' && !categoria && !debounced ? 'No hay consultas abiertas: nada espera respuesta.' : 'No hay consultas con esos filtros.'} />
+                <Empty text={estado === 'OPEN' && !categoria && !cuenta && !debounced ? 'No hay consultas abiertas: nada espera respuesta.' : 'No hay consultas con esos filtros.'} />
               ) : (
                 <div style={{ padding: '36px 16px', textAlign: 'center' }}>
                   <Inbox size={26} strokeWidth={1.5} aria-hidden="true" style={{ color: 'var(--color-subtle)' }} />
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>Todavía ningún negocio mandó una consulta</div>
-                  <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5 }}>Cuando escriban desde Configuración → Soporte de su panel, aparecen acá y también llegan a soporte@orbita.site.</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5 }}>Cuando escriban desde Configuración → Soporte de su panel o desde el formulario de orbita.site, aparecen acá y también llegan a soporte@orbita.site.</div>
                 </div>
               )
             ) : (
@@ -260,8 +276,22 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
                   cells: [
                     <span key="n" style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap' }}>#{r.number}</span>,
                     <div key="b" style={{ minWidth: 150 }}>
-                      <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>{r.business.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{r.business.subdomain}.orbita.site</div>
+                      {r.business ? (
+                        <>
+                          <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>{r.business.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{r.business.subdomain}.orbita.site</div>
+                        </>
+                      ) : (
+                        /* Formulario de la web y el email no es de ningún miembro:
+                           puede ser alguien que todavía no es cliente. */
+                        <>
+                          <div style={{ marginBottom: 4 }}><Pill text="Sin cuenta" tone="amber" /></div>
+                          <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>Formulario de la web</div>
+                        </>
+                      )}
+                      {r.source === 'LANDING' && r.business && (
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Formulario de la web</div>
+                      )}
                     </div>,
                     <div key="s" style={{ minWidth: 240, maxWidth: 420 }}>
                       <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 5 }}>{r.subject}</div>
@@ -276,7 +306,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
                         )}
                       </div>
                     </div>,
-                    <span key="q" style={{ color: 'var(--color-body)' }}>{r.member.name}</span>,
+                    <span key="q" style={{ color: 'var(--color-body)' }}>{r.contact.name}</span>,
                     <Pill key="e" text={SUPPORT_STATUS_LABELS[r.status] ?? r.status} tone={TONO_ESTADO[r.status] ?? 'gray'} />,
                     <span key="t" title={dateTime(r.lastMessageAt)} style={{ fontSize: 13, color: 'var(--color-body)', whiteSpace: 'nowrap' }}>{fechaRelativa(r.lastMessageAt)}</span>,
                     <button
@@ -533,7 +563,7 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
             <Loader />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <FichaConsulta data={data} onIrAlNegocio={() => router.push(`/superadmin/negocios/${data.business.id}`)} />
+              <FichaConsulta data={data} onIrAlNegocio={(id) => router.push(`/superadmin/negocios/${id}`)} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {data.messages.map((m) => <Burbuja key={m.id} mensaje={m} />)}
               </div>
@@ -649,34 +679,56 @@ function ModuloPendiente({ onReintentar }: { onReintentar: () => void }) {
 }
 
 // Quién pregunta y desde dónde, arriba del hilo: para responder bien hay que
-// tener la ficha del negocio a un clic (plan, dominio, si está pausado).
-function FichaConsulta({ data, onIrAlNegocio }: { data: AdminSupportDetail; onIrAlNegocio: () => void }) {
+// tener la ficha del negocio a un clic (plan, dominio, si está pausado). Si
+// entró por el formulario de la web, decirlo antes que nada: cambia cómo se
+// responde (no hay panel al que mandarlo, y puede no ser cliente).
+function FichaConsulta({ data, onIrAlNegocio }: { data: AdminSupportDetail; onIrAlNegocio: (businessId: string) => void }) {
   const fila: React.CSSProperties = { display: 'grid', gridTemplateColumns: '96px minmax(0, 1fr)', gap: 10, alignItems: 'baseline', fontSize: 13 }
   const etiqueta: React.CSSProperties = { color: 'var(--color-muted)', fontWeight: 500 }
   const enlace: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', minHeight: 24 }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>
+      {data.source === 'LANDING' && (
+        <div style={fila}>
+          <span style={etiqueta}>Origen</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--color-body)' }}>
+            Formulario de orbita.site
+            <Pill text={data.hasAccount ? 'Con cuenta' : 'Sin cuenta'} tone={data.hasAccount ? 'green' : 'amber'} />
+          </span>
+        </div>
+      )}
       <div style={fila}>
         <span style={etiqueta}>Negocio</span>
         <span style={{ minWidth: 0 }}>
-          <a
-            href={`/superadmin/negocios/${data.business.id}`}
-            onClick={(e) => { e.preventDefault(); onIrAlNegocio() }}
-            className="ds-link"
-            style={enlace}
-          >
-            {data.business.name} <ExternalLink size={13} strokeWidth={2} aria-hidden="true" />
-          </a>
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{data.business.subdomain}.orbita.site</span>
+          {data.business ? (
+            <>
+              <a
+                href={`/superadmin/negocios/${data.business.id}`}
+                onClick={(e) => { e.preventDefault(); onIrAlNegocio(data.business!.id) }}
+                className="ds-link"
+                style={enlace}
+              >
+                {data.business.name} <ExternalLink size={13} strokeWidth={2} aria-hidden="true" />
+              </a>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{data.business.subdomain}.orbita.site</span>
+              {data.source === 'LANDING' && (
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El email coincide con un miembro de este negocio, pero escribió sin iniciar sesión.</span>
+              )}
+            </>
+          ) : (
+            <span style={{ color: 'var(--color-muted)' }}>Ninguno: ese email no está en ningún negocio de Órbita.</span>
+          )}
         </span>
       </div>
       <div style={fila}>
         <span style={etiqueta}>Quién</span>
         <span style={{ minWidth: 0 }}>
-          <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>{data.member.name}</span>
-          <a href={`mailto:${data.member.email}`} className="ds-link" style={{ ...enlace, fontWeight: 500, fontSize: 12.5, display: 'flex', wordBreak: 'break-all' }}>
-            <Mail size={13} strokeWidth={2} aria-hidden="true" /> {data.member.email}
-          </a>
+          <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>{data.contact.name}</span>
+          {data.contact.email && (
+            <a href={`mailto:${data.contact.email}`} className="ds-link" style={{ ...enlace, fontWeight: 500, fontSize: 12.5, display: 'flex', wordBreak: 'break-all' }}>
+              <Mail size={13} strokeWidth={2} aria-hidden="true" /> {data.contact.email}
+            </a>
+          )}
         </span>
       </div>
       {data.contactPhone && (

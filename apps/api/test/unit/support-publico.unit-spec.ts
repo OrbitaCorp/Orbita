@@ -45,23 +45,54 @@ describe('SendPublicSupportRequestDto', () => {
 });
 
 describe('SupportService.sendPublic', () => {
-  function armar(salio = true) {
+  // Desde el 22/09 la consulta de la landing se GUARDA (source LANDING) y se
+  // ve en el superadmin; el mail a soporte@ es un aviso. Si el email coincide
+  // con un miembro de algún negocio, queda "con cuenta" y apunta a ese
+  // negocio, pero sin memberId.
+  const FECHA = new Date('2026-09-22T12:00:00Z');
+  const guardada = (over: object = {}) => ({
+    id: 'req-9', number: 9, subject: 'Hola', category: 'OTRO', status: 'OPEN', contactPhone: null,
+    source: 'LANDING', hasAccount: false, contactName: 'Ana', contactEmail: 'ana@x.com',
+    businessId: null, memberId: null, business: null, member: null,
+    createdAt: FECHA, lastMessageAt: FECHA, _count: { messages: 1 },
+    messages: [{ id: 'msg-1', author: 'MEMBER', body: 'mensaje de prueba', attachments: [], createdAt: FECHA, member: null, admin: null }],
+    ...over,
+  });
+  function armar({ salio = true, miembro = null as null | { businessId: string } } = {}) {
+    const prisma = {
+      member: { findFirst: jest.fn().mockResolvedValue(miembro) },
+      supportRequest: { create: jest.fn().mockImplementation(async ({ data }: { data: any }) => guardada({ hasAccount: data.hasAccount, businessId: data.businessId, business: data.businessId ? { id: data.businessId, name: 'Tienda', subdomain: 'tienda' } : null })) },
+    };
     const mail = { sendPublicSupportRequest: jest.fn().mockResolvedValue(salio) };
-    return { svc: new SupportService({} as any, mail as any, {} as any), mail };
+    const svc = new SupportService(prisma as any, mail as any, {} as any);
+    (svc as any).logger = { warn: jest.fn(), error: jest.fn(), log: jest.fn() };
+    return { svc, mail, prisma };
   }
-  const dto = { name: 'Ana', email: 'ana@x.com', category: 'OTRO' as const, subject: 'Hola', message: 'mensaje de prueba' };
+  const dto = { name: 'Ana', email: 'Ana@X.com', category: 'OTRO' as const, subject: 'Hola', message: 'mensaje de prueba' };
 
-  it('manda siempre a soporte@orbita.site con los datos del visitante', async () => {
-    const { svc, mail } = armar();
-    await expect(svc.sendPublic(dto)).resolves.toEqual({ ok: true });
+  it('guarda la consulta como LANDING, sin cuenta si el email no es de ningún miembro, y avisa a soporte@orbita.site', async () => {
+    const { svc, mail, prisma } = armar();
+    await expect(svc.sendPublic(dto)).resolves.toEqual({ ok: true, number: 9 });
+    expect(prisma.member.findFirst.mock.calls[0][0].where).toEqual({ email: { equals: 'ana@x.com', mode: 'insensitive' } });
+    expect(prisma.supportRequest.create.mock.calls[0][0].data).toEqual(expect.objectContaining({
+      source: 'LANDING', hasAccount: false, businessId: null, memberId: null, contactName: 'Ana', contactEmail: 'ana@x.com', subject: 'Hola',
+    }));
     const [destino, datos] = mail.sendPublicSupportRequest.mock.calls[0];
     expect(destino).toBe('soporte@orbita.site');
-    expect(datos).toEqual(expect.objectContaining({ name: 'Ana', email: 'ana@x.com', category: 'Otra consulta', subject: 'Hola' }));
+    expect(datos).toEqual(expect.objectContaining({ number: 9, name: 'Ana', email: 'ana@x.com', category: 'Otra consulta', subject: 'Hola', hasAccount: false }));
   });
 
-  it('si el campo trampa trae contenido responde ok pero NO manda ningún mail', async () => {
-    const { svc, mail } = armar();
+  it('si el email es de un miembro, queda "con cuenta" y apunta al negocio pero SIN memberId (nadie probó ser él)', async () => {
+    const { svc, mail, prisma } = armar({ miembro: { businessId: 'biz-1' } });
+    await svc.sendPublic(dto);
+    expect(prisma.supportRequest.create.mock.calls[0][0].data).toEqual(expect.objectContaining({ hasAccount: true, businessId: 'biz-1', memberId: null }));
+    expect(mail.sendPublicSupportRequest.mock.calls[0][1]).toEqual(expect.objectContaining({ hasAccount: true, businessName: 'Tienda' }));
+  });
+
+  it('si el campo trampa trae contenido responde ok pero NO guarda ni manda nada', async () => {
+    const { svc, mail, prisma } = armar();
     await expect(svc.sendPublic({ ...dto, website: 'http://spam.example' })).resolves.toEqual({ ok: true });
+    expect(prisma.supportRequest.create).not.toHaveBeenCalled();
     expect(mail.sendPublicSupportRequest).not.toHaveBeenCalled();
   });
 
@@ -71,9 +102,10 @@ describe('SupportService.sendPublic', () => {
     expect(mail.sendPublicSupportRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('si el mail no sale → 422 genérico', async () => {
-    const { svc } = armar(false);
-    await expect(svc.sendPublic(dto)).rejects.toThrow('No se pudo enviar tu consulta');
+  it('si el mail no sale, la consulta queda guardada igual y la respuesta es ok', async () => {
+    const { svc, prisma } = armar({ salio: false });
+    await expect(svc.sendPublic(dto)).resolves.toEqual({ ok: true, number: 9 });
+    expect(prisma.supportRequest.create).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -87,14 +119,14 @@ describe('MailService.sendPublicSupportRequest', () => {
     (svc as any).logger = { warn: jest.fn(), error: jest.fn(), log: jest.fn() };
     return { svc, send };
   }
-  const datos = { name: 'Ana', email: 'ana@x.com', category: 'Otra consulta', subject: 'Ayuda', message: 'mensaje largo de prueba' };
+  const datos = { number: 7, name: 'Ana', email: 'ana@x.com', category: 'Otra consulta', subject: 'Ayuda', message: 'mensaje largo de prueba', hasAccount: false };
 
   it('responde directo al visitante (Reply-To) y va con asunto de una sola línea', async () => {
     const { svc, send } = servicio();
     await svc.sendPublicSupportRequest('soporte@orbita.site', { ...datos, subject: 'Ayuda\r\nBcc: otro@x.com' });
     const enviado = send.mock.calls[0][0] as { to: string; subject: string; replyTo?: string };
     expect(enviado.to).toBe('soporte@orbita.site');
-    expect(enviado.subject).toBe('[Contacto landing] Otra consulta — Ana: Ayuda Bcc: otro@x.com');
+    expect(enviado.subject).toBe('[Contacto landing] #7 Otra consulta — Ana: Ayuda Bcc: otro@x.com');
     expect(enviado.replyTo).toBe('ana@x.com');
   });
 

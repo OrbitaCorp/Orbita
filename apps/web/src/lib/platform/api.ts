@@ -517,8 +517,17 @@ export interface AdminSupportRow {
   createdAt: string
   lastMessageAt: string
   messagesCount: number
-  business: { id: string; name: string; subdomain: string }
-  member: { id: string; name: string; email: string }
+  // PANEL: Configuración → Soporte con sesión. LANDING: formulario público de
+  // orbita.site, sin sesión.
+  source: 'PANEL' | 'LANDING'
+  // Si el email de quien escribe tiene cuenta de miembro en algún negocio.
+  // Es el filtro "Con cuenta / Sin cuenta".
+  hasAccount: boolean
+  // Null en LANDING sin cuenta. En LANDING con cuenta es el negocio del
+  // miembro con ese email (nadie probó ser él: no se muestra en su panel).
+  business: { id: string; name: string; subdomain: string } | null
+  // Quién escribió, venga de donde venga. memberId null en LANDING.
+  contact: { name: string; email: string; memberId: string | null }
   lastMessage: { author: SupportMessageAuthor; excerpt: string; createdAt: string } | null
 }
 
@@ -628,7 +637,7 @@ export const platformApi = {
 
   // El backend devuelve las OPEN primero y después por última actividad: lo
   // que espera respuesta nunca queda enterrado bajo lo ya contestado.
-  supportRequests: (params: { status?: string; category?: string; businessId?: string; q?: string; page?: number; limit?: number } = {}) =>
+  supportRequests: (params: { status?: string; category?: string; businessId?: string; account?: 'with' | 'without'; q?: string; page?: number; limit?: number } = {}) =>
     getJSON<SupportList>(`/platform/support${toQuery(params)}`),
   supportSummary: () => getJSON<SupportSummary>('/platform/support/summary'),
   supportRequest: (id: string) => getJSON<AdminSupportDetail>(`/platform/support/${id}`),

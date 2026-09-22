@@ -13,7 +13,11 @@ export class ListSupportQueryDto {
   @IsOptional() @IsIn(SUPPORT_STATUSES) status?: SupportStatus;
   @IsOptional() @IsIn(SUPPORT_CATEGORIES) category?: SupportCategory;
   @IsOptional() @IsString() @MaxLength(64) businessId?: string;
-  // Busca en el asunto y en el nombre del negocio (ilike).
+  // "with": quien escribió tiene cuenta de miembro en algún negocio (todas
+  // las del panel y las de la landing cuyo email coincide). "without": llegó
+  // por la landing y ese email no está en ningún negocio.
+  @IsOptional() @IsIn(['with', 'without']) account?: 'with' | 'without';
+  // Busca en el asunto, el nombre del negocio y quién escribió (ilike).
   @IsOptional() @Transform(recortar) @IsString() @MaxLength(120) q?: string;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;

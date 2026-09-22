@@ -132,8 +132,11 @@ export class SupportService {
   }
 
   async list(businessId: string): Promise<{ data: SupportRequestRow[] }> {
+    // source PANEL: una consulta de la landing puede tener businessId (el
+    // email coincidió con un miembro) sin que nadie haya probado ser él, así
+    // que no se muestra en el panel del negocio.
     const filas = await this.prisma.supportRequest.findMany({
-      where: { businessId },
+      where: { businessId, source: 'PANEL' },
       orderBy: { lastMessageAt: 'desc' },
       include: INCLUDE_FILA,
     });
@@ -141,7 +144,7 @@ export class SupportService {
   }
 
   async get(businessId: string, id: string): Promise<SupportRequestDetail> {
-    const req = await this.prisma.supportRequest.findFirst({ where: { id, businessId }, include: INCLUDE_DETALLE });
+    const req = await this.prisma.supportRequest.findFirst({ where: { id, businessId, source: 'PANEL' }, include: INCLUDE_DETALLE });
     if (!req) throw new NotFoundException('Consulta no encontrada');
     return this.detalle(req);
   }
@@ -150,7 +153,7 @@ export class SupportService {
   // Órbita de nuevo, aunque la hubiera cerrado un admin.
   async addMessage(businessId: string, memberId: string, id: string, dto: ReplySupportRequestDto): Promise<SupportRequestDetail> {
     const existente = await this.prisma.supportRequest.findFirst({
-      where: { id, businessId },
+      where: { id, businessId, source: 'PANEL' },
       select: { id: true, number: true, subject: true, category: true, contactPhone: true },
     });
     if (!existente) throw new NotFoundException('Consulta no encontrada');
@@ -242,10 +245,17 @@ export class SupportService {
     if (q.status) where.status = q.status;
     if (q.category) where.category = q.category;
     if (q.businessId) where.businessId = q.businessId;
+    if (q.account) where.hasAccount = q.account === 'with';
     if (q.q) {
       where.OR = [
         { subject: { contains: q.q, mode: 'insensitive' } },
         { business: { name: { contains: q.q, mode: 'insensitive' } } },
+        // Quién escribió: por el panel está en member, por la landing en
+        // contactName/contactEmail. Buscar por email es lo que hace el equipo
+        // cuando alguien escribe "soy el de tal tienda".
+        { member: { is: { OR: [{ name: { contains: q.q, mode: 'insensitive' } }, { email: { contains: q.q, mode: 'insensitive' } }] } } },
+        { contactName: { contains: q.q, mode: 'insensitive' } },
+        { contactEmail: { contains: q.q, mode: 'insensitive' } },
       ];
     }
 
@@ -316,7 +326,11 @@ export class SupportService {
       this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { name: true, jobTitle: true } }),
       this.prisma.supportRequest.findUnique({
         where: { id },
-        select: { id: true, number: true, subject: true, businessId: true, member: { select: { id: true, name: true, email: true } }, business: { select: { subdomain: true } } },
+        select: {
+          id: true, number: true, subject: true, businessId: true, source: true, contactName: true, contactEmail: true,
+          member: { select: { id: true, name: true, email: true } },
+          business: { select: { subdomain: true } },
+        },
       }),
     ]);
     if (!existente) throw new NotFoundException('Consulta no encontrada');
@@ -345,25 +359,33 @@ export class SupportService {
     ]);
 
     // El mail nunca hace fallar la respuesta: ya está guardada y el negocio la
-    // ve en su panel aunque el aviso no salga.
-    try {
-      const ok = await this.mail.sendSupportReply(
-        existente.member.email,
-        {
-          number: existente.number,
-          subject: existente.subject,
-          memberName: existente.member.name,
-          adminName,
-          adminTitle,
-          message: dto.message.trim(),
-          panelUrl: this.urlDelPanel(existente.business.subdomain, id),
-          supportEmail: this.SUPPORT_EMAIL,
-        },
-        { businessId: existente.businessId, memberId: existente.member.id },
-      );
-      if (!ok) this.logger.warn(`El aviso de respuesta de la consulta #${existente.number} no salió (ver email_logs)`);
-    } catch (e) {
-      this.logger.error(`No se pudo mandar el aviso de respuesta de la consulta #${existente.number}: ${e instanceof Error ? e.message : e}`);
+    // ve en su panel aunque el aviso no salga. Por el panel va al miembro que
+    // abrió la consulta, con link al hilo; por la landing va al email que
+    // escribió y la única forma de seguir es contestar el mail (no hay panel).
+    const destino = existente.member?.email ?? existente.contactEmail;
+    const panelUrl = existente.member && existente.business ? this.urlDelPanel(existente.business.subdomain, id) : null;
+    if (destino) {
+      try {
+        const ok = await this.mail.sendSupportReply(
+          destino,
+          {
+            number: existente.number,
+            subject: existente.subject,
+            memberName: existente.member?.name ?? existente.contactName ?? 'Hola',
+            adminName,
+            adminTitle,
+            message: dto.message.trim(),
+            panelUrl,
+            supportEmail: this.SUPPORT_EMAIL,
+          },
+          { businessId: existente.businessId ?? undefined, memberId: existente.member?.id },
+        );
+        if (!ok) this.logger.warn(`El aviso de respuesta de la consulta #${existente.number} no salió (ver email_logs)`);
+      } catch (e) {
+        this.logger.error(`No se pudo mandar el aviso de respuesta de la consulta #${existente.number}: ${e instanceof Error ? e.message : e}`);
+      }
+    } else {
+      this.logger.warn(`La consulta #${existente.number} no tiene email de contacto: la respuesta quedó solo en el superadmin`);
     }
 
     return this.detalleAdmin(actualizada);
@@ -437,7 +459,7 @@ export class SupportService {
   // 422 y la consulta se perdía; ahora ya está guardada cuando llegamos acá,
   // así que el fallo se loguea y nada más.
   private async avisarASoporte(
-    req: { id: string; number: number; subject: string; category: SupportCategory; contactPhone: string | null; businessId: string; memberId: string },
+    req: { id: string; number: number; subject: string; category: SupportCategory; contactPhone: string | null; businessId: string | null; memberId: string | null },
     member: { name: string; email: string },
     business: { name: string; subdomain: string },
     message: string,
@@ -461,7 +483,7 @@ export class SupportService {
           isReply,
           adminUrl: this.urlDelSuperadmin(),
         },
-        { businessId: req.businessId, memberId: req.memberId },
+        { businessId: req.businessId ?? undefined, memberId: req.memberId ?? undefined },
       );
       if (!ok) this.logger.warn(`El aviso de la consulta #${req.number} no salió (ver email_logs); la consulta quedó guardada`);
     } catch (e) {
@@ -506,7 +528,7 @@ export class SupportService {
     return salida;
   }
 
-  private fila(f: FilaDb | DetalleDb): SupportRequestRow {
+  private filaBase(f: FilaDb | DetalleDb): Omit<SupportRequestRow, 'member'> {
     // En el detalle los mensajes vienen asc (hilo completo); en la fila, solo
     // el último. Se toma el más nuevo en los dos casos.
     const ultimo = f.messages.reduce<(typeof f.messages)[number] | null>(
@@ -522,16 +544,27 @@ export class SupportService {
       createdAt: f.createdAt.toISOString(),
       lastMessageAt: f.lastMessageAt.toISOString(),
       messagesCount: f._count.messages,
-      member: { id: f.member.id, name: f.member.name },
       lastMessage: ultimo ? { author: ultimo.author, excerpt: this.extracto(ultimo.body), createdAt: ultimo.createdAt.toISOString() } : null,
     };
   }
-
+  // Fila del panel: acá solo llegan consultas PANEL (list/get filtran por
+  // source), así que member existe; el fallback es por el tipo, no por un
+  // caso real.
+  private fila(f: FilaDb | DetalleDb): SupportRequestRow {
+    return {
+      ...this.filaBase(f),
+      member: { id: f.member?.id ?? '', name: f.member?.name ?? MIEMBRO_SIN_NOMBRE },
+    };
+  }
   private filaAdmin(f: FilaDb | DetalleDb): AdminSupportRow {
     return {
-      ...this.fila(f),
-      business: { id: f.business.id, name: f.business.name, subdomain: f.business.subdomain },
-      member: { id: f.member.id, name: f.member.name, email: f.member.email },
+      ...this.filaBase(f),
+      source: f.source,
+      hasAccount: f.hasAccount,
+      business: f.business ? { id: f.business.id, name: f.business.name, subdomain: f.business.subdomain } : null,
+      contact: f.member
+        ? { name: f.member.name, email: f.member.email, memberId: f.member.id }
+        : { name: f.contactName ?? MIEMBRO_SIN_NOMBRE, email: f.contactEmail ?? '', memberId: null },
     };
   }
 
@@ -539,7 +572,7 @@ export class SupportService {
     return d.messages.map((m) => ({
       id: m.id,
       author: m.author,
-      authorName: m.author === 'ADMIN' ? (m.admin?.name ?? ADMIN_SIN_NOMBRE) : (m.member?.name ?? d.member.name ?? MIEMBRO_SIN_NOMBRE),
+      authorName: m.author === 'ADMIN' ? (m.admin?.name ?? ADMIN_SIN_NOMBRE) : (m.member?.name ?? d.member?.name ?? d.contactName ?? MIEMBRO_SIN_NOMBRE),
       authorTitle: m.author === 'ADMIN' ? (m.admin?.jobTitle ?? null) : null,
       body: m.body,
       attachments: this.adjuntosDe(m.attachments),
@@ -557,16 +590,59 @@ export class SupportService {
 
   // ── Landing pública (sin auth) ────────────────────────────────────────────
 
-  async sendPublic(dto: SendPublicSupportRequestDto): Promise<{ ok: true }> {
+  // Formulario público de la landing. Desde el 22/09 la consulta se GUARDA
+  // como las del panel (source LANDING) y aparece en el superadmin, donde se
+  // responde igual: al visitante le llega la respuesta por mail. Antes solo
+  // era un mail a soporte@ y no quedaba registro de nada.
+  //
+  // "¿Tiene cuenta?": se busca el email entre los miembros de TODOS los
+  // negocios (cross-tenant a propósito, ver aislamiento-consultas). Si hay
+  // uno, la consulta queda con hasAccount y apunta a ese negocio para que el
+  // equipo tenga la ficha a mano — pero sin memberId: nadie probó ser esa
+  // persona, y la consulta no se muestra en el panel del negocio.
+  async sendPublic(dto: SendPublicSupportRequestDto): Promise<{ ok: true; number?: number }> {
     if (dto.website?.trim()) return { ok: true };
-    const ok = await this.mail.sendPublicSupportRequest(this.SUPPORT_EMAIL, {
-      name: dto.name,
-      email: dto.email,
-      category: this.CATEGORY_LABEL[dto.category],
-      subject: dto.subject,
-      message: dto.message,
+    const email = dto.email.trim().toLowerCase();
+    const miembro = await this.prisma.member.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      orderBy: { createdAt: 'asc' },
+      select: { businessId: true },
     });
-    if (!ok) throw new UnprocessableEntityException('No se pudo enviar tu consulta — probá de nuevo en un momento');
-    return { ok: true };
+    const ahora = new Date();
+    const creada = await this.prisma.supportRequest.create({
+      data: {
+        source: 'LANDING',
+        businessId: miembro?.businessId ?? null,
+        memberId: null,
+        contactName: dto.name.trim(),
+        contactEmail: email,
+        hasAccount: !!miembro,
+        category: dto.category,
+        subject: dto.subject.trim(),
+        lastMessageAt: ahora,
+        messages: { create: { author: 'MEMBER', body: dto.message.trim(), attachments: [] } },
+      },
+      include: INCLUDE_DETALLE,
+    });
+
+    // Igual que avisarASoporte: la consulta ya está guardada, el mail es un
+    // aviso y su fallo se loguea nada más.
+    try {
+      const ok = await this.mail.sendPublicSupportRequest(this.SUPPORT_EMAIL, {
+        number: creada.number,
+        name: creada.contactName ?? dto.name,
+        email,
+        category: this.CATEGORY_LABEL[dto.category],
+        subject: creada.subject,
+        message: dto.message.trim(),
+        hasAccount: creada.hasAccount,
+        businessName: creada.business?.name,
+        adminUrl: this.urlDelSuperadmin(),
+      });
+      if (!ok) this.logger.warn(`El aviso de la consulta #${creada.number} (landing) no salió (ver email_logs); la consulta quedó guardada`);
+    } catch (e) {
+      this.logger.error(`No se pudo mandar el aviso de la consulta #${creada.number} (landing, quedó guardada igual): ${e instanceof Error ? e.message : e}`);
+    }
+    return { ok: true, number: creada.number };
   }
 }

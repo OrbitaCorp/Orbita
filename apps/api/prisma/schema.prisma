@@ -2559,14 +2559,32 @@ enum SupportMessageAuthor {
   ADMIN
 }
 
+enum SupportRequestSource {
+  PANEL // Configuración → Soporte del panel, con sesión de miembro
+  LANDING // formulario público de orbita.site, sin sesión
+}
+
 model SupportRequest {
   id            String               @id @default(uuid())
   // Correlativo global y corto ("Consulta #12"): es lo que va en el asunto del
   // mail y lo que el negocio nombra cuando vuelve a escribir. El uuid no sirve
   // para eso.
   number        Int                  @unique @default(autoincrement())
-  businessId    String               @map("business_id")
-  memberId      String               @map("member_id")
+  // Nulos cuando la consulta entró por el formulario público de la landing
+  // (source LANDING): no hay sesión. Si el email de quien escribió coincide
+  // con un miembro de algún negocio, businessId apunta a ese negocio (para
+  // que el equipo tenga la ficha a mano) pero memberId sigue null: nadie
+  // probó ser esa persona, así que no aparece en el panel del negocio.
+  businessId    String?              @map("business_id")
+  memberId      String?              @map("member_id")
+  source        SupportRequestSource @default(PANEL)
+  // Solo LANDING: quién escribió. Con PANEL están en member.
+  contactName   String?              @map("contact_name")
+  contactEmail  String?              @map("contact_email")
+  // Si el email de quien escribe tiene cuenta de miembro en algún negocio.
+  // PANEL siempre true; LANDING se resuelve al crear. Es el filtro
+  // "Con cuenta / Sin cuenta" del superadmin.
+  hasAccount    Boolean              @default(true) @map("has_account")
   category      SupportCategory
   subject       String
   contactPhone  String?              @map("contact_phone")
@@ -2582,12 +2600,13 @@ model SupportRequest {
   // Cascade en los dos: si se elimina el negocio (subscriptions.service borra
   // los miembros a mano en la misma transacción) o se saca a un empleado del
   // equipo, la consulta se va con él en vez de bloquear el borrado.
-  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  member   Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  business Business?        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  member   Member?          @relation(fields: [memberId], references: [id], onDelete: Cascade)
   messages SupportMessage[]
 
   @@index([businessId, createdAt])
   @@index([status, lastMessageAt])
+  @@index([hasAccount, status])
   @@map("support_requests")
 }
 

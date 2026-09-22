@@ -1,4 +1,4 @@
-import type { SupportCategory, SupportMessageAuthor, SupportRequestStatus } from '@prisma/client';
+import type { SupportCategory, SupportMessageAuthor, SupportRequestSource, SupportRequestStatus } from '@prisma/client';
 
 // Lo que viaja en JSON entre la API y los dos clientes (panel del negocio y
 // superadmin). Mismos nombres en apps/web/src/lib/api.ts y
@@ -35,15 +35,27 @@ export type SupportRequestDetail = SupportRequestRow & {
   messages: SupportMessageDto[];
 };
 
-export type AdminSupportRow = SupportRequestRow & {
-  business: { id: string; name: string; subdomain: string };
-  member: { id: string; name: string; email: string };
+// Lo que el superadmin ve de más respecto del panel. Desde el 22/09 las
+// consultas también entran por el formulario público de la landing, sin
+// sesión: ahí no hay member, y business solo si el email coincide con un
+// miembro de algún negocio.
+type AdminSupportExtra = {
+  // PANEL: Configuración → Soporte con sesión. LANDING: orbita.site, sin sesión.
+  source: SupportRequestSource;
+  // Si el email de quien escribe tiene cuenta de miembro en algún negocio
+  // (PANEL siempre; LANDING se verifica al crear). Filtro "Con cuenta /
+  // Sin cuenta" del superadmin.
+  hasAccount: boolean;
+  // Null en LANDING sin cuenta. En LANDING con cuenta es el negocio del
+  // miembro con ese email, sin que nadie haya probado ser él.
+  business: { id: string; name: string; subdomain: string } | null;
+  // Quién escribió, venga de donde venga. memberId null en LANDING.
+  contact: { name: string; email: string; memberId: string | null };
 };
 
-export type AdminSupportDetail = SupportRequestDetail & {
-  business: { id: string; name: string; subdomain: string };
-  member: { id: string; name: string; email: string };
-};
+export type AdminSupportRow = Omit<SupportRequestRow, 'member'> & AdminSupportExtra;
+
+export type AdminSupportDetail = Omit<SupportRequestDetail, 'member'> & AdminSupportExtra;
 
 export type SupportSummary = {
   open: number;

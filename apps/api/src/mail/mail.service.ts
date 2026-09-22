@@ -922,9 +922,21 @@ export class MailService {
   // Contacto desde la landing (sin auth). Reply-To al email de quien escribió.
   async sendPublicSupportRequest(
     to: string,
-    data: { name: string; email: string; category: string; subject: string; message: string },
+    data: {
+      number: number;
+      name: string;
+      email: string;
+      category: string;
+      subject: string;
+      message: string;
+      // Si el email coincide con un miembro de algún negocio, y cuál.
+      hasAccount: boolean;
+      businessName?: string;
+      // Link al hilo en el superadmin, para responder desde ahí y no por mail.
+      adminUrl?: string;
+    },
   ): Promise<boolean> {
-    const asunto = `[Contacto landing] ${data.category} — ${data.name}: ${data.subject}`;
+    const asunto = `[Contacto landing] #${data.number} ${data.category} — ${data.name}: ${data.subject}`;
     return this.sendOrLog(to, asunto, 'public-support-request', data, undefined, data.email);
   }
 
@@ -942,7 +954,9 @@ export class MailService {
       // Cargo con el que firma ("CEO"); null = "del equipo de Órbita".
       adminTitle: string | null;
       message: string;
-      panelUrl: string;
+      // Null cuando la consulta entró por la landing: no hay panel al que
+      // volver, la persona sigue la conversación contestando el mail.
+      panelUrl: string | null;
       supportEmail: string;
     },
     meta?: MailMeta,

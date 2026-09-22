@@ -89,6 +89,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
     const primero = useRef<HTMLInputElement>(null);
 
     const [estado, setEstado] = useState<Estado>('editando');
+    const [numero, setNumero] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     // Los errores de campo recién se muestran después del primer intento de
     // enviar: mostrarlos mientras alguien todavía está escribiendo se siente
@@ -144,7 +145,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
         setEstado('enviando');
         setError(null);
         try {
-            await sendPublicSupportRequest({
+            const r = await sendPublicSupportRequest({
                 name: nombre.trim(),
                 email: email.trim(),
                 category: categoria,
@@ -152,6 +153,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                 message: mensaje.trim(),
                 website: trampa,
             });
+            setNumero(r.number ?? null);
             setEstado('enviado');
         } catch (err) {
             setEstado('editando');
@@ -226,7 +228,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                             </svg>
                         </span>
                         <p className="mt-5 max-w-[360px] text-[14.5px] leading-relaxed text-slate-300">
-                            Te vamos a responder por mail a <strong className="font-semibold text-white">{email.trim()}</strong>.
+                            {numero !== null && <>Es la consulta <strong className="font-semibold text-white">#{numero}</strong>. </>}Te vamos a responder por mail a <strong className="font-semibold text-white">{email.trim()}</strong>.
                         </p>
                         <button
                             type="button"

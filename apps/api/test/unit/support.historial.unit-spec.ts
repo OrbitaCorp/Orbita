@@ -26,6 +26,10 @@ const consulta = (over: Record<string, unknown> = {}) => ({
   contactPhone: null,
   businessId: BIZ,
   memberId: 'm1',
+  source: 'PANEL',
+  hasAccount: true,
+  contactName: null,
+  contactEmail: null,
   createdAt: FECHA,
   lastMessageAt: FECHA,
   business: { id: BIZ, name: 'Tienda', subdomain: 'tienda' },
@@ -113,14 +117,14 @@ describe('Panel: listar, leer y repreguntar', () => {
   it('el listado y el detalle filtran por el negocio del token', async () => {
     const { svc, prisma } = armar();
     const { data } = await svc.list(BIZ);
-    expect(prisma.supportRequest.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ } }));
+    expect(prisma.supportRequest.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, source: 'PANEL' } }));
     expect(data[0]).toEqual(expect.objectContaining({ number: 12, messagesCount: 1, member: { id: 'm1', name: 'Ana' } }));
     expect(data[0].lastMessage).toEqual({ author: 'MEMBER', excerpt: 'La tienda no carga desde ayer', createdAt: FECHA.toISOString() });
     // La fila del panel no lleva el negocio ni el email (eso es del admin).
     expect(data[0]).not.toHaveProperty('business');
 
     await svc.get(BIZ, 'req-1');
-    expect(prisma.supportRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'req-1', businessId: BIZ } }));
+    expect(prisma.supportRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'req-1', businessId: BIZ, source: 'PANEL' } }));
   });
 
   it('una consulta de otro negocio → 404', async () => {
@@ -179,12 +183,18 @@ describe('Superadmin', () => {
     const args = prisma.supportRequest.findMany.mock.calls[0][0];
     expect(args.where).toEqual({
       status: 'OPEN',
-      OR: [{ subject: { contains: 'carga', mode: 'insensitive' } }, { business: { name: { contains: 'carga', mode: 'insensitive' } } }],
+      OR: [
+        { subject: { contains: 'carga', mode: 'insensitive' } },
+        { business: { name: { contains: 'carga', mode: 'insensitive' } } },
+        { member: { is: { OR: [{ name: { contains: 'carga', mode: 'insensitive' } }, { email: { contains: 'carga', mode: 'insensitive' } }] } } },
+        { contactName: { contains: 'carga', mode: 'insensitive' } },
+        { contactEmail: { contains: 'carga', mode: 'insensitive' } },
+      ],
     });
     expect(args).toEqual(expect.objectContaining({ skip: 10, take: 10, orderBy: [{ status: 'asc' }, { lastMessageAt: 'desc' }] }));
     expect(prisma.supportRequest.count).toHaveBeenLastCalledWith({ where: { status: 'OPEN' } });
     expect(r).toEqual(expect.objectContaining({ total: 1, page: 2, limit: 10, openCount: 1 }));
-    expect(r.data[0]).toEqual(expect.objectContaining({ business: { id: BIZ, name: 'Tienda', subdomain: 'tienda' }, member: { id: 'm1', name: 'Ana', email: 'ana@x.com' } }));
+    expect(r.data[0]).toEqual(expect.objectContaining({ source: 'PANEL', hasAccount: true, business: { id: BIZ, name: 'Tienda', subdomain: 'tienda' }, contact: { name: 'Ana', email: 'ana@x.com', memberId: 'm1' } }));
   });
 
   it('el resumen cuenta por estado y agrupa la opinión del manual por capítulo', async () => {
@@ -205,7 +215,7 @@ describe('Superadmin', () => {
   it('responder crea un mensaje ADMIN, pasa a ANSWERED, avisa al miembro y deja PlatformAdminLog', async () => {
     const { svc, prisma, mail } = armar();
     prisma.supportRequest.findUnique.mockResolvedValue({
-      id: 'req-1', number: 12, subject: 'No carga', businessId: BIZ,
+      id: 'req-1', number: 12, subject: 'No carga', businessId: BIZ, source: 'PANEL', contactName: null, contactEmail: null,
       member: { id: 'm1', name: 'Ana', email: 'ana@x.com' }, business: { subdomain: 'tienda' },
     });
     prisma.supportRequest.update.mockResolvedValue(consulta({
@@ -236,7 +246,7 @@ describe('Superadmin', () => {
   it('si el mail al miembro falla, la respuesta queda guardada igual', async () => {
     const { svc, prisma, mail } = armar();
     prisma.supportRequest.findUnique.mockResolvedValue({
-      id: 'req-1', number: 12, subject: 'No carga', businessId: BIZ,
+      id: 'req-1', number: 12, subject: 'No carga', businessId: BIZ, source: 'PANEL', contactName: null, contactEmail: null,
       member: { id: 'm1', name: 'Ana', email: 'ana@x.com' }, business: { subdomain: 'tienda' },
     });
     mail.sendSupportReply.mockRejectedValue(new Error('Resend caído'));

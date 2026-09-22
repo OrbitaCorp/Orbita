@@ -1004,7 +1004,9 @@ export async function sendPublicSupportRequest(input: {
     const body = await res.json().catch(() => ({ message: 'Error' }))
     throw new ApiError(res.status, body.message ?? 'Error')
   }
-  return (await res.json()) as { ok: true }
+  // number: el correlativo de la consulta guardada ("Consulta #12"). No viene
+  // cuando el campo trampa descartó el envío en silencio.
+  return (await res.json()) as { ok: true; number?: number }
 }
 
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
