@@ -251,7 +251,7 @@ function Mensaje({ m }: { m: SupportMessage }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 4 }}>
                     <User size={12} strokeWidth={2} aria-hidden="true" />
                     <span style={{ fontWeight: 600, color: propio ? 'var(--color-primary)' : 'var(--color-body)' }}>
-                        {propio ? m.authorName : `Soporte de Órbita · ${m.authorName}`}
+                        {propio ? m.authorName : `${m.authorName} · ${m.authorTitle ? `${m.authorTitle} de Órbita` : 'Soporte de Órbita'}`}
                     </span>
                     <span aria-hidden="true">·</span>
                     <time dateTime={m.createdAt}>{fechaCompleta(m.createdAt)}</time>

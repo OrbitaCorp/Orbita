@@ -713,7 +713,7 @@ function Burbuja({ mensaje }: { mensaje: SupportMessageDto }) {
         border: '1px solid var(--color-border)',
       }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: esOrbita ? 'var(--color-primary)' : 'var(--color-text)', marginBottom: 4 }}>
-          {esOrbita ? `${mensaje.authorName} · Órbita` : mensaje.authorName}
+          {esOrbita ? `${mensaje.authorName} · ${mensaje.authorTitle ? `${mensaje.authorTitle} de Órbita` : 'Órbita'}` : mensaje.authorName}
         </div>
         <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{mensaje.body}</div>
         {mensaje.attachments.length > 0 && <Adjuntos items={mensaje.attachments} />}

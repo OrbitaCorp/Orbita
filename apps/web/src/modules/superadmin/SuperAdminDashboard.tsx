@@ -467,8 +467,8 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
       />
       <Card noPad>
         <Table
-          head={['Nombre', 'Email', 'Rol', 'Cómo entra', 'Último acceso', 'Estado', 'Acciones']}
-          alignRight={[6]}
+          head={['Nombre', 'Cargo', 'Email', 'Rol', 'Cómo entra', 'Último acceso', 'Estado', 'Acciones']}
+          alignRight={[7]}
           rows={data.map((a) => ({
             key: a.id,
             cells: [
@@ -476,6 +476,9 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
                 <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{a.name}</span>
                 {a.id === currentAdminId && <Chip text="Vos" tone="blue" />}
               </span>,
+              a.jobTitle
+                ? <span key="c" style={{ color: 'var(--color-body)' }}>{a.jobTitle}</span>
+                : <span key="c" style={{ color: 'var(--color-subtle)' }}>Sin cargo</span>,
               <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
               <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
               <span key="acc" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
@@ -522,6 +525,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
   const [name, setName] = useState(admin?.name ?? '')
   const [email, setEmail] = useState(admin?.email ?? '')
   const [role, setRole] = useState<PlatformAdminRole>(admin?.role ?? 'OPERATOR')
+  const [jobTitle, setJobTitle] = useState(admin?.jobTitle ?? '')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
@@ -534,8 +538,9 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
     }
     setGuardando(true)
     try {
-      if (admin) await platformApi.updateAdmin(admin.id, { name: name.trim(), email: email.trim(), role })
-      else await platformApi.createAdmin({ name: name.trim(), email: email.trim(), role })
+      const input = { name: name.trim(), email: email.trim(), role, jobTitle: jobTitle.trim() }
+      if (admin) await platformApi.updateAdmin(admin.id, input)
+      else await platformApi.createAdmin(input)
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar.')
@@ -547,8 +552,14 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
     <ModalShell onClose={onClose} title={admin ? 'Editar admin' : 'Nuevo admin'}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {error && <ErrorBox msg={error} />}
-        <Field label="Nombre">
+        <Field label="Nombre y apellido">
           <input value={name} onChange={(e) => setName(e.target.value)} className="ds-field" style={inputStyle} />
+        </Field>
+        <Field label="Cargo (opcional)">
+          {/* Es lo que ve el negocio cuando esta persona responde en Soporte:
+              "Ale Pérez · CEO de Órbita". Sin cargo, "Soporte de Órbita". */}
+          <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={40} placeholder="CEO, CTO, CPO, Soporte…" className="ds-field" style={inputStyle} />
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--color-muted)' }}>Así firma las respuestas de Soporte: {name.trim() || 'Nombre'} · {jobTitle.trim() ? `${jobTitle.trim()} de Órbita` : 'Soporte de Órbita'}</p>
         </Field>
         <Field label="Email">
           {/* El backend no soporta cambiar el email de un admin existente. */}

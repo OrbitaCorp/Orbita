@@ -939,6 +939,8 @@ export class MailService {
       subject: string;
       memberName: string;
       adminName: string;
+      // Cargo con el que firma ("CEO"); null = "del equipo de Órbita".
+      adminTitle: string | null;
       message: string;
       panelUrl: string;
       supportEmail: string;

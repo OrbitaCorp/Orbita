@@ -726,6 +726,7 @@ export class PlatformService {
       name: a.name,
       email: a.email,
       role: a.role,
+      jobTitle: a.jobTitle,
       isActive: a.isActive,
       hasPassword: !!a.passwordHash,
       hasGoogle: !!a.googleId,
@@ -741,12 +742,12 @@ export class PlatformService {
     // Sin password: el nuevo admin entra con Google (se vincula en el 1er login)
     // o vía reset de contraseña cuando ese flujo exista (ver PENDIENTES).
     const admin = await this.prisma.platformAdmin.create({
-      data: { name: dto.name, email: dto.email, role: dto.role, isActive: true },
+      data: { name: dto.name, email: dto.email, role: dto.role, jobTitle: cargoDe(dto), isActive: true },
     });
     await this.prisma.platformAdminLog.create({
       data: { adminId: actingAdminId, action: 'create_admin', targetType: 'platform_admin', targetId: admin.id, details: { email: dto.email, role: dto.role } },
     });
-    return { id: admin.id, name: admin.name, email: admin.email, role: admin.role, isActive: admin.isActive };
+    return { id: admin.id, name: admin.name, email: admin.email, role: admin.role, jobTitle: admin.jobTitle, isActive: admin.isActive };
   }
 
   async updateAdmin(actingAdminId: string, id: string, dto: UpsertPlatformAdminDto) {
@@ -755,12 +756,12 @@ export class PlatformService {
 
     const updated = await this.prisma.platformAdmin.update({
       where: { id },
-      data: { name: dto.name, role: dto.role },
+      data: { name: dto.name, role: dto.role, jobTitle: cargoDe(dto) },
     });
     await this.prisma.platformAdminLog.create({
       data: { adminId: actingAdminId, action: 'update_admin', targetType: 'platform_admin', targetId: id, details: { role: dto.role } },
     });
-    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role, isActive: updated.isActive };
+    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role, jobTitle: updated.jobTitle, isActive: updated.isActive };
   }
 
   async removeAdmin(actingAdminId: string, id: string) {
@@ -1073,4 +1074,11 @@ export class PlatformService {
     if (Number.isNaN(d.getTime())) throw new BadRequestException('expiresAt inválido (usar ISO 8601)');
     return d;
   }
+}
+
+// El cargo se guarda recortado y vacío = null, así el hilo de Soporte no
+// muestra "  de Órbita" si alguien deja espacios en el formulario.
+function cargoDe(dto: UpsertPlatformAdminDto): string | null {
+  const c = dto.jobTitle?.trim();
+  return c ? c : null;
 }

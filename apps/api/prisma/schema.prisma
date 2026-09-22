@@ -2145,6 +2145,9 @@ model PlatformAdmin {
   name                  String
   email                 String            @unique
   role                  PlatformAdminRole @default(OPERATOR)
+  // Cargo con el que firma las respuestas de Soporte ("CEO", "CTO"...). Es
+  // texto libre y opcional: sin cargo, el negocio ve "Soporte de Órbita".
+  jobTitle              String?           @map("job_title")
   isActive              Boolean           @default(true) @map("is_active")
   // Credenciales propias (auth password + Google). A diferencia de member/customer,
   // el email es ÚNICO GLOBAL: un super admin no está scopeado a ningún negocio.

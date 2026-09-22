@@ -6,4 +6,6 @@ export class UpsertPlatformAdminDto {
   @IsString() @MaxLength(80) name!: string;
   @NormalizedEmail() email!: string;
   @IsIn(['SUPERADMIN', 'OPERATOR']) role!: 'SUPERADMIN' | 'OPERATOR';
+  // Cargo con el que firma en Soporte ("CEO", "CTO"). Vacío = sin cargo.
+  @IsOptional() @IsString() @MaxLength(40) jobTitle?: string;
 }

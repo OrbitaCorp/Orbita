@@ -221,6 +221,7 @@ export interface AdminRow {
   name: string
   email: string
   role: PlatformAdminRole
+  jobTitle: string | null
   isActive: boolean
   hasPassword: boolean
   hasGoogle: boolean
@@ -232,6 +233,7 @@ export interface UpsertAdminInput {
   name: string
   email: string
   role: PlatformAdminRole
+  jobTitle?: string
 }
 
 export interface LogRow {
@@ -498,6 +500,7 @@ export interface SupportMessageDto {
   id: string
   author: SupportMessageAuthor
   authorName: string
+  authorTitle: string | null
   body: string
   attachments: SupportAttachment[]
   createdAt: string

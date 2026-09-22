@@ -41,7 +41,7 @@ function armar() {
   const prisma = {
     business: { findUnique: jest.fn().mockResolvedValue({ name: 'Tienda', subdomain: 'tienda' }) },
     member: { findFirst: jest.fn().mockResolvedValue({ name: 'Ana', email: 'ana@x.com' }) },
-    platformAdmin: { findUnique: jest.fn().mockResolvedValue({ name: 'Mateo' }) },
+    platformAdmin: { findUnique: jest.fn().mockResolvedValue({ name: 'Mateo', jobTitle: 'CTO' }) },
     supportRequest: {
       create: jest.fn().mockResolvedValue(consulta()),
       findMany: jest.fn().mockResolvedValue([consulta()]),
@@ -212,7 +212,7 @@ describe('Superadmin', () => {
       status: 'ANSWERED',
       messages: [
         ...consulta().messages,
-        { id: 'msg-2', author: 'ADMIN', body: 'Ya lo arreglamos', attachments: [], createdAt: FECHA, member: null, admin: { name: 'Mateo' } },
+        { id: 'msg-2', author: 'ADMIN', body: 'Ya lo arreglamos', attachments: [], createdAt: FECHA, member: null, admin: { name: 'Mateo', jobTitle: 'CTO' } },
       ],
     }));
     const detalle = await svc.adminReply('adm-1', 'req-1', { message: 'Ya lo arreglamos, probá de nuevo' });
@@ -226,10 +226,11 @@ describe('Superadmin', () => {
     expect(mail.sendSupportReply.mock.calls[0][1]).toEqual(expect.objectContaining({
       number: 12,
       adminName: 'Mateo',
+      adminTitle: 'CTO',
       supportEmail: 'soporte@orbita.site',
       panelUrl: 'https://tienda.orbita.site/admin/ventas/configuracion?vista=soporte&consulta=req-1',
     }));
-    expect(detalle.messages[1]).toEqual(expect.objectContaining({ author: 'ADMIN', authorName: 'Mateo' }));
+    expect(detalle.messages[1]).toEqual(expect.objectContaining({ author: 'ADMIN', authorName: 'Mateo', authorTitle: 'CTO' }));
   });
 
   it('si el mail al miembro falla, la respuesta queda guardada igual', async () => {

@@ -66,7 +66,7 @@ const INCLUDE_DETALLE = {
   _count: { select: { messages: true } },
   messages: {
     orderBy: { createdAt: 'asc' },
-    include: { member: { select: { name: true } }, admin: { select: { name: true } } },
+    include: { member: { select: { name: true } }, admin: { select: { name: true, jobTitle: true } } },
   },
 } satisfies Prisma.SupportRequestInclude;
 
@@ -313,7 +313,7 @@ export class SupportService {
   // justamente el trabajo de soporte.
   async adminReply(adminId: string, id: string, dto: AdminReplyDto): Promise<AdminSupportDetail> {
     const [admin, existente] = await Promise.all([
-      this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { name: true } }),
+      this.prisma.platformAdmin.findUnique({ where: { id: adminId }, select: { name: true, jobTitle: true } }),
       this.prisma.supportRequest.findUnique({
         where: { id },
         select: { id: true, number: true, subject: true, businessId: true, member: { select: { id: true, name: true, email: true } }, business: { select: { subdomain: true } } },
@@ -321,6 +321,7 @@ export class SupportService {
     ]);
     if (!existente) throw new NotFoundException('Consulta no encontrada');
     const adminName = admin?.name ?? ADMIN_SIN_NOMBRE;
+    const adminTitle = admin?.jobTitle ?? null;
     const ahora = new Date();
 
     const [, actualizada] = await this.prisma.$transaction([
@@ -353,6 +354,7 @@ export class SupportService {
           subject: existente.subject,
           memberName: existente.member.name,
           adminName,
+          adminTitle,
           message: dto.message.trim(),
           panelUrl: this.urlDelPanel(existente.business.subdomain, id),
           supportEmail: this.SUPPORT_EMAIL,
@@ -538,6 +540,7 @@ export class SupportService {
       id: m.id,
       author: m.author,
       authorName: m.author === 'ADMIN' ? (m.admin?.name ?? ADMIN_SIN_NOMBRE) : (m.member?.name ?? d.member.name ?? MIEMBRO_SIN_NOMBRE),
+      authorTitle: m.author === 'ADMIN' ? (m.admin?.jobTitle ?? null) : null,
       body: m.body,
       attachments: this.adjuntosDe(m.attachments),
       createdAt: m.createdAt.toISOString(),
