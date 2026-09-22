@@ -54,6 +54,12 @@ function moverElemento<T>(arr: T[], from: number, to: number): T[] {
 // va la que ya tiene lógica real detrás, hoy nada más que Vidriera).
 const NOMBRE_PLANTILLA: Record<string, string> = { vidriera: 'Vidriera' }
 
+// Umbral para el aviso "cargá tu catálogo" de más abajo — con menos que esto
+// las grillas de productos/categorías de la vista previa se ven demasiado
+// vacías o repetidas como para juzgar el diseño en serio, aunque ya no estén
+// literalmente en cero.
+const CATALOGO_PREVIEW_MIN = { productos: 10, categorias: 5 }
+
 async function subirImagenApariencia(file: File): Promise<string> {
     const r = await panelUploadStorefrontImage(file, file.name)
     return r.url
@@ -844,16 +850,19 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
                         {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
                         {/* La vista previa de acá abajo es la tienda real embebida
-                            (ver StorePreview.tsx) — sin productos ni categorías
-                            cargados, las secciones que los muestran (grillas,
-                            destacados) quedan vacías y el dueño no puede juzgar
-                            cómo le queda el diseño. Se avisa una sola vez, no en
+                            (ver StorePreview.tsx) — con poco catálogo las
+                            secciones que muestran productos/categorías (grillas,
+                            destacados) se ven vacías o repetidas y el dueño no
+                            puede juzgar cómo le queda el diseño. El umbral
+                            (CATALOGO_PREVIEW_MIN) no es "cero": un par de
+                            productos sueltos tampoco alcanza para una vista
+                            previa representativa. Se avisa una sola vez, no en
                             cada carga: molesta menos que repetirlo siempre que
-                            entra acá antes de cargar su catálogo. */}
-                        {!cargando && !avisoCatalogoCerrado && (categorias.length === 0 || productos.length === 0) && (
+                            entra acá antes de completar su catálogo. */}
+                        {!cargando && !avisoCatalogoCerrado && (categorias.length < CATALOGO_PREVIEW_MIN.categorias || productos.length < CATALOGO_PREVIEW_MIN.productos) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', fontSize: 12.5, color: 'var(--color-body)' }}>
                                 <span style={{ flex: 1 }}>
-                                    Para ver cómo queda tu diseño de verdad, cargá productos y categorías antes de personalizarlo — sin catálogo, la vista previa no tiene qué mostrar.
+                                    Para ver cómo queda tu diseño de verdad, cargá al menos {CATALOGO_PREVIEW_MIN.productos} productos y {CATALOGO_PREVIEW_MIN.categorias} categorías antes de personalizarlo — con poco catálogo, la vista previa no refleja cómo se va a ver.
                                 </span>
                                 <button
                                     className="ds-link"
