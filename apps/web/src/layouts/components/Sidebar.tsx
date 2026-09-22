@@ -281,6 +281,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // En modo hover, el sidebar es position:fixed y el spacer ocupa lugar en flex
     const esHoverDesktop = mode === 'hover' && isDesktop
 
+    // Posición del popover del selector de modo: cuando el sidebar está
+    // colapsado, el popover se posiciona con fixed para escapar el
+    // overflow:hidden del aside.
+    const selectorRect = selectorAbierto && esAngosto && selectorRef.current
+        ? selectorRef.current.getBoundingClientRect() : null
+
     const sidebar = (
         <aside
             className={`admin-sidebar flex flex-col h-full${isOpen ? ' sidebar-open' : ''}`}
@@ -479,10 +485,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 </button>
                 {selectorAbierto && (
                     <div style={{
-                        position: 'absolute',
-                        bottom: 'calc(100% + 4px)',
-                        left: esAngosto ? W_NARROW + 4 : 8,
-                        ...(esAngosto ? { bottom: 0 } : {}),
+                        position: selectorRect ? 'fixed' : 'absolute',
+                        ...(selectorRect
+                            ? { left: selectorRect.right + 4, bottom: window.innerHeight - selectorRect.bottom }
+                            : { bottom: 'calc(100% + 4px)', left: 8 }),
                         width: 210, padding: 6, borderRadius: 10, zIndex: 80,
                         background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                         boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
