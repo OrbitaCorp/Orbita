@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LifeBuoy, Check, Mail, Clock, Activity, BookOpen, ArrowRight, Send, Lightbulb, Inbox } from 'lucide-react'
+import { LifeBuoy, Check, Mail, Clock, BookOpen, ArrowRight, Send, Lightbulb, Inbox } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { useAuth } from '@/hooks/useAuth'
@@ -35,7 +35,7 @@ import { CAPITULOS, textoPlano } from '@/modules/ventas/panel/manual/contenido'
 import { SoporteAdjuntos, agregarAdjuntos, type AdjuntoLocal } from './SoporteAdjuntos'
 import { SoporteHilo } from './SoporteHilo'
 import {
-    CATEGORIAS, EstadoPill, categoriaDe, fechaRelativa, hhmm, leerVistos, marcarVisto, normalizar, sinLeer, type Vistos,
+    CATEGORIAS, EstadoPill, categoriaDe, fechaRelativa, leerVistos, marcarVisto, normalizar, sinLeer, type Vistos,
     mensajeParaElNegocio,
 } from './SoporteComun'
 
@@ -43,15 +43,14 @@ import {
 // también en el mail de confirmación, así que es un compromiso del equipo.
 // Confirmada por Ale el 21/09/2026 (48 horas hábiles, no 24); si cambia,
 // se cambia acá y en ningún otro lado.
+// Casilla oficial de soporte. La API manda ahí cada consulta del formulario
+// (SUPPORT_EMAIL fijo en support.service.ts); acá solo se muestra.
+export const CORREO_SOPORTE = 'soporte@orbita.site'
+
 export const PROMESA_SOPORTE = {
     texto: 'Menos de 48 horas hábiles',
     horario: 'Lunes a viernes de 9 a 18 (hora de Argentina)',
 }
-
-// Misma base que lib/api.ts (que no la exporta). /health es público y se
-// pide sin sesión: no pasa por authedFetch a propósito, para que un 401 de
-// una sesión vencida no se confunda con "el sistema está caído".
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 // Los temas del manual que más consultas evitan. Los ids son los de
 // contenido.ts (capítulo → tema); si se renombra uno allá, se renombra acá.
@@ -95,7 +94,6 @@ function buscarEnManual(consulta: string): TemaIndexado[] {
     return puntuados.sort((a, b) => b.puntos - a.puntos).slice(0, 3).map(x => x.t)
 }
 
-type Salud = { estado: 'cargando' } | { estado: 'ok' | 'sin-verificar'; hora: string }
 type Errores = { categoria?: string; asunto?: string; mensaje?: string }
 
 export default function Soporte() {
@@ -135,7 +133,6 @@ export default function Soporte() {
     const [consultas, setConsultas] = useState<SupportRequestRow[] | null>(null)
     const [errorLista, setErrorLista] = useState<string | null>(null)
     const [vistos, setVistos] = useState<Vistos>({})
-    const [salud, setSalud] = useState<Salud>({ estado: 'cargando' })
 
     // Precarga de categoría por query param — se limpia apenas se captura,
     // mismo criterio que otras vueltas con query param en el proyecto
@@ -178,20 +175,6 @@ export default function Soporte() {
         void cargarLista()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router.isReady, consultaId])
-
-    // Estado del sistema: un ping a /health con tope de 5s. Si falla, NO se
-    // dice que está caído: lo más probable es la red de quien mira, y un
-    // "caído" falso genera justo las consultas que esta columna quiere evitar.
-    useEffect(() => {
-        let vivo = true
-        const ctrl = new AbortController()
-        const timer = window.setTimeout(() => ctrl.abort(), 5000)
-        fetch(`${API_BASE}/health`, { signal: ctrl.signal, cache: 'no-store' })
-            .then(r => { if (vivo) setSalud({ estado: r.ok ? 'ok' : 'sin-verificar', hora: hhmm(new Date()) }) })
-            .catch(() => { if (vivo) setSalud({ estado: 'sin-verificar', hora: hhmm(new Date()) }) })
-            .finally(() => window.clearTimeout(timer))
-        return () => { vivo = false; window.clearTimeout(timer); ctrl.abort() }
-    }, [])
 
     // Sugerencias del manual: el asunto se "asienta" 250ms después de la
     // última tecla y recién ahí se busca. La búsqueda en sí es derivada.
@@ -607,20 +590,13 @@ export default function Soporte() {
                             <Mail size={13} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-muted)' }} />
                             <span>Te respondemos a {email ? <strong style={{ fontWeight: 600 }}>{email}</strong> : 'tu correo'}</span>
                         </div>
-                    </BloqueLateral>
-
-                    <BloqueLateral Icon={Activity} titulo="Estado del sistema">
-                        {/* El punto de color nunca va solo: el texto dice lo mismo. */}
-                        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
-                            <span aria-hidden="true" style={{
-                                width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
-                                background: salud.estado === 'ok' ? 'var(--color-success)' : salud.estado === 'sin-verificar' ? 'var(--color-warning)' : 'var(--color-border-strong)',
-                            }} />
-                            {salud.estado === 'cargando' ? 'Revisando…' : salud.estado === 'ok' ? 'Todo funcionando' : 'No pudimos verificar el estado'}
+                        {/* La casilla es la misma a la que llega cada consulta del
+                            formulario (SUPPORT_EMAIL en support.service.ts): si cambia
+                            allá, cambia acá. */}
+                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 8, overflowWrap: 'anywhere' }}>
+                            También podés escribirnos a{' '}
+                            <a href={`mailto:${CORREO_SOPORTE}`} className="sop-link" style={{ fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none' }}>{CORREO_SOPORTE}</a>
                         </div>
-                        {salud.estado !== 'cargando' && (
-                            <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginTop: 4 }}>Revisado {salud.hora}</div>
-                        )}
                     </BloqueLateral>
 
                     <BloqueLateral Icon={BookOpen} titulo="Antes de escribir">

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Search, ChevronLeft, ChevronRight, X, ExternalLink, Mail, Phone, Send, RotateCcw, CircleCheck,
-  ThumbsUp, ThumbsDown, Paperclip, CloudOff, RefreshCw, Inbox,
+  ThumbsUp, ThumbsDown, Paperclip, CloudOff, RefreshCw, Inbox, Activity,
 } from 'lucide-react'
 import {
   platformApi,
@@ -15,7 +15,13 @@ import {
   SUPPORT_STATUS_LABELS, SUPPORT_CATEGORY_LABELS,
 } from './ui'
 import { CAPITULOS } from '@/modules/ventas/panel/manual/contenido'
-import { fechaRelativa } from '@/modules/ventas/panel/configuracion/SoporteComun'
+import { fechaRelativa, hhmm } from '@/modules/ventas/panel/configuracion/SoporteComun'
+
+// Misma base que lib/platform/api.ts (que no la exporta). /health es público
+// y se pide sin sesión: no pasa por authedFetch a propósito, para que un 401
+// de una sesión vencida no se confunda con "la API está caída".
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
+type Salud = { estado: 'cargando' } | { estado: 'ok' | 'sin-verificar'; hora: string }
 
 // Soporte (super admin → Soporte): la bandeja de consultas que los negocios
 // mandan desde Configuración → Soporte de su panel.
@@ -29,6 +35,10 @@ import { fechaRelativa } from '@/modules/ventas/panel/configuracion/SoporteComun
 // Al pie está lo que opinan los negocios del manual (pulgar arriba/abajo por
 // capítulo): es la otra cara de "en qué se traban", y se lee junto con las
 // consultas para decidir qué capítulo reescribir.
+//
+// Arriba, junto a los conteos, va el estado de la API (ping a /health). Antes
+// lo veía cada negocio en su Configuración → Soporte; Ale lo movió acá el
+// 22/09/2026: es información para el equipo que atiende, no para el negocio.
 
 const TONO_ESTADO: Record<SupportRequestStatus, 'amber' | 'green' | 'gray'> = {
   OPEN: 'amber',
@@ -72,6 +82,22 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   const cambiarCategoria = (v: SupportCategory | '') => { setCategoria(v); setPage(1) }
 
   const { data: resumen, error: errorResumen, status: statusResumen } = useFetch(() => platformApi.supportSummary(), [reloadKey])
+
+  // Estado del sistema: un ping a /health con tope de 5s. Si falla, NO se
+  // dice que está caído: lo más probable es la red de quien mira. Se vuelve
+  // a pedir con cada "reintentar" (reloadKey), así el dato no queda viejo.
+  const [salud, setSalud] = useState<Salud>({ estado: 'cargando' })
+  useEffect(() => {
+    let vivo = true
+    setSalud({ estado: 'cargando' })
+    const ctrl = new AbortController()
+    const timer = window.setTimeout(() => ctrl.abort(), 5000)
+    fetch(`${API_BASE}/health`, { signal: ctrl.signal, cache: 'no-store' })
+      .then((r) => { if (vivo) setSalud({ estado: r.ok ? 'ok' : 'sin-verificar', hora: hhmm(new Date()) }) })
+      .catch(() => { if (vivo) setSalud({ estado: 'sin-verificar', hora: hhmm(new Date()) }) })
+      .finally(() => window.clearTimeout(timer))
+    return () => { vivo = false; window.clearTimeout(timer); ctrl.abort() }
+  }, [reloadKey])
   const { data: lista, error: errorLista, status: statusLista, loading } = useFetch(
     () => platformApi.supportRequests({
       status: estado || undefined,
@@ -130,20 +156,22 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
         subtitle="Las consultas que mandan los negocios desde su panel. Todo lo que respondas acá les llega por mail y les queda en su historial."
       />
 
-      {errorResumen ? (
-        <ErrorBox msg="No se pudo cargar el resumen de soporte." action={reintentar} />
-      ) : (
-        <Grid>
-          <Kpi
-            label="Abiertas"
-            value={resumen ? String(resumen.open) : '…'}
-            accent={!!resumen && resumen.open > 0}
-            hint={!resumen || resumen.open > 0 ? 'Esperan una respuesta del equipo' : 'Nada esperando respuesta'}
-          />
-          <Kpi label="Respondidas" value={resumen ? String(resumen.answered) : '…'} hint="Contestadas; ahora la pelota está del lado del negocio" />
-          <Kpi label="Cerradas" value={resumen ? String(resumen.closed) : '…'} hint="Resueltas y archivadas" />
-        </Grid>
-      )}
+      {errorResumen && <ErrorBox msg="No se pudo cargar el resumen de soporte." action={reintentar} />}
+      <Grid>
+        {!errorResumen && (
+          <>
+            <Kpi
+              label="Abiertas"
+              value={resumen ? String(resumen.open) : '…'}
+              accent={!!resumen && resumen.open > 0}
+              hint={!resumen || resumen.open > 0 ? 'Esperan una respuesta del equipo' : 'Nada esperando respuesta'}
+            />
+            <Kpi label="Respondidas" value={resumen ? String(resumen.answered) : '…'} hint="Contestadas; ahora la pelota está del lado del negocio" />
+            <Kpi label="Cerradas" value={resumen ? String(resumen.closed) : '…'} hint="Resueltas y archivadas" />
+          </>
+        )}
+        <EstadoSistema salud={salud} />
+      </Grid>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Estado como pestañas con el conteo al lado: es el filtro que se
@@ -807,6 +835,27 @@ function BarraUtil({ pct }: { pct: number }) {
         <div style={{ width: `${100 - pct}%`, background: 'var(--color-error)', opacity: 0.85 }} />
       </div>
       <span aria-hidden="true" style={{ fontSize: 12.5, fontWeight: 600, fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', whiteSpace: 'nowrap' }}>{pct}% útil</span>
+    </div>
+  )
+}
+
+// Misma tarjeta que los KPI pero con texto en vez de número: el punto de color
+// nunca va solo, la frase dice lo mismo (accesibilidad y modo oscuro).
+function EstadoSistema({ salud }: { salud: Salud }) {
+  const color = salud.estado === 'ok' ? 'var(--color-success)' : salud.estado === 'sin-verificar' ? 'var(--color-warning)' : 'var(--color-border-strong)'
+  return (
+    <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: '16px 18px', boxShadow: 'var(--shadow-card)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', marginBottom: 10, lineHeight: 1.3 }}>
+        <Activity size={13} strokeWidth={2} aria-hidden="true" />
+        Estado del sistema
+      </div>
+      <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2, minHeight: 29 }}>
+        <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: color }} />
+        {salud.estado === 'cargando' ? 'Revisando…' : salud.estado === 'ok' ? 'API funcionando' : 'No se pudo verificar'}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', marginTop: 6 }}>
+        {salud.estado === 'cargando' ? 'Ping a /health' : `Revisado ${salud.hora} · ping a /health`}
+      </div>
     </div>
   )
 }
