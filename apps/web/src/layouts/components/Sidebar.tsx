@@ -13,15 +13,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Search, ChevronDown, Check, Plus, Store, X, Sparkles, Maximize2, Minimize2, MousePointer } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
-import { fmtMoney } from '@/lib/utils'
+import { getUnreadConversationsCount, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiTrigger } from '@/components/orbi/OrbiTrigger'
-import { SkeletonText } from '@/design-system/components/Skeleton'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { useSidebarMode, type SidebarMode } from '@/layouts/SidebarModeContext'
 
@@ -31,11 +29,6 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: Rea
 // menú: nada visible que el rol no pueda usar.
 interface Sub { label: string; seccion: string; vista?: string; permisos?: string[] }
 interface Modulo { id: string; label: string; Icon: IconType; seccion: string; badge?: number; alert?: boolean; subs?: Sub[] }
-
-// El negocio tiene UN espacio activo (su rubro). El selector no lista rubros
-// ajenos que no existen: muestra el espacio actual y ofrece crear otro — el
-// alta de un espacio nuevo pasa por el onboarding de rubro, no por acá.
-const ESPACIO_ACTUAL = { id: 'tienda', label: 'Tienda', desc: 'E-commerce y retail', Icon: Store, color: '#2563EB', bg: 'rgba(37,99,235,0.10)' }
 
 const MODULOS: Modulo[] = [
     { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, seccion: 'dashboard' },
@@ -150,8 +143,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     })
 
     const [abierto,   setAbierto]   = useState(moduloActivo)
-    const [busqueda,  setBusqueda]  = useState('')
-    const [rubroOpen, setRubroOpen] = useState(false)
 
     useEffect(() => { setAbierto(moduloActivo) }, [moduloActivo])
 
@@ -207,52 +198,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         }
     }, [user?.type])
 
-    const rubroActual = ESPACIO_ACTUAL
-
     const ir = (sec: string, v?: string) => {
         router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: v ? { vista: v } : undefined })
         onClose()
     }
-
-    const irDetalle = (sec: string, id: string) => {
-        router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: { vista: 'detalle', id } })
-        onClose()
-    }
-
-    // Búsqueda real contra GET /search.
-    const [resultados, setResultados] = useState<ApiSearchResults | null>(null)
-    const [buscando, setBuscando] = useState(false)
-    const buscadorRef = useRef<HTMLDivElement | null>(null)
-    useEffect(() => {
-        const afuera = (e: MouseEvent) => {
-            if (buscadorRef.current && !buscadorRef.current.contains(e.target as Node)) {
-                setResultados(null)
-                setBuscando(false)
-            }
-        }
-        document.addEventListener('mousedown', afuera)
-        return () => document.removeEventListener('mousedown', afuera)
-    }, [])
-    useEffect(() => {
-        const q = busqueda.trim()
-        if (q.length < 2) { setResultados(null); setBuscando(false); return }
-        let vigente = true
-        setBuscando(true)
-        const t = setTimeout(() => {
-            panelSearch(q)
-                .then(r => {
-                    if (!vigente) return
-                    setResultados({
-                        query: r?.query ?? q,
-                        pedidos: r?.pedidos ?? [], clientes: r?.clientes ?? [],
-                        productos: r?.productos ?? [], descuentos: r?.descuentos ?? [],
-                    })
-                })
-                .catch(() => { if (vigente) setResultados(null) })
-                .finally(() => { if (vigente) setBuscando(false) })
-        }, 350)
-        return () => { vigente = false; clearTimeout(t) }
-    }, [busqueda])
 
     const subActiva = (m: Modulo, s: Sub) => {
         if (seccion !== s.seccion) return false
@@ -312,108 +261,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 <OrbitLogo />
                 {!esAngosto && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
             </div>
-
-            {/* Selector de espacio */}
-            {!esAngosto && (
-            <div style={{ margin: '10px 12px 4px', position: 'relative' }}>
-                <button
-                    onClick={() => setRubroOpen(o => !o)}
-                    className="ds-hover"
-                    style={{
-                        width: '100%', height: 36, padding: '0 10px',
-                        borderRadius: 8,
-                        border: `1px solid ${rubroOpen ? rubroActual.color + '55' : 'var(--color-border)'}`,
-                        background: rubroOpen ? rubroActual.bg : 'var(--color-surface)',
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        transition: 'all 180ms',
-                    }}
-                >
-                    <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
-                        <rubroActual.Icon size={12} strokeWidth={2} color={rubroActual.color} />
-                    </div>
-                    <div style={{ flex: 1, textAlign: 'left' }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
-                        <div style={{ fontSize: 9, color: 'var(--color-subtle)', lineHeight: 1.2 }}>{rubroActual.desc}</div>
-                    </div>
-                    <ChevronDown size={12} strokeWidth={2} color="var(--color-muted)" style={{ transition: 'transform 200ms', transform: rubroOpen ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }} />
-                </button>
-
-                {rubroOpen && (
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 5px)', zIndex: 60, borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '10px 12px 6px' }}>Tu espacio</div>
-                        <div style={{ margin: '0 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, background: rubroActual.bg }}>
-                            <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
-                                <rubroActual.Icon size={14} strokeWidth={1.8} color={rubroActual.color} />
-                            </div>
-                            <div style={{ flex: 1, textAlign: 'left' }}>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
-                                <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>{rubroActual.desc}</div>
-                            </div>
-                            <Check size={13} strokeWidth={2.5} color={rubroActual.color} />
-                        </div>
-                        <div
-                            style={{ width: 'calc(100% - 12px)', margin: '8px 6px 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, border: '1px dashed var(--color-border)', background: 'transparent' }}
-                        >
-                            <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center' }}>
-                                <Plus size={14} strokeWidth={2} color="var(--color-subtle)" />
-                            </div>
-                            <div style={{ flex: 1, textAlign: 'left' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', lineHeight: 1.2 }}>Otro espacio</span>
-                                    <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-subtle)', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 999, padding: '2px 6px' }}>Próximamente</span>
-                                </div>
-                                <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3, marginTop: 2 }}>Vas a poder sumar otro rubro a tu cuenta</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-            )}
-
-            {/* Buscador */}
-            {!esAngosto && (
-            <div className="relative mx-3 mt-2 mb-1" ref={buscadorRef}>
-                <Search size={13} strokeWidth={1.6} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted)' }} />
-                <input
-                    value={busqueda}
-                    onChange={e => setBusqueda(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Escape') { setBusqueda(''); setResultados(null) } }}
-                    placeholder="Buscar pedidos, clientes..."
-                    className="ds-field w-full h-8 pl-7 pr-7 text-xs rounded-md outline-none"
-                    style={{ background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                />
-                {busqueda && (
-                    <button
-                        onClick={() => { setBusqueda(''); setResultados(null) }}
-                        title="Limpiar búsqueda"
-                        className="ds-hover absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center rounded"
-                        style={{ position: 'absolute', width: 18, height: 18, border: 'none', background: 'transparent', color: 'var(--color-muted)' }}
-                    >
-                        <X size={11} strokeWidth={2.2} />
-                    </button>
-                )}
-                {(buscando || resultados) && (
-                    <div className="absolute left-0 right-0 mt-1 p-1.5 rounded-lg overflow-y-auto" style={{ top: '100%', zIndex: 70, maxHeight: 340, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
-                        {buscando ? (
-                            <div aria-hidden="true" style={{ padding: '4px 2px' }}>
-                                {[0, 1, 2].map(i => (
-                                    <div key={i} style={{ padding: '8px' }}>
-                                        <SkeletonText width={`${[76, 62, 68][i]}%`} height={10} delay={i * 90} />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : resultados ? (
-                            <>
-                                {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <ResBtn key={p.id} onClick={() => { irDetalle('pedidos', p.id); setBusqueda(''); setResultados(null) }}>#{p.orderNumber} · {p.customerName ?? 'Sin cliente'} · {fmtMoney(p.total)}</ResBtn>)}</>}
-                                {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <ResBtn key={c.id} onClick={() => { irDetalle('clientes', c.id); setBusqueda(''); setResultados(null) }}>{c.nombre}{c.email ? ` · ${c.email}` : ''}</ResBtn>)}</>}
-                                {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <ResBtn key={p.id} onClick={() => { ir('catalogo'); setBusqueda(''); setResultados(null) }}>{p.name} · {fmtMoney(p.basePrice)}</ResBtn>)}</>}
-                                {resultados.pedidos.length + resultados.clientes.length + resultados.productos.length === 0 && <div className="p-3 text-xs text-center" style={{ color: 'var(--color-muted)' }}>Sin resultados</div>}
-                            </>
-                        ) : null}
-                    </div>
-                )}
-            </div>
-            )}
 
             {/* Nav */}
             <nav className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-0.5">
@@ -580,18 +427,3 @@ function OrbitLogo() {
     return <OrbitaLogo size={26} />
 }
 
-function ResBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            style={resItem}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-bg)'; e.currentTarget.style.color = 'var(--color-primary)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-body)' }}
-        >
-            {children}
-        </button>
-    )
-}
-
-const resLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 8px 4px' }
-const resItem:  React.CSSProperties = { width: '100%', textAlign: 'left', padding: '8px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--color-body)', transition: 'background 140ms, color 140ms' }
