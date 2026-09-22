@@ -33,12 +33,12 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { tenantUrl } from '@/lib/tenant';
 
-const LINKS: { label: string; href: string; soloTrasHero?: boolean }[] = [
+const LINKS: { label: string; href: string }[] = [
     { label: 'Qué incluye',   href: '#modulos'       },
     { label: 'Cómo funciona', href: '#como-funciona' },
-    { label: 'Comparativa',   href: '#comparativa', soloTrasHero: true },
+    { label: 'Comparativa',   href: '#comparativa'   },
     { label: 'Qué vendés',    href: '#rubros'        },
-    { label: 'Avanzado',      href: '#avanzado',   soloTrasHero: true },
+    { label: 'Avanzado',      href: '#avanzado'      },
     { label: 'Precio',        href: '#precios'       },
     { label: 'Preguntas',     href: '#faq'           },
     { label: 'Nosotros',      href: '/nosotros'      },
@@ -119,9 +119,8 @@ export function NavbarV2() {
                 <ul className="ml-4 hidden flex-1 items-center gap-0.5 lg:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
-                        if (l.soloTrasHero && !pasadoHero) return null;
                         return (
-                            <li key={l.href} className={l.soloTrasHero ? 'hidden xl:list-item' : undefined}>
+                            <li key={l.href}>
                                 <a
                                     href={hrefReal(l.href)}
                                     onMouseEnter={() => setHoverLink(l.href)}
