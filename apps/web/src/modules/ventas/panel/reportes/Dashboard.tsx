@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown, Receipt } from 'lucide-react'
+import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown, Receipt, ExternalLink, PauseCircle } from 'lucide-react'
 import { DateRangePicker, fmtChip } from './components/DateRangePicker'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -23,10 +23,10 @@ import { KpiCard } from '@/design-system/components/KpiCard'
 import { Skeleton, SkeletonFilas, SkeletonBarras } from '@/design-system/components/Skeleton'
 import { LineChart, BarChart, DonutChart } from '@/design-system/components/Chart'
 import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
-import { adminPath, currentSlug } from '@/lib/tenant'
+import { adminPath, currentSlug, tenantUrl } from '@/lib/tenant'
 import { useAuth } from '@/hooks/useAuth'
 import {
-    ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness,
+    ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness, pauseBusiness,
     type ApiDashboardReport, type ApiOrderStatus,
 } from '@/lib/api'
 
@@ -72,11 +72,16 @@ export default function Dashboard() {
     const [descartadas, setDescartadas] = useState<string[]>([])
     const [publicada, setPublicada] = useState(false)
     const [publicando, setPublicando] = useState(false)
+    const [subdominio, setSubdominio] = useState<string | null>(null)
+    const [tiendaMenuOpen, setTiendaMenuOpen] = useState(false)
+    const [modalPausar, setModalPausar] = useState(false)
+    const [pausando, setPausando] = useState(false)
     const [expand, setExpand] = useState<null | 'ventas' | 'top'>(null)
     const [toast, setToast] = useState<string | null>(null)
     const [calendarOpen, setCalendarOpen] = useState(false)
     const [customRange, setCustomRange] = useState<{ start: Date; end: Date | null } | null>(null)
     const calendarRef = useRef<HTMLDivElement>(null)
+    const tiendaMenuRef = useRef<HTMLDivElement>(null)
 
     const [datos, setDatos] = useState<ApiDashboardReport | null>(null)
     const [cargando, setCargando] = useState(true)
@@ -93,6 +98,9 @@ export default function Dashboard() {
         function handleClick(e: MouseEvent) {
             if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
                 setCalendarOpen(false)
+            }
+            if (tiendaMenuRef.current && !tiendaMenuRef.current.contains(e.target as Node)) {
+                setTiendaMenuOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClick)
@@ -134,7 +142,7 @@ export default function Dashboard() {
     useEffect(() => {
         let cancelado = false
         panelGetBusiness()
-            .then(b => { if (!cancelado) setPublicada(b.isActive && !b.isPaused) })
+            .then(b => { if (!cancelado) { setPublicada(b.isActive && !b.isPaused); setSubdominio(b.subdomain) } })
             .catch(() => { /* sin dato: el botón queda en "Publicar tienda" */ })
         return () => { cancelado = true }
     }, [])
@@ -159,6 +167,20 @@ export default function Dashboard() {
             setToast(e instanceof ApiError ? e.message : 'No se pudo publicar la tienda')
         } finally {
             setPublicando(false)
+        }
+    }
+
+    const pausarTienda = async () => {
+        setModalPausar(false)
+        setPausando(true)
+        try {
+            await pauseBusiness(true)
+            setPublicada(false)
+            setToast('Tienda pausada: dejó de verse para tus clientes')
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo pausar la tienda')
+        } finally {
+            setPausando(false)
         }
     }
 
@@ -315,11 +337,59 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    <Button variant={publicada ? 'secondary' : 'outline'} icon={<Globe size={15} />} loading={publicando} onClick={() => void publicar()} style={publicada ? { color: 'var(--color-success)' } : undefined}>
-                        {publicada ? '✓ Tienda online' : 'Publicar tienda'}
-                    </Button>
+                    {publicada ? (
+                        <div style={{ position: 'relative' }} ref={tiendaMenuRef}>
+                            <Button variant="secondary" icon={<Globe size={15} />} loading={pausando} onClick={() => setTiendaMenuOpen(o => !o)} style={{ color: 'var(--color-success)' }}>
+                                ✓ Tienda online
+                            </Button>
+                            {tiendaMenuOpen && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 180, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                                    <a
+                                        href={subdominio ? tenantUrl(subdominio, '/') : undefined}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ds-hover"
+                                        onClick={() => setTiendaMenuOpen(false)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', fontSize: 13, color: 'var(--color-text)', textDecoration: 'none' }}
+                                    >
+                                        <ExternalLink size={14} />
+                                        Ver tienda
+                                    </a>
+                                    <button
+                                        className="ds-hover"
+                                        onClick={() => { setTiendaMenuOpen(false); setModalPausar(true) }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '9px 12px', fontSize: 13, color: 'var(--color-text)', border: 'none', borderTop: '1px solid var(--color-border)', background: 'transparent', fontFamily: 'inherit' }}
+                                    >
+                                        <PauseCircle size={14} />
+                                        Pausar tienda
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Button variant="outline" icon={<Globe size={15} />} loading={publicando} onClick={() => void publicar()}>
+                            Publicar tienda
+                        </Button>
+                    )}
                 </div>
             </div>
+
+            <Modal
+                isOpen={modalPausar}
+                onClose={() => setModalPausar(false)}
+                title="¿Pausar la tienda?"
+                variant="danger"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setModalPausar(false)}>Cancelar</Button>
+                        <Button variant="danger" onClick={() => void pausarTienda()}>Sí, pausar</Button>
+                    </>
+                }
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    Tu tienda deja de estar visible para tus clientes. Los datos se conservan y podés reactivarla cuando quieras.
+                </div>
+            </Modal>
 
             {/* Error de carga, con reintento */}
             {errorCarga && (
