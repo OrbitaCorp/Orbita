@@ -33,15 +33,15 @@ const ORGANIZATION_JSON_LD = {
     name: 'Órbita',
     url: `https://${SEO_CANONICAL_HOST}`,
     logo: `https://${SEO_CANONICAL_HOST}/logo.svg`,
-    description: 'Tienda online con punto de venta, stock, pedidos y pagos integrados, sin comisiones por venta.',
+    description: 'Tu tienda online con catálogo, stock y pedidos, sin comisiones por venta y con tu propio dominio.',
 };
 
 export default function HomePage() {
     return (
         <PaginaV2 scrollKey="/">
             <Seo
-                title="Órbita — Tienda online y punto de venta sin comisiones"
-                description="Tienda online, punto de venta, stock y pagos integrados, sin comisiones por venta: vos cobrás en tu propia cuenta, todo en un solo lugar."
+                title="Tu negocio, en órbita — sin comisiones por venta"
+                description="Tu tienda online con catálogo, stock y pedidos, sin comisiones por venta y con tu propio dominio. Todo en un solo lugar."
                 path="/"
             />
             <Head>
