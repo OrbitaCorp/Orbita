@@ -8,6 +8,7 @@ import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
+import { SidebarModeProvider } from './SidebarModeContext'
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
 // y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
@@ -25,7 +26,9 @@ import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 export default function AdminLayout({ children }: { children: ReactNode }) {
     return (
         <RequireAuth type="member">
-            <AdminShell>{children}</AdminShell>
+            <SidebarModeProvider>
+                <AdminShell>{children}</AdminShell>
+            </SidebarModeProvider>
         </RequireAuth>
     )
 }
