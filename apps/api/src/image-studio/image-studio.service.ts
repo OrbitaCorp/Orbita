@@ -211,32 +211,47 @@ export class ImageStudioService {
         .resize(width, height, { fit: 'cover' })
         .toBuffer();
 
-      // Silueta del producto difuminada y atenuada al 45%, usada como canal
-      // alfa de un negro transparente — no un negro sólido tapando todo el
-      // fondo (ese fue el bug de la primera versión: 'multiply' con una
-      // máscara sin atenuar ennegrecía TODA el área fuera del producto). Al
-      // tamaño natural del recorte (cutoutWidth/cutoutHeight), no del canvas
-      // — se posiciona centrada al componer, igual que el recorte.
-      const sombraAlfa = await sharp(cutout, ENTRADA_IMAGEN)
-        .ensureAlpha()
-        .extractChannel('alpha')
-        .blur(18)
-        .linear(0.45, 0)
-        .raw()
-        .toBuffer();
-      const sombra = await sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .joinChannel(sombraAlfa, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
-        .png()
-        .toBuffer();
+      // Sombra en DOS capas, no una — una sombra real tiene dos componentes
+      // distintas: un "contacto" chico y oscuro justo donde el producto
+      // toca la mesa (ahí no entra nada de luz) y una "ambiente" grande y
+      // difusa alrededor (el producto tapa un poco la luz que llega desde
+      // varios lados, se nota mucho menos pero se extiende más lejos). Con
+      // una sola sombra tratando de cumplir las dos funciones a la vez, el
+      // resultado quedaba a mitad de camino: ni el contacto se notaba
+      // firme, ni la ambiente daba sensación real de volumen — la prenda se
+      // veía "pegada" sobre el fondo en vez de apoyada. Cada capa usa el
+      // mismo canal alfa del recorte (silueta), difuminado y atenuado con
+      // su propio blur/opacidad/desplazamiento — no un negro sólido tapando
+      // todo el fondo (ese fue el bug de la primera versión: 'multiply' con
+      // una máscara sin atenuar). Al tamaño natural del recorte
+      // (cutoutWidth/cutoutHeight), se posicionan centradas al componer.
+      const capaSombra = async (blur: number, atenuacion: number): Promise<Buffer> => {
+        const alfa = await sharp(cutout, ENTRADA_IMAGEN)
+          .ensureAlpha()
+          .extractChannel('alpha')
+          .blur(blur)
+          .linear(atenuacion, 0)
+          .raw()
+          .toBuffer();
+        return sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+          .joinChannel(alfa, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
+          .png()
+          .toBuffer();
+      };
+      const sombraContacto = await capaSombra(6, 0.55);
+      const sombraAmbiente = await capaSombra(40, 0.22);
 
-      // Desplazada unos px hacia abajo/derecha (luz simulada desde arriba-
+      // Desplazadas hacia abajo/derecha (luz simulada desde arriba-
       // izquierda) — el recorte crudo va encima tapando la sombra que cae
-      // debajo suyo; solo asoma el borde, como una sombra de contacto real.
-      const desplazamiento = Math.round(cutoutHeight * 0.012);
+      // debajo suyo; solo asoma el borde. La ambiente se desplaza más que
+      // la de contacto, como en una sombra real.
+      const despContacto = Math.round(cutoutHeight * 0.006);
+      const despAmbiente = Math.round(cutoutHeight * 0.02);
 
       composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
         .composite([
-          { input: sombra, top: top + desplazamiento, left: left + desplazamiento },
+          { input: sombraAmbiente, top: top + despAmbiente, left: left + despAmbiente },
+          { input: sombraContacto, top: top + despContacto, left: left + despContacto },
           { input: cutout, top, left },
         ])
         .png()
