@@ -8,6 +8,11 @@ import { CloudflareImageService, CloudflareQuotaExhaustedException } from '../..
 //   tenga los campos "correctos", tira 400 "required properties at '/' are
 //   'multipart'". Si esto se rompe (Cloudflare cambia el contrato), el test
 //   de forma del multipart de abajo lo detecta.
+// - editImage(): el campo de la imagen de referencia es "input_image_0", NO
+//   "image" — con el nombre equivocado la API igual devuelve success:true
+//   pero ignora la foto de entrada (bug real encontrado y corregido
+//   22/09/2026, ver comentario en cloudflare-image.service.ts). El test de
+//   abajo lo fija para que no se rompa de nuevo en silencio.
 // - code 5035 ("no disponible en el plan Free") se traduce a 503, no 500 —
 //   es información útil para quien lo esté probando, no un bug nuestro.
 
@@ -45,7 +50,7 @@ describe('CloudflareImageService', () => {
     expect(result.buffer.toString()).toBe('img-bytes');
   });
 
-  it('editImage: manda multipart/form-data real (no JSON) con los campos prompt e image', async () => {
+  it('editImage: manda multipart/form-data real (no JSON) con los campos prompt e input_image_0', async () => {
     const base64 = Buffer.from('edited-bytes').toString('base64');
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -62,6 +67,11 @@ describe('CloudflareImageService', () => {
     // Sin Content-Type manual: si se hubiera puesto "application/json" a
     // mano, Workers AI lo rechaza con el 400 de "multipart" (ver arriba).
     expect(init.headers['Content-Type']).toBeUndefined();
+    // "image" a secas no es un campo real de la API — la foto de entrada
+    // tiene que ir en "input_image_0" o la API la ignora en silencio.
+    const form = init.body as FormData;
+    expect(form.get('input_image_0')).not.toBeNull();
+    expect(form.get('image')).toBeNull();
   });
 
   it('code 5035 (modelo no disponible en el plan actual) se traduce a 503, no 500', async () => {

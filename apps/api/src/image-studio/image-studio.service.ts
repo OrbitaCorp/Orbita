@@ -284,11 +284,14 @@ export class ImageStudioService {
   /**
    * Genera una versión de la prenda puesta en un modelo. A diferencia de
    * generateBackground(), acá SÍ se le pide a la IA que reinterprete la
-   * imagen completa — no hay forma de componer esto localmente. El
-   * resultado NO es un "probador virtual" real (no hay garantía de que
-   * estampas/logos se reproduzcan tal cual, ver pruebas en el resumen de la
-   * tarea) — se devuelve con advertencia explícita para que el vendedor lo
-   * revise antes de publicarlo en la tienda.
+   * imagen completa — no hay forma de componer esto localmente. La fidelidad
+   * mejoró mucho el 22/09/2026 al corregir un bug en
+   * CloudflareImageService.editImage() (el campo de la imagen de referencia
+   * estaba mal — ver comentario ahí), pero sigue sin ser un "probador
+   * virtual" con garantías: no es inpainting con máscara, así que no hay
+   * certeza formal de que estampas/logos se reproduzcan exactos — se
+   * devuelve con advertencia explícita para que el vendedor lo revise antes
+   * de publicarlo en la tienda.
    */
   async generateModelWearing(
     businessId: string,
