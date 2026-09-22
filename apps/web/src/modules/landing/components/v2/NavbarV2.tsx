@@ -33,10 +33,12 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { tenantUrl } from '@/lib/tenant';
 
-const LINKS = [
+const LINKS: { label: string; href: string; soloTrasHero?: boolean }[] = [
     { label: 'Qué incluye',   href: '#modulos'       },
     { label: 'Cómo funciona', href: '#como-funciona' },
+    { label: 'Comparativa',   href: '#comparativa', soloTrasHero: true },
     { label: 'Qué vendés',    href: '#rubros'        },
+    { label: 'Avanzado',      href: '#avanzado',   soloTrasHero: true },
     { label: 'Precio',        href: '#precios'       },
     { label: 'Preguntas',     href: '#faq'           },
     { label: 'Nosotros',      href: '/nosotros'      },
@@ -109,24 +111,22 @@ export function NavbarV2() {
             <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-6 px-6" aria-label="Principal">
                 {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
                     de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
-                <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Ir al inicio">
+                <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Órbita — Ir al inicio">
                     <OrbitaLogo size={26} />
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
 
-                <ul className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
+                <ul className="ml-4 hidden flex-1 items-center gap-0.5 lg:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
+                        if (l.soloTrasHero && !pasadoHero) return null;
                         return (
-                            <li key={l.href}>
-                                {/* Mismo criterio que .oc-card-hover: solo color, nunca
-                                    transform. Sin `act`, un hover en un link ya resaltado
-                                    no se nota, que es lo esperable. */}
+                            <li key={l.href} className={l.soloTrasHero ? 'hidden xl:list-item' : undefined}>
                                 <a
                                     href={hrefReal(l.href)}
                                     onMouseEnter={() => setHoverLink(l.href)}
                                     onMouseLeave={() => setHoverLink(h => (h === l.href ? null : h))}
-                                    className={`inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200 ${act ? '' : 'hover:bg-white/[0.06]'}`}
+                                    className={`inline-flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-[13.5px] font-semibold transition-colors duration-200 ${act ? '' : 'hover:bg-white/[0.06]'}`}
                                     style={{
                                         color: act || hoverLink === l.href ? 'var(--oc-text)' : 'var(--oc-text-3)',
                                         background: act ? 'var(--oc-accent-soft)' : undefined,

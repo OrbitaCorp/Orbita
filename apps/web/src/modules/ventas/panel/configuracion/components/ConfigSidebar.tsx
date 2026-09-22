@@ -1,24 +1,22 @@
-// Menú guía de Configuración — reemplaza el modelo anterior (una sola
-// pantalla "General" con 6 tarjetas apiladas de a dos columnas + 3 pantallas
-// sueltas para Apariencia/Equipo/Notificaciones, elegidas desde el sidebar
-// PRINCIPAL del panel). Ahora cada sección es una raíz propia acá, en un
-// menú dedicado — el sidebar principal se colapsa a la franja de íconos
-// apenas se entra a Configuración (ver Sidebar.tsx) para hacerle lugar a
-// este, mismo patrón que un módulo de configuración típico (paneles de
-// administración de flotas, IDEs, etc. — la referencia que pasó el usuario).
+// Menú guía de Configuración — columna fija a la derecha del riel principal.
+//
+// Estilo columna (borde derecho, sin card ni rounded corners) en escritorio,
+// tira horizontal de chips en celular (misma pieza que antes).
+//
+// Cuando la vista activa es "apariencia", las secciones de Apariencia se
+// despliegan como sub-ítems bajo el botón de Apariencia (misma mecánica que
+// los sub-ítems de módulos en Sidebar.tsx). Reemplaza el viejo popover por
+// hover que salía de un portal.
 
-import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
+import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
 import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
-import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy, History,
+    Crown, Globe, LifeBuoy, History,
     Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Video, Image as ImageIcon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
-
-const COLLAPSE_KEY = 'orbita-config-sidebar-collapsed'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>
 interface Item { vista: VistaConfig; label: string; Icon: IconType; permisos?: string[]; peligro?: boolean }
@@ -26,9 +24,6 @@ interface Grupo { label?: string; items: Item[] }
 
 const GRUPOS: Grupo[] = [
     {
-        // Suscripción sola arriba de todo — es el estado de la cuenta en sí
-        // (plan + upsell del paquete Avanzado), no una configuración del
-        // negocio como el resto de los grupos de abajo.
         items: [
             { vista: 'suscripcion', label: 'Suscripción', Icon: Crown, permisos: ['config.edit'] },
         ],
@@ -50,17 +45,10 @@ const GRUPOS: Grupo[] = [
             { vista: 'apariencia',     label: 'Apariencia',     Icon: Palette, permisos: ['config.edit'] },
             { vista: 'equipo',         label: 'Equipo',         Icon: Users,   permisos: ['config.team.view', 'config.team.manage'] },
             { vista: 'notificaciones', label: 'Notificaciones', Icon: Bell,    permisos: ['config.edit'] },
-            // Registro de actividad: quien hizo que (audit_logs). Permiso propio
-            // (config.audit.view), no config.edit: se puede querer que alguien
-            // LEA el registro sin poder tocar la configuracion.
             { vista: 'actividad',      label: 'Registro de actividad', Icon: History, permisos: ['config.audit.view'] },
         ],
     },
     {
-        // Sin `permisos` a propósito — cualquiera con sesión de panel puede
-        // pedir ayuda, no es una acción sensible como el resto (mismo
-        // criterio que support.controller.ts del lado del backend: sin
-        // @RequirePermission).
         items: [
             { vista: 'soporte', label: 'Soporte', Icon: LifeBuoy },
         ],
@@ -72,21 +60,8 @@ const GRUPOS: Grupo[] = [
     },
 ]
 
-// Índice de secciones DENTRO de Apariencia (pedido explícito del dueño:
-// "que en el sidebar que ya está" — no una vista nueva, ni un submenú que
-// navega, solo un ancla que scrollea). Cada `id` tiene que ser EXACTAMENTE
-// el `id` que esa SecCard tiene en Apariencia.tsx — es la misma coordinación
-// implícita que ya existe entre este archivo y ConfigTabs.tsx (ambos hablan
-// de la misma `VistaConfig`), documentada acá para que quien agregue o saque
-// una sección en Apariencia se acuerde de actualizar esta lista también.
-//
-// No incluye "Header" ni "Cupón": esas dos son EXCLUSIVAS del editor de una
-// plantilla activa (Avanzado → Plantillas), una pantalla aparte que no pasa
-// por este sidebar — acá solo van las secciones de la Apariencia clásica.
-//
-// Si hay una plantilla de Home activa, Apariencia clásica muestra el cartel
-// de "bloqueada" en vez de estas tarjetas — clickear un ítem de acá en ese
-// estado no hace nada (el `id` no existe en el DOM), no rompe nada.
+// Sub-ítems de Apariencia: cada `id` es el mismo que la SecCard de
+// Apariencia.tsx — al hacer click scrollea a esa sección.
 const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
     { id: 'ap-sec-identidad',     label: 'Identidad de marca',       Icon: Palette },
     { id: 'ap-sec-paleta',        label: 'Paleta de colores',        Icon: Droplets },
@@ -103,84 +78,22 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
 
 export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onNavigate: (v: VistaConfig) => void }) {
     const { user } = useAuth()
-    // Índice de Apariencia — primero se probó como una franja fija de íconos
-    // arriba de los módulos (SECCIONES_APARIENCIA rendida siempre que
-    // activa==='apariencia'). No gustó: 8 anclas nuevas mezcladas con los
-    // módulos de siempre, sin separación real más que una línea. Ahora es un
-    // desplegable que aparece con el mouse sobre el ícono de Apariencia y se
-    // cierra solo al sacarlo — usa el hueco que ya existe entre el riel
-    // colapsado y el contenido de Apariencia a la derecha, en vez de sumar
-    // altura permanente al sidebar.
-    const [indiceAbierto, setIndiceAbierto] = useState(false)
-    // Posición del desplegable, calculada desde el ícono en cada hover. Hace
-    // falta porque el desplegable se saca del sidebar con un portal (ver
-    // abajo) — sin esto no tiene de dónde ubicarse.
-    const [indicePos, setIndicePos] = useState<{ top: number; left: number } | null>(null)
-    const apRef = useRef<HTMLDivElement>(null)
-    // Timer de cierre con demora: el ícono y el desplegable son DOS nodos DOM
-    // separados por un portal (ver más abajo por qué), así que moverse de
-    // uno a otro pasa por un instante SIN mouse encima de ninguno — sin este
-    // margen el desplegable se cierra a mitad de camino antes de llegar.
-    const cerrarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-    function abrirIndice() {
-        if (cerrarTimer.current) { clearTimeout(cerrarTimer.current); cerrarTimer.current = null }
-        const r = apRef.current?.getBoundingClientRect()
-        if (r) setIndicePos({ top: r.top, left: r.right + 10 })
-        setIndiceAbierto(true)
-    }
-    function cerrarIndiceConDemora() {
-        cerrarTimer.current = setTimeout(() => setIndiceAbierto(false), 150)
-    }
-    useEffect(() => () => { if (cerrarTimer.current) clearTimeout(cerrarTimer.current) }, [])
-    // Mismo criterio que el sidebar principal (Sidebar.tsx): el dueño ve todo
-    // siempre (permisos = null = sin filtro); un empleado solo ve lo que su
-    // rol puede tocar.
     const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null
     const puedeVer = (item: Item) => !permisos || !item.permisos || item.permisos.some(p => permisos.includes(p))
 
-    // Colapsable — Apariencia en particular necesita todo el ancho posible
-    // (editor + vista previa lado a lado). Arranca expandido en el primer
-    // render (server Y cliente) a propósito, mismo criterio que el sidebar
-    // principal: evita un mismatch de hidratación, el valor guardado se lee
-    // recién después de montar.
-    const [colapsado, setColapsado] = useState(false)
-    // En mobile la tira ya pasa a ser horizontal por su cuenta (ver el
-    // <style> más abajo) — el colapsado "a íconos" es un concepto de
-    // escritorio nomás. Mismo patrón que el sidebar principal (Sidebar.tsx,
-    // colapsadoEfectivo): sin esto, un usuario que colapsó en escritorio y
-    // después abre el panel en el celular se quedaba sin las etiquetas en la
-    // tira horizontal, donde sí entran cómodas.
+    // Desktop detection — en mobile la columna pasa a ser una tira horizontal
+    // de chips (misma pieza que el sidebar principal).
     const [isDesktop, setIsDesktop] = useState(true)
     useEffect(() => {
-        try { if (localStorage.getItem(COLLAPSE_KEY) === '1') setColapsado(true) } catch { /* sin localStorage: arranca expandido */ }
         const mq = window.matchMedia('(min-width: 769px)')
         const actualizar = () => setIsDesktop(mq.matches)
         actualizar()
         mq.addEventListener('change', actualizar)
         return () => mq.removeEventListener('change', actualizar)
     }, [])
-    // Auto-colapso de CONTEXTO al entrar a Apariencia — es la sección que de
-    // verdad necesita el ancho (editor + vista previa lado a lado), así que
-    // se colapsa sola apenas se entra ahí, sin que el usuario tenga que
-    // acordarse de tocar el botón. Mismo criterio que el sidebar principal
-    // colapsándose solo al entrar a Configuración (Sidebar.tsx): no se
-    // persiste — es de esta sección puntual, no una preferencia general —
-    // así que al salir de Apariencia vuelve solo a como estaba. El botón
-    // manual se OR-ea encima por si alguien lo quiere colapsado en otra
-    // sección también.
-    const colapsadoEfectivo = (colapsado || activa === 'apariencia') && isDesktop
-    // Celular: la tira es horizontal y con 13 ítems no entran todos. El hook
-    // compartido centra el activo y pinta la barrita de scroll — la misma
-    // pieza que usan las pestañas de Pedidos (components/TiraScroll.tsx).
-    const { scrollerRef: navRef, hintRef } = useTiraScroll<HTMLElement>(activa, !isDesktop)
 
-    function toggleColapsado() {
-        setColapsado(c => {
-            const next = !c
-            try { localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0') } catch { /* no persiste, sigue andando en memoria */ }
-            return next
-        })
-    }
+    // Mobile: la tira es horizontal y con 13 ítems no entran todos.
+    const { scrollerRef: navRef, hintRef } = useTiraScroll<HTMLElement>(activa, !isDesktop)
 
     return (
         <>
@@ -188,52 +101,34 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
             ref={navRef}
             className="cfg-sidebar ds-tira"
             style={{
-                width: colapsadoEfectivo ? 52 : 216, flexShrink: 0, padding: colapsadoEfectivo ? '20px 8px' : '20px 12px',
-                borderRadius: 12, border: '1px solid var(--color-border)',
-                background: 'var(--color-bg)', boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-                display: 'flex', flexDirection: 'column', gap: 20,
-                boxSizing: 'border-box', transition: 'width 180ms ease, padding 180ms ease',
-                // "Flotante": nada de línea divisoria fija contra el contenido —
-                // una card con su propio borde entero, sticky + scroll propio,
-                // mismo criterio que el filtro del catálogo del storefront
-                // (Catalogo.tsx, .sf-cat-sidebar) — sigue el scroll de la
-                // página en vez de quedar cortada a la altura de la ventana.
-                position: 'sticky', top: 20, maxHeight: 'calc(100vh - 40px)', overflowY: 'auto', overflowX: 'hidden',
+                width: 208, flexShrink: 0,
+                padding: '16px 8px',
+                // Estilo columna: borde derecho, sin card, sin sombra
+                borderRight: '1px solid var(--color-border)',
+                background: 'var(--color-bg)',
+                display: 'flex', flexDirection: 'column', gap: 16,
+                boxSizing: 'border-box',
+                // Sticky para seguir el scroll de .admin-main
+                position: 'sticky', top: 0,
+                maxHeight: 'calc(100vh - 64px)', overflowY: 'auto', overflowX: 'hidden',
             }}
         >
-            {/* Mobile (<=768px, mismo corte que el resto del panel): la card
-                vertical no entra en un celular — pasa a ser una tira de chips
-                a todo el ancho, pegada arriba (sticky) mientras se scrollea la
-                sección. Sin card ni scrollbar (el scroll es táctil, con snap),
-                cada chip en una sola línea, el activo lleno de color y centrado
-                solo (ver el effect de navRef). Los títulos de grupo y
-                separadores no entran en una fila y se sacan. Sale a sangre con
-                márgenes negativos contra el padding de 12px de .cfg-hub-layout. */}
             <style>{`
                 @media (max-width: 768px) {
                     .cfg-sidebar {
                         position: sticky !important; top: 0 !important; z-index: 20 !important;
-                        /* Sangrado con margenes negativos y ancho automatico:
-                           con width: calc(100% + 24px) el nav se hacia mas
-                           ancho que su contenedor y el scroll horizontal se
-                           escapaba a la pagina entera en vez de quedarse
-                           adentro de la tira (se veia como 86px de desborde
-                           en Apariencia). */
                         width: auto !important; align-self: stretch !important;
                         margin: -12px -12px 0 !important; min-width: 0 !important;
                         max-height: none !important; flex-direction: row !important;
                         align-items: center !important; overflow-x: auto !important;
                         overflow-y: hidden !important; gap: 8px !important;
                         padding: 10px 12px 8px !important; border-radius: 0 !important;
-                        border: none !important;
+                        border: none !important; border-right: none !important;
                         box-shadow: none !important; background: var(--color-surface) !important;
                         scrollbar-width: none; -webkit-overflow-scrolling: touch;
                         scroll-snap-type: x proximity; scroll-padding: 0 12px;
                     }
                     .cfg-sidebar::-webkit-scrollbar { display: none; }
-                    /* La forma del chip (píldora, activa en azul) es compartida
-                       con el resto del panel: .ds-tira-chip en globals.css.
-                       Acá queda solo lo propio de esta pantalla. */
                     .cfg-scroll-hint {
                         display: block !important; position: sticky; top: 56px; z-index: 20;
                         width: auto; align-self: stretch;
@@ -243,157 +138,89 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                     }
                     .cfg-sidebar-header, .cfg-sidebar-group-label, .cfg-sidebar-divider { display: none !important; }
                     .cfg-sidebar-group { flex-direction: row !important; flex-shrink: 0 !important; gap: 8px !important; }
+                    .cfg-sidebar-ap-subs { display: none !important; }
                 }
             `}</style>
-            {!colapsadoEfectivo && (
-                <div className="cfg-sidebar-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0 0 8px' }}>
-                    <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)' }}>Configuración</span>
-                    <button
-                        onClick={toggleColapsado} title="Colapsar menú" aria-label="Colapsar menú"
-                        className="ds-hover"
-                        style={{ width: 26, height: 26, borderRadius: 6, background: 'none', border: 'none', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
-                    >
-                        <PanelLeftClose size={15} strokeWidth={1.7} />
-                    </button>
-                </div>
-            )}
-            {colapsadoEfectivo && (
-                <button
-                    className="cfg-sidebar-header ds-hover"
-                    onClick={toggleColapsado} title="Expandir menú" aria-label="Expandir menú"
-                    style={{ width: 36, height: 36, margin: '0 auto', borderRadius: 8, background: 'none', border: 'none', color: 'var(--color-muted)', display: 'grid', placeItems: 'center' }}
-                >
-                    <PanelLeftOpen size={16} strokeWidth={1.7} />
-                </button>
-            )}
+
+            {/* Título */}
+            <div className="cfg-sidebar-header" style={{ padding: '0 8px', fontSize: 17, fontWeight: 700, color: 'var(--color-text)' }}>
+                Configuración
+            </div>
 
             {GRUPOS.map((g, gi) => {
                 const visibles = g.items.filter(puedeVer)
                 if (visibles.length === 0) return null
                 return (
                     <div key={gi} className="cfg-sidebar-group" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {g.label && !colapsadoEfectivo && (
+                        {g.label && (
                             <div className="cfg-sidebar-group-label" style={{ padding: '0 8px 6px', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)' }}>
                                 {g.label}
                             </div>
                         )}
-                        {g.label && colapsadoEfectivo && <div className="cfg-sidebar-divider" style={{ height: 1, background: 'var(--color-border)', margin: '2px 4px 6px' }} />}
                         {visibles.map(item => {
                             const act = activa === item.vista
                             const color = item.peligro
                                 ? (act ? 'var(--color-error)' : 'var(--color-muted)')
                                 : (act ? 'var(--color-primary)' : 'var(--color-body)')
-                            const boton = (
-                                <button
-                                    className="cfg-sidebar-item ds-tira-chip ds-hover"
-                                    data-activa={act || undefined}
-                                    data-peligro={item.peligro || undefined}
-                                    onClick={() => onNavigate(item.vista)}
-                                    title={item.label}
-                                    style={{
-                                        display: 'flex', gap: 10,
-                                        minHeight: 36, borderRadius: 8,
-                                        border: 'none', cursor: 'pointer', textAlign: 'left',
-                                        fontSize: 13, fontWeight: act ? 600 : 500, color,
-                                        background: act
-                                            ? (item.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)')
-                                            : 'transparent',
-                                        transition: 'background 120ms, color 120ms',
-                                        // Labels largos ("Cancelaciones y devoluciones") no entran en una
-                                        // línea a este ancho — pasan a 2 líneas en vez de desbordar el
-                                        // contenedor (antes `nowrap` + `height` fijo los cortaba a lo bruto).
-                                        ...(colapsadoEfectivo
-                                            ? { width: 36, height: 36, padding: 0, justifyContent: 'center', alignItems: 'center' } as const
-                                            : { width: '100%', padding: '8px 10px', whiteSpace: 'normal', lineHeight: 1.3, alignItems: 'flex-start' } as const),
-                                    }}
-                                >
-                                    <item.Icon size={15} strokeWidth={1.7} style={{ flexShrink: 0, marginTop: colapsadoEfectivo ? 0 : 1 }} />
-                                    {!colapsadoEfectivo && item.label}
-                                </button>
-                            )
-
-                            // El índice de secciones de Apariencia SOLO tiene
-                            // sentido acá: colapsado (con expandido, el label
-                            // ya alcanza para navegar) y ya estando en esa
-                            // pantalla (ahí es donde existe el hueco a la
-                            // derecha del riel que el desplegable ocupa). El
-                            // wrapper cubre ícono + desplegable con el MISMO
-                            // par de handlers — sin eso, el hueco entre los
-                            // dos se lee como "el mouse se fue" y se cierra
-                            // antes de poder tocar un ítem.
-                            if (item.vista === 'apariencia' && act && colapsadoEfectivo) {
-                                return (
-                                    <div
-                                        key={item.vista}
-                                        ref={apRef}
-                                        style={{ position: 'relative' }}
-                                        onMouseEnter={abrirIndice}
-                                        onMouseLeave={cerrarIndiceConDemora}
+                            return (
+                                <div key={item.vista}>
+                                    <button
+                                        className="cfg-sidebar-item ds-tira-chip ds-hover"
+                                        data-activa={act || undefined}
+                                        data-peligro={item.peligro || undefined}
+                                        onClick={() => onNavigate(item.vista)}
+                                        title={item.label}
+                                        style={{
+                                            display: 'flex', gap: 10,
+                                            width: '100%', minHeight: 36, padding: '8px 10px',
+                                            borderRadius: 8,
+                                            border: 'none', cursor: 'pointer', textAlign: 'left',
+                                            fontSize: 13, fontWeight: act ? 600 : 500, color,
+                                            background: act
+                                                ? (item.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)')
+                                                : 'transparent',
+                                            transition: 'background 120ms, color 120ms',
+                                            whiteSpace: 'normal', lineHeight: 1.3, alignItems: 'flex-start',
+                                        }}
                                     >
-                                        {boton}
-                                        {/* Portal a document.body: el sidebar colapsado
-                                            (`.cfg-sidebar`, más arriba) tiene
-                                            `overflow-x: hidden` para no mostrar
-                                            scrollbar horizontal en la tira de íconos —
-                                            eso mismo recortaba este desplegable, que
-                                            necesita salir por afuera del sidebar hacia
-                                            la derecha. Posicionado en coords de
-                                            viewport (`position: fixed`) calculadas en
-                                            `abrirIndice`, no relativas al sidebar. */}
-                                        {indiceAbierto && indicePos && typeof document !== 'undefined' && createPortal(
-                                            <div
-                                                onMouseEnter={abrirIndice}
-                                                onMouseLeave={cerrarIndiceConDemora}
-                                                style={{
-                                                    position: 'fixed', top: indicePos.top, left: indicePos.left, zIndex: 40,
-                                                    width: 208, padding: 6, borderRadius: 10,
-                                                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                                                    boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
-                                                }}
-                                            >
-                                                {SECCIONES_APARIENCIA.map(sec => (
-                                                    <button
-                                                        key={sec.id}
-                                                        className="ds-hover"
-                                                        // CON `behavior: 'smooth'` a propósito acá — el
-                                                        // que scrollea de verdad no es `html` (que sí
-                                                        // tiene scroll-behavior:smooth por CSS global,
-                                                        // ver globals.css) sino `.admin-main`
-                                                        // (overflow-auto propio, ver AdminLayout.tsx),
-                                                        // que NO lo tiene declarado por CSS. Sin pasarlo
-                                                        // acá el salto era instantáneo. Mismo patrón que
-                                                        // ya usa el tutorial Checklist para este mismo
-                                                        // contenedor (tutoriales/anclas.ts).
-                                                        onClick={() => {
-                                                            document.getElementById(sec.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-                                                            setIndiceAbierto(false)
-                                                        }}
-                                                        style={{
-                                                            display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-                                                            padding: '8px 10px', borderRadius: 7, border: 'none',
-                                                            background: 'transparent', color: 'var(--color-body)',
-                                                            fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-                                                            cursor: 'pointer', fontFamily: 'inherit',
-                                                        }}
-                                                    >
-                                                        <sec.Icon size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} />
-                                                        {sec.label}
-                                                    </button>
-                                                ))}
-                                            </div>,
-                                            document.body,
-                                        )}
-                                    </div>
-                                )
-                            }
+                                        <item.Icon size={15} strokeWidth={1.7} style={{ flexShrink: 0, marginTop: 1 }} />
+                                        {item.label}
+                                    </button>
 
-                            return <div key={item.vista}>{boton}</div>
+                                    {/* Sub-ítems de Apariencia — aparecen cuando Apariencia está activa.
+                                        Cada uno scrollea a su sección dentro de Apariencia.tsx. */}
+                                    {item.vista === 'apariencia' && act && (
+                                        <div className="cfg-sidebar-ap-subs" style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 18, paddingTop: 4, paddingBottom: 4 }}>
+                                            {SECCIONES_APARIENCIA.map(sec => (
+                                                <button
+                                                    key={sec.id}
+                                                    className="ds-hover"
+                                                    onClick={() => {
+                                                        document.getElementById(sec.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                                                    }}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                                                        padding: '6px 8px', borderRadius: 6, border: 'none',
+                                                        background: 'transparent', color: 'var(--color-muted)',
+                                                        fontSize: 12, fontWeight: 500, textAlign: 'left',
+                                                        cursor: 'pointer', fontFamily: 'inherit',
+                                                        transition: 'color 120ms',
+                                                    }}
+                                                >
+                                                    <sec.Icon size={13} strokeWidth={1.7} style={{ flexShrink: 0 }} />
+                                                    {sec.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
                         })}
                     </div>
                 )
             })}
         </nav>
-        {/* Solo celular (display por CSS): pista + pulgar del scroll horizontal. */}
+        {/* Solo celular: pista + pulgar del scroll horizontal. */}
         <TiraScrollHint hintRef={hintRef} className="cfg-scroll-hint" style={{ display: 'none' }} />
         </>
     )

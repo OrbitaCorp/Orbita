@@ -285,31 +285,18 @@ export class BackgroundRemovalService {
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    // Descontamina el color del borde: un píxel de alfa PARCIAL (antialiasing
-    // normal contra el contorno, deseable — sin esto el borde se ve dentado)
-    // todavía tiene en su RGB una mezcla con el fondo BLANCO original de la
-    // foto (mismo supuesto que el flatten() de más arriba: casi toda foto de
-    // producto es sobre fondo claro/estudio). El endurecido de la máscara de
-    // arriba reduce CUÁNTOS píxeles quedan en esa zona de alfa intermedio,
-    // pero no arregla el color de los que de todos modos quedan ahí — y ESE
-    // remanente blancuzco es justo lo que se nota como filo claro al componer
-    // sobre un fondo nuevo oscuro. Fórmula estándar de "unpremultiply" contra
-    // un fondo conocido: recupera el color real del producto a partir del
-    // color mezclado + qué tan opaco es ese píxel. Confirmado a mano
-    // (21/09/2026): un dobladillo con antialiasing más ancho que el resto del
-    // contorno (probablemente por foco/movimiento en la foto original) seguía
-    // con un filo claro después del endurecido solo — esto lo saca del todo.
-    const FONDO_ORIGINAL = 255;
-    for (let i = 0; i < maskResized.length; i++) {
-      const alfa = maskResized[i] / 255;
-      if (alfa <= 0 || alfa >= 1) continue;
-      for (let canal = 0; canal < 3; canal++) {
-        const idx = i * 3 + canal;
-        const corregido = (rgbRaw[idx] - (1 - alfa) * FONDO_ORIGINAL) / alfa;
-        rgbRaw[idx] = Math.max(0, Math.min(255, Math.round(corregido)));
-      }
-    }
-
+    // NOTA (22/09/2026): hubo acá una "descontaminación" de color por
+    // unpremultiply (recuperar el color real del producto en píxeles de
+    // alfa parcial, contra un fondo blanco asumido) — se sacó por inestable:
+    // la fórmula divide por `alfa`, así que en el anillo de alfa MUY bajo
+    // (recién pasado el borde ya erosionado) cualquier ruido de un par de
+    // valores en el RGB observado se amplifica a un overshoot enorme que
+    // clampea a negro puro — confirmado a mano con una foto de fondo BLANCO
+    // (bóxer + caja): quedó un contorno negro grueso rodeando todo el
+    // producto. La erosión + el desenfoque de arriba ya sacan el halo del
+    // caso real que motivó esto (sombra de contacto mal clasificada, ver
+    // comentario de RADIO_EROSION) sin este riesgo — no hacía falta la
+    // descontaminación además.
     const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
       .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
       .png()

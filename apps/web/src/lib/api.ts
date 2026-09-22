@@ -989,6 +989,22 @@ export function panelGetManualFeedback() {
   return panelRequest<{ data: { chapterId: string; helpful: boolean }[] }>('/support/manual-feedback')
 }
 
+export async function sendPublicSupportRequest(input: {
+  name: string; email: string; category: SupportCategory
+  subject: string; message: string; website?: string
+}) {
+  const res = await fetch(`${API_BASE}/support/public`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: 'Error' }))
+    throw new ApiError(res.status, body.message ?? 'Error')
+  }
+  return (await res.json()) as { ok: true }
+}
+
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
 // BusinessConfig (que es donde vive el resto de "Retiro en local"). Antes
 // solo se cargaba una vez, durante el wizard de onboarding, y si el

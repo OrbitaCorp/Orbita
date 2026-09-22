@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ThemeProvider } from '@/modules/landing/context/ThemeContext';
+import { ContactoProvider } from './Contacto';
 import { EscenaEspacial } from './EscenaEspacial';
 import { NavbarV2 } from './NavbarV2';
 import { FooterV2 } from './FooterV2';
@@ -119,7 +120,7 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
                         --oc-text:          #ffffff;
                         --oc-text-2:        rgba(203,213,225,.82);
                         --oc-text-3:        #94a3b8;
-                        --oc-text-4:        #64748b;
+                        --oc-text-4:        #6a7b91;
                         /* Empezó gris (#7c869b), después un azul grisáceo
                            (#7fa6dd) — pedido de subirlo: se ve más marca así,
                            el azul del logo y del resto del sitio (#3b82f6). */
@@ -257,9 +258,11 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
 
                 <NavbarV2 />
 
+                <ContactoProvider>
                 <main className="relative">{children}</main>
 
                 <FooterV2 />
+                </ContactoProvider>
             </div>
         </ThemeProvider>
     );

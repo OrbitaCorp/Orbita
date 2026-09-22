@@ -7,8 +7,10 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SupportService } from './support.service';
 import { SendSupportRequestDto } from './dto/send-support-request.dto';
+import { SendPublicSupportRequestDto } from './dto/send-public-support-request.dto';
 import { ReplySupportRequestDto } from './dto/reply-support-request.dto';
 import { ManualFeedbackDto } from './dto/manual-feedback.dto';
+import { Public } from '../common/decorators/public.decorator';
 
 // Lado del negocio (Configuración → Soporte y el Manual). Todo filtra por el
 // businessId del token: un negocio nunca ve ni toca consultas de otro. Las
@@ -72,5 +74,12 @@ export class SupportController {
   addMessage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ReplySupportRequestDto) {
     const member = assertMemberContext(ctx);
     return this.supportService.addMessage(member.businessId, member.memberId, id, dto);
+  }
+
+  @Post('public')
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 600_000 } })
+  sendPublic(@Body() dto: SendPublicSupportRequestDto) {
+    return this.supportService.sendPublic(dto);
   }
 }

@@ -211,32 +211,64 @@ export class ImageStudioService {
         .resize(width, height, { fit: 'cover' })
         .toBuffer();
 
-      // Silueta del producto difuminada y atenuada al 45%, usada como canal
-      // alfa de un negro transparente — no un negro sólido tapando todo el
-      // fondo (ese fue el bug de la primera versión: 'multiply' con una
-      // máscara sin atenuar ennegrecía TODA el área fuera del producto). Al
-      // tamaño natural del recorte (cutoutWidth/cutoutHeight), no del canvas
-      // — se posiciona centrada al componer, igual que el recorte.
-      const sombraAlfa = await sharp(cutout, ENTRADA_IMAGEN)
+      // Sombra en DOS capas, no una — una sombra real tiene dos componentes
+      // distintas: un "contacto" chico y oscuro justo donde el producto
+      // toca la mesa (ahí no entra nada de luz) y una "ambiente" grande y
+      // difusa alrededor (el producto tapa un poco la luz que llega desde
+      // varios lados, se nota mucho menos pero se extiende más lejos). Con
+      // una sola sombra tratando de cumplir las dos funciones a la vez, el
+      // resultado quedaba a mitad de camino: ni el contacto se notaba
+      // firme, ni la ambiente daba sensación real de volumen — la prenda se
+      // veía "pegada" sobre el fondo en vez de apoyada.
+      //
+      // La ambiente NO sale de difuminar la silueta del recorte (como sí
+      // hace la de contacto) — feedback real (21/09/2026): un producto de
+      // contorno más bien rectangular (remera doblada, caja) sigue
+      // leyéndose como "un rectángulo con blur" sin importar cuánto blur o
+      // cuán suave la opacidad, porque la forma de origen ya es un
+      // rectángulo. Una elipse con gradiente radial (dibujada aparte, no
+      // derivada del contorno) da la misma sensación de volumen sin heredar
+      // esa forma — no tiene esquinas que blurear.
+      const alfaContacto = await sharp(cutout, ENTRADA_IMAGEN)
         .ensureAlpha()
         .extractChannel('alpha')
-        .blur(18)
-        .linear(0.45, 0)
+        .blur(6)
+        .linear(0.55, 0)
         .raw()
         .toBuffer();
-      const sombra = await sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .joinChannel(sombraAlfa, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
+      const sombraContacto = await sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+        .joinChannel(alfaContacto, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
         .png()
         .toBuffer();
 
-      // Desplazada unos px hacia abajo/derecha (luz simulada desde arriba-
+      // Centrada bajo el producto, un poco más abajo del centro y algo más
+      // ancha/baja que su bounding box (una sombra apoyada "cae" y se
+      // ensancha levemente en vez de calcar el contorno exacto).
+      const cxAmbiente = left + cutoutWidth / 2;
+      const cyAmbiente = top + cutoutHeight * 0.54;
+      const rxAmbiente = cutoutWidth * 0.56;
+      const ryAmbiente = cutoutHeight * 0.46;
+      const sombraAmbiente = Buffer.from(`<svg width="${width}" height="${height}">
+        <defs>
+          <radialGradient id="sombraAmbiente" cx="${cxAmbiente}" cy="${cyAmbiente}" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(${rxAmbiente} 0 0 ${ryAmbiente} ${cxAmbiente - rxAmbiente} ${cyAmbiente - ryAmbiente}) translate(1 1)">
+            <stop offset="0%" stop-color="black" stop-opacity="0.30"/>
+            <stop offset="55%" stop-color="black" stop-opacity="0.16"/>
+            <stop offset="100%" stop-color="black" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="${cxAmbiente}" cy="${cyAmbiente}" rx="${rxAmbiente}" ry="${ryAmbiente}" fill="url(#sombraAmbiente)"/>
+      </svg>`);
+
+      // Contacto desplazada hacia abajo/derecha (luz simulada desde arriba-
       // izquierda) — el recorte crudo va encima tapando la sombra que cae
-      // debajo suyo; solo asoma el borde, como una sombra de contacto real.
-      const desplazamiento = Math.round(cutoutHeight * 0.012);
+      // debajo suyo, solo asoma el borde. La ambiente ya está centrada por
+      // su propio gradiente, no necesita desplazamiento aparte.
+      const despContacto = Math.round(cutoutHeight * 0.006);
 
       composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
         .composite([
-          { input: sombra, top: top + desplazamiento, left: left + desplazamiento },
+          { input: sombraAmbiente, top: 0, left: 0 },
+          { input: sombraContacto, top: top + despContacto, left: left + despContacto },
           { input: cutout, top, left },
         ])
         .png()

@@ -2,6 +2,7 @@
 // RBT-304: listado con búsqueda, filtros y métricas, contra la API real.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/router'
 import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
@@ -215,6 +216,9 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 }) {
     const [indice, setIndice] = useState(0)
     const [menuAbierto, setMenuAbierto] = useState(false)
+    const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+    const menuBtnRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
@@ -228,6 +232,40 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
         e.stopPropagation()
         setIndice(i => (i + 1) % p.images.length)
     }
+
+    function abrirMenu() {
+        const r = menuBtnRef.current?.getBoundingClientRect()
+        if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+        setMenuAbierto(true)
+    }
+
+    // El botón "···" vive dentro de una card con className="ds-hover", que
+    // trae isolation:isolate (ver globals.css) para su velo de hover — eso
+    // crea un contexto de apilamiento propio por card, así que un menú
+    // position:absolute (o incluso fixed, sin portal) queda atrapado dentro
+    // de SU card y aparece detrás de la card siguiente, que se pinta después
+    // en el DOM. Portal a document.body (mismo patrón que MenuContextual.tsx
+    // y el menú "···" de la vista en tabla) para escapar de ese contexto.
+    useEffect(() => {
+        if (!menuAbierto) return
+        function handleClick(e: MouseEvent) {
+            const t = e.target as Node
+            if (menuBtnRef.current?.contains(t) || menuRef.current?.contains(t)) return
+            setMenuAbierto(false)
+        }
+        function actualizarPos() {
+            const r = menuBtnRef.current?.getBoundingClientRect()
+            if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+        }
+        document.addEventListener('mousedown', handleClick)
+        window.addEventListener('scroll', actualizarPos, true)
+        window.addEventListener('resize', actualizarPos)
+        return () => {
+            document.removeEventListener('mousedown', handleClick)
+            window.removeEventListener('scroll', actualizarPos, true)
+            window.removeEventListener('resize', actualizarPos)
+        }
+    }, [menuAbierto])
 
     return (
         <div
@@ -374,18 +412,16 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     </button>
                     <button onClick={onResenas} title="Reseñas" aria-label={`Reseñas de ${p.name}`} className="prod-card-actbtn" style={cardActBtn}><MessageSquare size={14} /></button>
                     <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
-                    <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
+                    <button ref={menuBtnRef} onClick={() => menuAbierto ? setMenuAbierto(false) : abrirMenu()} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
 
-                    {menuAbierto && (
-                        <>
-                            <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                            <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
-                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
-                                {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
-                                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
-                            </div>
-                        </>
+                    {menuAbierto && menuPos && createPortal(
+                        <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
+                            <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                            {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
+                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                            <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                        </div>,
+                        document.body
                     )}
                 </div>
             )}

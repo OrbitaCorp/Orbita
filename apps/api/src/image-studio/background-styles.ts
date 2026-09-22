@@ -147,6 +147,33 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
     prompt: `${VISTA_CENITAL} A brushed steel metal surface texture, cool neutral tones, subtle diagonal brushed pattern, clean industrial lighting, no large objects. ${CENTRO_VACIO}`,
     backgroundKeys: ['image-studio/backgrounds/industrial_metal/0.jpg', 'image-studio/backgrounds/industrial_metal/1.jpg', 'image-studio/backgrounds/industrial_metal/2.jpg'],
   },
+  // Tres estilos urbanos NUEVOS (21/09/2026, pedido explícito: "más fondos
+  // de tipo urbano para ropa urbana") — distintos entre sí y de los urbanos
+  // que ya había (calle_urbana es fieltro/concreto gris con tiza; ropa_deportiva
+  // es piso de gimnasio). Sembrados con scripts/image-studio/seed-backgrounds.ts.
+  //
+  // "grafiti_chapa" se probó y se descartó: pese a pedir explícitamente "no
+  // text, no letters, no words", 2 de 3 variantes salieron con letras de
+  // grafiti bien legibles (nombres/tags armados a mano) — mismo problema que
+  // "papel_kraft" (ver abajo): un concepto que el modelo no respeta de forma
+  // confiable pase lo que pase en el wording exacto. No vale la pena seguir
+  // peleándolo — si hace falta un fondo tipo grafiti/arte urbano, mejor una
+  // foto real con licencia que este prompt.
+  asfalto_tiza: {
+    label: 'Asfalto con tiza (streetwear, skate)',
+    prompt: `${VISTA_CENITAL} A dark gray asphalt/blacktop surface texture, subtle cracks and weathering, a few faint chalk or paint marks scattered only at the edges, gritty skatepark editorial style, no large objects. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/asfalto_tiza/0.jpg', 'image-studio/backgrounds/asfalto_tiza/1.jpg', 'image-studio/backgrounds/asfalto_tiza/2.jpg'],
+  },
+  cemento_pulido: {
+    label: 'Cemento pulido (streetwear, loft industrial)',
+    prompt: `${VISTA_CENITAL} A smooth polished concrete floor texture, cool moody gray tones, subtle imperfections and fine cracks, minimalist industrial loft editorial style. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/cemento_pulido/0.jpg', 'image-studio/backgrounds/cemento_pulido/1.jpg', 'image-studio/backgrounds/cemento_pulido/2.jpg'],
+  },
+  cuero_negro: {
+    label: 'Cuero negro (streetwear, techwear)',
+    prompt: `${VISTA_CENITAL} A dark black textured leather surface, subtle natural grain and soft sheen, moody dramatic lighting, urban techwear editorial style. ${CENTRO_VACIO}`,
+    backgroundKeys: ['image-studio/backgrounds/cuero_negro/0.jpg', 'image-studio/backgrounds/cuero_negro/1.jpg', 'image-studio/backgrounds/cuero_negro/2.jpg'],
+  },
 };
 
 export const BACKGROUND_STYLE_KEYS = Object.keys(BACKGROUND_STYLES);

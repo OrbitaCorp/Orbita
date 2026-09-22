@@ -1593,7 +1593,7 @@ export default function ConfigGeneral() {
                     .cfg-peligro-row > button { width: 100% !important; }
                 }
             `}</style>
-            <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
+            <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: 0 }}>
                 <ConfigSidebar activa={sub} onNavigate={ir} />
                 <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
                     {content}

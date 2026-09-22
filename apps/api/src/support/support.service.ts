@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma, SupportRequestStatus } from '@prisma/client';
 import sharp from 'sharp';
@@ -13,6 +14,7 @@ import { MailService } from '../mail/mail.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { SendSupportRequestDto, type SupportCategory } from './dto/send-support-request.dto';
+import { SendPublicSupportRequestDto } from './dto/send-public-support-request.dto';
 import { ReplySupportRequestDto } from './dto/reply-support-request.dto';
 import { SupportAttachmentDto } from './dto/support-attachment.dto';
 import { ManualFeedbackDto } from './dto/manual-feedback.dto';
@@ -548,5 +550,20 @@ export class SupportService {
 
   private detalleAdmin(d: DetalleDb): AdminSupportDetail {
     return { ...this.filaAdmin(d), contactPhone: d.contactPhone, messages: this.mensajes(d) };
+  }
+
+  // ── Landing pública (sin auth) ────────────────────────────────────────────
+
+  async sendPublic(dto: SendPublicSupportRequestDto): Promise<{ ok: true }> {
+    if (dto.website?.trim()) return { ok: true };
+    const ok = await this.mail.sendPublicSupportRequest(this.SUPPORT_EMAIL, {
+      name: dto.name,
+      email: dto.email,
+      category: this.CATEGORY_LABEL[dto.category],
+      subject: dto.subject,
+      message: dto.message,
+    });
+    if (!ok) throw new UnprocessableEntityException('No se pudo enviar tu consulta — probá de nuevo en un momento');
+    return { ok: true };
   }
 }

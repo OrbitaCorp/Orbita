@@ -20,6 +20,7 @@
 // para publicarlas tal cual sin leerlas.
 
 import { useState, type ReactNode } from 'react';
+import { TarjetaContacto } from './Contacto';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
 /**
@@ -100,6 +101,13 @@ export function Nosotros() {
                     Quiénes lo hacemos
                 </h3>
                 <EquipoAcordeon />
+            </Reveal>
+
+            <Reveal delay={200} className="mt-14">
+                <TarjetaContacto
+                    titulo="¿Querés hablar con nosotros?"
+                    texto="Escribinos por cualquier duda, sugerencia o problema. Te respondemos por mail."
+                />
             </Reveal>
         </Seccion>
     );

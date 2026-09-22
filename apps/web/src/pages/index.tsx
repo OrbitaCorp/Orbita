@@ -10,6 +10,7 @@
 // guardado/restauración de scroll) vive en PaginaV2.tsx — es el mismo que usa
 // pages/nosotros.tsx.
 
+import Head from 'next/head';
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
@@ -23,6 +24,10 @@ import { Precios, Faq, CierreCta } from '@/modules/landing/components/v2/Cierre'
 export default function HomePage() {
     return (
         <PaginaV2 scrollKey="/">
+            <Head>
+                <title>Órbita — Tienda online + punto de venta para emprendedores</title>
+                <meta name="description" content="Armá tu tienda online con punto de venta, stock, pedidos y pagos integrados. Todo lo que necesitás para vender, en un solo lugar." />
+            </Head>
             <HeroCinematic />
             <Modulos />
             <ComoFunciona />
