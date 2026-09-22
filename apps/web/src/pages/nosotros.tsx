@@ -15,10 +15,16 @@
 
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { Nosotros } from '@/modules/landing/components/v2/Nosotros';
+import { Seo } from '@/modules/landing/components/Seo';
 
 export default function NosotrosPage() {
     return (
         <PaginaV2 scrollKey="/nosotros" planeta={false}>
+            <Seo
+                title="Sobre nosotros — Órbita"
+                description="Conocé al equipo detrás de Órbita y la misión de darle a cualquier emprendedor las herramientas para vender online sin fricción."
+                path="/nosotros"
+            />
             <Nosotros />
         </PaginaV2>
     );
