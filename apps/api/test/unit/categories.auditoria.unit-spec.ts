@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { Prisma } from '@prisma/client';
 import { CategoriesService } from '../../src/categories/categories.service';
 import { UpsertCategoryDto } from '../../src/categories/dto/upsert-category.dto';
 import { ReorderCategoriesDto } from '../../src/categories/dto/reorder-categories.dto';
@@ -75,6 +76,28 @@ describe('Reordenar valida padres e ids', () => {
     const { svc, prisma } = categorias();
     await svc.reorder(BIZ, { items: [{ id: C, position: 3, parentId: null }, { id: B, position: 1, parentId: A }] });
     expect(prisma.category.updateMany).toHaveBeenCalledWith({ where: { id: C, businessId: BIZ }, data: { position: 3, parentId: null } });
+  });
+});
+
+describe('El slug es único por categoría padre, no por negocio entero', () => {
+  // Bug real (22/09/2026, venustyle.orbita.site): "jeans" bajo Indumentaria
+  // masculina bloqueaba crear "jeans" bajo Indumentaria femenina — el
+  // vendedor terminó con "jeanss" para esquivarlo. La unicidad real la
+  // aplican dos índices parciales en la migración (no algo que este test
+  // pueda ver contra un mock de Prisma) — esto solo cubre que un choque de
+  // Prisma (P2002, sea cual sea el índice que lo disparó) se traduzca al
+  // mensaje correcto, ya no "en este negocio" que ahora sería engañoso.
+  it('un P2002 al crear se traduce a un mensaje que ya no dice "en este negocio"', async () => {
+    const { svc, prisma } = categorias();
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' });
+    prisma.category.create.mockRejectedValueOnce(p2002);
+    await expect(svc.create(BIZ, { name: 'Jeans', parentId: A })).rejects.toThrow(/mismo nivel/);
+  });
+
+  it('un error que no es P2002 no se enmascara', async () => {
+    const { svc, prisma } = categorias();
+    prisma.category.create.mockRejectedValueOnce(new Error('conexión caída'));
+    await expect(svc.create(BIZ, { name: 'Jeans', parentId: A })).rejects.toThrow('conexión caída');
   });
 });
 

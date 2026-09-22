@@ -743,7 +743,21 @@ model Category {
   children Category[] @relation("CategoryTree")
   products Product[]
 
-  @@unique([businessId, slug])
+  // El slug es único por PADRE, no por negocio entero (bug real, 22/09/2026):
+  // con @@unique([businessId, slug]) una subcategoría "jeans" en "Indumentaria
+  // masculina" bloqueaba crear otra "jeans" en "Indumentaria femenina" —
+  // confirmado en producción (venustyle.orbita.site tenía que llamarla
+  // "jeanss" con doble S para esquivar el choque). Categorías bajo padres
+  // distintos son namespaces independientes, tiene que poder repetirse.
+  // Postgres NO trata dos NULL como iguales en un unique compuesto, así que
+  // @@unique([businessId, parentId, slug]) por sí solo dejaría duplicar
+  // categorías de nivel raíz (parentId NULL) entre sí sin chocar nunca. Por
+  // eso la unicidad real se aplica con DOS índices únicos PARCIALES a mano
+  // en la migración (Prisma no tiene sintaxis @@unique con WHERE):
+  //   - (business_id, slug)             WHERE parent_id IS NULL     (raíz)
+  //   - (business_id, parent_id, slug)  WHERE parent_id IS NOT NULL (hijas)
+  // Estos índices no están representados acá arriba — ver
+  // prisma/migrations/20260923000000_category_slug_unico_por_padre.
   @@index([businessId])
   @@index([parentId])
   @@map("categories")

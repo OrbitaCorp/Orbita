@@ -237,7 +237,10 @@ export class CategoriesService {
 
   private mapSlugConflict(err: unknown): never {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      throw new BadRequestException('Ya existe una categoría con ese slug en este negocio');
+      // Único por padre, no por negocio entero (ver comentario en
+      // schema.prisma) — el mensaje ya no puede decir "en este negocio",
+      // sería engañoso justo en el caso que motivó el fix.
+      throw new BadRequestException('Ya existe una categoría con ese nombre en este mismo nivel (misma categoría padre)');
     }
     throw err as Error;
   }
