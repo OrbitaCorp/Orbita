@@ -13,7 +13,7 @@ import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     Crown, Globe, LifeBuoy, History,
-    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Video, Image as ImageIcon,
+    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, BadgeCheck, Video, Image as ImageIcon, MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -70,6 +70,7 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
     { id: 'ap-sec-parallax',      label: 'Banner con efecto parallax', Icon: ImageIcon },
     { id: 'ap-sec-marcas',        label: 'Marcas con las que trabajás', Icon: BadgeCheck },
     { id: 'ap-sec-video',         label: 'Video en tu tienda',       Icon: Video },
+    { id: 'ap-sec-whatsapp',      label: 'Banner de WhatsApp',       Icon: MessageCircle },
     { id: 'ap-sec-visibilidad',   label: '¿Qué ven tus clientes?',   Icon: Eye },
     { id: 'ap-sec-textos',        label: 'Textos de tu tienda',      Icon: AlignLeft },
     { id: 'ap-sec-estadisticas',  label: 'Barra de estadísticas',    Icon: Hash },
