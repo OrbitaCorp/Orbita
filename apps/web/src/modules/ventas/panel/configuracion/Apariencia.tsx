@@ -4,6 +4,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
+import { useRouter } from 'next/router'
 import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Video, Image as ImageIcon } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
@@ -15,7 +16,7 @@ import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelPresignStorefrontVideo, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
-import { ROOT_DOMAIN } from '@/lib/tenant'
+import { ROOT_DOMAIN, adminPath, currentSlug } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -167,6 +168,7 @@ const TABS_PLANTILLA: [TabPlantilla, string][] = [
 ]
 
 export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
+    const router = useRouter()
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
     // Lo que la tienda muestra HOY (lo último cargado o guardado). La vista
@@ -185,6 +187,11 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // (ver TipoCampo en plantillas/tipos.ts): "Armá tu setup" de Nocturno deja
     // elegir una categoría O un producto concreto, así que hacen falta los dos.
     const [productos, setProductos] = useState<ApiProductListItem[]>([])
+    // Aviso "cargá tu catálogo antes de diseñar" — se puede cerrar y no
+    // vuelve a aparecer en esta visita (se resetea solo al recargar la
+    // pantalla, no queda guardado entre sesiones: si sigue sin catálogo la
+    // próxima vez que entre, tiene sentido que lo vea de nuevo).
+    const [avisoCatalogoCerrado, setAvisoCatalogoCerrado] = useState(false)
     const [guardando, setGuardando] = useState(false)
     const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
 
@@ -836,6 +843,37 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Apariencia pública</h1>
                         <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
                         {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
+                        {/* La vista previa de acá abajo es la tienda real embebida
+                            (ver StorePreview.tsx) — sin productos ni categorías
+                            cargados, las secciones que los muestran (grillas,
+                            destacados) quedan vacías y el dueño no puede juzgar
+                            cómo le queda el diseño. Se avisa una sola vez, no en
+                            cada carga: molesta menos que repetirlo siempre que
+                            entra acá antes de cargar su catálogo. */}
+                        {!cargando && !avisoCatalogoCerrado && (categorias.length === 0 || productos.length === 0) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', fontSize: 12.5, color: 'var(--color-body)' }}>
+                                <span style={{ flex: 1 }}>
+                                    Para ver cómo queda tu diseño de verdad, cargá productos y categorías antes de personalizarlo — sin catálogo, la vista previa no tiene qué mostrar.
+                                </span>
+                                <button
+                                    className="ds-link"
+                                    onClick={() => {
+                                        const negocioId = currentSlug() ?? 'rama-tienda'
+                                        void router.push(adminPath(negocioId, 'ventas', 'catalogo'))
+                                    }}
+                                    style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', padding: 0 }}
+                                >
+                                    Ir a Productos →
+                                </button>
+                                <button
+                                    onClick={() => setAvisoCatalogoCerrado(true)}
+                                    title="Cerrar aviso"
+                                    style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center' }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 {/* flexWrap acá: en mobile la fila (badge + 2 botones) no
@@ -1075,7 +1113,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                     label: op.label,
                                     ayuda: op.desc,
                                     disabled: op.necesitaFoto && !hayFotosDeCategoria,
-                                    motivo: 'Necesita al menos una categoría con foto cargada',
+                                    motivo: 'Necesita una categoría con foto cargada',
                                     svg: MINIATURA_CATEGORIA[op.id],
                                 }))}
                             />
@@ -1617,7 +1655,9 @@ function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layou
 // `disabled` + `motivo`: para opciones que dependen de un dato que la tienda
 // todavía no tiene (hoy, los estilos de categoría que necesitan foto). Se
 // muestran igual — que el dueño vea que existen y qué le falta para usarlas —
-// pero no se pueden elegir. `ayuda` es la descripción corta bajo el label.
+// pero no se pueden elegir. `ayuda` es la descripción corta bajo el label;
+// deshabilitada, esa línea se reemplaza por `motivo` (y queda también como
+// tooltip) para que el porqué se vea sin depender del hover.
 function VisualPick({ value, onChange, options }: {
     value: string
     onChange: (v: string) => void
@@ -1645,7 +1685,9 @@ function VisualPick({ value, onChange, options }: {
                     >
                         <div style={{ height: 52, display: 'grid', placeItems: 'center' }}>{o.svg}</div>
                         <div style={{ fontSize: 12, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-body)', marginTop: 6 }}>{o.label}</div>
-                        {o.ayuda && <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 3, lineHeight: 1.3 }}>{o.ayuda}</div>}
+                        {(off && o.motivo ? o.motivo : o.ayuda) && (
+                            <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 3, lineHeight: 1.3 }}>{off && o.motivo ? o.motivo : o.ayuda}</div>
+                        )}
                     </button>
                 )
             })}
