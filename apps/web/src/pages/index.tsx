@@ -10,6 +10,7 @@
 // guardado/restauración de scroll) vive en PaginaV2.tsx — es el mismo que usa
 // pages/nosotros.tsx.
 
+import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { Seo } from '@/modules/landing/components/Seo';
 import { SEO_CANONICAL_HOST } from '@/lib/tenant';
@@ -17,11 +18,14 @@ import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
 import { ComoFunciona } from '@/modules/landing/components/v2/ComoFunciona';
-import { PlanetaInteractivo } from '@/modules/landing/components/v2/PlanetaInteractivo';
-import { Comparativa } from '@/modules/landing/components/v2/Comparativa';
-import { Rubros } from '@/modules/landing/components/v2/Rubros';
-import { Avanzado } from '@/modules/landing/components/v2/Avanzado';
-import { Precios, Faq, CierreCta } from '@/modules/landing/components/v2/Cierre';
+
+const PlanetaInteractivo = dynamic(() => import('@/modules/landing/components/v2/PlanetaInteractivo').then(m => m.PlanetaInteractivo), { ssr: false });
+const Comparativa = dynamic(() => import('@/modules/landing/components/v2/Comparativa').then(m => m.Comparativa));
+const Rubros = dynamic(() => import('@/modules/landing/components/v2/Rubros').then(m => m.Rubros));
+const Avanzado = dynamic(() => import('@/modules/landing/components/v2/Avanzado').then(m => m.Avanzado));
+const Precios = dynamic(() => import('@/modules/landing/components/v2/Cierre').then(m => m.Precios));
+const Faq = dynamic(() => import('@/modules/landing/components/v2/Cierre').then(m => m.Faq));
+const CierreCta = dynamic(() => import('@/modules/landing/components/v2/Cierre').then(m => m.CierreCta));
 
 // Organization schema (JSON-LD): le da a Google una descripción explícita y
 // estructurada de qué es Órbita, en vez de tener que inferirla del texto de

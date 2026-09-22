@@ -210,11 +210,19 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
 
     useEffect(() => {
         if (medidas.W === 0) return;
-        const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         const { W, H } = medidas;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const canvas = canvasRef.current;
+
+        let raf = 0;
+        let cancelado = false;
+        let limpiarInterna: (() => void) | null = null;
+
+        const iniciar = () => {
+        if (cancelado) return;
+        const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const ctx = canvas?.getContext('2d') ?? null;
         if (canvas && ctx) {
             canvas.width = W * dpr;
@@ -222,22 +230,18 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
             ctx.scale(dpr, dpr);
         }
 
-        let raf = 0;
         let anterior = performance.now();
         const t0 = anterior;
-        // Arranca desde el scroll REAL, no desde 0: si este efecto se
-        // reinicia con la página ya scrolleada (cambio de tema, o un resize
-        // de verdad que sí pasa el filtro de arriba), que no se vea un salto
-        // de vuelta al principio mientras el suavizado re-converge.
         const suave = { objetivo: window.scrollY, actual: window.scrollY };
         const estrellas = generarEstrellas(W, H);
         const cometas: Cometa[] = [];
-        // El primero entra enseguida: si el visitante se queda mirando el hero,
-        // tiene que ver el cielo moverse sin esperar.
         let proximoCometa = 700;
+        let altoCache = document.documentElement.scrollHeight - H;
 
         const onScroll = () => { suave.objetivo = window.scrollY; };
+        const onResize = () => { altoCache = document.documentElement.scrollHeight - H; };
         window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onResize);
 
         const tick = (ahora: number) => {
             const dt = Math.min(ahora - anterior, 50);
@@ -247,7 +251,7 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
             const y = suave.actual;
 
             // Progreso total de la página, para saber cuándo estamos cerca del final.
-            const alto = document.documentElement.scrollHeight - H;
+            const alto = altoCache;
             const prog = alto > 0 ? clamp(y / alto, 0, 1) : 0;
 
             // Ida: el planeta se hunde mientras dejás atrás el hero.
@@ -356,7 +360,19 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
         };
 
         raf = requestAnimationFrame(tick);
-        return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
+        limpiarInterna = () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); cancelAnimationFrame(raf); };
+        }; // fin iniciar
+
+        const idle = 'requestIdleCallback' in window
+            ? (window as any).requestIdleCallback(iniciar)
+            : setTimeout(iniciar, 1);
+
+        return () => {
+            cancelado = true;
+            if ('requestIdleCallback' in window) (window as any).cancelIdleCallback(idle);
+            else clearTimeout(idle);
+            limpiarInterna?.();
+        };
     }, [medidas, paleta]);
 
     const { W, H } = medidas;
