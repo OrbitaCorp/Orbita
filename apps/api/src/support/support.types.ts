@@ -47,9 +47,9 @@ type AdminSupportExtra = {
   // Sin cuenta" del superadmin.
   hasAccount: boolean;
   // Null en LANDING sin cuenta. En LANDING con cuenta es el negocio del
-  // miembro con ese email, sin que nadie haya probado ser él.
+  // miembro con ese email: la consulta se le colgó a él.
   business: { id: string; name: string; subdomain: string } | null;
-  // Quién escribió, venga de donde venga. memberId null en LANDING.
+  // Quién escribió, venga de donde venga. memberId null solo sin cuenta.
   contact: { name: string; email: string; memberId: string | null };
 };
 

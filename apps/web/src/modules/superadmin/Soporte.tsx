@@ -712,7 +712,7 @@ function FichaConsulta({ data, onIrAlNegocio }: { data: AdminSupportDetail; onIr
               </a>
               <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{data.business.subdomain}.orbita.site</span>
               {data.source === 'LANDING' && (
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El email coincide con un miembro de este negocio, pero escribió sin iniciar sesión.</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Escribió desde la web sin iniciar sesión. Como el email es de un miembro de este negocio, la consulta le quedó en su panel y la respuesta le llega con el link al hilo.</span>
               )}
             </>
           ) : (

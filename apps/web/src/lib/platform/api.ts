@@ -524,9 +524,9 @@ export interface AdminSupportRow {
   // Es el filtro "Con cuenta / Sin cuenta".
   hasAccount: boolean
   // Null en LANDING sin cuenta. En LANDING con cuenta es el negocio del
-  // miembro con ese email (nadie probó ser él: no se muestra en su panel).
+  // miembro con ese email: la consulta se le colgó a él y la ve en su panel.
   business: { id: string; name: string; subdomain: string } | null
-  // Quién escribió, venga de donde venga. memberId null en LANDING.
+  // Quién escribió, venga de donde venga. memberId null solo sin cuenta.
   contact: { name: string; email: string; memberId: string | null }
   lastMessage: { author: SupportMessageAuthor; excerpt: string; createdAt: string } | null
 }

@@ -2571,10 +2571,11 @@ model SupportRequest {
   // para eso.
   number        Int                  @unique @default(autoincrement())
   // Nulos cuando la consulta entró por el formulario público de la landing
-  // (source LANDING): no hay sesión. Si el email de quien escribió coincide
-  // con un miembro de algún negocio, businessId apunta a ese negocio (para
-  // que el equipo tenga la ficha a mano) pero memberId sigue null: nadie
-  // probó ser esa persona, así que no aparece en el panel del negocio.
+  // (source LANDING) y el email no es de ningún miembro. Si coincide con un
+  // miembro de algún negocio, la consulta se le cuelga a esa cuenta
+  // (decisión de Ale, 22/09): la ve en Configuración → Soporte de su panel
+  // y la respuesta le llega al mail con el link al hilo, como si la hubiera
+  // escrito desde adentro.
   businessId    String?              @map("business_id")
   memberId      String?              @map("member_id")
   source        SupportRequestSource @default(PANEL)

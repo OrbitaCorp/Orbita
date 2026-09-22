@@ -47,8 +47,8 @@ describe('SendPublicSupportRequestDto', () => {
 describe('SupportService.sendPublic', () => {
   // Desde el 22/09 la consulta de la landing se GUARDA (source LANDING) y se
   // ve en el superadmin; el mail a soporte@ es un aviso. Si el email coincide
-  // con un miembro de algún negocio, queda "con cuenta" y apunta a ese
-  // negocio, pero sin memberId.
+  // con un miembro de algún negocio, se le cuelga a esa cuenta (la ve en su
+  // panel y la respuesta le llega con link al hilo).
   const FECHA = new Date('2026-09-22T12:00:00Z');
   const guardada = (over: object = {}) => ({
     id: 'req-9', number: 9, subject: 'Hola', category: 'OTRO', status: 'OPEN', contactPhone: null,
@@ -58,10 +58,10 @@ describe('SupportService.sendPublic', () => {
     messages: [{ id: 'msg-1', author: 'MEMBER', body: 'mensaje de prueba', attachments: [], createdAt: FECHA, member: null, admin: null }],
     ...over,
   });
-  function armar({ salio = true, miembro = null as null | { businessId: string } } = {}) {
+  function armar({ salio = true, miembro = null as null | { id: string; businessId: string } } = {}) {
     const prisma = {
       member: { findFirst: jest.fn().mockResolvedValue(miembro) },
-      supportRequest: { create: jest.fn().mockImplementation(async ({ data }: { data: any }) => guardada({ hasAccount: data.hasAccount, businessId: data.businessId, business: data.businessId ? { id: data.businessId, name: 'Tienda', subdomain: 'tienda' } : null })) },
+      supportRequest: { create: jest.fn().mockImplementation(async ({ data }: { data: any }) => guardada({ hasAccount: data.hasAccount, businessId: data.businessId, memberId: data.memberId, business: data.businessId ? { id: data.businessId, name: 'Tienda', subdomain: 'tienda' } : null, member: data.memberId ? { id: data.memberId, name: 'Ana', email: 'ana@x.com' } : null })) },
     };
     const mail = { sendPublicSupportRequest: jest.fn().mockResolvedValue(salio) };
     const svc = new SupportService(prisma as any, mail as any, {} as any);
@@ -82,10 +82,12 @@ describe('SupportService.sendPublic', () => {
     expect(datos).toEqual(expect.objectContaining({ number: 9, name: 'Ana', email: 'ana@x.com', category: 'Otra consulta', subject: 'Hola', hasAccount: false }));
   });
 
-  it('si el email es de un miembro, queda "con cuenta" y apunta al negocio pero SIN memberId (nadie probó ser él)', async () => {
-    const { svc, mail, prisma } = armar({ miembro: { businessId: 'biz-1' } });
+  it('si el email es de un miembro, queda "con cuenta" y se le cuelga a esa cuenta: negocio + memberId, también en el mensaje', async () => {
+    const { svc, mail, prisma } = armar({ miembro: { id: 'm-1', businessId: 'biz-1' } });
     await svc.sendPublic(dto);
-    expect(prisma.supportRequest.create.mock.calls[0][0].data).toEqual(expect.objectContaining({ hasAccount: true, businessId: 'biz-1', memberId: null }));
+    const data = prisma.supportRequest.create.mock.calls[0][0].data;
+    expect(data).toEqual(expect.objectContaining({ hasAccount: true, businessId: 'biz-1', memberId: 'm-1' }));
+    expect(data.messages.create).toEqual(expect.objectContaining({ author: 'MEMBER', memberId: 'm-1' }));
     expect(mail.sendPublicSupportRequest.mock.calls[0][1]).toEqual(expect.objectContaining({ hasAccount: true, businessName: 'Tienda' }));
   });
 

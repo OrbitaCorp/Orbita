@@ -117,14 +117,14 @@ describe('Panel: listar, leer y repreguntar', () => {
   it('el listado y el detalle filtran por el negocio del token', async () => {
     const { svc, prisma } = armar();
     const { data } = await svc.list(BIZ);
-    expect(prisma.supportRequest.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, source: 'PANEL' } }));
+    expect(prisma.supportRequest.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ } }));
     expect(data[0]).toEqual(expect.objectContaining({ number: 12, messagesCount: 1, member: { id: 'm1', name: 'Ana' } }));
     expect(data[0].lastMessage).toEqual({ author: 'MEMBER', excerpt: 'La tienda no carga desde ayer', createdAt: FECHA.toISOString() });
     // La fila del panel no lleva el negocio ni el email (eso es del admin).
     expect(data[0]).not.toHaveProperty('business');
 
     await svc.get(BIZ, 'req-1');
-    expect(prisma.supportRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'req-1', businessId: BIZ, source: 'PANEL' } }));
+    expect(prisma.supportRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'req-1', businessId: BIZ } }));
   });
 
   it('una consulta de otro negocio → 404', async () => {

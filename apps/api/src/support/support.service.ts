@@ -132,11 +132,10 @@ export class SupportService {
   }
 
   async list(businessId: string): Promise<{ data: SupportRequestRow[] }> {
-    // source PANEL: una consulta de la landing puede tener businessId (el
-    // email coincidió con un miembro) sin que nadie haya probado ser él, así
-    // que no se muestra en el panel del negocio.
+    // Incluye las que entraron por la landing con el email de un miembro de
+    // este negocio: se le colgaron a esa cuenta (ver sendPublic).
     const filas = await this.prisma.supportRequest.findMany({
-      where: { businessId, source: 'PANEL' },
+      where: { businessId },
       orderBy: { lastMessageAt: 'desc' },
       include: INCLUDE_FILA,
     });
@@ -144,7 +143,7 @@ export class SupportService {
   }
 
   async get(businessId: string, id: string): Promise<SupportRequestDetail> {
-    const req = await this.prisma.supportRequest.findFirst({ where: { id, businessId, source: 'PANEL' }, include: INCLUDE_DETALLE });
+    const req = await this.prisma.supportRequest.findFirst({ where: { id, businessId }, include: INCLUDE_DETALLE });
     if (!req) throw new NotFoundException('Consulta no encontrada');
     return this.detalle(req);
   }
@@ -153,7 +152,7 @@ export class SupportService {
   // Órbita de nuevo, aunque la hubiera cerrado un admin.
   async addMessage(businessId: string, memberId: string, id: string, dto: ReplySupportRequestDto): Promise<SupportRequestDetail> {
     const existente = await this.prisma.supportRequest.findFirst({
-      where: { id, businessId, source: 'PANEL' },
+      where: { id, businessId },
       select: { id: true, number: true, subject: true, category: true, contactPhone: true },
     });
     if (!existente) throw new NotFoundException('Consulta no encontrada');
@@ -597,30 +596,31 @@ export class SupportService {
   //
   // "¿Tiene cuenta?": se busca el email entre los miembros de TODOS los
   // negocios (cross-tenant a propósito, ver aislamiento-consultas). Si hay
-  // uno, la consulta queda con hasAccount y apunta a ese negocio para que el
-  // equipo tenga la ficha a mano — pero sin memberId: nadie probó ser esa
-  // persona, y la consulta no se muestra en el panel del negocio.
+  // uno, la consulta se le cuelga a esa cuenta (decisión de Ale, 22/09): le
+  // aparece en Configuración → Soporte de su panel y la respuesta le llega al
+  // mail con el link al hilo, igual que si la hubiera escrito desde adentro.
+  // Si el mismo email está en varios negocios, va al más antiguo.
   async sendPublic(dto: SendPublicSupportRequestDto): Promise<{ ok: true; number?: number }> {
     if (dto.website?.trim()) return { ok: true };
     const email = dto.email.trim().toLowerCase();
     const miembro = await this.prisma.member.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
       orderBy: { createdAt: 'asc' },
-      select: { businessId: true },
+      select: { id: true, businessId: true },
     });
     const ahora = new Date();
     const creada = await this.prisma.supportRequest.create({
       data: {
         source: 'LANDING',
         businessId: miembro?.businessId ?? null,
-        memberId: null,
+        memberId: miembro?.id ?? null,
         contactName: dto.name.trim(),
         contactEmail: email,
         hasAccount: !!miembro,
         category: dto.category,
         subject: dto.subject.trim(),
         lastMessageAt: ahora,
-        messages: { create: { author: 'MEMBER', body: dto.message.trim(), attachments: [] } },
+        messages: { create: { author: 'MEMBER', memberId: miembro?.id ?? null, body: dto.message.trim(), attachments: [] } },
       },
       include: INCLUDE_DETALLE,
     });
