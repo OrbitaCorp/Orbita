@@ -40,7 +40,7 @@ export default function HomePage() {
     return (
         <PaginaV2 scrollKey="/">
             <Seo
-                title="Tu negocio, en órbita — sin comisiones por venta"
+                title="Órbita — Tu tienda online sin comisiones por venta"
                 description="Tu tienda online con catálogo, stock y pedidos, sin comisiones por venta y con tu propio dominio. Todo en un solo lugar."
                 path="/"
             />
