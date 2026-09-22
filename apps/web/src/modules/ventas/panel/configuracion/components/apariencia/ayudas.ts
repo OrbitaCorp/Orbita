@@ -80,6 +80,11 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
         donde: 'En el inicio, después del banner parallax y antes del pie de página.',
         afecta: 'Sirve para mostrar el local, cómo se usa un producto, o una campaña. Un video con un link que no reconocemos (el campo avisa en rojo) no aparece en la tienda; si ninguno es válido, la sección entera no se muestra.',
     },
+    whatsapp: {
+        que: 'La invitación a escribir por WhatsApp, en el diseño que elijas: la tarjeta grande de siempre, una línea sobria, una franja angosta, o dos tarjetas (la consulta y tu horario de atención).',
+        donde: 'En el inicio, justo antes del pie de página.',
+        afecta: 'Solo cambia CÓMO se ve — sigue necesitando "WhatsApp flotante" prendido (en "¿Qué ven tus clientes?") y un número real cargado en Configuración → Contacto; sin eso, ningún diseño se muestra.',
+    },
     visibilidad: {
         que: 'Los interruptores de lo que se muestra y lo que no en tu tienda: etiquetas de los productos, buscador, opiniones, WhatsApp y algunas secciones del inicio.',
         donde: 'Cada uno tiene su propio lugar — tocá el ícono de cada interruptor para ver dónde se muestra y qué pasa si lo apagás.',

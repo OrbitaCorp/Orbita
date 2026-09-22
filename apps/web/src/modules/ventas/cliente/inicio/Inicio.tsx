@@ -11,6 +11,7 @@ import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/Ac
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
+import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -599,8 +600,6 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     .sf-hero-inner { min-height:520px; padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
                     .sf-2col      { grid-template-columns:1fr }
-                    .sf-wpp-grid  { grid-template-columns:1fr !important; gap:24px !important; padding:32px 28px !important; }
-                    .sf-wpp-chat  { display:none !important; }
                     .sf-parallax  { min-height:380px; margin-bottom:44px; }
                     .sf-parallax-title { font-size:32px; }
                 }
@@ -626,7 +625,6 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
-                    .sf-wpp-grid   { padding:24px 20px !important; }
                     .sf-parallax   { min-height:320px; margin-bottom:32px; }
                     .sf-parallax-title { font-size:26px; }
                     .sf-parallax-sub   { font-size:14px; }
@@ -875,56 +873,17 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 />
             )}
 
-            {/* ══ BANNER WHATSAPP ══ */}
+            {/* ══ BANNER WHATSAPP ══ — diseño elegido en Apariencia (ver
+                WhatsappBanner.tsx y WHATSAPP_LAYOUTS en apariencia.mock.ts).
+                El gate (toggle + número real cargado) sigue acá, como en
+                cualquier otra sección; el componente decide el resto. */}
             {config?.appearance?.showWhatsapp !== false && tienda.wpp && (
-            <section className="sf-w" style={{ paddingBottom: 52 }}>
-                <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: 'linear-gradient(135deg,#064E3B 0%,#065F46 50%,#047857 100%)', boxShadow: '0 20px 60px rgba(6,78,59,0.30)' }}>
-
-                    {/* Decoración fondo */}
-                    <div style={{ position: 'absolute', top: -80, right: 260, width: 320, height: 320, borderRadius: '50%', background: 'rgba(52,211,153,0.10)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-                    <div style={{ position: 'absolute', bottom: -60, left: -40, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', filter: 'blur(60px)', pointerEvents: 'none' }} />
-
-                    <div className="sf-wpp-grid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 300px', alignItems: 'center', gap: 48, padding: '40px 48px' }}>
-
-                        {/* ── Columna izquierda ── */}
-                        <div>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 26, padding: '0 12px', borderRadius: 999, background: 'rgba(52,211,153,0.18)', border: '1px solid rgba(52,211,153,0.35)', marginBottom: 16 }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="#34D399"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.118 1.528 5.845L.057 23.882l6.2-1.624A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.007-1.372l-.36-.213-3.681.965.982-3.594-.235-.369A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#6EE7B7', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Atención por WhatsApp</span>
-                            </div>
-                            <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.15, margin: '0 0 10px', maxWidth: 420 }}>
-                                Respondemos en menos<br />de una hora
-                            </h2>
-                            <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 380 }}>
-                                Consultá talles, disponibilidad o coordiná un envío. Te atendemos de lunes a sábado, sin bots.
-                            </p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
-                                <button
-                                    onClick={() => openWpp(tienda.wpp, 'Hola! Quería hacer una consulta.')}
-                                    style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#25D366', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(37,211,102,0.40)', transition: 'all 150ms', flexShrink: 0 }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = '#1DAA52'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = '#25D366'; e.currentTarget.style.transform = 'translateY(0)' }}
-                                >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.558 4.118 1.528 5.845L.057 23.882l6.2-1.624A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.8 9.8 0 01-5.007-1.372l-.36-.213-3.681.965.982-3.594-.235-.369A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
-                                    Escribirnos ahora
-                                </button>
-                                <div style={{ display: 'flex', gap: 24 }}>
-                                    {([['< 1hs', 'respuesta'], ['+1.200', 'consultas']] as [string,string][]).map(([n, l]) => (
-                                        <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                            <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.02em' }}>{n}</span>
-                                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>{l}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── Chat animado ── */}
-                        <div className="sf-wpp-chat"><WppChat /></div>
-
-                    </div>
-                </div>
-            </section>
+                <WhatsappBanner
+                    layout={config?.appearance?.whatsappLayout}
+                    wpp={tienda.wpp}
+                    message={config?.appearance?.whatsappText}
+                    scheduleText={config?.contact?.scheduleText}
+                />
             )}
             </>
             )}
@@ -1740,83 +1699,6 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
                 </div>
             )}
         </>
-    )
-}
-
-// ─── Chat WhatsApp animado ─────────────────────────────────────────────────────
-
-const WPP_DOUBLE_CHECK = (
-    <svg width="14" height="9" viewBox="0 0 16 10" fill="none">
-        <path d="M1 5L4.5 8.5L11 2" stroke="rgba(255,255,255,0.85)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M5 5L8.5 8.5L15 2" stroke="rgba(255,255,255,0.85)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-)
-
-// phase: 0=vacío → 1=msg cliente → 2=typing tienda → 3=msg tienda → 4=msg cliente2 → reset
-function WppChat() {
-    const [phase, setPhase] = useState(0)
-
-    useEffect(() => {
-        const DELAYS: Record<number, number> = { 0: 500, 1: 1000, 2: 1800, 3: 1000, 4: 3000 }
-        const next = phase < 4 ? phase + 1 : 0
-        const t = setTimeout(() => setPhase(next), DELAYS[phase] ?? 1000)
-        return () => clearTimeout(t)
-    }, [phase])
-
-    const show1   = phase >= 1
-    const typing  = phase === 2
-    const show2   = phase >= 3
-    const show3   = phase >= 4
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-            <style>{`
-                @keyframes wppBubble {
-                    from { opacity: 0; transform: translateY(8px) scale(0.96); }
-                    to   { opacity: 1; transform: translateY(0) scale(1); }
-                }
-                @keyframes wppDot {
-                    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-                    30%           { transform: translateY(-4px); opacity: 1; }
-                }
-            `}</style>
-
-            {/* Mensaje cliente */}
-            {show1 && (
-                <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.13)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '14px 14px 14px 3px', padding: '9px 13px', maxWidth: '85%', animation: 'wppBubble 280ms ease both' }}>
-                    <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>Hola! ¿Tienen la campera en talle M?</p>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 3, display: 'block', textAlign: 'right' }}>09:41</span>
-                </div>
-            )}
-
-            {/* Typing indicator */}
-            {typing && (
-                <div style={{ alignSelf: 'flex-end', background: '#25D366', borderRadius: '14px 14px 3px 14px', padding: '10px 16px', animation: 'wppBubble 200ms ease both', display: 'flex', gap: 4, alignItems: 'center' }}>
-                    {[0, 0.18, 0.36].map((d, i) => (
-                        <span key={i} style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.85)', animation: `wppDot 1s ${d}s ease-in-out infinite` }} />
-                    ))}
-                </div>
-            )}
-
-            {/* Respuesta tienda */}
-            {show2 && (
-                <div style={{ alignSelf: 'flex-end', background: '#25D366', borderRadius: '14px 14px 3px 14px', padding: '9px 13px', maxWidth: '92%', animation: 'wppBubble 280ms ease both' }}>
-                    <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>¡Sí! Tenemos en M y L. Te coordinamos el envío hoy mismo 🎉</p>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>09:42</span>
-                        {WPP_DOUBLE_CHECK}
-                    </div>
-                </div>
-            )}
-
-            {/* Respuesta final cliente */}
-            {show3 && (
-                <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.13)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '14px 14px 14px 3px', padding: '9px 13px', maxWidth: '70%', animation: 'wppBubble 280ms ease both' }}>
-                    <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>¡Perfecto, muchas gracias! 🙌</p>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 3, display: 'block', textAlign: 'right' }}>09:43</span>
-                </div>
-            )}
-        </div>
     )
 }
 

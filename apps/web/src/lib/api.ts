@@ -1150,6 +1150,10 @@ export type ApiAppearanceConfig = {
   showVideo: boolean
   shippingText: string | null
   whatsappText: string | null
+  // Diseño del banner de WhatsApp del home — null = 'clasico' (el de
+  // siempre). Ver WHATSAPP_LAYOUTS en apariencia.mock.ts. Opcional: misma
+  // ventana de deploy que videoLayout.
+  whatsappLayout?: 'clasico' | 'minimal' | 'franja' | 'bento' | null
   statsBar: ApiStatsBarItem[] | null
   parallaxImageUrl: string | null
   parallaxTitle: string | null

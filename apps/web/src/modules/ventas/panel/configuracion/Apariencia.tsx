@@ -5,7 +5,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Video, Image as ImageIcon } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, BadgeCheck, Video, Image as ImageIcon, MessageCircle } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -31,12 +31,12 @@ import { AyudaBoton, AyudaPanel, type Ayuda } from './components/apariencia/Ayud
 import { AYUDA_SECCIONES, AYUDA_OPCIONES } from './components/apariencia/ayudas'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
-    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX, VIDEO_LAYOUTS,
+    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX, VIDEO_LAYOUTS, WHATSAPP_LAYOUTS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type CategoryLayout as CategoryLayoutT, type HeroSlide,
     type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
-    type VideoItem, type VideoLayout,
+    type VideoItem, type VideoLayout, type WhatsappLayout,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
 
@@ -1279,6 +1279,27 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} />
                     </SecCard>
 
+                    {/* Banner de WhatsApp — antes un solo diseño fijo (pedido
+                        explícito: variedad). El toggle sigue siendo
+                        "WhatsApp flotante" de "¿Qué ven tus clientes?"; acá
+                        solo se elige CÓMO se ve, por eso el picker se apaga
+                        (no se oculta) cuando ese interruptor está apagado. */}
+                    <SecCard id="ap-sec-whatsapp" title="Banner de WhatsApp" icon={MessageCircle} ayuda={AYUDA_SECCIONES.whatsapp}>
+                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                            La invitación a escribir por WhatsApp, justo antes del pie. Se muestra con &quot;WhatsApp
+                            flotante&quot; prendido (en &quot;¿Qué ven tus clientes?&quot;) y un número real cargado en
+                            Configuración → Contacto.
+                        </p>
+                        <div style={{ opacity: ap.mostrarWhatsapp ? 1 : 0.5, pointerEvents: ap.mostrarWhatsapp ? 'auto' : 'none' }}>
+                            <FieldLabel help="Cómo se ve la invitación a escribir por WhatsApp.">Diseño</FieldLabel>
+                            <VisualPick
+                                value={ap.estiloWhatsapp}
+                                onChange={v => set('estiloWhatsapp', v as WhatsappLayout)}
+                                options={WHATSAPP_LAYOUTS.map(op => ({ id: op.id, label: op.label, ayuda: op.desc, svg: MINIATURA_WHATSAPP[op.id] }))}
+                            />
+                        </div>
+                    </SecCard>
+
                     {tarjetasSecundarias}
 
                 </div>
@@ -1565,6 +1586,47 @@ const MINIATURA_VIDEO: Record<VideoLayout, ReactNode> = {
             <rect x="40" y={y} width="7" height="5" rx="1" fill="var(--color-border)" />
             <rect x="49" y={y + 1.5} width="9" height="2" rx="1" fill="var(--color-muted)" />
         </g>)}
+    </g>),
+}
+
+// Miniaturas de los 4 diseños del banner de WhatsApp — mismo criterio que
+// las de video: se lee el LAYOUT (tarjeta grande + chat, línea sobria,
+// franja, dos tarjetas), no el contenido real.
+const MINIATURA_WHATSAPP: Record<WhatsappLayout, ReactNode> = {
+    // Clásico: bloque grande a la izquierda (tarjeta) y dos burbujas de
+    // chat a la derecha.
+    clasico: hline(<g>
+        <rect x="2" y="3" width="35" height="28" rx="3" fill="var(--color-primary)" opacity="0.8" />
+        <rect x="7" y="9" width="22" height="3" rx="1.5" fill="var(--color-bg)" />
+        <rect x="7" y="15.5" width="16" height="2" rx="1" fill="var(--color-bg)" opacity="0.6" />
+        <rect x="7" y="22" width="14" height="6" rx="3" fill="var(--color-bg)" />
+        <rect x="41" y="6" width="14" height="7" rx="3.5" fill="var(--color-border)" />
+        <rect x="45" y="18" width="13" height="7" rx="3.5" fill="var(--color-primary)" opacity="0.5" />
+    </g>),
+    // Sobrio: un círculo (ícono), dos renglones de texto y un botón chico,
+    // todo en una fila con aire alrededor.
+    minimal: hline(<g>
+        <circle cx="9" cy="17" r="6" fill="var(--color-primary)" opacity="0.75" />
+        <rect x="21" y="12.5" width="20" height="3" rx="1.5" fill="var(--color-text)" />
+        <rect x="21" y="19" width="14" height="2" rx="1" fill="var(--color-border)" />
+        <rect x="46" y="13" width="11" height="7" rx="3.5" fill="none" stroke="var(--color-border)" strokeWidth="1.5" />
+    </g>),
+    // Franja: una barra angosta a todo el ancho, con ícono y botón adentro.
+    franja: hline(<g>
+        <rect x="2" y="13" width="56" height="10" rx="5" fill="var(--color-primary)" opacity="0.75" />
+        <circle cx="10" cy="18" r="3" fill="var(--color-bg)" />
+        <rect x="17" y="16.5" width="20" height="3" rx="1.5" fill="var(--color-bg)" opacity="0.85" />
+        <rect x="46" y="15.5" width="9" height="5" rx="2.5" fill="var(--color-bg)" />
+    </g>),
+    // Dos tarjetas: un bloque sólido (la consulta) y uno con borde (el
+    // horario), del mismo tamaño, lado a lado.
+    bento: hline(<g>
+        <rect x="2" y="4" width="27" height="26" rx="3" fill="var(--color-primary)" opacity="0.8" />
+        <rect x="7" y="11" width="16" height="3" rx="1.5" fill="var(--color-bg)" />
+        <rect x="7" y="21" width="11" height="5" rx="2.5" fill="var(--color-bg)" />
+        <rect x="32" y="4" width="26" height="26" rx="3" fill="none" stroke="var(--color-border)" strokeWidth="1.5" />
+        <rect x="37" y="12" width="16" height="2.5" rx="1.25" fill="var(--color-muted)" />
+        <rect x="37" y="18" width="12" height="2.5" rx="1.25" fill="var(--color-border)" />
     </g>),
 }
 

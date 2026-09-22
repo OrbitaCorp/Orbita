@@ -55,6 +55,10 @@ export type StorefrontContentBlock = { id: string; url: string; eyebrow?: string
 // uno grande con la lista al costado. null = 'cine'.
 export type VideoLayout = 'cine' | 'alternado' | 'reels' | 'lista'
 
+// Diseño del banner de WhatsApp del home, antes del pie — ver
+// WhatsappBanner.tsx. null = 'clasico' (el de siempre).
+export type WhatsappLayout = 'clasico' | 'minimal' | 'franja' | 'bento'
+
 // Contenido propio de una plantilla de Home. Cada clave la usa UNA plantilla
 // (`cupon` de Vidriera, `mostrarIconoLogo` de Escaparate) — se van sumando
 // acá a medida que una plantilla nueva necesite algo que las demás no
@@ -135,6 +139,9 @@ export type StorefrontConfigResponse = {
     showVideo: boolean
     shippingText: string | null
     whatsappText: string | null
+    // Diseño del banner de WhatsApp del home — ver WhatsappBanner.tsx.
+    // Opcional: misma ventana de deploy que videoLayout.
+    whatsappLayout?: WhatsappLayout | null
     statsBar: StorefrontStatsItem[]
     parallaxImageUrl: string | null
     parallaxTitle: string | null

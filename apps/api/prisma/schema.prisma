@@ -411,6 +411,14 @@ model StorefrontConfig {
   // único video (ver SeccionVideos.tsx en apps/web).
   videoLayout      String? @map("video_layout")
   videos           Json?
+  // Diseño del banner de WhatsApp del home, antes del pie (ver
+  // WhatsappBanner.tsx en apps/web): 'clasico' (tarjeta grande en degradé
+  // con chat animado, el de siempre) | 'minimal' (una línea sobria, sin
+  // color de fondo) | 'franja' (barra angosta a todo el ancho) | 'bento'
+  // (dos tarjetas: la consulta y el horario de atención real de Contacto).
+  // null = 'clasico'. No cambia CUÁNDO aparece (sigue gateado por
+  // showWhatsapp + número real cargado), solo cómo se ve.
+  whatsappLayout   String? @map("whatsapp_layout")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -112,6 +112,11 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsString() @MaxLength(200) shippingText?: string;
   @IsOptional() @IsString() @MaxLength(500) whatsappText?: string;
 
+  // Diseño del banner de WhatsApp del home — ver `whatsappLayout` en
+  // schema.prisma. Lista cerrada, mismo criterio que videoLayout/categoryLayout.
+  @IsOptional() @IsIn(['clasico', 'minimal', 'franja', 'bento'])
+  whatsappLayout?: 'clasico' | 'minimal' | 'franja' | 'bento';
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(12)

@@ -70,6 +70,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showParallaxBanner: ap.mostrarParallax,
         shippingText: ap.textoEnvio,
         whatsappText: ap.textoWhatsapp,
+        whatsappLayout: ap.estiloWhatsapp,
         statsBar: ap.stats,
         parallaxImageUrl: ap.parallaxImagen,
         parallaxTitle: ap.parallaxTitulo,
@@ -199,6 +200,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
+        // ?? por la misma ventana de deploy que videoLayout: campo nuevo, la
+        // API puede no mandarlo todavía.
+        estiloWhatsapp: (dto.whatsappLayout as Ap['estiloWhatsapp']) ?? defaults.estiloWhatsapp,
         parallaxImagen: dto.parallaxImageUrl,
         parallaxTitulo: dto.parallaxTitle ?? defaults.parallaxTitulo,
         parallaxSubtitulo: dto.parallaxSubtitle ?? defaults.parallaxSubtitulo,

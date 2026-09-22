@@ -172,6 +172,19 @@ export const VIDEO_LAYOUTS: { id: VideoLayout; label: string; desc: string }[] =
     { id: 'lista',     label: 'Con lista',  desc: 'Uno grande y al costado la lista para elegir otro.' },
 ]
 
+export type WhatsappLayout = 'clasico' | 'minimal' | 'franja' | 'bento'
+
+// Diseños del banner de WhatsApp del home, antes del pie (ver
+// WhatsappBanner.tsx, apps/web/src/components/storefront). Antes había un
+// solo diseño fijo (clasico) — pedido explícito: variedad para tiendas que
+// no quieren un bloque grande y a color, o que prefieren algo más sobrio.
+export const WHATSAPP_LAYOUTS: { id: WhatsappLayout; label: string; desc: string }[] = [
+    { id: 'clasico', label: 'Clásico',   desc: 'Tarjeta grande en degradé, con stats y un chat animado. El de siempre.' },
+    { id: 'minimal', label: 'Sobrio',    desc: 'Una línea con ícono, texto y botón. Sin color de fondo, sin animación.' },
+    { id: 'franja',  label: 'Franja',    desc: 'Barra angosta a todo el ancho, en verde WhatsApp. Ocupa poco lugar.' },
+    { id: 'bento',   label: 'Dos tarjetas', desc: 'La consulta de un lado y tu horario de atención del otro.' },
+]
+
 export interface Apariencia {
     nombreTienda: string
     tagline:      string
@@ -222,6 +235,10 @@ export interface Apariencia {
     stats: StatItem[]
     textoEnvio:    string
     textoWhatsapp: string
+    // Diseño del banner de WhatsApp del home (ver WHATSAPP_LAYOUTS). Se
+    // dibuja igual que hasta ahora (mostrarWhatsapp + número real cargado en
+    // Contacto) — esto solo cambia CÓMO se ve, no cuándo aparece.
+    estiloWhatsapp: WhatsappLayout
     // Banner de imagen a pantalla completa en medio del home, con efecto
     // parallax (fondo fijo mientras el resto de la página se desplaza) —
     // pedido explícito del dueño, con una tienda de referencia. Solo se
@@ -323,6 +340,7 @@ export const AP_DEFAULTS: Apariencia = {
         { id: 'st4', value: '3 cuotas', label: 'sin interés' },
     ],
     textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
+    estiloWhatsapp: 'clasico',
     // Apagado por default: es una sección nueva, no aparece sola en ninguna
     // tienda hasta que el dueño suba su imagen y la prenda a propósito.
     mostrarParallax: false, parallaxImagen: null,

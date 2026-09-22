@@ -378,6 +378,8 @@ export class StorefrontService {
             // como único video (ver SeccionVideos.tsx en apps/web).
             videoLayout: appearance.videoLayout,
             videos: appearance.videos ?? [],
+            // null = 'clasico' — ver WhatsappBanner.tsx en apps/web.
+            whatsappLayout: appearance.whatsappLayout,
           }
         : null,
       contact: contact
