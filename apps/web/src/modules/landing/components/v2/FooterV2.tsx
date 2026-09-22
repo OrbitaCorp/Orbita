@@ -87,9 +87,9 @@ export function FooterV2() {
                             <div className="grid grid-cols-2 gap-10 sm:gap-16">
                                 {COLUMNAS.map(col => (
                                     <div key={col.titulo}>
-                                        <h4 className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        <p className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-500">
                                             {col.titulo}
-                                        </h4>
+                                        </p>
                                         <ul className="space-y-2.5">
                                             {col.links.map(l => (
                                                 <li key={l.label}>

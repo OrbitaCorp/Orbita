@@ -109,7 +109,7 @@ export function NavbarV2() {
             <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-6 px-6" aria-label="Principal">
                 {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
                     de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
-                <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Ir al inicio">
+                <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Órbita — Ir al inicio">
                     <OrbitaLogo size={26} />
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
