@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Search, ChevronLeft, ChevronRight, X, ExternalLink, Mail, Phone, Send, RotateCcw, CircleCheck,
-  ThumbsUp, ThumbsDown, Paperclip,
+  ThumbsUp, ThumbsDown, Paperclip, CloudOff, RefreshCw, Inbox,
 } from 'lucide-react'
 import {
   platformApi,
@@ -15,6 +15,7 @@ import {
   SUPPORT_STATUS_LABELS, SUPPORT_CATEGORY_LABELS,
 } from './ui'
 import { CAPITULOS } from '@/modules/ventas/panel/manual/contenido'
+import { fechaRelativa } from '@/modules/ventas/panel/configuracion/SoporteComun'
 
 // Soporte (super admin → Soporte): la bandeja de consultas que los negocios
 // mandan desde Configuración → Soporte de su panel.
@@ -70,8 +71,8 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   const cambiarEstado = (v: SupportRequestStatus | '') => { setEstado(v); setPage(1) }
   const cambiarCategoria = (v: SupportCategory | '') => { setCategoria(v); setPage(1) }
 
-  const { data: resumen, error: errorResumen } = useFetch(() => platformApi.supportSummary(), [reloadKey])
-  const { data: lista, error: errorLista, loading } = useFetch(
+  const { data: resumen, error: errorResumen, status: statusResumen } = useFetch(() => platformApi.supportSummary(), [reloadKey])
+  const { data: lista, error: errorLista, status: statusLista, loading } = useFetch(
     () => platformApi.supportRequests({
       status: estado || undefined,
       category: categoria || undefined,
@@ -100,6 +101,28 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
   const hasta = lista ? Math.min(page * POR_PAGINA, total) : 0
   const hayFiltros = estado !== '' || categoria !== '' || debounced !== ''
 
+  // 404 en cualquiera de los dos pedidos = la API que está sirviendo no tiene
+  // este módulo (frontend desplegado antes que la API). No es una caída: se
+  // explica qué falta y se ofrece reintentar, en vez de dos cajas rojas.
+  const moduloAusente = statusResumen === 404 || statusLista === 404
+  const reintentar = (
+    <button type="button" onClick={recargar} className="ds-hover" style={btnGhostSm}>
+      <RefreshCw size={13} strokeWidth={2} aria-hidden="true" /> Reintentar
+    </button>
+  )
+
+  if (moduloAusente) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <PageHeader
+          title="Soporte"
+          subtitle="Las consultas que mandan los negocios desde su panel. Todo lo que respondas acá les llega por mail y les queda en su historial."
+        />
+        <ModuloPendiente onReintentar={recargar} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <PageHeader
@@ -108,7 +131,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
       />
 
       {errorResumen ? (
-        <ErrorBox msg="No se pudo cargar el resumen de soporte." />
+        <ErrorBox msg="No se pudo cargar el resumen de soporte." action={reintentar} />
       ) : (
         <Grid>
           <Kpi
@@ -123,17 +146,38 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
       )}
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 13, color: 'var(--color-muted)', fontWeight: 500 }}>Filtrar por</span>
-        <select
-          value={estado}
-          onChange={(e) => cambiarEstado(e.target.value as SupportRequestStatus | '')}
-          aria-label="Estado"
-          className="ds-field"
-          style={{ ...inputStyle, minWidth: 160 }}
-        >
-          <option value="">Todas</option>
-          {ESTADOS.map((s) => <option key={s} value={s}>{SUPPORT_STATUS_LABELS[s]}</option>)}
-        </select>
+        {/* Estado como pestañas con el conteo al lado: es el filtro que se
+            toca todo el tiempo y con el número ya se sabe si vale la pena
+            entrar. Categoría y búsqueda quedan como controles comunes. */}
+        <div role="group" aria-label="Estado" style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 12, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
+          {([...ESTADOS, ''] as (SupportRequestStatus | '')[]).map((s) => {
+            const activo = estado === s
+            const n = resumen ? (s === '' ? resumen.open + resumen.answered + resumen.closed : s === 'OPEN' ? resumen.open : s === 'ANSWERED' ? resumen.answered : resumen.closed) : null
+            const label = s === '' ? 'Todas' : `${SUPPORT_STATUS_LABELS[s]}s`
+            return (
+              <button
+                key={s || 'todas'}
+                type="button"
+                onClick={() => cambiarEstado(s)}
+                aria-pressed={activo}
+                className="ds-hover"
+                style={{
+                  height: 32, padding: '0 12px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600,
+                  background: activo ? 'var(--color-bg)' : 'transparent',
+                  color: activo ? 'var(--color-text)' : 'var(--color-muted)',
+                  boxShadow: activo ? 'var(--shadow-card)' : 'none',
+                  transition: 'background 150ms ease, color 150ms ease',
+                }}
+              >
+                {label}
+                {n !== null && (
+                  <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 11.5, fontWeight: 600, color: activo && s === 'OPEN' && n > 0 ? 'var(--color-primary)' : 'var(--color-subtle)' }}>{n}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
         <select
           value={categoria}
           onChange={(e) => cambiarCategoria(e.target.value as SupportCategory | '')}
@@ -159,7 +203,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
       </div>
 
       {errorLista ? (
-        <ErrorBox msg="No se pudieron cargar las consultas." />
+        <ErrorBox msg="No se pudieron cargar las consultas." action={reintentar} />
       ) : !lista ? (
         <Loader />
       ) : (
@@ -169,7 +213,15 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
         <Card noPad>
           <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 150ms ease' }} aria-busy={loading || undefined}>
             {lista.data.length === 0 ? (
-              <Empty text={hayFiltros ? 'No hay consultas con esos filtros.' : 'Todavía ningún negocio mandó una consulta.'} />
+              hayFiltros ? (
+                <Empty text={estado === 'OPEN' && !categoria && !debounced ? 'No hay consultas abiertas: nada espera respuesta.' : 'No hay consultas con esos filtros.'} />
+              ) : (
+                <div style={{ padding: '36px 16px', textAlign: 'center' }}>
+                  <Inbox size={26} strokeWidth={1.5} aria-hidden="true" style={{ color: 'var(--color-subtle)' }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>Todavía ningún negocio mandó una consulta</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5 }}>Cuando escriban desde Configuración → Soporte de su panel, aparecen acá y también llegan a soporte@orbita.site.</div>
+                </div>
+              )
             ) : (
               <Table
                 head={['Nº', 'Negocio', 'Asunto', 'Quién', 'Estado', 'Última actividad', 'Acciones']}
@@ -198,7 +250,7 @@ export function TabSoporte({ onCambio }: { currentAdminId: string; onCambio?: ()
                     </div>,
                     <span key="q" style={{ color: 'var(--color-body)' }}>{r.member.name}</span>,
                     <Pill key="e" text={SUPPORT_STATUS_LABELS[r.status] ?? r.status} tone={TONO_ESTADO[r.status] ?? 'gray'} />,
-                    <span key="t" style={{ fontSize: 13, color: 'var(--color-body)', whiteSpace: 'nowrap' }}>{dateTime(r.lastMessageAt)}</span>,
+                    <span key="t" title={dateTime(r.lastMessageAt)} style={{ fontSize: 13, color: 'var(--color-body)', whiteSpace: 'nowrap' }}>{fechaRelativa(r.lastMessageAt)}</span>,
                     <button
                       key="a"
                       type="button"
@@ -288,7 +340,7 @@ const DRAWER_CSS = `
 function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => void; onCambio: () => void }) {
   const router = useRouter()
   const [reloadKey, setReloadKey] = useState(0)
-  const { data, error } = useFetch(() => platformApi.supportRequest(id), [id, reloadKey])
+  const { data, error, status } = useFetch(() => platformApi.supportRequest(id), [id, reloadKey])
   const [respuesta, setRespuesta] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [cambiandoEstado, setCambiandoEstado] = useState(false)
@@ -297,6 +349,7 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
   const panelRef = useRef<HTMLDivElement>(null)
   const tituloRef = useRef<HTMLHeadingElement>(null)
   const cuerpoRef = useRef<HTMLDivElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   // Recién después de mandar una respuesta se baja el hilo hasta el final,
   // para ver lo que uno acaba de escribir. Al abrir NO: una consulta se lee
   // desde el principio.
@@ -440,7 +493,14 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
 
         <div ref={cuerpoRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 22px 22px', background: 'var(--color-surface)' }}>
           {error ? (
-            <ErrorBox msg="No se pudo cargar la consulta." />
+            <ErrorBox
+              msg={status === 404 ? 'Esta consulta ya no existe o no se pudo encontrar.' : 'No se pudo cargar la consulta.'}
+              action={status === 404 ? undefined : (
+                <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="ds-hover" style={btnGhostSm}>
+                  <RefreshCw size={13} strokeWidth={2} aria-hidden="true" /> Reintentar
+                </button>
+              )}
+            />
           ) : !data ? (
             <Loader />
           ) : (
@@ -454,7 +514,7 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
         </div>
 
         {data && (
-          <form onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 22px 18px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+          <form ref={formRef} onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 22px 18px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
             {errorAccion && <ErrorBox msg={errorAccion} />}
             {data.status === 'CLOSED' && (
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
@@ -470,6 +530,15 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
               rows={4}
               maxLength={MAX_RESPUESTA}
               disabled={enviando}
+              // Ctrl/Cmd + Enter manda, como en cualquier cliente de mail: se
+              // responde con las manos en el teclado. Enter solo sigue
+              // haciendo salto de línea.
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !enviando) {
+                  e.preventDefault()
+                  formRef.current?.requestSubmit()
+                }
+              }}
               className="ds-field"
               style={{ ...inputStyle, height: 'auto', minHeight: 96, padding: '10px 13px', lineHeight: 1.5, resize: 'vertical' }}
             />
@@ -479,7 +548,7 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
                   ? `Mínimo ${MIN_RESPUESTA} caracteres`
                   : faltan > 0
                     ? `Faltan ${faltan} caracteres`
-                    : `${respuesta.trim().length} / ${MAX_RESPUESTA}`}
+                    : `${respuesta.trim().length} / ${MAX_RESPUESTA} · Ctrl + Enter envía`}
               </span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {data.status === 'CLOSED' ? (
@@ -514,6 +583,40 @@ function DrawerConsulta({ id, onClose, onCambio }: { id: string; onClose: () => 
         )}
       </div>
     </>
+  )
+}
+
+// La API que está sirviendo no tiene /platform/support: el panel se desplegó
+// (Vercel) antes que la API (Cloud Run, a mano con deploy.sh). Es un estado
+// esperable en cada release que toque apps/api, no una falla: se dice qué
+// falta y a quién le toca, en el tono del equipo (esta pantalla es interna).
+function ModuloPendiente({ onReintentar }: { onReintentar: () => void }) {
+  const mono: React.CSSProperties = { fontFamily: '"Geist Mono", monospace', fontSize: 12.5 }
+  return (
+    <Card>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+          <CloudOff size={22} strokeWidth={1.75} aria-hidden="true" />
+        </div>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.01em' }}>
+            La API en producción todavía no tiene el módulo de Soporte
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55, maxWidth: 640 }}>
+            El panel ya está actualizado, pero la API que está sirviendo es anterior a este módulo y responde 404 en <code style={mono}>/platform/support</code>.
+            Falta desplegar la API desde <code style={mono}>apps/api</code> con <code style={mono}>deploy/deploy.sh</code> (ver DEPLOYMENT.md).
+          </p>
+          <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.55, maxWidth: 640 }}>
+            Mientras tanto no se pierde nada: las consultas que manden los negocios siguen llegando por mail a soporte@orbita.site, y las que se guarden en la base van a aparecer acá apenas la API nueva esté sirviendo.
+          </p>
+          <div style={{ marginTop: 14 }}>
+            <button type="button" onClick={onReintentar} className="ds-hover" style={btnGhost}>
+              <RefreshCw size={15} strokeWidth={2} aria-hidden="true" /> Volver a intentar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
   )
 }
 

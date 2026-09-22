@@ -972,7 +972,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                                 <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                                                     {mp?.connected
                                                         ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
-                                                        : 'Sin conectar, activá esto para poder cobrar online'}
+                                                        : 'Sin conectar. Es opcional: conectala si querés aceptar tarjeta y dinero en cuenta'}
                                                 </span>
                                             </div>
                                         </div>

@@ -7,9 +7,21 @@ import { authedFetch } from '@/lib/auth/authClient'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
+// Error con el código HTTP a mano: la pantalla decide qué decir según el
+// código. El caso que importa es el 404 de ruta: la API desplegada es más
+// vieja que el frontend y todavía no tiene ese módulo (pasó con Soporte el
+// 21/09: el panel salió por Vercel antes que la API por Cloud Run). Sin el
+// status, el superadmin mostraba "No se pudo cargar" como si fuera una caída.
+export class PlatformApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message)
+    this.name = 'PlatformApiError'
+  }
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
-  if (!res.ok) throw new Error(`Platform API ${res.status}`)
+  if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
   return (await res.json()) as T
 }
 
@@ -24,7 +36,7 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body
     // class-validator devuelve `message` como array cuando falla más de una
     // regla; sin esto el usuario veía "[object Object]" en vez del motivo.
     const msg = (data as { message?: string | string[] })?.message
-    throw new Error(Array.isArray(msg) ? msg.join('. ') : (msg ?? `Platform API ${res.status}`))
+    throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? `Platform API ${res.status}`))
   }
   return data as T
 }

@@ -104,7 +104,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'pasos', items: [
                     { titulo: 'Confirmá tu email', texto: 'Mi perfil → te mandamos un código de 6 números y lo pegás ahí. Es lo que nos deja devolverte la cuenta si alguna vez perdés el acceso. Tenés 7 días desde que creaste la tienda.' },
                     { titulo: 'Completá los datos del negocio', texto: 'Configuración → Negocio: nombre, rubro y dirección. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.' },
-                    { titulo: 'Conectá Mercado Pago', texto: 'Configuración → Pagos → [[Conectar cuenta]]. Sin esto la tienda no puede cobrar online. Son dos minutos.' },
+                    { titulo: 'Elegí cómo cobrás', texto: 'Configuración → Pagos: efectivo, transferencia o Mercado Pago. Conectar Mercado Pago ([[Conectar cuenta]]) es opcional, pero conviene si querés que paguen con tarjeta desde la tienda. Son dos minutos y lo podés hacer más adelante.' },
                     { titulo: 'Armá tus categorías', texto: 'Productos → Categorías. Con 2 a 6 alcanza. Hacelo ANTES del primer producto, así cada uno nace en su lugar y no queda todo en "Sin categoría".' },
                     { titulo: 'Cargá tu primer producto', texto: 'Productos → [[Crear producto]]: fotos, precio, stock y categoría. Es el paso que hace que la tienda exista.' },
                     { titulo: 'Definí cómo entregás', texto: 'Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.' },
@@ -643,7 +643,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Qué medios de pago acepta tu tienda.' },
                 { tipo: 'campos', items: [
-                    { label: 'Mercado Pago', texto: 'Pagos online con tarjeta, débito y cuotas. Se conecta con [[Conectar cuenta]]: te lleva a Mercado Pago, autorizás, y volvés. Sin esto la tienda no cobra online.' },
+                    { label: 'Mercado Pago', texto: 'Pagos online con tarjeta, débito y cuotas. Se conecta con [[Conectar cuenta]]: te lleva a Mercado Pago, autorizás, y volvés. Es opcional: sin Mercado Pago igual podés cobrar por transferencia o en efectivo; lo que no vas a tener es el pago con tarjeta desde la tienda.' },
                     { label: 'Coordinar por WhatsApp', texto: 'El cliente cierra la compra y vos arreglás el pago por WhatsApp. No se le muestra ningún CBU ni alias en la tienda.' },
                     { label: 'Retiro en local', texto: 'Si lo activás, el cliente puede retirar. Ahí se habilitan los medios de pago que aceptás en el mostrador: efectivo, débito, crédito o Mercado Pago.' },
                     { label: 'Descuento por pagar con Mercado Pago', texto: 'Un % opcional para empujar el pago online.' },

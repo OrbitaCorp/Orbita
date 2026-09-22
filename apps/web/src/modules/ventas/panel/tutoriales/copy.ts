@@ -110,15 +110,15 @@ export const SECCIONES: SeccionCopy[] = [
     {
         id: 'configuracion', sidebarTexto: 'Configuración', titulo: 'Configuración',
         queEs: 'Los datos que hacen funcionar la tienda.',
-        paraQue: 'Es la sección más importante de la primera semana: sin datos del negocio y sin Mercado Pago conectado, el checkout no puede cobrar online.',
+        paraQue: 'Es la sección más importante de la primera semana: acá cargás los datos del negocio y elegís cómo cobrás. Conectar Mercado Pago es opcional, pero conviene si querés que tus clientes paguen con tarjeta.',
         claves: [
             'Negocio: nombre, rubro y dirección (con mapa).',
-            'Pagos: conectar Mercado Pago, efectivo con descuento, coordinar por WhatsApp.',
+            'Pagos: efectivo, transferencia, coordinar por WhatsApp y, si querés cobrar con tarjeta, Mercado Pago.',
             'Envíos: cómo entregás y cuánto cobrás.',
             'Equipo: invitá gente con roles y permisos — cada uno ve solo lo suyo.',
             'También: dominios, notificaciones, apariencia y tu suscripción.',
         ],
-        accionClave: 'Completar "Información del negocio" y conectar Mercado Pago. Ese es EL paso uno.',
+        accionClave: 'Completar "Información del negocio" y elegir cómo cobrás. Mercado Pago es una sugerencia, no un requisito.',
         ruta: ['ventas', 'configuracion'], mock: 'config',
     },
     {
@@ -213,8 +213,8 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
         guiaLabel: 'Tus datos se cargan acá',
     },
     {
-        id: 'mp', titulo: 'Conectá Mercado Pago',
-        detalle: 'Sin esto la tienda no puede cobrar online. Está en Configuración → Pagos, botón "Conectar cuenta". Lleva dos minutos.',
+        id: 'mp', titulo: 'Conectá Mercado Pago (opcional)',
+        detalle: 'Es una sugerencia, no un requisito: con Mercado Pago tus clientes pagan con tarjeta o dinero en cuenta sin salir de la tienda. Si preferís, podés arrancar cobrando por transferencia o en efectivo y conectarlo más adelante. Está en Configuración → Pagos, botón "Conectar cuenta". Lleva dos minutos.',
         destino: ['ventas', 'configuracion', { vista: 'pagos' }], destinoLabel: 'Ir a Pagos',
         seccionDestino: 'configuracion', anclaDestino: 'boton:Conectar cuenta || .cfg-sidebar-item[title="Pagos"]',
         guiaLabel: 'Conectá tu cuenta desde acá',
@@ -461,7 +461,7 @@ export const TIPS_POR_SECCION: Partial<Record<string, TipSeccion[]>> = {
         { ancla: '.dl-actions', titulo: 'Cupones', texto: 'Códigos que el cliente escribe en el checkout. Se pueden limitar por usos totales o por cliente.' },
     ],
     configuracion: [
-        { ancla: '.cfg-sidebar', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. Las dos claves de la primera semana: Negocio (tus datos) y Pagos (conectar Mercado Pago).' },
+        { ancla: '.cfg-sidebar', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. La clave de la primera semana es Negocio (tus datos). En Pagos elegís cómo cobrás; conectar Mercado Pago es opcional, pero conviene si querés aceptar tarjeta.' },
     ],
     avanzado: [
         { ancla: 'centro', titulo: 'El paquete Avanzado', texto: 'Extras pagos aparte de tu suscripción: juegos con premio, modales de anuncios, plantillas de Home y countdown. Si no lo tenés, "Ver qué incluye" te muestra el detalle.' },
@@ -516,7 +516,7 @@ export const MISIONES_ASISTENTE: MisionAsistente[] = [
     {
         id: 'configuracion', esperaSeccion: 'configuracion', resaltaSidebar: 'Configuración',
         pedido: 'Vamos a la más importante: **Configuración**.',
-        explicacion: 'Los datos que hacen funcionar la tienda. Los dos imprescindibles de la primera semana: completar "Negocio" y conectar Mercado Pago en "Pagos" — sin eso no podés cobrar online. En "Equipo" invitás gente con permisos.',
+        explicacion: 'Los datos que hacen funcionar la tienda. Lo imprescindible de la primera semana: completar "Negocio". En "Pagos" elegís cómo cobrás: efectivo, transferencia y, si conectás Mercado Pago (opcional, pero recomendado), también tarjeta. En "Equipo" invitás gente con permisos.',
     },
     {
         id: 'avanzado', esperaSeccion: 'avanzado', resaltaSidebar: 'Avanzado',
@@ -543,11 +543,11 @@ export const TEXTOS = {
     listo: 'Listo',
     reiniciar: 'Reiniciar tutorial',
     cierreTitulo: 'Eso es todo',
-    cierre: 'Ya conocés el mapa. El mejor primer paso real: Configuración → completar tus datos y conectar Mercado Pago. Después, tu primer producto.',
+    cierre: 'Ya conocés el mapa. El mejor primer paso real: Configuración → completar tus datos y elegir cómo cobrás. Después, tu primer producto.',
     // Checklist: acá las 6 tareas están hechas de verdad (o marcadas), no es
     // un "ya viste el mapa" — es "tu tienda quedó lista".
     cierreChecklistTitulo: 'Tu tienda está lista',
-    cierreChecklist: 'Datos cargados, Mercado Pago conectado, categorías y productos creados, envíos definidos y tienda publicada. Ya podés vender.',
+    cierreChecklist: 'Datos cargados, formas de cobro elegidas, categorías y productos creados, envíos definidos y tienda publicada. Ya podés vender.',
     // Del cierre de la primera etapa se sigue a la segunda (pedido de Ale:
     // "cuando termina el primero le sale el segundo").
     seguirEtapa2: 'Seguir con la segunda etapa',

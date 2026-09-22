@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import type { BusinessStatus } from '@/lib/platform/api'
+import { PlatformApiError, type BusinessStatus } from '@/lib/platform/api'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 // Piezas de UI compartidas entre el dashboard de super admin
@@ -118,9 +118,13 @@ export function humanize(value: string, dict: Record<string, string>): string {
 // Las deps de este panel son todas primitivas (ids, rangos, contadores); si
 // alguna vez hay que pasar un objeto, serializarlo acá seguiría siendo válido
 // mientras su forma sea estable.
-export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | null; error: boolean; loading: boolean } {
+// `status` es el código HTTP del último error (0 si fue de red o no vino de
+// la API de plataforma; null mientras no hubo error). Lo usa Soporte para
+// distinguir "la API todavía no tiene este módulo" (404) de una caída real.
+export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | null; error: boolean; status: number | null; loading: boolean } {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState(false)
+  const [status, setStatus] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fnRef = useRef(fn)
@@ -131,14 +135,20 @@ export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | 
     let cancelled = false
     setLoading(true)
     setError(false)
+    setStatus(null)
     fnRef.current()
       .then((d) => { if (!cancelled) { setData(d); setLoading(false) } })
-      .catch(() => { if (!cancelled) { setError(true); setLoading(false) } })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setError(true)
+        setStatus(e instanceof PlatformApiError ? e.status : 0)
+        setLoading(false)
+      })
     return () => {
       cancelled = true
     }
   }, [key])
-  return { data, error, loading }
+  return { data, error, status, loading }
 }
 
 // ─── Layout / contenedores ────────────────────────────────────────────────────
@@ -347,8 +357,15 @@ export function Pill({ text, tone }: { text: string; tone: Tone }) {
 export function Loader() {
   return <div style={{ padding: 44, display: 'grid', placeItems: 'center' }}><div style={{ width: 26, height: 26, border: '3px solid var(--color-border)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'orbita-spin 0.7s linear infinite' }} /><style>{`@keyframes orbita-spin{to{transform:rotate(360deg)}}`}</style></div>
 }
-export function ErrorBox({ msg }: { msg: string }) {
-  return <div style={{ padding: '14px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', borderRadius: 12, color: 'var(--color-error)', fontSize: 13.5, fontWeight: 500 }}>{msg}</div>
+// `action` (opcional) va a la derecha del texto: casi siempre un "Reintentar".
+// Un error sin salida obliga a recargar la página entera y perder los filtros.
+export function ErrorBox({ msg, action }: { msg: string; action?: React.ReactNode }) {
+  return (
+    <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '14px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', borderRadius: 12, color: 'var(--color-error)', fontSize: 13.5, fontWeight: 500 }}>
+      <span>{msg}</span>
+      {action}
+    </div>
+  )
 }
 export function Empty({ text }: { text: string }) {
   return <div style={{ padding: '26px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>{text}</div>
