@@ -11,6 +11,8 @@
 // pages/nosotros.tsx.
 
 import Head from 'next/head';
+import { Seo } from '@/modules/landing/components/Seo';
+import { ROOT_DOMAIN } from '@/lib/tenant';
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
@@ -21,12 +23,32 @@ import { Rubros } from '@/modules/landing/components/v2/Rubros';
 import { Avanzado } from '@/modules/landing/components/v2/Avanzado';
 import { Precios, Faq, CierreCta } from '@/modules/landing/components/v2/Cierre';
 
+// Organization schema (JSON-LD): le da a Google una descripción explícita y
+// estructurada de qué es Órbita, en vez de tener que inferirla del texto de
+// la página. No hay perfiles de redes sociales propios de Órbita todavía
+// (sameAs) — se suman cuando existan.
+const ORGANIZATION_JSON_LD = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Órbita',
+    url: `https://${ROOT_DOMAIN}`,
+    logo: `https://${ROOT_DOMAIN}/logo.svg`,
+    description: 'Tienda online con punto de venta, stock, pedidos y pagos integrados para emprendedores y comercios.',
+};
+
 export default function HomePage() {
     return (
         <PaginaV2 scrollKey="/">
+            <Seo
+                title="Órbita — Tienda online + punto de venta para emprendedores"
+                description="Armá tu tienda online con punto de venta, stock, pedidos y pagos integrados. Todo lo que necesitás para vender, en un solo lugar."
+                path="/"
+            />
             <Head>
-                <title>Órbita — Tienda online + punto de venta para emprendedores</title>
-                <meta name="description" content="Armá tu tienda online con punto de venta, stock, pedidos y pagos integrados. Todo lo que necesitás para vender, en un solo lugar." />
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+                />
             </Head>
             <HeroCinematic />
             <Modulos />

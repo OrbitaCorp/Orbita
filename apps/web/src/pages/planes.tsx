@@ -15,10 +15,16 @@
 
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { Planes } from '@/modules/landing/components/v2/Planes';
+import { Seo } from '@/modules/landing/components/Seo';
 
 export default function PlanesPage() {
     return (
         <PaginaV2 scrollKey="/planes" planeta={false}>
+            <Seo
+                title="Planes y precios — Órbita"
+                description="Comparalos en detalle: Base y Base + Avanzado. Elegí el plan de Órbita que se ajusta a tu negocio y arrancá a vender hoy."
+                path="/planes"
+            />
             <Planes />
         </PaginaV2>
     );
