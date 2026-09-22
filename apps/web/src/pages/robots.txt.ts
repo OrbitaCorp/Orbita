@@ -12,7 +12,7 @@
 // individuales no tienen todavía su propio robots.txt/sitemap: queda fuera
 // del alcance de esto, que es sobre el sitio de marketing.
 import type { GetServerSideProps } from 'next'
-import { ROOT_DOMAIN } from '@/lib/tenant'
+import { SEO_CANONICAL_HOST } from '@/lib/tenant'
 
 const DISALLOWED_PATHS = [
     '/panel',
@@ -38,7 +38,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
         'Allow: /',
         ...DISALLOWED_PATHS.map((path) => `Disallow: ${path}`),
         '',
-        `Sitemap: https://${ROOT_DOMAIN}/sitemap.xml`,
+        `Sitemap: https://${SEO_CANONICAL_HOST}/sitemap.xml`,
     ]
 
     res.setHeader('Content-Type', 'text/plain')

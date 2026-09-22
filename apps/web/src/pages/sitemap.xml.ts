@@ -10,13 +10,13 @@
 //   - /tienda/*, /panel, /admin, etc.: no son contenido de marketing, ver
 //     robots.txt.ts.
 import type { GetServerSideProps } from 'next'
-import { ROOT_DOMAIN } from '@/lib/tenant'
+import { SEO_CANONICAL_HOST } from '@/lib/tenant'
 
 const STATIC_PATHS = ['/', '/nosotros', '/planes']
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     const urlEntries = STATIC_PATHS.map(
-        (path) => `  <url>\n    <loc>https://${ROOT_DOMAIN}${path}</loc>\n  </url>`,
+        (path) => `  <url>\n    <loc>https://${SEO_CANONICAL_HOST}${path}</loc>\n  </url>`,
     ).join('\n')
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>`

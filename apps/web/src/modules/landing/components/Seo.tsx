@@ -6,7 +6,7 @@
 // la descripción del resultado por su cuenta en vez de usar los que se le
 // dan, y que compartir un link en WhatsApp/redes no muestre nada.
 import Head from 'next/head'
-import { ROOT_DOMAIN } from '@/lib/tenant'
+import { SEO_CANONICAL_HOST } from '@/lib/tenant'
 
 // TODO: reemplazar por una imagen 1200x630 dedicada (hoy usa el ícono
 // cuadrado de 512x512, que Facebook/WhatsApp recortan en vez de mostrar
@@ -21,8 +21,8 @@ type SeoProps = {
 }
 
 export function Seo({ title, description, path }: SeoProps) {
-    const url = `https://${ROOT_DOMAIN}${path}`
-    const image = `https://${ROOT_DOMAIN}${OG_IMAGE_PATH}`
+    const url = `https://${SEO_CANONICAL_HOST}${path}`
+    const image = `https://${SEO_CANONICAL_HOST}${OG_IMAGE_PATH}`
 
     return (
         <Head>

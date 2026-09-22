@@ -12,7 +12,7 @@
 
 import Head from 'next/head';
 import { Seo } from '@/modules/landing/components/Seo';
-import { ROOT_DOMAIN } from '@/lib/tenant';
+import { SEO_CANONICAL_HOST } from '@/lib/tenant';
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
@@ -31,8 +31,8 @@ const ORGANIZATION_JSON_LD = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'Órbita',
-    url: `https://${ROOT_DOMAIN}`,
-    logo: `https://${ROOT_DOMAIN}/logo.svg`,
+    url: `https://${SEO_CANONICAL_HOST}`,
+    logo: `https://${SEO_CANONICAL_HOST}/logo.svg`,
     description: 'Tienda online con punto de venta, stock, pedidos y pagos integrados para emprendedores y comercios.',
 };
 

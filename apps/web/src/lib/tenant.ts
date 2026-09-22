@@ -14,6 +14,16 @@
 // dominio real. Se puede sobrescribir por env sin recompilar la lógica.
 export const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local'
 
+// Host canónico para URLs de SEO (canonical, Open Graph, sitemap.xml,
+// robots.txt) — encontrado 2026-09-22: en producción el apex (`ROOT_DOMAIN`
+// sin www) redirige con 307 a `www.${ROOT_DOMAIN}` (config de dominio en
+// Vercel, no de esta app). Google Search Console no sigue redirects al leer
+// un sitemap, así que cualquier URL de SEO tiene que apuntar directo al host
+// final (www) para no romper la lectura. NO usar esto para URLs de
+// tiendas/tenants: los subdominios (`{slug}.${ROOT_DOMAIN}`) no llevan www,
+// ese redirect es solo del apex exacto.
+export const SEO_CANONICAL_HOST = process.env.NODE_ENV === 'production' ? `www.${ROOT_DOMAIN}` : ROOT_DOMAIN
+
 /**
  * Extrae el slug del negocio a partir de un host.
  * - `tienda1.orbita.local`      → "tienda1"
