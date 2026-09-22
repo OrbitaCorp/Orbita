@@ -17,6 +17,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { EMAIL_SOPORTE, useContacto } from './Contacto';
 import { LegalModal } from '@/modules/landing/components/ui/LegalModal';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 
@@ -44,6 +45,11 @@ const COLUMNAS = [
     },
 ];
 
+const COL_AYUDA_LINKS = [
+    { label: 'Enviar consulta', accion: true as const },
+    { label: EMAIL_SOPORTE,     href: `mailto:${EMAIL_SOPORTE}` },
+];
+
 const LEGALES: { label: string; key: LegalKey }[] = [
     { label: 'Términos de uso', key: 'terminos'   },
     { label: 'Privacidad',      key: 'privacidad' },
@@ -52,6 +58,7 @@ const LEGALES: { label: string; key: LegalKey }[] = [
 
 export function FooterV2() {
     const [legal, setLegal] = useState<LegalKey | null>(null);
+    const { abrir } = useContacto();
     const enHome = useRouter().pathname === '/';
     const hrefReal = (href: string) => (href.startsWith('#') && !enHome ? `/${href}` : href);
 
@@ -84,7 +91,7 @@ export function FooterV2() {
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-10 sm:gap-16">
+                            <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 sm:gap-16">
                                 {COLUMNAS.map(col => (
                                     <div key={col.titulo}>
                                         <p className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-500">
@@ -104,6 +111,34 @@ export function FooterV2() {
                                         </ul>
                                     </div>
                                 ))}
+
+                                <div>
+                                    <p className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        Ayuda
+                                    </p>
+                                    <ul className="space-y-2.5">
+                                        {COL_AYUDA_LINKS.map(l => (
+                                            <li key={l.label}>
+                                                {'accion' in l ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={abrir}
+                                                        className="cursor-pointer text-[13.5px] text-slate-400 transition-colors duration-200 hover:text-white"
+                                                    >
+                                                        {l.label}
+                                                    </button>
+                                                ) : (
+                                                    <a
+                                                        href={l.href}
+                                                        className="cursor-pointer text-[13.5px] text-slate-400 transition-colors duration-200 hover:text-white"
+                                                    >
+                                                        {l.label}
+                                                    </a>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>

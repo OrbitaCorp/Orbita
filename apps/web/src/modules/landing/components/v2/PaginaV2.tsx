@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ThemeProvider } from '@/modules/landing/context/ThemeContext';
+import { ContactoProvider } from './Contacto';
 import { EscenaEspacial } from './EscenaEspacial';
 import { NavbarV2 } from './NavbarV2';
 import { FooterV2 } from './FooterV2';
@@ -257,9 +258,11 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
 
                 <NavbarV2 />
 
+                <ContactoProvider>
                 <main className="relative">{children}</main>
 
                 <FooterV2 />
+                </ContactoProvider>
             </div>
         </ThemeProvider>
     );

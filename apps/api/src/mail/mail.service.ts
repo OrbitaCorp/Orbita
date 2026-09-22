@@ -174,6 +174,7 @@ export class MailService {
     // HACIA Órbita, no tiene sentido que vaya con el branding de ESE
     // negocio (nadie del negocio lo va a leer, lo lee el equipo de Órbita).
     'support-request',
+    'public-support-request',
     // La respuesta va al revés (Órbita → negocio), pero la firma Órbita como
     // plataforma, no la tienda: el que la recibe es el dueño de esa tienda.
     'support-reply',
@@ -305,7 +306,10 @@ export class MailService {
     'game-prize': this.svgIcon(
       '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"/><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"/>',
     ),
-    // LifeBuoy — formulario de Soporte.
+    // LifeBuoy — formulario de Soporte (panel y landing).
+    'public-support-request': this.svgIcon(
+      '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
+    ),
     'support-request': this.svgIcon(
       '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
     ),
@@ -913,6 +917,15 @@ export class MailService {
   ): Promise<boolean> {
     const asunto = `[Soporte] ${data.isReply ? 'Re: ' : ''}#${data.number} ${data.category} — ${data.businessName}: ${data.subject}`;
     return this.sendOrLog(to, asunto, 'support-request', { ...data, hasAttachments: (data.attachments?.length ?? 0) > 0 }, meta, data.memberEmail);
+  }
+
+  // Contacto desde la landing (sin auth). Reply-To al email de quien escribió.
+  async sendPublicSupportRequest(
+    to: string,
+    data: { name: string; email: string; category: string; subject: string; message: string },
+  ): Promise<boolean> {
+    const asunto = `[Contacto landing] ${data.category} — ${data.name}: ${data.subject}`;
+    return this.sendOrLog(to, asunto, 'public-support-request', data, undefined, data.email);
   }
 
   // Órbita le respondió al negocio desde el superadmin (SupportService#reply).

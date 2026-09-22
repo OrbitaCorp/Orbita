@@ -21,6 +21,7 @@
 // bienvenida termina, desde el panel — sin renovación automática (mail +
 // botón "Activar mi plan").
 
+import { TarjetaContacto } from './Contacto';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 // Las tarjetas y sus montos viven en planesDatos.ts desde que existe /planes
 // (la comparación detallada): son los mismos datos en las dos pantallas, así
@@ -197,6 +198,10 @@ export function Faq() {
                     </Reveal>
                 ))}
             </div>
+
+            <Reveal delay={FAQS.length * 60 + 60} className="mt-10">
+                <TarjetaContacto />
+            </Reveal>
         </Seccion>
     );
 }
