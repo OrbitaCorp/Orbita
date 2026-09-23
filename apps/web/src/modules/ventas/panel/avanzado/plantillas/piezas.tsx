@@ -23,6 +23,15 @@ export const CSS = `
 .pl-card:hover .pl-media .pl-a { transform: scale(1.06); }
 .pl-media .pl-b { position: absolute; inset: 0; opacity: 0; }
 .pl-card:hover .pl-media .pl-b { opacity: 1; }
+/* Con segunda foto, la primera tiene que apagarse al mismo tiempo que la de
+   abajo se prende — si no, la de abajo queda flotando ENCIMA de la de
+   arriba (que sigue en opacity:1) y cualquier borde donde el objectFit
+   'contain' de la segunda no tape a la primera deja asomar un pedazo de la
+   otra foto (bug real, reportado con captura: se veía una tela distinta
+   asomando abajo del producto). El selector :has() es a propósito: sin
+   segunda foto no hay pl-b hermano, y pl-a tiene que seguir visible (zoom
+   solo, sin cross-fade). */
+.pl-card:hover .pl-media:has(.pl-b) .pl-a { opacity: 0; }
 
 .pl-tile { position: relative; overflow: hidden; }
 .pl-tile img { transition: transform .9s cubic-bezier(.2,.7,.3,1); }

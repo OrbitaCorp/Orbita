@@ -1030,9 +1030,19 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
       case 'categorias':
         out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', 'Ver todas →'))
         break
-      case 'fila':
-        out.push(encabezado(b.id, 'Fila de productos', 'El encabezado de esta fila. Los productos salen de tu catálogo.', 'Lo más elegido', 'Destacados', 'Ver todo →'))
+      case 'fila': {
+        // El título por defecto seguía siendo "Destacados" para CUALQUIER
+        // fila, así que una plantilla con dos (una de destacados y otra de
+        // más vendidos, ej. Base/Lienzo) mostraba el mismo título dos veces
+        // aunque los productos de cada una fueran distintos (reportado con
+        // captura). Distingue por `fuente`, no por posición: una plantilla
+        // con una sola fila (sin fuente) se queda con el default de siempre.
+        const [vol, tit] =
+          b.fuente === 'masVendidos' ? ['Recién llegado', 'Nuevo lanzamiento']
+            : ['Lo más elegido', 'Destacados']
+        out.push(encabezado(b.id, 'Fila de productos', 'El encabezado de esta fila. Los productos salen de tu catálogo.', vol, tit, 'Ver todo →'))
         break
+      }
       case 'franja':
         out.push({
           id: 'franja',
