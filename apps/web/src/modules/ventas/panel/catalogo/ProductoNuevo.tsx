@@ -1599,10 +1599,15 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         al menos una foto general (pendiente o ya guardada, no tiene
                                         sentido elegir un estilo sin nada para probarlo). */}
                                     {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
+                                        // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
+                                        // pipeline de "Fondo con IA" (ver background-removal.service.ts).
+                                        // Deshabilitado en vez de ocultado para que quede claro que vuelve.
                                         <Button
                                             variant="outline" size="sm"
                                             icon={<Sparkles size={13} strokeWidth={2.2} />}
                                             onClick={() => setModalFondoIA(true)}
+                                            disabled
+                                            title="En mantenimiento — vuelve pronto"
                                         >
                                             Fondo con IA
                                         </Button>
@@ -2387,23 +2392,26 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         real pasa en el backend. Antes era un ícono flotante
                         sobre la miniatura (bajo contraste, difícil de ver con
                         ciertas fotos) — ahora es un botón explícito debajo. */}
+                    {/* EN MANTENIMIENTO (24/09/2026): deshabilitado, no oculto — ver
+                        background-removal.service.ts. */}
                     {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
                         <button
                             type="button"
                             className="ds-hover"
-                            onClick={() => onQuitarFondo(it.id)}
-                            title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
+                            disabled
+                            title="En mantenimiento — vuelve pronto"
                             style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                                 width: '100%', padding: compacta ? '3px 4px' : '4px 6px', borderRadius: 6,
-                                border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
-                                background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
-                                color: it.quitarFondo ? '#fff' : 'var(--color-text)',
-                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-surface)',
+                                color: 'var(--color-muted)',
+                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'not-allowed',
+                                opacity: 0.6,
                             }}
                         >
-                            <Sparkles size={compacta ? 10 : 11} fill={it.quitarFondo ? '#fff' : 'none'} />
-                            {it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
+                            <Sparkles size={compacta ? 10 : 11} />
+                            Quitar fondo
                         </button>
                     )}
                 </div>

@@ -1979,9 +1979,12 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
                     <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
-                    <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-body)', borderRadius: 6, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={removeBg} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
-                        Quitar el fondo automáticamente al subir esta imagen
+                    {/* EN MANTENIMIENTO (24/09/2026): deshabilitado, no oculto — ver
+                        background-removal.service.ts. removeBg queda forzado en
+                        false (el checkbox nunca puede tildarse mientras esté así). */}
+                    <label className="ds-hover" title="En mantenimiento — vuelve pronto" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-muted)', borderRadius: 6, cursor: 'not-allowed' }}>
+                        <input type="checkbox" checked={false} disabled onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+                        Quitar el fondo automáticamente al subir esta imagen (en mantenimiento)
                     </label>
 
                     {!soloTexto && (<>
