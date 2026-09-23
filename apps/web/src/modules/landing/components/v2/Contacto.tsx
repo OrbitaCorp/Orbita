@@ -83,6 +83,24 @@ function mensajeDeFallo(err: unknown): string {
     return `No pudimos enviar tu consulta ahora. Si sigue fallando, escribinos a ${EMAIL_SOPORTE}.`;
 }
 
+// El DTO del backend (send-public-support-request.dto.ts) exige `name` y
+// `subject`, pero al visitante no se los pedimos: son dos campos de más para
+// alguien que solo quiere contarnos algo. Se arman con lo que ya escribió, así
+// el formulario queda en email + mensaje sin tocar el backend.
+//
+// El nombre es la parte del email antes de la @ (le llega al equipo como
+// "juan.perez"); el asunto, el tema elegido más el arranque del mensaje.
+function nombreDesdeEmail(email: string): string {
+    const local = email.split('@')[0].trim();
+    return local.length >= 2 ? local.slice(0, 80) : 'Visitante';
+}
+
+function asuntoDesdeMensaje(tema: string, mensaje: string): string {
+    const resumen = mensaje.replace(/\s+/g, ' ').trim();
+    const cabeza = resumen.length > 70 ? `${resumen.slice(0, 70).trimEnd()}…` : resumen;
+    return `${tema}: ${cabeza}`.slice(0, 120);
+}
+
 function ModalContacto({ onClose }: { onClose: () => void }) {
     const idTitulo = useId();
     const panel = useRef<HTMLDivElement>(null);
@@ -96,18 +114,14 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
     // como un regaño.
     const [intento, setIntento] = useState(false);
 
-    const [nombre, setNombre] = useState('');
     const [email, setEmail] = useState('');
     const [categoria, setCategoria] = useState<SupportCategory>('OTRO');
-    const [asunto, setAsunto] = useState('');
     const [mensaje, setMensaje] = useState('');
     const [trampa, setTrampa] = useState('');
 
-    // Mismos mínimos que el DTO del backend (send-public-support-request.dto.ts).
+    // Mismos mínimos que el DTO del backend para lo que sí se escribe acá.
     const errores = {
-        nombre: nombre.trim().length < 2 ? 'Escribí tu nombre.' : null,
         email: EMAIL_RE.test(email.trim()) ? null : 'Revisá el email: parece incompleto.',
-        asunto: asunto.trim().length < 3 ? 'Ponele un asunto corto.' : null,
         mensaje: mensaje.trim().length < 10 ? 'Contanos un poco más (mínimo 10 caracteres).' : null,
     };
     const hayErrores = Object.values(errores).some(Boolean);
@@ -123,7 +137,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
             if (e.key === 'Escape') { onClose(); return; }
             if (e.key !== 'Tab' || !panel.current) return;
             const enfocables = panel.current.querySelectorAll<HTMLElement>(
-                'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), textarea:not([disabled])',
+                'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled])',
             );
             if (!enfocables.length) return;
             const ini = enfocables[0];
@@ -145,11 +159,12 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
         setEstado('enviando');
         setError(null);
         try {
+            const tema = CATEGORIAS.find(c => c.value === categoria)?.label ?? 'Consulta';
             const r = await sendPublicSupportRequest({
-                name: nombre.trim(),
+                name: nombreDesdeEmail(email),
                 email: email.trim(),
                 category: categoria,
-                subject: asunto.trim(),
+                subject: asuntoDesdeMensaje(tema, mensaje),
                 message: mensaje.trim(),
                 website: trampa,
             });
@@ -190,7 +205,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={idTitulo}
-                className="oc-modal-panel relative max-h-[100dvh] w-full overflow-y-auto rounded-t-2xl px-5 pb-6 pt-5 sm:max-w-[560px] sm:rounded-2xl sm:px-7 sm:pb-7 sm:pt-6"
+                className="oc-modal-panel relative max-h-[100dvh] w-full overflow-y-auto rounded-t-2xl px-5 pb-5 pt-5 sm:max-w-[520px] sm:rounded-2xl sm:px-6 sm:pb-5 sm:pt-5"
                 style={{ background: 'var(--oc-bg)', border: '1px solid var(--oc-panel-bd)', boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}
             >
                 <div className="flex items-start justify-between gap-4">
@@ -240,56 +255,14 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                     </div>
                 ) : (
                     <form onSubmit={enviar} noValidate className="mt-5">
-                        <p className="mb-5 text-[14px] leading-relaxed text-slate-400">
-                            Contanos qué necesitás y te respondemos por mail.
-                        </p>
-
-                        <fieldset className="mb-5">
-                            <legend className={etiqueta}>¿Sobre qué es tu consulta?</legend>
-                            <div role="radiogroup" className="flex flex-wrap gap-2">
-                                {CATEGORIAS.map(c => {
-                                    const activa = categoria === c.value;
-                                    return (
-                                        <button
-                                            key={c.value}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={activa}
-                                            onClick={() => setCategoria(c.value)}
-                                            className="oc-chip min-h-[44px] cursor-pointer rounded-full px-4 text-[13px] font-semibold transition-colors duration-200 sm:min-h-[38px]"
-                                            style={{
-                                                border: `1px solid ${activa ? 'var(--oc-accent-bd)' : 'var(--oc-card-bd)'}`,
-                                                background: activa ? 'var(--oc-accent-soft)' : 'transparent',
-                                                color: activa ? 'var(--oc-accent-fuerte)' : 'var(--oc-text-3)',
-                                            }}
-                                        >
-                                            {c.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </fieldset>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label htmlFor={`${idTitulo}-nombre`} className={etiqueta}>Nombre</label>
-                                <input
-                                    ref={primero}
-                                    id={`${idTitulo}-nombre`}
-                                    value={nombre}
-                                    onChange={e => setNombre(e.target.value)}
-                                    autoComplete="name"
-                                    maxLength={80}
-                                    aria-invalid={!!ver('nombre')}
-                                    aria-describedby={ver('nombre') ? `${idTitulo}-nombre-e` : undefined}
-                                    className={`${campo} h-12`}
-                                    style={estiloCampo(!!ver('nombre'))}
-                                />
-                                {ver('nombre') && <p id={`${idTitulo}-nombre-e`} className={textoError}>{errores.nombre}</p>}
-                            </div>
+                        {/* Email y tema en una sola fila: son los dos campos cortos.
+                            El tema es opcional (arranca en "Otra consulta"); sirve
+                            para que el equipo ordene lo que llega. */}
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label htmlFor={`${idTitulo}-email`} className={etiqueta}>Tu email</label>
                                 <input
+                                    ref={primero}
                                     id={`${idTitulo}-email`}
                                     type="email"
                                     inputMode="email"
@@ -297,42 +270,49 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                                     onChange={e => setEmail(e.target.value)}
                                     autoComplete="email"
                                     maxLength={254}
+                                    placeholder="nombre@correo.com"
                                     aria-invalid={!!ver('email')}
                                     aria-describedby={ver('email') ? `${idTitulo}-email-e` : undefined}
-                                    className={`${campo} h-12`}
+                                    className={`${campo} h-11`}
                                     style={estiloCampo(!!ver('email'))}
                                 />
                                 {ver('email') && <p id={`${idTitulo}-email-e`} className={textoError}>{errores.email}</p>}
                             </div>
+                            <div>
+                                <label htmlFor={`${idTitulo}-tema`} className={etiqueta}>Tema</label>
+                                <div className="relative">
+                                    <select
+                                        id={`${idTitulo}-tema`}
+                                        value={categoria}
+                                        onChange={e => setCategoria(e.target.value as SupportCategory)}
+                                        className={`${campo} h-11 cursor-pointer appearance-none pr-10`}
+                                        style={{ ...estiloCampo(false), colorScheme: 'dark' }}
+                                    >
+                                        {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                    </select>
+                                    <svg
+                                        width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                                        className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"
+                                    >
+                                        <path d="m6 9 6 6 6-6" />
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="mt-4">
-                            <label htmlFor={`${idTitulo}-asunto`} className={etiqueta}>Asunto</label>
-                            <input
-                                id={`${idTitulo}-asunto`}
-                                value={asunto}
-                                onChange={e => setAsunto(e.target.value)}
-                                maxLength={120}
-                                aria-invalid={!!ver('asunto')}
-                                aria-describedby={ver('asunto') ? `${idTitulo}-asunto-e` : undefined}
-                                className={`${campo} h-12`}
-                                style={estiloCampo(!!ver('asunto'))}
-                            />
-                            {ver('asunto') && <p id={`${idTitulo}-asunto-e`} className={textoError}>{errores.asunto}</p>}
-                        </div>
-
-                        <div className="mt-4">
-                            <label htmlFor={`${idTitulo}-mensaje`} className={etiqueta}>Contanos el detalle</label>
+                        <div className="mt-3">
+                            <label htmlFor={`${idTitulo}-mensaje`} className={etiqueta}>¿Qué necesitás?</label>
                             <textarea
                                 id={`${idTitulo}-mensaje`}
                                 value={mensaje}
                                 onChange={e => setMensaje(e.target.value)}
-                                rows={5}
+                                rows={4}
                                 maxLength={4000}
+                                placeholder="Contanos y te respondemos por mail."
                                 aria-invalid={!!ver('mensaje')}
                                 aria-describedby={ver('mensaje') ? `${idTitulo}-mensaje-e` : undefined}
-                                className={`${campo} resize-y py-3`}
-                                style={{ ...estiloCampo(!!ver('mensaje')), minHeight: 120 }}
+                                className={`${campo} resize-none py-3`}
+                                style={{ ...estiloCampo(!!ver('mensaje')), minHeight: 104 }}
                             />
                             {ver('mensaje') && <p id={`${idTitulo}-mensaje-e`} className={textoError}>{errores.mensaje}</p>}
                         </div>
@@ -355,12 +335,12 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                         <button
                             type="submit"
                             disabled={estado === 'enviando'}
-                            className="oc-cta mt-6 inline-flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-7 text-[15px] font-bold transition-colors duration-200 disabled:cursor-wait disabled:opacity-70"
+                            className="oc-cta mt-4 inline-flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-7 text-[15px] font-bold transition-colors duration-200 disabled:cursor-wait disabled:opacity-70"
                         >
                             {estado === 'enviando' ? 'Enviando…' : 'Enviar consulta'}
                         </button>
 
-                        <p className="mt-4 text-center text-[12.5px] text-slate-500">
+                        <p className="mt-3 text-center text-[12.5px] text-slate-500">
                             O escribinos directo a{' '}
                             <a href={`mailto:${EMAIL_SOPORTE}`} className="cursor-pointer text-slate-300 underline-offset-4 transition-colors duration-200 hover:text-white hover:underline">
                                 {EMAIL_SOPORTE}
@@ -434,16 +414,26 @@ export function TarjetaContacto({
                             {EMAIL_SOPORTE}
                         </a>
                         <span aria-hidden="true">·</span>
+                        {/* El botón mismo cambia de estado: nada de un elemento
+                            aparte que aparezca y desaparezca. Ancho mínimo fijo
+                            para que la fila no salte al cambiar el texto. */}
                         <button
                             type="button"
                             onClick={copiar}
-                            className="cursor-pointer text-slate-400 underline-offset-4 transition-colors duration-200 hover:text-white hover:underline"
+                            aria-live="polite"
+                            title={copia === 'error' ? 'No se pudo copiar: seleccioná el mail y copialo a mano' : undefined}
+                            className={`inline-flex min-w-[76px] cursor-pointer items-center justify-center gap-1.5 underline-offset-4 transition-colors duration-200 ${
+                                copia === 'ok' ? 'font-semibold' : copia === 'error' ? 'text-red-300' : 'text-slate-400 hover:text-white hover:underline'
+                            }`}
+                            style={copia === 'ok' ? { color: 'var(--oc-ok)' } : undefined}
                         >
-                            Copiar
+                            {copia === 'ok' && (
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                            )}
+                            {copia === 'ok' ? 'Copiado' : copia === 'error' ? 'No se pudo' : 'Copiar'}
                         </button>
-                        <span role="status" aria-live="polite" className="min-w-0 text-[12px] text-slate-500">
-                            {copia === 'ok' ? '¡Copiado!' : copia === 'error' ? 'No se pudo, copialo a mano' : ''}
-                        </span>
                     </div>
                 </div>
             </div>
