@@ -5,6 +5,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, Upload, Trash2, Loader2 } from 'lucide-react'
+import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
 
 interface ImgUploaderProps {
     value:    string | null
@@ -13,21 +14,37 @@ interface ImgUploaderProps {
     shape?:   'square' | 'circle'
     size?:    number
     formats?: string
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, no se pudo convertir). */
+    onToast?: (m: string) => void
 }
 
-export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB' }: ImgUploaderProps) {
+export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB', onToast }: ImgUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [drag, setDrag] = useState(false)
     const [uploading, setUploading] = useState(false)
 
-    const handle = (file: File | undefined | null) => {
-        if (!file || !file.type.startsWith('image/')) return
+    const handle = async (fileOriginal: File | undefined | null) => {
+        if (!fileOriginal) return
+        if (!esArchivoDeImagen(fileOriginal)) {
+            onToast?.(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`)
+            return
+        }
+        setUploading(true)
+        let file: File
+        try {
+            file = await normalizarImagen(fileOriginal)
+        } catch {
+            // No se pudo decodificar (HEIC corrupto, formato raro). Mejor
+            // avisar en el momento que subir algo que después no se ve.
+            setUploading(false)
+            onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
         const r = new FileReader()
         r.onload = async e => {
             onChange(e.target?.result as string)
-            if (!onUpload) return
+            if (!onUpload) { setUploading(false); return }
             try {
-                setUploading(true)
                 const url = await onUpload(file)
                 onChange(url)
             } catch {
@@ -69,7 +86,7 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
                         <Loader2 size={18} color="#fff" style={{ animation: 'spin 800ms linear infinite' }} />
                     </div>
                 )}
-                <input ref={ref} type="file" accept="image/*" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
+                <input ref={ref} type="file" accept="image/*,.heic,.heif" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 

@@ -14,6 +14,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
 
 interface LogoPickerProps {
     value:    string | null
@@ -22,15 +23,30 @@ interface LogoPickerProps {
     /** Para el aria-label, así el botón no es "subir imagen" a secas cuando hay varios. */
     nombre?:  string
     size?:    number
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, no se pudo convertir). */
+    onToast?: (m: string) => void
 }
 
-export function LogoPicker({ value, onChange, onUpload, nombre, size = 44 }: LogoPickerProps) {
+export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, onToast }: LogoPickerProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [subiendo, setSubiendo] = useState(false)
     const de = nombre?.trim() ? ` de ${nombre.trim()}` : ''
 
-    const handle = (file: File | undefined | null) => {
-        if (!file || !file.type.startsWith('image/')) return
+    const handle = async (fileOriginal: File | undefined | null) => {
+        if (!fileOriginal) return
+        if (!esArchivoDeImagen(fileOriginal)) {
+            onToast?.(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`)
+            return
+        }
+        setSubiendo(true)
+        let file: File
+        try {
+            file = await normalizarImagen(fileOriginal)
+        } catch {
+            setSubiendo(false)
+            onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
         const r = new FileReader()
         r.onload = async e => {
             // Preview instantáneo con el dataURL y recién después la URL real
@@ -38,7 +54,6 @@ export function LogoPicker({ value, onChange, onUpload, nombre, size = 44 }: Log
             // no se pierde de vista lo que el usuario eligió).
             onChange(e.target?.result as string)
             try {
-                setSubiendo(true)
                 onChange(await onUpload(file))
             } catch {
                 /* se queda con el preview local; el guardado avisa después */
@@ -97,7 +112,7 @@ export function LogoPicker({ value, onChange, onUpload, nombre, size = 44 }: Log
                 </div>
             )}
 
-            <input ref={ref} type="file" accept="image/*" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
+            <input ref={ref} type="file" accept="image/*,.heic,.heif" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
         </div>
     )
 }

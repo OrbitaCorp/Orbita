@@ -18,6 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -654,7 +655,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }
 
     // ── Imágenes ────────────────────────────────────────────────────────────
-    function agregarImagenes(files: FileList | null, valorOpcion?: string) {
+    async function agregarImagenes(files: FileList | null, valorOpcion?: string) {
         if (!files?.length) return
         // Si el producto todavía no tiene ninguna principal, la PRIMERA
         // imagen general de esta tanda pasa a serlo — se decide una sola vez
@@ -664,8 +665,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // ninguna de las nuevas cargada).
         let faltaPrincipal = !valorOpcion && imagenes.every(i => !i.principal) && guardadas.every(g => !g.principal)
         const nuevas: ImagenPendiente[] = []
-        for (const file of Array.from(files)) {
-            if (!file.type.startsWith('image/')) continue
+        for (const fileOriginal of Array.from(files)) {
+            if (!esArchivoDeImagen(fileOriginal)) { onToast(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`); continue }
+            let file: File
+            try {
+                file = await normalizarImagen(fileOriginal)
+            } catch {
+                onToast(`"${fileOriginal.name}" no se pudo procesar`)
+                continue
+            }
+            // El chequeo de tamaño va sobre el archivo YA convertido: es el
+            // que termina subiéndose, y un HEIC pasado a JPEG puede pesar
+            // distinto que el original.
             if (file.size > 5 * 1024 * 1024) { onToast(`"${file.name}" supera los 5MB`); continue }
             const principal = faltaPrincipal
             if (principal) faltaPrincipal = false
@@ -2395,7 +2406,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                 </div>
             ))}
             <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
-                <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                <input type="file" accept="image/*,.heic,.heif" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={compacta ? 16 : 20} />
             </label>
         </div>
@@ -2503,7 +2514,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                 </div>
             ))}
             <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
-                <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                <input type="file" accept="image/*,.heic,.heif" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={18} />
             </label>
         </div>
