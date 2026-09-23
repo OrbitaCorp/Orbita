@@ -344,7 +344,8 @@ export default function Categorias() {
                                         onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
                                         shape="circle"
                                         size={64}
-                                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda"
+                                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda. PNG, JPG o HEIC · máx 10MB"
+                                        onToast={notify}
                                     />
                                 </div>
                             </div>
@@ -421,6 +422,7 @@ export default function Categorias() {
                 <CatModal
                     modal={modal}
                     onClose={() => setModal(null)}
+                    onToast={notify}
                     onSave={async (campos, parentId, editId) => {
                         const payload = {
                             name: campos.nombre,
@@ -478,10 +480,11 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 
 type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'color' | 'imagen' | 'activa'>
 
-function CatModal({ modal, onClose, onSave }: {
+function CatModal({ modal, onClose, onSave, onToast }: {
     modal: ModalState
     onClose: () => void
     onSave: (campos: CatCampos, parentId: string | null, editId: string | null) => Promise<void>
+    onToast: (m: string) => void
 }) {
     const editing  = modal.edit
     const parentId = modal.parentId ?? null
@@ -540,7 +543,8 @@ function CatModal({ modal, onClose, onSave }: {
                         onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
                         shape="circle"
                         size={64}
-                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda"
+                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda. PNG, JPG o HEIC · máx 10MB"
+                        onToast={onToast}
                     />
                 </div>
             </div>

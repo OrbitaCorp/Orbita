@@ -200,6 +200,7 @@ export class ProductsService {
           status: dto.status ?? 'DRAFT',
           specs: dto.specs ? (dto.specs.map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue) : undefined,
           videoUrl: dto.videoUrl || null,
+          photoType: dto.photoType ?? 'flat',
         },
       });
 
@@ -359,6 +360,7 @@ export class ProductsService {
           status: dto.status ?? undefined,
           specs: (dto.specs ?? []).map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue,
           videoUrl: dto.videoUrl || null,
+          photoType: dto.photoType ?? undefined,
         },
       });
       if (count === 0) throw new NotFoundException('Producto no encontrado');
@@ -684,6 +686,13 @@ export class ProductsService {
         select: { id: true },
       });
       if (!addon) throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+      // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
+      // el pipeline de "Fondo con IA" de producto (modo gratis actual + modo
+      // premium nuevo con Gemini/Workers AI). El toggle de fotos de producto y
+      // el modal "Fondo con IA" (image-studio.service.ts) quedan pausados;
+      // uploadStorefrontImage() en businesses.service.ts (sliders de
+      // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
+      throw new ServiceUnavailableException('"Quitar fondo" está en mantenimiento — vuelve pronto.');
       // Corre el modelo local ANTES de convertir a webp — mismo orden que
       // uploadStorefrontImage() en businesses.service.ts, para no codificar
       // la imagen dos veces.
@@ -903,6 +912,7 @@ export class ProductsService {
       cost: p.cost ? Number(p.cost) : null,
       status: p.status,
       isFeatured: p.isFeatured,
+      photoType: p.photoType,
       specs: normalizarSpecs(p.specs),
       videoUrl: p.videoUrl,
       contentBlocks: normalizarBloques(p.contentBlocks),

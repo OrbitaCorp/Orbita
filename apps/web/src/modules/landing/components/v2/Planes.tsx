@@ -22,7 +22,7 @@ import { useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 import {
     PRESTACIONES_BASE, PRESTACIONES_AVANZADO, PERIODOS, TARJETAS, fmt,
-    type PeriodoKey, type PlanTarjeta,
+    type PeriodoKey, type PlanTarjeta, type Prestacion,
 } from './planesDatos';
 
 function Tilde() {
@@ -204,6 +204,47 @@ export function Planes() {
                     Podés cambiar de período, o sumar y sacar el paquete Avanzado, cuando quieras desde el panel.
                 </p>
             </Reveal>
+
+            {/* Detalle completo: las tarjetas de arriba dan el título de cada
+                prestación para que se puedan comparar de un vistazo; acá se
+                repiten con su explicación completa (mismo texto que Modulos.tsx
+                y Avanzado.tsx) para quien quiere entender qué es cada una antes
+                de decidir. Sin ícono ni acento por fila a propósito — ya son
+                dieciocho líneas, y un color o un ícono por cada una compite
+                contra el texto en vez de ordenarlo. */}
+            <Reveal className="mx-auto mt-20 max-w-5xl">
+                <h3 className="text-center text-[20px] font-black tracking-[-0.02em] text-white sm:text-[24px]">
+                    Cada prestación, explicada
+                </h3>
+                <p className="mx-auto mt-3 max-w-[560px] text-center text-[13px] leading-relaxed text-slate-400">
+                    Lo mismo que ves arriba, con el detalle de qué es cada cosa.
+                </p>
+
+                <div className="mt-10 grid grid-cols-1 gap-x-10 gap-y-10 lg:grid-cols-2">
+                    <ListaDetalle titulo="En Base y en Base + Avanzado" items={PRESTACIONES_BASE} />
+                    <ListaDetalle titulo="Sumando el paquete Avanzado" items={PRESTACIONES_AVANZADO} />
+                </div>
+            </Reveal>
         </Seccion>
+    );
+}
+
+function ListaDetalle({ titulo, items }: { titulo: string; items: Prestacion[] }) {
+    return (
+        <div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300/80">{titulo}</span>
+            <ul className="mt-4">
+                {items.map((it, i) => (
+                    <li
+                        key={it.titulo}
+                        className="py-4"
+                        style={{ borderTop: i === 0 ? 'none' : '1px solid var(--oc-card-bd)' }}
+                    >
+                        <p className="text-[14px] font-bold text-white">{it.titulo}</p>
+                        <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{it.texto}</p>
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 }

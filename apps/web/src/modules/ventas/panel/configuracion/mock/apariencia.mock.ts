@@ -2,6 +2,8 @@
 // Estado de apariencia pública de la tienda + helpers de fuentes.
 // TODO: persistir contra el backend cuando esté listo.
 
+import type { MarcaModo } from '@/components/storefront/marca'
+
 export type ModoColor    = 'claro' | 'oscuro' | 'sistema'
 export type EscalaFuente = 'sm' | 'md' | 'lg'
 export type LayoutHeader = 'standard' | 'full' | 'minimal' | 'centered'
@@ -296,6 +298,12 @@ export interface Apariencia {
     // cae al texto de la maqueta, así que vaciarlo devuelve el diseño original
     // en vez de dejar un hueco.
     seccionesPlantilla: Record<string, Record<string, string>>
+    // Cómo se ve la marca en el header clásico: qué muestra (logo y nombre /
+    // solo logo / solo nombre) y con qué estilo — ver
+    // components/storefront/marca.tsx. Se guarda dentro de homeTemplateData
+    // (clave interna `_marca`), no en una columna propia.
+    marcaModo:   MarcaModo
+    marcaEstilo: string
 }
 
 // OJO con volver a poner texto de ejemplo en `nombreTienda`/`tagline`: estos
@@ -369,6 +377,9 @@ export const AP_DEFAULTS: Apariencia = {
     // Vacío = cada sección de la plantilla activa usa el texto con el que se
     // diseñó. Se llena solo con lo que el dueño edite.
     seccionesPlantilla: {},
+    // El diseño de siempre: logo a la izquierda, nombre al lado.
+    marcaModo: 'ambos',
+    marcaEstilo: 'lado',
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']

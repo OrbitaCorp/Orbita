@@ -16,6 +16,11 @@ jest.mock('../../src/common/utils/subida-imagen', () => ({
   ENTRADA_IMAGEN: { limitInputPixels: 100 },
 }));
 
+// El "mantenimiento" del 24/09/2026 (ver el plan de la tarea "Fondo con IA:
+// pipeline 2D/3D") NO vive acá — este servicio sigue andando igual, lo que
+// se pausó son los callers de producto/"Fondo con IA" (ver
+// products.service.ts y image-studio.service.ts). Este archivo sigue
+// probando BackgroundRemovalService tal cual.
 describe('Quitar el fondo', () => {
   it('tope por negocio: pasado el máximo de la ventana, 429 sin correr el modelo', async () => {
     const svc = new BackgroundRemovalService();

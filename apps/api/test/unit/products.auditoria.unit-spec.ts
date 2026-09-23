@@ -1,4 +1,4 @@
-import { ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import sharp from 'sharp';
@@ -73,6 +73,24 @@ describe('Fotos de producto', () => {
       svc.addImage(BIZ, 'p-1', {}, { buffer: Buffer.from('x'), mimetype: 'image/png', originalname: 'a.png' }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(upload).not.toHaveBeenCalled();
+  });
+
+  // "Quitar fondo" en fotos de producto está en mantenimiento (24/09/2026, ver
+  // el plan "Fondo con IA: pipeline 2D/3D") — a diferencia de los sliders de
+  // Apariencia (uploadStorefrontImage en businesses.service.ts), que siguen
+  // andando con el modelo local.
+  it('quitar fondo está en mantenimiento: 503 sin correr el modelo', async () => {
+    const bg = { removeBackground: jest.fn() };
+    const prisma = {
+      product: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1', name: 'Remera' }) },
+      productImage: { count: jest.fn().mockResolvedValue(0) },
+      businessAddon: { findFirst: jest.fn().mockResolvedValue({ id: 'a-1' }) },
+    };
+    const svc = new ProductsService(prisma as any, {} as any, bg as any);
+    await expect(
+      svc.addImage(BIZ, 'p-1', { removeBackground: true } as any, { buffer: Buffer.from('x'), mimetype: 'image/png', originalname: 'a.png' }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(bg.removeBackground).not.toHaveBeenCalled();
   });
 });
 

@@ -39,6 +39,7 @@ import {
     type VideoItem, type VideoLayout, type WhatsappLayout,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
+import { MARCA_MODOS, MARCA_ESTILOS, marcaValida, type MarcaModo } from '@/components/storefront/marca'
 
 // Intercambia el elemento en `from` con el que está en `to` — usado para
 // reordenar los sliders del hero con las flechas subir/bajar (ver SlideItem).
@@ -529,12 +530,39 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette} ayuda={AYUDA_SECCIONES[soloContenido ? 'hero' : 'identidad']}>
             {!soloContenido && (<>
                 <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
+                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG o HEIC · máx 10MB" onToast={onToast} />
                 <Divider />
                 <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
-                <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
+                <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" onToast={onToast} />
                 <Divider />
-                <div><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
+                <div>
+                    <FieldLabel help="Es opcional. Si lo dejás vacío se usa el nombre de tu negocio. Y si tu logo ya dice el nombre, podés mostrar solo el logo (acá abajo).">Nombre de la tienda <span style={{ color: 'var(--color-subtle)', fontWeight: 400 }}>· opcional</span></FieldLabel>
+                    <Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} placeholder="Ej: Venus Style" />
+                </div>
+                <Divider />
+                <FieldLabel help="Elegí qué se muestra arriba a la izquierda de tu tienda y con qué diseño.">Cómo se ve tu marca en el header</FieldLabel>
+                <VisualPick
+                    value={ap.marcaModo}
+                    onChange={v => {
+                        const m = marcaValida(v, ap.marcaEstilo)
+                        set('marcaModo', m.modo)
+                        set('marcaEstilo', m.estilo)
+                    }}
+                    options={MARCA_MODOS.map(m => ({ id: m.id, label: m.label, svg: miniMarca(m.id, marcaValida(m.id, null).estilo), ayuda: m.ayuda }))}
+                />
+                <div style={{ height: 14 }} />
+                <VisualPick
+                    value={marcaValida(ap.marcaModo, ap.marcaEstilo).estilo}
+                    onChange={v => set('marcaEstilo', v)}
+                    options={MARCA_ESTILOS[ap.marcaModo].map(e => ({ id: e.id, label: e.label, svg: miniMarca(ap.marcaModo, e.id), ayuda: e.ayuda }))}
+                />
+                {ap.marcaModo !== 'nombre' && !ap.logo && (
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '10px 0 0' }}>
+                        {ap.marcaModo === 'logo'
+                            ? 'Todavía no subiste un logo: mientras tanto se muestra el nombre en texto.'
+                            : 'Sin logo subido se dibuja un ícono genérico. Subí el tuyo arriba, o elegí "Solo nombre".'}
+                    </p>
+                )}
                 <Divider />
             </>)}
             {/* Escaparate (heroPropio, sin rotación — ver heroNoRotativo más
@@ -578,6 +606,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         canMoveDown={i < slidersVisibles.length - 1}
                         onMoveUp={() => set('sliders', moverElemento(ap.sliders, i, i - 1))}
                         onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
+                        onToast={onToast}
                     />
                 ))}
                 {(!heroMax || slidersVisibles.length < heroMax) && (
@@ -672,7 +701,8 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 onUpload={subirImagenApariencia}
                                 shape="square"
                                 size={80}
-                                formats="JPG, PNG · máx 4MB"
+                                formats="JPG, PNG o HEIC · máx 10MB"
+                                onToast={onToast}
                             />
                         ) : campo.tipo === 'parrafo' ? (
                             <textarea
@@ -1165,7 +1195,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                         <Divider />
                         <FieldLabel help="Foto ancha y de buena resolución — se recomienda al menos 1600×900px.">Imagen de fondo</FieldLabel>
-                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
+                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
                         <Divider />
                         <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.parallaxTitulo} onChange={v => set('parallaxTitulo', v)} /></div>
                         <div style={{ marginBottom: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.parallaxSubtitulo} onChange={v => set('parallaxSubtitulo', v)} /></div>
@@ -1210,6 +1240,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                         nombre={m.name}
                                         onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, logo: v } : x))}
                                         onUpload={subirImagenApariencia}
+                                        onToast={onToast}
                                     />
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <Inp
@@ -1276,7 +1307,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             />
                         </div>
                         <Divider />
-                        <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} />
+                        <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} onToast={onToast} />
                     </SecCard>
 
                     {/* Banner de WhatsApp — antes un solo diseño fijo (pedido
@@ -1499,6 +1530,30 @@ function hline(c: ReactNode) {
     return <svg width="60" height="34" viewBox="0 0 60 34">{c}</svg>
 }
 
+// Miniaturas de la marca del header (ver components/storefront/marca.tsx): el
+// logo va en el color primario, el texto en gris — se lee de un vistazo qué
+// muestra cada opción y dónde. Mismos tokens que el resto de los pickers.
+function miniMarca(modo: MarcaModo, estilo: string): ReactNode {
+    const logo = 'var(--color-primary)'
+    const txt  = 'var(--color-muted)'
+    const barra = (x: number, y: number, w: number, h = 4) => <rect x={x} y={y} width={w} height={h} rx={h / 2} fill={txt} />
+    if (modo === 'logo') {
+        if (estilo === 'grande')  return hline(<rect x="12" y="8" width="36" height="18" rx="3" fill={logo} />)
+        if (estilo === 'redondo') return hline(<circle cx="30" cy="17" r="9" fill={logo} />)
+        return hline(<rect x="21" y="8" width="18" height="18" rx="4" fill={logo} />)
+    }
+    if (modo === 'nombre') {
+        if (estilo === 'mayusculas') return hline(barra(10, 12, 40, 10))
+        if (estilo === 'espaciado')  return hline(<g>{[0, 1, 2, 3, 4, 5].map(i => <rect key={i} x={9 + i * 8.5} y="14" width="4.5" height="6" rx="1" fill={txt} />)}</g>)
+        if (estilo === 'italica')    return hline(<polygon points="12,22 16,11 50,11 46,22" fill={txt} />)
+        return hline(barra(10, 13, 40, 8))
+    }
+    if (estilo === 'redondo')   return hline(<g><circle cx="12" cy="17" r="7" fill={logo} />{barra(23, 15, 30)}</g>)
+    if (estilo === 'apilado')   return hline(<g><rect x="25" y="4" width="10" height="14" rx="3" fill={logo} />{barra(19, 22, 22, 3)}</g>)
+    if (estilo === 'espaciado') return hline(<g><rect x="5" y="10" width="14" height="14" rx="3" fill={logo} /><rect x="24" y="8" width="1.5" height="18" fill="var(--color-border-strong)" />{barra(30, 15, 25, 3)}</g>)
+    return hline(<g><rect x="5" y="10" width="14" height="14" rx="3" fill={logo} />{barra(24, 15, 30)}</g>)
+}
+
 // Miniaturas de los 6 estilos de la sección de categorías. Cada una tiene que
 // leerse como el LAYOUT que representa de un vistazo, sin texto: el círculo
 // del medallón, el filete del índice, el bloque grande del mosaico. Los
@@ -1634,7 +1689,7 @@ const MINIATURA_WHATSAPP: Record<WhatsappLayout, ReactNode> = {
 // link (o archivo subido) y, abajo, el texto que lo acompaña. Mismo tope que
 // el DTO del backend (ArrayMaxSize(12)).
 const MAX_VIDEOS = 12
-function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layout: VideoLayout; onChange: (v: VideoItem[]) => void }) {
+function EditorVideos({ videos, layout, onChange, onToast }: { videos: VideoItem[]; layout: VideoLayout; onChange: (v: VideoItem[]) => void; onToast: (m: string) => void }) {
     const upd = (i: number, cambio: Partial<VideoItem>) => onChange(videos.map((x, j) => j === i ? { ...x, ...cambio } : x))
     const mover = (i: number, d: -1 | 1) => {
         const j = i + d
@@ -1694,7 +1749,7 @@ function EditorVideos({ videos, layout, onChange }: { videos: VideoItem[]; layou
                                 que el cuadro se vea recortado. */}
                             <div style={{ marginBottom: 12 }}>
                                 <FieldLabel help={layout === 'reels' ? 'Opcional. Una imagen parada (9:16) queda mejor en este diseño, sobre todo si el video es horizontal.' : 'Opcional. Se ve antes de darle play, en vez del primer cuadro del video.'}>Portada</FieldLabel>
-                                <ImgUploader value={v.portada} onChange={x => upd(i, { portada: x })} onUpload={subirImagenApariencia} shape="square" size={64} formats="JPG, PNG · máx 4MB" />
+                                <ImgUploader value={v.portada} onChange={x => upd(i, { portada: x })} onUpload={subirImagenApariencia} shape="square" size={64} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
                             </div>
                             <div style={{ marginBottom: usaTexto ? 8 : 0 }}><Inp value={v.titulo} onChange={x => upd(i, { titulo: x })} maxLength={120} placeholder="Título (opcional)" /></div>
                             {usaTexto && (
@@ -1920,10 +1975,11 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto, etiqueta = 'Slide' }: {
+function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto, etiqueta = 'Slide', onToast }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
     canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
+    onToast: (m: string) => void
     // Con una plantilla de Home activa (ver Apariencia.tsx soloContenido): el
     // estilo/posición/patrón/color de fondo del slide son decisiones de LA
     // PLANTILLA (su identidad visual fija, ver skill plantillas-home), no del
@@ -1974,11 +2030,39 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
             {open && (
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
-                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
-                    <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-body)', borderRadius: 6, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={removeBg} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
-                        Quitar el fondo automáticamente al subir esta imagen
+                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
+                    {/* Pedido explícito (24/09/2026): habilitado SOLO con "Imagen
+                        centrada" — es el único estilo pensado para una foto sin
+                        fondo (queda compuesta sobre el patrón decorativo). Con
+                        "Imagen completa" no tiene sentido (la foto ocupa todo el
+                        slide) y queda deshabilitado. El backend
+                        (uploadStorefrontImage en businesses.service.ts) sigue
+                        andando con el modelo local sin cambios — esto es solo un
+                        límite de UI, no del "Fondo con IA"/mantenimiento de
+                        producto (ver products.service.ts / image-studio.service.ts).
+
+                        Con `soloTexto` (plantilla avanzada activa, ver el
+                        comentario de esa prop más abajo) el checkbox entero se
+                        saca, no alcanza con deshabilitarlo: el hero de una
+                        plantilla avanzada SIEMPRE muestra la foto a pantalla
+                        completa, nunca "centrada sobre un patrón" (ese estilo
+                        ni existe ahí, ver homes.tsx/plantillaReal.ts), así que
+                        quitar el fondo dejaría un recorte flotando sobre nada
+                        en un slot pensado para una foto entera. Sin este gate,
+                        un slide que quedó en 'centered' desde antes de activar
+                        la plantilla (dato que este modo ya no deja cambiar)
+                        mostraba `centrada` en true y el checkbox aparecía
+                        habilitado, como si aplicara (reportado con captura). */}
+                    {!soloTexto && (
+                    <label
+                        className="ds-hover"
+                        title={centrada ? undefined : 'Solo aplica con el estilo "Imagen centrada"'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: centrada ? 'var(--color-body)' : 'var(--color-muted)', borderRadius: 6, cursor: centrada ? 'pointer' : 'not-allowed' }}
+                    >
+                        <input type="checkbox" checked={centrada && removeBg} disabled={!centrada} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+                        Quitar el fondo automáticamente al subir esta imagen{centrada ? '' : ' (solo con "Imagen centrada")'}
                     </label>
+                    )}
 
                     {!soloTexto && (<>
                     <Divider />

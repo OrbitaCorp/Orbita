@@ -18,6 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -110,6 +111,11 @@ interface ProdForm {
     nombre: string; descripcion: string; categoriaId: string; tags: string[]; estado: ProductStatus
     precio: string; costo: string; sku: string
     stock: string; stockMinimo: string
+    // "Fondo con IA" premium: flat (plano) o volume (con volumen) — ver
+    // ImageStudioService.generatePremiumBackground(). Se sugiere solo según
+    // la categoría al elegirla por primera vez (ver sugerirPhotoType), el
+    // vendedor lo puede cambiar si no aplica.
+    photoType: 'flat' | 'volume'
     tieneVariantes: boolean; tiposVariante: TipoVariante[]
     // Ficha técnica opcional ("RAM" -> "16GB") — ideal para productos de
     // tecnología. [] = el producto no tiene, el detalle del storefront no
@@ -199,10 +205,22 @@ function ProductoNuevoSkeleton() {
     )
 }
 
+// Heurística de sugerencia (no determina nada por sí sola, el vendedor
+// siempre puede cambiarla): categorías de indumentaria/calzado son casi
+// siempre planas; el resto se sugiere con volumen por default, que es lo más
+// común fuera de moda. Palabras sueltas, no una taxonomía fija — las
+// categorías son texto libre del vendedor.
+const PALABRAS_PLANO = ['ropa', 'indumentaria', 'remera', 'remeras', 'camisa', 'camisas', 'campera', 'camperas', 'buzo', 'buzos', 'pantalon', 'pantalones', 'jean', 'jeans', 'vestido', 'vestidos', 'short', 'shorts', 'falda', 'faldas', 'calzado', 'zapatilla', 'zapatillas', 'zapato', 'zapatos', 'media', 'medias', 'ropa interior', 'traje de baño', 'bikini', 'conjunto', 'conjuntos', 'moda']
+function sugerirPhotoType(nombreCategoria: string): 'flat' | 'volume' {
+    const n = nombreCategoria.toLowerCase()
+    return PALABRAS_PLANO.some(p => n.includes(p)) ? 'flat' : 'volume'
+}
+
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
     precio: '', costo: '', sku: '',
     stock: '0', stockMinimo: '5',
+    photoType: 'flat',
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
     specs: [],
@@ -282,6 +300,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // tocado el campo a mano — apenas escribe algo propio, se respeta y se
     // deja de pisarlo en cada cambio de nombre (ver efecto más abajo).
     const skuAutoRef = useRef(true)
+    // Mismo patrón que skuAutoRef: el default de photoType se sugiere solo
+    // según la categoría MIENTRAS el vendedor no haya tocado el control a
+    // mano — apenas lo cambia él mismo, se respeta (ver sugerirPhotoType).
+    const photoTypeAutoRef = useRef(true)
     const [filas, setFilas] = useState<FilaVariante[]>([])
     // Id de LA variante, para un producto SIN opciones que se está editando —
     // separado de `filas` a propósito (ver bug de abajo). `undefined` = alta
@@ -441,6 +463,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     categoriaId: p.categoryId ?? '',
                     tags: p.tags.map(t => t.name),
                     estado: p.status,
+                    photoType: p.photoType,
                     precio: String(p.basePrice),
                     costo: p.cost != null ? String(p.cost) : '',
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
@@ -453,6 +476,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     specs: p.specs,
                     videoUrl: p.videoUrl ?? '',
                 })
+                // Ya tiene un photoType guardado — no volver a sugerirlo solo
+                // porque el vendedor toque la categoría mientras edita.
+                photoTypeAutoRef.current = false
                 setMostrarSpecs(p.specs.length > 0)
                 setFilas(
                     conVariantes
@@ -654,7 +680,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }
 
     // ── Imágenes ────────────────────────────────────────────────────────────
-    function agregarImagenes(files: FileList | null, valorOpcion?: string) {
+    async function agregarImagenes(files: FileList | null, valorOpcion?: string) {
         if (!files?.length) return
         // Si el producto todavía no tiene ninguna principal, la PRIMERA
         // imagen general de esta tanda pasa a serlo — se decide una sola vez
@@ -664,9 +690,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // ninguna de las nuevas cargada).
         let faltaPrincipal = !valorOpcion && imagenes.every(i => !i.principal) && guardadas.every(g => !g.principal)
         const nuevas: ImagenPendiente[] = []
-        for (const file of Array.from(files)) {
-            if (!file.type.startsWith('image/')) continue
-            if (file.size > 5 * 1024 * 1024) { onToast(`"${file.name}" supera los 5MB`); continue }
+        for (const fileOriginal of Array.from(files)) {
+            if (!esArchivoDeImagen(fileOriginal)) { onToast(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`); continue }
+            let file: File
+            try {
+                file = await normalizarImagen(fileOriginal)
+            } catch {
+                onToast(`"${fileOriginal.name}" no se pudo procesar`)
+                continue
+            }
+            // El chequeo de tamaño va sobre el archivo YA convertido: es el
+            // que termina subiéndose, y un HEIC pasado a JPEG puede pesar
+            // distinto que el original.
+            if (file.size > MAX_IMAGEN_BYTES) { onToast(`"${file.name}" supera los ${MAX_IMAGEN_MB}MB`); continue }
             const principal = faltaPrincipal
             if (principal) faltaPrincipal = false
             nuevas.push({
@@ -949,6 +985,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             basePrice: precio,
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: prod.estado,
+            photoType: prod.photoType,
             ...(tagIds.length > 0 ? { tagIds } : {}),
             specs,
             videoUrl: prod.videoUrl.trim() || undefined,
@@ -1339,9 +1376,44 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
-                                <CategoriaSelect categorias={categorias} value={prod.categoriaId} onChange={v => set('categoriaId', v)} />
+                                <CategoriaSelect
+                                    categorias={categorias}
+                                    value={prod.categoriaId}
+                                    onChange={v => {
+                                        set('categoriaId', v)
+                                        if (photoTypeAutoRef.current) {
+                                            const nombreCat = categorias.find(c => c.id === v)?.name ?? ''
+                                            set('photoType', sugerirPhotoType(nombreCat))
+                                        }
+                                    }}
+                                />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
                                     Obligatoria — así el producto aparece agrupado en el catálogo de tu tienda.
+                                </div>
+                            </div>
+                            <div style={{ marginBottom: 18 }}>
+                                <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
+                                    Forma del producto
+                                    <span title='Para "Fondo con IA": un producto plano (indumentaria) usa un motor de IA distinto que uno con volumen (riñoneras, accesorios).' style={{ display: 'inline-flex', marginLeft: 6, cursor: 'help' }}>
+                                        <Info size={11} strokeWidth={2.25} color="var(--color-muted)" />
+                                    </span>
+                                </label>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    {(['flat', 'volume'] as const).map(tipo => (
+                                        <button
+                                            key={tipo}
+                                            type="button"
+                                            onClick={() => { photoTypeAutoRef.current = false; set('photoType', tipo) }}
+                                            style={{
+                                                flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                                                border: '1px solid ' + (prod.photoType === tipo ? 'var(--color-primary)' : 'var(--color-border)'),
+                                                background: prod.photoType === tipo ? 'var(--color-primary-bg)' : 'var(--color-surface)',
+                                                color: prod.photoType === tipo ? 'var(--color-primary)' : 'var(--color-text)',
+                                            }}
+                                        >
+                                            {tipo === 'flat' ? 'Plano (indumentaria)' : 'Con volumen (objetos)'}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                             <div style={{ marginBottom: 18 }}>
@@ -1588,10 +1660,15 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         al menos una foto general (pendiente o ya guardada, no tiene
                                         sentido elegir un estilo sin nada para probarlo). */}
                                     {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
+                                        // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
+                                        // pipeline de "Fondo con IA" (ver background-removal.service.ts).
+                                        // Deshabilitado en vez de ocultado para que quede claro que vuelve.
                                         <Button
                                             variant="outline" size="sm"
                                             icon={<Sparkles size={13} strokeWidth={2.2} />}
                                             onClick={() => setModalFondoIA(true)}
+                                            disabled
+                                            title="En mantenimiento — vuelve pronto"
                                         >
                                             Fondo con IA
                                         </Button>
@@ -1610,7 +1687,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     permitePrincipal
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
+                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
                                 </div>
                             </div>
 
@@ -1715,7 +1792,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 onQuitarGuardada={quitarGuardada}
                                                 onEtiquetar={etiquetarPendiente}
                                                 onReorder={reordenarVariante}
+                                                onQuitarFondo={alternarQuitarFondo}
+                                                avanzadoDisponible={avanzado}
                                             />
+                                            <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                                PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
+                                            </div>
                                             {valoresConFotoDuplicada.length > 0 && (
                                                 <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
                                                     Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.
@@ -2033,6 +2115,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 ]}
                 onAplicar={aplicarFondoIA}
                 onToast={onToast}
+                photoType={prod.photoType}
             />
         </div>
     )
@@ -2373,29 +2456,32 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         real pasa en el backend. Antes era un ícono flotante
                         sobre la miniatura (bajo contraste, difícil de ver con
                         ciertas fotos) — ahora es un botón explícito debajo. */}
+                    {/* EN MANTENIMIENTO (24/09/2026): deshabilitado, no oculto — ver
+                        background-removal.service.ts. */}
                     {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
                         <button
                             type="button"
                             className="ds-hover"
-                            onClick={() => onQuitarFondo(it.id)}
-                            title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
+                            disabled
+                            title="En mantenimiento — vuelve pronto"
                             style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                                 width: '100%', padding: compacta ? '3px 4px' : '4px 6px', borderRadius: 6,
-                                border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
-                                background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
-                                color: it.quitarFondo ? '#fff' : 'var(--color-text)',
-                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-surface)',
+                                color: 'var(--color-muted)',
+                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'not-allowed',
+                                opacity: 0.6,
                             }}
                         >
-                            <Sparkles size={compacta ? 10 : 11} fill={it.quitarFondo ? '#fff' : 'none'} />
-                            {it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
+                            <Sparkles size={compacta ? 10 : 11} />
+                            Quitar fondo
                         </button>
                     )}
                 </div>
             ))}
             <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
-                <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                <input type="file" accept="image/*,.heic,.heif" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={compacta ? 16 : 20} />
             </label>
         </div>
@@ -2408,7 +2494,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
 // componente aparte (no una variante más de GaleriaImagenes) porque el layout
 // de cada card es distinto (imagen + tira de etiqueta abajo, sin estrella de
 // principal) y mezclar los dos hacía ese componente difícil de leer.
-function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder }: {
+function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder, onQuitarFondo, avanzadoDisponible }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     opciones: string[]
@@ -2421,12 +2507,19 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     onQuitarGuardada: (id: string) => void
     onEtiquetar: (key: string, valor: string) => void
     onReorder: (nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) => void
+    // Paquete "Avanzado" — quitar fondo con IA, mismo criterio y mismo
+    // handler (alternarQuitarFondo) que GaleriaImagenes: solo aplica a
+    // pendientes, se procesa recién al subir. Pedido explícito (24/09/2026):
+    // las fotos por variante también tienen que poder pedirlo, el backend ya
+    // lo soporta vía optionValueId sin cambios (ver products.service.ts).
+    onQuitarFondo?: (key: string) => void
+    avanzadoDisponible?: boolean
 }) {
     const alto = 88
-    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean }
+    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean }
     const items: ItemEtiquetado[] = [
         ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false })),
-        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true })),
+        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo })),
     ]
     const [arrastrando, setArrastrando] = useState<number | null>(null)
     const [sobre, setSobre] = useState<number | null>(null)
@@ -2500,10 +2593,29 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                             {it.etiqueta ?? '-'}
                         </span>
                     )}
+                    {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
+                        <button
+                            type="button"
+                            className="ds-hover"
+                            onClick={() => onQuitarFondo(it.id)}
+                            title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                                width: '100%', padding: '3px 4px', borderRadius: 5,
+                                border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
+                                background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
+                                color: it.quitarFondo ? '#fff' : 'var(--color-text)',
+                                fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                            }}
+                        >
+                            <Sparkles size={9} fill={it.quitarFondo ? '#fff' : 'none'} />
+                            {it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
+                        </button>
+                    )}
                 </div>
             ))}
             <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
-                <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                <input type="file" accept="image/*,.heic,.heif" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={18} />
             </label>
         </div>

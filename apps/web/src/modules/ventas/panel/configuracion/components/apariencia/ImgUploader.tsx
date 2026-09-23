@@ -5,6 +5,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, Upload, Trash2, Loader2 } from 'lucide-react'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, FORMATOS_IMAGEN_AYUDA } from '@/lib/heic'
 
 interface ImgUploaderProps {
     value:    string | null
@@ -13,27 +14,57 @@ interface ImgUploaderProps {
     shape?:   'square' | 'circle'
     size?:    number
     formats?: string
+    /** Tope de tamaño en MB — default: el mismo que ya exige el backend (ver MAX_IMAGEN_MB). */
+    maxMB?:   number
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, supera el tamaño, no se pudo convertir). */
+    onToast?: (m: string) => void
 }
 
-export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB' }: ImgUploaderProps) {
+export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = FORMATOS_IMAGEN_AYUDA, maxMB = MAX_IMAGEN_MB, onToast }: ImgUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [drag, setDrag] = useState(false)
     const [uploading, setUploading] = useState(false)
 
-    const handle = (file: File | undefined | null) => {
-        if (!file || !file.type.startsWith('image/')) return
+    const handle = async (fileOriginal: File | undefined | null) => {
+        if (!fileOriginal) return
+        if (!esArchivoDeImagen(fileOriginal)) {
+            onToast?.(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`)
+            return
+        }
+        setUploading(true)
+        let file: File
+        try {
+            file = await normalizarImagen(fileOriginal)
+        } catch {
+            // No se pudo decodificar (HEIC corrupto, formato raro). Mejor
+            // avisar en el momento que subir algo que después no se ve.
+            setUploading(false)
+            onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
+        // El chequeo de tamaño va sobre el archivo YA convertido — es el que
+        // termina subiéndose, y un HEIC pasado a JPEG puede pesar distinto
+        // que el original.
+        if (file.size > maxMB * 1024 * 1024) {
+            setUploading(false)
+            onToast?.(`"${file.name}" supera los ${maxMB}MB`)
+            return
+        }
+        const anterior = value
         const r = new FileReader()
         r.onload = async e => {
             onChange(e.target?.result as string)
-            if (!onUpload) return
+            if (!onUpload) { setUploading(false); return }
             try {
-                setUploading(true)
                 const url = await onUpload(file)
                 onChange(url)
             } catch {
-                // Se queda con el preview local; el guardado de Apariencia fallará
-                // más tarde si esa URL nunca se resolvió (no es un dataURL válido
-                // para persistir), pero al menos no se pierde lo que el usuario ve.
+                // La subida falló (en el celular es común: fotos pesadas, red
+                // floja): se vuelve a la imagen anterior y se avisa. Dejar el
+                // dataURL en el estado rompía el guardado ENTERO de Apariencia,
+                // porque la API rechaza todo lo que no sea una URL https.
+                onChange(anterior)
+                onToast?.(`No se pudo subir "${file.name}". Probá de nuevo o con una imagen más liviana`)
             } finally {
                 setUploading(false)
             }
@@ -69,7 +100,7 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
                         <Loader2 size={18} color="#fff" style={{ animation: 'spin 800ms linear infinite' }} />
                     </div>
                 )}
-                <input ref={ref} type="file" accept="image/*" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
+                <input ref={ref} type="file" accept="image/*,.heic,.heif" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 

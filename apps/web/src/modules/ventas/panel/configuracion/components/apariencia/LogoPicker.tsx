@@ -14,6 +14,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB } from '@/lib/heic'
 
 interface LogoPickerProps {
     value:    string | null
@@ -22,26 +23,49 @@ interface LogoPickerProps {
     /** Para el aria-label, así el botón no es "subir imagen" a secas cuando hay varios. */
     nombre?:  string
     size?:    number
+    /** Tope de tamaño en MB — default: el mismo que ya exige el backend (ver MAX_IMAGEN_MB). */
+    maxMB?:   number
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, supera el tamaño, no se pudo convertir). */
+    onToast?: (m: string) => void
 }
 
-export function LogoPicker({ value, onChange, onUpload, nombre, size = 44 }: LogoPickerProps) {
+export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, maxMB = MAX_IMAGEN_MB, onToast }: LogoPickerProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [subiendo, setSubiendo] = useState(false)
     const de = nombre?.trim() ? ` de ${nombre.trim()}` : ''
 
-    const handle = (file: File | undefined | null) => {
-        if (!file || !file.type.startsWith('image/')) return
+    const handle = async (fileOriginal: File | undefined | null) => {
+        if (!fileOriginal) return
+        if (!esArchivoDeImagen(fileOriginal)) {
+            onToast?.(`"${fileOriginal.name}" no se pudo subir: el formato no es una imagen soportada`)
+            return
+        }
+        setSubiendo(true)
+        let file: File
+        try {
+            file = await normalizarImagen(fileOriginal)
+        } catch {
+            setSubiendo(false)
+            onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
+        if (file.size > maxMB * 1024 * 1024) {
+            setSubiendo(false)
+            onToast?.(`"${file.name}" supera los ${maxMB}MB`)
+            return
+        }
+        const anterior = value
         const r = new FileReader()
         r.onload = async e => {
             // Preview instantáneo con el dataURL y recién después la URL real
-            // — mismo criterio que ImgUploader (si la subida falla, al menos
-            // no se pierde de vista lo que el usuario eligió).
+            // — mismo criterio que ImgUploader (si la subida falla se vuelve
+            // a la imagen anterior: un dataURL en el estado rompe el guardado).
             onChange(e.target?.result as string)
             try {
-                setSubiendo(true)
                 onChange(await onUpload(file))
             } catch {
-                /* se queda con el preview local; el guardado avisa después */
+                onChange(anterior)
+                onToast?.(`No se pudo subir "${file.name}". Probá de nuevo o con una imagen más liviana`)
             } finally {
                 setSubiendo(false)
             }
@@ -97,7 +121,7 @@ export function LogoPicker({ value, onChange, onUpload, nombre, size = 44 }: Log
                 </div>
             )}
 
-            <input ref={ref} type="file" accept="image/*" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
+            <input ref={ref} type="file" accept="image/*,.heic,.heif" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
         </div>
     )
 }

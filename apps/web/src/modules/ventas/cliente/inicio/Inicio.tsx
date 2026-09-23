@@ -273,7 +273,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // de que ese fetch responda, ver StorefrontChrome `homeTemplateSSR`.
     const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : __homeTemplate
     const heroSlides = config?.appearance?.heroSlides ?? []
-    const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
+    // [] es válido: el dueño borró todas y no quiere barra (solo cae al default si no hay config).
+    const stats = config?.appearance?.statsBar ?? STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
 
     // ── Tira de marcas ──

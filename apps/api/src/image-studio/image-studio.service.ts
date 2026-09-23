@@ -1,12 +1,20 @@
-import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
+import { GeminiImageService } from '../gemini-image/gemini-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
-import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, SIN_FONDO_KEY, type BackgroundStyle } from './background-styles';
+import {
+  BACKGROUND_STYLES,
+  DEFAULT_BACKGROUND_STYLE,
+  PREMIUM_ONLY_STYLES,
+  SIN_FONDO_KEY,
+  type BackgroundStyle,
+  type PremiumOnlyStyle,
+} from './background-styles';
 
 export interface ImageStudioResult {
   /** Imagen resultante en base64, lista para <img src="data:{mimeType};base64,...">. */
@@ -34,6 +42,7 @@ export class ImageStudioService {
     private readonly businesses: BusinessesService,
     private readonly backgroundRemoval: BackgroundRemovalService,
     private readonly cloudflareImage: CloudflareImageService,
+    private readonly geminiImage: GeminiImageService,
     private readonly r2: R2Service,
     private readonly config: ConfigService,
   ) {}
@@ -138,6 +147,18 @@ export class ImageStudioService {
     imageUrl?: string,
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
+
+    // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
+    // este pipeline (modo gratis actual + modo premium nuevo con Gemini/
+    // Workers AI). El toggle de producto (products.service.ts) queda pausado
+    // igual; uploadStorefrontImage() en businesses.service.ts (sliders de
+    // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
+    // Tipado como `boolean` (no el literal `true`) a propósito: si no, tsc
+    // marca todo lo de abajo como código muerto y pierde el narrowing de
+    // `origen`/`imageUrl` (TS2345/TS18048). Poner en `false` es el primer
+    // paso al retomar esta tarea.
+    const EN_MANTENIMIENTO: boolean = true;
+    if (EN_MANTENIMIENTO) throw new ServiceUnavailableException('"Fondo con IA" está en mantenimiento — vuelve pronto.');
 
     const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
     if (!origen) throw new BadRequestException('Falta la imagen a procesar');
@@ -279,6 +300,93 @@ export class ImageStudioService {
     }
 
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
+  }
+
+  // Instrucción de edición para el modo premium — validada a mano en esta
+  // misma tarea contra Gemini (jersey 49ers, texto/logos densos) y Workers AI
+  // (riñonera en ángulo): un solo call de edición sobre la foto COMPLETA
+  // preserva el producto igual de bien que componer local, y de paso resuelve
+  // 3D sin la metadata de superficie que generateBackground() necesitaría.
+  // Reusa style.prompt tal cual (pensado para el catálogo gratis, con
+  // VISTA_CENITAL) — en la práctica el modelo lo interpreta como la textura
+  // del fondo, no como un mandato de cámara para toda la foto, así que sirve
+  // igual para productos en ángulo (ver resumen de la tarea). Catálogo de
+  // estilos dedicado a premium (más realista, "podio" para 3D) es la Fase 2.
+  // Refuerzo de preservación de color (Fase 2, pedido explícito del
+  // vendedor): antes solo decía "same colors" en la misma frase que forma/
+  // texto/logos — se lo separa en su propia oración, explícito sobre qué NO
+  // hacer (viraje de balance de blancos, recoloreo "para combinar" con el
+  // fondo nuevo), porque es el punto más fácil de perder en una edición
+  // generativa de la foto completa.
+  private promptPremium(style: BackgroundStyle | PremiumOnlyStyle, descripcion?: string): string {
+    const escena = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
+    return (
+      'This is a product photo. Replace ONLY the background with the following scene, keeping the product ' +
+      'itself pixel-perfect: same shape, same angle, same text, same numbers, same logos, same stitching, same ' +
+      'zippers — do not redraw, restyle or reinterpret the product in any way, only place it on the new ' +
+      'background with a soft realistic contact shadow. Keep the EXACT original color of the product (same hue, ' +
+      'saturation and brightness as the source photo) — do not shift white balance, do not recolor, do not apply ' +
+      `any color grading or tint to the product to match the new background. Background scene: ${escena}`
+    );
+  }
+
+  /**
+   * Modo premium de "Fondo con IA": en vez de componer local (ver
+   * generateBackground()), le pide a un modelo generativo que edite la foto
+   * completa de una sola vez. Dos motores según `photoType` (Product.photoType,
+   * decisión del vendedor al cargar el producto — ver el plan "Fondo con IA:
+   * pipeline 2D/3D"):
+   * - `flat` (indumentaria, la mayoría del catálogo) → Gemini: Workers AI
+   *   bloquea con falsos positivos de NSFW la indumentaria femenina ajustada
+   *   (confirmado por el vendedor), Gemini no.
+   * - `volume` (riñoneras, accesorios) → Workers AI: gratis dentro del free
+   *   tier de Cloudflare, y ya resolvió bien un producto en ángulo sin la
+   *   metadata de superficie que necesitaría el modo gratis.
+   *
+   * El caso "Sin fondo" sigue siendo SIEMPRE BackgroundRemovalService (ONNX)
+   * acá también — ni Gemini ni Workers AI garantizan canal alfa real, son
+   * generativos, no segmentadores.
+   */
+  async generatePremiumBackground(
+    businessId: string,
+    photoType?: 'flat' | 'volume',
+    file?: { buffer: Buffer; mimetype: string },
+    estilo?: string,
+    descripcion?: string,
+    imageUrl?: string,
+  ): Promise<ImageStudioResult> {
+    await this.requireAddonAvanzado(businessId);
+
+    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
+    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
+
+    if (estilo === SIN_FONDO_KEY) {
+      const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
+      return { base64: cutout.toString('base64'), mimeType: 'image/png' };
+    }
+
+    // Catálogo combinado: BACKGROUND_STYLES (compartido con el modo gratis)
+    // + PREMIUM_ONLY_STYLES (Fase 2 — texturas premium y familia "podio",
+    // sin backgroundKeys porque el modo premium no compone contra R2).
+    const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
+    const style: BackgroundStyle | PremiumOnlyStyle | undefined = BACKGROUND_STYLES[key] ?? PREMIUM_ONLY_STYLES[key];
+    if (!style) throw new BadRequestException('Estilo de fondo inválido');
+
+    // "podio_*" está pensado para un producto apoyado sobre una superficie
+    // real (perspectiva, profundidad) — no tiene sentido para indumentaria
+    // plana. Mismo criterio que la regla firme 2D=Gemini/3D=Workers AI, pero
+    // a nivel de catálogo en vez de motor.
+    if ('soloVolumen' in style && style.soloVolumen && photoType !== 'volume') {
+      throw new BadRequestException('Este estilo es solo para productos con volumen');
+    }
+
+    const prompt = this.promptPremium(style, descripcion);
+    const result =
+      photoType === 'volume'
+        ? await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype)
+        : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
+
+    return { base64: result.buffer.toString('base64'), mimeType: result.mimeType };
   }
 
   /**

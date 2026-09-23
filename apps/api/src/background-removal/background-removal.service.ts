@@ -3,6 +3,7 @@ import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
 import * as path from 'node:path';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { endurecer, guidedFilter } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -181,99 +182,97 @@ export class BackgroundRemovalService {
       maskBytes[i] = Math.round(((maskData[i] - maskMin) / range) * 255);
     }
 
-    // Endurece la transición de la máscara Y corre el punto medio hacia
-    // arriba (a la 320x320 reducida, más barato que en la resolución final).
-    // Sin esto, dos problemas relacionados pero distintos: (1) los píxeles
-    // de alfa intermedio conservan el color de fondo ORIGINAL de la foto
-    // (blanco/claro de estudio) en su RGB, no el del producto; (2) incluso
-    // subiendo el contraste nomás (probado a mano: factor 3 y 5, mismo
-    // resultado), un anillo de píxeles de confianza MEDIA-ALTA — no
-    // exactamente en el 50%, pero tampoco 100% seguros — quedan marcados
-    // como opacos igual, y esos son justo los que en la foto original están
-    // en la zona de antialiasing (RGB ya mezclado, grisáceo). Ningún
-    // contraste sobre el alfa arregla eso si el pixel igual termina opaco:
-    // hay que exigirle más confianza al modelo para contar como "producto",
-    // no solo una transición más dura en el mismo punto. Corriendo el punto
-    // medio de 127 a 150 ese anillo pasa a NO contar como opaco (se recorta
-    // un poco el contorno hacia adentro, imperceptible a simple vista) — es
-    // el mismo truco de "choke/shrink matte" de cualquier herramienta de
-    // recorte. Confirmado a mano el 21/09/2026: con esto el halo
-    // gris/blancuzco alrededor de una remera negra sobre fondo "denim
-    // vintage" desapareció por completo (antes, con centro en 127, se
-    // notaba un resto fino aunque el contraste ya estuviera en 5).
     const CENTRO_BORDE = 150;
-    const CONTRASTE_BORDE = 4;
-    for (let i = 0; i < chwSize; i++) {
-      maskBytes[i] = Math.max(0, Math.min(255, Math.round((maskBytes[i] - CENTRO_BORDE) * CONTRASTE_BORDE + 127)));
-    }
+    // Fase 3 (24/09/2026): la máscara se mantiene SUAVE hasta el final y se la
+    // afina contra la foto real — antes se endurecía a 320x320 (contraste 4 +
+    // punto medio 150) y se volvía a endurecer después de agrandarla ~4-8x, y
+    // cada "escalón" de 1 px de la máscara chica quedaba como un escalón de
+    // 4-8 px en el contorno (bordes pixelados, sobre todo en mangas y
+    // hombros de prendas oscuras sobre fondo claro). Ahora: agrandar suave
+    // (mitchell, sin ringing) → guided filter con la foto como guía (el
+    // contorno pasa a seguir el borde real de la prenda, no la grilla de
+    // 320px) → recién ahí se endurece, se erosiona (sombra de contacto, ver
+    // más abajo) y se redondea con un desenfoque + curva S.
+    // Todo a una resolución de trabajo acotada (no a los 60 MP posibles): la
+    // máscara final se reescala a la real al final.
+    const MAX_TRABAJO = 1200;
+    const escalaTrabajo = Math.min(1, MAX_TRABAJO / Math.max(origWidth, origHeight));
+    const wT = Math.max(1, Math.round(origWidth * escalaTrabajo));
+    const hT = Math.max(1, Math.round(origHeight * escalaTrabajo));
 
-    // Máscara 320×320 → tamaño ORIGINAL real (no el reducido de arriba).
-    // Dos trampas de sharp acá, las dos confirmadas con un repro mínimo:
-    // (1) .resize() sobre una entrada raw de 1 canal la promueve en silencio
-    //     a 3 canales (sRGB) — sin .toColourspace('b-w') el buffer resultante
-    //     mide 3x lo esperado y corrompe cualquier lectura por índice.
-    // (2) .raw() antes de toBuffer() es obligatorio — sin él, toBuffer()
-    //     codifica a PNG y joinChannel() de abajo interpretaría esos bytes
-    //     codificados como si fueran píxeles crudos.
-    // kernel: 'mitchell' — el default de sharp (lanczos3) genera "ringing"
-    // (rebote/overshoot) al agrandar ~7-8x un borde ya duro: en vez de una
-    // transición prolija de opaco a transparente, aparece un pico de vuelta
-    // hacia opaco justo pasado el contorno real. Ese pico, al pasar por el
-    // endurecido de más abajo, se redondea a alfa=255 — y como ese anillo
-    // cae FUERA del producto, el RGB que arrastra es el del fondo BLANCO
-    // original de la foto, no el del producto. Resultado: una línea blanca
-    // sólida calcando el contorno, mucho más marcada que el resto del halo
-    // (confirmado a mano el 21/09/2026 con un scan de píxeles: un salto de
-    // rgb(24,24,28) a rgb(194,194,196) y de vuelta a rgb(14,27,42) en 4
-    // píxeles, justo en el dobladillo). mitchell no genera ese rebote.
-    const maskResizedSuave = await sharp(maskBytes, { raw: { width: MODEL_SIZE, height: MODEL_SIZE, channels: 1 } })
-      .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
+    // Trampas de sharp (confirmadas con un repro mínimo, siguen vigentes):
+    // (1) .resize() sobre un raw de 1 canal lo promueve en silencio a 3
+    //     (sRGB) — sin .toColourspace('b-w') el buffer mide 3x lo esperado.
+    // (2) .raw() antes de toBuffer() es obligatorio, si no codifica a PNG.
+    // kernel 'mitchell': el default (lanczos3) hace "ringing" al agrandar un
+    // borde duro — un pico de vuelta a opaco fuera del contorno real que
+    // arrastraba el blanco del fondo original (línea blanca calcando el
+    // contorno, confirmado a mano el 21/09/2026).
+    const maskSuave = await sharp(maskBytes, { raw: { width: MODEL_SIZE, height: MODEL_SIZE, channels: 1 } })
+      .resize(wT, hT, { fit: 'fill', kernel: 'mitchell' })
       .toColourspace('b-w')
       .raw()
       .toBuffer();
-
-    // El resize de arriba (320px → resolución real, típicamente ~7-8x) es
-    // interpolado: vuelve a meter grises intermedios en el borde aunque la
-    // máscara de 320px ya haya quedado dura ahí (cada píxel de la máscara
-    // chica se reparte suavizado entre varios píxeles reales). Sin este
-    // segundo endurecido, el halo seguía notándose (más fino, pero
-    // presente) incluso con CENTRO_BORDE/CONTRASTE_BORDE altos arriba —
-    // confirmado a mano el 21/09/2026 comparando un recorte 1:1 sin reescalar.
-    const maskDura = Buffer.alloc(maskResizedSuave.length);
-    for (let i = 0; i < maskResizedSuave.length; i++) {
-      maskDura[i] = Math.max(0, Math.min(255, Math.round((maskResizedSuave[i] - CENTRO_BORDE) * CONTRASTE_BORDE + 127)));
-    }
-
-    // "Choke" final: erosiona la máscara unos píxeles hacia adentro — no es
-    // ruido de resize (probado con kernel: 'mitchell' arriba, sin cambios),
-    // es la SOMBRA DE CONTACTO real que la prenda proyecta sobre la mesa en
-    // la foto original (gris, no el fondo parejo) — el modelo a veces la
-    // clasifica como "probablemente producto" con más confianza de la que
-    // el endurecido de arriba filtra, y esos píxeles arrastran el gris de
-    // esa sombra real, no el color de la prenda. Confirmado a mano
-    // (21/09/2026) con un scan de píxeles en un dobladillo: rgb(24,24,28)
-    // [prenda] → rgb(194,194,196) [sombra de la foto original, mal
-    // clasificada como prenda] → rgb(14,27,42) [fondo nuevo] en 4 píxeles.
-    // Un umbral de confianza más alto no alcanza de forma confiable (varía
-    // según cuán marcada sea la sombra de cada foto) — achicar la silueta un
-    // radio fijo sí, sea cual sea la confianza del modelo ahí. Radio
-    // proporcional a la resolución (no un número fijo de px): a mano da un
-    // resultado parejo entre fotos chicas y grandes.
-    const RADIO_EROSION = Math.max(2, Math.round(Math.min(origWidth, origHeight) * 0.006));
-    const maskErosionada = erosionar(maskDura, origWidth, origHeight, RADIO_EROSION);
-
-    // El filtro de mínimo de arriba es un cuadrado (separable en horizontal
-    // + vertical) — en un borde diagonal o curvo eso deja un contorno
-    // dentado tipo escalera en vez de una línea prolija (confirmado a mano:
-    // se notaba en la línea del hombro/manga). Un desenfoque chico redondea
-    // ese dentado sin reabrir el problema del anillo: como ya está erosionado
-    // hacia ADENTRO del área contaminada, volver a suavizar un par de
-    // píxeles no vuelve a exponer la sombra de la foto original.
-    const maskResized = await sharp(maskErosionada, { raw: { width: origWidth, height: origHeight, channels: 1 } })
-      .blur(1.5)
-      .toColourspace('b-w') // misma trampa que el resize de arriba: sin esto, sharp promueve a 3 canales en silencio
+    const guiaBytes = await sharp(sourceForMask, ENTRADA_IMAGEN)
+      .flatten({ background: '#ffffff' })
+      .resize(wT, hT, { fit: 'fill' })
+      .greyscale()
       .raw()
       .toBuffer();
+
+    const pMask = new Float32Array(wT * hT);
+    const guia = new Float32Array(wT * hT);
+    for (let i = 0; i < pMask.length; i++) {
+      pMask[i] = maskSuave[i] / 255;
+      guia[i] = guiaBytes[i] / 255;
+    }
+    const radioGuia = Math.max(3, Math.round(Math.min(wT, hT) * 0.012));
+    const maskGuiada = guidedFilter(guia, pMask, wT, hT, radioGuia, 1e-3);
+
+    // Mismo criterio que antes (punto medio corrido hacia arriba: exigirle más
+    // confianza al modelo para contar como "producto" — "choke matte", saca
+    // el halo del fondo original en píxeles de antialiasing), pero sobre la
+    // máscara ya afinada y con transición suave (curva S) en vez de lineal
+    // saturada. Confirmado a mano el 21/09/2026: centro 150/255 borra el halo.
+    endurecer(maskGuiada, CENTRO_BORDE / 255, 0.14);
+
+    const maskDura = Buffer.alloc(wT * hT);
+    for (let i = 0; i < maskDura.length; i++) maskDura[i] = Math.round(maskGuiada[i] * 255);
+
+    // "Choke" final: erosiona la máscara unos píxeles hacia adentro — es la
+    // SOMBRA DE CONTACTO real que la prenda proyecta sobre la mesa en la foto
+    // original (gris, no el fondo parejo): el modelo a veces la clasifica como
+    // "probablemente producto" y esos píxeles arrastran su gris, no el color
+    // de la prenda (confirmado a mano el 21/09/2026 con un scan de píxeles en
+    // un dobladillo). Un umbral de confianza más alto no alcanza de forma
+    // confiable; achicar la silueta un radio fijo sí. Proporcional a la
+    // resolución (no un número fijo de px).
+    const RADIO_EROSION = Math.max(2, Math.round(Math.min(wT, hT) * 0.006));
+    const maskErosionada = erosionar(maskDura, wT, hT, RADIO_EROSION);
+
+    // El filtro de mínimo es un cuadrado (separable): en un borde diagonal o
+    // curvo deja un contorno dentado tipo escalera. Desenfoque proporcional al
+    // radio + curva S: redondea el dentado y deja un borde antialiasado de
+    // ~2 px sin reabrir el halo (ya está erosionado hacia adentro).
+    const maskRedonda = await sharp(maskErosionada, { raw: { width: wT, height: hT, channels: 1 } })
+      .blur(Math.max(1.5, RADIO_EROSION * 0.5))
+      .toColourspace('b-w') // misma trampa de arriba: sin esto, sharp promueve a 3 canales en silencio
+      .raw()
+      .toBuffer();
+    const maskFinalT = new Float32Array(wT * hT);
+    for (let i = 0; i < maskFinalT.length; i++) maskFinalT[i] = maskRedonda[i] / 255;
+    endurecer(maskFinalT, 0.5, 0.3);
+    const maskFinalBytes = Buffer.alloc(wT * hT);
+    for (let i = 0; i < maskFinalBytes.length; i++) maskFinalBytes[i] = Math.round(maskFinalT[i] * 255);
+
+    const maskResized =
+      wT === origWidth && hT === origHeight
+        ? maskFinalBytes
+        : await sharp(maskFinalBytes, { raw: { width: wT, height: hT, channels: 1 } })
+            .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
+            .toColourspace('b-w')
+            .raw()
+            .toBuffer();
 
     // Compone: RGB original + la máscara como canal alfa. joinChannel() sobre
     // un sharp() todavía "encoded" (recién decodificado de PNG/JPEG, sin pasar

@@ -11,6 +11,7 @@
 
 import { type Apariencia as Ap, type EscalaFuente, type ModoColor, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
+import { escribirMarca, leerMarca, marcaValida, sinMarca } from '@/components/storefront/marca'
 
 const ESCALA_A_FONT_SCALE: Record<EscalaFuente, number> = { sm: 0.9, md: 1.0, lg: 1.15 }
 
@@ -28,6 +29,10 @@ function fontScaleAEscala(v: string | number | null): EscalaFuente {
 const MODO_A_COLOR_MODE: Record<ModoColor, 'light' | 'dark' | 'system'> = { claro: 'light', oscuro: 'dark', sistema: 'system' }
 const COLOR_MODE_A_MODO: Record<'light' | 'dark' | 'system', ModoColor> = { light: 'claro', dark: 'oscuro', system: 'sistema' }
 
+// Un data: es la vista previa de una subida que no terminó — la API lo
+// rechaza (solo https o ruta del sitio) y tira abajo el guardado entero.
+const sinDataUrl = (v: string | null): string | null => (v && v.startsWith('data:') ? null : v)
+
 export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
     return {
         // Vacíos NO se mandan (el DTO del backend es @IsOptional() @IsString(),
@@ -35,8 +40,8 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         // al nombre real del negocio, en vez de quedar con el título en blanco.
         ...(ap.nombreTienda.trim() ? { storeName: ap.nombreTienda.trim() } : {}),
         ...(ap.tagline.trim() ? { tagline: ap.tagline.trim() } : {}),
-        logoUrl: ap.logo,
-        faviconUrl: ap.favicon,
+        logoUrl: sinDataUrl(ap.logo),
+        faviconUrl: sinDataUrl(ap.favicon),
         colorPrimary: ap.colorPrimario,
         colorSecondary: ap.colorSecundario,
         colorAccent: ap.colorAccent,
@@ -49,7 +54,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         gridLayout: ap.layoutGrid,
         categoryLayout: ap.estiloCategorias,
         categoryIds: ap.categoriasIds,
-        heroSlides: ap.sliders,
+        heroSlides: ap.sliders.map(s => ({ ...s, img: s.img?.startsWith('data:') ? '' : s.img })),
         headerLinks: ap.headerLinks,
         showReviews: ap.mostrarResenas,
         showNewBadge: ap.mostrarBadgeNuevo,
@@ -72,7 +77,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         whatsappText: ap.textoWhatsapp,
         whatsappLayout: ap.estiloWhatsapp,
         statsBar: ap.stats,
-        parallaxImageUrl: ap.parallaxImagen,
+        parallaxImageUrl: sinDataUrl(ap.parallaxImagen),
         parallaxTitle: ap.parallaxTitulo,
         parallaxSubtitle: ap.parallaxSubtitulo,
         parallaxCtaText: ap.parallaxCtaTexto,
@@ -85,7 +90,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         // tienda como un hueco en la tira.
         brands: ap.marcas
             .filter(m => m.name.trim() !== '')
-            .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo ? { logoUrl: m.logo } : {}) })),
+            .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo && !m.logo.startsWith('data:') ? { logoUrl: m.logo } : {}) })),
         showVideo: ap.mostrarVideo,
         videoTitle: ap.videoTitulo,
         videoSubtitle: ap.videoSubtitulo,
@@ -120,7 +125,9 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
             // Solo lo que tenga algo escrito: un campo vacío no se guarda, así
             // el home vuelve a caer al texto con el que se diseñó la sección
             // (ver el helper `txt()` en homes.tsx) en vez de dibujar un hueco.
-            secciones: limpiarSecciones(ap.seccionesPlantilla),
+            // La marca del header viaja en la misma bolsa (clave `_marca`, ver
+            // marca.tsx): no hace falta un campo nuevo en la API.
+            secciones: escribirMarca(limpiarSecciones(ap.seccionesPlantilla), marcaValida(ap.marcaModo, ap.marcaEstilo)),
         },
     }
 }
@@ -197,7 +204,8 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         bannerDesplazable: dto.announcementScroll,
         mostrarStats: dto.showStatsBar,
         mostrarParallax: dto.showParallaxBanner,
-        stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
+        // null = nunca guardó (arranca con los de ejemplo); [] = los borró a propósito.
+        stats: dto.statsBar ?? defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
         // ?? por la misma ventana de deploy que videoLayout: campo nuevo, la
@@ -233,6 +241,8 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
                 : [],
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
-        seccionesPlantilla: dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla,
+        seccionesPlantilla: sinMarca(dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla),
+        marcaModo: leerMarca(dto.homeTemplateData?.secciones).modo,
+        marcaEstilo: leerMarca(dto.homeTemplateData?.secciones).estilo,
     }
 }
