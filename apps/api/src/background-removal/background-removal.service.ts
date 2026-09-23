@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
 import * as path from 'node:path';
@@ -82,14 +82,6 @@ export class BackgroundRemovalService {
   // Devuelve un buffer PNG con canal alfa (RGBA) — SIN codificar a webp, eso
   // lo hace uploadToStorage() en businesses.service.ts, para no codificar dos veces.
   async removeBackground(buffer: Buffer, businessId: string): Promise<Buffer> {
-    // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo todo
-    // el pipeline de "Fondo con IA" (modo gratis actual + modo premium nuevo con
-    // Gemini/Workers AI, ver el plan de esa tarea). Único choke point — lo
-    // consumen products.service.ts, businesses.service.ts e image-studio.service.ts,
-    // así que este throw apaga el toggle "Quitar fondo", el estilo "Sin fondo" del
-    // modal "Fondo con IA" y el checkbox de los sliders de Apariencia/Plantillas de
-    // una sola vez. Sacar este throw es el primer paso al retomar esa tarea.
-    throw new ServiceUnavailableException('"Quitar fondo" está en mantenimiento — vuelve pronto.');
     this.registrarUso(businessId);
     await this.esperarTurno();
     try {

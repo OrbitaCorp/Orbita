@@ -684,6 +684,13 @@ export class ProductsService {
         select: { id: true },
       });
       if (!addon) throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+      // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
+      // el pipeline de "Fondo con IA" de producto (modo gratis actual + modo
+      // premium nuevo con Gemini/Workers AI). El toggle de fotos de producto y
+      // el modal "Fondo con IA" (image-studio.service.ts) quedan pausados;
+      // uploadStorefrontImage() en businesses.service.ts (sliders de
+      // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
+      throw new ServiceUnavailableException('"Quitar fondo" está en mantenimiento — vuelve pronto.');
       // Corre el modelo local ANTES de convertir a webp — mismo orden que
       // uploadStorefrontImage() en businesses.service.ts, para no codificar
       // la imagen dos veces.

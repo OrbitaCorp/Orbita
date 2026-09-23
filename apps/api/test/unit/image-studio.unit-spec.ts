@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { ImageStudioService } from '../../src/image-studio/image-studio.service';
 
 // ImageStudioService (fondos de producto + "prenda en modelo", paquete
@@ -56,7 +56,18 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     expect(prompt).toContain('modelo mujer, fondo urbano');
   });
 
-  it('generateBackground: "sin_fondo" devuelve el recorte directo, sin componer ni llamar a Flux', async () => {
+  // "Fondo con IA" (generateBackground) está en mantenimiento (24/09/2026,
+  // ver el plan "Fondo con IA: pipeline 2D/3D") — con el add-on activo, corta
+  // con 503 antes de llegar a esta lógica. Los tests de abajo (marcados
+  // .skip) quedan tal cual para reactivar cuando se saque ese throw.
+  it('generateBackground: con el add-on, en mantenimiento (503), no llama a nada', async () => {
+    const { svc, backgroundRemoval, cloudflareImage } = makeService(true);
+    await expect(svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' })).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(backgroundRemoval.removeBackground).not.toHaveBeenCalled();
+    expect(cloudflareImage.generateImage).not.toHaveBeenCalled();
+  });
+
+  it.skip('generateBackground: "sin_fondo" devuelve el recorte directo, sin componer ni llamar a Flux', async () => {
     const { svc, backgroundRemoval, cloudflareImage } = makeService(true);
     const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'sin_fondo');
     expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
@@ -65,7 +76,7 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     expect(result.mimeType).toBe('image/png');
   });
 
-  it('generateBackground: imageUrl de nuestro propio storage se baja y procesa igual que un file', async () => {
+  it.skip('generateBackground: imageUrl de nuestro propio storage se baja y procesa igual que un file', async () => {
     const { svc } = makeService(true);
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -80,7 +91,7 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     fetchMock.mockRestore();
   });
 
-  it('generateBackground: imageUrl que NO es de nuestro storage se rechaza (SSRF)', async () => {
+  it.skip('generateBackground: imageUrl que NO es de nuestro storage se rechaza (SSRF)', async () => {
     const { svc } = makeService(true);
     const fetchMock = jest.spyOn(global, 'fetch');
     await expect(
@@ -90,12 +101,12 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     fetchMock.mockRestore();
   });
 
-  it('generateBackground: sin file ni imageUrl, 400', async () => {
+  it.skip('generateBackground: sin file ni imageUrl, 400', async () => {
     const { svc } = makeService(true);
     await expect(svc.generateBackground('biz-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('generateBackground: estilo que no existe en el catálogo, 400 y no llama al quita-fondos', async () => {
+  it.skip('generateBackground: estilo que no existe en el catálogo, 400 y no llama al quita-fondos', async () => {
     const { svc, backgroundRemoval } = makeService(true);
     await expect(
       svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
@@ -103,7 +114,7 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     expect(backgroundRemoval.removeBackground).not.toHaveBeenCalled();
   });
 
-  describe('generateBackground — fondo cacheado vs. en vivo', () => {
+  describe.skip('generateBackground — fondo cacheado vs. en vivo', () => {
     afterEach(() => jest.restoreAllMocks());
 
     it('sin descripción: baja una de las variantes cacheadas de R2, no llama a Flux', async () => {

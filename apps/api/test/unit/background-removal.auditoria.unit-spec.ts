@@ -1,4 +1,4 @@
-import { BadRequestException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import sharp from 'sharp';
 import { BackgroundRemovalService } from '../../src/background-removal/background-removal.service';
 
@@ -16,18 +16,12 @@ jest.mock('../../src/common/utils/subida-imagen', () => ({
   ENTRADA_IMAGEN: { limitInputPixels: 100 },
 }));
 
-it('en mantenimiento: removeBackground rechaza siempre con 503, sin correr el modelo', async () => {
-  const svc = new BackgroundRemovalService();
-  const procesar = jest.spyOn(svc as any, 'procesar');
-  await expect(svc.removeBackground(Buffer.from('x'), 'biz-1')).rejects.toBeInstanceOf(ServiceUnavailableException);
-  expect(procesar).not.toHaveBeenCalled();
-});
-
-// Pausados mientras dure el mantenimiento (ver background-removal.service.ts:84-92
-// y el plan de la tarea "Fondo con IA: pipeline 2D/3D") — el throw de arriba de
-// removeBackground() corta antes de llegar a esta lógica. Reactivar (sacar el
-// .skip) en cuanto se saque ese throw en la Fase 1.
-describe.skip('Quitar el fondo', () => {
+// El "mantenimiento" del 24/09/2026 (ver el plan de la tarea "Fondo con IA:
+// pipeline 2D/3D") NO vive acá — este servicio sigue andando igual, lo que
+// se pausó son los callers de producto/"Fondo con IA" (ver
+// products.service.ts y image-studio.service.ts). Este archivo sigue
+// probando BackgroundRemovalService tal cual.
+describe('Quitar el fondo', () => {
   it('tope por negocio: pasado el máximo de la ventana, 429 sin correr el modelo', async () => {
     const svc = new BackgroundRemovalService();
     const procesar = jest.spyOn(svc as any, 'procesar').mockResolvedValue(Buffer.from('ok'));

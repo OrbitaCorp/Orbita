@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
@@ -138,6 +138,18 @@ export class ImageStudioService {
     imageUrl?: string,
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
+
+    // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
+    // este pipeline (modo gratis actual + modo premium nuevo con Gemini/
+    // Workers AI). El toggle de producto (products.service.ts) queda pausado
+    // igual; uploadStorefrontImage() en businesses.service.ts (sliders de
+    // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
+    // Tipado como `boolean` (no el literal `true`) a propósito: si no, tsc
+    // marca todo lo de abajo como código muerto y pierde el narrowing de
+    // `origen`/`imageUrl` (TS2345/TS18048). Poner en `false` es el primer
+    // paso al retomar esta tarea.
+    const EN_MANTENIMIENTO: boolean = true;
+    if (EN_MANTENIMIENTO) throw new ServiceUnavailableException('"Fondo con IA" está en mantenimiento — vuelve pronto.');
 
     const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
     if (!origen) throw new BadRequestException('Falta la imagen a procesar');
