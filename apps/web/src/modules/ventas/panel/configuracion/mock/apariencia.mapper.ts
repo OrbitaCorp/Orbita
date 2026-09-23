@@ -201,7 +201,8 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         bannerDesplazable: dto.announcementScroll,
         mostrarStats: dto.showStatsBar,
         mostrarParallax: dto.showParallaxBanner,
-        stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
+        // null = nunca guardó (arranca con los de ejemplo); [] = los borró a propósito.
+        stats: dto.statsBar ?? defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
         // ?? por la misma ventana de deploy que videoLayout: campo nuevo, la
