@@ -1979,13 +1979,38 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
                     <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
-                    {/* EN MANTENIMIENTO (24/09/2026): deshabilitado, no oculto — ver
-                        background-removal.service.ts. removeBg queda forzado en
-                        false (el checkbox nunca puede tildarse mientras esté así). */}
-                    <label className="ds-hover" title="En mantenimiento — vuelve pronto" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-muted)', borderRadius: 6, cursor: 'not-allowed' }}>
-                        <input type="checkbox" checked={false} disabled onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
-                        Quitar el fondo automáticamente al subir esta imagen (en mantenimiento)
+                    {/* Pedido explícito (24/09/2026): habilitado SOLO con "Imagen
+                        centrada" — es el único estilo pensado para una foto sin
+                        fondo (queda compuesta sobre el patrón decorativo). Con
+                        "Imagen completa" no tiene sentido (la foto ocupa todo el
+                        slide) y queda deshabilitado. El backend
+                        (uploadStorefrontImage en businesses.service.ts) sigue
+                        andando con el modelo local sin cambios — esto es solo un
+                        límite de UI, no del "Fondo con IA"/mantenimiento de
+                        producto (ver products.service.ts / image-studio.service.ts).
+
+                        Con `soloTexto` (plantilla avanzada activa, ver el
+                        comentario de esa prop más abajo) el checkbox entero se
+                        saca, no alcanza con deshabilitarlo: el hero de una
+                        plantilla avanzada SIEMPRE muestra la foto a pantalla
+                        completa, nunca "centrada sobre un patrón" (ese estilo
+                        ni existe ahí, ver homes.tsx/plantillaReal.ts), así que
+                        quitar el fondo dejaría un recorte flotando sobre nada
+                        en un slot pensado para una foto entera. Sin este gate,
+                        un slide que quedó en 'centered' desde antes de activar
+                        la plantilla (dato que este modo ya no deja cambiar)
+                        mostraba `centrada` en true y el checkbox aparecía
+                        habilitado, como si aplicara (reportado con captura). */}
+                    {!soloTexto && (
+                    <label
+                        className="ds-hover"
+                        title={centrada ? undefined : 'Solo aplica con el estilo "Imagen centrada"'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: centrada ? 'var(--color-body)' : 'var(--color-muted)', borderRadius: 6, cursor: centrada ? 'pointer' : 'not-allowed' }}
+                    >
+                        <input type="checkbox" checked={centrada && removeBg} disabled={!centrada} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+                        Quitar el fondo automáticamente al subir esta imagen{centrada ? '' : ' (solo con "Imagen centrada")'}
                     </label>
+                    )}
 
                     {!soloTexto && (<>
                     <Divider />
