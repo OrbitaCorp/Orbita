@@ -626,9 +626,32 @@ export class BusinessesService {
     if (dto.template !== null && !HOME_TEMPLATES_DISPONIBLES.includes(dto.template as (typeof HOME_TEMPLATES_DISPONIBLES)[number])) {
       throw new BadRequestException(`Plantilla desconocida: ${dto.template}`);
     }
+
+    // El hero de UNA plantilla avanzada se dibuja SIEMPRE a pantalla completa
+    // (ninguna lee imageStyle/imagePosition/bgPattern/bgColor — ver
+    // plantillas/homes.tsx y plantillaReal.ts en el front, que ignoran esos
+    // campos por completo). Si el dueño había dejado un slide en "imagen
+    // centrada" desde Apariencia clásica, esa configuración quedaba pegada al
+    // activar la plantilla — mezclando ahí un diseño que ese editor ni
+    // siquiera deja tocar (soloTexto, reportado con captura). Al activar
+    // CUALQUIER plantilla se reinicia el estilo de los sliders existentes a
+    // imagen completa sin diseño encima; título/subtítulo/CTA/imagen no se
+    // tocan. Al desactivar (dto.template === null) no se toca nada: el dueño
+    // vuelve a Apariencia clásica y arma el diseño desde ahí, de cero.
+    const heroSlides = dto.template !== null && Array.isArray(current.heroSlides)
+      ? (current.heroSlides as Prisma.JsonArray).map((s) => ({
+          ...(s as Record<string, unknown>),
+          imageStyle: 'full',
+          imagePosition: 'right',
+          bgPattern: 'none',
+          bgPatternScope: 'image',
+          bgColor: '',
+        })) as object[]
+      : undefined;
+
     const config = await this.prisma.storefrontConfig.update({
       where: { businessId },
-      data: { homeTemplate: dto.template },
+      data: { homeTemplate: dto.template, ...(heroSlides ? { heroSlides } : {}) },
     });
     return this.toAppearanceResponse(config);
   }
