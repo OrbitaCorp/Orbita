@@ -529,7 +529,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette} ayuda={AYUDA_SECCIONES[soloContenido ? 'hero' : 'identidad']}>
             {!soloContenido && (<>
                 <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" onToast={onToast} />
+                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG o HEIC · máx 10MB" onToast={onToast} />
                 <Divider />
                 <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
                 <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" onToast={onToast} />
@@ -673,7 +673,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 onUpload={subirImagenApariencia}
                                 shape="square"
                                 size={80}
-                                formats="JPG, PNG · máx 4MB"
+                                formats="JPG, PNG o HEIC · máx 10MB"
                                 onToast={onToast}
                             />
                         ) : campo.tipo === 'parrafo' ? (
@@ -1167,7 +1167,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                         <Divider />
                         <FieldLabel help="Foto ancha y de buena resolución — se recomienda al menos 1600×900px.">Imagen de fondo</FieldLabel>
-                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" onToast={onToast} />
+                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
                         <Divider />
                         <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.parallaxTitulo} onChange={v => set('parallaxTitulo', v)} /></div>
                         <div style={{ marginBottom: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.parallaxSubtitulo} onChange={v => set('parallaxSubtitulo', v)} /></div>
@@ -1697,7 +1697,7 @@ function EditorVideos({ videos, layout, onChange, onToast }: { videos: VideoItem
                                 que el cuadro se vea recortado. */}
                             <div style={{ marginBottom: 12 }}>
                                 <FieldLabel help={layout === 'reels' ? 'Opcional. Una imagen parada (9:16) queda mejor en este diseño, sobre todo si el video es horizontal.' : 'Opcional. Se ve antes de darle play, en vez del primer cuadro del video.'}>Portada</FieldLabel>
-                                <ImgUploader value={v.portada} onChange={x => upd(i, { portada: x })} onUpload={subirImagenApariencia} shape="square" size={64} formats="JPG, PNG · máx 4MB" onToast={onToast} />
+                                <ImgUploader value={v.portada} onChange={x => upd(i, { portada: x })} onUpload={subirImagenApariencia} shape="square" size={64} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
                             </div>
                             <div style={{ marginBottom: usaTexto ? 8 : 0 }}><Inp value={v.titulo} onChange={x => upd(i, { titulo: x })} maxLength={120} placeholder="Título (opcional)" /></div>
                             {usaTexto && (
@@ -1978,7 +1978,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
             {open && (
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
-                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG · máx 4MB" onToast={onToast} />
+                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
                     <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-body)', borderRadius: 6, cursor: 'pointer' }}>
                         <input type="checkbox" checked={removeBg} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
                         Quitar el fondo automáticamente al subir esta imagen

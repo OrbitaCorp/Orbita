@@ -18,7 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
-import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -677,7 +677,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             // El chequeo de tamaño va sobre el archivo YA convertido: es el
             // que termina subiéndose, y un HEIC pasado a JPEG puede pesar
             // distinto que el original.
-            if (file.size > 5 * 1024 * 1024) { onToast(`"${file.name}" supera los 5MB`); continue }
+            if (file.size > MAX_IMAGEN_BYTES) { onToast(`"${file.name}" supera los ${MAX_IMAGEN_MB}MB`); continue }
             const principal = faltaPrincipal
             if (principal) faltaPrincipal = false
             nuevas.push({
@@ -1621,7 +1621,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     permitePrincipal
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
+                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
                                 </div>
                             </div>
 
@@ -1727,6 +1727,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 onEtiquetar={etiquetarPendiente}
                                                 onReorder={reordenarVariante}
                                             />
+                                            <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                                PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
+                                            </div>
                                             {valoresConFotoDuplicada.length > 0 && (
                                                 <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
                                                     Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.

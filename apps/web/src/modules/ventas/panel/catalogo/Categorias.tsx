@@ -344,7 +344,7 @@ export default function Categorias() {
                                         onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
                                         shape="circle"
                                         size={64}
-                                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda"
+                                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda. PNG, JPG o HEIC · máx 10MB"
                                         onToast={notify}
                                     />
                                 </div>
@@ -543,7 +543,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
                         onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
                         shape="circle"
                         size={64}
-                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda"
+                        formats="Recomendado: una foto se ve mejor que un ícono en la tienda. PNG, JPG o HEIC · máx 10MB"
                         onToast={onToast}
                     />
                 </div>

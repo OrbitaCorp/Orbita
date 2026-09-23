@@ -11,6 +11,16 @@
 // también mira la extensión — confiar solo en `file.type` deja pasar el
 // archivo sin convertir.
 
+// Espejo del límite real del backend (MAX_IMAGEN_BYTES en
+// apps/api/src/common/utils/subida-imagen.ts, que aplica parejo a logo,
+// imágenes de Apariencia, fotos de producto y avatar) — no tiene sentido que
+// el panel avise un tope más chico del que el backend realmente acepta.
+export const MAX_IMAGEN_MB = 10
+export const MAX_IMAGEN_BYTES = MAX_IMAGEN_MB * 1024 * 1024
+
+/** Texto estándar de formatos/tamaño para los uploaders de imagen del panel. */
+export const FORMATOS_IMAGEN_AYUDA = `PNG, JPG o HEIC · máx ${MAX_IMAGEN_MB}MB`
+
 const HEIC_MIME_TYPES = new Set(['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'])
 
 function esHeic(file: File): boolean {

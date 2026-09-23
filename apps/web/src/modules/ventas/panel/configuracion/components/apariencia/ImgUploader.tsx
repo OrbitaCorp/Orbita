@@ -5,7 +5,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, Upload, Trash2, Loader2 } from 'lucide-react'
-import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, FORMATOS_IMAGEN_AYUDA } from '@/lib/heic'
 
 interface ImgUploaderProps {
     value:    string | null
@@ -14,11 +14,13 @@ interface ImgUploaderProps {
     shape?:   'square' | 'circle'
     size?:    number
     formats?: string
-    /** Aviso cuando el archivo elegido no sirve (formato no soportado, no se pudo convertir). */
+    /** Tope de tamaño en MB — default: el mismo que ya exige el backend (ver MAX_IMAGEN_MB). */
+    maxMB?:   number
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, supera el tamaño, no se pudo convertir). */
     onToast?: (m: string) => void
 }
 
-export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB', onToast }: ImgUploaderProps) {
+export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = FORMATOS_IMAGEN_AYUDA, maxMB = MAX_IMAGEN_MB, onToast }: ImgUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [drag, setDrag] = useState(false)
     const [uploading, setUploading] = useState(false)
@@ -38,6 +40,14 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
             // avisar en el momento que subir algo que después no se ve.
             setUploading(false)
             onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
+        // El chequeo de tamaño va sobre el archivo YA convertido — es el que
+        // termina subiéndose, y un HEIC pasado a JPEG puede pesar distinto
+        // que el original.
+        if (file.size > maxMB * 1024 * 1024) {
+            setUploading(false)
+            onToast?.(`"${file.name}" supera los ${maxMB}MB`)
             return
         }
         const r = new FileReader()

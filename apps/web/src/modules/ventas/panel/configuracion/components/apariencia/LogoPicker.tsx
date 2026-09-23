@@ -14,7 +14,7 @@
 
 import { useRef, useState } from 'react'
 import { Image as ImageIcon, X, Loader2 } from 'lucide-react'
-import { esArchivoDeImagen, normalizarImagen } from '@/lib/heic'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB } from '@/lib/heic'
 
 interface LogoPickerProps {
     value:    string | null
@@ -23,11 +23,13 @@ interface LogoPickerProps {
     /** Para el aria-label, así el botón no es "subir imagen" a secas cuando hay varios. */
     nombre?:  string
     size?:    number
-    /** Aviso cuando el archivo elegido no sirve (formato no soportado, no se pudo convertir). */
+    /** Tope de tamaño en MB — default: el mismo que ya exige el backend (ver MAX_IMAGEN_MB). */
+    maxMB?:   number
+    /** Aviso cuando el archivo elegido no sirve (formato no soportado, supera el tamaño, no se pudo convertir). */
     onToast?: (m: string) => void
 }
 
-export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, onToast }: LogoPickerProps) {
+export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, maxMB = MAX_IMAGEN_MB, onToast }: LogoPickerProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [subiendo, setSubiendo] = useState(false)
     const de = nombre?.trim() ? ` de ${nombre.trim()}` : ''
@@ -45,6 +47,11 @@ export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, onToa
         } catch {
             setSubiendo(false)
             onToast?.(`"${fileOriginal.name}" no se pudo procesar`)
+            return
+        }
+        if (file.size > maxMB * 1024 * 1024) {
+            setSubiendo(false)
+            onToast?.(`"${file.name}" supera los ${maxMB}MB`)
             return
         }
         const r = new FileReader()
