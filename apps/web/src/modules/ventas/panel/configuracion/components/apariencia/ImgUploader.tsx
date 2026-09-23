@@ -50,6 +50,7 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
             onToast?.(`"${file.name}" supera los ${maxMB}MB`)
             return
         }
+        const anterior = value
         const r = new FileReader()
         r.onload = async e => {
             onChange(e.target?.result as string)
@@ -58,9 +59,12 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
                 const url = await onUpload(file)
                 onChange(url)
             } catch {
-                // Se queda con el preview local; el guardado de Apariencia fallará
-                // más tarde si esa URL nunca se resolvió (no es un dataURL válido
-                // para persistir), pero al menos no se pierde lo que el usuario ve.
+                // La subida falló (en el celular es común: fotos pesadas, red
+                // floja): se vuelve a la imagen anterior y se avisa. Dejar el
+                // dataURL en el estado rompía el guardado ENTERO de Apariencia,
+                // porque la API rechaza todo lo que no sea una URL https.
+                onChange(anterior)
+                onToast?.(`No se pudo subir "${file.name}". Probá de nuevo o con una imagen más liviana`)
             } finally {
                 setUploading(false)
             }

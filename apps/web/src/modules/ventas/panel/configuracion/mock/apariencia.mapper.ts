@@ -28,6 +28,10 @@ function fontScaleAEscala(v: string | number | null): EscalaFuente {
 const MODO_A_COLOR_MODE: Record<ModoColor, 'light' | 'dark' | 'system'> = { claro: 'light', oscuro: 'dark', sistema: 'system' }
 const COLOR_MODE_A_MODO: Record<'light' | 'dark' | 'system', ModoColor> = { light: 'claro', dark: 'oscuro', system: 'sistema' }
 
+// Un data: es la vista previa de una subida que no terminó — la API lo
+// rechaza (solo https o ruta del sitio) y tira abajo el guardado entero.
+const sinDataUrl = (v: string | null): string | null => (v && v.startsWith('data:') ? null : v)
+
 export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
     return {
         // Vacíos NO se mandan (el DTO del backend es @IsOptional() @IsString(),
@@ -35,8 +39,8 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         // al nombre real del negocio, en vez de quedar con el título en blanco.
         ...(ap.nombreTienda.trim() ? { storeName: ap.nombreTienda.trim() } : {}),
         ...(ap.tagline.trim() ? { tagline: ap.tagline.trim() } : {}),
-        logoUrl: ap.logo,
-        faviconUrl: ap.favicon,
+        logoUrl: sinDataUrl(ap.logo),
+        faviconUrl: sinDataUrl(ap.favicon),
         colorPrimary: ap.colorPrimario,
         colorSecondary: ap.colorSecundario,
         colorAccent: ap.colorAccent,
@@ -49,7 +53,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         gridLayout: ap.layoutGrid,
         categoryLayout: ap.estiloCategorias,
         categoryIds: ap.categoriasIds,
-        heroSlides: ap.sliders,
+        heroSlides: ap.sliders.map(s => ({ ...s, img: s.img?.startsWith('data:') ? '' : s.img })),
         headerLinks: ap.headerLinks,
         showReviews: ap.mostrarResenas,
         showNewBadge: ap.mostrarBadgeNuevo,
@@ -72,7 +76,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         whatsappText: ap.textoWhatsapp,
         whatsappLayout: ap.estiloWhatsapp,
         statsBar: ap.stats,
-        parallaxImageUrl: ap.parallaxImagen,
+        parallaxImageUrl: sinDataUrl(ap.parallaxImagen),
         parallaxTitle: ap.parallaxTitulo,
         parallaxSubtitle: ap.parallaxSubtitulo,
         parallaxCtaText: ap.parallaxCtaTexto,
@@ -85,7 +89,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         // tienda como un hueco en la tira.
         brands: ap.marcas
             .filter(m => m.name.trim() !== '')
-            .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo ? { logoUrl: m.logo } : {}) })),
+            .map(m => ({ id: m.id, name: m.name.trim(), ...(m.logo && !m.logo.startsWith('data:') ? { logoUrl: m.logo } : {}) })),
         showVideo: ap.mostrarVideo,
         videoTitle: ap.videoTitulo,
         videoSubtitle: ap.videoSubtitulo,

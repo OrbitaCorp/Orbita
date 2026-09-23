@@ -54,16 +54,18 @@ export function LogoPicker({ value, onChange, onUpload, nombre, size = 44, maxMB
             onToast?.(`"${file.name}" supera los ${maxMB}MB`)
             return
         }
+        const anterior = value
         const r = new FileReader()
         r.onload = async e => {
             // Preview instantáneo con el dataURL y recién después la URL real
-            // — mismo criterio que ImgUploader (si la subida falla, al menos
-            // no se pierde de vista lo que el usuario eligió).
+            // — mismo criterio que ImgUploader (si la subida falla se vuelve
+            // a la imagen anterior: un dataURL en el estado rompe el guardado).
             onChange(e.target?.result as string)
             try {
                 onChange(await onUpload(file))
             } catch {
-                /* se queda con el preview local; el guardado avisa después */
+                onChange(anterior)
+                onToast?.(`No se pudo subir "${file.name}". Probá de nuevo o con una imagen más liviana`)
             } finally {
                 setSubiendo(false)
             }
