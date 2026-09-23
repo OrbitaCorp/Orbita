@@ -1881,6 +1881,9 @@ export type ApiProductFull = {
   cost: number | null
   status: ProductStatus
   isFeatured: boolean
+  // "Fondo con IA" premium: flat (plano) usa Gemini, volume (con volumen)
+  // usa Workers AI — ver ImageStudioService.generatePremiumBackground().
+  photoType: 'flat' | 'volume'
   // Ficha técnica opcional ("RAM" -> "16GB") — [] = el producto no tiene,
   // el detalle del storefront no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -1918,6 +1921,7 @@ export type UpsertProductInput = {
   comparePrice?: number
   cost?: number
   status?: ProductStatus
+  photoType?: 'flat' | 'volume'
   tagIds?: string[]
   specs?: { label: string; value: string }[]
   videoUrl?: string
@@ -2060,7 +2064,7 @@ export type ApiImageStudioResult = { base64: string; mimeType: string; advertenc
 // el navegador.
 export async function panelGenerateProductBackground(
   origen: { file: Blob; filename: string } | { imageUrl: string },
-  opts: { estilo?: string; descripcion?: string } = {},
+  opts: { estilo?: string; descripcion?: string; modo?: 'gratis' | 'premium'; photoType?: 'flat' | 'volume' } = {},
 ) {
   const form = new FormData()
   if ('imageUrl' in origen) {
@@ -2070,6 +2074,8 @@ export async function panelGenerateProductBackground(
   }
   if (opts.estilo) form.append('estilo', opts.estilo)
   if (opts.descripcion) form.append('descripcion', opts.descripcion)
+  if (opts.modo) form.append('modo', opts.modo)
+  if (opts.photoType) form.append('photoType', opts.photoType)
 
   const res = await authedFetch(`${API_BASE}/image-studio/background`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)

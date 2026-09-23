@@ -20,12 +20,13 @@ function makeService(hasActiveAddon: boolean) {
     generateImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/jpeg' }),
     editImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/jpeg' }),
   };
+  const geminiImage = { editImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/png' }) };
   // publicUrlDe() alcanza para estos tests: ninguno llega a bajar el fondo
   // cacheado de verdad (los de "sin add-on"/"estilo inválido" cortan antes).
   const r2 = { publicUrlDe: jest.fn((key: string) => `https://cdn.test/${key}`) };
   const config = { get: jest.fn((key: string) => (key === 'SUPABASE_URL' ? 'https://proj.supabase.co' : undefined)) };
-  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any, r2 as any, config as any);
-  return { svc, businesses, backgroundRemoval, cloudflareImage, r2, config };
+  const svc = new ImageStudioService(businesses as any, backgroundRemoval as any, cloudflareImage as any, geminiImage as any, r2 as any, config as any);
+  return { svc, businesses, backgroundRemoval, cloudflareImage, geminiImage, r2, config };
 }
 
 describe('ImageStudioService — gate de "Avanzado"', () => {
@@ -112,6 +113,54 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
       svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(backgroundRemoval.removeBackground).not.toHaveBeenCalled();
+  });
+
+  describe('generatePremiumBackground — Gemini para 2D, Workers AI para 3D', () => {
+    it('photoType "flat" (o sin especificar): le pega a Gemini, no a Workers AI', async () => {
+      const { svc, geminiImage, cloudflareImage } = makeService(true);
+      const result = await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera');
+      expect(geminiImage.editImage).toHaveBeenCalledTimes(1);
+      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+      expect(result.base64).toBe(FAKE_JPEG.toString('base64'));
+    });
+
+    it('photoType "volume": le pega a Workers AI, no a Gemini', async () => {
+      const { svc, geminiImage, cloudflareImage } = makeService(true);
+      await svc.generatePremiumBackground('biz-1', 'volume', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'cuero_negro');
+      expect(cloudflareImage.editImage).toHaveBeenCalledTimes(1);
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+    });
+
+    it('el prompt final incluye la preservación del producto y la descripción del estilo', async () => {
+      const { svc, geminiImage } = makeService(true);
+      await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera');
+      const [prompt] = geminiImage.editImage.mock.calls[0];
+      expect(prompt).toMatch(/pixel-perfect/i);
+      expect(prompt).toContain('wood plank');
+    });
+
+    it('"sin_fondo" sigue siendo el recorte local (ONNX), no le pega a ningún motor de IA', async () => {
+      const { svc, backgroundRemoval, geminiImage, cloudflareImage } = makeService(true);
+      const result = await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'sin_fondo');
+      expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+      expect(result.mimeType).toBe('image/png');
+    });
+
+    it('sin el add-on, 403 y no llama a ningún motor', async () => {
+      const { svc, geminiImage, cloudflareImage } = makeService(false);
+      await expect(svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+    });
+
+    it('estilo inválido, 400', async () => {
+      const { svc } = makeService(true);
+      await expect(
+        svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 
   describe.skip('generateBackground — fondo cacheado vs. en vivo', () => {

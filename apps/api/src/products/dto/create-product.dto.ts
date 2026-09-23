@@ -55,6 +55,12 @@ export class CreateProductDto {
   @IsOptional() @IsNumber() @Min(0.01, { message: 'El precio de comparación debe ser mayor a $0' }) @Max(MAX_PRECIO) comparePrice?: number;
   @IsOptional() @IsNumber() @Min(0, { message: 'El costo no puede ser negativo' }) @Max(MAX_PRECIO) cost?: number;
   @IsOptional() @IsIn(['PUBLISHED', 'DRAFT']) status?: 'PUBLISHED' | 'DRAFT';
+  // "Fondo con IA" (modo premium): flat (plano, la mayoría) o volume (con
+  // volumen) — decide si esa función usa Gemini o Workers AI, ver
+  // ImageStudioService.generatePremiumBackground(). El panel sugiere un
+  // default según la categoría; el vendedor lo puede cambiar. Default 'flat'
+  // si se omite (mismo default que Product.photoType en el schema).
+  @IsOptional() @IsIn(['flat', 'volume']) photoType?: 'flat' | 'volume';
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsUUID('4', { each: true }) tagIds?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(5) @ValidateNested({ each: true }) @Type(() => ProductOptionInput) options?: ProductOptionInput[];
   @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => ProductVariantInput) variants!: ProductVariantInput[];

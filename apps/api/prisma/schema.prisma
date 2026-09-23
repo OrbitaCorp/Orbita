@@ -791,6 +791,14 @@ model Product {
   // sección "Destacados" del storefront público. No confundir con `status`.
   isFeatured    Boolean       @default(false) @map("is_featured")
   inventoryType String        @default("standard") @map("inventory_type") // standard | serialized | fractional | batch | simple
+  // "Fondo con IA" (modo premium, ver ImageStudioService): qué motor generativo
+  // usar. flat (plano — indumentaria, la mayoría del catálogo) va a Gemini;
+  // volume (con volumen — riñoneras, accesorios) va a Workers AI, porque
+  // Gemini regenera bien texto/logos pero Workers AI resuelve mejor un
+  // producto en ángulo sin metadata de superficie. El panel sugiere un
+  // default según la categoría al crear el producto; el vendedor lo puede
+  // cambiar a mano si no aplica (sin detección automática por imagen).
+  photoType     String        @default("flat") @map("photo_type") // flat | volume
   // Especificaciones técnicas opcionales (ej. "RAM" -> "16GB") — array de
   // {label, value} en el orden que las carga el vendedor. Json en vez de una
   // tabla propia: nunca se consultan sueltas, siempre viajan junto con el

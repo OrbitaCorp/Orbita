@@ -24,6 +24,12 @@
 // de Neurons de Cloudflare se agotó para el resto de los estilos (ver
 // CloudflareQuotaExhaustedException en el backend: ese error viene con un
 // mensaje ya armado para mostrar tal cual, no hace falta traducirlo acá).
+//
+// Modo "Gratis" vs "Premium" (24/09/2026, ver el plan "Fondo con IA:
+// pipeline 2D/3D"): gratis es el pipeline de siempre (compone local contra
+// el catálogo cacheado en R2); premium le pega a un modelo generativo sobre
+// la foto completa — Gemini si el producto es plano (`photoType`), Workers
+// AI si tiene volumen. "Sin fondo" es igual en los dos modos (siempre ONNX).
 import { Fragment, useEffect, useState } from 'react'
 import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
@@ -43,6 +49,10 @@ interface Props {
      *  (pendiente) o agregar como una foto pendiente nueva (guardada). */
     onAplicar: (origen: ImagenParaFondo, file: File, preview: string) => void
     onToast: (m: string) => void
+    /** Plano o con volumen (Product.photoType) — solo importa en modo premium,
+     *  decide si el backend le pega a Gemini o a Workers AI (ver
+     *  ImageStudioService.generatePremiumBackground()). */
+    photoType?: 'flat' | 'volume'
 }
 
 function base64AFile(base64: string, mimeType: string, nombre: string): File {
@@ -61,10 +71,16 @@ function nombreDeImagen(img: ImagenParaFondo): string {
     return img.url.split('/').pop()?.split('?')[0] || 'foto.jpg'
 }
 
-export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToast }: Props) {
+export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToast, photoType }: Props) {
     const [estilos, setEstilos] = useState<ApiBackgroundStyle[] | null>(null)
     const [errorEstilos, setErrorEstilos] = useState<string | null>(null)
     const [estiloElegido, setEstiloElegido] = useState<string | null>(null)
+    // "Gratis" (de siempre, sin cambios) vs "Premium" (Gemini/Workers AI,
+    // llamada generativa directa — ver el plan "Fondo con IA: pipeline 2D/3D").
+    // Default "gratis": elegir el modo no debe sorprender a nadie que ya usaba
+    // esto. Se resetea a "gratis" al cerrar el modal, mismo criterio que el
+    // resto del estado de acá abajo.
+    const [modo, setModo] = useState<'gratis' | 'premium'>('gratis')
 
     // Preview: se genera contra la primera foto general apenas se elige un
     // estilo — así el vendedor ve el resultado ANTES de aplicarlo a todas.
@@ -134,11 +150,11 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             setAplicando(false)
             setProgreso({ hecho: 0, total: 0 })
             setZoomAbierto(false)
+            setModo('gratis')
         }
     }, [isOpen])
 
-    async function elegirEstilo(key: string) {
-        setEstiloElegido(key)
+    async function generarPreview(key: string, modoElegido: 'gratis' | 'premium') {
         setPreview(null)
         setErrorPreview(null)
         setZoomAbierto(false)
@@ -148,7 +164,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         }
         setGenerandoPreview(true)
         try {
-            const r = await panelGenerateProductBackground(origenParaApi(primera), { estilo: key })
+            const r = await panelGenerateProductBackground(origenParaApi(primera), { estilo: key, modo: modoElegido, photoType })
             const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(primera))
             setPreview({ file, url: URL.createObjectURL(file) })
         } catch (e) {
@@ -156,6 +172,18 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         } finally {
             setGenerandoPreview(false)
         }
+    }
+
+    function elegirEstilo(key: string) {
+        setEstiloElegido(key)
+        void generarPreview(key, modo)
+    }
+
+    // Cambiar de modo con un estilo ya elegido regenera el preview contra ese
+    // mismo estilo — si no, el vendedor vería el resultado del modo anterior.
+    function elegirModo(nuevoModo: 'gratis' | 'premium') {
+        setModo(nuevoModo)
+        if (estiloElegido) void generarPreview(estiloElegido, nuevoModo)
     }
 
     async function aplicarASeleccionadas() {
@@ -169,7 +197,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
 
             for (const img of imagenesElegidas.slice(1)) {
                 try {
-                    const r = await panelGenerateProductBackground(origenParaApi(img), { estilo: estiloElegido })
+                    const r = await panelGenerateProductBackground(origenParaApi(img), { estilo: estiloElegido, modo, photoType })
                     const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
                     onAplicar(img, file, URL.createObjectURL(file))
                 } catch {
@@ -214,6 +242,42 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.55 }}>
                     Elegí un estilo de fondo — se prueba primero en una foto; si te convence, lo aplicás a las fotos que tildaste abajo (una sola, algunas, o todas).
+                </div>
+
+                {/* Gratis (de siempre) vs Premium (Gemini/Workers AI) — ver
+                    comentario de `modo` más arriba. */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                        type="button"
+                        onClick={() => elegirModo('gratis')}
+                        disabled={aplicando}
+                        style={{
+                            flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
+                            cursor: aplicando ? 'default' : 'pointer',
+                            border: '1px solid ' + (modo === 'gratis' ? 'var(--color-primary)' : 'var(--color-border)'),
+                            background: modo === 'gratis' ? 'var(--color-primary-bg)' : 'var(--color-surface)',
+                            color: modo === 'gratis' ? 'var(--color-primary)' : 'var(--color-text)',
+                        }}
+                    >
+                        Gratis
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => elegirModo('premium')}
+                        disabled={aplicando}
+                        title="Genera el fondo con IA en un solo paso, sobre la foto completa — mejor para productos con volumen o telas complejas."
+                        style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            padding: '8px 10px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit',
+                            cursor: aplicando ? 'default' : 'pointer',
+                            border: '1px solid ' + (modo === 'premium' ? 'var(--color-primary)' : 'var(--color-border)'),
+                            background: modo === 'premium' ? 'var(--color-primary-bg)' : 'var(--color-surface)',
+                            color: modo === 'premium' ? 'var(--color-primary)' : 'var(--color-text)',
+                        }}
+                    >
+                        <Sparkles size={12} strokeWidth={2.2} />
+                        Premium
+                    </button>
                 </div>
 
                 {/* Tira de fotos: cada una es un checkbox — tocarla la

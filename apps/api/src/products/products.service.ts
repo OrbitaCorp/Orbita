@@ -200,6 +200,7 @@ export class ProductsService {
           status: dto.status ?? 'DRAFT',
           specs: dto.specs ? (dto.specs.map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue) : undefined,
           videoUrl: dto.videoUrl || null,
+          photoType: dto.photoType ?? 'flat',
         },
       });
 
@@ -359,6 +360,7 @@ export class ProductsService {
           status: dto.status ?? undefined,
           specs: (dto.specs ?? []).map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue,
           videoUrl: dto.videoUrl || null,
+          photoType: dto.photoType ?? undefined,
         },
       });
       if (count === 0) throw new NotFoundException('Producto no encontrado');
@@ -910,6 +912,7 @@ export class ProductsService {
       cost: p.cost ? Number(p.cost) : null,
       status: p.status,
       isFeatured: p.isFeatured,
+      photoType: p.photoType,
       specs: normalizarSpecs(p.specs),
       videoUrl: p.videoUrl,
       contentBlocks: normalizarBloques(p.contentBlocks),

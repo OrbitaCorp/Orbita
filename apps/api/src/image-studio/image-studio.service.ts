@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
+import { GeminiImageService } from '../gemini-image/gemini-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, SIN_FONDO_KEY, type BackgroundStyle } from './background-styles';
@@ -34,6 +35,7 @@ export class ImageStudioService {
     private readonly businesses: BusinessesService,
     private readonly backgroundRemoval: BackgroundRemovalService,
     private readonly cloudflareImage: CloudflareImageService,
+    private readonly geminiImage: GeminiImageService,
     private readonly r2: R2Service,
     private readonly config: ConfigService,
   ) {}
@@ -291,6 +293,73 @@ export class ImageStudioService {
     }
 
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
+  }
+
+  // Instrucción de edición para el modo premium — validada a mano en esta
+  // misma tarea contra Gemini (jersey 49ers, texto/logos densos) y Workers AI
+  // (riñonera en ángulo): un solo call de edición sobre la foto COMPLETA
+  // preserva el producto igual de bien que componer local, y de paso resuelve
+  // 3D sin la metadata de superficie que generateBackground() necesitaría.
+  // Reusa style.prompt tal cual (pensado para el catálogo gratis, con
+  // VISTA_CENITAL) — en la práctica el modelo lo interpreta como la textura
+  // del fondo, no como un mandato de cámara para toda la foto, así que sirve
+  // igual para productos en ángulo (ver resumen de la tarea). Catálogo de
+  // estilos dedicado a premium (más realista, "podio" para 3D) es la Fase 2.
+  private promptPremium(style: BackgroundStyle, descripcion?: string): string {
+    const escena = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
+    return (
+      'This is a product photo. Replace ONLY the background with the following scene, keeping the product ' +
+      'itself pixel-perfect: same shape, same angle, same colors, same text, same numbers, same logos, same ' +
+      'stitching, same zippers — do not redraw, restyle or reinterpret the product in any way, only place it ' +
+      `on the new background with a soft realistic contact shadow. Background scene: ${escena}`
+    );
+  }
+
+  /**
+   * Modo premium de "Fondo con IA": en vez de componer local (ver
+   * generateBackground()), le pide a un modelo generativo que edite la foto
+   * completa de una sola vez. Dos motores según `photoType` (Product.photoType,
+   * decisión del vendedor al cargar el producto — ver el plan "Fondo con IA:
+   * pipeline 2D/3D"):
+   * - `flat` (indumentaria, la mayoría del catálogo) → Gemini: Workers AI
+   *   bloquea con falsos positivos de NSFW la indumentaria femenina ajustada
+   *   (confirmado por el vendedor), Gemini no.
+   * - `volume` (riñoneras, accesorios) → Workers AI: gratis dentro del free
+   *   tier de Cloudflare, y ya resolvió bien un producto en ángulo sin la
+   *   metadata de superficie que necesitaría el modo gratis.
+   *
+   * El caso "Sin fondo" sigue siendo SIEMPRE BackgroundRemovalService (ONNX)
+   * acá también — ni Gemini ni Workers AI garantizan canal alfa real, son
+   * generativos, no segmentadores.
+   */
+  async generatePremiumBackground(
+    businessId: string,
+    photoType?: 'flat' | 'volume',
+    file?: { buffer: Buffer; mimetype: string },
+    estilo?: string,
+    descripcion?: string,
+    imageUrl?: string,
+  ): Promise<ImageStudioResult> {
+    await this.requireAddonAvanzado(businessId);
+
+    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
+    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
+
+    if (estilo === SIN_FONDO_KEY) {
+      const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
+      return { base64: cutout.toString('base64'), mimeType: 'image/png' };
+    }
+
+    const style = BACKGROUND_STYLES[estilo ?? DEFAULT_BACKGROUND_STYLE];
+    if (!style) throw new BadRequestException('Estilo de fondo inválido');
+
+    const prompt = this.promptPremium(style, descripcion);
+    const result =
+      photoType === 'volume'
+        ? await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype)
+        : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
+
+    return { base64: result.buffer.toString('base64'), mimeType: result.mimeType };
   }
 
   /**

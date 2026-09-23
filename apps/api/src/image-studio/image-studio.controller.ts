@@ -75,7 +75,9 @@ export class ImageStudioController {
     // edición) — uno de los dos, ver comentario de ImageStudioService.
     if (!file && !dto.imageUrl) throw new BadRequestException('Falta el archivo "file" o "imageUrl"');
     this.consumirCuota(member.businessId);
-    return this.imageStudio.generateBackground(member.businessId, file, dto.estilo, dto.descripcion, dto.imageUrl);
+    return dto.modo === 'premium'
+      ? this.imageStudio.generatePremiumBackground(member.businessId, dto.photoType, file, dto.estilo, dto.descripcion, dto.imageUrl)
+      : this.imageStudio.generateBackground(member.businessId, file, dto.estilo, dto.descripcion, dto.imageUrl);
   }
 
   @Post('model')
