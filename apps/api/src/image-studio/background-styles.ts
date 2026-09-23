@@ -179,6 +179,86 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
 export const BACKGROUND_STYLE_KEYS = Object.keys(BACKGROUND_STYLES);
 export const DEFAULT_BACKGROUND_STYLE = 'estudio_neutro';
 
+// ── Fase 2 (24/09/2026, ver el plan "Fondo con IA: pipeline 2D/3D") ────────
+// Catálogo EXCLUSIVO del modo premium (ImageStudioService.generatePremiumBackground()):
+// a diferencia de BACKGROUND_STYLES de arriba, estos NO tienen backgroundKeys
+// (no hay nada pre-generado en R2 que componer) porque el modo premium no
+// compone local — le pasa la foto completa + prompt a Gemini/Workers AI en
+// una sola llamada (ver promptPremium()). Agregar un estilo acá es solo
+// texto, sin correr seed-backgrounds.ts.
+//
+// `soloVolumen: true` reserva el estilo para productos con volumen
+// (Product.photoType === 'volume') — por la regla firme 2D=Gemini/3D=Workers
+// AI, estos SIEMPRE se generan con Workers AI (ver generatePremiumBackground(),
+// que ya rutea por photoType, sin importar el estilo). Sin la marca, el
+// estilo está disponible para ambos tipos de producto.
+export interface PremiumOnlyStyle {
+  label: string;
+  prompt: string;
+  soloVolumen?: boolean;
+}
+
+const PRESERVAR_VOLUMEN =
+  'Preserve all natural volume, drape, sheen and material highlights of the product exactly as ' +
+  'photographed — do not flatten it or make it look pasted on.';
+
+export const PREMIUM_ONLY_STYLES: Record<string, PremiumOnlyStyle> = {
+  // Pedido explícito del vendedor: fondo con textura de pelo/alfombra tipo
+  // shag, como la foto de referencia que mandó (conjunto beige sobre alfombra
+  // de pelo largo). Vista cenital, igual criterio que el catálogo gratis —
+  // este SÍ aplica bien a 2D (flat-lay) además de volumen.
+  alfombra_pelo: {
+    label: 'Alfombra de pelo (textura premium)',
+    prompt: `${VISTA_CENITAL} A luxurious thick shag rug texture with long soft fur-like fibers, warm neutral beige tone, soft natural side lighting that catches the texture of each fiber, cozy premium editorial style. ${CENTRO_VACIO} ${PRESERVAR_VOLUMEN}`,
+  },
+  // Más realista/con volumen que "cuero_negro" del catálogo gratis: brillo
+  // marcado y pliegues profundos en vez de una textura plana.
+  cuero_camel: {
+    label: 'Cuero camel con brillo (premium, calzado/accesorios)',
+    prompt: `${VISTA_CENITAL} A rich camel-brown leather surface with deep natural creases and a pronounced soft sheen catching warm directional light, premium boutique editorial style. ${CENTRO_VACIO} ${PRESERVAR_VOLUMEN}`,
+  },
+  seda_ondulada: {
+    label: 'Seda ondulada (premium, indumentaria fina/gala)',
+    prompt: `${VISTA_CENITAL} A flowing ivory silk fabric with soft natural waves and folds catching gentle highlights, warm elegant lighting, premium fashion editorial style. ${CENTRO_VACIO} ${PRESERVAR_VOLUMEN}`,
+  },
+
+  // "Podio" — familia para 3D (riñoneras, accesorios, botellas, etc.): a
+  // diferencia de arriba, ACÁ SÍ hay perspectiva y profundidad a propósito
+  // (el producto se apoya sobre una superficie real, no queda centrado sobre
+  // una textura plana) — por eso NO usan VISTA_CENITAL/CENTRO_VACIO. Solo
+  // tiene sentido para photoType 'volume': un producto plano (indumentaria)
+  // no se "para" sobre un podio.
+  podio_estudio: {
+    label: 'Podio de estudio (productos con volumen)',
+    prompt:
+      'A minimalist photography studio scene: the product resting on top of a smooth cylindrical podium/pedestal, ' +
+      'soft seamless gradient background (light gray fading to white), soft realistic contact shadow under the ' +
+      'product, gentle studio lighting from above, professional e-commerce product photography style. ' +
+      PRESERVAR_VOLUMEN,
+    soloVolumen: true,
+  },
+  podio_dramatico: {
+    label: 'Podio dramático (productos con volumen)',
+    prompt:
+      'A dramatic minimalist studio scene: the product resting on top of a matte stone podium/pedestal, deep ' +
+      'moody dark background with a soft directional spotlight highlighting the product, realistic contact shadow, ' +
+      'premium editorial product photography style. ' +
+      PRESERVAR_VOLUMEN,
+    soloVolumen: true,
+  },
+  podio_color: {
+    label: 'Podio con color (productos con volumen)',
+    prompt:
+      'A vibrant minimalist studio scene: the product resting on top of a solid-color cylindrical podium/pedestal ' +
+      'matching a soft complementary gradient background, clean bold e-commerce editorial style, soft realistic ' +
+      'contact shadow, even studio lighting. ' +
+      PRESERVAR_VOLUMEN,
+    soloVolumen: true,
+  },
+};
+
+export const PREMIUM_STYLE_KEYS = Object.keys(PREMIUM_ONLY_STYLES);
+
 // "Sin fondo": no es un estilo del catálogo (no compone nada contra un fondo
 // generado, ver ImageStudioService.generateBackground()) — es un atajo para
 // llegar al mismo resultado que el toggle "Quitar fondo" de siempre, pero

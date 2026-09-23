@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
-import { BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY } from '../background-styles';
+import { BACKGROUND_STYLE_KEYS, PREMIUM_STYLE_KEYS, SIN_FONDO_KEY } from '../background-styles';
 
 export class GenerateBackgroundDto {
   // "gratis" (default, compone local contra el catálogo cacheado en R2 — el
@@ -24,9 +24,12 @@ export class GenerateBackgroundDto {
   // Key del catálogo curado (ver background-styles.ts) — "madera",
   // "marmol_plantas", "lino_flores", etc. — o SIN_FONDO_KEY para no
   // componer nada (mismo resultado que el toggle "Quitar fondo" de
-  // siempre). Si viene vacío, se usa DEFAULT_BACKGROUND_STYLE.
+  // siempre). Si viene vacío, se usa DEFAULT_BACKGROUND_STYLE. Incluye
+  // también PREMIUM_STYLE_KEYS (Fase 2: texturas + familia "podio") —
+  // esas keys solo existen en modo "premium", ImageStudioService valida
+  // eso además de esta lista de sintaxis.
   @IsOptional()
-  @IsIn([...BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY])
+  @IsIn([...BACKGROUND_STYLE_KEYS, ...PREMIUM_STYLE_KEYS, SIN_FONDO_KEY])
   estilo?: string;
 
   // Ajuste libre ADEMÁS del estilo elegido (ej. "con tonos más fríos", "sin

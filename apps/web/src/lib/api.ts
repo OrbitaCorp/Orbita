@@ -2051,8 +2051,12 @@ export type ApiBackgroundStyle = { key: string; label: string; previewUrl: strin
 // add-on Avanzado — es catálogo estático, no gasta nada, y el panel lo
 // necesita para poder mostrarlo como upsell aunque el negocio todavía no
 // tenga el paquete.
-export function panelListBackgroundStyles() {
-  return panelRequest<ApiBackgroundStyle[]>('/image-studio/background-styles')
+export function panelListBackgroundStyles(opts: { modo?: 'gratis' | 'premium'; photoType?: 'flat' | 'volume' } = {}) {
+  const params = new URLSearchParams()
+  if (opts.modo) params.set('modo', opts.modo)
+  if (opts.photoType) params.set('photoType', opts.photoType)
+  const qs = params.toString()
+  return panelRequest<ApiBackgroundStyle[]>(`/image-studio/background-styles${qs ? `?${qs}` : ''}`)
 }
 
 export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string }

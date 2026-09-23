@@ -163,6 +163,46 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     });
   });
 
+  // Fase 2 (24/09/2026): catálogo exclusivo del modo premium — texturas sin
+  // backgroundKeys (alfombra_pelo, etc.) y familia "podio" reservada a
+  // productos con volumen. Ver background-styles.ts § PREMIUM_ONLY_STYLES.
+  describe('generatePremiumBackground — catálogo premium (Fase 2)', () => {
+    it('estilo premium-only sin volumen (ej. alfombra_pelo): funciona igual con photoType "flat"', async () => {
+      const { svc, geminiImage, cloudflareImage } = makeService(true);
+      const result = await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'alfombra_pelo');
+      expect(geminiImage.editImage).toHaveBeenCalledTimes(1);
+      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+      const [prompt] = geminiImage.editImage.mock.calls[0];
+      expect(prompt).toMatch(/shag rug/i);
+      expect(result.base64).toBe(FAKE_JPEG.toString('base64'));
+    });
+
+    it('estilo "podio_estudio" con photoType "volume": le pega a Workers AI', async () => {
+      const { svc, cloudflareImage, geminiImage } = makeService(true);
+      await svc.generatePremiumBackground('biz-1', 'volume', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'podio_estudio');
+      expect(cloudflareImage.editImage).toHaveBeenCalledTimes(1);
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+      const [prompt] = cloudflareImage.editImage.mock.calls[0];
+      expect(prompt).toMatch(/podium/i);
+    });
+
+    it('estilo "podio_*" con photoType "flat" (o sin especificar): 400, es solo para productos con volumen', async () => {
+      const { svc, cloudflareImage, geminiImage } = makeService(true);
+      await expect(
+        svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'podio_dramatico'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+    });
+
+    it('el prompt premium refuerza la preservación de color, no solo forma/texto', async () => {
+      const { svc, geminiImage } = makeService(true);
+      await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'madera');
+      const [prompt] = geminiImage.editImage.mock.calls[0];
+      expect(prompt).toMatch(/exact original color/i);
+    });
+  });
+
   describe.skip('generateBackground — fondo cacheado vs. en vivo', () => {
     afterEach(() => jest.restoreAllMocks());
 

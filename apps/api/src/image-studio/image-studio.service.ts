@@ -7,7 +7,14 @@ import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
 import { GeminiImageService } from '../gemini-image/gemini-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
-import { BACKGROUND_STYLES, DEFAULT_BACKGROUND_STYLE, SIN_FONDO_KEY, type BackgroundStyle } from './background-styles';
+import {
+  BACKGROUND_STYLES,
+  DEFAULT_BACKGROUND_STYLE,
+  PREMIUM_ONLY_STYLES,
+  SIN_FONDO_KEY,
+  type BackgroundStyle,
+  type PremiumOnlyStyle,
+} from './background-styles';
 
 export interface ImageStudioResult {
   /** Imagen resultante en base64, lista para <img src="data:{mimeType};base64,...">. */
@@ -305,13 +312,21 @@ export class ImageStudioService {
   // del fondo, no como un mandato de cámara para toda la foto, así que sirve
   // igual para productos en ángulo (ver resumen de la tarea). Catálogo de
   // estilos dedicado a premium (más realista, "podio" para 3D) es la Fase 2.
-  private promptPremium(style: BackgroundStyle, descripcion?: string): string {
+  // Refuerzo de preservación de color (Fase 2, pedido explícito del
+  // vendedor): antes solo decía "same colors" en la misma frase que forma/
+  // texto/logos — se lo separa en su propia oración, explícito sobre qué NO
+  // hacer (viraje de balance de blancos, recoloreo "para combinar" con el
+  // fondo nuevo), porque es el punto más fácil de perder en una edición
+  // generativa de la foto completa.
+  private promptPremium(style: BackgroundStyle | PremiumOnlyStyle, descripcion?: string): string {
     const escena = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
     return (
       'This is a product photo. Replace ONLY the background with the following scene, keeping the product ' +
-      'itself pixel-perfect: same shape, same angle, same colors, same text, same numbers, same logos, same ' +
-      'stitching, same zippers — do not redraw, restyle or reinterpret the product in any way, only place it ' +
-      `on the new background with a soft realistic contact shadow. Background scene: ${escena}`
+      'itself pixel-perfect: same shape, same angle, same text, same numbers, same logos, same stitching, same ' +
+      'zippers — do not redraw, restyle or reinterpret the product in any way, only place it on the new ' +
+      'background with a soft realistic contact shadow. Keep the EXACT original color of the product (same hue, ' +
+      'saturation and brightness as the source photo) — do not shift white balance, do not recolor, do not apply ' +
+      `any color grading or tint to the product to match the new background. Background scene: ${escena}`
     );
   }
 
@@ -350,8 +365,20 @@ export class ImageStudioService {
       return { base64: cutout.toString('base64'), mimeType: 'image/png' };
     }
 
-    const style = BACKGROUND_STYLES[estilo ?? DEFAULT_BACKGROUND_STYLE];
+    // Catálogo combinado: BACKGROUND_STYLES (compartido con el modo gratis)
+    // + PREMIUM_ONLY_STYLES (Fase 2 — texturas premium y familia "podio",
+    // sin backgroundKeys porque el modo premium no compone contra R2).
+    const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
+    const style: BackgroundStyle | PremiumOnlyStyle | undefined = BACKGROUND_STYLES[key] ?? PREMIUM_ONLY_STYLES[key];
     if (!style) throw new BadRequestException('Estilo de fondo inválido');
+
+    // "podio_*" está pensado para un producto apoyado sobre una superficie
+    // real (perspectiva, profundidad) — no tiene sentido para indumentaria
+    // plana. Mismo criterio que la regla firme 2D=Gemini/3D=Workers AI, pero
+    // a nivel de catálogo en vez de motor.
+    if ('soloVolumen' in style && style.soloVolumen && photoType !== 'volume') {
+      throw new BadRequestException('Este estilo es solo para productos con volumen');
+    }
 
     const prompt = this.promptPremium(style, descripcion);
     const result =

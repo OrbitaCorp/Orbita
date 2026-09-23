@@ -37,6 +37,13 @@ import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, type ApiBackgroundStyle } from '@/lib/api'
 
+// Mismo valor que SIN_FONDO_KEY en apps/api/src/image-studio/background-styles.ts
+// — no compone nada, es el único estilo que se muestra con el checkerboard de
+// transparencia. Los estilos premium nuevos (Fase 2: texturas + "podio")
+// también llegan con previewUrl null (no tienen thumbnail en R2) pero NO son
+// "sin fondo" — se distinguen por key, no por previewUrl===null.
+const SIN_FONDO_KEY = 'sin_fondo'
+
 export type ImagenParaFondo =
     | { key: string; tipo: 'pendiente'; file: File; preview: string }
     | { key: string; tipo: 'guardada'; url: string; preview: string }
@@ -130,14 +137,29 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
         return () => window.removeEventListener('keydown', onKey)
     }, [zoomAbierto])
 
+    // Re-pide el catálogo al cambiar de modo (Fase 2): premium suma texturas
+    // + "podio" que no existen en gratis (ver ListBackgroundStylesDto en el
+    // backend). Si había un estilo elegido que no existe en el catálogo
+    // nuevo (ej. "podio_estudio" al pasar a gratis), se limpia la selección
+    // en vez de dejar un preview de un estilo que ya no está en la grilla.
     useEffect(() => {
         if (!isOpen) return
         let cancelado = false
-        panelListBackgroundStyles()
-            .then(r => { if (!cancelado) setEstilos(r) })
+        setEstilos(null)
+        setErrorEstilos(null)
+        panelListBackgroundStyles({ modo, photoType })
+            .then(r => {
+                if (cancelado) return
+                setEstilos(r)
+                if (estiloElegido && !r.some(e => e.key === estiloElegido)) {
+                    setEstiloElegido(null)
+                    setPreview(null)
+                }
+            })
             .catch(e => { if (!cancelado) setErrorEstilos(e instanceof ApiError ? e.message : 'No se pudieron cargar los estilos') })
         return () => { cancelado = true }
-    }, [isOpen])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, modo, photoType])
 
     // Al cerrar, se resetea todo — cada apertura arranca de cero (no tiene
     // sentido recordar el estilo elegido la sesión pasada: el objetivo de
@@ -357,10 +379,12 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                         border: elegido ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                                         outline: elegido ? '2px solid var(--color-primary-bg)' : 'none', outlineOffset: 1,
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        // previewUrl null = "Sin fondo" (no compone nada, ver
-                                        // ImageStudioController) — checkerboard estándar para
-                                        // indicar transparencia, en vez de un thumbnail real.
-                                        ...(e.previewUrl ? {} : {
+                                        // "Sin fondo" (no compone nada, ver ImageStudioController):
+                                        // checkerboard estándar para indicar transparencia. Los
+                                        // estilos premium (Fase 2: texturas + "podio") también
+                                        // llegan sin previewUrl pero no son transparentes — se
+                                        // distinguen por key, ver comentario del import de arriba.
+                                        ...(e.key === SIN_FONDO_KEY ? {
                                             backgroundImage:
                                                 'linear-gradient(45deg, var(--color-border) 25%, transparent 25%), ' +
                                                 'linear-gradient(-45deg, var(--color-border) 25%, transparent 25%), ' +
@@ -368,11 +392,13 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                 'linear-gradient(-45deg, transparent 75%, var(--color-border) 75%)',
                                             backgroundSize: '12px 12px',
                                             backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
-                                        }),
+                                        } : !e.previewUrl ? { background: 'var(--color-primary-bg)' } : {}),
                                     }}>
                                         {e.previewUrl
                                             ? <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                            : <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />}
+                                            : e.key === SIN_FONDO_KEY
+                                                ? <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />
+                                                : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
                                     </div>
                                     <span style={{
                                         fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',
