@@ -11,6 +11,7 @@
 
 import { type Apariencia as Ap, type EscalaFuente, type ModoColor, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
+import { escribirMarca, leerMarca, marcaValida, sinMarca } from '@/components/storefront/marca'
 
 const ESCALA_A_FONT_SCALE: Record<EscalaFuente, number> = { sm: 0.9, md: 1.0, lg: 1.15 }
 
@@ -124,7 +125,9 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
             // Solo lo que tenga algo escrito: un campo vacío no se guarda, así
             // el home vuelve a caer al texto con el que se diseñó la sección
             // (ver el helper `txt()` en homes.tsx) en vez de dibujar un hueco.
-            secciones: limpiarSecciones(ap.seccionesPlantilla),
+            // La marca del header viaja en la misma bolsa (clave `_marca`, ver
+            // marca.tsx): no hace falta un campo nuevo en la API.
+            secciones: escribirMarca(limpiarSecciones(ap.seccionesPlantilla), marcaValida(ap.marcaModo, ap.marcaEstilo)),
         },
     }
 }
@@ -238,6 +241,8 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
                 : [],
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
         mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
-        seccionesPlantilla: dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla,
+        seccionesPlantilla: sinMarca(dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla),
+        marcaModo: leerMarca(dto.homeTemplateData?.secciones).modo,
+        marcaEstilo: leerMarca(dto.homeTemplateData?.secciones).estilo,
     }
 }

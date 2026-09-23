@@ -31,6 +31,7 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { StorefrontHeader, navRealDe } from './StorefrontHeader'
+import { leerMarca } from './marca'
 import { AccionesPlantilla, BuscadorPlantilla } from './AccionesPlantilla'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
 import { Home as PlantillaHome, LAYOUTS_CON_HEADER_PROPIO } from '@/modules/ventas/panel/avanzado/plantillas/homes'
@@ -225,6 +226,8 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           logoIcono={logoIcono}
           navCentrada={navCentrada}
           sinNav={sinNav}
+          // Solo sin plantilla: con una activa, la marca es parte de SU diseño.
+          marca={plantilla ? undefined : leerMarca(config?.appearance?.homeTemplateData?.secciones)}
         />
       )}
       {/* Con header lateral el contenido ya se dibujó adentro de la fila, a la

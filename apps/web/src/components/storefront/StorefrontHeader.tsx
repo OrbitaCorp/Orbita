@@ -10,6 +10,7 @@ import { getStorefrontProducts, type StorefrontProductItem } from '@/lib/storefr
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { PromoChip } from '@/modules/ventas/_shared/components'
 import type { TiendaConfig } from '@/lib/storefront/types'
+import { MarcaVista, type Marca } from './marca'
 
 type Props = {
   tienda:  TiendaConfig
@@ -63,6 +64,10 @@ type Props = {
   // desktop ni en el drawer de mobile — solo logo + buscador/carrito/cuenta.
   navCentrada?: boolean
   sinNav?: boolean
+  // Qué muestra la marca (logo y nombre / solo logo / solo nombre) y con qué
+  // estilo — ver marca.tsx. Sin este prop (o con Escaparate, que tiene su
+  // propio tratamiento del nombre) el bloque de la marca queda como siempre.
+  marca?: Marca
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -123,7 +128,7 @@ export function navRealDe(headerLinks?: { id: string; label: string; on: boolean
     : NAV_LINKS_DEFAULT.map(l => ({ label: l.label, path: l.path }))
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true, navCentrada = false, sinNav = false }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true, navCentrada = false, sinNav = false, marca }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -488,6 +493,19 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     // Logo — un poco más grande que antes (32px), acompañando la cabecera
     // más alta (pedido explícito del dueño).
     <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, ...(centrado ? { justifySelf: 'center' } : { marginRight: 8 }) }}>
+      {marca && !escaparate ? (
+        <MarcaVista
+          marca={marca}
+          nombre={tienda.nombre}
+          logoUrl={logoUrl}
+          centrado={centrado}
+          logoGenerico={
+            <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
+            </div>
+          }
+        />
+      ) : (<>
       {logoIcono && (logoUrl ? (
         <img src={logoUrl} alt="" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
       ) : (
@@ -506,6 +524,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         ? { fontSize: 22, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.03em', textTransform: 'uppercase', lineHeight: 1.1, fontFamily: 'var(--font-heading, inherit)', ...(centrado ? { textAlign: 'center' } : {}) }
         : { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)', ...(centrado ? { textAlign: 'center' } : {}) }
       }>{tienda.nombre}</div>
+      </>)}
     </a>
   )
 
