@@ -1496,6 +1496,14 @@ function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void })
 // Para tiendas con muchas categorías donde la sección es navegación
 // secundaria y no merece peso visual propio.
 function CatChips({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    // Mismo carrusel automático que pastillas (mismo umbral y mismo loop).
+    if (cats.length > CAT_MIN_MARQUEE) {
+        return (
+            <MarqueeLoop items={cats} gap={8} render={(c, key) => (
+                <button key={key} className="sf-cat-chip" onClick={() => go(`/catalogo/${c.slug}`)}>{c.nombre}</button>
+            )} />
+        )
+    }
     return (
         <div className="sf-cat-chips-wrap">
             <div className="sf-w sf-cat-chips">
@@ -1571,6 +1579,17 @@ function CatTarjetas({ cats, go }: { cats: CatVisual[]; go: (p: string) => void 
 // recorte circular sirve para los dos), así que no depende de que el dueño
 // haya subido imágenes.
 function CatCirculos({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
+    // Mismo carrusel automático que pastillas (mismo umbral y mismo loop).
+    if (cats.length > CAT_MIN_MARQUEE) {
+        return (
+            <MarqueeLoop items={cats} gap={22} render={(c, key) => (
+                <button key={key} className="sf-cat-circulo" onClick={() => go(`/catalogo/${c.slug}`)}>
+                    <CatMedallon c={c} size={76} />
+                    <span className="sf-cat-circulo-nombre">{c.nombre}</span>
+                </button>
+            )} />
+        )
+    }
     return (
         <div className="sf-cat-circulos-wrap">
             <div className="sf-w sf-cat-circulos">
@@ -1671,11 +1690,15 @@ function MarqueeLoop<T>({ items, gap, duracion, render }: {
                 {items.map((x, i) => render(x, `medidor-${i}`))}
             </div>
 
-            <div className="sf-marquee-track" style={duracion ? { animationDuration: `${duracion}s` } : undefined}>
+            {/* gap:0 y el espacio entre las dos mitades va como paddingRight de
+                cada una: así el track mide exactamente 2 × (mitad + gap) y el
+                -50% de la animación cae justo donde arrancó, con cualquier
+                separación (con el gap del CSS, la costura se corría gap/2). */}
+            <div className="sf-marquee-track" style={{ gap: 0, ...(duracion ? { animationDuration: `${duracion}s` } : undefined) }}>
                 {/* Dos mitades idénticas (loop sin costura) — cada una con
                     `repeticiones` copias del set, calculadas arriba. */}
                 {[0, 1].map(mitad => (
-                    <div key={mitad} style={{ display: 'flex', gap }}>
+                    <div key={mitad} style={{ display: 'flex', gap, paddingRight: gap }}>
                         {Array.from({ length: repeticiones }).flatMap((_, r) =>
                             items.map((x, i) => render(x, `${i}-${mitad}-${r}`)),
                         )}
