@@ -66,6 +66,27 @@ export type StoreStatusSSR = 'ok' | 'paused' | 'inactive' | 'not_found'
 // ENCIMA de la latencia real; si el backend se acelera, se puede bajar.
 const SSR_CONFIG_TIMEOUT_MS = 6000
 
+// Memoria corta de la config por tienda, en el server. Este getServerSideProps
+// corre en CADA navegación dentro de la tienda (Next lo vuelve a pedir en cada
+// transición del lado del cliente: ficha ↔ catálogo ↔ inicio), y esperaba la
+// config completa del backend cada vez — un pedido de ~cientos de ms a
+// segundos, en serie, antes de poder mostrar la página siguiente. La misma
+// tienda navegada seguido reusa la de hace unos segundos. TTL corto: solo
+// alimenta branding/estado de pausa, y las páginas piden su config fresca
+// aparte; que pausar o cambiar la marca se note en ≤ 20s es un costo chico.
+// Solo se guardan respuestas OK (un error o un 404 se vuelve a intentar).
+const TTL_CONFIG_SSR_MS = 20_000
+const configSSR = new Map<string, { hasta: number; cfg: Awaited<ReturnType<typeof getStorefrontConfig>> }>()
+async function getConfigConMemoria(slug: string) {
+  const previa = configSSR.get(slug)
+  if (previa && previa.hasta > Date.now()) return previa.cfg
+  const cfg = await getStorefrontConfig(slug)
+  configSSR.set(slug, { hasta: Date.now() + TTL_CONFIG_SSR_MS, cfg })
+  // No dejar crecer el mapa sin tope si hay muchas tiendas en la misma instancia.
+  if (configSSR.size > 200) configSSR.delete(configSSR.keys().next().value as string)
+  return cfg
+}
+
 // Fuerza SSR en las páginas del storefront en vez de dejar que Next.js las
 // optimice automáticamente como estáticas (comportamiento default de un
 // page sin getServerSideProps/getStaticProps), y de paso resuelve el
@@ -106,7 +127,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       // Carrera contra un timeout: si el backend está frío, la tienda igual
       // responde (el cliente completa el branding después).
       const cfg = await Promise.race([
-        getStorefrontConfig(slug),
+        getConfigConMemoria(slug),
         new Promise<null>(resolve => setTimeout(() => resolve(null), SSR_CONFIG_TIMEOUT_MS)),
       ])
       if (cfg) {

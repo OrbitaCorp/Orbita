@@ -171,27 +171,31 @@ export default function ProductoDetalle() {
         setSeleccion(Object.fromEntries(p.options.map(o => [o.id, o.values[0]?.id]).filter(([, v]) => v)))
         setImgIdx(0)
         setQty(1)
-        return getStorefrontProducts(slug, { categoryId: p.categoryId ?? undefined, limit: 5 })
-      })
-      .then(r => {
-        if (cancelado || !r) return
-        const mismaCategoria = r.data.filter(x => x.id !== id).slice(0, 4)
-        setRelacionadosCrudos(mismaCategoria)
-        // Si la categoría no llena la fila (4), se completa con otros
-        // productos de la tienda para que la sección no quede vacía o rala.
-        // Falla aparte: sin esto, la ficha entera no tiene por qué caerse.
-        if (mismaCategoria.length >= 4) return
-        return getStorefrontProducts(slug, { limit: 12 })
-          .then(o => {
+        // La ficha se muestra YA con el producto. Antes el esqueleto seguía
+        // hasta que terminaban también los "relacionados" (uno o dos pedidos
+        // más en serie): entrar a una ficha se sentía lento aunque el
+        // producto hubiera llegado hace rato.
+        setCargando(false)
+        setRelacionadosCrudos([])
+        // "También te puede gustar": aparte, con su propia falla. Misma
+        // categoría primero; si no llena la fila (4) se completa con otros
+        // productos de la tienda para que no quede vacía o rala.
+        getStorefrontProducts(slug, { categoryId: p.categoryId ?? undefined, limit: 5 })
+          .then(r => {
             if (cancelado) return
-            const yaEstan = new Set([id, ...mismaCategoria.map(x => x.id)])
-            const extra = o.data.filter(x => !yaEstan.has(x.id))
-            setRelacionadosCrudos([...mismaCategoria, ...extra].slice(0, 4))
+            const mismaCategoria = r.data.filter(x => x.id !== id).slice(0, 4)
+            setRelacionadosCrudos(mismaCategoria)
+            if (mismaCategoria.length >= 4) return
+            return getStorefrontProducts(slug, { limit: 12 }).then(o => {
+              if (cancelado) return
+              const yaEstan = new Set([id, ...mismaCategoria.map(x => x.id)])
+              const extra = o.data.filter(x => !yaEstan.has(x.id))
+              setRelacionadosCrudos([...mismaCategoria, ...extra].slice(0, 4))
+            })
           })
           .catch(() => {})
       })
-      .catch(() => { if (!cancelado) setNotFound(true) })
-      .finally(() => { if (!cancelado) setCargando(false) })
+      .catch(() => { if (!cancelado) { setNotFound(true); setCargando(false) } })
     return () => { cancelado = true }
   }, [slug, id])
 

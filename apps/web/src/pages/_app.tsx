@@ -47,6 +47,9 @@ function safeScale(v: number | null): number | null {
 // Piso de tiempo que se muestra el loader — puramente estético (evita un
 // parpadeo si todo resuelve casi instantáneo), no depende de datos.
 const MIN_LOADER_MS = 500
+// Cuánto tiene que tardar una navegación dentro de la tienda para que aparezca
+// el loader (ver el efecto de `navegando` más abajo).
+const DEMORA_LOADER_MS = 150
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -83,12 +86,27 @@ export default function App({ Component, pageProps }: AppProps) {
   const [navegando, setNavegando] = useState(false)
   useEffect(() => {
     if (!isStorefront) return
-    const empieza = () => setNavegando(true)
-    const termina = () => setNavegando(false)
+    // Dos reglas para no tapar la tienda con el loader de pantalla completa
+    // (fade de 300ms) sin necesidad:
+    //  · Un cambio de URL `shallow` (el catálogo sincroniza filtros y página
+    //    con `router.replace(..., { shallow: true })`) no carga ninguna página
+    //    nueva: antes disparaba el loader igual, con cada filtro o página.
+    //  · Solo aparece si la navegación tarda más de DEMORA_LOADER_MS: una
+    //    transición rápida (ficha ↔ catálogo con la página ya cargada) se ve
+    //    directa, sin el parpadeo del velo entrando y saliendo.
+    let temporizador: ReturnType<typeof setTimeout> | null = null
+    const limpiar = () => { if (temporizador) { clearTimeout(temporizador); temporizador = null } }
+    const empieza = (_url: string, opts?: { shallow?: boolean }) => {
+      if (opts?.shallow) return
+      limpiar()
+      temporizador = setTimeout(() => setNavegando(true), DEMORA_LOADER_MS)
+    }
+    const termina = () => { limpiar(); setNavegando(false) }
     router.events.on('routeChangeStart', empieza)
     router.events.on('routeChangeComplete', termina)
     router.events.on('routeChangeError', termina)
     return () => {
+      limpiar()
       router.events.off('routeChangeStart', empieza)
       router.events.off('routeChangeComplete', termina)
       router.events.off('routeChangeError', termina)
