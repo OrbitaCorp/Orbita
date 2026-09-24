@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Grid, List, Tag, TrendingUp, Search, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
@@ -50,7 +50,12 @@ function construirArbolCategorias(cats: StorefrontCategoryItem[]): CategoriaNodo
   return out
 }
 
-const ORDENES: StorefrontSort[] = ['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']
+// Última respuesta de cada consulta del catálogo (misma tienda + mismos
+// filtros/página), en memoria mientras la pestaña siga abierta. Ver el efecto
+// que pide los productos.
+const cacheConsultas = new Map<string, Awaited<ReturnType<typeof getStorefrontProducts>>>()
+
+const ORDENES: StorefrontSort[] =['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']
 
 export default function Catalogo() {
   const router = useRouter()
@@ -195,8 +200,7 @@ export default function Catalogo() {
   useEffect(() => {
     if (!slug || !urlListo) return
     let cancelado = false
-    setCargando(true)
-    getStorefrontProducts(slug, {
+    const params = {
       categoryId: catsActivas.length > 0 ? catsActivas : undefined,
       optionValues: opcionesActivas.length > 0 ? opcionesActivas : undefined,
       search: busqueda.trim() || undefined,
@@ -206,9 +210,26 @@ export default function Catalogo() {
       sort: orden,
       page,
       limit: LIMIT,
-    })
+    }
+    // Si esta misma consulta ya se vio (típico: se vuelve atrás desde una
+    // ficha), se muestra AL INSTANTE lo de la vez anterior y se refresca por
+    // detrás sin esqueleto. Sin esto la lista arrancaba vacía, la página se
+    // acortaba, el navegador te mandaba arriba y recién al llegar la
+    // respuesta se volvía a la posición guardada: el "sube y baja" trabado.
+    const clave = `${slug}|${JSON.stringify(params)}`
+    const previo = cacheConsultas.get(clave)
+    if (previo) {
+      setCrudos(previo.data)
+      setTotal(previo.total)
+      setFacetas(previo.availableOptions ?? [])
+      setCargando(false)
+    } else {
+      setCargando(true)
+    }
+    getStorefrontProducts(slug, params)
       .then(r => {
         if (cancelado) return
+        cacheConsultas.set(clave, r)
         setCrudos(r.data)
         setTotal(r.total)
         // ?? [] : si la API contesta sin availableOptions (build de backend
@@ -242,7 +263,10 @@ export default function Catalogo() {
   }, [router.events])
 
   const scrollRestaurado = useRef(false)
-  useEffect(() => {
+  // useLayoutEffect y scroll directo (sin requestAnimationFrame): corre con
+  // los productos ya en el DOM y ANTES de pintar, así no hay un cuadro en el
+  // que se vea la lista arriba de todo.
+  useLayoutEffect(() => {
     if (scrollRestaurado.current || !urlListo || cargando || productos.length === 0) return
     scrollRestaurado.current = true
     try {
@@ -250,7 +274,7 @@ export default function Catalogo() {
       const y = k ? sessionStorage.getItem(`orb-cat-scroll:${k}`) : null
       if (y == null) return
       sessionStorage.removeItem(`orb-cat-scroll:${k}`)
-      requestAnimationFrame(() => window.scrollTo(0, Number(y)))
+      window.scrollTo(0, Number(y))
     } catch { /* idem */ }
   }, [urlListo, cargando, productos.length])
 
