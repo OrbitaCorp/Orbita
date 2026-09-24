@@ -50,6 +50,8 @@ function construirArbolCategorias(cats: StorefrontCategoryItem[]): CategoriaNodo
   return out
 }
 
+const ORDENES: StorefrontSort[] = ['relevancia', 'precio-asc', 'precio-desc', 'bestselling', 'recommended']
+
 export default function Catalogo() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
@@ -89,16 +91,37 @@ export default function Catalogo() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [cargando, setCargando] = useState(true)
+  // La URL ya se leyó y sus filtros/página ya están aplicados al estado: hasta
+  // entonces no se pide nada al backend (evita pedir la página 1 sin filtros y
+  // recién después la real) ni se reescribe la URL (borraría lo que trae).
+  const [urlListo, setUrlListo] = useState(false)
 
   // Header "Ofertas"/"Más vendidos" llegan acá como ?onSale=1 / ?sort=bestselling
   // (ver StorefrontHeader.tsx) — se toman como filtro inicial una sola vez,
   // apenas el router está listo, para no pisar lo que el usuario elija después
   // a mano en esta misma página.
+  //
+  // Además el catálogo guarda su propio estado en la URL (ver el efecto de
+  // "URL <- estado" más abajo): página, filtros, orden, precio, búsqueda y
+  // vista. Así abrir una ficha y volver atrás (o compartir el link) devuelve
+  // exactamente lo que se estaba mirando, en vez de reiniciar en la página 1.
   useEffect(() => {
     if (!router.isReady) return
-    if (router.query.onSale === '1') setSoloOferta(true)
-    if (router.query.sort === 'bestselling') setOrden('bestselling')
-    if (typeof router.query.search === 'string') setBusqueda(router.query.search)
+    const q = router.query
+    const uno = (k: string) => (typeof q[k] === 'string' ? (q[k] as string) : '')
+    const lista = (k: string) => uno(k).split(',').map(x => x.trim()).filter(Boolean)
+    if (uno('onSale') === '1') setSoloOferta(true)
+    const ordenUrl = uno('sort')
+    if (ORDENES.includes(ordenUrl as StorefrontSort)) setOrden(ordenUrl as StorefrontSort)
+    if (uno('search')) setBusqueda(uno('search'))
+    if (uno('min')) setPrecioMin(uno('min'))
+    if (uno('max')) setPrecioMax(uno('max'))
+    const opt = lista('opt')
+    if (opt.length > 0) setOpcionesActivas(opt)
+    const vista = uno('vista')
+    if (vista === 'list' || vista === 'grid') { vistaEnUrl.current = true; setViewMode(vista) }
+    const pag = parseInt(uno('page'), 10)
+    if (Number.isFinite(pag) && pag > 1) setPage(pag)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
 
@@ -112,6 +135,8 @@ export default function Catalogo() {
   // Una sola vez (`catAplicada`): después manda lo que el usuario toque en el
   // panel de filtros, no la URL con la que entró.
   const catAplicada = useRef(false)
+  // ?vista= en la URL con la que se entró: manda sobre el default de Apariencia.
+  const vistaEnUrl = useRef(false)
   useEffect(() => {
     if (!router.isReady || catAplicada.current || categorias.length === 0) return
     const crudo = router.query.cat
@@ -125,6 +150,17 @@ export default function Catalogo() {
     if (ids.length > 0) setCatsActivas(ids)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, categorias])
+
+  // La URL está lista cuando ya no falta nada por aplicar: sin `cat` es
+  // inmediato; con `cat` hay que esperar las categorías (el efecto de arriba
+  // convierte el slug en id en ESTE mismo render, así el primer pedido de
+  // productos ya sale con todo aplicado).
+  useEffect(() => {
+    if (!router.isReady || urlListo) return
+    const conCat = typeof router.query.cat === 'string' || Array.isArray(router.query.cat)
+    if (!conCat || catAplicada.current || !catsCargando) setUrlListo(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, categorias, catsCargando])
 
   useEffect(() => {
     if (!slug) return
@@ -140,7 +176,7 @@ export default function Catalogo() {
         // leía (reportado: elegir "Lista" en el panel no cambiaba nada acá).
         // El shopper sigue pudiendo cambiarlo a mano con el selector de
         // arriba (viewMode es su propio estado, sin tocar esa parte).
-        if (cfg.appearance?.gridLayout === 'list') setViewMode('list')
+        if (cfg.appearance?.gridLayout === 'list' && !vistaEnUrl.current) setViewMode('list')
       })
       .catch(() => {})
       .finally(() => { if (!cancelado) setCatsCargando(false) })
@@ -148,7 +184,7 @@ export default function Catalogo() {
   }, [slug])
 
   useEffect(() => {
-    if (!slug) return
+    if (!slug || !urlListo) return
     let cancelado = false
     setCargando(true)
     getStorefrontProducts(slug, {
@@ -175,7 +211,69 @@ export default function Catalogo() {
       .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, catsActivas, opcionesActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
+  }, [slug, urlListo, catsActivas, opcionesActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
+
+  // Scroll al volver atrás desde una ficha. Cada entrada del historial de Next
+  // tiene una clave propia y estable (`history.state.key`: `push` crea una
+  // nueva, `replace` conserva la misma, y "atrás" vuelve a la de siempre).
+  // Al salir de la página se guarda el scroll bajo esa clave; al entrar, si
+  // hay uno guardado para la clave actual es que se VOLVIÓ a esta entrada (una
+  // visita nueva, por ejemplo desde el menú, siempre trae una clave distinta y
+  // arranca arriba). Se aplica una sola vez, cuando los productos ya se
+  // dibujaron: antes la página todavía no tiene alto para scrollear.
+  useEffect(() => {
+    const guardar = () => {
+      try {
+        const k = window.history.state?.key
+        if (k) sessionStorage.setItem(`orb-cat-scroll:${k}`, String(window.scrollY))
+      } catch { /* sin sessionStorage (modo privado): no se restaura y listo */ }
+    }
+    router.events.on('routeChangeStart', guardar)
+    return () => router.events.off('routeChangeStart', guardar)
+  }, [router.events])
+
+  const scrollRestaurado = useRef(false)
+  useEffect(() => {
+    if (scrollRestaurado.current || !urlListo || cargando || productos.length === 0) return
+    scrollRestaurado.current = true
+    try {
+      const k = window.history.state?.key
+      const y = k ? sessionStorage.getItem(`orb-cat-scroll:${k}`) : null
+      if (y == null) return
+      sessionStorage.removeItem(`orb-cat-scroll:${k}`)
+      requestAnimationFrame(() => window.scrollTo(0, Number(y)))
+    } catch { /* idem */ }
+  }, [urlListo, cargando, productos.length])
+
+  // URL <- estado. `replace` (no `push`): filtrar o paginar no llena el
+  // historial de entradas, pero la entrada actual queda con la URL real, y es
+  // a esa a la que vuelve el botón "atrás" desde una ficha de producto.
+  // `shallow` + la ruta visible intacta (`as`) para no tocar cómo se ve la URL
+  // en un dominio propio o subdominio.
+  useEffect(() => {
+    if (!router.isReady || !urlListo) return
+    const q = new URLSearchParams()
+    const slugsCat = catsActivas.map(id => categorias.find(c => c.id === id)?.slug).filter((x): x is string => !!x)
+    if (slugsCat.length > 0) q.set('cat', slugsCat.join(','))
+    if (opcionesActivas.length > 0) q.set('opt', opcionesActivas.join(','))
+    if (orden !== 'relevancia') q.set('sort', orden)
+    if (soloOferta) q.set('onSale', '1')
+    if (busqueda.trim()) q.set('search', busqueda.trim())
+    if (precioMin) q.set('min', precioMin)
+    if (precioMax) q.set('max', precioMax)
+    const vistaDefault = config?.appearance?.gridLayout === 'list' ? 'list' : 'grid'
+    if (viewMode !== vistaDefault) q.set('vista', viewMode)
+    if (page > 1) q.set('page', String(page))
+    const qs = q.toString()
+    const [ruta, actual = ''] = router.asPath.split('#')[0].split('?')
+    if (qs === actual) return
+    void router.replace(
+      { pathname: router.pathname, query: { slug, ...Object.fromEntries(q) } },
+      qs ? `${ruta}?${qs}` : ruta,
+      { shallow: true, scroll: false },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlListo, catsActivas, categorias, opcionesActivas, orden, soloOferta, busqueda, precioMin, precioMax, viewMode, page, config])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
   // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa

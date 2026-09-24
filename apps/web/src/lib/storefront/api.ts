@@ -604,6 +604,14 @@ export function toOferta(d: StorefrontDiscountLanding): Oferta {
 // de si el producto ES nuevo/está en oferta no cambia. Default true (se
 // muestran) si todavía no se cargó la config, mismo criterio "fail-open" que
 // el resto del storefront.
+// "-20%": el porcentaje real de descuento contra el precio anterior. Menos de
+// 1% (un descuento simbólico) no se puede escribir como porcentaje sin que
+// diga "-0%": ahí queda el "Oferta" de siempre.
+function badgeOferta(precio: number, precioAnt: number): string {
+  const pct = Math.round((1 - precio / precioAnt) * 100)
+  return pct >= 1 ? `-${pct}%` : 'Oferta'
+}
+
 export function toProducto(
   p: StorefrontProductItem | StorefrontProductDetail,
   badges?: { showNew?: boolean; showOffer?: boolean; showLowStock?: boolean },
@@ -634,7 +642,7 @@ export function toProducto(
     // "2x1"/"3x2" (RBT-675) gana siempre que el producto participe — es más
     // específico que "Oferta"/"Nuevo" y no depende de los toggles de
     // Apariencia (no es un badge cosmético, es una promo real corriendo).
-    badge: p.promoLabel ?? ((enOferta && showOffer) ? 'Oferta' : (esNuevo && showNew) ? 'Nuevo' : null),
+    badge: p.promoLabel ?? ((enOferta && showOffer) ? badgeOferta(p.price, p.comparePrice!) : (esNuevo && showNew) ? 'Nuevo' : null),
     hue: hueFromId(p.id),
     stock: inStock,
     lowStock: bajoStock && showLowStock,

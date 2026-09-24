@@ -57,11 +57,12 @@ export default function DescuentoCompartido() {
     let cancelado = false
     setCargandoProductos(true)
     getStorefrontProducts(slug, { discountId: id, limit: 24 })
-      .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p))) })
+      .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }))) })
       .catch(() => { if (!cancelado) setProductos([]) })
       .finally(() => { if (!cancelado) setCargandoProductos(false) })
     return () => { cancelado = true }
-  }, [slug, id, oferta])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, id, oferta, config?.appearance])
 
   if (cargando) {
     return (

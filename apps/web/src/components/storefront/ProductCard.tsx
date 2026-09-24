@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Eye, Check, ShoppingCart, Timer } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
@@ -104,9 +105,10 @@ function OfertaTermina({ hasta, color }: { hasta?: string | null; color?: string
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
-  // Dash/% — no lo produce ningún caller real hoy (toProducto() en
-  // lib/storefront/api.ts arma el badge de descuento como el texto fijo
-  // "Oferta", nunca un porcentaje) pero se deja por si alguna vez sí.
+  // Descuento con porcentaje ("-20%"): lo arma toProducto() en
+  // lib/storefront/api.ts (badgeOferta) con el descuento real contra el precio
+  // anterior; sale en rojo. Con un descuento menor a 1% queda el "Oferta"
+  // genérico, que cae al color de acento de más abajo.
   if (badge.startsWith('−') || badge.startsWith('-') || badge.includes('%'))
     return { bg: '#DC2626', color: '#fff' }
   if (badge.toLowerCase() === 'nuevo')
@@ -181,6 +183,14 @@ export function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchS
       ))}
     </div>
   )
+}
+
+// <a> que cubre toda la tarjeta (ver globals.css → .orb-pcard-link/-raiz: queda
+// por encima del contenido y por debajo de los botones y selectores de color,
+// que siguen andando). `prefetch={false}`: una grilla tiene decenas de tarjetas
+// y precargar la ficha de cada una no lo hacía el router.push de antes.
+function EnlaceProducto({ href, nombre }: { href: string; nombre: string }) {
+  return <Link href={href} prefetch={false} className="orb-pcard-link" aria-label={nombre} draggable={false} />
 }
 
 export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', tema, sangre, alto, transferPct }: Props) {
@@ -285,6 +295,21 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
     }
   }
 
+  // La ficha es un ENLACE de verdad (un <a> que cubre la tarjeta, ver
+  // EnlaceProducto): así el navegador ofrece "Abrir en pestaña nueva" para la
+  // ficha, con clic derecho en escritorio y mantener apretado en el celular,
+  // y no "Abrir imagen en pestaña nueva" como pasaba cuando la tarjeta era un
+  // <div> con onClick. Si el clic cae sobre el enlace, lo resuelve él (Next lo
+  // navega sin recargar y con ctrl/cmd/clic del medio abre otra pestaña); si
+  // cae sobre algo decorativo por encima de él (una etiqueta, el contador), se
+  // navega igual, como siempre.
+  const hrefProducto = `/tienda/${slug}/producto/${producto.id}`
+  const irAlProducto = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('a')) return
+    router.push(hrefProducto)
+  }
+  const enlace = slug ? <EnlaceProducto href={hrefProducto} nombre={producto.nombre} /> : null
+
   const handleAdd = (e: React.MouseEvent) => accionar('agregar', e)
   // Mismo destino que el "Comprar ahora" del detalle de producto
   // (ProductoDetalle.tsx): agrega y va derecho a cargar los datos de envío.
@@ -296,10 +321,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
     return (
       <>
       <div
-        onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
+        className="orb-pcard-raiz"
+        onClick={irAlProducto}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
+          position: 'relative',
           display: 'flex', alignItems: 'center', gap: 14, padding: 10,
           background: 'var(--color-bg)',
           border: `1px solid ${hov ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
@@ -308,6 +335,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           transition: 'box-shadow 200ms ease, border-color 200ms ease',
         }}
       >
+        {enlace}
         <ProdImage hue={producto.hue} imgUrl={imgMostrada} radius={9} style={{ width: 76, height: 76, flexShrink: 0 }} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -319,7 +347,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               const { bg, color } = badgeColor(producto.badge)
               return <span style={{ flexShrink: 0, height: 18, padding: '0 7px', borderRadius: 999, background: bg, color, fontSize: 9.5, fontWeight: 700 }}>{producto.badge}</span>
             })()}
-            {producto.lowStock && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#D97706' }}>⚡ Últimas unidades</span>}
+            {producto.lowStock && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#D97706' }}>Últimas unidades</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
@@ -403,11 +431,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
     return (
       <>
       <div
-        className="orb-pcard-grupo pl-card"
-        onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
+        className="orb-pcard-grupo orb-pcard-raiz pl-card"
+        onClick={irAlProducto}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
+          position: 'relative',
           background: tema.surf, color: tema.text, fontFamily: tema.fb,
           // A sangre: sin radio ni sombra, apenas una línea que la separa de
           // la vecina — así la fila entera se lee como una sola pieza, que es
@@ -420,6 +449,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           cursor: 'pointer',
         }}
       >
+        {enlace}
         {/* ── Foto ──
             `contain` con inset, no `cover` como la maqueta: las fotos reales
             de un catálogo no tienen un estándar de recorte entre productos
@@ -627,12 +657,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
         dispositivos con hover de verdad: en touch quedan visibles siempre,
         ver el comentario en globals.css. */}
     <div
-      className="orb-pcard-grupo"
-      onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
+      className="orb-pcard-grupo orb-pcard-raiz"
+      onClick={irAlProducto}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      style={{ cursor: 'pointer' }}
+      style={{ position: 'relative', cursor: 'pointer' }}
     >
+      {enlace}
       {/* ── Imagen ──
           Pedido explícito del dueño: "quiero tener el diseño de esta
           referencia" — no solo la mecánica (aspectRatio/crossfade, ya
@@ -747,7 +778,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             color: '#fff', fontSize: 10, fontWeight: 700,
             display: 'inline-flex', alignItems: 'center', gap: 4,
           }}>
-            ⚡ Últimas unidades
+            Últimas unidades
           </span>
         )}
 

@@ -848,7 +848,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     avisa que la normativa los pide — ponerles "opcional" al lado
                                     contradiría esa advertencia. */}
                                 <CfgField label="Razón social" value={contacto.legalName} placeholder="Ej. Zapatos Lorena S.R.L." onChange={v => setContacto(p => ({ ...p, legalName: v }))} />
-                                <CfgField label="CUIT" value={contacto.cuit} placeholder="Ej. 30-71234567-1" onChange={v => setContacto(p => ({ ...p, cuit: v }))} />
+                                <CfgField label="CUIT/CUIL" value={contacto.cuit} placeholder="Ej. 30-71234567-1" onChange={v => setContacto(p => ({ ...p, cuit: v }))} />
                             </>
                         )}
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>

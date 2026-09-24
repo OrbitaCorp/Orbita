@@ -439,15 +439,14 @@ export default function ProductoDetalle() {
   // al lado de "Agregar al carrito"/"Comprar ahora".
   const esVidriera = config?.business?.mode === 'SHOWCASE'
   // El número exacto SOLO se ve cuando queda poco (maxQty acotado del lado
-  // del backend, ver storefront.service.ts) — gateado además por el toggle
-  // "Insignia de stock bajo" de Apariencia: sin él, se ve "Disponible" a
-  // secas aunque quede poco. Para la variante seleccionada, "queda poco" es
-  // EN VIVO (quedanPocas, ver utils.ts): reacciona a `restante` bajando por
+  // del backend, ver storefront.service.ts). NO depende del toggle "Indicador
+  // de stock bajo" de Apariencia: ese toggle manda solo sobre el badge de las
+  // tarjetas (ProductCard); la ficha siempre avisa (pedido explícito). Para la
+  // variante seleccionada, "queda poco" es EN VIVO (quedanPocas, ver utils.ts): reacciona a `restante` bajando por
   // lo que el cliente ya tiene en su propio carrito, no solo al flag que
   // trajo el fetch inicial — sin esto, agregar 18 de 20 dejaba la variante
   // mostrando "Disponible" como si sobrara.
-  const bajoStock = (config?.appearance?.showLowStock ?? true)
-    && (varianteSeleccionada ? quedanPocas(restante, varianteSeleccionada.lowStock) : producto.variants.some(v => v.lowStock))
+  const bajoStock = (varianteSeleccionada ? quedanPocas(restante, varianteSeleccionada.lowStock) : producto.variants.some(v => v.lowStock))
   // Ya tiene en el carrito TODO lo que hay disponible — distinto de "sin
   // stock": acá sí hay, pero ya está todo reservado en su propio carrito.
   const todoEnCarrito = enStock && varianteSeleccionada != null && restante === 0
@@ -922,7 +921,7 @@ export default function ProductoDetalle() {
             ))}
 
             {/* Stock — orden de prioridad: sin stock > ya está todo en tu
-                carrito > queda poco (con número, si showLowStock) > disponible. */}
+                carrito > queda poco (con número, siempre) > disponible. */}
             {!varianteSeleccionada && producto.options.length > 0 ? (
               <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 Esa combinación no está disponible

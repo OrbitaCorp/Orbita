@@ -138,14 +138,14 @@ export const AYUDA_OPCIONES: Partial<Record<keyof Apariencia, Ayuda>> = {
         afecta: 'Apagado, esos productos se siguen vendiendo igual: lo único que pasa es que dejan de tener el cartelito que avisa que son nuevos. Ojo: un producto que además está en oferta o tiene una promo muestra ESA etiqueta y no la de "Nuevo" — hay un solo lugar para las dos.',
     },
     mostrarBadgeOferta: {
-        que: 'La etiqueta que marca los productos que tienen un precio anterior más alto que el que se paga hoy.',
+        que: 'La etiqueta con el porcentaje de descuento (por ejemplo "-20%") en los productos que tienen un precio anterior más alto que el que se paga hoy.',
         donde: 'Sobre la foto del producto, en las tarjetas del inicio, del catálogo y de cada categoría.',
         afecta: 'Apagado, el precio anterior tachado se sigue viendo en la tarjeta: lo que se saca es el cartelito de color que llama la atención sobre la foto. No cambia ningún precio.',
     },
     mostrarStockBajo: {
-        que: 'El aviso naranja "Últimas unidades" en los productos a los que les queda poco stock.',
-        donde: 'Abajo a la izquierda de la foto del producto, en las tarjetas del inicio, del catálogo y de cada categoría.',
-        afecta: 'Nunca muestra la cantidad exacta que te queda, solo que es poca. Apagado, tus clientes no se enteran de que está por agotarse: se pierde esa urgencia, pero tampoco parece que te quedás sin mercadería.',
+        que: 'El cartelito "Últimas unidades" en los productos a los que les queda poco stock.',
+        donde: 'Sobre la foto del producto, en las tarjetas del inicio, del catálogo y de cada categoría.',
+        afecta: 'Solo cambia las tarjetas: dentro de la ficha del producto, y al elegir talle o color, tus clientes siempre ven que quedan pocas unidades (con el número). Apagado, la grilla se ve más limpia y no transmite urgencia hasta que abren el producto.',
     },
     mostrarWhatsapp: {
         que: 'El botón verde redondo de WhatsApp que queda flotando sobre la página.',
