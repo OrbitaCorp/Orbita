@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown, Receipt, ExternalLink, PauseCircle } from 'lucide-react'
+import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown, Receipt, ExternalLink, PauseCircle, Eye } from 'lucide-react'
 import { DateRangePicker, fmtChip } from './components/DateRangePicker'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -268,11 +268,7 @@ export default function Dashboard() {
                        números de arriba. Se quedan en dos y la card se compacta
                        (clases ds-kpi-* en globals.css). */
                     .dash-kpis { gap: 8px !important; }
-                    /* Son cinco: en dos columnas el ultimo queda huerfano a
-                       media pantalla. Que ocupe la fila entera. */
-                    .dash-kpis > *:last-child { grid-column: 1 / -1 !important; }
-                    /* El nº de pedido no necesita 90px y el padding lateral de
-                       20px angostaba el nombre del cliente hasta el ellipsis. */
+                    /* Con 6 cards en dos columnas se distribuyen exactamente 3 filas de 2 sin huérfanos */
                     .dash-act-row { grid-template-columns: 52px minmax(0,1fr) auto !important; padding: 12px 14px !important; }
                     .dash-charts { gap: 12px !important; }
                 }
@@ -343,7 +339,15 @@ export default function Dashboard() {
                                 ✓ Tienda online
                             </Button>
                             {tiendaMenuOpen && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 180, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 200, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                                    <div style={{ padding: '9px 12px', borderBottom: '1px solid var(--color-border)', fontSize: 11.5, color: 'var(--color-muted)' }}>
+                                        <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{k?.visitasTotal ?? k?.visitas ?? 0} visitas a la tienda</div>
+                                        {(k?.visitasTotalDominio ?? 0) > 0 ? (
+                                            <div style={{ marginTop: 2 }}>{k?.visitasTotalSubdominio ?? 0} subdom. · {k?.visitasTotalDominio} propio</div>
+                                        ) : (
+                                            <div style={{ marginTop: 2 }}>subdominio y dominio propio</div>
+                                        )}
+                                    </div>
                                     <a
                                         href={subdominio ? tenantUrl(subdominio, '/') : undefined}
                                         target="_blank"
@@ -400,12 +404,30 @@ export default function Dashboard() {
             )}
 
             {/* 2. KPIs */}
-            <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
+            <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 16 }}>
                 {/* "Ventas" es plata que quedó: el backend le resta las devoluciones aprobadas del período. */}
                 <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
                 <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
                 <KpiCard label="Ticket promedio" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
                 <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />
+                {/* Contador de visitas a la tienda: subdominio y dominio propio */}
+                <KpiCard
+                    label="Visitas"
+                    value={k?.visitas ?? 0}
+                    delta={d?.visitas ?? 0}
+                    accent="#06B6D4"
+                    icon={Eye}
+                    loading={cargandoKpis}
+                    footnote={
+                        k ? (
+                            <span style={{ fontSize: 11, color: 'var(--color-muted)' }} title={`Total acumulado: ${k.visitasTotal ?? k.visitas ?? 0} visitas`}>
+                                {(k.visitasDominio ?? 0) > 0
+                                    ? `${k.visitasSubdominio ?? 0} subdom. · ${k.visitasDominio} propio`
+                                    : `${k.visitasTotal ?? k.visitas ?? 0} en total`}
+                            </span>
+                        ) : undefined
+                    }
+                />
                 {/* Comisión real que Mercado Pago le cobró al negocio en el período
                     (suma de fee_details de cada pago aprobado, no una tasa
                     estimada) — invertirColor porque acá "subió" es lo malo. */}

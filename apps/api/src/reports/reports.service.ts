@@ -308,7 +308,7 @@ export class ReportsService {
     const desdeAnterior = new Date(desde.getTime() - duracion);
 
     const kpisDe = async (gte: Date, lt: Date) => {
-      const [grupos, clientesNuevos, devueltoAgg, comisionMpAgg] = await Promise.all([
+      const [grupos, clientesNuevos, devueltoAgg, comisionMpAgg, visitasPeriodo, visitasCustomPeriodo] = await Promise.all([
         this.prisma.order.groupBy({
           by: ['status'],
           where: { businessId, deletedAt: null, createdAt: { gte, lt } },
@@ -334,6 +334,12 @@ export class ReportsService {
           _sum: { mpFeeAmount: true },
           where: { businessId, method: 'MERCADOPAGO', status: 'APPROVED', paidAt: { gte, lt } },
         }),
+        this.prisma.storeVisit.count({
+          where: { businessId, createdAt: { gte, lt } },
+        }),
+        this.prisma.storeVisit.count({
+          where: { businessId, isCustom: true, createdAt: { gte, lt } },
+        }),
       ]);
       let pedidos = 0;
       let ventasBrutas = 0;
@@ -356,6 +362,9 @@ export class ReportsService {
         clientesNuevos,
         pedidosPendientes: pendientes,
         comisionMp: Math.round(comisionMp * 100) / 100,
+        visitas: visitasPeriodo,
+        visitasDominio: visitasCustomPeriodo,
+        visitasSubdominio: Math.max(0, visitasPeriodo - visitasCustomPeriodo),
       };
     };
 
@@ -364,7 +373,7 @@ export class ReportsService {
     const inicioSerie = new Date(inicioHoy.getTime() - 6 * 24 * 60 * 60 * 1000);
     const inicioSerieAnterior = new Date(inicioSerie.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [actual, anterior, ordenesSerie, devolucionesSerie, alertas, topProductosRaw, actividadRaw] = await Promise.all([
+    const [actual, anterior, ordenesSerie, devolucionesSerie, alertas, topProductosRaw, actividadRaw, visitasTotal, visitasTotalDominio] = await Promise.all([
       kpisDe(desde, hastaExcl),
       kpisDe(desdeAnterior, desde),
       this.prisma.order.findMany({
@@ -431,6 +440,8 @@ export class ReportsService {
           onlineOrderDetails: { select: { buyerName: true } },
         },
       }),
+      this.prisma.storeVisit.count({ where: { businessId } }),
+      this.prisma.storeVisit.count({ where: { businessId, isCustom: true } }),
     ]);
 
     // Serie diaria: los 7 días de esta semana y el total de la anterior.
@@ -512,12 +523,16 @@ export class ReportsService {
       hasta: new Date(hastaExcl.getTime() - 1).toISOString(),
       kpis: {
         ...actual,
+        visitasTotal,
+        visitasTotalDominio,
+        visitasTotalSubdominio: Math.max(0, visitasTotal - visitasTotalDominio),
         deltas: {
           ventas: variacion(actual.ventas, anterior.ventas),
           pedidos: variacion(actual.pedidos, anterior.pedidos),
           ticketPromedio: variacion(actual.ticketPromedio, anterior.ticketPromedio),
           clientesNuevos: variacion(actual.clientesNuevos, anterior.clientesNuevos),
           comisionMp: variacion(actual.comisionMp, anterior.comisionMp),
+          visitas: variacion(actual.visitas, anterior.visitas),
         },
       },
       alertas,

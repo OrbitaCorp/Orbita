@@ -2257,7 +2257,13 @@ export type ApiDashboardReport = {
     clientesNuevos: number
     pedidosPendientes: number
     comisionMp: number
-    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number }
+    visitas?: number
+    visitasTotal?: number
+    visitasSubdominio?: number
+    visitasDominio?: number
+    visitasTotalSubdominio?: number
+    visitasTotalDominio?: number
+    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number; visitas?: number }
   }
   alertas: {
     stockCritico: number

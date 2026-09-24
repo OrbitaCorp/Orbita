@@ -102,6 +102,7 @@ model Business {
   supportRequests      SupportRequest[]
   manualFeedback       ManualFeedback[]
   usageEvents          UsageEvent[]
+  visits               StoreVisit[]
 
   @@map("businesses")
 }
@@ -2793,3 +2794,23 @@ model CostAlert {
 
   @@map("cost_alerts")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Métricas y analíticas de visitas a tiendas
+// ═══════════════════════════════════════════════════════════════════════════
+
+model StoreVisit {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  domain     String   @default("")
+  isCustom   Boolean  @default(false) @map("is_custom")
+  path       String   @default("/")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([businessId, isCustom])
+  @@map("store_visits")
+}
+

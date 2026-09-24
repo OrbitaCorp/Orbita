@@ -11,6 +11,7 @@ import { OrdersService } from '../orders/orders.service';
 import { CheckoutDto } from './dto/checkout.dto';
 import { ValidateCartDto } from './dto/validate-cart.dto';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
+import { RecordVisitDto } from './dto/record-visit.dto';
 
 @Controller('storefront')
 export class StorefrontController {
@@ -23,6 +24,14 @@ export class StorefrontController {
   @Public()
   config(@Param('slug') slug: string) {
     return this.storefrontService.getConfig(slug);
+  }
+
+  // Registra una visita a la tienda (tanto desde subdominio como desde dominio propio).
+  @Post(':slug/visit')
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  recordVisit(@Param('slug') slug: string, @Body() dto: RecordVisitDto) {
+    return this.storefrontService.recordVisit(slug, dto);
   }
 
   // Resuelve un dominio PROPIO (CustomDomain) → slug del negocio. Lo llama

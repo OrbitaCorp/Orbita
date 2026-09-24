@@ -9,7 +9,7 @@ import { PageLoader } from '@/components/PageLoader'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
-import { getStorefrontConfig } from '@/lib/storefront/api'
+import { getStorefrontConfig, recordStorefrontVisit } from '@/lib/storefront/api'
 import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
 // Solo el tipo: el módulo de plantillas pesa 78 KB y este archivo lo carga
 // TODA la página de la app. El objeto en sí llega serializado desde el server
@@ -112,6 +112,26 @@ export default function App({ Component, pageProps }: AppProps) {
       router.events.off('routeChangeError', termina)
     }
   }, [isStorefront, router.events])
+
+  // Contador de visitas al storefront: registra 1 visita por sesión de navegación
+  // (sea subdominio *.orbita.site o dominio propio vinculado).
+  useEffect(() => {
+    if (!isStorefront) return
+    const slug = (router.query.slug as string) || currentSlug()
+    if (!slug || typeof window === 'undefined') return
+
+    const sessionKey = `orbita_v_${slug}`
+    try {
+      if (sessionStorage.getItem(sessionKey)) return
+      sessionStorage.setItem(sessionKey, '1')
+    } catch {
+      // Si el navegador bloquea sessionStorage (ej. modo incógnito estricto), continúa
+    }
+
+    const hostname = window.location.hostname
+    const path = window.location.pathname
+    recordStorefrontVisit(slug, { domain: hostname, path }).catch(() => {})
+  }, [isStorefront, router.query.slug])
 
   // Nombre/logo reales de la tienda — hoy solo para `TiendaPausada` (se
   // muestra cuando el negocio está pausado/suspendido). Ya no gatea el
