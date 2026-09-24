@@ -174,7 +174,7 @@ export function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchS
           }}
         >
           {v.imageUrl
-            ? <img src={v.imageUrl} alt={v.value} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ? <img src={v.imageUrl} alt={v.value} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             : <div style={{
                 width: '100%', height: '100%',
                 background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.value)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.value)}) 5px 10px)`,
@@ -484,13 +484,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           }}
         >
           {imgMostrada && (
-            <img className="pl-a" src={imgMostrada} alt="" style={{ position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
+            <img className="pl-a" src={imgMostrada} alt="" loading="lazy" decoding="async" style={{ position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
           )}
           {/* La opacidad la maneja .pl-b/.pl-card:hover del CSS de la
               plantilla, no un estilo inline: si se pisa acá, el crossfade
               deja de existir. */}
           {segundaFoto && (
-            <img className="pl-b" src={segundaFoto} alt="" style={{ inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
+            <img className="pl-b" src={segundaFoto} alt="" loading="lazy" decoding="async" style={{ inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
           )}
 
           {producto.badge && (() => {
@@ -701,6 +701,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <img
             className="orb-pcard-img"
             src={imgMostrada} alt=""
+            loading="lazy" decoding="async"
             style={{
               position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
               opacity: hoverMuestraSegunda ? 0 : 1,
@@ -715,6 +716,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <img
             className="orb-pcard-img"
             src={producto.imgUrl2} alt=""
+            loading="lazy" decoding="async"
             style={{
               position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
               opacity: hoverMuestraSegunda ? 1 : 0,

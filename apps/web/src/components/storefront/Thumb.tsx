@@ -62,6 +62,8 @@ export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, child
         <img
           src={imgUrl}
           alt=""
+          loading="lazy"
+          decoding="async"
           style={cover
             ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
             : { position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }}
