@@ -175,7 +175,20 @@ export default function ProductoDetalle() {
       })
       .then(r => {
         if (cancelado || !r) return
-        setRelacionadosCrudos(r.data.filter(x => x.id !== id).slice(0, 4))
+        const mismaCategoria = r.data.filter(x => x.id !== id).slice(0, 4)
+        setRelacionadosCrudos(mismaCategoria)
+        // Si la categoría no llena la fila (4), se completa con otros
+        // productos de la tienda para que la sección no quede vacía o rala.
+        // Falla aparte: sin esto, la ficha entera no tiene por qué caerse.
+        if (mismaCategoria.length >= 4) return
+        return getStorefrontProducts(slug, { limit: 12 })
+          .then(o => {
+            if (cancelado) return
+            const yaEstan = new Set([id, ...mismaCategoria.map(x => x.id)])
+            const extra = o.data.filter(x => !yaEstan.has(x.id))
+            setRelacionadosCrudos([...mismaCategoria, ...extra].slice(0, 4))
+          })
+          .catch(() => {})
       })
       .catch(() => { if (!cancelado) setNotFound(true) })
       .finally(() => { if (!cancelado) setCargando(false) })
