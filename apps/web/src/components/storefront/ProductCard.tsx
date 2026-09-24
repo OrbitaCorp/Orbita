@@ -822,7 +822,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               style={{
                 width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: ocupado ? 'default' : 'pointer',
                 background: agregado ? 'var(--color-success)' : '#fff',
-                color: agregado ? '#fff' : 'var(--color-text)',
+                color: agregado ? '#fff' : '#0F172A',
                 display: 'grid', placeItems: 'center',
                 opacity: ocupado ? 0.7 : 1,
                 // box-shadow NO va acá — vive en .orb-pcard-accion
@@ -833,7 +833,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
                 transition: 'transform 260ms ease, box-shadow 200ms ease, background 150ms, color 150ms',
               }}
               onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
-              onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = 'var(--color-text)' } }}
+              onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#0F172A' } }}
             >
               {agregado ? <Check size={17} strokeWidth={2.4} /> : <ShoppingCart size={17} strokeWidth={2} />}
             </button>
@@ -842,7 +842,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               className="orb-pcard-accion"
               style={{
                 width: 40, height: 40, borderRadius: '50%',
-                background: '#fff', color: 'var(--color-text)', display: 'grid', placeItems: 'center',
+                background: '#fff', color: '#0F172A', display: 'grid', placeItems: 'center',
                 transitionDelay: '60ms',
                 // box-shadow: mismo motivo que el botón de arriba, ver el
                 // comentario ahí y en globals.css.
