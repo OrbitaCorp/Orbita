@@ -590,6 +590,15 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
              no entran todos los links, pero arrancan centrados en vez de
              pegados a la izquierda. */
           .sf-nav-scroll-center { justify-content: center; }
+          /* "Estándar" en desktop: 3 columnas (1fr | nav | 1fr) para que la
+             navegación quede centrada en la PÁGINA. Con flex:1 quedaba
+             centrada en el hueco entre logo y acciones, y como las acciones
+             son más anchas que el logo se corría a la izquierda. Solo desktop:
+             en mobile la nav no existe y el grid acomodaría mal las acciones. */
+          @media (min-width: 769px) {
+            .sf-hdr-row-std { display: grid !important; grid-template-columns: 1fr minmax(0, auto) 1fr; }
+            .sf-hdr-row-std > :last-child { justify-self: end; }
+          }
           .sf-nav-scroll::-webkit-scrollbar { display: none; }
 
           .sf-mobile-only  { display: none !important; }
@@ -611,7 +620,12 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
           /* Nav mobile drawer */
           .sf-drawer {
-            position: fixed; inset: 0; top: 77px;
+            /* Colgado del borde de abajo del <header> (sticky), no fijo a un
+               "77px" de la ventana: con la barra de anuncio visible el header
+               empieza más abajo y el drawer lo tapaba a medias (se veía el
+               logo y los íconos cortados). Alto = lo que queda de pantalla. */
+            position: absolute; left: 0; right: 0; top: 100%;
+            height: calc(100vh - 77px); height: calc(100dvh - 77px);
             background: var(--color-bg); z-index: 100; overflow-y: auto;
             border-top: 1px solid var(--color-border);
             animation: sfDrawerIn 200ms ease;
@@ -646,7 +660,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         `}</style>
 
         <div
-          className="sf-hdr-row"
+          className={`sf-hdr-row${navCentrada && !sinNav && !centrado ? ' sf-hdr-row-std' : ''}`}
           style={{
             height: 76, padding: '0 24px', alignItems: 'center',
             ...(centrado
