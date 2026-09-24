@@ -21,6 +21,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { createClient } = require('@supabase/supabase-js');
 const sharp = require('sharp');
+const WebSocket = require('ws'); // Node < 22 no expone WebSocket nativo — ver supabase.service.ts / import-tefaltacalleok.ts
 
 const MAX_LADO = 1600;
 const BUCKET = 'product-images';
@@ -36,6 +37,7 @@ const BUCKET = 'product-images';
   const prisma = new PrismaClient();
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: WebSocket },
   });
 
   const business = await prisma.business.findUnique({ where: { subdomain: slug }, select: { id: true, name: true } });
