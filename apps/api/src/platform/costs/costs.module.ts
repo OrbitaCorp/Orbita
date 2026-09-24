@@ -7,7 +7,7 @@ import { CloudflareCostAdapter } from './adapters/cloudflare.adapter';
 import { SupabaseCostAdapter } from './adapters/supabase.adapter';
 import { InternalCostAdapter } from './adapters/internal.adapter';
 
-export const COST_ADAPTERS = 'COST_ADAPTERS';
+import { COST_ADAPTERS } from './costs.constants';
 
 @Module({
   controllers: [CostsController],

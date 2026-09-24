@@ -5,7 +5,7 @@ import { CreateLimitDto } from './dto/create-limit.dto';
 import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 import { CostAdapter } from './adapters/adapter.interface';
 import { InternalCostAdapter } from './adapters/internal.adapter';
-import { COST_ADAPTERS } from './costs.module';
+import { COST_ADAPTERS } from './costs.constants';
 
 const DEFAULT_PROVIDERS = [
   { slug: 'gcloud', name: 'Google Cloud', color: '#4285f4', apiType: 'MANUAL' as const },
@@ -37,7 +37,7 @@ export class CostsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() @Inject(COST_ADAPTERS) private readonly adapters: CostAdapter[] = [],
+    @Inject(COST_ADAPTERS) private readonly adapters: CostAdapter[],
     @Optional() private readonly internalAdapter?: InternalCostAdapter,
   ) {}
 
