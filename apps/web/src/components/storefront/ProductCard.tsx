@@ -308,6 +308,20 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
     if ((e.target as HTMLElement).closest('a')) return
     router.push(hrefProducto)
   }
+  // Clic con la ruedita: sobre el <a> que cubre la tarjeta el navegador ya abre
+  // pestaña nueva solo; esto cubre lo que queda POR ENCIMA de él (etiquetas,
+  // contador, zonas decorativas), donde no pasaba nada. Los botones y enlaces
+  // propios de la tarjeta se dejan en paz. El mousedown del medio se frena
+  // para que no arranque el autoscroll del navegador en lugar de abrir.
+  const esZonaPropia = (e: React.MouseEvent) => !!(e.target as HTMLElement).closest('a, button')
+  const abrirEnPestana = (e: React.MouseEvent) => {
+    if (e.button !== 1 || esZonaPropia(e)) return
+    e.preventDefault()
+    window.open(hrefProducto, '_blank', 'noopener')
+  }
+  const frenarAutoscroll = (e: React.MouseEvent) => {
+    if (e.button === 1 && !esZonaPropia(e)) e.preventDefault()
+  }
   const enlace = slug ? <EnlaceProducto href={hrefProducto} nombre={producto.nombre} /> : null
 
   const handleAdd = (e: React.MouseEvent) => accionar('agregar', e)
@@ -322,7 +336,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
       <>
       <div
         className="orb-pcard-raiz"
-        onClick={irAlProducto}
+        onClick={irAlProducto} onAuxClick={abrirEnPestana} onMouseDown={frenarAutoscroll}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
@@ -432,7 +446,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
       <>
       <div
         className="orb-pcard-grupo orb-pcard-raiz pl-card"
-        onClick={irAlProducto}
+        onClick={irAlProducto} onAuxClick={abrirEnPestana} onMouseDown={frenarAutoscroll}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
         style={{
@@ -658,7 +672,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
         ver el comentario en globals.css. */}
     <div
       className="orb-pcard-grupo orb-pcard-raiz"
-      onClick={irAlProducto}
+      onClick={irAlProducto} onAuxClick={abrirEnPestana} onMouseDown={frenarAutoscroll}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{ position: 'relative', cursor: 'pointer' }}
