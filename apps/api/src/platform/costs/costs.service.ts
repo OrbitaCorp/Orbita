@@ -1,8 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLimitDto } from './dto/create-limit.dto';
 import { CreateSnapshotDto } from './dto/create-snapshot.dto';
+import { CostAdapter } from './adapters/adapter.interface';
+import { InternalCostAdapter } from './adapters/internal.adapter';
+import { COST_ADAPTERS } from './costs.module';
 
 const DEFAULT_PROVIDERS = [
   { slug: 'gcloud', name: 'Google Cloud', color: '#4285f4', apiType: 'MANUAL' as const },
@@ -32,7 +35,11 @@ function monthsAgo(n: number): string[] {
 export class CostsService {
   private readonly logger = new Logger(CostsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(COST_ADAPTERS) private readonly adapters: CostAdapter[] = [],
+    @Optional() private readonly internalAdapter?: InternalCostAdapter,
+  ) {}
 
   async seedProviders(): Promise<void> {
     for (const p of DEFAULT_PROVIDERS) {
@@ -325,9 +332,102 @@ export class CostsService {
   }
 
   async syncAll() {
+    if (!this.adapters.length) {
+      return {
+        synced: [] as string[],
+        errors: [] as string[],
+        message: 'Sin adapters configurados',
+      };
+    }
+
+    const month = currentMonth();
+    const synced: string[] = [];
+    const errors: string[] = [];
+
+    for (const adapter of this.adapters) {
+      try {
+        const result = await adapter.fetchMonthlyCost(month);
+        if (result.amountUsd === 0 && Object.keys(result.breakdown).length === 0) {
+          continue;
+        }
+
+        const provider = await this.prisma.costProvider.findUnique({
+          where: { slug: adapter.slug },
+        });
+        if (!provider) {
+          this.logger.warn(`Adapter ${adapter.slug}: no existe el provider en la DB`);
+          errors.push(`${adapter.slug}: provider no encontrado`);
+          continue;
+        }
+
+        await this.prisma.costSnapshot.upsert({
+          where: { providerId_month: { providerId: provider.id, month } },
+          update: {
+            amountUsd: result.amountUsd,
+            breakdown: result.breakdown,
+            source: 'API',
+            fetchedAt: new Date(),
+          },
+          create: {
+            providerId: provider.id,
+            month,
+            amountUsd: result.amountUsd,
+            breakdown: result.breakdown,
+            source: 'API',
+          },
+        });
+
+        await this.prisma.costProvider.update({
+          where: { id: provider.id },
+          data: { apiType: 'AUTO' },
+        });
+
+        synced.push(adapter.slug);
+        this.logger.log(`Sync ${adapter.slug}: $${result.amountUsd} para ${month}`);
+      } catch (err) {
+        this.logger.error(`Error sincronizando ${adapter.slug}: ${err}`);
+        errors.push(`${adapter.slug}: ${err}`);
+      }
+    }
+
+    // Internal adapters: aggregate usage_events for gemini/groq/resend
+    if (this.internalAdapter) {
+      try {
+        const internalResults = await this.internalAdapter.syncAllInternal(month);
+        for (const [slug, result] of internalResults) {
+          const provider = await this.prisma.costProvider.findUnique({ where: { slug } });
+          if (!provider) continue;
+
+          await this.prisma.costSnapshot.upsert({
+            where: { providerId_month: { providerId: provider.id, month } },
+            update: {
+              amountUsd: result.amountUsd,
+              breakdown: result.breakdown,
+              source: 'API',
+              fetchedAt: new Date(),
+            },
+            create: {
+              providerId: provider.id,
+              month,
+              amountUsd: result.amountUsd,
+              breakdown: result.breakdown,
+              source: 'API',
+            },
+          });
+          synced.push(slug);
+        }
+      } catch (err) {
+        this.logger.error(`Error sincronizando adapters internos: ${err}`);
+        errors.push(`internal: ${err}`);
+      }
+    }
+
     return {
-      synced: [] as string[],
-      message: 'Sin adapters configurados todavía — los snapshots se cargan manualmente',
+      synced,
+      errors,
+      message: synced.length
+        ? `Sincronizados: ${synced.join(', ')}`
+        : 'Ningún adapter devolvió datos',
     };
   }
 }

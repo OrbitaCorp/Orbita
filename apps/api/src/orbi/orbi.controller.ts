@@ -13,6 +13,7 @@ import { PendingActionStore } from './tools/pending-action.store';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaDiaria } from './cuota-diaria';
 
@@ -50,6 +51,7 @@ export class OrbiController {
     private readonly toolRegistry: ToolRegistryService,
     private readonly wizardAnalytics: WizardAnalyticsService,
     private readonly pendingActions: PendingActionStore,
+    private readonly usageMetering: UsageMeteringService,
   ) {}
 
   @Post('chat')
@@ -97,6 +99,9 @@ export class OrbiController {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
+
+    let promptTokens = 0;
+    let completionTokens = 0;
 
     try {
       let conversationId = dto.conversationId;
@@ -260,6 +265,9 @@ export class OrbiController {
               toolCallId: event.call.id,
             });
             continueLoop = true;
+          } else if (event.type === 'usage') {
+            promptTokens += event.usage.promptTokens;
+            completionTokens += event.usage.completionTokens;
           } else if (event.type === 'done') {
             if (!continueLoop) {
               // Vuelta final: si se bufereó, recién acá sale el texto — de una,
@@ -285,6 +293,23 @@ export class OrbiController {
       this.logger.error(`Orbi chat error: ${error}`);
       res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
     } finally {
+      if (promptTokens > 0) {
+        const slug = (this.modeloPara(dto.context.surface) ?? '').includes('groq') ? 'groq' : 'gemini';
+        this.usageMetering.track({
+          providerSlug: slug,
+          businessId: user.businessId,
+          category: 'prompt_tokens',
+          quantity: promptTokens,
+          unit: 'tokens',
+        });
+        this.usageMetering.track({
+          providerSlug: slug,
+          businessId: user.businessId,
+          category: 'completion_tokens',
+          quantity: completionTokens,
+          unit: 'tokens',
+        });
+      }
       res.end();
     }
   }
@@ -506,6 +531,22 @@ export class OrbiController {
       });
       if (turnId) res.write(`event: turn\ndata: ${JSON.stringify({ turnId })}\n\n`);
       res.end();
+
+      if (promptTokens > 0) {
+        const slug = (modeloReportado ?? '').includes('groq') ? 'groq' : 'gemini';
+        this.usageMetering.track({
+          providerSlug: slug,
+          category: 'prompt_tokens',
+          quantity: promptTokens,
+          unit: 'tokens',
+        });
+        this.usageMetering.track({
+          providerSlug: slug,
+          category: 'completion_tokens',
+          quantity: completionTokens,
+          unit: 'tokens',
+        });
+      }
     }
   }
 }

@@ -1,12 +1,13 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { asuntoDominioPorVencer, TEMPLATE_DOMINIO_POR_VENCER } from '../domains/dominio-por-vencer';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as Handlebars from 'handlebars';
 import { EmailSendStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { escaparHtml } from '../common/utils/html';
 import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
 
@@ -322,6 +323,7 @@ export class MailService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly usageMetering?: UsageMeteringService,
   ) {
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     this.isConfigured = !!apiKey;
@@ -584,6 +586,13 @@ export class MailService {
         return false;
       }
       await this.registrar(to, subject, template, EmailSendStatus.SENT, meta);
+      this.usageMetering?.track({
+        providerSlug: 'resend',
+        businessId: meta?.businessId,
+        category: 'email_sent',
+        quantity: 1,
+        unit: 'emails',
+      });
       return true;
     } catch (e) {
       // Cubre errores de red/transporte (Resend caído, timeout) Y errores al
@@ -631,6 +640,13 @@ export class MailService {
         return false;
       }
       await this.registrar(to, subject, null, EmailSendStatus.SENT, meta);
+      this.usageMetering?.track({
+        providerSlug: 'resend',
+        businessId: meta?.businessId,
+        category: 'email_sent',
+        quantity: 1,
+        unit: 'emails',
+      });
       return true;
     } catch (e) {
       this.logger.error(`No se pudo armar/enviar el email custom a ${to}: ${e}`);
