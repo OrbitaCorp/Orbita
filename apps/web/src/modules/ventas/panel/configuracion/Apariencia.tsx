@@ -154,6 +154,15 @@ const LINKS_FIJOS_HEADER = [
     { id: 'masVendidos', label: 'Más vendidos' },
 ]
 
+// Cuántos enlaces caben en la fila de navegación sin apretarse, según el
+// "Estilo de header". Completo y Estándar comparten la fila con logo, buscador
+// y acciones (~650px libres a 1280px: 5 enlaces de ~100px); Centrado los pone
+// en una fila propia, con todo el ancho; Minimal no muestra navegación. Los
+// enlaces fijos también cuentan. Es un tope de la UI del panel (deshabilita
+// los interruptores apagados al llegar), no un corte en la tienda: si algo
+// se pasa igual, el nav scrollea horizontal como siempre.
+const LIMITE_NAV_HEADER: Record<LayoutHeader, number> = { full: 5, standard: 5, centered: 8, minimal: 0 }
+
 // Editando una plantilla activa (soloContenido): antes esto era una grilla de
 // dos columnas desparejas —Hero solo a la izquierda, Header + cinco tarjetas
 // más apiladas a la derecha— así que apenas el Hero se quedaba sin contenido
@@ -325,6 +334,20 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         ...LINKS_FIJOS_HEADER.map(l => ({ ...l, esCategoria: false })),
         ...categorias.map(c => ({ id: `cat:${c.slug}`, label: c.name, esCategoria: true })),
     ].map(base => ({ ...base, on: ap.headerLinks.find(x => x.id === base.id)?.on ?? false }))
+
+    // Guarda la lista completa normalizada, pero de las categorías solo las
+    // ENCENDIDAS: el backend acota headerLinks a 30 entradas y un negocio con
+    // muchas categorías las pasaría si se guardaran también las apagadas.
+    // Lo apagado se reconstruye igual desde `categorias` (itemsHeader).
+    function alternarLinkHeader(id: string, v: boolean) {
+        set('headerLinks', itemsHeader
+            .map(x => ({ id: x.id, label: x.label, on: x.id === id ? v : x.on }))
+            .filter(x => !x.id.startsWith('cat:') || x.on))
+    }
+    const limiteNav = LIMITE_NAV_HEADER[ap.layoutHeader] ?? 5
+    const linksActivos = itemsHeader.filter(x => x.on).length
+    const enLimite = linksActivos >= limiteNav
+    const categoriasHeader = itemsHeader.filter(x => x.esCategoria)
 
     // Habilita los estilos de categoría basados en imagen. Mientras las
     // categorías no terminen de cargar queda en false: es el lado seguro —
@@ -790,9 +813,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <ToggleRow
                             label={it.esCategoria ? `${it.label} · categoría` : it.label}
                             on={it.on}
-                            onChange={v => set('headerLinks', itemsHeader.map(x => ({
-                                id: x.id, label: x.label, on: x.id === it.id ? v : x.on,
-                            })))}
+                            onChange={v => alternarLinkHeader(it.id, v)}
                         />
                     </div>
                 ))}
@@ -1109,18 +1130,53 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 },
                             ]} />
                         </div>
-                        <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header. En el estilo Minimal no se muestra navegación.">Elementos del header</FieldLabel>
-                        <div style={{ marginBottom: 18, border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
-                            {ap.headerLinks.map((lnk, i) => (
-                                <div key={lnk.id} style={{ borderBottom: i < ap.headerLinks.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                    <ToggleRow
-                                        label={lnk.label}
-                                        on={lnk.on}
-                                        onChange={v => set('headerLinks', ap.headerLinks.map((x, j) => j === i ? { ...x, on: v } : x))}
-                                    />
+                        <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header: los de siempre y las categorías de tu tienda. La cantidad máxima depende del estilo de header que elijas. En el estilo Minimal no se muestra navegación.">Elementos del header</FieldLabel>
+                        {ap.layoutHeader === 'minimal' ? (
+                            <div style={{ marginBottom: 18, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, border: '1px solid var(--color-border)', borderRadius: 8, padding: '12px 14px' }}>
+                                El estilo <strong style={{ color: 'var(--color-text)' }}>Minimal</strong> no muestra navegación en el header. Elegí Completo, Estándar o Centrado para armar los enlaces.
+                            </div>
+                        ) : (
+                            <div style={{ marginBottom: 18 }}>
+                                <div style={{ fontSize: 12, color: enLimite ? 'var(--color-warning-text, #B45309)' : 'var(--color-muted)', marginTop: -4, marginBottom: 8, lineHeight: 1.45 }}>
+                                    {linksActivos > limiteNav
+                                        ? `Tenés ${linksActivos} activos y este estilo aprovecha hasta ${limiteNav}: apagá algunos para que el header no se apriete.`
+                                        : enLimite
+                                            ? `${linksActivos} de ${limiteNav}: llegaste al máximo para este estilo de header. Apagá uno para sumar otro.`
+                                            : `${linksActivos} de ${limiteNav} posibles con este estilo de header.`}
                                 </div>
-                            ))}
-                        </div>
+                                <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
+                                    {itemsHeader.filter(x => !x.esCategoria).map((it, i, fijos) => (
+                                        <div key={it.id} style={{ borderBottom: i < fijos.length - 1 || categoriasHeader.length > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                                            <ToggleRow
+                                                label={it.label}
+                                                on={it.on}
+                                                disabled={!it.on && enLimite}
+                                                onChange={v => alternarLinkHeader(it.id, v)}
+                                            />
+                                        </div>
+                                    ))}
+                                    {categoriasHeader.length > 0 && (
+                                        <>
+                                            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-muted)', padding: '10px 4px 2px' }}>Categorías</div>
+                                            {/* Un negocio puede tener decenas: la lista scrollea
+                                                sola en vez de estirar toda la tarjeta. */}
+                                            <div style={{ maxHeight: 232, overflowY: 'auto' }}>
+                                                {categoriasHeader.map((it, i) => (
+                                                    <div key={it.id} style={{ borderBottom: i < categoriasHeader.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                                        <ToggleRow
+                                                            label={it.label}
+                                                            on={it.on}
+                                                            disabled={!it.on && enLimite}
+                                                            onChange={v => alternarLinkHeader(it.id, v)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <FieldLabel>Grilla de productos</FieldLabel>
                         <div style={{ marginBottom: 18 }}>
                             <VisualPick value={ap.layoutGrid} onChange={v => set('layoutGrid', v as LayoutGridT)} options={[
@@ -1898,7 +1954,7 @@ function SelectorCategorias({ candidatas, seleccionadas, tope, necesitaFoto, onC
 // afuera del botón), y de paso el interruptor anuncia bien su estado
 // (role/aria-checked) a un lector de pantalla, que antes veía un <button>
 // pelado sin decir si estaba prendido.
-function ToggleRow({ label, on, onChange, ayuda }: { label: string; on: boolean; onChange: (v: boolean) => void; ayuda?: Ayuda }) {
+function ToggleRow({ label, on, onChange, ayuda, disabled = false }: { label: string; on: boolean; onChange: (v: boolean) => void; ayuda?: Ayuda; disabled?: boolean }) {
     const [ayudaAbierta, setAyudaAbierta] = useState(false)
     const panelAyudaId = useId()
     const fila = (
@@ -1909,8 +1965,9 @@ function ToggleRow({ label, on, onChange, ayuda }: { label: string; on: boolean;
                 aria-checked={on}
                 aria-label={label}
                 onClick={() => onChange(!on)}
+                disabled={disabled}
                 className="ds-hover"
-                style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', borderRadius: 6, border: 'none', background: 'transparent', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, fontFamily: 'inherit', textAlign: 'left' }}
             >
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{label}</span>
                 <span aria-hidden style={{ display: 'block', width: 40, height: 22, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', position: 'relative', flexShrink: 0 }}>
