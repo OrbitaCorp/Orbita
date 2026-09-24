@@ -11,8 +11,8 @@ export class SupabaseCostAdapter implements CostAdapter {
 
   constructor(private readonly config: ConfigService) {}
 
-  private get serviceRoleKey(): string | undefined {
-    return this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+  private get pat(): string | undefined {
+    return this.config.get<string>('SUPABASE_PAT');
   }
   private get supabaseUrl(): string | undefined {
     return this.config.get<string>('SUPABASE_URL');
@@ -26,26 +26,22 @@ export class SupabaseCostAdapter implements CostAdapter {
 
   async fetchMonthlyCost(_month: string): Promise<CostBreakdown> {
     const ref = this.projectRef;
-    const key = this.serviceRoleKey;
-    if (!ref || !key) {
-      this.logger.warn('SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY no configurados — skip');
+    const token = this.pat;
+    if (!ref || !token) {
+      this.logger.warn('SUPABASE_URL o SUPABASE_PAT no configurados — skip');
       return { amountUsd: 0, breakdown: {} };
     }
 
     const breakdown: Record<string, number> = {};
 
-    // Supabase Management API requires a personal access token or OAuth,
-    // not a service role key. The service role key only works for the Data API.
-    // We use it here to at least estimate based on addon pricing.
-    const addons = await this.fetchAddons(ref, key);
+    const addons = await this.fetchAddons(ref, token);
     if (addons) {
       for (const addon of addons) {
         breakdown[addon.type] = addon.price;
       }
     }
 
-    // Disk usage estimate (free plan = 500MB included, $0.125/GB after)
-    const disk = await this.fetchDiskUsage(ref, key);
+    const disk = await this.fetchDiskUsage(ref, token);
     if (disk) {
       const freeGb = 0.5;
       const usedGb = disk / (1024 ** 3);
@@ -66,12 +62,12 @@ export class SupabaseCostAdapter implements CostAdapter {
 
   async fetchCurrentUsage(): Promise<{ items: UsageItem[] }> {
     const ref = this.projectRef;
-    const key = this.serviceRoleKey;
-    if (!ref || !key) return { items: [] };
+    const token = this.pat;
+    if (!ref || !token) return { items: [] };
 
     const items: UsageItem[] = [];
 
-    const disk = await this.fetchDiskUsage(ref, key);
+    const disk = await this.fetchDiskUsage(ref, token);
     if (disk !== null) {
       items.push({
         category: 'Database',
@@ -90,7 +86,7 @@ export class SupabaseCostAdapter implements CostAdapter {
         headers: { Authorization: `Bearer ${key}` },
       });
       if (!res.ok) {
-        this.logger.debug(`Supabase addons API ${res.status} — probablemente necesita PAT, no service role key`);
+        this.logger.debug(`Supabase addons API respondió ${res.status}`);
         return null;
       }
       const data = await res.json() as any;
