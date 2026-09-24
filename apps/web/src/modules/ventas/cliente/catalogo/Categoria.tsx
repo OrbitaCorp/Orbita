@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -22,7 +22,14 @@ export default function Categoria() {
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
-  const [productos, setProductos] = useState<Producto[]>([])
+  // Crudos + conversión al dibujar: la config (toggles de badges) llega en
+  // paralelo y a veces después de los productos (ver Catalogo.tsx).
+  const [crudos, setCrudos] = useState<Parameters<typeof toProducto>[0][]>([])
+  const badgesConfig = config?.appearance
+  const productos: Producto[] = useMemo(
+    () => crudos.map(p => toProducto(p, { showNew: badgesConfig?.showNewBadge, showOffer: badgesConfig?.showOfferBadge, showLowStock: badgesConfig?.showLowStock })),
+    [crudos, badgesConfig?.showNewBadge, badgesConfig?.showOfferBadge, badgesConfig?.showLowStock],
+  )
   const [cargando, setCargando] = useState(true)
 
   const cat = categorias.find(c => c.slug === categoria) ?? null
@@ -40,8 +47,8 @@ export default function Categoria() {
     let cancelado = false
     setCargando(true)
     getStorefrontProducts(slug, { categoryId: cat.id, limit: 24 })
-      .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }))) })
-      .catch(() => { if (!cancelado) setProductos([]) })
+      .then(r => { if (!cancelado) setCrudos(r.data) })
+      .catch(() => { if (!cancelado) setCrudos([]) })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [slug, cat])

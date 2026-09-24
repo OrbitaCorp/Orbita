@@ -113,7 +113,14 @@ export default function ProductoDetalle() {
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   const [producto, setProducto] = useState<StorefrontProductDetail | null>(null)
-  const [relacionados, setRelacionados] = useState<Producto[]>([])
+  // Crudos + conversión al dibujar: la config (toggles de badges) llega en
+  // paralelo y a veces después (ver Catalogo.tsx).
+  const [relacionadosCrudos, setRelacionadosCrudos] = useState<Parameters<typeof toProducto>[0][]>([])
+  const badgesConfig = config?.appearance
+  const relacionados: Producto[] = useMemo(
+    () => relacionadosCrudos.map(p => toProducto(p, { showNew: badgesConfig?.showNewBadge, showOffer: badgesConfig?.showOfferBadge, showLowStock: badgesConfig?.showLowStock })),
+    [relacionadosCrudos, badgesConfig?.showNewBadge, badgesConfig?.showOfferBadge, badgesConfig?.showLowStock],
+  )
   const [cargando, setCargando] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -168,7 +175,7 @@ export default function ProductoDetalle() {
       })
       .then(r => {
         if (cancelado || !r) return
-        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
+        setRelacionadosCrudos(r.data.filter(x => x.id !== id).slice(0, 4))
       })
       .catch(() => { if (!cancelado) setNotFound(true) })
       .finally(() => { if (!cancelado) setCargando(false) })

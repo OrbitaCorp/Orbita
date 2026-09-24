@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Grid, List, Tag, TrendingUp, Search, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
@@ -87,7 +87,16 @@ export default function Catalogo() {
   const [seccionCategoria, setSeccionCategoria] = useState(true)
   const [seccionPrecio, setSeccionPrecio] = useState(true)
 
-  const [productos, setProductos] = useState<Producto[]>([])
+  // Productos CRUDOS de la API: se convierten al dibujar (useMemo) y no al
+  // recibirlos, porque la config (toggles de badges de Apariencia) carga en
+  // paralelo y suele llegar DESPUÉS: convertir al recibir dejaba los valores
+  // por defecto (todo activado) aunque el dueño hubiera apagado el badge.
+  const [crudos, setCrudos] = useState<Parameters<typeof toProducto>[0][]>([])
+  const badgesConfig = config?.appearance
+  const productos: Producto[] = useMemo(
+    () => crudos.map(p => toProducto(p, { showNew: badgesConfig?.showNewBadge, showOffer: badgesConfig?.showOfferBadge, showLowStock: badgesConfig?.showLowStock })),
+    [crudos, badgesConfig?.showNewBadge, badgesConfig?.showOfferBadge, badgesConfig?.showLowStock],
+  )
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [cargando, setCargando] = useState(true)
@@ -200,7 +209,7 @@ export default function Catalogo() {
     })
       .then(r => {
         if (cancelado) return
-        setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
+        setCrudos(r.data)
         setTotal(r.total)
         // ?? [] : si la API contesta sin availableOptions (build de backend
         // anterior al filtro generico, que se despliega a mano) el .map de mas
@@ -208,7 +217,7 @@ export default function Catalogo() {
         // quedaba en blanco entera.
         setFacetas(r.availableOptions ?? [])
       })
-      .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
+      .catch(() => { if (!cancelado) { setCrudos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [slug, urlListo, catsActivas, opcionesActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
