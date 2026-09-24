@@ -705,10 +705,26 @@ export class ProductsService {
     // con decenas de fotos) y estandariza el formato servido a la tienda. webp
     // soporta canal alfa, así que no rompe la transparencia si se pidió
     // quitar el fondo.
+    //
+    // .resize() al lado más largo (fit:'inside', sin agrandar lo que ya es
+    // chico): antes solo se recomprimía a webp sin tocar las DIMENSIONES, así
+    // que una foto de celular (hasta 60 MP, ver ENTRADA_IMAGEN) se guardaba y
+    // servía entera aunque la card del catálogo la muestre a ~300px de ancho
+    // — el navegador tenía que descargar y decodificar el original completo
+    // por cada foto de cada card, en cada página del catálogo. Encontrado
+    // real: una tienda con fotos subidas directo del celular sentía la
+    // grilla trabada al paginar; otra con fotos ya livianas (importadas de
+    // un feed externo, ver import-tefaltacalleok.ts) no tenía el problema —
+    // mismo código, mismo bug, pero solo duele con fotos pesadas. 1600px
+    // alcanza de sobra para la foto más grande que se muestra (detalle de
+    // producto) incluso en pantallas retina.
     let webpBuffer: Buffer;
     try {
       // Con tope de píxeles (ver ENTRADA_IMAGEN en subida-imagen.ts).
-      webpBuffer = await sharp(sourceBuffer, ENTRADA_IMAGEN).webp({ quality: 82 }).toBuffer();
+      webpBuffer = await sharp(sourceBuffer, ENTRADA_IMAGEN)
+        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
     } catch {
       throw new BadRequestException('El archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles');
     }
