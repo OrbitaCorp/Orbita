@@ -570,7 +570,12 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                    contenido) el ancho automatico pasa a ser "lo que mide el
                    contenido" en vez del ancho del slide, y el bloque quedaba
                    angosto y corrido a la izquierda. */
-                .sf-hero-inner { min-height:680px; padding-top:88px; padding-bottom:88px; width:100% }
+                /* El piso ahora sigue a la pantalla: el hero ocupa el alto visible
+                   menos ~120px de anuncio + header, así el carrusel de categorías
+                   queda debajo del pliegue en vez de asomar (pedido del dueño). El
+                   px de antes queda como mínimo para pantallas bajas. svh: en el
+                   celular no cuenta la barra del navegador. */
+                .sf-hero-inner { min-height:max(680px, calc(100vh - 120px)); min-height:max(680px, calc(100svh - 120px)); padding-top:88px; padding-bottom:88px; width:100% }
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
@@ -598,7 +603,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     .sf-w         { padding:0 24px }
                     .sf-g4        { grid-template-columns:repeat(2,1fr); gap:12px }
                     .sf-hero-grid { grid-template-columns:1fr; padding:0 32px }
-                    .sf-hero-inner { min-height:520px; padding-top:64px; padding-bottom:64px }
+                    .sf-hero-inner { min-height:max(520px, calc(100vh - 120px)); min-height:max(520px, calc(100svh - 120px)); padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
                     .sf-2col      { grid-template-columns:1fr }
                     .sf-parallax  { min-height:380px; margin-bottom:44px; }
@@ -614,7 +619,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                     .sf-marca-img  { max-height:36px; max-width:104px }
                     .sf-marca-txt  { font-size:18px }
                     .sf-hero-grid  { padding:0 20px }
-                    .sf-hero-inner { min-height:420px; padding-top:40px; padding-bottom:40px }
+                    .sf-hero-inner { min-height:max(420px, calc(100vh - 120px)); min-height:max(420px, calc(100svh - 120px)); padding-top:40px; padding-bottom:40px }
                     /* Bajan de "centradas a media altura" (donde el texto
                        las tapa, ver el comentario en HeroCarousel) al
                        renglón de abajo, a la altura de los dots — mismo
