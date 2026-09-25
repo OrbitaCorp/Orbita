@@ -331,6 +331,25 @@ export class CostsService {
     });
   }
 
+  async getUsage() {
+    const result: Record<string, { slug: string; items: { category: string; value: number; unit: string; limit?: number }[] }> = {};
+
+    for (const adapter of this.adapters) {
+      if (typeof adapter.fetchCurrentUsage === 'function') {
+        try {
+          const usage = await adapter.fetchCurrentUsage();
+          if (usage.items.length > 0) {
+            result[adapter.slug] = { slug: adapter.slug, items: usage.items };
+          }
+        } catch (err) {
+          this.logger.warn(`Error obteniendo usage de ${adapter.slug}: ${err}`);
+        }
+      }
+    }
+
+    return { providers: result };
+  }
+
   async syncAll() {
     if (!this.adapters.length) {
       return {

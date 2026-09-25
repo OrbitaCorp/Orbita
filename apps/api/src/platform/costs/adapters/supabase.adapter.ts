@@ -68,13 +68,32 @@ export class SupabaseCostAdapter implements CostAdapter {
     const items: UsageItem[] = [];
 
     const disk = await this.fetchDiskUsage(ref, token);
+    const diskConfig = await this.fetchDiskConfig(ref, token);
     if (disk !== null) {
+      const usedMb = Math.round(disk / (1024 * 1024));
+      const limitMb = diskConfig ? diskConfig * 1024 : 500;
       items.push({
-        category: 'Database',
-        value: Math.round(disk / (1024 * 1024)),
+        category: 'Database Size',
+        value: usedMb,
         unit: 'MB',
-        limit: 500,
+        limit: limitMb,
       });
+    }
+
+    const apiCounts = await this.fetchApiCounts(ref, token);
+    if (apiCounts) {
+      if (apiCounts.auth > 0) {
+        items.push({ category: 'Auth Requests', value: apiCounts.auth, unit: 'requests' });
+      }
+      if (apiCounts.rest > 0) {
+        items.push({ category: 'REST Requests', value: apiCounts.rest, unit: 'requests' });
+      }
+      if (apiCounts.storage > 0) {
+        items.push({ category: 'Storage Requests', value: apiCounts.storage, unit: 'requests' });
+      }
+      if (apiCounts.realtime > 0) {
+        items.push({ category: 'Realtime Requests', value: apiCounts.realtime, unit: 'requests' });
+      }
     }
 
     return { items };
@@ -108,6 +127,43 @@ export class SupabaseCostAdapter implements CostAdapter {
       if (!res.ok) return null;
       const data = await res.json() as any;
       return data.metrics?.fs_used_bytes ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchDiskConfig(ref: string, key: string): Promise<number | null> {
+    try {
+      const res = await fetch(`${SUPABASE_MGMT_BASE}/projects/${ref}/config/disk`, {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      return data.attributes?.size_gb ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchApiCounts(ref: string, key: string): Promise<{
+    auth: number; rest: number; storage: number; realtime: number;
+  } | null> {
+    try {
+      const res = await fetch(
+        `${SUPABASE_MGMT_BASE}/projects/${ref}/analytics/endpoints/usage.api-counts`,
+        { headers: { Authorization: `Bearer ${key}` } },
+      );
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      const rows = data.result ?? [];
+      let auth = 0, rest = 0, storage = 0, realtime = 0;
+      for (const row of rows) {
+        auth += row.total_auth_requests ?? 0;
+        rest += row.total_rest_requests ?? 0;
+        storage += row.total_storage_requests ?? 0;
+        realtime += row.total_realtime_requests ?? 0;
+      }
+      return { auth, rest, storage, realtime };
     } catch {
       return null;
     }

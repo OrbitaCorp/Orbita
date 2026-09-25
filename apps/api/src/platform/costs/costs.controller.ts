@@ -43,6 +43,11 @@ export class CostsController {
     return this.costs.getByBusiness(month);
   }
 
+  @Get('usage')
+  usage() {
+    return this.costs.getUsage();
+  }
+
   @Get('limits')
   limits() {
     return this.costs.getLimits();

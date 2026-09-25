@@ -644,6 +644,17 @@ export interface CostAlertRow {
   acknowledgedAt: string | null
 }
 
+export interface CostUsageItem {
+  category: string
+  value: number
+  unit: string
+  limit?: number
+}
+
+export interface CostUsageResponse {
+  providers: Record<string, { slug: string; items: CostUsageItem[] }>
+}
+
 // Arma "?a=1&b=2" salteando lo vacío, para no mandar `status=` cuando el
 // filtro está en "Todas".
 function toQuery(params: Record<string, string | number | undefined | null>): string {
@@ -729,6 +740,7 @@ export const platformApi = {
   supportReply: (id: string, message: string) => sendJSON<AdminSupportDetail>(`/platform/support/${id}/reply`, 'POST', { message }),
   supportStatus: (id: string, status: 'OPEN' | 'CLOSED') => sendJSON<AdminSupportDetail>(`/platform/support/${id}/status`, 'PUT', { status }),
 
+  costsUsage: () => getJSON<CostUsageResponse>('/platform/costs/usage'),
   costsOverview: (months = 3) => getJSON<CostOverviewResponse>(`/platform/costs/overview?months=${months}`),
   costsHistory: (months = 6) => getJSON<CostHistoryResponse>(`/platform/costs/history?months=${months}`),
   costsProvider: (slug: string, month?: string) => getJSON<CostProviderDetail>(`/platform/costs/provider/${slug}${month ? `?month=${month}` : ''}`),

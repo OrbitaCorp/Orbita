@@ -47,6 +47,18 @@ export class CloudflareCostAdapter implements CostAdapter {
     if (!token || !accountId) return { items: [] };
 
     const items: UsageItem[] = [];
+
+    const r2Storage = await this.fetchR2StorageBytes(accountId, token);
+    if (r2Storage !== null) {
+      const usedGb = Math.round((r2Storage / (1024 ** 3)) * 1000) / 1000;
+      items.push({
+        category: 'R2 Storage',
+        value: usedGb,
+        unit: 'GB',
+        limit: 10,
+      });
+    }
+
     try {
       const res = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets`,
@@ -58,9 +70,20 @@ export class CloudflareCostAdapter implements CostAdapter {
           category: 'R2 Buckets',
           value: data.result?.length ?? 0,
           unit: 'buckets',
+          limit: 100,
         });
       }
     } catch { /* skip */ }
+
+    const workers = await this.fetchWorkersRequests(accountId, token);
+    if (workers !== null) {
+      items.push({
+        category: 'Workers Requests (hoy)',
+        value: workers,
+        unit: 'requests',
+        limit: 100_000,
+      });
+    }
 
     return { items };
   }
@@ -88,6 +111,69 @@ export class CloudflareCostAdapter implements CostAdapter {
       return Math.round(gb * 0.015 * 10000) / 10000;
     } catch (err) {
       this.logger.warn(`Error fetching R2 metrics: ${err}`);
+      return null;
+    }
+  }
+
+  private async fetchR2StorageBytes(accountId: string, token: string): Promise<number | null> {
+    try {
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/metrics`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      const stats = data.result;
+      if (!stats) return null;
+      let totalBytes = 0;
+      for (const cls of ['standard', 'infrequentAccess']) {
+        for (const state of ['published', 'uploaded']) {
+          totalBytes += stats[cls]?.[state]?.payloadSize ?? 0;
+          totalBytes += stats[cls]?.[state]?.metadataSize ?? 0;
+        }
+      }
+      return totalBytes;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchWorkersRequests(accountId: string, token: string): Promise<number | null> {
+    const now = new Date();
+    const startOfDay = now.toISOString().slice(0, 10) + 'T00:00:00Z';
+    const end = now.toISOString();
+
+    const query = `{
+      viewer {
+        accounts(filter: {accountTag: "${accountId}"}) {
+          workersInvocationsAdaptive(
+            filter: { datetime_geq: "${startOfDay}", datetime_leq: "${end}" }
+            limit: 1000
+          ) {
+            sum { requests }
+          }
+        }
+      }
+    }`;
+
+    try {
+      const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      const entries = data?.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive ?? [];
+      let total = 0;
+      for (const e of entries) {
+        total += e.sum?.requests ?? 0;
+      }
+      return total;
+    } catch {
       return null;
     }
   }

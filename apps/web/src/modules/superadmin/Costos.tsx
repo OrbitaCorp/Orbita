@@ -6,6 +6,8 @@ import {
   type CostLimitRow,
   type CostAlertRow,
   type CostBusinessRow,
+  type CostUsageItem,
+  type CostUsageResponse,
   type CreateCostLimitInput,
 } from '@/lib/platform/api'
 import {
@@ -164,6 +166,92 @@ function LimitBar({ limit }: { limit: CostLimitRow }) {
   )
 }
 
+// ─── Usage gauge ─────────────────────────────────────────────────────────────
+
+const PROVIDER_NAMES: Record<string, string> = {
+  vercel: 'Vercel', cloudflare: 'Cloudflare', supabase: 'Supabase',
+  gcloud: 'Google Cloud', gemini: 'Gemini', resend: 'Resend', groq: 'Groq',
+}
+
+const PROVIDER_COLORS: Record<string, string> = {
+  vercel: '#000000', cloudflare: '#f6821f', supabase: '#3ecf8e',
+  gcloud: '#4285f4', gemini: '#886ef8', resend: '#111111', groq: '#f55036',
+}
+
+function UsageGauge({ item }: { item: CostUsageItem }) {
+  const hasLimit = item.limit != null && item.limit > 0
+  const pct = hasLimit ? Math.min((item.value / item.limit!) * 100, 100) : -1
+  const tone = pct >= 90 ? 'var(--color-error)' : pct >= 70 ? '#F59E0B' : 'var(--color-primary)'
+
+  return (
+    <div style={{ padding: '6px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500 }}>
+          {item.category}
+        </span>
+        <span style={{
+          fontSize: 12, fontFamily: '"Geist Mono", monospace',
+          color: 'var(--color-text)', fontWeight: 600, whiteSpace: 'nowrap',
+        }}>
+          {fmtValue(item.value)} {hasLimit ? `/ ${fmtValue(item.limit!)}` : ''} {item.unit}
+        </span>
+      </div>
+      {hasLimit && (
+        <>
+          <div style={{ height: 5, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
+            <div style={{
+              width: `${pct}%`, height: '100%', borderRadius: 999,
+              background: tone, transition: 'width 0.3s',
+            }} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 3, textAlign: 'right' }}>
+            {pct.toFixed(0)}%
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function fmtValue(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n % 1 === 0 ? String(n) : n.toFixed(2)
+}
+
+function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
+  if (!usage) return null
+  const slugs = Object.keys(usage.providers)
+  if (slugs.length === 0) return null
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+      gap: 14,
+    }}>
+      {slugs.map((slug) => {
+        const provider = usage.providers[slug]
+        const name = PROVIDER_NAMES[slug] ?? slug
+        const color = PROVIDER_COLORS[slug] ?? 'var(--color-primary)'
+        return (
+          <Card key={slug} title={name}>
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 2,
+              borderLeft: `3px solid ${color}`,
+              paddingLeft: 12,
+            }}>
+              {provider.items.map((item, i) => (
+                <UsageGauge key={i} item={item} />
+              ))}
+            </div>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Manual Snapshot Modal ───────────────────────────────────────────────────
 
 function ManualModal({ providers, onClose, onSaved }: {
@@ -318,6 +406,7 @@ export function TabCostos() {
   const { data: overview, error: errOverview, loading: loadingOverview } = useFetch(
     () => platformApi.costsOverview(months), [months, tick],
   )
+  const { data: usage } = useFetch(() => platformApi.costsUsage(), [tick])
   const { data: limits } = useFetch(() => platformApi.costsLimits(), [tick])
   const { data: alerts } = useFetch(() => platformApi.costsAlerts(), [tick])
   const { data: byBiz } = useFetch(() => platformApi.costsByBusiness(), [tick])
@@ -392,6 +481,13 @@ export function TabCostos() {
           )}
         </div>
       </Card>
+
+      {/* Uso del Plan */}
+      {usage && Object.keys(usage.providers).length > 0 && (
+        <Card title="Uso del Plan" subtitle="Métricas de consumo en tiempo real — cuánto usás de lo disponible en cada servicio.">
+          <UsageSection usage={usage} />
+        </Card>
+      )}
 
       {/* Two columns: Limits + Top businesses */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
