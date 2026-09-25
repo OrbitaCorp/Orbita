@@ -2,12 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 import { UpdateOnboardingBusinessDto } from './dto/update-onboarding-business.dto';
 import { motivoSubdominioInvalido } from '../common/utils/subdominio';
@@ -178,9 +180,12 @@ const TEMP_SUBDOMAIN_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 @Injectable()
 export class OnboardingService {
+  private readonly logger = new Logger(OnboardingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
+    private readonly mail: MailService,
   ) {}
 
   // ── RBT-292 ──────────────────────────────────────────────────────────────
@@ -367,6 +372,24 @@ export class OnboardingService {
     );
 
     const token = this.authService.signToken({ sub: result.member.id, type: 'member', businessId: result.business.id });
+
+    // Bienvenida al DUEÑO — hallazgo de la auditoría de mails: no existía
+    // ningún aviso al terminar el onboarding (sendWelcome es para un CLIENTE
+    // creando cuenta en una tienda ajena, no para esto). Este es el único
+    // punto de creación real de un negocio — lo reusa tanto el alta gratis/
+    // dev (registerBusiness llamado directo) como la paga de verdad
+    // (SubscriptionsService.confirmAndCreate llama a este mismo método), así
+    // que alcanza con mandarlo acá una sola vez. Best-effort: un mail caído
+    // nunca puede voltear el alta de un negocio ya creado y ya cobrado.
+    const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    this.mail
+      .sendBusinessWelcome(dto.email, {
+        ownerName: dto.ownerName,
+        businessName: result.business.name,
+        subdomain: result.business.subdomain,
+        panelUrl: `${frontend}/admin/${result.business.id}/ventas/dashboard`,
+      }, { businessId: result.business.id, memberId: result.member.id })
+      .catch((e) => this.logger.warn(`No se pudo mandar la bienvenida al dueño de ${result.business.id}: ${e}`));
 
     return {
       token,

@@ -180,7 +180,7 @@ describe('Subdominio: una sola regla para todos los caminos', () => {
         update: jest.fn(),
       },
     };
-    return { svc: new OnboardingService(prisma as any, {} as any), prisma };
+    return { svc: new OnboardingService(prisma as any, {} as any, {} as any), prisma };
   }
 
   it('check-subdomain dice que un reservado no está disponible, sin ir a la base', async () => {

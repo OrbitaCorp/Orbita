@@ -336,6 +336,20 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { businessName: FIXTURE_BUSINESS_BRANDING.storeName, storeUrl: 'https://mitienda.orbita.site' },
   },
   {
+    id: 'business-welcome',
+    label: 'Bienvenida al dueño (fin del onboarding)',
+    group: 'Plataforma',
+    template: 'business-welcome',
+    isPlatform: true,
+    subject: '¡Bienvenido a Órbita, Lucas!',
+    data: {
+      ownerName: 'Lucas',
+      businessName: FIXTURE_BUSINESS_BRANDING.storeName,
+      subdomain: 'panaderialopez',
+      panelUrl: 'https://panel.orbita.site/admin/biz-1/ventas/dashboard',
+    },
+  },
+  {
     id: 'business-cancellation-confirmed',
     label: 'Cancelación voluntaria confirmada',
     group: 'Plataforma',

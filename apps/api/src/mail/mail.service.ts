@@ -661,6 +661,17 @@ export class MailService {
     await this.sendOrLog(to, `Bienvenido a ${data.storeName}`, 'welcome', data, meta);
   }
 
+  // Distinto de sendWelcome: ese es para un CLIENTE creando cuenta en una
+  // tienda ajena. Este es para el DUEÑO al terminar el onboarding — no
+  // existía ningún aviso en ese momento (hallazgo de la auditoría de mails).
+  async sendBusinessWelcome(
+    to: string,
+    data: { ownerName: string; businessName: string; subdomain: string; panelUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `¡Bienvenido a Órbita, ${data.ownerName}!`, 'business-welcome', data, meta);
+  }
+
   async sendPasswordReset(to: string, data: { code: string; expiresIn: string }, meta?: MailMeta) {
     await this.sendOrLog(to, 'Recuperá tu contraseña', 'reset-password', data, meta);
   }

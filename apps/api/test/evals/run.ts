@@ -69,7 +69,7 @@ const config = new ConfigService();
 // único que estas dos tools tocan de OnboardingService es checkSubdomain/
 // suggestSubdomains, que nunca lo usan.
 const prisma = new PrismaService();
-const onboardingService = new OnboardingService(prisma, null as never);
+const onboardingService = new OnboardingService(prisma, null as never, null as never);
 
 const registry = new ToolRegistryService();
 registry.register(new SuggestBusinessNameTool(config, onboardingService));
