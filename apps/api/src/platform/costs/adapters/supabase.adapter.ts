@@ -80,21 +80,31 @@ export class SupabaseCostAdapter implements CostAdapter {
       });
     }
 
-    const apiCounts = await this.fetchApiCounts(ref, token);
-    if (apiCounts) {
-      if (apiCounts.auth > 0) {
-        items.push({ category: 'Auth Requests', value: apiCounts.auth, unit: 'requests' });
-      }
-      if (apiCounts.rest > 0) {
-        items.push({ category: 'REST Requests', value: apiCounts.rest, unit: 'requests' });
-      }
-      if (apiCounts.storage > 0) {
-        items.push({ category: 'Storage Requests', value: apiCounts.storage, unit: 'requests' });
-      }
-      if (apiCounts.realtime > 0) {
-        items.push({ category: 'Realtime Requests', value: apiCounts.realtime, unit: 'requests' });
-      }
+    const storageBytes = await this.execSql<{ bytes: number | string }>(
+      ref, token,
+      `select coalesce(sum((metadata->>'size')::bigint), 0) as bytes from storage.objects`,
+    );
+    if (storageBytes) {
+      const usedMb = Math.round(Number(storageBytes[0]?.bytes ?? 0) / (1024 * 1024));
+      items.push({ category: 'File Storage', value: usedMb, unit: 'MB', limit: 1024 });
     }
+
+    const mau = await this.execSql<{ count: number | string }>(
+      ref, token,
+      `select count(*) as count from auth.users where last_sign_in_at >= date_trunc('month', now())`,
+    );
+    if (mau) {
+      items.push({
+        category: 'Monthly Active Users',
+        value: Number(mau[0]?.count ?? 0),
+        unit: 'users',
+        limit: 50_000,
+      });
+    }
+
+    // Egress, Log Ingestion y Log Query del Free Plan no tienen endpoint público en la
+    // Management API de Supabase (ni REST ni SQL vía pg-meta) — se omiten en vez de
+    // mostrar un 0 falso que sugeriría consumo nulo.
 
     return { items };
   }
@@ -145,26 +155,25 @@ export class SupabaseCostAdapter implements CostAdapter {
     }
   }
 
-  private async fetchApiCounts(ref: string, key: string): Promise<{
-    auth: number; rest: number; storage: number; realtime: number;
-  } | null> {
+  private async execSql<T = Record<string, unknown>>(
+    ref: string, key: string, sql: string,
+  ): Promise<T[] | null> {
     try {
-      const res = await fetch(
-        `${SUPABASE_MGMT_BASE}/projects/${ref}/analytics/endpoints/usage.api-counts`,
-        { headers: { Authorization: `Bearer ${key}` } },
-      );
-      if (!res.ok) return null;
-      const data = await res.json() as any;
-      const rows = data.result ?? [];
-      let auth = 0, rest = 0, storage = 0, realtime = 0;
-      for (const row of rows) {
-        auth += row.total_auth_requests ?? 0;
-        rest += row.total_rest_requests ?? 0;
-        storage += row.total_storage_requests ?? 0;
-        realtime += row.total_realtime_requests ?? 0;
+      const res = await fetch(`${SUPABASE_MGMT_BASE}/projects/${ref}/database/query`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: sql }),
+      });
+      if (!res.ok) {
+        this.logger.debug(`Supabase database/query respondió ${res.status} para: ${sql}`);
+        return null;
       }
-      return { auth, rest, storage, realtime };
-    } catch {
+      return await res.json() as T[];
+    } catch (err) {
+      this.logger.warn(`Error ejecutando SQL en Supabase: ${err}`);
       return null;
     }
   }
