@@ -81,6 +81,20 @@ const BA: [number, number] = [-34.6037, -58.3816]
 
 type EstadoSub = 'idle' | 'checking' | 'disponible' | 'ocupado'
 
+// Mismo criterio que el slugify privado de OnboardingService (backend) — se
+// duplica acá porque el botón "Generar a partir del nombre" necesita el
+// resultado al instante, sin ida y vuelta al servidor (el input ya dispara
+// su propio checkSubdomain debounced apenas cambia, así que la disponibilidad
+// se valida igual que si lo hubiera tipeado a mano).
+function slugify(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '')
+}
+
 // ─── Shared UI atoms ──────────────────────────────────────────────────────────
 // El logo vive en design-system/components/OrbitaLogo: el orbital animado
 // (mismo que ElegirRubro.tsx, el paso anterior de este mismo wizard) — antes
@@ -390,6 +404,24 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
             {estadoSub === 'ocupado'    && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-error)',   marginRight: 12, flexShrink: 0, whiteSpace: 'nowrap' }}>✗ No disponible</span>}
           </div>
           {sugeridosPorOrbi.has('subdominio') && <SugeridoPorOrbiTag />}
+          {/* Ahora que el campo es obligatorio, este es el atajo para quien no
+              quiere pensar un subdominio propio — mismo slugify que usa el
+              backend (generateUniqueSubdomain/suggestSubdomains en
+              onboarding.service.ts), así el resultado es consistente con lo
+              que el negocio hubiera recibido como fallback automático antes
+              de este cambio. */}
+          {negocio.nombre.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                setNegocio(prev => ({ ...prev, subdominio: slugify(prev.nombre) }))
+                onManualEdit('subdominio')
+              }}
+              style={{ marginTop: 6, background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Generar a partir del nombre
+            </button>
+          )}
           <p style={{ fontSize: 11, color: 'var(--color-muted)', margin: '5px 0 0' }}>
             Una vez activo tu espacio, podés conectar un dominio propio como <strong>tunegocio.com.ar</strong>.
           </p>
