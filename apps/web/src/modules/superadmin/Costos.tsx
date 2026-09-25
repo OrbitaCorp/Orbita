@@ -275,7 +275,7 @@ function LimitBar({ limit }: { limit: CostLimitRow }) {
 // ─── Usage stat cards (inspired by React Bits stats blocks) ─────────────────
 
 const PROVIDER_CARD_STYLES: Record<string, { bg: string; accent: string; text: string }> = {
-  vercel:     { bg: '#f0f0f0', accent: '#000000', text: '#1a1a2e' },
+  vercel:     { bg: '#f0f0f0', accent: '#0070f3', text: '#1a1a2e' },
   cloudflare: { bg: '#fff4eb', accent: '#f6821f', text: '#4a2800' },
   supabase:   { bg: '#e8faf0', accent: '#3ecf8e', text: '#0a3d22' },
   gcloud:     { bg: '#eaf1fd', accent: '#4285f4', text: '#1a2744' },
@@ -305,7 +305,7 @@ function CircularProgress({ pct, size = 44, stroke = 4, color }: {
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-border)" strokeWidth={stroke} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={stroke}
