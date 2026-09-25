@@ -67,36 +67,68 @@ export class SupabaseCostAdapter implements CostAdapter {
 
     const items: UsageItem[] = [];
 
-    const disk = await this.fetchDiskUsage(ref, token);
-    const diskConfig = await this.fetchDiskConfig(ref, token);
-    if (disk !== null) {
-      const usedMb = Math.round(disk / (1024 * 1024));
-      const limitMb = diskConfig ? diskConfig * 1024 : 500;
+    const dbRows = await this.execSql<{ bytes: number | string }>(
+      ref,
+      token,
+      'SELECT pg_database_size(current_database()) AS bytes',
+    );
+    if (dbRows?.[0]) {
       items.push({
         category: 'Database Size',
-        value: usedMb,
+        value: Math.round(Number(dbRows[0].bytes) / (1024 * 1024)),
         unit: 'MB',
-        limit: limitMb,
+        limit: 500,
       });
     }
 
-    const apiCounts = await this.fetchApiCounts(ref, token);
-    if (apiCounts) {
-      if (apiCounts.auth > 0) {
-        items.push({ category: 'Auth Requests', value: apiCounts.auth, unit: 'requests' });
-      }
-      if (apiCounts.rest > 0) {
-        items.push({ category: 'REST Requests', value: apiCounts.rest, unit: 'requests' });
-      }
-      if (apiCounts.storage > 0) {
-        items.push({ category: 'Storage Requests', value: apiCounts.storage, unit: 'requests' });
-      }
-      if (apiCounts.realtime > 0) {
-        items.push({ category: 'Realtime Requests', value: apiCounts.realtime, unit: 'requests' });
-      }
+    const storageRows = await this.execSql<{ bytes: string }>(
+      ref,
+      token,
+      "SELECT coalesce(sum((metadata->>'size')::bigint), 0) AS bytes FROM storage.objects",
+    );
+    if (storageRows?.[0]) {
+      const mb = Number(storageRows[0].bytes) / (1024 * 1024);
+      items.push({
+        category: 'File Storage',
+        value: Math.round(mb * 100) / 100,
+        unit: 'MB',
+        limit: 1024,
+      });
+    }
+
+    const mauRows = await this.execSql<{ mau: number | string }>(
+      ref,
+      token,
+      "SELECT count(*) AS mau FROM auth.users WHERE last_sign_in_at >= date_trunc('month', now())",
+    );
+    if (mauRows?.[0]) {
+      items.push({
+        category: 'Monthly Active Users',
+        value: Number(mauRows[0].mau),
+        unit: 'usuarios',
+        limit: 50_000,
+      });
     }
 
     return { items };
+  }
+
+  private async execSql<T>(ref: string, key: string, query: string): Promise<T[] | null> {
+    try {
+      const res = await fetch(`${SUPABASE_MGMT_BASE}/projects/${ref}/database/query`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Supabase database/query respondió ${res.status}`);
+        return null;
+      }
+      return (await res.json()) as T[];
+    } catch (err) {
+      this.logger.warn(`Error ejecutando SQL en Supabase: ${err}`);
+      return null;
+    }
   }
 
   private async fetchAddons(ref: string, key: string): Promise<{ type: string; price: number }[] | null> {
@@ -140,30 +172,6 @@ export class SupabaseCostAdapter implements CostAdapter {
       if (!res.ok) return null;
       const data = await res.json() as any;
       return data.attributes?.size_gb ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async fetchApiCounts(ref: string, key: string): Promise<{
-    auth: number; rest: number; storage: number; realtime: number;
-  } | null> {
-    try {
-      const res = await fetch(
-        `${SUPABASE_MGMT_BASE}/projects/${ref}/analytics/endpoints/usage.api-counts`,
-        { headers: { Authorization: `Bearer ${key}` } },
-      );
-      if (!res.ok) return null;
-      const data = await res.json() as any;
-      const rows = data.result ?? [];
-      let auth = 0, rest = 0, storage = 0, realtime = 0;
-      for (const row of rows) {
-        auth += row.total_auth_requests ?? 0;
-        rest += row.total_rest_requests ?? 0;
-        storage += row.total_storage_requests ?? 0;
-        realtime += row.total_realtime_requests ?? 0;
-      }
-      return { auth, rest, storage, realtime };
     } catch {
       return null;
     }
