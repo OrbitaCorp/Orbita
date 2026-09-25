@@ -80,6 +80,7 @@ describe('Fotos de producto', () => {
   // Apariencia (uploadStorefrontImage en businesses.service.ts), que siguen
   // andando con el modelo local.
   it('quitar fondo está en mantenimiento: 503 sin correr el modelo', async () => {
+    delete process.env.FONDO_IA_MANTENIMIENTO; // no depender del .env local (ver fondo-ia-mantenimiento.ts)
     const bg = { removeBackground: jest.fn() };
     const prisma = {
       product: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1', name: 'Remera' }) },
@@ -125,5 +126,106 @@ describe('Quitar el fondo en Apariencia exige el paquete Avanzado', () => {
     const { svc, bg } = apariencia(false);
     await expect(svc.uploadStorefrontImage(BIZ, { buffer: await png(), mimetype: 'image/png', originalname: 'a.png' }, false)).resolves.toBeDefined();
     expect(bg.removeBackground).not.toHaveBeenCalled();
+  });
+});
+
+// "Quitar fondo" persistente (24/09/2026): la marca y la foto original se
+// guardan para poder mostrar el botón "Sin fondo" y volver atrás al EDITAR un
+// producto, en fotos principales y de variantes (mismo registro ProductImage).
+describe('Fotos de producto: quitar fondo persistente', () => {
+  const png = () => sharp({ create: { width: 4, height: 4, channels: 3, background: '#fff' } }).png().toBuffer();
+  const archivo = async () => ({ buffer: await png(), mimetype: 'image/png', originalname: 'a.png' });
+  const URL_BASE = 'https://x.supabase.co/storage/v1/object/public/product-images/';
+
+  beforeEach(() => { process.env.FONDO_IA_MANTENIMIENTO = 'false'; });
+  afterEach(() => { delete process.env.FONDO_IA_MANTENIMIENTO; });
+
+  function armar(imagen: Record<string, unknown> | null, tieneAddon = true) {
+    let n = 0;
+    const upload = jest.fn().mockResolvedValue({ error: null });
+    const download = jest.fn(async () => ({ data: new Blob([new Uint8Array(await png())]), error: null }));
+    const remove = jest.fn().mockResolvedValue({});
+    const prisma = {
+      product: { findFirst: jest.fn().mockResolvedValue({ id: 'p-1', name: 'Remera' }) },
+      productImage: {
+        count: jest.fn().mockResolvedValue(0),
+        aggregate: jest.fn().mockResolvedValue({ _max: { position: 0 } }),
+        updateMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(imagen),
+        create: jest.fn(async ({ data }: any) => ({ id: 'img-new', position: 1, isPrimary: false, optionValueId: null, hasAiBackground: false, ...data })),
+        update: jest.fn(async ({ data }: any) => ({ id: 'img-1', ...imagen, ...data })),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      businessAddon: { findFirst: jest.fn().mockResolvedValue(tieneAddon ? { id: 'a-1' } : null) },
+    };
+    const supabase = {
+      adminClient: {
+        storage: { from: () => ({ upload, download, remove, getPublicUrl: () => ({ data: { publicUrl: `${URL_BASE}${BIZ}/p-1/nuevo-${++n}.webp` } }) }) },
+      },
+    };
+    const bg = { removeBackground: jest.fn((b: Buffer) => Promise.resolve(b)) };
+    return { svc: new ProductsService(prisma as any, supabase as any, bg as any), prisma, bg, upload, download, remove };
+  }
+
+  it('al subir con "Quitar fondo" guarda la marca y la foto original', async () => {
+    const { svc, prisma, upload } = armar(null);
+    const r = await svc.addImage(BIZ, 'p-1', { removeBackground: true } as any, await archivo());
+    expect(upload).toHaveBeenCalledTimes(2); // original + sin fondo
+    const data = prisma.productImage.create.mock.calls[0][0].data;
+    expect(data.backgroundRemoved).toBe(true);
+    expect(data.originalUrl).toContain('nuevo-1');
+    expect(data.url).toContain('nuevo-2');
+    expect(r.backgroundRemoved).toBe(true);
+  });
+
+  it('una foto normal no guarda original ni marca', async () => {
+    const { svc, prisma, upload } = armar(null);
+    await svc.addImage(BIZ, 'p-1', {} as any, await archivo());
+    expect(upload).toHaveBeenCalledTimes(1);
+    const data = prisma.productImage.create.mock.calls[0][0].data;
+    expect(data.backgroundRemoved).toBe(false);
+    expect(data.originalUrl).toBeNull();
+  });
+
+  it('quitar el fondo de una foto guardada: procesa, sube y deja el original', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-1/orig.webp`, backgroundRemoved: false, originalUrl: null, optionValueId: 'ov-1' };
+    const { svc, prisma, bg, download } = armar(guardada);
+    const r = await svc.setImageBackground(BIZ, 'p-1', 'img-1', true);
+    expect(download).toHaveBeenCalledWith(`${BIZ}/p-1/orig.webp`);
+    expect(bg.removeBackground).toHaveBeenCalledTimes(1);
+    expect(prisma.productImage.update.mock.calls[0][0].data).toMatchObject({ backgroundRemoved: true, originalUrl: guardada.url });
+    expect(r.backgroundRemoved).toBe(true);
+    expect(r.url).toContain('nuevo-1');
+  });
+
+  it('devolver el fondo: vuelve a la original, sin correr el modelo ni borrar archivos', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-1/sinfondo.webp`, backgroundRemoved: true, originalUrl: `${URL_BASE}${BIZ}/p-1/orig.webp` };
+    const { svc, prisma, bg, remove } = armar(guardada);
+    const r = await svc.setImageBackground(BIZ, 'p-1', 'img-1', false);
+    expect(prisma.productImage.update.mock.calls[0][0].data).toEqual({ url: guardada.originalUrl, originalUrl: null, backgroundRemoved: false });
+    expect(r).toMatchObject({ url: guardada.originalUrl, backgroundRemoved: false });
+    expect(bg.removeBackground).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('sin el paquete Avanzado: 403 y el modelo no corre', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-1/orig.webp`, backgroundRemoved: false, originalUrl: null };
+    const { svc, bg } = armar(guardada, false);
+    await expect(svc.setImageBackground(BIZ, 'p-1', 'img-1', true)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(bg.removeBackground).not.toHaveBeenCalled();
+  });
+
+  it('una foto que no es de nuestro almacenamiento no se descarga', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: 'https://otro.com/foto.jpg', backgroundRemoved: false, originalUrl: null };
+    const { svc, download } = armar(guardada);
+    await expect(svc.setImageBackground(BIZ, 'p-1', 'img-1', true)).rejects.toThrow();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('borrar la foto borra también el original', async () => {
+    const guardada = { id: 'img-1', productId: 'p-1', url: `${URL_BASE}${BIZ}/p-1/sinfondo.webp`, backgroundRemoved: true, originalUrl: `${URL_BASE}${BIZ}/p-1/orig.webp` };
+    const { svc, remove } = armar(guardada);
+    await svc.removeImage(BIZ, 'p-1', 'img-1');
+    expect(remove).toHaveBeenCalledWith([`${BIZ}/p-1/sinfondo.webp`, `${BIZ}/p-1/orig.webp`]);
   });
 });

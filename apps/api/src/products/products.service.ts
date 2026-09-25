@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { fondoIaEnMantenimiento } from '../common/utils/fondo-ia-mantenimiento';
 import {
   BadRequestException,
   ConflictException,
@@ -636,6 +637,8 @@ export class ProductsService {
             position: img.position,
             isPrimary: img.isPrimary,
             hasAiBackground: img.hasAiBackground,
+            backgroundRemoved: img.backgroundRemoved,
+            originalUrl: img.originalUrl,
           },
         });
       }
@@ -670,80 +673,20 @@ export class ProductsService {
       throw new UnprocessableEntityException(`Un producto puede tener hasta ${MAX_IMAGENES_POR_PRODUCTO} fotos. Borrá alguna para subir otra.`);
     }
 
-    // Paquete "Avanzado": quitar el fondo es un extra pago — se valida acá
-    // (no con @RequiresAddon en el endpoint, porque el resto de este mismo
-    // endpoint — subir una foto normal — sigue disponible sin el add-on).
-    // Mismo mensaje que AddonGuard para que el frontend lo reconozca igual.
     let sourceBuffer = file.buffer;
+    let originalUrl: string | null = null;
     if (dto.removeBackground) {
-      const addon = await this.prisma.businessAddon.findFirst({
-        where: {
-          businessId,
-          type: 'ADVANCED',
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        select: { id: true },
-      });
-      if (!addon) throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
-      // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
-      // el pipeline de "Fondo con IA" de producto (modo gratis actual + modo
-      // premium nuevo con Gemini/Workers AI). El toggle de fotos de producto y
-      // el modal "Fondo con IA" (image-studio.service.ts) quedan pausados;
-      // uploadStorefrontImage() en businesses.service.ts (sliders de
-      // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
-      throw new ServiceUnavailableException('"Quitar fondo" está en mantenimiento — vuelve pronto.');
+      await this.exigirQuitarFondo(businessId);
       // Corre el modelo local ANTES de convertir a webp — mismo orden que
       // uploadStorefrontImage() en businesses.service.ts, para no codificar
       // la imagen dos veces.
       sourceBuffer = await this.backgroundRemoval.removeBackground(file.buffer, businessId);
+      // La foto tal cual se subió queda guardada para poder volver atrás al
+      // editar el producto (botón "Sin fondo", ver setImageBackground).
+      originalUrl = await this.subirImagenWebp(businessId, productId, file.buffer);
     }
 
-    // Se convierte a webp ANTES de subir — nunca se persiste el archivo
-    // original en Storage, así que no hace falta un paso aparte de "borrar el
-    // original": simplemente nunca se sube. Reduce bastante el peso (catálogos
-    // con decenas de fotos) y estandariza el formato servido a la tienda. webp
-    // soporta canal alfa, así que no rompe la transparencia si se pidió
-    // quitar el fondo.
-    //
-    // .resize() al lado más largo (fit:'inside', sin agrandar lo que ya es
-    // chico): antes solo se recomprimía a webp sin tocar las DIMENSIONES, así
-    // que una foto de celular (hasta 60 MP, ver ENTRADA_IMAGEN) se guardaba y
-    // servía entera aunque la card del catálogo la muestre a ~300px de ancho
-    // — el navegador tenía que descargar y decodificar el original completo
-    // por cada foto de cada card, en cada página del catálogo. Encontrado
-    // real: una tienda con fotos subidas directo del celular sentía la
-    // grilla trabada al paginar; otra con fotos ya livianas (importadas de
-    // un feed externo, ver import-tefaltacalleok.ts) no tenía el problema —
-    // mismo código, mismo bug, pero solo duele con fotos pesadas. 1600px
-    // alcanza de sobra para la foto más grande que se muestra (detalle de
-    // producto) incluso en pantallas retina.
-    let webpBuffer: Buffer;
-    try {
-      // Con tope de píxeles (ver ENTRADA_IMAGEN en subida-imagen.ts).
-      webpBuffer = await sharp(sourceBuffer, ENTRADA_IMAGEN)
-        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 82 })
-        .toBuffer();
-    } catch {
-      throw new BadRequestException('El archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles');
-    }
-
-    const path = `${businessId}/${productId}/${randomUUID()}.webp`;
-
-    const { error: uploadError } = await this.supabase.adminClient.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
-    // El detalle de Supabase va al log, no al panel (auditoría interna 10/09,
-    // ítem `api.businesses`: mismo arreglo que BusinessesService.uploadToStorage).
-    if (uploadError) {
-      new Logger(ProductsService.name).error(`Subida a ${PRODUCT_IMAGES_BUCKET} falló para ${businessId}: ${uploadError.message}`);
-      throw new ServiceUnavailableException('No se pudo subir la imagen: el almacenamiento no respondió, probá de nuevo en un rato');
-    }
-
-    const { data: publicUrl } = this.supabase.adminClient.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .getPublicUrl(path);
+    const url = await this.subirImagenWebp(businessId, productId, sourceBuffer);
 
     const maxPosition = await this.prisma.productImage.aggregate({
       where: { productId },
@@ -759,10 +702,12 @@ export class ProductsService {
       data: {
         productId,
         optionValueId: dto.optionValueId ?? null,
-        url: publicUrl.publicUrl,
+        url,
         position: (maxPosition._max.position ?? -1) + 1,
         isPrimary,
         hasAiBackground: dto.hasAiBackground ?? false,
+        backgroundRemoved: !!dto.removeBackground,
+        originalUrl,
       },
     });
 
@@ -773,7 +718,101 @@ export class ProductsService {
       isPrimary: image.isPrimary,
       optionValueId: image.optionValueId,
       hasAiBackground: image.hasAiBackground,
+      backgroundRemoved: image.backgroundRemoved,
     };
+  }
+
+  // Paquete "Avanzado": quitar el fondo es un extra pago — se valida acá
+  // (no con @RequiresAddon en el endpoint, porque el resto de addImage — subir
+  // una foto normal — sigue disponible sin el add-on). Mismo mensaje que
+  // AddonGuard para que el frontend lo reconozca igual.
+  private async exigirQuitarFondo(businessId: string): Promise<void> {
+    const addon = await this.prisma.businessAddon.findFirst({
+      where: {
+        businessId,
+        type: 'ADVANCED',
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    if (!addon) throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+    // EN MANTENIMIENTO (24/09/2026, pedido explícito): se está reconstruyendo
+    // el pipeline de "Fondo con IA" de producto. uploadStorefrontImage() en
+    // businesses.service.ts (sliders de Apariencia/Plantillas) NO se toca.
+    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException('"Quitar fondo" está en mantenimiento — vuelve pronto.');
+  }
+
+  // Convierte a webp y sube a Storage; devuelve la URL pública. Nunca se
+  // persiste el archivo tal cual en su formato original: reduce bastante el
+  // peso (catálogos con decenas de fotos) y estandariza el formato servido a
+  // la tienda. webp soporta canal alfa, así que no rompe la transparencia.
+  private async subirImagenWebp(businessId: string, productId: string, source: Buffer): Promise<string> {
+    let webpBuffer: Buffer;
+    try {
+      // Con tope de píxeles (ver ENTRADA_IMAGEN en subida-imagen.ts).
+      webpBuffer = await sharp(source, ENTRADA_IMAGEN)
+        .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+    } catch {
+      throw new BadRequestException('El archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles');
+    }
+
+    const path = `${businessId}/${productId}/${randomUUID()}.webp`;
+    const { error: uploadError } = await this.supabase.adminClient.storage
+      .from(PRODUCT_IMAGES_BUCKET)
+      .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
+    // El detalle de Supabase va al log, no al panel (auditoría interna 10/09,
+    // ítem `api.businesses`: mismo arreglo que BusinessesService.uploadToStorage).
+    if (uploadError) {
+      new Logger(ProductsService.name).error(`Subida a ${PRODUCT_IMAGES_BUCKET} falló para ${businessId}: ${uploadError.message}`);
+      throw new ServiceUnavailableException('No se pudo subir la imagen: el almacenamiento no respondió, probá de nuevo en un rato');
+    }
+    return this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
+  }
+
+  // Quita (o devuelve) el fondo de una foto YA guardada — el botón "Quitar
+  // fondo"/"Sin fondo" de la miniatura al editar un producto, tanto en las
+  // fotos principales como en las de variantes (mismo registro).
+  // - true: baja la foto, corre el modelo local, sube el resultado y guarda la
+  //   foto vigente como `originalUrl`.
+  // - false: vuelve a `originalUrl`. El archivo sin fondo NO se borra de
+  //   Storage: las copias de un producto duplicado comparten URLs (ver
+  //   duplicate()), así que borrar acá podría romper otra ficha.
+  async setImageBackground(businessId: string, productId: string, imageId: string, removeBackground: boolean) {
+    await this.findOneRaw(businessId, productId);
+    const image = await this.prisma.productImage.findFirst({ where: { id: imageId, productId } });
+    if (!image) throw new NotFoundException('Imagen no encontrada');
+
+    if (!removeBackground) {
+      if (!image.backgroundRemoved || !image.originalUrl) {
+        return { id: image.id, url: image.url, backgroundRemoved: false };
+      }
+      const restored = await this.prisma.productImage.update({
+        where: { id: image.id },
+        data: { url: image.originalUrl, originalUrl: null, backgroundRemoved: false },
+      });
+      return { id: restored.id, url: restored.url, backgroundRemoved: false };
+    }
+
+    if (image.backgroundRemoved) return { id: image.id, url: image.url, backgroundRemoved: true };
+    await this.exigirQuitarFondo(businessId);
+
+    // Solo se baja lo que está en NUESTRO bucket: la URL sale de la base, pero
+    // extractStoragePath la valida igual antes de pedirla.
+    const path = this.extractStoragePath(image.url);
+    if (!path) throw new BadRequestException('La foto no está en el almacenamiento del sistema');
+    const { data: blob, error } = await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).download(path);
+    if (error || !blob) throw new ServiceUnavailableException('No se pudo leer la foto: el almacenamiento no respondió, probá de nuevo en un rato');
+
+    const sinFondo = await this.backgroundRemoval.removeBackground(Buffer.from(await blob.arrayBuffer()), businessId);
+    const url = await this.subirImagenWebp(businessId, productId, sinFondo);
+    const updated = await this.prisma.productImage.update({
+      where: { id: image.id },
+      data: { url, originalUrl: image.url, backgroundRemoved: true },
+    });
+    return { id: updated.id, url: updated.url, backgroundRemoved: true };
   }
 
   async removeImage(businessId: string, productId: string, imageId: string) {
@@ -784,8 +823,10 @@ export class ProductsService {
     // Best-effort: si falla el borrado en Storage no bloqueamos el borrado
     // del registro (evita imágenes "zombie" en la UI por un error de red).
     const path = this.extractStoragePath(image.url);
-    if (path) {
-      await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]).catch(() => {});
+    const pathOriginal = image.originalUrl ? this.extractStoragePath(image.originalUrl) : null;
+    const aBorrar = [path, pathOriginal].filter((x): x is string => !!x);
+    if (aBorrar.length > 0) {
+      await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove(aBorrar).catch(() => {});
     }
 
     // ProductImage no tiene businessId propio (solo productId) — el where lleva
@@ -960,6 +1001,7 @@ export class ProductsService {
         isPrimary: img.isPrimary,
         optionValueId: img.optionValueId,
         hasAiBackground: img.hasAiBackground,
+        backgroundRemoved: img.backgroundRemoved,
       })),
     };
   }

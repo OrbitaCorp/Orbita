@@ -144,6 +144,17 @@ describe('CloudflareImageService', () => {
 
     const svc = makeService(CONFIG_OK);
     await expect(svc.generateImage('algo')).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it('"output has been flagged" (Flux 2 klein) también se reintenta hasta que pasa', async () => {
+    const flagged = { ok: false, status: 400, json: async () => ({ success: false, errors: [{ message: 'AiError: Your output has been flagged. Please choose another prompt / input image combination', code: 3030 }] }) } as Response;
+    const ok = { ok: true, status: 200, json: async () => ({ success: true, result: { image: Buffer.from('x').toString('base64') } }) } as Response;
+    const fetchMock = jest.fn().mockResolvedValueOnce(flagged).mockResolvedValueOnce(flagged).mockResolvedValueOnce(ok);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    await svc.editImage('algo', Buffer.from('img'), 'image/jpeg');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

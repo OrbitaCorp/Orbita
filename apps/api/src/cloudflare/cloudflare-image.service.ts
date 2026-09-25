@@ -101,6 +101,12 @@ export class CloudflareQuotaExhaustedException extends ServiceUnavailableExcepti
  * error puntual — cualquier otro error (credenciales, modelo no disponible,
  * red) no se reintenta, porque reintentar algo determinístico no cambia nada.
  */
+// El filtro de contenido de Workers AI da falsos positivos AL AZAR (la misma
+// foto pasa en el 2º o 3er intento, confirmado a mano el 23/09/2026): se
+// reintenta solo, sin que el usuario lo note, hasta este tope. Cada intento
+// tarda ~10 s y gasta neuronas del tier gratis, por eso hay tope.
+const MAX_INTENTOS_FILTRO = 6;
+
 @Injectable()
 export class CloudflareImageService {
   private readonly logger = new Logger(CloudflareImageService.name);
@@ -122,7 +128,10 @@ export class CloudflareImageService {
   }
 
   private esFalsoPositivoNsfw(json: WorkersAiErrorBody | null): boolean {
-    return !!json?.errors?.some((e) => /nsfw/i.test(e.message));
+    // Dos redacciones del mismo filtro: "NSFW content detected" y, en Flux 2
+    // klein (23/09/2026), "Your output has been flagged. Please choose another
+    // prompt / input image combination". Sin la segunda no reintentaba nunca.
+    return !!json?.errors?.some((e) => /nsfw|output has been flagged/i.test(e.message));
   }
 
   private esCuotaAgotada(json: WorkersAiErrorBody | null): boolean {
@@ -138,6 +147,11 @@ export class CloudflareImageService {
     if (json?.errors?.some((e) => e.code === CODIGO_MODELO_NO_DISPONIBLE_EN_FREE)) {
       throw new ServiceUnavailableException('Este modelo de imagen no está disponible en el plan actual de Cloudflare');
     }
+    if (this.esFalsoPositivoNsfw(json)) {
+      throw new InternalServerErrorException(
+        'El filtro de contenido de la IA bloqueó esta foto varias veces seguidas. Probá con otro estilo u otra foto.',
+      );
+    }
     throw new InternalServerErrorException('No se pudo generar la imagen. Probá de nuevo.');
   }
 
@@ -145,7 +159,7 @@ export class CloudflareImageService {
   async generateImage(prompt: string): Promise<CloudflareGeneratedImage> {
     const { accountId, apiToken } = this.getCreds();
 
-    const MAX_INTENTOS = 3;
+    const MAX_INTENTOS = MAX_INTENTOS_FILTRO;
     let ultimoJson: WorkersAiErrorBody | null = null;
     let ultimoStatus = 0;
 
@@ -188,7 +202,7 @@ export class CloudflareImageService {
   async editImage(prompt: string, image: Buffer, mimeType: string): Promise<CloudflareGeneratedImage> {
     const { accountId, apiToken } = this.getCreds();
 
-    const MAX_INTENTOS = 3;
+    const MAX_INTENTOS = MAX_INTENTOS_FILTRO;
     let ultimoJson: WorkersAiErrorBody | null = null;
     let ultimoStatus = 0;
 

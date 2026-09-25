@@ -28,6 +28,7 @@ import { BusinessesService } from '../businesses/businesses.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
+import { SetImageBackgroundDto } from './dto/set-image-background.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
@@ -161,6 +162,19 @@ export class ProductsController {
   removeImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Param('imageId') imageId: string) {
     const member = assertMemberContext(ctx);
     return this.productsService.removeImage(member.businessId, id, imageId);
+  }
+
+  // Quitar / devolver el fondo de una foto ya guardada (miniaturas al editar).
+  @Patch(':id/images/:imageId/background')
+  @RequirePermission('catalog.manage')
+  setImageBackground(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @Body() dto: SetImageBackgroundDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.setImageBackground(member.businessId, id, imageId, dto.removeBackground);
   }
 
   @Patch(':id/images/reorder')

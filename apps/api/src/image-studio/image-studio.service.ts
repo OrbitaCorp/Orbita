@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as path from 'path';
 import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
@@ -7,6 +9,7 @@ import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
 import { GeminiImageService } from '../gemini-image/gemini-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
+import { fondoIaEnMantenimiento, fondoIaMotor, MENSAJE_FONDO_IA_MANTENIMIENTO } from '../common/utils/fondo-ia-mantenimiento';
 import {
   BACKGROUND_STYLES,
   DEFAULT_BACKGROUND_STYLE,
@@ -22,7 +25,19 @@ export interface ImageStudioResult {
   mimeType: string;
   /** Solo en generateModelWearing(): el resultado no es determinístico, avisar antes de publicar. */
   advertencia?: string;
+  /** Solo en "Sin fondo": el recorte local probablemente salió mal — el panel ofrece mejorarRecorte(). */
+  recorteDificil?: boolean;
 }
+
+// Mejorar recorte: solo cambia el fondo, sin tocar el producto (mismo lenguaje
+// de preservación que promptPremium) — el blanco liso es lo que hace fácil el
+// recorte local posterior.
+const PROMPT_FONDO_BLANCO =
+  'This is a product photo. Replace ONLY the background with a perfectly flat, uniform, pure white (#FFFFFF) ' +
+  'background, with no shadows, no texture and no gradient. Keep the product itself pixel-perfect: same shape, ' +
+  'same angle, same text, same logos, same stitching, and the EXACT original colors (same hue, saturation and ' +
+  'brightness) — do not redraw, restyle, recolor or reinterpret it in any way. Remove everything that is not the ' +
+  'product, including anything visible through gaps, straps or openings of the product.';
 
 const PROMPT_MODELO_DEFAULT =
   'a photorealistic person wearing this exact garment, natural studio lighting, e-commerce fashion photography, neutral background';
@@ -82,12 +97,24 @@ export class ImageStudioService {
     }
   }
 
+  // "Sin fondo": siempre el recorte local (ONNX), en los dos modos — ni Gemini ni
+  // Workers AI garantizan canal alfa real. Además avisa si el recorte
+  // probablemente salió mal (producto y fondo parecidos, ver
+  // BackgroundRemovalService.removeBackgroundConAnalisis).
+  private async recorteSinFondo(buffer: Buffer, businessId: string): Promise<ImageStudioResult> {
+    const { png, dificil } = await this.backgroundRemoval.removeBackgroundConAnalisis(buffer, businessId);
+    return { base64: png.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+  }
+
   // Elige una de las variantes pre-generadas al azar (no siempre la misma,
   // para que no todos los productos con el mismo estilo se vean idénticos)
   // y la baja de R2. Si R2 no responde (caso raro, no el camino feliz), cae
   // a generar en vivo con Flux en vez de romper el pedido del vendedor —
   // más lento pero mejor que un 500.
   private async obtenerFondoCacheado(style: BackgroundStyle, businessId: string): Promise<Buffer> {
+    if (!style.backgroundKeys || style.backgroundKeys.length === 0) {
+      return (await this.cloudflareImage.generateImage(style.prompt)).buffer;
+    }
     const key = style.backgroundKeys[Math.floor(Math.random() * style.backgroundKeys.length)];
     const url = this.r2.publicUrlDe(key);
     try {
@@ -98,6 +125,34 @@ export class ImageStudioService {
       this.logger.warn(`No se pudo bajar el fondo cacheado (${url}) para negocio ${businessId}, generando en vivo: ${error}`);
       return (await this.cloudflareImage.generateImage(style.prompt)).buffer;
     }
+  }
+
+  private async obtenerFondoParaComposicion(style: BackgroundStyle, businessId: string): Promise<Buffer> {
+    if (style.localAsset) {
+      const candidates = [
+        path.resolve(process.cwd(), style.localAsset),
+        path.resolve(process.cwd(), 'apps/api', style.localAsset),
+        path.resolve(__dirname, 'assets/fondos', path.basename(style.localAsset)),
+        path.resolve(__dirname, '../../src/image-studio/assets/fondos', path.basename(style.localAsset)),
+      ];
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          return await fs.promises.readFile(p);
+        }
+      }
+      this.logger.warn(`Asset local no encontrado para ${style.localAsset}, usando fallback`);
+    }
+
+    if (style.backgroundKeys && style.backgroundKeys.length > 0) {
+      return await this.obtenerFondoCacheado(style, businessId);
+    }
+
+    const defaultStyle = BACKGROUND_STYLES[DEFAULT_BACKGROUND_STYLE];
+    if (defaultStyle && defaultStyle.backgroundKeys && defaultStyle.backgroundKeys.length > 0) {
+      return await this.obtenerFondoCacheado(defaultStyle, businessId);
+    }
+
+    return (await this.cloudflareImage.generateImage(style.prompt)).buffer;
   }
 
   /**
@@ -145,6 +200,7 @@ export class ImageStudioService {
     estilo?: string,
     descripcion?: string,
     imageUrl?: string,
+    photoType?: 'flat' | 'volume',
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
 
@@ -153,64 +209,81 @@ export class ImageStudioService {
     // Workers AI). El toggle de producto (products.service.ts) queda pausado
     // igual; uploadStorefrontImage() en businesses.service.ts (sliders de
     // Apariencia/Plantillas) NO se toca, sigue andando con el modelo local.
-    // Tipado como `boolean` (no el literal `true`) a propósito: si no, tsc
-    // marca todo lo de abajo como código muerto y pierde el narrowing de
-    // `origen`/`imageUrl` (TS2345/TS18048). Poner en `false` es el primer
-    // paso al retomar esta tarea.
-    const EN_MANTENIMIENTO: boolean = true;
-    if (EN_MANTENIMIENTO) throw new ServiceUnavailableException('"Fondo con IA" está en mantenimiento — vuelve pronto.');
+    // Se habilita con FONDO_IA_MANTENIMIENTO=false (ver fondo-ia-mantenimiento.ts).
+    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException(MENSAJE_FONDO_IA_MANTENIMIENTO);
 
     const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
     if (!origen) throw new BadRequestException('Falta la imagen a procesar');
 
-    // "Sin fondo": no compone nada, devuelve directo el recorte transparente
-    // — mismo motor que el toggle "Quitar fondo" de siempre (que solo aplica
-    // recién al subir la foto, sin preview) pero con resultado inmediato acá.
-    if (estilo === SIN_FONDO_KEY) {
-      const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
-      return { base64: cutout.toString('base64'), mimeType: 'image/png' };
-    }
+    // "Sin fondo": siempre el recorte local (ONNX segmenter)
+    if (estilo === SIN_FONDO_KEY) return this.recorteSinFondo(origen.buffer, businessId);
 
-    const style = BACKGROUND_STYLES[estilo ?? DEFAULT_BACKGROUND_STYLE];
+    const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
+    const style: BackgroundStyle | undefined = BACKGROUND_STYLES[key] ?? (PREMIUM_ONLY_STYLES as any)[key];
     if (!style) throw new BadRequestException('Estilo de fondo inválido');
 
-    const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
+    // Flujo unificado:
+    // 1. Intenta Workers AI (hasta 6 intentos).
+    // 2. Si falla (error, flag de contenido NSFW, cuota o tras los 6 intentos),
+    //    aplica automáticamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
+    const prompt = this.promptPremium(style, descripcion);
+    let workersResult: { buffer: Buffer; mimeType: string } | null = null;
+    const MAX_INTENTOS_WORKERS = 6;
+    let ultimoError: any = null;
+
+    for (let intento = 1; intento <= MAX_INTENTOS_WORKERS; intento++) {
+      try {
+        this.logger.log(`[generateBackground] Intento ${intento}/${MAX_INTENTOS_WORKERS} con Workers AI (estilo: ${key})`);
+        const res = await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype);
+        if (res && res.buffer && res.buffer.length > 0) {
+          workersResult = res;
+          break;
+        }
+      } catch (err: any) {
+        ultimoError = err;
+        this.logger.warn(`[generateBackground] Intento ${intento}/${MAX_INTENTOS_WORKERS} falló: ${err?.message || err}`);
+        // Si el filtro de contenido de Cloudflare bloqueó la imagen (código 3030 o flagged),
+        // reintentar la misma imagen no va a cambiar el resultado. Pasamos de inmediato al modelo local.
+        if (err?.message && (err.message.includes('flagged') || err.message.includes('3030') || err.message.includes('NSFW'))) {
+          this.logger.warn(`[generateBackground] Workers AI detectó flag de contenido (falso positivo NSFW). Pasando al modelo local.`);
+          break;
+        }
+        // Si la cuota diaria se agotó (429 / 503 / quota), pasamos directo al modelo local
+        if (err?.status === 429 || err?.status === 503 || (err?.message && err.message.includes('quota'))) {
+          this.logger.warn(`[generateBackground] Cuota de Workers AI agotada o 503. Pasando al modelo local.`);
+          break;
+        }
+        if (intento < MAX_INTENTOS_WORKERS) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        }
+      }
+    }
+
+    if (workersResult) {
+      return {
+        base64: workersResult.buffer.toString('base64'),
+        mimeType: workersResult.mimeType || 'image/jpeg',
+      };
+    }
+
+    // Fallback al modelo local pulido (BiRefNet + sombra orgánica doble capa + composición):
+    this.logger.log(
+      `[generateBackground] Fallback al modelo local (BiRefNet-Lite + sombra orgánica + composición) para estilo: ${key} (${ultimoError?.message})`,
+    );
+    return await this.componerConModeloLocal(businessId, origen.buffer, style, descripcion);
+  }
+
+  private async componerConModeloLocal(
+    businessId: string,
+    origenBuffer: Buffer,
+    style: BackgroundStyle,
+    descripcion?: string,
+  ): Promise<ImageStudioResult> {
+    const cutout = await this.backgroundRemoval.removeBackground(origenBuffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
     const cutoutWidth = meta.width ?? 1024;
     const cutoutHeight = meta.height ?? 1024;
 
-    // El canvas del compuesto NO hereda el aspect ratio de la foto tal cual
-    // la subió el vendedor (arbitraria) — se fuerza a 3:4, el mismo aspect
-    // ratio que usa ProductCard.tsx en la tienda (contenedor con
-    // aspectRatio:'3/4' + object-fit:contain). Feedback real: un compuesto
-    // con OTRO aspect ratio quedaba "chico" en la tarjeta — contain no
-    // recorta, deja franjas vacías donde el aspect ratio no coincide con el
-    // del contenedor (ver comparación en el resumen de la tarea: mismo tipo
-    // de fondo, uno lleno de borde a borde y otro con letterboxing). El
-    // producto NO se estira ni se recorta acá — va centrado a tamaño
-    // natural, y el fondo (una textura genérica pensada para extenderse) se
-    // agranda para llenar el resto del canvas.
-    // Margen alrededor del producto — historia completa (21/09/2026):
-    // 1) Primer intento: 60% de margen en las dos direcciones. Con
-    //    object-fit:contain (lo que usaba el storefront en ese momento) eso
-    //    ACHICABA la prenda en pantalla: contain escala la imagen COMPLETA
-    //    para que entre en su recuadro, así que si la prenda ocupa el 62%
-    //    del lienzo, se ve al 62% de grande — sin importar los píxeles del
-    //    archivo. Se revirtió a MARGEN_FONDO=1 (sin margen).
-    // 2) Con el margen en 1 (cero slack), al pasar las imágenes de "Fondo
-    //    con IA" a object-fit:cover (ver ProductImage.hasAiBackground) el
-    //    problema cambió de signo: cover SÍ recorta lo que sobra para
-    //    llenar el recuadro, y sin margen no hay nada de fondo para
-    //    recortar — recorta directo la prenda si el recuadro real no
-    //    coincide exacto con el 3:4 del lienzo (confirmado a mano: una
-    //    camisa quedó con los costados cortados en la ficha real).
-    // Con cover, a diferencia de contain, el margen NO achica la prenda en
-    // pantalla — cover siempre escala hasta llenar el recuadro, así que el
-    // margen es pura "tela de sobra" para recortar, nunca visible como
-    // reducción de tamaño. Por eso se puede volver a agregar sin reabrir el
-    // problema del punto 1. 1.35 (35% extra por eje) es un valor moderado:
-    // no tan grande como el primer intento, pensado para absorber el rango
-    // normal de formas de recuadro entre escritorio y laptop.
     const MARGEN_FONDO = 1.35;
     const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
     const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
@@ -224,7 +297,7 @@ export class ImageStudioService {
 
     const backgroundBuffer = descripcion
       ? (await this.cloudflareImage.generateImage(`${style.prompt} Additional style note: ${descripcion}.`)).buffer
-      : await this.obtenerFondoCacheado(style, businessId);
+      : await this.obtenerFondoParaComposicion(style, businessId);
 
     let composedBuffer: Buffer;
     try {
@@ -232,65 +305,59 @@ export class ImageStudioService {
         .resize(width, height, { fit: 'cover' })
         .toBuffer();
 
-      // Sombra en DOS capas, no una — una sombra real tiene dos componentes
-      // distintas: un "contacto" chico y oscuro justo donde el producto
-      // toca la mesa (ahí no entra nada de luz) y una "ambiente" grande y
-      // difusa alrededor (el producto tapa un poco la luz que llega desde
-      // varios lados, se nota mucho menos pero se extiende más lejos). Con
-      // una sola sombra tratando de cumplir las dos funciones a la vez, el
-      // resultado quedaba a mitad de camino: ni el contacto se notaba
-      // firme, ni la ambiente daba sensación real de volumen — la prenda se
-      // veía "pegada" sobre el fondo en vez de apoyada.
-      //
-      // La ambiente NO sale de difuminar la silueta del recorte (como sí
-      // hace la de contacto) — feedback real (21/09/2026): un producto de
-      // contorno más bien rectangular (remera doblada, caja) sigue
-      // leyéndose como "un rectángulo con blur" sin importar cuánto blur o
-      // cuán suave la opacidad, porque la forma de origen ya es un
-      // rectángulo. Una elipse con gradiente radial (dibujada aparte, no
-      // derivada del contorno) da la misma sensación de volumen sin heredar
-      // esa forma — no tiene esquinas que blurear.
-      const alfaContacto = await sharp(cutout, ENTRADA_IMAGEN)
-        .ensureAlpha()
-        .extractChannel('alpha')
-        .blur(6)
-        .linear(0.55, 0)
-        .raw()
-        .toBuffer();
-      const sombraContacto = await sharp({ create: { width: cutoutWidth, height: cutoutHeight, channels: 3, background: { r: 0, g: 0, b: 0 } } })
-        .joinChannel(alfaContacto, { raw: { width: cutoutWidth, height: cutoutHeight, channels: 1 } })
+      // Sombra de contacto profesional en DOBLE CAPA calculada sobre el lienzo completo:
+      // Al renderizar primero el producto centrado en el lienzo final (width x height)
+      // con márgenes libres, el desenfoque gaussiano decae de forma 100% natural
+      // a cero opacidad sin recortarse contra los límites de una caja delimitadora
+      // (evita esquinas cuadradas y líneas rectas en mangas o dobladillos).
+      const prodFull = await sharp({
+        create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      })
+        .composite([{ input: cutout, left, top }])
         .png()
         .toBuffer();
 
-      // Centrada bajo el producto, un poco más abajo del centro y algo más
-      // ancha/baja que su bounding box (una sombra apoyada "cae" y se
-      // ensancha levemente en vez de calcar el contorno exacto).
-      const cxAmbiente = left + cutoutWidth / 2;
-      const cyAmbiente = top + cutoutHeight * 0.54;
-      const rxAmbiente = cutoutWidth * 0.56;
-      const ryAmbiente = cutoutHeight * 0.46;
-      const sombraAmbiente = Buffer.from(`<svg width="${width}" height="${height}">
-        <defs>
-          <radialGradient id="sombraAmbiente" cx="${cxAmbiente}" cy="${cyAmbiente}" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(${rxAmbiente} 0 0 ${ryAmbiente} ${cxAmbiente - rxAmbiente} ${cyAmbiente - ryAmbiente}) translate(1 1)">
-            <stop offset="0%" stop-color="black" stop-opacity="0.30"/>
-            <stop offset="55%" stop-color="black" stop-opacity="0.16"/>
-            <stop offset="100%" stop-color="black" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <ellipse cx="${cxAmbiente}" cy="${cyAmbiente}" rx="${rxAmbiente}" ry="${ryAmbiente}" fill="url(#sombraAmbiente)"/>
-      </svg>`);
+      const alphaFull = await sharp(prodFull).extractChannel(3).raw().toBuffer();
 
-      // Contacto desplazada hacia abajo/derecha (luz simulada desde arriba-
-      // izquierda) — el recorte crudo va encima tapando la sombra que cae
-      // debajo suyo, solo asoma el borde. La ambiente ya está centrada por
-      // su propio gradiente, no necesita desplazamiento aparte.
-      const despContacto = Math.round(cutoutHeight * 0.006);
+      // Capa A: Oclusión de Contacto fina (blur 4) - estricto 1 canal b-w
+      const alphaContacto = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(4)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      // Capa B: Difusión Ambiental suave (blur 22) - estricto 1 canal b-w
+      const alphaAmbiente = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(22)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      const contactoRgba = Buffer.alloc(width * height * 4);
+      const ambienteRgba = Buffer.alloc(width * height * 4);
+
+      for (let i = 0; i < width * height; i++) {
+        contactoRgba[i * 4] = 12;
+        contactoRgba[i * 4 + 1] = 12;
+        contactoRgba[i * 4 + 2] = 12;
+        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.35);
+
+        ambienteRgba[i * 4] = 15;
+        ambienteRgba[i * 4 + 1] = 15;
+        ambienteRgba[i * 4 + 2] = 15;
+        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.18);
+      }
+
+      const sombraContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+      const sombraAmbiente = await sharp(ambienteRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
 
       composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
         .composite([
-          { input: sombraAmbiente, top: 0, left: 0 },
-          { input: sombraContacto, top: top + despContacto, left: left + despContacto },
-          { input: cutout, top, left },
+          { input: sombraAmbiente, top: 8, left: 2 },
+          { input: sombraContacto, top: 2, left: 0 },
+          { input: prodFull, top: 0, left: 0 },
         ])
         .png()
         .toBuffer();
@@ -356,14 +423,12 @@ export class ImageStudioService {
     imageUrl?: string,
   ): Promise<ImageStudioResult> {
     await this.requireAddonAvanzado(businessId);
+    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException(MENSAJE_FONDO_IA_MANTENIMIENTO);
 
     const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
     if (!origen) throw new BadRequestException('Falta la imagen a procesar');
 
-    if (estilo === SIN_FONDO_KEY) {
-      const cutout = await this.backgroundRemoval.removeBackground(origen.buffer, businessId);
-      return { base64: cutout.toString('base64'), mimeType: 'image/png' };
-    }
+    if (estilo === SIN_FONDO_KEY) return this.recorteSinFondo(origen.buffer, businessId);
 
     // Catálogo combinado: BACKGROUND_STYLES (compartido con el modo gratis)
     // + PREMIUM_ONLY_STYLES (Fase 2 — texturas premium y familia "podio",
@@ -382,11 +447,40 @@ export class ImageStudioService {
 
     const prompt = this.promptPremium(style, descripcion);
     const result =
-      photoType === 'volume'
+      photoType === 'volume' || fondoIaMotor() === 'workers'
         ? await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype)
         : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
 
     return { base64: result.buffer.toString('base64'), mimeType: result.mimeType };
+  }
+
+  /**
+   * "Recorte difícil: mejorar con IA": para fotos donde el recorte local no
+   * separa producto de fondo (ej. prenda beige sobre alfombra beige, ver
+   * BackgroundRemovalService.removeBackgroundConAnalisis). Gemini reemplaza el
+   * fondo por blanco liso (mucho más fácil de recortar que la alfombra) y
+   * después se corre el recorte local sobre ESE resultado — devuelve el PNG
+   * con transparencia. Siempre Gemini (no Workers AI): sigue la regla de no
+   * mandar indumentaria por el filtro NSFW de Cloudflare. Cada llamada cuenta
+   * contra el cupo compartido de generaciones IA (ver el controller).
+   */
+  async mejorarRecorte(
+    businessId: string,
+    file?: { buffer: Buffer; mimetype: string },
+    imageUrl?: string,
+  ): Promise<ImageStudioResult> {
+    await this.requireAddonAvanzado(businessId);
+    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException(MENSAJE_FONDO_IA_MANTENIMIENTO);
+
+    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
+    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
+
+    const conFondoBlanco =
+      fondoIaMotor() === 'workers'
+        ? await this.cloudflareImage.editImage(PROMPT_FONDO_BLANCO, origen.buffer, origen.mimetype)
+        : await this.geminiImage.editImage(PROMPT_FONDO_BLANCO, origen.buffer, origen.mimetype);
+    const cutout = await this.backgroundRemoval.removeBackground(conFondoBlanco.buffer, businessId);
+    return { base64: cutout.toString('base64'), mimeType: 'image/png' };
   }
 
   /**

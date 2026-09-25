@@ -33,3 +33,4 @@ backups/
 # .env.prueba (configuración local contra la base de prueba) no se repite acá:
 # ya lo cubren `.env*` en el .gitignore de la raíz (git) y `.env.*` en el
 # .gcloudignore de esta carpeta (Cloud Build).
+src/background-removal/models/birefnet*.onnx

@@ -46,10 +46,14 @@
       "Bash(pkill -f \"nest start\")",
       "Bash(curl -s -m 5 -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/api/v1/roles)",
       "Bash(graphify query *)",
-      "Bash(graphify path *)"
+      "Bash(graphify path *)",
+      "Bash(gcloud secrets versions access * --secret=DATABASE_URL --project=orbita-api-corp)",
+      "Bash(gcloud secrets versions access * --secret=DIRECT_URL --project=orbita-api-corp)"
     ]
   },
   "disabledMcpjsonServers": [
     "shadcn"
-  ]
+  ],
+  "autoCompactEnabled": true,
+  "autoCompactWindow": 600000
 }

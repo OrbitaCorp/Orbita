@@ -456,7 +456,7 @@ export class BusinessesService {
     if (dto.cuit !== undefined) {
       const digitos = limpiarCuit(dto.cuit ?? '');
       if (digitos === '') data.cuit = null;
-      else if (!cuitValido(digitos)) throw new BadRequestException('El CUIT no es válido: son 11 dígitos y el último tiene que ser el verificador');
+      else if (!cuitValido(digitos)) throw new BadRequestException('El CUIT/CUIL no es válido: son 11 dígitos y el último tiene que ser el verificador');
       else data.cuit = digitos;
     }
     if (dto.legalName !== undefined) data.legalName = (dto.legalName ?? '').trim() || null;

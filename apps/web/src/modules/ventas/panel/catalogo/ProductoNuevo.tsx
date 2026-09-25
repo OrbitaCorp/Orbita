@@ -26,11 +26,12 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import { EstudioFondoModal, type ImagenParaFondo } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
-    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
+    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
     panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     panelGetBusiness, getRubrosCatalog,
     ApiError,
+    panelGenerateProductBackground,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
 import { presetsDelNegocio, specsDelNegocio, type GrupoPresets, type PresetVariantes } from './presetsVariantes'
@@ -41,6 +42,12 @@ import {
 } from '@/lib/productUploadTracker'
 import { Volver } from '../_shared/Volver'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
+
+// "Quitar fondo" / "Fondo con IA" de fotos de producto: en mantenimiento por default
+// (mismo criterio que el backend, ver FONDO_IA_MANTENIMIENTO en apps/api). Para
+// probarlo en local: NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO=false en apps/web/.env.local.
+const FONDO_IA_MANTENIMIENTO = process.env.NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO !== 'false'
+const TITULO_MANTENIMIENTO = 'En mantenimiento — vuelve pronto'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
@@ -89,10 +96,11 @@ interface ImagenPendiente {
     principal: boolean
     // Valor de opción al que se asocia ("Negro"). Vacío = imagen general.
     valorOpcion?: string
-    // Paquete "Avanzado" — si está marcado, se quita el fondo con IA (local,
-    // sin costo por llamada externa) recién al subir la foto de verdad; el
-    // preview de acá arriba sigue mostrando la original tal cual se cargó.
+    // Paquete "Avanzado" — true si a esta foto YA se le quitó el fondo (recorte
+    // local, ver quitarFondoAhora): `file`/`preview` son el PNG transparente y
+    // `original` guarda la foto tal cual se cargó, para poder deshacerlo.
     quitarFondo?: boolean
+    original?: { file: File; preview: string }
     // true si `file` ya viene compuesto por "Fondo con IA" (ver
     // EstudioFondoModal/aplicarFondoIA) — se manda al subir para que el
     // storefront la muestre con object-fit:cover, ver ProductImage.hasAiBackground.
@@ -105,6 +113,8 @@ interface ImagenGuardada {
     principal: boolean
     optionValueId: string | null
     hasAiBackground: boolean
+    /** El sistema le quitó el fondo; `url` ya es la versión sin fondo. */
+    backgroundRemoved: boolean
 }
 
 interface ProdForm {
@@ -342,6 +352,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // "Fondo con IA" — mismo gate (avanzado) que el toggle de arriba, ver
     // EstudioFondoModal.tsx.
     const [modalFondoIA, setModalFondoIA] = useState(false)
+    const [modalFondoIAVariantes, setModalFondoIAVariantes] = useState(false)
     // Modelos de variantes y especificaciones sugeridas según lo que el negocio
     // eligió que vende en el wizard (ver presetsVariantes.ts). Vacíos hasta
     // que resuelve el negocio — y si falla, el formulario queda como siempre.
@@ -515,7 +526,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             ?? p.variants.find(v => v.stock.some(s => s.quantity > 0))
                             ?? p.variants[0])?.id,
                 )
-                setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId, hasAiBackground: img.hasAiBackground })))
+                setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId, hasAiBackground: img.hasAiBackground, backgroundRemoved: img.backgroundRemoved })))
                 // BUG encontrado 2026-08-16: la sección "Fotos por talle/color"
                 // filtraba `guardadas` por optionValueId, pero nada armaba esa
                 // correspondencia — `valoresParaImagen` solo tiene el STRING
@@ -724,7 +735,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // guardado siga existiendo antes de usarlo.
     const [ultimoValorEtiqueta, setUltimoValorEtiqueta] = useState<string | undefined>(undefined)
 
-    // A diferencia de "Fotos del producto" (una sola caja general), acá hay
+    // A diferencia de "Fotos principales" (una sola caja general), acá hay
     // UNA sola caja para TODAS las fotos de variante — nunca se le pregunta
     // al vendedor para qué valor es antes de subir (eso era justo la
     // fricción que había con una galería por valor): se etiquetan solas con
@@ -781,7 +792,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     function quitarPendiente(key: string) {
         setImagenes(prev => {
             const img = prev.find(i => i.key === key)
-            if (img) URL.revokeObjectURL(img.preview)
+            if (img) { URL.revokeObjectURL(img.preview); if (img.original) URL.revokeObjectURL(img.original.preview) }
             return prev.filter(i => i.key !== key)
         })
     }
@@ -802,10 +813,63 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setGuardadas(prev => prev.map(g => ({ ...g, principal: false })))
     }
 
-    // Paquete "Avanzado" — solo marca la intención acá; el modelo corre en el
-    // backend recién al subir (ver panelUploadProductImage más abajo).
-    function alternarQuitarFondo(key: string) {
-        setImagenes(prev => prev.map(i => i.key === key ? { ...i, quitarFondo: !i.quitarFondo } : i))
+    // Paquete "Avanzado" — "Quitar fondo" se aplica AL INSTANTE: corre el recorte
+    // local en el backend (mismo que "Sin fondo" del modal de Fondo con IA) y
+    // reemplaza el File/preview de la pendiente por el PNG transparente, así la
+    // miniatura y la vista previa ya lo muestran. Tocarlo de nuevo lo deshace
+    // (vuelve a la foto original, que se guarda en `original`).
+    const [fondoEnProceso, setFondoEnProceso] = useState<Set<string>>(new Set())
+    async function alternarQuitarFondo(key: string) {
+        const img = imagenesRef.current.find(i => i.key === key)
+        if (!img || fondoEnProceso.has(key)) return
+
+        if (img.quitarFondo && img.original) {
+            const original = img.original
+            setImagenes(prev => prev.map(i => {
+                if (i.key !== key) return i
+                URL.revokeObjectURL(i.preview)
+                return { ...i, file: original.file, preview: original.preview, quitarFondo: false, original: undefined }
+            }))
+            return
+        }
+
+        setFondoEnProceso(prev => new Set(prev).add(key))
+        try {
+            const r = await panelGenerateProductBackground({ file: img.file, filename: img.file.name }, { estilo: 'sin_fondo', modo: 'gratis' })
+            const bytes = atob(r.base64)
+            const arr = new Uint8Array(bytes.length)
+            for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+            const nombre = img.file.name.replace(/\.[^.]+$/, '') + '.png'
+            const recortada = new File([arr], nombre, { type: r.mimeType })
+            const previewNueva = URL.createObjectURL(recortada)
+            const sigueEstando = imagenesRef.current.some(i => i.key === key)
+            if (!sigueEstando) { URL.revokeObjectURL(previewNueva); return }
+            setImagenes(prev => prev.map(i => i.key === key
+                ? { ...i, file: recortada, preview: previewNueva, quitarFondo: true, original: { file: i.file, preview: i.preview } }
+                : i))
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo quitar el fondo. Probá de nuevo.')
+        } finally {
+            setFondoEnProceso(prev => { const n = new Set(prev); n.delete(key); return n })
+        }
+    }
+
+    // Lo mismo para una foto YA guardada (edición de un producto): el
+    // backend guarda la marca y la foto original (ProductImage.backgroundRemoved
+    // / originalUrl), así el botón sigue ahí al reabrir el producto y se puede
+    // volver atrás. Aplica igual a fotos principales y de variantes.
+    async function alternarQuitarFondoGuardada(imagenId: string) {
+        const img = guardadas.find(g => g.id === imagenId)
+        if (!img || !editarId || fondoEnProceso.has(imagenId)) return
+        setFondoEnProceso(prev => new Set(prev).add(imagenId))
+        try {
+            const r = await panelSetProductImageBackground(editarId, imagenId, !img.backgroundRemoved)
+            setGuardadas(prev => prev.map(g => g.id === imagenId ? { ...g, url: r.url, backgroundRemoved: r.backgroundRemoved } : g))
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo cambiar el fondo. Probá de nuevo.')
+        } finally {
+            setFondoEnProceso(prev => { const n = new Set(prev); n.delete(imagenId); return n })
+        }
     }
 
     // "Fondo con IA" (ver EstudioFondoModal) — reemplaza el File/preview de
@@ -838,14 +902,48 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }])
     }
 
-    // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
+    // "Fondo con IA" para las fotos POR VARIANTE (Color/Talle): mismo modal que
+    // para las principales, pero con las fotos etiquetadas. Una pendiente se
+    // reemplaza en el lugar (conserva su etiqueta, valorOpcion); una GUARDADA no
+    // se toca — el resultado se agrega como pendiente nueva con la MISMA
+    // etiqueta que la original, así queda asociada al mismo valor.
+    function aplicarFondoIAVariante(origen: ImagenParaFondo, file: File, preview: string) {
+        if (origen.tipo === 'pendiente') {
+            reemplazarImagenPendiente(origen.key, file, preview)
+            return
+        }
+        const guardada = guardadas.find(g => g.id === origen.key)
+        const valor = valoresParaImagen.find(v => valorIds.get(v.valor) === guardada?.optionValueId)?.valor
+        if (!valor) {
+            URL.revokeObjectURL(preview)
+            onToast('No se pudo asociar la foto a su variante. Probá con una foto nueva.')
+            return
+        }
+        setImagenes(prev => [...prev, {
+            key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
+            file,
+            preview,
+            principal: false,
+            valorOpcion: valor,
+            fondoIA: true,
+        }])
+    }
+
+    // Reordena las fotos GENERALES del producto (las de "Fotos principales",
     // no las de por talle/color) — `nuevoOrden` llega de GaleriaImagenes ya
     // armado con el orden final que el vendedor arrastró, mezclando
     // guardadas y pendientes en una sola secuencia. Acá se reparte de vuelta
     // en los dos arrays de estado (cada uno solo sabe de lo suyo) y, si el
     // producto ya existe (edición), se persiste al toque contra el backend
     // — ya está armado el endpoint (reorder), solo faltaba usarlo.
+    // Orden mezclado de las fotos generales ("guardada:ID" / "pendiente:KEY"):
+    // guardadas y pendientes viven en arrays de estado separados y la galería
+    // las dibuja siempre guardadas primero, así que sin esto arrastrar una
+    // pendiente ANTES de una guardada no tenía efecto. Undefined = orden natural.
+    const [ordenGeneral, setOrdenGeneral] = useState<string[] | undefined>(undefined)
+
     function reordenarGeneral(nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) {
+        setOrdenGeneral(nuevoOrden.map(o => `${o.tipo}:${o.id}`))
         setGuardadas(prev => {
             const porId = new Map(prev.map(g => [g.id, g]))
             const generalesNuevas = nuevoOrden
@@ -889,7 +987,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // verdad, y usa el valor más actualizado de `imagenes` en ese momento.
     const imagenesRef = useRef(imagenes)
     useEffect(() => { imagenesRef.current = imagenes })
-    useEffect(() => () => { imagenesRef.current.forEach(i => URL.revokeObjectURL(i.preview)) }, [])
+    useEffect(() => () => { imagenesRef.current.forEach(i => { URL.revokeObjectURL(i.preview); if (i.original) URL.revokeObjectURL(i.original.preview) }) }, [])
 
     // ── Guardado ────────────────────────────────────────────────────────────
 
@@ -1058,7 +1156,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
                                         isPrimary: img.principal,
                                         optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                                        removeBackground: img.quitarFondo,
                                         hasAiBackground: img.fondoIA,
                                     })
                                     markImageUploaded(tempId, true)
@@ -1068,6 +1165,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     return null
                                 } finally {
                                     URL.revokeObjectURL(img.preview)
+                                    if (img.original) URL.revokeObjectURL(img.original.preview)
                                 }
                             }),
                         )
@@ -1134,12 +1232,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
                                 isPrimary: img.principal,
                                 optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                                removeBackground: img.quitarFondo,
                                 hasAiBackground: img.fondoIA,
                             })
                             return { key: img.key, id: subida.id }
                         } finally {
                             URL.revokeObjectURL(img.preview)
+                            if (img.original) URL.revokeObjectURL(img.original.preview)
                         }
                     }),
                 )
@@ -1156,10 +1254,30 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         .filter((r): r is PromiseFulfilledResult<{ key: string; id: string }> => r.status === 'fulfilled')
                         .map(r => [r.value.key, r.value.id]),
                 )
-                const itemsOrden = imgsASubir
-                    .map(img => idPorKey.get(img.key))
-                    .filter((id): id is string => !!id)
-                    .map((id, i) => ({ id, position: offsetGenerales + i }))
+                // Si el vendedor arrastró fotos (ordenGeneral), se respeta el orden
+                // mezclado completo: guardadas y recién subidas juntas, desde 0.
+                let itemsOrden: { id: string; position: number }[]
+                if (ordenGeneral) {
+                    const guardadasVivas = new Set(guardadas.map(g => g.id))
+                    const ordenados: string[] = []
+                    for (const e of ordenGeneral) {
+                        const i = e.indexOf(':')
+                        const tipo = e.slice(0, i)
+                        const ref = e.slice(i + 1)
+                        const id = tipo === 'guardada' ? (guardadasVivas.has(ref) ? ref : undefined) : idPorKey.get(ref)
+                        if (id && !ordenados.includes(id)) ordenados.push(id)
+                    }
+                    for (const img of imgsASubir) {
+                        const id = idPorKey.get(img.key)
+                        if (id && !ordenados.includes(id)) ordenados.push(id)
+                    }
+                    itemsOrden = ordenados.map((id, i) => ({ id, position: i }))
+                } else {
+                    itemsOrden = imgsASubir
+                        .map(img => idPorKey.get(img.key))
+                        .filter((id): id is string => !!id)
+                        .map((id, i) => ({ id, position: offsetGenerales + i }))
+                }
                 if (itemsOrden.length > 0) await panelReorderProductImages(guardado.id, itemsOrden).catch(() => {})
 
                 finishProductEdit(idParaTracker, fotosFallidas)
@@ -1228,10 +1346,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // galería — guardadas primero, pendientes después) + una foto
     // representativa por cada valor de la opción visual, para poder navegar
     // y mostrar swatches en PreviewProducto. ────────────────────────────────
+    // Mismo orden mezclado que la galería (ver ordenGeneral): guardadas y
+    // pendientes según cómo las arrastró el vendedor; lo que no figure, al final.
     const fotosGeneralesPreview = [
-        ...guardadas.filter(g => g.optionValueId == null).map(g => g.url),
-        ...imagenes.filter(i => !i.valorOpcion).map(i => i.preview),
+        ...guardadas.filter(g => g.optionValueId == null).map(g => ({ ref: `guardada:${g.id}`, url: g.url })),
+        ...imagenes.filter(i => !i.valorOpcion).map(i => ({ ref: `pendiente:${i.key}`, url: i.preview })),
     ]
+        .sort((a, b) => {
+            if (!ordenGeneral) return 0
+            const ia = ordenGeneral.indexOf(a.ref)
+            const ib = ordenGeneral.indexOf(b.ref)
+            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib)
+        })
+        .map(f => f.url)
     const fotosPorValorPreview = (opcionVisual?.opciones ?? []).map(valor => ({
         valor,
         url: guardadas.find(g => g.optionValueId === valorIds.get(valor))?.url
@@ -1649,88 +1776,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             )}
 
-                            {/* Imagen principal + galería general */}
-                            <div style={{ marginTop: 24 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                                    <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
-                                        Fotos del producto
-                                        {avanzado && <TipQuitarFondo />}
-                                    </label>
-                                    {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
-                                        al menos una foto general (pendiente o ya guardada, no tiene
-                                        sentido elegir un estilo sin nada para probarlo). */}
-                                    {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
-                                        // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
-                                        // pipeline de "Fondo con IA" (ver background-removal.service.ts).
-                                        // Deshabilitado en vez de ocultado para que quede claro que vuelve.
-                                        <Button
-                                            variant="outline" size="sm"
-                                            icon={<Sparkles size={13} strokeWidth={2.2} />}
-                                            onClick={() => setModalFondoIA(true)}
-                                            disabled
-                                            title="En mantenimiento — vuelve pronto"
-                                        >
-                                            Fondo con IA
-                                        </Button>
-                                    )}
-                                </div>
-                                <GaleriaImagenes
-                                    pendientes={imagenes.filter(i => !i.valorOpcion)}
-                                    guardadas={guardadas.filter(g => !g.optionValueId)}
-                                    onAgregar={files => agregarImagenes(files)}
-                                    onQuitarPendiente={quitarPendiente}
-                                    onQuitarGuardada={quitarGuardada}
-                                    onPrincipal={marcarPrincipal}
-                                    onReorder={reordenarGeneral}
-                                    onQuitarFondo={alternarQuitarFondo}
-                                    avanzadoDisponible={avanzado}
-                                    permitePrincipal
-                                />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
-                                </div>
-                            </div>
-
-                            {/* Video del producto — opcional, un solo video por producto (no por
-                                variante). Mismo mecanismo que la sección de video de Apariencia:
-                                pegar un link (YouTube/Vimeo/archivo) o subir el archivo directo,
-                                los dos escriben el mismo campo `videoUrl`. Se muestra en la ficha
-                                del storefront como una pieza más de la galería (ver
-                                ProductoDetalle.tsx). */}
-                            <div style={{ marginTop: 24 }}>
-                                <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
-                                {/* El input de link solo tiene sentido si NO hay ya un
-                                    archivo subido — con un archivo, ese link es el
-                                    de R2 (armado por el uploader, no algo que el
-                                    usuario deba tocar); se vuelve a mostrar si
-                                    quita el video con la papelera de abajo. */}
-                                {!esVideoArchivo(prod.videoUrl) && (
-                                    <>
-                                        <input
-                                            className="ds-field"
-                                            value={prod.videoUrl}
-                                            onChange={e => set('videoUrl', e.target.value)}
-                                            placeholder="https://www.youtube.com/watch?v=..."
-                                            style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
-                                        />
-                                        {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
-                                            <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
-                                                No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
-                                            </div>
-                                        )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
-                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                        </div>
-                                    </>
-                                )}
-                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
-                                </div>
-                            </div>
-
                             {/* Fotos por valor de opción — opt-in, nunca asumido. Este flujo lo usan
                                 rubros muy distintos (indumentaria, gastronomía, plantas, tecnología…):
                                 en la mayoría de los casos NINGUNA opción tiene una foto distinta por
@@ -1782,6 +1827,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '10px 0' }}>
                                                 Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde, como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
                                             </div>
+                                            {avanzado && (imagenes.some(i => !!i.valorOpcion) || guardadas.some(g => g.optionValueId != null)) && (
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                                                    <Button
+                                                        variant="outline" size="sm"
+                                                        icon={<Sparkles size={13} strokeWidth={2.2} />}
+                                                        onClick={() => setModalFondoIAVariantes(true)}
+                                                        disabled={FONDO_IA_MANTENIMIENTO}
+                                                        title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
+                                                    >
+                                                        Fondo con IA
+                                                    </Button>
+                                                </div>
+                                            )}
                                             <GaleriaImagenesEtiquetada
                                                 pendientes={imagenes.filter(i => !!i.valorOpcion)}
                                                 guardadas={guardadas.filter(g => g.optionValueId != null)}
@@ -1793,6 +1851,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 onEtiquetar={etiquetarPendiente}
                                                 onReorder={reordenarVariante}
                                                 onQuitarFondo={alternarQuitarFondo}
+                                                onQuitarFondoGuardada={alternarQuitarFondoGuardada}
+                                                fondoEnProceso={fondoEnProceso}
                                                 avanzadoDisponible={avanzado}
                                             />
                                             <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
@@ -1807,6 +1867,92 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
                                 </div>
                             )}
+
+                            {/* Imagen principal + galería general */}
+                            <div style={{ marginTop: 24 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                                    <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
+                                        Fotos principales
+                                        {avanzado && <TipQuitarFondo />}
+                                    </label>
+                                    {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
+                                        al menos una foto general (pendiente o ya guardada, no tiene
+                                        sentido elegir un estilo sin nada para probarlo). */}
+                                    {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
+                                        // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
+                                        // pipeline de "Fondo con IA" (ver background-removal.service.ts).
+                                        // Deshabilitado en vez de ocultado para que quede claro que vuelve.
+                                        <Button
+                                            variant="outline" size="sm"
+                                            icon={<Sparkles size={13} strokeWidth={2.2} />}
+                                            onClick={() => setModalFondoIA(true)}
+                                            disabled={FONDO_IA_MANTENIMIENTO}
+                                            title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
+                                        >
+                                            Fondo con IA
+                                        </Button>
+                                    )}
+                                </div>
+                                <GaleriaImagenes
+                                    pendientes={imagenes.filter(i => !i.valorOpcion)}
+                                    guardadas={guardadas.filter(g => !g.optionValueId)}
+                                    onAgregar={files => agregarImagenes(files)}
+                                    onQuitarPendiente={quitarPendiente}
+                                    onQuitarGuardada={quitarGuardada}
+                                    onPrincipal={marcarPrincipal}
+                                    onReorder={reordenarGeneral}
+                                    orden={ordenGeneral}
+                                    onQuitarFondo={alternarQuitarFondo}
+                                    onQuitarFondoGuardada={alternarQuitarFondoGuardada}
+                                    fondoEnProceso={fondoEnProceso}
+                                    avanzadoDisponible={avanzado}
+                                    permitePrincipal
+                                />
+                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
+                                </div>
+                            </div>
+
+                            {/* Video del producto — opcional, un solo video por producto (no por
+                                variante). Mismo mecanismo que la sección de video de Apariencia:
+                                pegar un link (YouTube/Vimeo/archivo) o subir el archivo directo,
+                                los dos escriben el mismo campo `videoUrl`. Se muestra en la ficha
+                                del storefront como una pieza más de la galería (ver
+                                ProductoDetalle.tsx). */}
+                            <div style={{ marginTop: 24 }}>
+                                <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
+                                {/* El input de link solo tiene sentido si NO hay ya un
+                                    archivo subido — con un archivo, ese link es el
+                                    de R2 (armado por el uploader, no algo que el
+                                    usuario deba tocar); se vuelve a mostrar si
+                                    quita el video con la papelera de abajo. */}
+                                {!esVideoArchivo(prod.videoUrl) && (
+                                    <>
+                                        <input
+                                            className="ds-field"
+                                            value={prod.videoUrl}
+                                            onChange={e => set('videoUrl', e.target.value)}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                            style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
+                                        />
+                                        {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
+                                                No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                        </div>
+                                    </>
+                                )}
+                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
+                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                    Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
+                                </div>
+                            </div>
+
                         </div>
                     )}
 
@@ -2117,6 +2263,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 onToast={onToast}
                 photoType={prod.photoType}
             />
+
+            <EstudioFondoModal
+                isOpen={modalFondoIAVariantes}
+                onClose={() => setModalFondoIAVariantes(false)}
+                imagenes={[
+                    ...imagenes.filter(i => !!i.valorOpcion).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
+                    ...guardadas.filter(g => g.optionValueId != null).map((g): ImagenParaFondo => ({ key: g.id, tipo: 'guardada', url: g.url, preview: g.url })),
+                ]}
+                onAplicar={aplicarFondoIAVariante}
+                onToast={onToast}
+                photoType={prod.photoType}
+            />
         </div>
     )
 }
@@ -2304,8 +2462,8 @@ function PreviewProducto({
 // (guardadas siempre primero) sin ninguna forma de reordenar ni de saber,
 // de un vistazo, cuál se ve primero en el catálogo.
 type ItemGaleria =
-    | { tipo: 'guardada'; id: string; url: string; principal: boolean }
-    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean }
+    | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false }
 
 // Tip de "quitar fondo con IA" — vive una sola vez junto al título de la
 // sección (no repetido por foto, es una recomendación de cómo sacar la
@@ -2357,14 +2515,14 @@ function TipQuitarFondo() {
                         color: 'var(--color-body)', lineHeight: 1.45, fontWeight: 400, zIndex: 20,
                     }}
                 >
-                    Para mejores resultados quitando el fondo, sacá la foto del producto con un <strong>fondo liso</strong> (una pared o mesa de un solo color).
+                    Para mejores resultados quitando el fondo, sacá la foto con un <strong>fondo liso</strong> y que <strong>contraste con la prenda</strong> (evitá fondos del mismo color o alfombras con pelo).
                 </div>
             )}
         </span>
     )
 }
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, onQuitarFondo, avanzadoDisponible, permitePrincipal, compacta }: {
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
@@ -2372,22 +2530,34 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     onQuitarGuardada: (id: string) => void
     onPrincipal: (key: string) => void
     // Opcional: sin esto la galería se ve igual pero sin números ni drag —
-    // hoy solo lo usa "Fotos del producto" (permitePrincipal), no las de
+    // hoy solo lo usa "Fotos principales" (permitePrincipal), no las de
     // por talle/color (raro que ahí importe el orden, casi siempre 1 foto).
     onReorder?: (nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) => void
+    /** Orden mezclado elegido arrastrando ("tipo:id"); lo que no figure va al final, guardadas primero. */
+    orden?: string[]
     // Paquete "Avanzado" — quitar fondo con IA. Solo aplica a pendientes (se
     // procesa recién al subir, ver armarPayload/subida más abajo); una foto
     // ya guardada no tiene forma de reprocesarse desde acá.
     onQuitarFondo?: (key: string) => void
+    /** Quitar/devolver el fondo de una foto ya guardada (id de ProductImage). */
+    onQuitarFondoGuardada?: (id: string) => void
+    fondoEnProceso?: Set<string>
     avanzadoDisponible?: boolean
     permitePrincipal?: boolean
     compacta?: boolean
 }) {
     const alto = compacta ? 72 : 96
-    const items: ItemGaleria[] = [
-        ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal })),
+    const natural: ItemGaleria[] = [
+        ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
         ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo })),
     ]
+    const items: ItemGaleria[] = orden
+        ? [...natural].sort((a, b) => {
+            const ia = orden.indexOf(`${a.tipo}:${a.id}`)
+            const ib = orden.indexOf(`${b.tipo}:${b.id}`)
+            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib)
+        })
+        : natural
     const [arrastrando, setArrastrando] = useState<number | null>(null)
     const [sobre, setSobre] = useState<number | null>(null)
 
@@ -2456,26 +2626,27 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         real pasa en el backend. Antes era un ícono flotante
                         sobre la miniatura (bajo contraste, difícil de ver con
                         ciertas fotos) — ahora es un botón explícito debajo. */}
-                    {/* EN MANTENIMIENTO (24/09/2026): deshabilitado, no oculto — ver
-                        background-removal.service.ts. */}
-                    {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
+                    {/* Deshabilitado (no oculto) mientras FONDO_IA_MANTENIMIENTO. */}
+                    {avanzadoDisponible && onQuitarFondo && (it.tipo === 'pendiente' || (onQuitarFondoGuardada && !it.conFondoIA)) && (
                         <button
                             type="button"
                             className="ds-hover"
-                            disabled
-                            title="En mantenimiento — vuelve pronto"
+                            onClick={() => (it.tipo === 'guardada' ? onQuitarFondoGuardada?.(it.id) : onQuitarFondo(it.id))}
+                            disabled={FONDO_IA_MANTENIMIENTO || !!fondoEnProceso?.has(it.id)}
+                            title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : fondoEnProceso?.has(it.id) ? 'Quitando el fondo…' : it.quitarFondo ? 'Ya sin fondo — tocá para volver a la foto original' : 'Quitar el fondo de esta foto'}
                             style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                                 width: '100%', padding: compacta ? '3px 4px' : '4px 6px', borderRadius: 6,
-                                border: '1px solid var(--color-border)',
-                                background: 'var(--color-surface)',
-                                color: 'var(--color-muted)',
-                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'not-allowed',
-                                opacity: 0.6,
+                                border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
+                                background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
+                                color: it.quitarFondo ? '#fff' : FONDO_IA_MANTENIMIENTO ? 'var(--color-muted)' : 'var(--color-text)',
+                                fontSize: compacta ? 9.5 : 10.5, fontWeight: 600, fontFamily: 'inherit',
+                                cursor: FONDO_IA_MANTENIMIENTO ? 'not-allowed' : 'pointer',
+                                opacity: FONDO_IA_MANTENIMIENTO ? 0.6 : 1,
                             }}
                         >
-                            <Sparkles size={compacta ? 10 : 11} />
-                            Quitar fondo
+                            <Sparkles size={compacta ? 10 : 11} fill={it.quitarFondo ? '#fff' : 'none'} />
+                            {fondoEnProceso?.has(it.id) ? 'Quitando…' : it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
                         </button>
                     )}
                 </div>
@@ -2494,7 +2665,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
 // componente aparte (no una variante más de GaleriaImagenes) porque el layout
 // de cada card es distinto (imagen + tira de etiqueta abajo, sin estrella de
 // principal) y mezclar los dos hacía ese componente difícil de leer.
-function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder, onQuitarFondo, avanzadoDisponible }: {
+function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     opciones: string[]
@@ -2513,12 +2684,15 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     // las fotos por variante también tienen que poder pedirlo, el backend ya
     // lo soporta vía optionValueId sin cambios (ver products.service.ts).
     onQuitarFondo?: (key: string) => void
+    /** Quitar/devolver el fondo de una foto ya guardada (id de ProductImage). */
+    onQuitarFondoGuardada?: (id: string) => void
+    fondoEnProceso?: Set<string>
     avanzadoDisponible?: boolean
 }) {
     const alto = 88
-    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean }
+    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean }
     const items: ItemEtiquetado[] = [
-        ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false })),
+        ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
         ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo })),
     ]
     const [arrastrando, setArrastrando] = useState<number | null>(null)
@@ -2593,23 +2767,25 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                             {it.etiqueta ?? '-'}
                         </span>
                     )}
-                    {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
+                    {avanzadoDisponible && onQuitarFondo && (it.tipo === 'pendiente' || (onQuitarFondoGuardada && !it.conFondoIA)) && (
                         <button
                             type="button"
                             className="ds-hover"
-                            onClick={() => onQuitarFondo(it.id)}
-                            title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
+                            onClick={() => (it.tipo === 'guardada' ? onQuitarFondoGuardada?.(it.id) : onQuitarFondo(it.id))}
+                            disabled={FONDO_IA_MANTENIMIENTO || !!fondoEnProceso?.has(it.id)}
+                            title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : fondoEnProceso?.has(it.id) ? 'Quitando el fondo…' : it.quitarFondo ? 'Ya sin fondo — tocá para volver a la foto original' : 'Quitar el fondo de esta foto'}
                             style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
                                 width: '100%', padding: '3px 4px', borderRadius: 5,
                                 border: '1px solid ' + (it.quitarFondo ? 'var(--color-primary)' : 'var(--color-border)'),
                                 background: it.quitarFondo ? 'var(--color-primary)' : 'var(--color-surface)',
                                 color: it.quitarFondo ? '#fff' : 'var(--color-text)',
-                                fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+                                fontSize: 9, fontWeight: 600, fontFamily: 'inherit', cursor: FONDO_IA_MANTENIMIENTO ? 'not-allowed' : 'pointer',
+                                opacity: FONDO_IA_MANTENIMIENTO ? 0.6 : 1,
                             }}
                         >
                             <Sparkles size={9} fill={it.quitarFondo ? '#fff' : 'none'} />
-                            {it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
+                            {fondoEnProceso?.has(it.id) ? 'Quitando…' : it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
                         </button>
                     )}
                 </div>

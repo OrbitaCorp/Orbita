@@ -2,8 +2,10 @@ import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nes
 import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
-import { endurecer, guidedFilter } from './mask-refine';
+import { yaEsRecorteConAlfa } from './transparencia';
+import { analizarSenales, endurecer, completarHuecos, guidedFilter, recuperarFinos, type SenalesRecorte } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -28,6 +30,11 @@ const MAX_INPUT_EDGE = 2000;
 const VENTANA_MS = 10 * 60 * 1000;
 const MAX_POR_VENTANA = 30;
 const MAX_SIMULTANEOS = 2;
+
+// Producto y fondo casi del mismo color (distancia RGB media) Y fondo con
+// textura (desvío de luminosidad): ahí el modelo local no distingue uno de otro.
+const UMBRAL_DISTANCIA_COLOR = 60;
+const UMBRAL_TEXTURA_FONDO = 12;
 
 // Erosión morfológica (filtro de mínimo) sobre un buffer de 1 canal —
 // separable en pasada horizontal + vertical, O(w·h·radio) en vez de
@@ -71,11 +78,24 @@ export class BackgroundRemovalService {
   private enCurso = 0;
   private readonly enEspera: Array<() => void> = [];
 
+  // Detecta si BiRefNet-Lite (alta definición 1024x1024) está disponible;
+  // de lo contrario recurre al modelo liviano u2netp (320x320).
+  private getModelConfig(): { path: string; size: number; isBiRefNet: boolean } {
+    const birefnetPath = path.join(__dirname, 'models', 'birefnet-lite.onnx');
+    if (fs.existsSync(birefnetPath)) {
+      return { path: birefnetPath, size: 1024, isBiRefNet: true };
+    }
+    return { path: path.join(__dirname, 'models', 'u2netp.onnx'), size: 320, isBiRefNet: false };
+  }
+
   // Carga el modelo una sola vez (lazy) y reusa la sesión entre requests.
   private getSession(): Promise<ort.InferenceSession> {
     if (!this.sessionPromise) {
-      const modelPath = path.join(__dirname, 'models', 'u2netp.onnx');
-      this.sessionPromise = ort.InferenceSession.create(modelPath);
+      const config = this.getModelConfig();
+      this.sessionPromise = ort.InferenceSession.create(config.path, {
+        executionProviders: ['cpu'],
+        graphOptimizationLevel: 'all',
+      });
     }
     return this.sessionPromise;
   }
@@ -83,10 +103,23 @@ export class BackgroundRemovalService {
   // Devuelve un buffer PNG con canal alfa (RGBA) — SIN codificar a webp, eso
   // lo hace uploadToStorage() en businesses.service.ts, para no codificar dos veces.
   async removeBackground(buffer: Buffer, businessId: string): Promise<Buffer> {
+    return (await this.removeBackgroundConAnalisis(buffer, businessId)).png;
+  }
+
+  // Igual que removeBackground() pero además dice si el recorte local
+  // PROBABLEMENTE salió mal (producto y fondo del mismo color con textura,
+  // ej. prenda beige sobre alfombra beige — el modelo local no los separa):
+  // ahí el panel ofrece "mejorar con IA" (ImageStudioService.mejorarRecorte),
+  // que consume del cupo de generaciones. Calibrado con solo dos fotos reales
+  // (conjunto beige sobre alfombra → dificil; remera negra sobre blanco →
+  // no): si aparecen falsos positivos/negativos, ajustar los umbrales de acá.
+  async removeBackgroundConAnalisis(buffer: Buffer, businessId: string): Promise<{ png: Buffer; senales: SenalesRecorte; dificil: boolean }> {
     this.registrarUso(businessId);
     await this.esperarTurno();
     try {
-      return await this.procesar(buffer);
+      const { png, senales } = await this.procesar(buffer);
+      const dificil = senales.distanciaColor < UMBRAL_DISTANCIA_COLOR && senales.texturaFondo > UMBRAL_TEXTURA_FONDO;
+      return { png, senales, dificil };
     } catch (e) {
       if (e instanceof HttpException) throw e;
       // sharp u onnx: archivo que no es imagen, corrupto o con más píxeles
@@ -122,12 +155,24 @@ export class BackgroundRemovalService {
     else this.enCurso--;
   }
 
-  private async procesar(buffer: Buffer): Promise<Buffer> {
+  private async procesar(buffer: Buffer): Promise<{ png: Buffer; senales: SenalesRecorte }> {
     // Todas las lecturas del original con el tope de píxeles de las subidas
     // (ENTRADA_IMAGEN): un PNG chico puede declarar cientos de megapíxeles.
     const meta = await sharp(buffer, ENTRADA_IMAGEN).metadata();
     const origWidth = meta.width ?? MODEL_SIZE;
     const origHeight = meta.height ?? MODEL_SIZE;
+
+    // Ya viene recortada (fondo transparente): no se le pasa el modelo, solo se
+    // le quita el margen vacío como al resto — ver yaEsRecorteConAlfa.
+    if (await yaEsRecorteConAlfa(buffer)) {
+      const senalesRecorte: SenalesRecorte = { distanciaColor: 441, texturaFondo: 0, indecision: 0 };
+      try {
+        const png = await sharp(buffer, ENTRADA_IMAGEN).trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+        return { png, senales: senalesRecorte };
+      } catch {
+        return { png: await sharp(buffer, ENTRADA_IMAGEN).png().toBuffer(), senales: senalesRecorte };
+      }
+    }
 
     // Si la imagen de entrada es muy grande, se trabaja sobre una copia
     // reducida para el modelo — la máscara resultante se reescala luego a la
@@ -141,45 +186,98 @@ export class BackgroundRemovalService {
         .toBuffer();
     }
 
+    const modelConfig = this.getModelConfig();
+    const modelSize = modelConfig.size;
+
     // Fondo blanco antes de aplanar: evita franjas oscuras si la imagen de
     // origen ya tuviera transparencia parcial.
     const { data: raw } = await sharp(sourceForMask, ENTRADA_IMAGEN)
       .flatten({ background: '#ffffff' })
-      .resize(MODEL_SIZE, MODEL_SIZE, { fit: 'fill' })
+      .resize(modelSize, modelSize, { fit: 'fill' })
+      .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const chwSize = MODEL_SIZE * MODEL_SIZE;
-    let maxVal = 1; // evita división por cero si la imagen fuera negra
-    for (let i = 0; i < raw.length; i++) if (raw[i] > maxVal) maxVal = raw[i];
-
+    const chwSize = modelSize * modelSize;
     const tensorData = new Float32Array(3 * chwSize);
-    for (let p = 0; p < chwSize; p++) {
-      const r = raw[p * 3] / maxVal;
-      const g = raw[p * 3 + 1] / maxVal;
-      const b = raw[p * 3 + 2] / maxVal;
-      tensorData[p] = (r - MEAN[0]) / STD[0];
-      tensorData[chwSize + p] = (g - MEAN[1]) / STD[1];
-      tensorData[2 * chwSize + p] = (b - MEAN[2]) / STD[2];
+
+    if (modelConfig.isBiRefNet) {
+      for (let p = 0; p < chwSize; p++) {
+        for (let c = 0; c < 3; c++) {
+          tensorData[c * chwSize + p] = (raw[p * 3 + c] / 255 - MEAN[c]) / STD[c];
+        }
+      }
+    } else {
+      let maxVal = 1; // evita división por cero si la imagen fuera negra
+      for (let i = 0; i < raw.length; i++) if (raw[i] > maxVal) maxVal = raw[i];
+      for (let p = 0; p < chwSize; p++) {
+        const r = raw[p * 3] / maxVal;
+        const g = raw[p * 3 + 1] / maxVal;
+        const b = raw[p * 3 + 2] / maxVal;
+        tensorData[p] = (r - MEAN[0]) / STD[0];
+        tensorData[chwSize + p] = (g - MEAN[1]) / STD[1];
+        tensorData[2 * chwSize + p] = (b - MEAN[2]) / STD[2];
+      }
     }
 
     const session = await this.getSession();
-    const inputTensor = new ort.Tensor('float32', tensorData, [1, 3, MODEL_SIZE, MODEL_SIZE]);
+    const inputTensor = new ort.Tensor('float32', tensorData, [1, 3, modelSize, modelSize]);
     const results = await session.run({ [session.inputNames[0]]: inputTensor });
     const maskData = results[session.outputNames[0]].data as Float32Array;
 
-    // normPRED de u2net_test.py: reescala la salida de la red a [0,1] real
-    // según su propio mínimo/máximo antes de convertir a bytes de máscara.
-    let maskMin = Infinity;
-    let maskMax = -Infinity;
-    for (let i = 0; i < maskData.length; i++) {
-      if (maskData[i] < maskMin) maskMin = maskData[i];
-      if (maskData[i] > maskMax) maskMax = maskData[i];
-    }
-    const range = maskMax - maskMin || 1;
     const maskBytes = Buffer.alloc(chwSize);
-    for (let i = 0; i < chwSize; i++) {
-      maskBytes[i] = Math.round(((maskData[i] - maskMin) / range) * 255);
+    if (modelConfig.isBiRefNet) {
+      for (let i = 0; i < chwSize; i++) {
+        maskBytes[i] = Math.round((1 / (1 + Math.exp(-maskData[i]))) * 255);
+      }
+    } else {
+      // normPRED de u2net_test.py: reescala la salida de la red a [0,1] real
+      // según su propio mínimo/máximo antes de convertir a bytes de máscara.
+      let maskMin = Infinity;
+      let maskMax = -Infinity;
+      for (let i = 0; i < maskData.length; i++) {
+        if (maskData[i] < maskMin) maskMin = maskData[i];
+        if (maskData[i] > maskMax) maskMax = maskData[i];
+      }
+      const range = maskMax - maskMin || 1;
+      for (let i = 0; i < chwSize; i++) {
+        maskBytes[i] = Math.round(((maskData[i] - maskMin) / range) * 255);
+      }
+    }
+
+    const senales = analizarSenales(raw, maskBytes);
+
+    // Con BiRefNet-Lite (1024x1024), la máscara nativa ya tiene definición sub-píxel.
+    // Se compone directamente sin necesidad de guided-filter ni erosión agresiva.
+    if (modelConfig.isBiRefNet) {
+      const maskResized =
+        origWidth === modelSize && origHeight === modelSize
+          ? maskBytes
+          : await sharp(maskBytes, { raw: { width: modelSize, height: modelSize, channels: 1 } })
+              .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
+              .toColourspace('b-w')
+              .raw()
+              .toBuffer();
+
+      const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
+        .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
+        .png()
+        .toBuffer();
+
+      try {
+        const png = await sharp(compuesta)
+          .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer();
+        return { png, senales };
+      } catch {
+        return { png: compuesta, senales };
+      }
     }
 
     const CENTRO_BORDE = 150;
@@ -228,6 +326,16 @@ export class BackgroundRemovalService {
     }
     const radioGuia = Math.max(3, Math.round(Math.min(wT, hT) * 0.012));
     const maskGuiada = guidedFilter(guia, pMask, wT, hT, radioGuia, 1e-3);
+    // El filtro sigue el brillo de la foto: en una estampa con muchos contrastes
+    // (camisa clara con dibujo oscuro) llega a borrar partes claras de la
+    // prenda que el modelo tenía bien (confirmado: la máscara cruda del modelo
+    // traía el cuello y el hombro completos). Solo puede MOVER el borde un
+    // poco respecto de la máscara suave, nunca crear ni tapar bloques.
+    const MAX_AJUSTE_GUIA = 0.2;
+    for (let i = 0; i < maskGuiada.length; i++) {
+      const delta = Math.max(-MAX_AJUSTE_GUIA, Math.min(MAX_AJUSTE_GUIA, maskGuiada[i] - pMask[i]));
+      maskGuiada[i] = pMask[i] + delta;
+    }
 
     // Mismo criterio que antes (punto medio corrido hacia arriba: exigirle más
     // confianza al modelo para contar como "producto" — "choke matte", saca
@@ -235,6 +343,19 @@ export class BackgroundRemovalService {
     // máscara ya afinada y con transición suave (curva S) en vez de lineal
     // saturada. Confirmado a mano el 21/09/2026: centro 150/255 borra el halo.
     endurecer(maskGuiada, CENTRO_BORDE / 255, 0.14);
+
+    // RGB a la resolución de trabajo, para las correcciones que miran color.
+    const rgbTrabajo = await sharp(sourceForMask, ENTRADA_IMAGEN)
+      .flatten({ background: '#ffffff' })
+      .resize(wT, hT, { fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+
+    // Zonas claras del producto que el modelo tomó por fondo (pantalla de un
+    // celular con fondo de pantalla claro sobre blanco liso): se rellenan antes
+    // del choke, ver completarHuecos.
+    completarHuecos(rgbTrabajo, maskGuiada, wT, hT);
 
     const maskDura = Buffer.alloc(wT * hT);
     for (let i = 0; i < maskDura.length; i++) maskDura[i] = Math.round(maskGuiada[i] * 255);
@@ -250,6 +371,13 @@ export class BackgroundRemovalService {
     const RADIO_EROSION = Math.max(2, Math.round(Math.min(wT, hT) * 0.006));
     const maskErosionada = erosionar(maskDura, wT, hT, RADIO_EROSION);
 
+    // Estructuras finas (brazo de un micrófono, cables) que el choke de arriba
+    // borra: se recuperan aparte, solo con fondo liso, ver recuperarFinos.
+    const bandaFinos = Math.max(2, Math.round(Math.min(wT, hT) * 0.006)) * 2;
+    const maskErosionadaF = new Float32Array(wT * hT);
+    for (let i = 0; i < maskErosionadaF.length; i++) maskErosionadaF[i] = maskErosionada[i] / 255;
+    const finos = recuperarFinos(rgbTrabajo, maskErosionadaF, wT, hT, bandaFinos);
+
     // El filtro de mínimo es un cuadrado (separable): en un borde diagonal o
     // curvo deja un contorno dentado tipo escalera. Desenfoque proporcional al
     // radio + curva S: redondea el dentado y deja un borde antialiasado de
@@ -262,6 +390,16 @@ export class BackgroundRemovalService {
     const maskFinalT = new Float32Array(wT * hT);
     for (let i = 0; i < maskFinalT.length; i++) maskFinalT[i] = maskRedonda[i] / 255;
     endurecer(maskFinalT, 0.5, 0.3);
+    if (finos) {
+      const finosSuaves = await sharp(Buffer.from(finos), { raw: { width: wT, height: hT, channels: 1 } })
+        .blur(0.8)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+      for (let i = 0; i < maskFinalT.length; i++) {
+        maskFinalT[i] = Math.max(maskFinalT[i], Math.min(1, (finosSuaves[i] / 255) * 1.6));
+      }
+    }
     const maskFinalBytes = Buffer.alloc(wT * hT);
     for (let i = 0; i < maskFinalBytes.length; i++) maskFinalBytes[i] = Math.round(maskFinalT[i] * 255);
 
@@ -312,16 +450,17 @@ export class BackgroundRemovalService {
     // esquina superior izquierda) porque el borde de la máscara puede no ser
     // 100% transparente ahí si el fondo original no llegaba a esa esquina.
     try {
-      return await sharp(compuesta)
+      const png = await sharp(compuesta)
         .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
+      return { png, senales };
     } catch {
       // Puede fallar si el modelo no detectó NADA de fondo para recortar
       // (imagen ya sin margen, o la máscara salió toda opaca/transparente
       // pareja) — en ese caso la foto compuesta sin recortar sigue siendo
       // correcta, solo sin este paso extra.
-      return compuesta;
+      return { png: compuesta, senales };
     }
   }
 }

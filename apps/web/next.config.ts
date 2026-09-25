@@ -13,11 +13,12 @@ const nextConfig: NextConfig = {
   // pintado final, no durante).
   // Subdominios de tienda en desarrollo: Next 16 bloquea recursos de dev
   // (/_next/*) servidos a orígenes distintos de localhost salvo que se listen
-  // acá. Agregar cada tienda de prueba usada en local.
+  // acá. El comodín cubre cualquier tienda de prueba (negocio.orbita.local,
+  // etc.): sin él, el WebSocket de HMR (/_next/hmr) se rechaza y el dev server
+  // recarga la página sola cada tanto.
   allowedDevOrigins: [
     'orbita.local',
-    'tienda1.orbita.local',
-    'tienda2.orbita.local',
+    '*.orbita.local',
   ],
   // /home-v2 fue la ruta de prueba del rediseño (2026-09-06/07) mientras se
   // comparaba contra el home viejo sin tocarlo. El 2026-09-07 pasó a ser el

@@ -940,6 +940,12 @@ model ProductImage {
   // cualquiera del vendedor (ver comentario de ProductCard.tsx/Thumb.tsx
   // sobre por qué esas usan contain).
   hasAiBackground Boolean  @default(false) @map("has_ai_background")
+  // El sistema le quitó el fondo ("Quitar fondo", modelo local): `url` es el
+  // PNG/webp transparente y `originalUrl` la foto tal cual la subió el
+  // vendedor — el panel las usa para mostrar el botón "Sin fondo" al editar y
+  // poder volver atrás. `originalUrl` es null si nunca se le quitó el fondo.
+  backgroundRemoved Boolean  @default(false) @map("background_removed")
+  originalUrl       String?  @map("original_url")
   createdAt       DateTime @default(now()) @map("created_at")
 
   product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)

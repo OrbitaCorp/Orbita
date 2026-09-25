@@ -10,6 +10,7 @@ import { ImageStudioService } from './image-studio.service';
 import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { ListBackgroundStylesDto } from './dto/list-background-styles.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
+import { MejorarRecorteDto } from './dto/mejorar-recorte.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { BACKGROUND_STYLES, PREMIUM_ONLY_STYLES, SIN_FONDO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
@@ -51,34 +52,29 @@ export class ImageStudioController {
   // tiene sentido pararse un producto plano sobre un podio.
   @Get('background-styles')
   listBackgroundStyles(@Query() query: ListBackgroundStylesDto) {
-    // Filtra estilos sin variantes en R2 todavía (backgroundKeys: []) — un
-    // estilo recién agregado al catálogo pero sin sembrar (ver
-    // scripts/image-studio/seed-backgrounds.ts) no tiene qué mostrar de
-    // preview y, peor, forzaría una generación en vivo con Flux en cada uso
-    // (gasta cuota gratis para algo que se supone pre-generado). Se habilita
-    // solo después de correr el script para ese estilo.
-    const estilosGratis = Object.entries(BACKGROUND_STYLES)
-      .filter(([, { backgroundKeys }]) => backgroundKeys.length > 0)
-      .map(([key, { label, backgroundKeys }]) => ({
-        key,
-        label,
-        previewUrl: this.r2.publicUrlDe(backgroundKeys[0]) as string | null,
-      }));
-
     // "Sin fondo" no es un estilo del catálogo (no compone nada, ver
     // ImageStudioService) — se agrega primero, con previewUrl null: el
-    // frontend le da un tratamiento visual propio (ver EstudioFondoModal).
+    // frontend le da un tratamiento visual propio con checkerboard.
     const sinFondo = { key: SIN_FONDO_KEY, label: 'Sin fondo (transparente)', previewUrl: null };
 
-    if (query.modo !== 'premium') return [sinFondo, ...estilosGratis];
+    // Catálogo unificado (25/09/2026): sin distinción entre gratis y premium.
+    // Incluye los nuevos fondos 3D/podios/alfombra con sus thumbnails locales,
+    // y los fondos curados de R2.
+    const estilos = Object.entries(BACKGROUND_STYLES)
+      .filter(([, style]) => !!style.localAsset || !!style.previewUrl || (style.backgroundKeys && style.backgroundKeys.length > 0))
+      .map(([key, style]) => {
+        let previewUrl: string | null = style.previewUrl ?? null;
+        if (!previewUrl && style.backgroundKeys && style.backgroundKeys.length > 0) {
+          previewUrl = this.r2.publicUrlDe(style.backgroundKeys[0]) as string | null;
+        }
+        return {
+          key,
+          label: style.label,
+          previewUrl,
+        };
+      });
 
-    const estilosPremium = Object.entries(PREMIUM_ONLY_STYLES)
-      .filter(([, { soloVolumen }]) => !soloVolumen || query.photoType === 'volume')
-      .map(([key, { label }]) => ({ key, label, previewUrl: null as string | null }));
-
-    // En premium se ofrece igual todo BACKGROUND_STYLES (mismos prompts,
-    // ver promptPremium()) + lo nuevo de PREMIUM_ONLY_STYLES.
-    return [sinFondo, ...estilosGratis, ...estilosPremium];
+    return [sinFondo, ...estilos];
   }
 
   @Post('background')
@@ -95,9 +91,33 @@ export class ImageStudioController {
     // edición) — uno de los dos, ver comentario de ImageStudioService.
     if (!file && !dto.imageUrl) throw new BadRequestException('Falta el archivo "file" o "imageUrl"');
     this.consumirCuota(member.businessId);
-    return dto.modo === 'premium'
-      ? this.imageStudio.generatePremiumBackground(member.businessId, dto.photoType, file, dto.estilo, dto.descripcion, dto.imageUrl)
-      : this.imageStudio.generateBackground(member.businessId, file, dto.estilo, dto.descripcion, dto.imageUrl);
+    return this.imageStudio.generateBackground(
+      member.businessId,
+      file,
+      dto.estilo,
+      dto.descripcion,
+      dto.imageUrl,
+      dto.photoType,
+    );
+  }
+
+  // Mejorar un recorte local dudoso con Gemini (ver
+  // ImageStudioService.mejorarRecorte). Comparte el tope diario con 'background'
+  // y 'model' — el cupo mensual de generaciones gratis por negocio se define en
+  // la fase de precios; hasta entonces este contador en memoria es el guardrail.
+  @Post('mejorar-recorte')
+  @RequirePermission('advanced.manage')
+  @RequiresAddon('ADVANCED')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  async mejorarRecorte(
+    @CurrentBusiness() ctx: AuthContext,
+    @Body() dto: MejorarRecorteDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const member = assertMemberContext(ctx);
+    if (!file && !dto.imageUrl) throw new BadRequestException('Falta el archivo "file" o "imageUrl"');
+    this.consumirCuota(member.businessId);
+    return this.imageStudio.mejorarRecorte(member.businessId, file, dto.imageUrl);
   }
 
   @Post('model')

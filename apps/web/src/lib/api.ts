@@ -1904,7 +1904,7 @@ export type ApiProductFull = {
     optionValues: { optionValueId: string; value: string }[]
     stock: { branchId: string; quantity: number; stockMin: number }[]
   }[]
-  images: { id: string; url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean }[]
+  images: { id: string; url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean; backgroundRemoved: boolean }[]
 }
 
 export function panelGetProductFull(id: string) {
@@ -2011,6 +2011,9 @@ export type ApiProductImage = {
   // Compuesta por "Fondo con IA" (ver EstudioFondoModal) — el storefront la
   // muestra con object-fit:cover en vez de contain, ver ProdImage/Thumb.tsx.
   hasAiBackground: boolean
+  // El sistema le quitó el fondo ("Quitar fondo"); el panel muestra "Sin fondo"
+  // al editar y puede volver a la foto original, ver panelSetProductImageBackground.
+  backgroundRemoved: boolean
 }
 
 export async function panelUploadProductImage(
@@ -2059,7 +2062,23 @@ export function panelListBackgroundStyles(opts: { modo?: 'gratis' | 'premium'; p
   return panelRequest<ApiBackgroundStyle[]>(`/image-studio/background-styles${qs ? `?${qs}` : ''}`)
 }
 
-export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string }
+// "Recorte difícil: mejorar con IA": Gemini pone fondo blanco y se recorta local
+// sobre eso — devuelve el PNG ya con transparencia. Consume una generación IA
+// del negocio (cupo compartido con Fondo con IA, ver ImageStudioController).
+export async function panelMejorarRecorte(origen: { file: Blob; filename: string } | { imageUrl: string }) {
+  const form = new FormData()
+  if ('imageUrl' in origen) form.append('imageUrl', origen.imageUrl)
+  else form.append('file', origen.file, origen.filename)
+  const res = await authedFetch(`${API_BASE}/image-studio/mejorar-recorte`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = mensajeDeError(res.status, body)
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ApiImageStudioResult
+}
+
+export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string; recorteDificil?: boolean }
 
 // `{ file, filename }` para una foto pendiente (recién elegida, todavía no
 // subida) o `{ imageUrl }` para una YA GUARDADA de un producto en edición —
@@ -2122,6 +2141,15 @@ export function panelPresignProductVideo(file: Blob, onProgress?: (pct: number) 
 
 export function panelDeleteProductImage(productId: string, imageId: string) {
   return panelRequest<{ ok: boolean }>(`/products/${productId}/images/${imageId}`, { method: 'DELETE' })
+}
+
+// Quita (true) o devuelve (false) el fondo de una foto YA guardada — mismo
+// registro para fotos principales y de variantes. Necesita el paquete Avanzado.
+export function panelSetProductImageBackground(productId: string, imageId: string, removeBackground: boolean) {
+  return panelRequest<{ id: string; url: string; backgroundRemoved: boolean }>(
+    `/products/${productId}/images/${imageId}/background`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ removeBackground }) },
+  )
 }
 
 export function panelReorderProductImages(

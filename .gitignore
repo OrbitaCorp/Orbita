@@ -68,3 +68,4 @@ apps/api/CLAUDE.md
 # install suelto en la raiz genera este archivo y ya hubo que borrarlo dos
 # veces a mano (ver 5a4ff16c).
 package-lock.json
+apps/api/src/background-removal/models/birefnet*.onnx

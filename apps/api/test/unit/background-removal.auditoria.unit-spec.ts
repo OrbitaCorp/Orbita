@@ -24,7 +24,7 @@ jest.mock('../../src/common/utils/subida-imagen', () => ({
 describe('Quitar el fondo', () => {
   it('tope por negocio: pasado el máximo de la ventana, 429 sin correr el modelo', async () => {
     const svc = new BackgroundRemovalService();
-    const procesar = jest.spyOn(svc as any, 'procesar').mockResolvedValue(Buffer.from('ok'));
+    const procesar = jest.spyOn(svc as any, 'procesar').mockResolvedValue({ png: Buffer.from('ok'), senales: { distanciaColor: 441, texturaFondo: 0, indecision: 0 } });
     for (let i = 0; i < 30; i++) await svc.removeBackground(Buffer.from('x'), 'biz-1');
     const err = await svc.removeBackground(Buffer.from('x'), 'biz-1').catch((e) => e);
     expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
@@ -42,7 +42,7 @@ describe('Quitar el fondo', () => {
       maximo = Math.max(maximo, enCurso);
       await new Promise((r) => setTimeout(r, 20));
       enCurso--;
-      return Buffer.from('ok');
+      return { png: Buffer.from('ok'), senales: { distanciaColor: 441, texturaFondo: 0, indecision: 0 } };
     });
     await Promise.all([1, 2, 3, 4, 5].map((i) => svc.removeBackground(Buffer.from('x'), `biz-${i}`)));
     expect(maximo).toBe(2);

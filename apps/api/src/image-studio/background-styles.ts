@@ -35,7 +35,9 @@
 export interface BackgroundStyle {
   label: string;
   prompt: string;
-  backgroundKeys: string[];
+  backgroundKeys?: string[];
+  localAsset?: string;
+  previewUrl?: string;
 }
 
 const VISTA_CENITAL =
@@ -50,6 +52,40 @@ const CENTRO_VACIO =
   'surface, ready for a product photo to be placed on top of later.';
 
 export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
+  podio_lujo_flores: {
+    label: 'Podio de lujo con flores (cosmética, joyas, tech)',
+    prompt:
+      'A circular travertine stone pedestal podium resting on draped ivory silk cloth, soft warm window sunlight casting natural branch shadows on an off-white wall with fluted architectural slats, a modern ceramic vase with white tulips and delicate baby\'s breath flowers on the side, elegant luxury e-commerce product photography, professional studio lighting, realistic depth and soft contact shadow.',
+    localAsset: 'src/image-studio/assets/fondos/podio_lujo_flores.jpg',
+    previewUrl: '/image-studio/thumbnails/podio_lujo_flores.jpg',
+  },
+  esquina_pared_3d: {
+    label: 'Esquina minimalista 3D (zapatillas, calzado, tecnología)',
+    prompt:
+      'An empty minimalist architectural corner of two textured concrete walls meeting the floor, deep realistic 3D perspective and clean depth, soft directional natural window sunlight from the side, clean empty floor space in the center, professional e-commerce product photography background, realistic floor contact shadow.',
+    localAsset: 'src/image-studio/assets/fondos/esquina_pared_3d.jpg',
+    previewUrl: '/image-studio/thumbnails/esquina_pared_3d.jpg',
+  },
+  escritorio_tech: {
+    label: 'Escritorio tech moderno (mouse, teclados, gadgets)',
+    prompt:
+      'An empty modern minimalist tech desk setup surface from slightly elevated front angle, sleek matte dark gray desk pad in the center, subtle warm ambient lighting, clean modern home office workspace aesthetic, empty central space ready for tech gadgets, professional product photography background, soft contact shadow.',
+    localAsset: 'src/image-studio/assets/fondos/escritorio_tech.jpg',
+    previewUrl: '/image-studio/thumbnails/escritorio_tech.jpg',
+  },
+  podio_urbano_concreto: {
+    label: 'Podio de concreto urbano (streetwear, zapatillas, riñoneras)',
+    prompt:
+      'A raw industrial concrete block pedestal in a modern urban brutalist architectural space, subtle gritty street aesthetic, soft diffused overcast natural lighting, strong 3D depth, empty central podium surface, professional streetwear product photography background, soft realistic contact shadow.',
+    localAsset: 'src/image-studio/assets/fondos/podio_urbano_concreto.jpg',
+    previewUrl: '/image-studio/thumbnails/podio_urbano_concreto.jpg',
+  },
+  alfombra_pelo_real: {
+    label: 'Alfombra nórdica de pelo (ropa, calzado, accesorios)',
+    prompt: `${VISTA_CENITAL} A luxurious Scandinavian thick shag rug with long soft fluffy fur-like fibers, warm creamy off-white beige tone, soft natural side lighting highlighting individual fibers, clean flat-lay texture, cozy minimalist aesthetic. ${CENTRO_VACIO}`,
+    localAsset: 'src/image-studio/assets/fondos/alfombra_pelo_real.jpg',
+    previewUrl: '/image-studio/thumbnails/alfombra_pelo_real.jpg',
+  },
   estudio_neutro: {
     label: 'Estudio neutro',
     prompt: `${VISTA_CENITAL} A soft neutral light gray fabric sheet texture, gentle natural wrinkles, subtle soft shadows, minimalist. ${CENTRO_VACIO}`,
