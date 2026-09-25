@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
+import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de pagar (o no) el
 // beneficio de bienvenida — un Checkout Pro de pago único (ver
@@ -27,6 +28,7 @@ type Estado = 'verificando' | 'ok' | 'pendiente' | 'error'
 
 export default function PagoRetornoPage() {
   const router = useRouter()
+  const resetWizard = useOnboardingStore(s => s.resetWizard)
   const [estado, setEstado] = useState<Estado>('verificando')
   const [mensaje, setMensaje] = useState('')
   const [subdominio, setSubdominio] = useState('')
@@ -98,6 +100,12 @@ export default function PagoRetornoPage() {
           // como si lo hubiera hecho confunde y suena a que va a llegar un cobro.
           setGratis(!!data.free)
           setEstado('ok')
+          // Recién ACÁ, con el pago confirmado de verdad y la cuenta ya
+          // creada, se limpia el wizard — antes se limpiaba en plan.tsx justo
+          // antes de salir a MercadoPago (optimista, sin saber si iba a
+          // pagar), y quien decidía no pagar y volvía con "atrás" perdía todo
+          // lo cargado (ver el comentario en plan.tsx#pagar).
+          resetWizard()
         } else if (preapprovalId.startsWith('FREE-')) {
           // No hay MercadoPago de por medio en este caso — si no se activó es
           // que el PendingSignup ya no estaba (doble click, o la pestaña

@@ -935,17 +935,38 @@ export default function PlanPage() {
   // de vuelta al paso 1 y te borraba todo lo cargado, en vez de dejarte acá
   // con el aviso de reingresar la contraseña.
   const hidratado = useOnboardingHidratado()
-  // resetWizard() vacía rubro/ownerEmail EN EL MISMO render en el que estamos
-  // saliendo hacia MercadoPago (o mostrando el éxito) — sin esta bandera, el
-  // guard de abajo veía el wizard vacío y su router.push('/onboarding/rubro')
-  // le ganaba a la navegación a MP: tocabas "Pagar" y aterrizabas de vuelta
-  // en el onboarding en vez de en el pago.
+  // resetWizard() vacía rubro/ownerEmail en el mismo render en el que
+  // activarNegocio() ya creó la cuenta de verdad (atajo de pago omitido,
+  // dev-only) — sin esta bandera, el guard de abajo veía el wizard vacío y su
+  // router.push('/onboarding/rubro') le ganaba a mostrar la pantalla de éxito.
+  // La salida real a MercadoPago (pagar(), más abajo) NO limpia el wizard —
+  // ver el comentario ahí.
   const saliendoRef = useRef(false)
   useEffect(() => {
     if (!hidratado || saliendoRef.current) return
     if (!wizard.rubro || !wizard.ownerEmail) router.push('/onboarding/rubro')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidratado, wizard.rubro, wizard.ownerEmail])
+
+  // Si el dueño decide NO pagar y vuelve con "atrás" desde MercadoPago, el
+  // navegador puede restaurar esta página desde el bfcache tal como había
+  // quedado justo antes de irse — en `estado: 'procesando'`, mostrando
+  // "Conectando con MercadoPago" CONGELADO para siempre, porque `estado` es
+  // memoria de React: el navegador no sabe "revertirlo" (reportado con
+  // captura — quedaba trabado ahí, y un segundo "atrás" ya mandaba a otro
+  // lado). `pageshow` con `persisted: true` es la señal estándar de que se
+  // restauró del bfcache en vez de cargar de cero: en ese caso se vuelve a
+  // mostrar la pantalla de elegir plan en vez de dejar la de "procesando"
+  // dando vueltas sin ningún pago real en curso.
+  useEffect(() => {
+    function onPageShow(e: PageTransitionEvent) {
+      if (!e.persisted) return
+      saliendoRef.current = false
+      setEstado('plan')
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   // El último paso del recorrido (ver BarraPasos). Llegar hasta acá y no pagar
   // es el abandono más caro de todos: hay que poder verlo separado del resto.
@@ -1031,11 +1052,16 @@ export default function PlanPage() {
 
     startPendingCheckout(account, wizard, plan, descuento?.code)
       .then(({ initPoint }) => {
-        // Ya viaja todo al backend — se limpia antes de salir para que al
-        // volver de MP no quede estado viejo dando vueltas. La bandera va
-        // primero: el guard de arriba no se mete con la salida.
+        // OJO: acá NO se llama resetWizard() todavía, a propósito — aunque
+        // los datos ya viajaron al backend (PendingSignup) y no hacen falta
+        // para que el pago se confirme. Si se limpia acá y el dueño decide NO
+        // pagar y vuelve con el botón "atrás" del navegador, el guard de más
+        // arriba (`!wizard.rubro || !wizard.ownerEmail`) lo mandaba de vuelta
+        // al paso 1 del wizard, con todo lo cargado perdido — reportado con
+        // captura. Ahora resetWizard() se llama recién cuando pago-retorno.tsx
+        // confirma el pago de verdad; si nunca paga, el wizard queda intacto
+        // y esta pantalla lo recibe de vuelta tal como lo dejó.
         saliendoRef.current = true
-        resetWizard()
         window.location.href = initPoint
       })
       .catch(manejarError)
