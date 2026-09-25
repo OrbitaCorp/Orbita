@@ -693,7 +693,9 @@ export class MailService {
     await this.sendOrLog(to, 'Nuevo inicio de sesión en tu cuenta', 'suspicious-login', data, meta);
   }
 
-  async sendPasswordReset(to: string, data: { code: string; expiresIn: string }, meta?: MailMeta) {
+  // `storeName` solo viaja cuando el mismo email tiene cuenta en varios negocios:
+  // cada mail dice de cuál es el código.
+  async sendPasswordReset(to: string, data: { code: string; expiresIn: string; storeName?: string }, meta?: MailMeta) {
     await this.sendOrLog(to, 'Recuperá tu contraseña', 'reset-password', data, meta);
   }
 

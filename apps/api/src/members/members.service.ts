@@ -278,6 +278,10 @@ export class MembersService {
     // (decisión abierta: si conviene liberar el email para poder reinvitarlo).
     const { count } = await this.prisma.member.deleteMany({ where: { id, businessId } });
     if (count === 0) throw new NotFoundException('Miembro no encontrado');
+    // Los códigos de recuperación pendientes de esa cuenta mueren con ella: si
+    // se lo vuelve a invitar con el mismo email, un código viejo no puede
+    // aplicarse a la cuenta nueva.
+    await this.prisma.passwordResetToken.deleteMany({ where: { email: member.email, businessId, userType: 'MEMBER' } });
     await this.audit?.registrar({
       businessId, memberId: actorId, entityType: 'member', entityId: id, action: 'DELETE',
       changes: [

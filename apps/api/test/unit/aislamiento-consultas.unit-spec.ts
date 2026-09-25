@@ -28,7 +28,7 @@ const SRC = join(RAIZ, 'src');
 // cuántas hay hoy. El número es un techo: si sube, el test falla y hay que
 // mirar la que se agregó.
 const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
-  'src/auth/auth.service.ts': { max: 18, motivo: 'Tokens buscados por su hash (único global), sesiones por userId+tipo, y el perfil propio con el id del token' },
+  'src/auth/auth.service.ts': { max: 19, motivo: 'Tokens buscados por su hash (único global), sesiones por userId+tipo, el perfil propio con el id del token, y los códigos de recuperación por email/id (el email puede tener cuenta en varios negocios: el código, no el negocio, decide cuál)' },
   'src/me/me.service.ts': { max: 5, motivo: 'Perfil del cliente: el id sale del token, no de la URL; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service)' },
   'src/member-profile/member-profile.service.ts': { max: 5, motivo: 'Perfil del miembro: el id sale del token; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service), sin filtrar por businessId porque refresh_tokens.business_id puede venir null' },
   'src/member-profile/email-verification.service.ts': { max: 3, motivo: 'Verificar el email propio: el memberId sale del token, no de la URL — mismo criterio que member-profile.service.ts. Los tokens de verificación se buscan por memberId + email, que ya acota al member' },

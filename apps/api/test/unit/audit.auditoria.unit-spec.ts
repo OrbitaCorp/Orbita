@@ -177,6 +177,7 @@ describe('Las acciones sensibles quedan registradas', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'm-2', name: 'Juan', role: { id: 'r', name: 'empleado' } }),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
     await new MembersService(prisma as any, {} as any, audit as any).remove(BIZ, 'm-2', 'm-owner');
     expect(audit.registrar).toHaveBeenCalledWith(expect.objectContaining({

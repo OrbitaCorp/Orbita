@@ -637,11 +637,22 @@ export class AuthService implements OnModuleInit {
   }
 
   // ── Forgot password ───────────────────────────────────────────────────────
+  //
+  // Una sola pantalla y un solo código por email sirven a los tres tipos de
+  // cuenta. Qué cuenta se restablece lo decide el TOKEN (userType + businessId),
+  // no el email: por eso puede haber varios códigos vivos para el mismo email
+  // (uno por negocio, o uno de tienda y otro de panel) y cada uno restablece
+  // solo lo suyo.
+  //
+  // Regla general (auditoría de recuperación de contraseña, 09/2026): restablecer
+  // NUNCA reactiva ni habilita nada. No emite código —ni lo acepta después—
+  // para una cuenta que el login rechazaría por estar inactiva: negocio
+  // eliminado, cliente borrado, super admin desactivado, invitación vencida.
 
   async forgotPassword(dto: ForgotPasswordDto, businessSlug?: string): Promise<void> {
     if (businessSlug) {
       const business = await this.prisma.business.findUnique({ where: { subdomain: businessSlug } });
-      if (!business) return; // no revelar si el negocio existe
+      if (!business || business.deletedAt) return; // no revelar si el negocio existe
 
       // Buscar como member, luego como customer de ESE negocio.
       const member = await this.prisma.member.findFirst({ where: { email: dto.email, businessId: business.id } });
@@ -650,6 +661,7 @@ export class AuthService implements OnModuleInit {
         : null;
 
       if (!member && !customer) return; // no revelar si el email existe
+      if (member && this.invitacionVencida(member)) return; // hay que reinvitar, no restablecer
 
       const userType = member ? 'MEMBER' : 'CUSTOMER';
       await this.issuePasswordResetToken(dto.email, userType, business.id, {
@@ -659,27 +671,52 @@ export class AuthService implements OnModuleInit {
       return;
     }
 
-    // Sin slug (orbita.com/panel) — mismo criterio que login(): buscar member
-    // globalmente. Nunca se busca customer sin slug: un customer siempre
-    // pertenece a un negocio específico (no existe "cuenta de plataforma" para
-    // clientes del storefront), a diferencia de un dueño que puede no recordar
-    // el subdominio de su propia tienda.
-    const member = await this.prisma.member.findFirst({ where: { email: dto.email } });
-    if (!member) return; // no revelar si el email existe
+    // Sin slug (orbita.site/login) — mismo criterio y misma precedencia que
+    // login(): PRIMERO el super admin activo con contraseña, después los member.
+    // Nunca se busca customer sin slug: un customer siempre pertenece a un
+    // negocio específico (no existe "cuenta de plataforma" para clientes del
+    // storefront), a diferencia de un dueño que puede no recordar el subdominio
+    // de su propia tienda.
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { email: dto.email } });
+    if (admin && admin.isActive && admin.passwordHash) {
+      await this.issuePasswordResetToken(dto.email, 'PLATFORM_ADMIN', null, {});
+      return;
+    }
 
-    const business = await this.prisma.business.findUnique({ where: { id: member.businessId } });
-    if (!business) return;
-
-    await this.issuePasswordResetToken(dto.email, 'MEMBER', business.id, {
-      memberId: member.id,
+    // El mismo email puede ser member de VARIOS negocios (cada uno con su propia
+    // contraseña): se emite un código por membresía y cada mail dice de qué
+    // tienda es, para que quien lo pide elija cuál restablece. Antes se tomaba
+    // una cualquiera (findFirst sin orden) y las demás quedaban sin salida.
+    const membresias = await this.prisma.member.findMany({
+      where: { email: dto.email },
+      include: { business: { include: { storefrontConfig: { select: { storeName: true } } } } },
+      take: 10,
     });
+    for (const m of membresias) {
+      if (m.business.deletedAt || this.invitacionVencida(m)) continue;
+      await this.issuePasswordResetToken(
+        dto.email,
+        'MEMBER',
+        m.businessId,
+        { memberId: m.id },
+        membresias.length > 1 ? (m.business.storefrontConfig?.storeName ?? m.business.name) : undefined,
+      );
+    }
+  }
+
+  // PENDING con la invitación vencida: el dueño tiene que reinvitar; recuperar
+  // la contraseña no puede saltear ese vencimiento (mismo criterio que
+  // assertInvitacionVigente() en el login).
+  private invitacionVencida(member: { status: string; invitationTokenExpiresAt: Date | null }): boolean {
+    return member.status === 'PENDING' && (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date());
   }
 
   private async issuePasswordResetToken(
     email: string,
-    userType: 'MEMBER' | 'CUSTOMER',
-    businessId: string,
-    destinatario?: { memberId?: string; customerId?: string },
+    userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN',
+    businessId: string | null,
+    destinatario: { memberId?: string; customerId?: string },
+    storeName?: string,
   ): Promise<void> {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const codeHash = this.hashToken(code);
@@ -701,9 +738,13 @@ export class AuthService implements OnModuleInit {
     // terminaba en un 500 que también los distinguía. El código ya quedó
     // guardado antes de esta línea, así que reintentar desde el front funciona.
     void this.mail
-      .sendPasswordReset(email, { code, expiresIn: '15 minutos' }, { businessId, ...destinatario })
+      .sendPasswordReset(
+        email,
+        { code, expiresIn: '15 minutos', ...(storeName ? { storeName } : {}) },
+        { ...(businessId ? { businessId } : {}), ...destinatario },
+      )
       .catch((e: unknown) => {
-        this.logger.error(`No se pudo enviar el código de recuperación (negocio ${businessId}): ${e instanceof Error ? e.message : e}`);
+        this.logger.error(`No se pudo enviar el código de recuperación (${userType}${businessId ? `, negocio ${businessId}` : ''}): ${e instanceof Error ? e.message : e}`);
       });
   }
 
@@ -716,99 +757,141 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Busca el código de recuperación vigente para `email` (el más reciente, no
-   * usado, no expirado) y lo compara con `code`. Si no matchea, incrementa
-   * `attempts` de ESA fila (no se puede buscar directo por hash: el código no
-   * es @unique, ver comentario en el schema) y, superado el límite, la
-   * invalida. No marca `usedAt` — eso es responsabilidad exclusiva de
-   * resetPassword(), el único paso que efectivamente gasta el código.
+   * Busca, entre los códigos vigentes de `email` (no usados, no vencidos, con
+   * intentos disponibles), el que coincide con `code`, y verifica que la
+   * cuenta a la que apunta siga vigente. Se comparan TODOS los vivos y no solo
+   * el más reciente: con un solo email pueden coexistir códigos de distintos
+   * negocios, y pedir uno nuevo (o que alguien lo pida por vos) no tiene que
+   * invalidar el anterior.
+   *
+   * Si ninguno coincide, suma un intento a cada uno de los comparados (no se
+   * puede buscar directo por hash: el código no es @unique, ver el schema) y,
+   * superado el límite, quedan invalidados. No marca `usedAt` — eso es
+   * responsabilidad exclusiva de resetPassword().
    */
   private async findValidResetCode(email: string, code: string) {
-    const stored = await this.prisma.passwordResetToken.findFirst({
-      where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+    const vivos = await this.prisma.passwordResetToken.findMany({
+      where: { email, usedAt: null, expiresAt: { gt: new Date() }, attempts: { lt: MAX_RESET_CODE_ATTEMPTS } },
       orderBy: { createdAt: 'desc' },
     });
+    if (vivos.length === 0) throw new BadRequestException('Código inválido o expirado');
 
-    if (!stored || stored.attempts >= MAX_RESET_CODE_ATTEMPTS) {
-      throw new BadRequestException('Código inválido o expirado');
-    }
-
-    if (stored.codeHash !== this.hashToken(code)) {
-      await this.prisma.passwordResetToken.update({
-        where: { id: stored.id },
+    const hash = this.hashToken(code);
+    const stored = vivos.find((t) => t.codeHash === hash);
+    if (!stored) {
+      await this.prisma.passwordResetToken.updateMany({
+        where: { id: { in: vivos.map((t) => t.id) } },
         data: { attempts: { increment: 1 } },
       });
       throw new BadRequestException('Código inválido o expirado');
     }
 
-    return stored;
+    const target = await this.resolverCuentaAReestablecer(stored);
+    if (!target) throw new BadRequestException('Código inválido o expirado');
+    return { stored, target };
+  }
+
+  // La cuenta que ese código restablece, o null si ya no corresponde: negocio
+  // eliminado, miembro/cliente borrado, invitación vencida, super admin
+  // desactivado. Mismas condiciones que login(), para que un reset nunca deje
+  // entrar a quien el login rechazaría (ni por eso mismo lo "reactive").
+  private async resolverCuentaAReestablecer(stored: { email: string; userType: string; businessId: string | null }) {
+    if (stored.userType === 'PLATFORM_ADMIN') {
+      const admin = await this.prisma.platformAdmin.findUnique({ where: { email: stored.email } });
+      return admin && admin.isActive ? ({ kind: 'PLATFORM_ADMIN', admin } as const) : null;
+    }
+    if (!stored.businessId) return null;
+    const business = await this.prisma.business.findUnique({
+      where: { id: stored.businessId },
+      include: { storefrontConfig: { select: { storeName: true } } },
+    });
+    if (!business || business.deletedAt) return null;
+
+    if (stored.userType === 'MEMBER') {
+      const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: business.id } });
+      return member && !this.invitacionVencida(member) ? ({ kind: 'MEMBER', member, business } as const) : null;
+    }
+    if (stored.userType === 'CUSTOMER') {
+      const customer = await this.prisma.customer.findFirst({ where: { email: stored.email, businessId: business.id, deletedAt: null } });
+      return customer ? ({ kind: 'CUSTOMER', customer, business } as const) : null;
+    }
+    return null;
   }
 
   // ── Reset password ────────────────────────────────────────────────────────
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }> {
-    const stored = await this.findValidResetCode(dto.email, dto.code);
+    const { stored, target } = await this.findValidResetCode(dto.email, dto.code);
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
 
-    // Los tokens de MEMBER/CUSTOMER siempre llevan businessId (el where lo exige);
-    // los de PLATFORM_ADMIN no (email único global). Ver forgotPassword() — hoy
-    // el apex solo emite tokens de member; el reset de admin queda para cuando se
-    // exponga su flujo (ver PENDIENTES), pero la persistencia ya lo contempla.
+    // El código se gasta de forma atómica ANTES de tocar la cuenta: dos pedidos
+    // simultáneos con el mismo código pasaban los dos por findValidResetCode y
+    // los dos cambiaban la contraseña. Con el updateMany condicionado, solo uno
+    // ve count 1. Y al gastarlo se invalidan también los otros códigos vivos de
+    // ESA misma cuenta.
+    const { count } = await this.prisma.passwordResetToken.updateMany({
+      where: { id: stored.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    if (count === 0) throw new BadRequestException('Código inválido o expirado');
+    await this.prisma.passwordResetToken.updateMany({
+      where: { email: stored.email, userType: stored.userType, businessId: stored.businessId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
     // Después de restablecer se cierran TODAS las sesiones de la cuenta, sin
     // preservar ninguna: quien restablece por el link no tiene sesión (o la
     // tiene alguien más, que es justamente el caso que se quiere cortar).
     // Hallazgo `cambio-clave-sin-cerrar-sesiones` (auditoría interna 09/09).
-    let cambiado: { memberId?: string; customerId?: string } | null = null;
-    if (stored.userType === 'MEMBER' && stored.businessId) {
-      const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: stored.businessId } });
-      if (member) {
-        // hasTempPassword se apaga (y su vencimiento con él): crear la
-        // definitiva por este camino ES el cambio que la marca pedía (sin
-        // esto, el miembro que restablecía por el link del admin quedaba con
-        // el cartel "Debe cambiar contraseña" para siempre).
-        await this.prisma.member.update({
-          where: { id: member.id },
-          data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null },
-        });
-        await this.revocarOtrasSesiones({ id: member.id, userType: 'MEMBER' });
-        cambiado = { memberId: member.id };
-      }
-    } else if (stored.userType === 'CUSTOMER' && stored.businessId) {
-      const customer = await this.prisma.customer.findFirst({ where: { email: stored.email, businessId: stored.businessId, deletedAt: null } });
-      if (customer) {
-        await this.prisma.customer.update({ where: { id: customer.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
-        await this.revocarOtrasSesiones({ id: customer.id, userType: 'CUSTOMER' });
-        cambiado = { customerId: customer.id };
-      }
-    } else if (stored.userType === 'PLATFORM_ADMIN') {
-      const admin = await this.prisma.platformAdmin.findUnique({ where: { email: stored.email } });
-      if (admin) {
-        await this.prisma.platformAdmin.update({
-          where: { id: admin.id },
-          data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null },
-        });
-        await this.revocarOtrasSesiones({ id: admin.id, userType: 'PLATFORM_ADMIN' });
-      }
+    // Haber recibido el código en el mail prueba que controla el email, así que
+    // se lo marca verificado (igual que hace aceptar la invitación).
+    let cambiado: { memberId?: string; customerId?: string } = {};
+    if (target.kind === 'MEMBER') {
+      const { member } = target;
+      // hasTempPassword se apaga (y su vencimiento con él): crear la definitiva
+      // por este camino ES el cambio que la marca pedía. Un miembro que todavía
+      // estaba PENDING (invitación vigente) queda activo: sin esto quedaba en un
+      // limbo, porque aceptar la invitación exige la contraseña temporal.
+      await this.prisma.member.update({
+        where: { id: member.id },
+        data: {
+          passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null,
+          emailVerified: true, emailVerifyDueAt: null,
+          ...(member.status === 'PENDING' ? { status: 'ACTIVE' as const, invitationToken: null, invitationTokenExpiresAt: null } : {}),
+        },
+      });
+      await this.revocarOtrasSesiones({ id: member.id, userType: 'MEMBER' });
+      cambiado = { memberId: member.id };
+    } else if (target.kind === 'CUSTOMER') {
+      await this.prisma.customer.update({
+        where: { id: target.customer.id },
+        data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null, emailVerified: true },
+      });
+      await this.revocarOtrasSesiones({ id: target.customer.id, userType: 'CUSTOMER' });
+      cambiado = { customerId: target.customer.id };
+    } else {
+      const { admin } = target;
+      await this.prisma.platformAdmin.update({
+        where: { id: admin.id },
+        data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null, emailVerified: true },
+      });
+      await this.revocarOtrasSesiones({ id: admin.id, userType: 'PLATFORM_ADMIN' });
+      await this.adminLog?.contrasenaRestablecida({ adminId: admin.id });
     }
-
-    await this.prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } });
 
     // Aviso de seguridad al dueño de la cuenta. Best-effort: si el mail falla,
     // la contraseña ya se cambió y el flujo no se rompe.
-    if (cambiado && stored.businessId) {
-      try {
-        const business = await this.prisma.business.findUnique({
-          where: { id: stored.businessId },
-          include: { storefrontConfig: { select: { storeName: true } } },
-        });
-        if (business) {
-          const storeName = business.storefrontConfig?.storeName ?? business.name;
-          await this.mail.sendPasswordChanged(stored.email, { storeName }, { businessId: business.id, ...cambiado });
-        }
-      } catch {
-        // nada — el aviso es informativo, no puede voltear el reset
+    try {
+      if (target.kind === 'PLATFORM_ADMIN') {
+        await this.mail.sendPasswordChanged(stored.email, { storeName: 'Órbita' });
+      } else {
+        const { business } = target;
+        const storeName = business.storefrontConfig?.storeName ?? business.name;
+        await this.mail.sendPasswordChanged(stored.email, { storeName }, { businessId: business.id, ...cambiado });
       }
+    } catch {
+      // nada — el aviso es informativo, no puede voltear el reset
     }
 
     return { userType: stored.userType as 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' };

@@ -52,6 +52,7 @@ export const ACCION_LOG_ADMIN = {
     bloqueado: 'mfa_code_blocked',
   },
   mailPrueba: 'send_mail_test',
+  contrasenaRestablecida: 'password_reset',
 } as const;
 
 // `codeId` es un id, no un secreto: la regex mira la clave entera para no
@@ -128,6 +129,17 @@ export class PlatformAdminLogService {
       targetType: 'platform_admin',
       targetId: e.adminId,
       details: { codeId: e.codeId ?? undefined, motivo: e.motivo, ...this.origen(e) },
+    });
+  }
+
+  // El super admin restableció su contraseña con el código del mail ("olvidé
+  // mi contraseña"). Sin sesión de por medio: es el único rastro de que pasó.
+  async contrasenaRestablecida(e: { adminId: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.contrasenaRestablecida,
+      targetType: 'platform_admin',
+      targetId: e.adminId,
     });
   }
 

@@ -143,7 +143,7 @@ export default function AdminForgotPassword() {
           <Divider />
 
           <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 20 }}>
-            Ingresá el email de tu cuenta de administrador y te enviaremos un código para restablecer tu contraseña.
+            Ingresá el email de tu cuenta de administrador y te enviaremos un código para restablecer tu contraseña. Si tu email tiene cuenta en más de un negocio, te llega un código por cada uno: usá el de la tienda que quieras recuperar.
           </p>
 
           <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

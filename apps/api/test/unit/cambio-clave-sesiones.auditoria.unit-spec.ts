@@ -135,12 +135,12 @@ describe('Restablecer por link (resetPassword) cierra TODAS las sesiones', () =>
   function reset(userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN') {
     const stored = { id: 'prt-1', email: 'ana@x.com', codeHash: hashDe(codigo), userType, businessId: userType === 'PLATFORM_ADMIN' ? null : 'biz-1', attempts: 0 };
     const prisma = {
-      passwordResetToken: { findFirst: jest.fn().mockResolvedValue(stored), update: jest.fn().mockResolvedValue({}) },
-      member: { findFirst: jest.fn().mockResolvedValue({ id: 'm-1' }), update: jest.fn().mockResolvedValue({}) },
+      passwordResetToken: { findMany: jest.fn().mockResolvedValue([stored]), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      member: { findFirst: jest.fn().mockResolvedValue({ id: 'm-1', status: 'ACTIVE', invitationTokenExpiresAt: null }), update: jest.fn().mockResolvedValue({}) },
       customer: { findFirst: jest.fn().mockResolvedValue({ id: 'c-1' }), update: jest.fn().mockResolvedValue({}) },
-      platformAdmin: { findUnique: jest.fn().mockResolvedValue({ id: 'a-1' }), update: jest.fn().mockResolvedValue({}) },
+      platformAdmin: { findUnique: jest.fn().mockResolvedValue({ id: 'a-1', isActive: true }), update: jest.fn().mockResolvedValue({}) },
       refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
-      business: { findUnique: jest.fn().mockResolvedValue(null) },
+      business: { findUnique: jest.fn().mockResolvedValue({ id: 'biz-1', name: 'Tienda', deletedAt: null, storefrontConfig: null }) },
     };
     const auth = authSobre(prisma, { sendPasswordChanged: jest.fn() });
     return { auth, prisma };

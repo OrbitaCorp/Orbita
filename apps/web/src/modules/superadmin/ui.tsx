@@ -29,6 +29,7 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_code_failed: 'Código de acceso rechazado',
   mfa_code_blocked: 'Código de acceso bloqueado',
   send_mail_test: 'Enviar mail de prueba',
+  password_reset: 'Restablecer contraseña',
   // Soporte: los escribe el módulo support (support-admin.controller.ts).
   support_reply: 'Responder consulta de soporte',
   support_status: 'Cambiar estado de consulta',
