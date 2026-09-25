@@ -53,8 +53,9 @@ function compra(opts: { pago?: Record<string, unknown>; claim?: number; secret?:
     refundPlatformPayment: jest.fn(),
     createPlatformPreference: jest.fn(),
   };
-  const svc = new DomainPurchaseService(prisma as any, config({ MP_WEBHOOK_SECRET: opts.secret }) as any, vercel as any, mp as any);
-  return { svc, prisma, vercel, mp };
+  const eventEmitter = { emit: jest.fn() };
+  const svc = new DomainPurchaseService(prisma as any, config({ MP_WEBHOOK_SECRET: opts.secret }) as any, vercel as any, mp as any, undefined, eventEmitter as any);
+  return { svc, prisma, vercel, mp, eventEmitter };
 }
 
 describe('Webhook de compra de dominio', () => {
@@ -91,6 +92,21 @@ describe('Webhook de compra de dominio', () => {
       data: { status: 'PAID', mpPaymentId: 'p1' },
     });
     expect(vercel.buyDomain).toHaveBeenCalledTimes(1);
+  });
+
+  // Aviso configurable (dominio_comprado, ver notifications.service.ts) —
+  // hallazgo de la auditoría de mails: una compra exitosa no avisaba nada.
+  it('una compra terminada avisa dominio_comprado; una que falla no', async () => {
+    const ok = compra();
+    await ok.svc.handlePaymentConfirmed(PEDIDO, 'p1');
+    expect(ok.eventEmitter.emit).toHaveBeenCalledWith('notification.dominio_comprado', {
+      businessId: BIZ, domain: 'lenteslindos.store', domainId: 'cd-1',
+    });
+
+    const falla = compra();
+    falla.vercel.buyDomain.mockRejectedValue(new Error('domain not available'));
+    await falla.svc.handlePaymentConfirmed(PEDIDO, 'p1');
+    expect(falla.eventEmitter.emit).not.toHaveBeenCalledWith('notification.dominio_comprado', expect.anything());
   });
 
   it('si Vercel no pudo comprar, se reembolsa y el pedido queda FAILED', async () => {

@@ -4,7 +4,7 @@ import { ReviewsService } from '../../src/reviews/reviews.service';
 // Unit test de la regla clave de RBT-632: SOLO puede reseñar quien compró el
 // producto y el pedido ya se entregó. Mockea Prisma — no toca la base.
 
-function svcCon(overrides: { order?: any; orderItem?: any } = {}) {
+function svcCon(overrides: { order?: any; orderItem?: any; conEventEmitter?: boolean } = {}) {
   const prisma = {
     order: { findFirst: jest.fn().mockResolvedValue(overrides.order ?? null) },
     orderItem: {
@@ -20,9 +20,11 @@ function svcCon(overrides: { order?: any; orderItem?: any } = {}) {
         customer: { firstName: 'María', lastName: 'González' },
       }),
     },
+    product: { findUnique: jest.fn().mockResolvedValue({ name: 'Remera azul' }) },
   };
-  const svc = new ReviewsService(prisma as any);
-  return { svc, prisma };
+  const eventEmitter = { emit: jest.fn() };
+  const svc = new ReviewsService(prisma as any, undefined, overrides.conEventEmitter ? (eventEmitter as any) : undefined);
+  return { svc, prisma, eventEmitter };
 }
 
 describe('ReviewsService — elegibilidad y alta (unit)', () => {
@@ -74,5 +76,23 @@ describe('ReviewsService — elegibilidad y alta (unit)', () => {
     expect(result).toEqual({ eligible: false, orderId: null });
     // Ni hace falta ir a buscar pedidos si ya sabemos que no es elegible.
     expect(prisma.orderItem.findFirst).not.toHaveBeenCalled();
+  });
+
+  // Aviso configurable al dueño (resena_nueva, ver notifications.service.ts)
+  // — hallazgo de la auditoría de mails: no había NINGÚN aviso de reseñas
+  // nuevas. Sin rating en el modelo, avisa de CUALQUIER reseña nueva (no
+  // solo negativas) — el dueño decide al leerla.
+  it('create() avisa resena_nueva con el nombre público y el producto', async () => {
+    const { svc, eventEmitter } = svcCon({ order: { id: 'order-1' }, orderItem: { id: 'item-1' }, conEventEmitter: true });
+    await svc.create('biz-1', 'cust-1', { orderId: 'order-1', productId: 'prod-1', text: 'Buenísimo' } as any);
+    expect(eventEmitter.emit).toHaveBeenCalledWith('notification.resena_nueva', {
+      businessId: 'biz-1', customerName: 'María G.', productName: 'Remera azul', reviewId: 'rev-1',
+    });
+  });
+
+  it('create() sin eventEmitter (specs viejos) no explota y no consulta el producto', async () => {
+    const { svc, prisma } = svcCon({ order: { id: 'order-1' }, orderItem: { id: 'item-1' } });
+    await svc.create('biz-1', 'cust-1', { orderId: 'order-1', productId: 'prod-1', text: 'Buenísimo' } as any);
+    expect(prisma.product.findUnique).not.toHaveBeenCalled();
   });
 });

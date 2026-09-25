@@ -25,6 +25,7 @@ import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
 import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
@@ -217,6 +218,9 @@ export class SubscriptionsService {
     // con menos argumentos (mismo criterio que el resto de los services con
     // AuditService).
     private readonly audit?: AuditService,
+    // Aviso configurable de cobro exitoso (cobro_suscripcion) — mismo
+    // criterio, opcional.
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   // true si hay token de MP configurado. Los crons lo usan para no romper en
@@ -1369,6 +1373,14 @@ export class SubscriptionsService {
       await this.notificarReactivacion(businessId).catch((e) =>
         this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
       );
+    } else if (aprobado && !cancelada && plan) {
+      // Renovación normal (la suscripción ya estaba ACTIVE) — recibo simple,
+      // configurable (dispatch(), ver notifications.service.ts): a diferencia
+      // de la reactivación de arriba y del aviso de pago fallido (siempre
+      // ON), esto es un "nice to have" que puede ser ruido mes a mes, así que
+      // el dueño lo prende si lo quiere (hallazgo de la auditoría de mails,
+      // pedido explícito de Ale, 25/09).
+      this.eventEmitter?.emit('notification.cobro_suscripcion', { businessId, amount: montoCobro });
     }
     // Aviso INMEDIATO (webhook) de un cobro recurrente rechazado — tenía
     // plantilla y función armadas (sendSubscriptionPaymentFailed) pero

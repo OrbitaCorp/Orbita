@@ -16,8 +16,12 @@ export default function Registro() {
   // RBT-351 — a dónde volver después de autenticarse (checkout, home, etc.).
   const returnTo = typeof router.query.returnTo === 'string' ? router.query.returnTo : ''
 
+  // Prefill desde el mail de "invitación a crear cuenta" post-compra de
+  // invitado — un link con `?email=` no debería obligar a retipearlo.
+  const emailInicial = typeof router.query.email === 'string' ? router.query.email : ''
+
   const [nombre,   setNombre]   = useState('')
-  const [email,    setEmail]    = useState('')
+  const [email,    setEmail]    = useState(emailInicial)
   const [telefono, setTelefono] = useState('')
   const [pw,       setPw]       = useState('')
   const [acepta,   setAcepta]   = useState(true)

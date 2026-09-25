@@ -66,6 +66,20 @@ const NOTIFICATION_EVENTS = [
   'resumen_diario',
   'cliente_nuevo',
   'reporte_semanal',
+  // Tanda del 25/09 (pedido explícito de Ale, "que sea configurable desde
+  // notificaciones"): dominio_comprado, cobro_suscripcion, primera_venta y
+  // resena_nueva pasan por el mismo dispatch() de siempre (panel + email a
+  // members, ver notifications.service.ts). invitacion_cuenta_invitado es
+  // distinto — el destinatario es el CLIENTE invitado, no el equipo del
+  // negocio — así que solo usa esta matriz como gate (channel "email" =
+  // "mandar o no este mail"), nunca pasa por dispatch()/sendEmailToMembers
+  // (ver orders.service.ts). Su "panel" queda sin efecto a propósito: no
+  // tiene sentido una campanita por cada invitado, ver comentario ahí.
+  'dominio_comprado',
+  'cobro_suscripcion',
+  'primera_venta',
+  'resena_nueva',
+  'invitacion_cuenta_invitado',
 ] as const;
 
 // Canales vivos. WhatsApp se sacó (19/08): los avisos nunca llegaban de

@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { HideReviewDto } from './dto/hide-review.dto';
@@ -36,6 +37,9 @@ export class ReviewsService {
     // compra: tiene que quedar quién la ocultó y por qué. Opcional solo para
     // los tests, igual que en el resto de los services.
     private readonly audit?: AuditService,
+    // Aviso configurable al dueño (resena_nueva, ver notifications.service.ts)
+    // — opcional, mismo criterio que audit.
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   // "María G." — nunca el apellido completo ni el email en una reseña pública.
@@ -103,6 +107,19 @@ export class ReviewsService {
         data: { businessId, productId: dto.productId, customerId, orderId: dto.orderId, text: dto.text, isVerified: true },
         include: { customer: { select: { firstName: true, lastName: true } } },
       });
+      // No hay rating/estrellas en el modelo (solo texto libre) — no hay forma
+      // barata de distinguir "negativa" de "positiva" sin sumar análisis de
+      // sentimiento, así que el aviso es de CUALQUIER reseña nueva; el dueño
+      // decide al leerla (hallazgo de la auditoría de mails, 25/09).
+      if (this.eventEmitter) {
+        const producto = await this.prisma.product.findUnique({ where: { id: dto.productId }, select: { name: true } });
+        this.eventEmitter.emit('notification.resena_nueva', {
+          businessId,
+          customerName: this.nombrePublico(r.customer),
+          productName: producto?.name ?? 'un producto',
+          reviewId: r.id,
+        });
+      }
       return this.aPublico(r);
     } catch (e) {
       // (customerId, productId) es @@unique — ya dejó una reseña de este

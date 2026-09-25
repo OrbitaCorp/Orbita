@@ -1040,6 +1040,16 @@ export class OrdersService {
             quantity: r.quantity,
           })),
         });
+        // Milestone "primera venta" (configurable, ver notifications.service.ts):
+        // no hay ningún OTRO pedido del negocio — mostrador u online, da igual
+        // el canal, cuenta la primera venta real sea cual sea.
+        const huboOtroPedido = await this.prisma.order.findFirst({
+          where: { businessId, id: { not: creado.id }, deletedAt: null },
+          select: { id: true },
+        });
+        if (!huboOtroPedido) {
+          this.eventEmitter.emit('notification.primera_venta', { businessId, orderId: creado.id });
+        }
         if (esPresencial) {
           await this.avisarStockCritico(businessId, creado.branchId, renglones.map((r) => r.variantId));
         }
@@ -1086,6 +1096,37 @@ export class OrdersService {
             else await this.mail.sendOrderReceived(buyerEmail, datos, meta);
           } catch (e) {
             this.logger.warn(`No se pudo mandar el aviso del pedido #${creado.orderNumber} al comprador: ${e}`);
+          }
+        }
+
+        // Invitación a crear cuenta — SOLO para un checkout real del
+        // storefront sin cuenta (invitado de verdad, no una venta cargada
+        // desde el panel). Gate propio con la matriz de notificaciones
+        // (invitacion_cuenta_invitado): a diferencia del resto de los
+        // eventos de esa matriz, el destinatario acá es el CLIENTE, no el
+        // equipo del negocio, así que esto NO pasa por dispatch()/
+        // sendEmailToMembers — se lee la config directo con Prisma para no
+        // sumar una dependencia de NotificationsModule en OrdersModule
+        // (mismo criterio que notifications.service.ts evita depender de
+        // ReportsModule: menos import circular, no más).
+        if (opts?.publicCheckout && !customer?.id && buyerEmail) {
+          try {
+            const config = await this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { matrix: true } });
+            const habilitado = (config?.matrix as Record<string, { email?: boolean }> | undefined)?.invitacion_cuenta_invitado?.email;
+            if (habilitado) {
+              const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+              if (negocio?.subdomain) {
+                const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+                const registerUrl = `${frontend}/tienda/${negocio.subdomain}/registro?email=${encodeURIComponent(buyerEmail)}`;
+                await this.mail.sendGuestAccountInvite(
+                  buyerEmail,
+                  { storeName: negocio.name, orderNumber: creado.orderNumber, registerUrl },
+                  { businessId },
+                );
+              }
+            }
+          } catch (e) {
+            this.logger.warn(`No se pudo mandar la invitación a crear cuenta del pedido #${creado.orderNumber}: ${e}`);
           }
         }
         return this.findOne(businessId, creado.id);

@@ -39,6 +39,15 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, profileUrl: 'https://panaderialopez.orbita.site/perfil' },
   },
   {
+    id: 'guest-account-invite',
+    label: 'Invitación a crear cuenta (invitado)',
+    group: 'Cuenta',
+    template: 'guest-account-invite',
+    isPlatform: false,
+    subject: 'Guardá tu pedido #1042 creando una cuenta',
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, registerUrl: 'https://panaderialopez.orbita.site/registro?email=juan%40x.com' },
+  },
+  {
     id: 'reset-password',
     label: 'Recuperar contraseña',
     group: 'Cuenta',
@@ -55,6 +64,15 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     isPlatform: false,
     subject: 'Tu contraseña fue actualizada',
     data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName },
+  },
+  {
+    id: 'suspicious-login',
+    label: 'Alerta de dispositivo nuevo',
+    group: 'Equipo',
+    template: 'suspicious-login',
+    isPlatform: false,
+    subject: 'Nuevo inicio de sesión en tu cuenta',
+    data: { memberName: 'Lucas', storeName: FIXTURE_BUSINESS_BRANDING.storeName, when: '25 de septiembre de 2026, 14:32', ip: '181.30.42.11' },
   },
   {
     id: 'member-invitation',

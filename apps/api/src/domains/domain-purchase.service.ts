@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
 import { sumarAniosCalendario } from '../common/utils/fechas';
@@ -72,6 +73,9 @@ export class DomainPurchaseService {
     // vincular). Hallazgo `auditoria-acciones-sin-registro`. Opcional solo
     // para los tests.
     private readonly audit?: AuditService,
+    // Aviso configurable al dueño (dominio_comprado, ver
+    // notifications.service.ts) — opcional, mismo criterio que audit.
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   // Todas las entradas de una compra comparten entityId (el pedido de compra):
@@ -399,6 +403,11 @@ export class DomainPurchaseService {
         { field: 'status', before: 'PENDING_PAYMENT', after: 'COMPLETED' },
         { field: 'customDomainId', before: null, after: customDomain.id },
       ]);
+      this.eventEmitter?.emit('notification.dominio_comprado', {
+        businessId: order.businessId,
+        domain: order.domain,
+        domainId: customDomain.id,
+      });
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Error desconocido comprando el dominio en Vercel';
       if (vercelOrderId) {

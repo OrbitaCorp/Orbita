@@ -50,3 +50,41 @@ describe('NotificationsService.dispatch', () => {
     expect(mail.sendCustomEmail).not.toHaveBeenCalled();
   });
 });
+
+// Tanda del 25/09 (hallazgo de la auditoría de mails, pedido explícito de
+// Ale): 4 eventos nuevos, todos pasando por el mismo dispatch() de siempre.
+describe('NotificationsService — eventos nuevos (25/09)', () => {
+  it('dominio_comprado dispara dispatch() con el evento correcto', async () => {
+    const { svc, prisma } = svcCon({ dominio_comprado: { panel: true, email: true } }, [{ email: 'a@test.com' }]);
+    const spy = jest.spyOn(svc, 'dispatch');
+    await svc.onDominioComprado({ businessId: 'biz-1', domain: 'lenteslindos.store', domainId: 'cd-1' });
+    expect(spy).toHaveBeenCalledWith('dominio_comprado', 'biz-1', expect.objectContaining({ resourceType: 'domain', resourceId: 'cd-1' }));
+    expect(prisma.notification.create).toHaveBeenCalled();
+  });
+
+  it('cobro_suscripcion dispara dispatch() con el monto en el cuerpo', async () => {
+    const { svc } = svcCon({ cobro_suscripcion: { panel: true, email: false } });
+    const spy = jest.spyOn(svc, 'dispatch');
+    await svc.onCobroSuscripcion({ businessId: 'biz-1', amount: 14900 });
+    expect(spy).toHaveBeenCalledWith('cobro_suscripcion', 'biz-1', expect.objectContaining({ body: expect.stringContaining('14900.00') }));
+  });
+
+  it('primera_venta dispara dispatch() apuntando al pedido', async () => {
+    const { svc } = svcCon({ primera_venta: { panel: true, email: false } });
+    const spy = jest.spyOn(svc, 'dispatch');
+    await svc.onPrimeraVenta({ businessId: 'biz-1', orderId: 'o-1' });
+    expect(spy).toHaveBeenCalledWith('primera_venta', 'biz-1', expect.objectContaining({ resourceType: 'order', resourceId: 'o-1' }));
+  });
+
+  it('resena_nueva dispara dispatch() con cliente y producto en el cuerpo', async () => {
+    const { svc } = svcCon({ resena_nueva: { panel: true, email: false } });
+    const spy = jest.spyOn(svc, 'dispatch');
+    await svc.onResenaNueva({ businessId: 'biz-1', customerName: 'María G.', productName: 'Remera azul', reviewId: 'r-1' });
+    expect(spy).toHaveBeenCalledWith('resena_nueva', 'biz-1', expect.objectContaining({
+      title: expect.stringContaining('María G.'),
+      body: expect.stringContaining('Remera azul'),
+      resourceType: 'review',
+      resourceId: 'r-1',
+    }));
+  });
+});

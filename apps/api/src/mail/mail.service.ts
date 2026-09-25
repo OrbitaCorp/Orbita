@@ -672,6 +672,27 @@ export class MailService {
     await this.sendOrLog(to, `¡Bienvenido a Órbita, ${data.ownerName}!`, 'business-welcome', data, meta);
   }
 
+  // Al invitado que compró sin cuenta — se manda UNA vez, apenas se crea el
+  // pedido (ver orders.service.ts), gateado por el toggle
+  // invitacion_cuenta_invitado (a diferencia del resto de sendOrLog, este NO
+  // pasa por dispatch()/NotificationsService: el destinatario es el cliente,
+  // no el equipo del negocio — hallazgo de la auditoría de mails, 25/09).
+  async sendGuestAccountInvite(
+    to: string,
+    data: { storeName: string; orderNumber: number; registerUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Guardá tu pedido #${data.orderNumber} creando una cuenta`, 'guest-account-invite', data, meta);
+  }
+
+  // Alerta de seguridad (dispositivo/IP nunca visto antes para ese member,
+  // ver auth.service.ts) — sin toggle a propósito, mismo criterio que
+  // sendPasswordChanged: no debería poder apagarse desde un dispositivo que
+  // capaz es justo el que está atacando la cuenta.
+  async sendSuspiciousLogin(to: string, data: { memberName: string; storeName: string; when: string; ip: string | null }, meta?: MailMeta) {
+    await this.sendOrLog(to, 'Nuevo inicio de sesión en tu cuenta', 'suspicious-login', data, meta);
+  }
+
   async sendPasswordReset(to: string, data: { code: string; expiresIn: string }, meta?: MailMeta) {
     await this.sendOrLog(to, 'Recuperá tu contraseña', 'reset-password', data, meta);
   }

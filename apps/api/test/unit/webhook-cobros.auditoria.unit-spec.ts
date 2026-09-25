@@ -30,7 +30,7 @@ function firmar(dataId: string, requestId: string, ts: number) {
   return `ts=${ts},v1=${hash}`;
 }
 
-function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean; extRef?: string | undefined; sinSub?: boolean } = {}) {
+function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean; extRef?: string | undefined; sinSub?: boolean; subStatus?: string } = {}) {
   const tx = {
     subscriptionPayment: { create: jest.fn() },
     subscription: { update: jest.fn() },
@@ -46,7 +46,7 @@ function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean;
               id: 'sub-1',
               businessId: BIZ,
               plan: opts.plan ?? 'mensual',
-              status: 'SUSPENDED',
+              status: opts.subStatus ?? 'SUSPENDED',
               amount: 16500,
               currentPeriodEnd: finDePeriodo,
             },
@@ -58,7 +58,8 @@ function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean;
   };
   const config = { get: (k: string) => (k === 'MP_WEBHOOK_SECRET' ? SECRET : undefined) };
   const mail = { sendSubscriptionReactivated: jest.fn().mockResolvedValue(undefined) };
-  const svc = new SubscriptionsService(prisma as any, config as any, {} as any, {} as any, {} as any, {} as any, mail as any);
+  const eventEmitter = { emit: jest.fn() };
+  const svc = new SubscriptionsService(prisma as any, config as any, {} as any, {} as any, {} as any, {} as any, mail as any, undefined, eventEmitter as any);
   const payment = {
     get: jest.fn().mockImplementation(({ id }: { id: string }) => {
       // MP responde 404 a un id de authorized_payment pedido como pago.
@@ -84,7 +85,7 @@ function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean;
   jest.spyOn(svc as any, 'syncAddonAvanzado').mockResolvedValue(undefined);
   jest.spyOn(svc as any, 'notificarReactivacion').mockResolvedValue(undefined);
   jest.spyOn(svc as any, 'notificarPagoFallido').mockResolvedValue(undefined);
-  return { svc, prisma, tx, payment, invoice };
+  return { svc, prisma, tx, payment, invoice, eventEmitter };
 }
 
 // Un webhook de MP ya firmado, listo para pasar la validación de firma.
@@ -177,6 +178,21 @@ describe('recordPayment: un cobro real nunca se pierde', () => {
     const aprobado = armar({ plan: 'mensual' });
     await aprobado.svc.recordPayment('174389217360');
     expect((aprobado.svc as any).notificarPagoFallido).not.toHaveBeenCalled();
+  });
+
+  // cobro_suscripcion (ver notifications.service.ts) — la renovación normal
+  // (la sub ya estaba ACTIVE) avisa con el recibo simple; una que saca de
+  // mora (SUSPENDED→ACTIVE) NO lo duplica, ya manda notificarReactivacion.
+  it('una renovación normal (ya ACTIVE) avisa cobro_suscripcion; una reactivación de mora no', async () => {
+    const renovacion = armar({ plan: 'mensual', subStatus: 'ACTIVE' });
+    await renovacion.svc.recordPayment('174389217360');
+    expect(renovacion.eventEmitter.emit).toHaveBeenCalledWith('notification.cobro_suscripcion', { businessId: BIZ, amount: 16500 });
+    expect((renovacion.svc as any).notificarReactivacion).not.toHaveBeenCalled();
+
+    const reactivacion = armar({ plan: 'mensual', subStatus: 'SUSPENDED' });
+    await reactivacion.svc.recordPayment('174389217360');
+    expect(reactivacion.eventEmitter.emit).not.toHaveBeenCalledWith('notification.cobro_suscripcion', expect.anything());
+    expect((reactivacion.svc as any).notificarReactivacion).toHaveBeenCalled();
   });
 
   it('cada camino que no registra dice por qué', async () => {

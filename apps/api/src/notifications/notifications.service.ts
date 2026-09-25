@@ -252,6 +252,51 @@ export class NotificationsService {
     });
   }
 
+  // Tanda del 25/09 — hallazgo de la auditoría de mails, pedido de Ale de
+  // hacerlos configurables desde el mismo panel de siempre en vez de mails
+  // fijos sin forma de apagarlos.
+
+  @OnEvent('notification.dominio_comprado')
+  async onDominioComprado(p: { businessId: string; domain: string; domainId: string }) {
+    await this.dispatch('dominio_comprado', p.businessId, {
+      title: `Dominio comprado: ${p.domain}`,
+      body: `Ya es tuyo — lo estamos vinculando a tu tienda, en unos minutos queda activo.`,
+      resourceType: 'domain',
+      resourceId: p.domainId,
+    });
+  }
+
+  @OnEvent('notification.cobro_suscripcion')
+  async onCobroSuscripcion(p: { businessId: string; amount: number }) {
+    await this.dispatch('cobro_suscripcion', p.businessId, {
+      title: `Cobramos tu suscripción`,
+      body: `Se acreditó el pago de tu suscripción a Órbita por $${p.amount.toFixed(2)}.`,
+    });
+  }
+
+  // Primer pedido que registra el negocio, sin importar el canal (mostrador
+  // u online) — ver detección en orders.service.ts. Un solo aviso en la
+  // vida del negocio, no hay resourceId particular al que apuntar.
+  @OnEvent('notification.primera_venta')
+  async onPrimeraVenta(p: { businessId: string; orderId: string }) {
+    await this.dispatch('primera_venta', p.businessId, {
+      title: `¡Hiciste tu primera venta en Órbita!`,
+      body: `Arrancó — acabás de registrar tu primer pedido.`,
+      resourceType: 'order',
+      resourceId: p.orderId,
+    });
+  }
+
+  @OnEvent('notification.resena_nueva')
+  async onResenaNueva(p: { businessId: string; customerName: string; productName: string; reviewId: string }) {
+    await this.dispatch('resena_nueva', p.businessId, {
+      title: `Nueva reseña de ${p.customerName}`,
+      body: `Dejó una opinión sobre ${p.productName}.`,
+      resourceType: 'review',
+      resourceId: p.reviewId,
+    });
+  }
+
   // ── Resumen diario / reporte semanal ──────────────────────────────────────
   // Itera los negocios activos que tengan el evento habilitado en al menos un
   // canal y les despacha un resumen agregado. No depende de ReportsModule

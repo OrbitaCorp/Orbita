@@ -269,8 +269,49 @@ export class AuthService implements OnModuleInit {
           data: { failedLoginAttempts: 0, lockedUntil: null, lastAccessAt: new Date() },
         });
 
+        // Alerta de dispositivo nuevo — hallazgo de la auditoría de mails,
+        // pedido explícito de Ale. Es una alerta de SEGURIDAD, no una
+        // preferencia: a diferencia del resto de los avisos nuevos de esta
+        // tanda, NO pasa por NotificationConfig (no debería poder apagarse
+        // desde un dispositivo que capaz es justo el atacante) — mismo
+        // criterio que password-changed.hbs, que tampoco tiene toggle.
+        // Heurística simple (sin comparar contra la SQL en Postgres para no
+        // depender de filtros JSON del proveedor): compara ip/userAgent
+        // contra las últimas sesiones del member en los últimos 90 días. Si
+        // esta es la PRIMERA sesión que se le conoce, no hay nada contra qué
+        // comparar — no es "nuevo", es el único, así que no alerta.
+        let dispositivoNuevo = false;
+        if (deviceInfo?.ip || deviceInfo?.userAgent) {
+          const previos = await this.prisma.refreshToken.findMany({
+            where: { userId: member.id, userType: 'MEMBER', createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } },
+            select: { deviceInfo: true },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+          });
+          const yaVisto = previos.some((r) => {
+            const d = r.deviceInfo as { ip?: string | null; userAgent?: string | null } | null;
+            return !!d && ((!!deviceInfo?.ip && d.ip === deviceInfo.ip) || (!!deviceInfo?.userAgent && d.userAgent === deviceInfo.userAgent));
+          });
+          dispositivoNuevo = previos.length > 0 && !yaVisto;
+        }
+
         const token = this.signToken({ sub: member.id, type: 'member', businessId: business.id });
         const refreshToken = await this.createRefreshToken(member.id, 'MEMBER', business.id, deviceInfo);
+
+        if (dispositivoNuevo) {
+          this.mail
+            .sendSuspiciousLogin(
+              member.email,
+              {
+                memberName: member.name,
+                storeName: business.name,
+                when: new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'long', timeStyle: 'short' }),
+                ip: deviceInfo?.ip ?? null,
+              },
+              { businessId: business.id },
+            )
+            .catch((e) => this.logger.warn(`No se pudo mandar la alerta de dispositivo nuevo para ${member.id}: ${e}`));
+        }
 
         return {
           type: 'member',

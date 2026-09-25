@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
     Bell, Mail, ShoppingBag, XCircle, PackageX, RotateCcw, Ban,
     CreditCard, UserPlus, Sun, CalendarDays, Check,
+    PartyPopper, Star, Globe, Receipt, Send,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -46,6 +47,7 @@ const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: str
             { key: 'pedido_cancelado',   label: 'Pedido cancelado',    desc: 'Un pedido se canceló',                               Icon: XCircle },
             { key: 'cancelacion_pedida', label: 'Cancelación pedida',  desc: 'Un cliente pidió cancelar un pedido ya confirmado',  Icon: Ban },
             { key: 'devolucion',         label: 'Devolución',          desc: 'Un cliente inició una devolución',                   Icon: RotateCcw },
+            { key: 'primera_venta',      label: 'Primera venta',       desc: 'Tu primer pedido registrado en Órbita — una sola vez', Icon: PartyPopper },
         ],
     },
     {
@@ -54,6 +56,7 @@ const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: str
         eventos: [
             { key: 'stock_critico', label: 'Stock crítico', desc: 'Un producto llegó a su stock mínimo', Icon: PackageX },
             { key: 'cliente_nuevo', label: 'Cliente nuevo', desc: 'Se registró un cliente nuevo',        Icon: UserPlus },
+            { key: 'resena_nueva',  label: 'Reseña nueva',  desc: 'Un cliente dejó una opinión sobre un producto', Icon: Star },
         ],
     },
     {
@@ -62,6 +65,26 @@ const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: str
         eventos: [
             { key: 'resumen_diario',  label: 'Resumen diario',  desc: 'Cómo cerró el día, todas las noches', Icon: Sun },
             { key: 'reporte_semanal', label: 'Reporte semanal', desc: 'Los números de la semana, los lunes', Icon: CalendarDays },
+        ],
+    },
+    {
+        titulo: 'Cuenta y plataforma',
+        desc: 'Lo que pasa con tu dominio y tu suscripción a Órbita',
+        eventos: [
+            { key: 'dominio_comprado',  label: 'Dominio comprado',        desc: 'Compraste un dominio propio y ya es tuyo',       Icon: Globe },
+            { key: 'cobro_suscripcion', label: 'Cobro de suscripción',    desc: 'Recibo simple cada vez que se cobra tu plan',    Icon: Receipt },
+        ],
+    },
+    {
+        titulo: 'Clientes invitados',
+        desc: 'Avisos que le llegan al CLIENTE, no a tu equipo',
+        eventos: [
+            {
+                key: 'invitacion_cuenta_invitado',
+                label: 'Invitación a crear cuenta',
+                desc: 'A quien compra sin loguearse, para que guarde sus datos. El toggle "Panel" no aplica acá — solo Email.',
+                Icon: Send,
+            },
         ],
     },
 ]
@@ -236,7 +259,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                                     <Skeleton width={30} height={30} radius={8} delay={i * 70} />
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                        <SkeletonText width={`${[38, 44, 32, 46, 36, 34, 40, 42, 37][i]}%`} height={12} delay={i * 70} />
+                                        <SkeletonText width={`${[38, 44, 32, 46, 36, 34, 40, 42, 37][i % 9]}%`} height={12} delay={i * 70} />
                                         <SkeletonText width="62%" height={9} delay={i * 70 + 40} />
                                     </div>
                                 </div>
@@ -287,7 +310,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-muted)', marginTop: 12 }}>
                 <Check size={13} strokeWidth={2.2} color="var(--color-success)" />
-                <span>Los avisos por email les llegan a vos y a todo tu equipo activo.</span>
+                <span>Los avisos por email les llegan a vos y a todo tu equipo activo — excepto "Invitación a crear cuenta", que le llega al cliente.</span>
             </div>
 
             {toast && (
