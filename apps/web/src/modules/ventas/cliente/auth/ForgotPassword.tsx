@@ -45,11 +45,22 @@ export default function ForgotPassword() {
     setEnviando(true)
     try {
       await forgotPassword(email.trim())
-    } catch {
-      // Anti-enumeración: seguimos igual al paso de código aunque falle.
+      setStep('code')
+    } catch (err) {
+      // Un 429 (demasiados intentos) es el ÚNICO error que se puede mostrar
+      // sin romper el anti-enumeración: el throttle corta ANTES de mirar si
+      // el email existe, así que un mensaje claro acá no distingue cuentas
+      // reales de inventadas — a diferencia de cualquier otro error, que se
+      // sigue tragando en silencio (reportado: "le doy a olvidar contraseña
+      // y nunca llega el código" — resultaba ser el balde de 5 intentos/15
+      // min agotado de tanto reintentar, sin ningún aviso).
+      if (err instanceof AuthError && err.status === 429) {
+        setError('Demasiados intentos. Esperá unos minutos y volvé a intentar.')
+      } else {
+        setStep('code')
+      }
     } finally {
       setEnviando(false)
-      setStep('code')
     }
   }
 
@@ -58,8 +69,11 @@ export default function ForgotPassword() {
     setDigits(Array(6).fill(''))
     try {
       await forgotPassword(email.trim())
-    } catch {
-      // idem — no revelamos nada
+    } catch (err) {
+      if (err instanceof AuthError && err.status === 429) {
+        setError('Demasiados intentos. Esperá unos minutos y volvé a intentar.')
+      }
+      // cualquier otro error se sigue tragando — no revelamos nada
     }
   }
 
