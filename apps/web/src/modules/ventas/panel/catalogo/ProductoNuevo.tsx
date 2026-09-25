@@ -43,10 +43,9 @@ import {
 import { Volver } from '../_shared/Volver'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 
-// "Quitar fondo" / "Fondo con IA" de fotos de producto: en mantenimiento por default
-// (mismo criterio que el backend, ver FONDO_IA_MANTENIMIENTO en apps/api). Para
-// probarlo en local: NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO=false en apps/web/.env.local.
-const FONDO_IA_MANTENIMIENTO = process.env.NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO !== 'false'
+// "Quitar fondo" / "Fondo con IA" de fotos de producto: activo por defecto.
+// Para ponerlo en mantenimiento: NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO=true.
+const FONDO_IA_MANTENIMIENTO = process.env.NEXT_PUBLIC_FONDO_IA_MANTENIMIENTO === 'true'
 const TITULO_MANTENIMIENTO = 'En mantenimiento — vuelve pronto'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
