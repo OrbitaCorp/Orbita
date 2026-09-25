@@ -11,13 +11,14 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus,
+  Search, Plus, DollarSign,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
 import { TabWizard } from './Wizard'
 import { TabAuditoria } from './Auditoria'
 import { TabSoporte } from './Soporte'
+import { TabCostos } from './Costos'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -81,6 +82,7 @@ export function SuperAdminDashboard() {
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
       {tab === 'descuentos' && <TabDescuentos />}
+      {tab === 'costos' && <TabCostos />}
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
@@ -89,7 +91,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -108,6 +110,7 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
   // Primero de "Interno": es el tablero de trabajo del equipo, lo que más se
   // abre; admins y actividad son de consulta.
+  { id: 'costos', label: 'Costos', Icono: DollarSign, grupo: 'Interno' },
   { id: 'auditoria', label: 'Auditoría', Icono: ClipboardCheck, grupo: 'Interno' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
   { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },

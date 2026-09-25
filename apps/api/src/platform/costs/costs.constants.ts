@@ -1,0 +1,1 @@
+export const COST_ADAPTERS = 'COST_ADAPTERS';

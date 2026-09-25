@@ -33,6 +33,7 @@ import { ReportsService } from '../reports/reports.service';
 import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
+import { CostsModule } from '../platform/costs/costs.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { OnboardingService } from '../onboarding/onboarding.service';
     ReportsModule,
     WizardAnalyticsModule,
     OnboardingModule,
+    CostsModule,
   ],
   controllers: [OrbiController],
   providers: [

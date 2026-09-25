@@ -395,28 +395,6 @@ export default function Catalogo() {
         .sf-catrow:hover { background: var(--color-surface); }
         .sf-catchk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--color-border-strong); flex-shrink: 0; display: grid; place-items: center; transition: background 120ms, border-color 120ms; }
         .sf-catchk.on { background: var(--color-primary); border-color: var(--color-primary); }
-        /* Circulito de "cambiando de página" — flota centrado arriba de la
-           grilla, que se queda montada (atenuada) debajo. Ver el comentario
-           en el JSX de la grilla para el motivo. */
-        .sf-cat-grid-wrap { position: relative; }
-        .sf-cat-fade { transition: opacity 200ms ease; }
-        .sf-cat-loading {
-          position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-          z-index: 3; width: 34px; height: 34px; border-radius: 999px;
-          background: var(--color-bg); border: 1px solid var(--color-border);
-          box-shadow: 0 2px 10px rgba(0,0,0,0.10);
-          display: grid; place-items: center;
-        }
-        .sf-cat-spinner {
-          width: 16px; height: 16px; border-radius: 50%;
-          border: 2px solid var(--color-border);
-          border-top-color: var(--color-primary);
-          animation: orbita-spin 0.7s linear infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .sf-cat-fade { transition: none; }
-          .sf-cat-spinner { animation: none; }
-        }
       `}</style>
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
@@ -620,38 +598,19 @@ export default function Catalogo() {
               </div>
             )}
 
-            {/* Skeleton completo SOLO en la primera carga (sin nada que mostrar
-                todavía). Al cambiar de página/filtro con la grilla ya
-                dibujada, `cargando` se pone en true pero `crudos` conserva la
-                página anterior a propósito (ver el efecto que pide los
-                productos) — reemplazarla por el skeleton entero desmontaba
-                todas las cards e imágenes de golpe, y eso era el "trabón" de
-                scroll reportado al paginar. Ahora la grilla anterior se queda
-                montada (nada de recargar imágenes de nuevo) nada más se atenúa,
-                con un circulito chico girando encima como aviso de que ya está
-                yendo a buscar la página nueva. */}
-            {cargando && productos.length === 0 ? (
+            {cargando ? (
               <SkeletonProductGrid cantidad={LIMIT} layout={viewMode} className="sf-cat-grid" />
             ) : productos.length === 0 ? (
               <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
                 No hay productos para mostrar con estos filtros.
               </div>
+            ) : viewMode === 'list' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
+              </div>
             ) : (
-              <div className="sf-cat-grid-wrap">
-                {cargando && (
-                  <div className="sf-cat-loading" role="status" aria-label="Cargando productos">
-                    <span className="sf-cat-spinner" />
-                  </div>
-                )}
-                {viewMode === 'list' ? (
-                  <div className="sf-cat-fade" style={{ display: 'flex', flexDirection: 'column', gap: 10, opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : undefined }}>
-                    {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
-                  </div>
-                ) : (
-                  <div className="sf-cat-grid sf-cat-fade" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16, opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : undefined }}>
-                    {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
-                  </div>
-                )}
+              <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16 }}>
+                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} tema={temaDePlantilla(config?.appearance?.homeTemplate)} />)}
               </div>
             )}
 

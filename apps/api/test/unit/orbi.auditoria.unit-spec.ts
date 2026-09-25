@@ -36,7 +36,7 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
     execute: jest.fn().mockResolvedValue({ success: true, label: 'ok' }),
   };
   const analitica = { logAiTurn: jest.fn().mockResolvedValue(null) };
-  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any);
+  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any);
   return { ctrl, llm, tools };
 }
 

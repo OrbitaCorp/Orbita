@@ -187,6 +187,50 @@ export class StorefrontService {
     return custom?.business.subdomain ?? null;
   }
 
+  // Registra una visita a la tienda (tanto desde subdominio como desde dominio propio).
+  // Tolera fallos silenciosamente para no interrumpir al visitante si hay un error transitorio.
+  async recordVisit(slug: string, dto: { domain?: string; path?: string }): Promise<{ ok: boolean }> {
+    try {
+      const business = await this.prisma.business.findUnique({
+        where: { subdomain: slug },
+        select: { id: true, subdomain: true, deletedAt: true },
+      });
+      if (!business || business.deletedAt) {
+        return { ok: false };
+      }
+
+      const rawDomain = (dto.domain || '').toLowerCase().trim();
+      const isPlatform =
+        !rawDomain ||
+        rawDomain.endsWith('.orbita.site') ||
+        rawDomain.endsWith('.orbita.local') ||
+        rawDomain === 'localhost' ||
+        rawDomain === '127.0.0.1' ||
+        rawDomain.endsWith('.vercel.app');
+
+      let isCustom = false;
+      if (rawDomain && !isPlatform) {
+        isCustom = true;
+      }
+
+      const domainToStore = rawDomain || `${business.subdomain}.orbita.site`;
+      const cleanPath = (dto.path || '/').slice(0, 255);
+
+      await this.prisma.storeVisit.create({
+        data: {
+          businessId: business.id,
+          domain: domainToStore.slice(0, 255),
+          isCustom,
+          path: cleanPath,
+        },
+      });
+
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  }
+
   // La MISMA sucursal contra la que OrdersService.create() valida stock al
   // comprar (la principal del negocio — el checkout público no manda
   // branch_id). Antes el storefront sumaba el stock de TODAS las sucursales

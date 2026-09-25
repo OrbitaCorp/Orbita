@@ -823,3 +823,19 @@ export function claimGameSession(slug: string, sessionId: string) {
     method: 'POST', headers: authHeaders(), body: JSON.stringify({ sessionId }),
   })
 }
+
+// Registra una visita al storefront (sea subdominio *.orbita.site o dominio propio).
+// Corre con keepalive y tolera fallos de red silenciosamente.
+export async function recordStorefrontVisit(slug: string, data: { domain?: string; path?: string }): Promise<{ ok: boolean }> {
+  try {
+    return await storefrontRequest<{ ok: boolean }>(`/${slug}/visit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      keepalive: true,
+    })
+  } catch {
+    return { ok: false }
+  }
+}
+

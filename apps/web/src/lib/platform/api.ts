@@ -561,6 +561,100 @@ export interface SupportSummary {
   manual: SupportManualChapter[]
 }
 
+// ─── Control de costos (super admin → Costos) ─────────────────────────────
+export interface CostProviderSummary {
+  slug: string
+  name: string
+  color: string
+  amountUsd: number
+  previousAmountUsd: number
+  deltaPercent: number
+  sparkline: number[]
+}
+
+export interface CostOverviewResponse {
+  month: string
+  totalUsd: number
+  previousTotalUsd: number
+  deltaPercent: number
+  providers: CostProviderSummary[]
+}
+
+export interface CostHistoryMonth {
+  month: string
+  totalUsd: number
+  byProvider: Record<string, number>
+}
+
+export interface CostHistoryResponse {
+  months: CostHistoryMonth[]
+}
+
+export interface CostProviderDetail {
+  slug: string
+  name: string
+  color: string
+  month: string
+  amountUsd: number
+  breakdown: Record<string, number>
+  source: string
+}
+
+export interface CostBusinessRow {
+  businessId: string
+  businessName: string
+  totalEstimatedUsd: number
+  byCategory: Record<string, number>
+  pctOfTotal: number
+}
+
+export interface CostByBusinessResponse {
+  month: string
+  businesses: CostBusinessRow[]
+}
+
+export interface CostLimitRow {
+  id: string
+  provider: { slug: string; name: string; color: string } | null
+  type: 'SPEND' | 'USAGE'
+  category: string | null
+  threshold: number
+  unit: string
+  alertAtPercent: number[]
+  currentValue: number
+  percent: number
+  active: boolean
+}
+
+export interface CreateCostLimitInput {
+  providerSlug?: string | null
+  type: 'SPEND' | 'USAGE'
+  category?: string | null
+  threshold: number
+  unit: string
+  alertAtPercent: number[]
+}
+
+export interface CostAlertRow {
+  id: string
+  limit: { id: string; provider: { name: string; color: string } | null; type: string; threshold: number; unit: string }
+  percentReached: number
+  currentValue: number
+  notifiedAt: string
+  acknowledgedAt: string | null
+}
+
+export interface CostUsageItem {
+  category: string
+  value: number
+  unit: string
+  limit?: number
+}
+
+export interface CostUsageResponse {
+  providers: Record<string, { slug: string; items: CostUsageItem[] }>
+}
+
 // Arma "?a=1&b=2" salteando lo vacío, para no mandar `status=` cuando el
 // filtro está en "Todas".
 function toQuery(params: Record<string, string | number | undefined | null>): string {
@@ -645,4 +739,18 @@ export const platformApi = {
   // hay forma de contestar "en silencio" y está bien que así sea.
   supportReply: (id: string, message: string) => sendJSON<AdminSupportDetail>(`/platform/support/${id}/reply`, 'POST', { message }),
   supportStatus: (id: string, status: 'OPEN' | 'CLOSED') => sendJSON<AdminSupportDetail>(`/platform/support/${id}/status`, 'PUT', { status }),
+
+  costsUsage: () => getJSON<CostUsageResponse>('/platform/costs/usage'),
+  costsOverview: (months = 3) => getJSON<CostOverviewResponse>(`/platform/costs/overview?months=${months}`),
+  costsHistory: (months = 6) => getJSON<CostHistoryResponse>(`/platform/costs/history?months=${months}`),
+  costsProvider: (slug: string, month?: string) => getJSON<CostProviderDetail>(`/platform/costs/provider/${slug}${month ? `?month=${month}` : ''}`),
+  costsByBusiness: (month?: string) => getJSON<CostByBusinessResponse>(`/platform/costs/by-business${month ? `?month=${month}` : ''}`),
+  costsLimits: () => getJSON<CostLimitRow[]>('/platform/costs/limits'),
+  costsCreateLimit: (body: CreateCostLimitInput) => sendJSON<CostLimitRow>('/platform/costs/limits', 'POST', body),
+  costsDeleteLimit: (id: string) => sendJSON<{ ok: true }>(`/platform/costs/limits/${id}`, 'DELETE'),
+  costsAlerts: (month?: string) => getJSON<CostAlertRow[]>(`/platform/costs/alerts${month ? `?month=${month}` : ''}`),
+  costsAckAlert: (id: string) => sendJSON<{ ok: true }>(`/platform/costs/alerts/${id}/ack`, 'POST'),
+  costsSync: () => sendJSON<{ synced: string[] }>('/platform/costs/sync', 'POST'),
+  costsManualSnapshot: (body: { providerSlug: string; month: string; amountUsd: number; breakdown?: Record<string, number> }) =>
+    sendJSON<{ id: string }>('/platform/costs/snapshot', 'POST', body),
 }
