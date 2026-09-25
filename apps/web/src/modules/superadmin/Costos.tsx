@@ -166,57 +166,104 @@ function LimitBar({ limit }: { limit: CostLimitRow }) {
   )
 }
 
-// ─── Usage gauge ─────────────────────────────────────────────────────────────
+// ─── Usage stat cards (inspired by React Bits stats blocks) ─────────────────
+
+const PROVIDER_CARD_STYLES: Record<string, { bg: string; accent: string; text: string }> = {
+  vercel:     { bg: '#f0f0f0', accent: '#000000', text: '#1a1a2e' },
+  cloudflare: { bg: '#fff4eb', accent: '#f6821f', text: '#4a2800' },
+  supabase:   { bg: '#e8faf0', accent: '#3ecf8e', text: '#0a3d22' },
+  gcloud:     { bg: '#eaf1fd', accent: '#4285f4', text: '#1a2744' },
+  gemini:     { bg: '#f0ecfd', accent: '#886ef8', text: '#2a1f4e' },
+  resend:     { bg: '#f0f0f0', accent: '#111111', text: '#1a1a1a' },
+  groq:       { bg: '#fdeeed', accent: '#f55036', text: '#4a1008' },
+}
 
 const PROVIDER_NAMES: Record<string, string> = {
   vercel: 'Vercel', cloudflare: 'Cloudflare', supabase: 'Supabase',
   gcloud: 'Google Cloud', gemini: 'Gemini', resend: 'Resend', groq: 'Groq',
 }
 
-const PROVIDER_COLORS: Record<string, string> = {
-  vercel: '#000000', cloudflare: '#f6821f', supabase: '#3ecf8e',
-  gcloud: '#4285f4', gemini: '#886ef8', resend: '#111111', groq: '#f55036',
+function fmtValue(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  return n % 1 === 0 ? String(n) : n.toFixed(2)
 }
 
-function UsageGauge({ item }: { item: CostUsageItem }) {
+function UsageStatCard({ item, accent, textColor }: {
+  item: CostUsageItem; accent: string; textColor: string
+}) {
   const hasLimit = item.limit != null && item.limit > 0
   const pct = hasLimit ? Math.min((item.value / item.limit!) * 100, 100) : -1
-  const tone = pct >= 90 ? 'var(--color-error)' : pct >= 70 ? '#F59E0B' : 'var(--color-primary)'
+  const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent
 
   return (
-    <div style={{ padding: '6px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500 }}>
-          {item.category}
-        </span>
-        <span style={{
-          fontSize: 12, fontFamily: '"Geist Mono", monospace',
-          color: 'var(--color-text)', fontWeight: 600, whiteSpace: 'nowrap',
+    <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8, marginBottom: 6 }}>
+        <div>
+          <div style={{
+            fontSize: 26, fontWeight: 800, lineHeight: 1.1,
+            fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.03em',
+            color: textColor,
+          }}>
+            {hasLimit ? `${pct.toFixed(0)}%` : fmtValue(item.value)}
+          </div>
+          <div style={{ fontSize: 12, color: textColor, opacity: 0.7, marginTop: 2, fontWeight: 500 }}>
+            {item.category}
+          </div>
+        </div>
+        <div style={{
+          fontSize: 11.5, fontFamily: '"Geist Mono", monospace',
+          color: textColor, opacity: 0.6, fontWeight: 500,
+          whiteSpace: 'nowrap', textAlign: 'right', lineHeight: 1.3,
         }}>
-          {fmtValue(item.value)} {hasLimit ? `/ ${fmtValue(item.limit!)}` : ''} {item.unit}
-        </span>
+          {fmtValue(item.value)}{hasLimit ? ` / ${fmtValue(item.limit!)}` : ''}<br />{item.unit}
+        </div>
       </div>
       {hasLimit && (
-        <>
-          <div style={{ height: 5, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
-            <div style={{
-              width: `${pct}%`, height: '100%', borderRadius: 999,
-              background: tone, transition: 'width 0.3s',
-            }} />
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 3, textAlign: 'right' }}>
-            {pct.toFixed(0)}%
-          </div>
-        </>
+        <div style={{
+          height: 6, borderRadius: 999, overflow: 'hidden',
+          background: 'rgba(0,0,0,0.08)',
+        }}>
+          <div style={{
+            width: `${pct}%`, height: '100%', borderRadius: 999,
+            background: barColor, transition: 'width 0.4s ease',
+          }} />
+        </div>
       )}
     </div>
   )
 }
 
-function fmtValue(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return n % 1 === 0 ? String(n) : n.toFixed(2)
+function UsageProviderBlock({ slug, items }: { slug: string; items: CostUsageItem[] }) {
+  const style = PROVIDER_CARD_STYLES[slug] ?? { bg: '#f5f5f5', accent: 'var(--color-primary)', text: '#1a1a2e' }
+  const name = PROVIDER_NAMES[slug] ?? slug
+  const icon = PROVIDER_ICONS[slug] ?? '●'
+
+  return (
+    <div style={{
+      background: style.bg,
+      borderRadius: 16,
+      padding: '20px 22px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      minWidth: 0,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 18 }}>{icon}</span>
+        <span style={{
+          fontSize: 14, fontWeight: 700, color: style.text,
+          letterSpacing: '-0.01em',
+        }}>
+          {name}
+        </span>
+      </div>
+      {items.map((item, i) => (
+        <UsageStatCard key={i} item={item} accent={style.accent} textColor={style.text} />
+      ))}
+    </div>
+  )
 }
 
 function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
@@ -227,27 +274,12 @@ function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: 14,
+      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+      gap: 16,
     }}>
-      {slugs.map((slug) => {
-        const provider = usage.providers[slug]
-        const name = PROVIDER_NAMES[slug] ?? slug
-        const color = PROVIDER_COLORS[slug] ?? 'var(--color-primary)'
-        return (
-          <Card key={slug} title={name}>
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 2,
-              borderLeft: `3px solid ${color}`,
-              paddingLeft: 12,
-            }}>
-              {provider.items.map((item, i) => (
-                <UsageGauge key={i} item={item} />
-              ))}
-            </div>
-          </Card>
-        )
-      })}
+      {slugs.map((slug) => (
+        <UsageProviderBlock key={slug} slug={slug} items={usage.providers[slug].items} />
+      ))}
     </div>
   )
 }
