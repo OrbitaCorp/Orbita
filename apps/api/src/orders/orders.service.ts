@@ -1023,24 +1023,41 @@ export class OrdersService {
 
           return order;
         });
+        // `items` acá: qué producto/variante compró, no solo el total — el
+        // aviso de "nuevo pedido" (panel + email al dueño) mostraba nombre y
+        // monto nomás, sin decir QUÉ se vendió ni linkear al pedido
+        // (reportado con captura: había que entrar al panel a ciegas a
+        // buscarlo). Mismo formato "Nombre · Variante" que ya arma el
+        // detalle de abajo para los mails al comprador.
         this.eventEmitter.emit('notification.nuevo_pedido', {
           businessId,
           orderNumber: creado.orderNumber,
           customerName: buyerName,
           total,
           orderId: creado.id,
+          items: renglones.map((r) => ({
+            name: `${r.productName}${r.variantLabel ? ` · ${r.variantLabel}` : ''}`,
+            quantity: r.quantity,
+          })),
         });
         if (esPresencial) {
           await this.avisarStockCritico(businessId, creado.branchId, renglones.map((r) => r.variantId));
         }
 
-        // Aviso al comprador (alta desde el panel, con `notifyCustomer`): la
-        // venta presencial le manda el comprobante de la compra (el mismo
-        // mail de "pedido confirmado", con el detalle y los precios); el
-        // pedido online le avisa que quedó cargado y que le vamos a ir
-        // contando cómo avanza. Nunca rompe el alta: si el mail falla queda
-        // en el log y el pedido ya está creado.
-        if (dto.notifyCustomer && !opts?.publicCheckout && buyerEmail) {
+        // Aviso al comprador: la venta presencial (alta desde el panel, con
+        // `notifyCustomer`) le manda el comprobante de la compra (el mismo
+        // mail de "pedido confirmado", con el detalle y los precios); un
+        // pedido online — sea cargado desde el panel con `notifyCustomer`, o
+        // un checkout real del storefront — le avisa que quedó recibido y
+        // que le vamos a ir contando cómo avanza. Antes esto último SOLO
+        // corría para el alta desde el panel (`!opts?.publicCheckout`): un
+        // checkout real del storefront (el caso de casi todos los pedidos)
+        // nunca mandaba nada al comprador al crearse — recién se enteraba
+        // cuando el negocio lo confirmaba, si es que lo confirmaba pronto
+        // (reportado: "falta un correo al comprador... diciendo que fue
+        // recibido y el detalle de lo que reservó"). Nunca rompe el alta: si
+        // el mail falla queda en el log y el pedido ya está creado.
+        if ((opts?.publicCheckout || dto.notifyCustomer) && buyerEmail) {
           try {
             const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
             const datos = {

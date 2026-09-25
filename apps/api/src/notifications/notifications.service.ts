@@ -87,7 +87,11 @@ export class NotificationsService {
     // en "nuevo pedido" y "nuevo cliente") o el negocio (nombre de producto):
     // van escapados al HTML. Antes entraban crudos (auditoría interna 10/09,
     // ítem api.mail). El asunto lo escapa MailService.
-    const cuerpo = `<p>${escaparHtml(htmlBody)}</p>`;
+    // El \n → <br> va DESPUÉS de escapar: los saltos de línea son de textos
+    // que arma este mismo service (ver onNuevoPedido, con el detalle de
+    // items y el link al pedido en varios renglones) — nunca de lo que
+    // escribió el cliente, así que no reabre ningún hueco de inyección.
+    const cuerpo = `<p>${escaparHtml(htmlBody).replace(/\n/g, '<br>')}</p>`;
     for (const m of members) {
       try {
         await this.mail.sendCustomEmail(m.email, subject, cuerpo, { businessId });
@@ -142,10 +146,26 @@ export class NotificationsService {
   // nombres exactos — ver hooks en orders/inventory/returns/mercadopago/customers.
 
   @OnEvent('notification.nuevo_pedido')
-  async onNuevoPedido(p: { businessId: string; orderNumber: number; customerName: string; total: number; orderId: string }) {
+  async onNuevoPedido(p: {
+    businessId: string; orderNumber: number; customerName: string; total: number; orderId: string
+    items: { name: string; quantity: number }[]
+  }) {
+    // La campanita del panel se queda corta a propósito (un renglón, sin
+    // link — ahí al lado ya está la lista completa a un click). El email es
+    // el que sale del panel, así que necesita lo que la campanita puede dar
+    // por sentado: QUÉ se vendió (reportado: solo decía nombre y monto, sin
+    // producto/variante) y un link directo al pedido, no solo "andá al
+    // panel a buscarlo". Mismo criterio de escape que ya usaba `body` —
+    // items.name lo arma el propio backend (product.name + variantLabel),
+    // pero de todos modos pasa por escaparHtml en sendEmailToMembers, así
+    // que un nombre de producto con caracteres raros tampoco es un problema.
+    const detalleItems = p.items.map((it) => `· ${it.name} × ${it.quantity}`).join('\n');
+    const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const link = `${frontend}/admin/${p.businessId}/ventas/pedidos?vista=detalle&id=${p.orderId}`;
     await this.dispatch('nuevo_pedido', p.businessId, {
       title: `Nuevo pedido #${p.orderNumber}`,
       body: `${p.customerName}: $${p.total.toFixed(2)}`,
+      emailBody: `${p.customerName} hizo un pedido por $${p.total.toFixed(2)}:\n\n${detalleItems}\n\nVer el pedido: ${link}`,
       resourceType: 'order',
       resourceId: p.orderId,
     });
