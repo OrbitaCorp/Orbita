@@ -357,7 +357,7 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
         <Field label="Teléfono" required>
           <Input type="tel" value={negocio.telefono} onChange={set('telefono')} placeholder="+54 11 1234-5678" campo="telefono" stepName="tu-negocio" />
         </Field>
-        <Field label="Subdominio de tu negocio">
+        <Field label="Subdominio de tu negocio" required>
           {/* ds-field solo en reposo: cuando el chequeo pinta el borde
               (disponible/ocupado/verificando) no hay que pisarlo al hover */}
           <div className={estadoSub === 'idle' ? 'ds-field' : undefined} style={{
@@ -1139,8 +1139,9 @@ export function SetupUnificado({
     if (paso === 1) {
       if (!negocio.nombre.trim())   return { campo: 'nombre',   texto: 'Completá el nombre de tu negocio' }
       if (!negocio.telefono.trim()) return { campo: 'telefono', texto: 'Completá tu teléfono' }
-      if (negocio.subdominio.trim() && estadoSub === 'ocupado')  return { campo: 'subdominio', texto: 'Ese subdominio ya está ocupado' }
-      if (negocio.subdominio.trim() && estadoSub === 'checking') return { campo: 'subdominio', texto: 'Verificando el subdominio…' }
+      if (!negocio.subdominio.trim())      return { campo: 'subdominio', texto: 'Completá el subdominio de tu negocio' }
+      if (estadoSub === 'ocupado')  return { campo: 'subdominio', texto: 'Ese subdominio ya está ocupado' }
+      if (estadoSub === 'checking') return { campo: 'subdominio', texto: 'Verificando el subdominio…' }
       if (conModoVenta && !negocio.modoVenta) return { campo: 'modoVenta', texto: 'Elegí cómo vas a vender' }
       return null
     }
