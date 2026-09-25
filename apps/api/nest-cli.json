@@ -4,7 +4,11 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["mail/templates/**/*.hbs", "background-removal/models/**/*.onnx"],
+    "assets": [
+      "mail/templates/**/*.hbs",
+      "background-removal/models/**/*.onnx",
+      "image-studio/assets/**/*"
+    ],
     "watchAssets": true
   }
 }
