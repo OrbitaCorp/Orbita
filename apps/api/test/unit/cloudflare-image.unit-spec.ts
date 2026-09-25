@@ -154,8 +154,20 @@ describe('CloudflareImageService', () => {
     jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
 
     const svc = makeService(CONFIG_OK);
-    await svc.editImage('algo', Buffer.from('img'), 'image/jpeg');
+    // editImage() no reintenta por defecto (failover inmediato al modelo local,
+    // 10d0eba3): quien quiera reintentos los pide con maxIntentos.
+    await svc.editImage('algo', Buffer.from('img'), 'image/jpeg', 3);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('editImage() por defecto NO reintenta un falso positivo: falla en la primera llamada', async () => {
+    const flagged = { ok: false, status: 400, json: async () => ({ success: false, errors: [{ message: 'AiError: Your output has been flagged. Please choose another prompt / input image combination', code: 3030 }] }) } as Response;
+    const fetchMock = jest.fn().mockResolvedValue(flagged);
+    jest.spyOn(global, 'fetch').mockImplementation(fetchMock);
+
+    const svc = makeService(CONFIG_OK);
+    await expect(svc.editImage('algo', Buffer.from('img'), 'image/jpeg')).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('un error que NO es NSFW no se reintenta (solo 1 llamada)', async () => {
