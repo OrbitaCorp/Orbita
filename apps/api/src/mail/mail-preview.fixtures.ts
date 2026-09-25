@@ -260,7 +260,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'subscription-payment-failed',
     isPlatform: true,
     subject: 'No pudimos cobrar tu suscripción de Órbita',
-    data: { businessName: FIXTURE_BUSINESS_BRANDING.storeName, amount: '$14.900', retryDate: '20/08/2026', graceDaysLeft: 5 },
+    data: { businessName: FIXTURE_BUSINESS_BRANDING.storeName, amount: '$14.900', retryDate: '20/08/2026', graceDaysLeft: 5, manageUrl: 'https://panaderialopez.orbita.site/admin/ventas/configuracion?vista=suscripcion' },
   },
   {
     id: 'platform-discount-offer',

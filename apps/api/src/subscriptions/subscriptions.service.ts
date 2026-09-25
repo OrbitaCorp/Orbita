@@ -1291,6 +1291,7 @@ export class SubscriptionsService {
     }
 
     const aprobado = pago.status === 'approved';
+    const montoCobro = pago.transaction_amount ?? Number(sub.amount);
 
     // Una suscripción dada de baja NO vuelve sola. Si igual llegó un cobro es
     // que la preapproval sobrevivió a la baja (ver cancelBusiness): se deja
@@ -1338,7 +1339,7 @@ export class SubscriptionsService {
       await tx.subscriptionPayment.create({
         data: {
           subscriptionId: sub.id,
-          amount: new Prisma.Decimal(pago.transaction_amount ?? Number(sub.amount)),
+          amount: new Prisma.Decimal(montoCobro),
           status: aprobado ? 'APPROVED' : 'FAILED',
           periodStart,
           periodEnd,
@@ -1369,6 +1370,18 @@ export class SubscriptionsService {
         this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
       );
     }
+    // Aviso INMEDIATO (webhook) de un cobro recurrente rechazado — tenía
+    // plantilla y función armadas (sendSubscriptionPaymentFailed) pero
+    // ningún llamador en todo el backend (auditoría de mails, pedido
+    // explícito de vincularla). Distinto del barrido nocturno
+    // (processLifecycleNotices/GRACIA_INICIO): ese recién avisa —con un
+    // texto genérico— al otro día, cuando currentPeriodEnd ya venció; este
+    // es lo primero que ve el dueño, el mismo día del rechazo.
+    if (!aprobado && !cancelada) {
+      await this.notificarPagoFallido(businessId, sub, montoCobro).catch((e) =>
+        this.logger.warn(`No se pudo mandar el mail de pago fallido para ${businessId}: ${e}`),
+      );
+    }
 
     return { recorded: true, approved: aprobado, cancelled: cancelada, renewed: aprobado && !cancelada && !!plan };
   }
@@ -1384,6 +1397,33 @@ export class SubscriptionsService {
     const storeUrl = `https://${business.subdomain}.orbita.site`;
     for (const email of emails) {
       await this.mail.sendSubscriptionReactivated(email, { businessName: business.name, storeUrl }, { businessId });
+    }
+  }
+
+  // retryDate: no tenemos visibilidad del cronograma de reintentos propio de
+  // MercadoPago para una preapproval (es interno de ellos, no lo expone la
+  // API) — se usa el vencimiento del período actual (currentPeriodEnd), que
+  // es la fecha real hasta la que el negocio sigue cubierto y a partir de la
+  // cual arranca la gracia si el cobro sigue sin resolverse. Igual de
+  // gracePeriodDays completos porque a esta altura la suscripción todavía no
+  // entró en gracia (eso lo decide reconcileOverdueSubscriptions() por
+  // currentPeriodEnd, no este webhook) — es el total disponible, no un
+  // remanente ya consumido.
+  private async notificarPagoFallido(
+    businessId: string,
+    sub: { currentPeriodEnd: Date; gracePeriodDays: number },
+    amount: number,
+  ): Promise<void> {
+    const { business, emails } = await this.destinatarios(businessId);
+    if (!business || emails.length === 0) return;
+    const manageUrl = this.manageUrl(business.subdomain);
+    const retryDate = sub.currentPeriodEnd.toISOString().slice(0, 10);
+    for (const email of emails) {
+      await this.mail.sendSubscriptionPaymentFailed(
+        email,
+        { businessName: business.name, amount, retryDate, graceDaysLeft: sub.gracePeriodDays, manageUrl },
+        { businessId },
+      );
     }
   }
 

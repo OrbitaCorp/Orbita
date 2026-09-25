@@ -1002,6 +1002,7 @@ export class MailService {
       amount: number;
       retryDate: string;
       graceDaysLeft: number;
+      manageUrl: string;
     },
     meta?: MailMeta,
   ) {

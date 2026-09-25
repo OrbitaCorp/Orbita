@@ -83,6 +83,7 @@ function armar(opts: { plan?: string; mpStatus?: string; yaRegistrado?: boolean;
   (svc as any)._invoice = invoice;
   jest.spyOn(svc as any, 'syncAddonAvanzado').mockResolvedValue(undefined);
   jest.spyOn(svc as any, 'notificarReactivacion').mockResolvedValue(undefined);
+  jest.spyOn(svc as any, 'notificarPagoFallido').mockResolvedValue(undefined);
   return { svc, prisma, tx, payment, invoice };
 }
 
@@ -158,6 +159,24 @@ describe('recordPayment: un cobro real nunca se pierde', () => {
     expect(tx.subscriptionPayment.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', failedReason: 'cc_rejected_insufficient_amount', paidAt: null }) }),
     );
+  });
+
+  // sendSubscriptionPaymentFailed tenía plantilla y función armadas pero
+  // ningún llamador (auditoría de mails, pedido explícito de cablearla):
+  // recordPayment() es el webhook real de MP, así que es acá donde tiene
+  // que dispararse — no en el barrido nocturno, que recién avisa al otro
+  // día con un texto genérico.
+  it('un cobro rechazado avisa al dueño por mail, uno aprobado no', async () => {
+    const rechazado = armar({ mpStatus: 'rejected' });
+    (rechazado.svc as any)._payment.get = jest.fn().mockResolvedValue({
+      external_reference: BIZ, status: 'rejected', status_detail: 'cc_rejected_insufficient_amount', transaction_amount: 16500,
+    });
+    await rechazado.svc.recordPayment('172852461415');
+    expect((rechazado.svc as any).notificarPagoFallido).toHaveBeenCalledWith(BIZ, expect.objectContaining({ id: 'sub-1' }), 16500);
+
+    const aprobado = armar({ plan: 'mensual' });
+    await aprobado.svc.recordPayment('174389217360');
+    expect((aprobado.svc as any).notificarPagoFallido).not.toHaveBeenCalled();
   });
 
   it('cada camino que no registra dice por qué', async () => {
