@@ -29,6 +29,112 @@ const PROVIDER_ICONS: Record<string, string> = {
   vercel: '▲', resend: '✉', groq: '⚙',
 }
 
+// ─── Skeletons ──────────────────────────────────────────────────────────────
+
+const skeletonBase: React.CSSProperties = {
+  background: 'var(--color-surface-alt)',
+  borderRadius: 6,
+  animation: 'orbita-pulse 1.6s ease-in-out infinite',
+}
+
+function SkeletonBox({ w, h, r, style }: { w?: number | string; h?: number; r?: number; style?: React.CSSProperties }) {
+  return <div style={{ ...skeletonBase, width: w ?? '100%', height: h ?? 14, borderRadius: r ?? 6, ...style }} />
+}
+
+function ServiceCardSkeleton() {
+  return (
+    <div style={{
+      background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+      borderRadius: 14, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <SkeletonBox w={36} h={36} r={10} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <SkeletonBox w={80} h={12} />
+          <SkeletonBox w={100} h={22} r={4} />
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <SkeletonBox w={70} h={12} />
+        <SkeletonBox w={80} h={28} r={4} />
+      </div>
+    </div>
+  )
+}
+
+function UsageBlockSkeleton() {
+  return (
+    <div style={{
+      background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+      borderRadius: 16, padding: '18px 22px',
+      display: 'flex', flexDirection: 'column', gap: 0,
+      boxShadow: 'var(--shadow-card)',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        paddingBottom: 12, borderBottom: '1px solid var(--color-border)', marginBottom: 2,
+      }}>
+        <SkeletonBox w={32} h={32} r={8} />
+        <SkeletonBox w={90} h={15} />
+      </div>
+      {[1, 2, 3].map((i) => (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 0', borderBottom: '1px solid var(--color-border)',
+        }}>
+          <SkeletonBox w={44} h={44} r={999} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <SkeletonBox w={120} h={13} />
+            <SkeletonBox w={90} h={12} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LimitSkeleton() {
+  return (
+    <div style={{ padding: '10px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <SkeletonBox w={120} h={13} />
+        <SkeletonBox w={80} h={12} />
+      </div>
+      <SkeletonBox h={6} r={999} />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        <SkeletonBox w={30} h={11} />
+      </div>
+    </div>
+  )
+}
+
+function BusinessRowSkeleton() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--color-border)' }}>
+      <SkeletonBox w={140} h={14} style={{ flex: 1 }} />
+      <SkeletonBox w={70} h={14} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 120 }}>
+        <SkeletonBox h={5} r={999} style={{ flex: 1 }} />
+        <SkeletonBox w={35} h={12} />
+      </div>
+    </div>
+  )
+}
+
+function AlertSkeleton() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px', borderRadius: 10,
+      background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+    }}>
+      <SkeletonBox w={15} h={15} r={4} />
+      <SkeletonBox h={13} style={{ flex: 1 }} />
+      <SkeletonBox w={40} h={11} />
+    </div>
+  )
+}
+
 function fmtUsd(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
@@ -189,47 +295,76 @@ function fmtValue(n: number): string {
   return n % 1 === 0 ? String(n) : n.toFixed(2)
 }
 
-function UsageStatCard({ item, accent, textColor }: {
-  item: CostUsageItem; accent: string; textColor: string
+function CircularProgress({ pct, size = 44, stroke = 4, color }: {
+  pct: number; size?: number; stroke?: number; color: string
 }) {
-  const hasLimit = item.limit != null && item.limit > 0
-  const pct = hasLimit ? Math.min((item.value / item.limit!) * 100, 100) : -1
-  const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent
+  const r = (size - stroke) / 2
+  const circumference = 2 * Math.PI * r
+  const filled = Math.min(pct, 100)
+  const offset = circumference - (filled / 100) * circumference
 
   return (
-    <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8, marginBottom: 6 }}>
-        <div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.08)" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke={color} strokeWidth={stroke}
+        strokeDasharray={circumference} strokeDashoffset={offset}
+        strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+      />
+    </svg>
+  )
+}
+
+function UsageListItem({ item, accent }: {
+  item: CostUsageItem; accent: string
+}) {
+  const hasLimit = item.limit != null && item.limit > 0
+  const pct = hasLimit ? Math.min((item.value / item.limit!) * 100, 100) : 0
+  const ringColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 14,
+      padding: '12px 0',
+      borderBottom: '1px solid var(--color-border)',
+    }}>
+      {hasLimit ? (
+        <div style={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
+          <CircularProgress pct={pct} color={ringColor} />
           <div style={{
-            fontSize: 26, fontWeight: 800, lineHeight: 1.1,
-            fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.03em',
-            color: textColor,
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transform: 'rotate(0deg)',
+            fontSize: 11, fontWeight: 700, fontFamily: '"Geist Mono", monospace',
+            color: ringColor, letterSpacing: '-0.03em',
           }}>
-            {hasLimit ? `${pct.toFixed(0)}%` : fmtValue(item.value)}
-          </div>
-          <div style={{ fontSize: 12, color: textColor, opacity: 0.7, marginTop: 2, fontWeight: 500 }}>
-            {item.category}
+            {pct.toFixed(0)}%
           </div>
         </div>
+      ) : (
         <div style={{
-          fontSize: 11.5, fontFamily: '"Geist Mono", monospace',
-          color: textColor, opacity: 0.6, fontWeight: 500,
-          whiteSpace: 'nowrap', textAlign: 'right', lineHeight: 1.3,
+          width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+          background: accent + '14', display: 'grid', placeItems: 'center',
+          fontSize: 13, fontWeight: 700, fontFamily: '"Geist Mono", monospace',
+          color: accent,
         }}>
-          {fmtValue(item.value)}{hasLimit ? ` / ${fmtValue(item.limit!)}` : ''}<br />{item.unit}
-        </div>
-      </div>
-      {hasLimit && (
-        <div style={{
-          height: 6, borderRadius: 999, overflow: 'hidden',
-          background: 'rgba(0,0,0,0.08)',
-        }}>
-          <div style={{
-            width: `${pct}%`, height: '100%', borderRadius: 999,
-            background: barColor, transition: 'width 0.4s ease',
-          }} />
+          {fmtValue(item.value)}
         </div>
       )}
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
+          {item.category}
+        </div>
+        <div style={{
+          fontSize: 12, color: 'var(--color-muted)', marginTop: 2,
+          fontFamily: '"Geist Mono", monospace', fontWeight: 500,
+        }}>
+          {fmtValue(item.value)}{hasLimit ? ` / ${fmtValue(item.limit!)}` : ''} {item.unit}
+        </div>
+      </div>
     </div>
   )
 }
@@ -241,26 +376,38 @@ function UsageProviderBlock({ slug, items }: { slug: string; items: CostUsageIte
 
   return (
     <div style={{
-      background: style.bg,
+      background: 'var(--color-bg)',
+      border: '1px solid var(--color-border)',
       borderRadius: 16,
-      padding: '20px 22px',
+      padding: '18px 22px',
       display: 'flex',
       flexDirection: 'column',
-      gap: 2,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      gap: 0,
+      boxShadow: 'var(--shadow-card)',
       minWidth: 0,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 18 }}>{icon}</span>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        paddingBottom: 12, borderBottom: '1px solid var(--color-border)',
+        marginBottom: 2,
+      }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8,
+          background: style.accent + '14',
+          display: 'grid', placeItems: 'center',
+          fontSize: 16, flexShrink: 0,
+        }}>
+          {icon}
+        </div>
         <span style={{
-          fontSize: 14, fontWeight: 700, color: style.text,
+          fontSize: 15, fontWeight: 700, color: 'var(--color-text)',
           letterSpacing: '-0.01em',
         }}>
           {name}
         </span>
       </div>
       {items.map((item, i) => (
-        <UsageStatCard key={i} item={item} accent={style.accent} textColor={style.text} />
+        <UsageListItem key={i} item={item} accent={style.accent} />
       ))}
     </div>
   )
@@ -438,10 +585,10 @@ export function TabCostos() {
   const { data: overview, error: errOverview, loading: loadingOverview } = useFetch(
     () => platformApi.costsOverview(months), [months, tick],
   )
-  const { data: usage } = useFetch(() => platformApi.costsUsage(), [tick])
-  const { data: limits } = useFetch(() => platformApi.costsLimits(), [tick])
-  const { data: alerts } = useFetch(() => platformApi.costsAlerts(), [tick])
-  const { data: byBiz } = useFetch(() => platformApi.costsByBusiness(), [tick])
+  const { data: usage, loading: loadingUsage } = useFetch(() => platformApi.costsUsage(), [tick])
+  const { data: limits, loading: loadingLimits } = useFetch(() => platformApi.costsLimits(), [tick])
+  const { data: alerts, loading: loadingAlerts } = useFetch(() => platformApi.costsAlerts(), [tick])
+  const { data: byBiz, loading: loadingByBiz } = useFetch(() => platformApi.costsByBusiness(), [tick])
 
   const [syncing, setSyncing] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -458,7 +605,6 @@ export function TabCostos() {
   }
 
   if (errOverview) return <ErrorBox msg="No se pudo cargar el control de costos." />
-  if (!overview && loadingOverview) return <Loader />
 
   const providers = overview?.providers ?? []
   const totalUsd = overview?.totalUsd ?? 0
@@ -502,12 +648,11 @@ export function TabCostos() {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
           gap: 14,
-          opacity: loadingOverview ? 0.5 : 1,
-          transition: 'opacity 0.2s',
         }}>
-          {providers.map((p) => (
-            <ServiceCard key={p.slug} provider={p} />
-          ))}
+          {loadingOverview && providers.length === 0
+            ? Array.from({ length: 7 }, (_, i) => <ServiceCardSkeleton key={i} />)
+            : providers.map((p) => <ServiceCard key={p.slug} provider={p} />)
+          }
           {providers.length === 0 && !loadingOverview && (
             <Empty text="No hay proveedores configurados. Cargá datos manuales para empezar." />
           )}
@@ -515,11 +660,17 @@ export function TabCostos() {
       </Card>
 
       {/* Uso del Plan */}
-      {usage && Object.keys(usage.providers).length > 0 && (
-        <Card title="Uso del Plan" subtitle="Métricas de consumo en tiempo real — cuánto usás de lo disponible en cada servicio.">
+      <Card title="Uso del Plan" subtitle="Métricas de consumo en tiempo real — cuánto usás de lo disponible en cada servicio.">
+        {loadingUsage && !usage ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {Array.from({ length: 3 }, (_, i) => <UsageBlockSkeleton key={i} />)}
+          </div>
+        ) : usage && Object.keys(usage.providers).length > 0 ? (
           <UsageSection usage={usage} />
-        </Card>
-      )}
+        ) : (
+          <Empty text="Sin métricas de uso disponibles." />
+        )}
+      </Card>
 
       {/* Two columns: Limits + Top businesses */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
@@ -532,7 +683,11 @@ export function TabCostos() {
             </button>
           }
         >
-          {limits && limits.length > 0 ? (
+          {loadingLimits && !limits ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {Array.from({ length: 2 }, (_, i) => <LimitSkeleton key={i} />)}
+            </div>
+          ) : limits && limits.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {limits.filter((l) => l.active).map((l) => <LimitBar key={l.id} limit={l} />)}
             </div>
@@ -543,7 +698,11 @@ export function TabCostos() {
 
         {/* Top negocios por consumo */}
         <Card title="Top negocios por consumo">
-          {byBiz && byBiz.businesses.length > 0 ? (
+          {loadingByBiz && !byBiz ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {Array.from({ length: 3 }, (_, i) => <BusinessRowSkeleton key={i} />)}
+            </div>
+          ) : byBiz && byBiz.businesses.length > 0 ? (
             <Table
               head={['Negocio', 'Total', '% del total']}
               alignRight={[1, 2]}
@@ -571,7 +730,11 @@ export function TabCostos() {
 
       {/* Alertas recientes */}
       <Card title="Alertas recientes">
-        {alerts && alerts.length > 0 ? (
+        {loadingAlerts && !alerts ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {Array.from({ length: 2 }, (_, i) => <AlertSkeleton key={i} />)}
+          </div>
+        ) : alerts && alerts.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {alerts.map((a) => (
               <AlertRow key={a.id} alert={a} onAck={async () => { await platformApi.costsAckAlert(a.id); reload() }} />

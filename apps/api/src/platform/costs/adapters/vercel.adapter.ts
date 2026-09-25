@@ -2,17 +2,34 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CostAdapter, CostBreakdown, UsageItem } from './adapter.interface';
 
-const HOBBY_LIMITS: Record<string, { limit: number; unit: string }> = {
-  'Deployments': { limit: 100, unit: 'deploys/día' },
-  'Fast Data Transfer': { limit: 100, unit: 'GB' },
-  'Edge Requests': { limit: 1_000_000, unit: 'requests' },
-  'Function Invocations': { limit: 1_000_000, unit: 'invocations' },
-  'Image Optimization': { limit: 5_000, unit: 'transforms' },
-  'ISR Reads': { limit: 1_000_000, unit: 'reads' },
-  'ISR Writes': { limit: 200_000, unit: 'writes' },
-  'Blob Storage': { limit: 1, unit: 'GB' },
-  'Web Analytics Events': { limit: 50_000, unit: 'events' },
-};
+interface UsageDayRequests {
+  request_hit_count: number;
+  request_miss_count: number;
+  bandwidth_outgoing_bytes: number;
+  bandwidth_incoming_bytes: number;
+  function_execution_successful_gb_hours: number;
+  function_execution_error_gb_hours: number;
+  function_execution_timeout_gb_hours: number;
+  function_invocation_successful_count: number;
+  function_invocation_error_count: number;
+  function_invocation_timeout_count: number;
+}
+
+interface UsageDayBuilds {
+  build_completed_count: number;
+  build_failed_count: number;
+  build_build_seconds: number;
+}
+
+const HOBBY_LIMITS = {
+  edgeRequests:         { limit: 1_000_000, unit: 'requests' },
+  functionInvocations:  { limit: 1_000_000, unit: 'invocaciones' },
+  fastDataTransfer:     { limit: 100,       unit: 'GB' },
+  fastOriginTransfer:   { limit: 10,        unit: 'GB' },
+  fluidMemory:          { limit: 1_000,     unit: 'GB-Hrs' },
+  buildMinutes:         { limit: 6_000,     unit: 'min' },
+  deploymentsPerDay:    { limit: 100,       unit: 'deploys/día' },
+} as const;
 
 @Injectable()
 export class VercelCostAdapter implements CostAdapter {
@@ -87,25 +104,126 @@ export class VercelCostAdapter implements CostAdapter {
 
     const items: UsageItem[] = [];
 
-    const deploys = await this.countDeploymentsThisMonth(token);
-    if (deploys !== null) {
+    const [requestsData, buildsData, deploysToday] = await Promise.all([
+      this.fetchUsageType<UsageDayRequests>(token, 'requests'),
+      this.fetchUsageType<UsageDayBuilds>(token, 'builds'),
+      this.countDeploymentsToday(token),
+    ]);
+
+    if (requestsData) {
+      const edgeReqs = requestsData.reduce(
+        (sum, d) => sum + (d.request_hit_count ?? 0) + (d.request_miss_count ?? 0), 0,
+      );
       items.push({
-        category: 'Deployments (hoy)',
-        value: deploys,
-        unit: 'deploys',
-        limit: HOBBY_LIMITS['Deployments'].limit,
+        category: 'Edge Requests',
+        value: edgeReqs,
+        unit: HOBBY_LIMITS.edgeRequests.unit,
+        limit: HOBBY_LIMITS.edgeRequests.limit,
+      });
+
+      const fnInvocations = requestsData.reduce(
+        (sum, d) =>
+          sum +
+          (d.function_invocation_successful_count ?? 0) +
+          (d.function_invocation_error_count ?? 0) +
+          (d.function_invocation_timeout_count ?? 0),
+        0,
+      );
+      items.push({
+        category: 'Function Invocations',
+        value: fnInvocations,
+        unit: HOBBY_LIMITS.functionInvocations.unit,
+        limit: HOBBY_LIMITS.functionInvocations.limit,
+      });
+
+      const bandwidthOutGB = requestsData.reduce(
+        (sum, d) => sum + (d.bandwidth_outgoing_bytes ?? 0), 0,
+      ) / (1024 ** 3);
+      items.push({
+        category: 'Fast Data Transfer',
+        value: Math.round(bandwidthOutGB * 100) / 100,
+        unit: HOBBY_LIMITS.fastDataTransfer.unit,
+        limit: HOBBY_LIMITS.fastDataTransfer.limit,
+      });
+
+      const bandwidthInGB = requestsData.reduce(
+        (sum, d) => sum + (d.bandwidth_incoming_bytes ?? 0), 0,
+      ) / (1024 ** 3);
+      items.push({
+        category: 'Fast Origin Transfer',
+        value: Math.round(bandwidthInGB * 100) / 100,
+        unit: HOBBY_LIMITS.fastOriginTransfer.unit,
+        limit: HOBBY_LIMITS.fastOriginTransfer.limit,
+      });
+
+      const gbHours = requestsData.reduce(
+        (sum, d) =>
+          sum +
+          (d.function_execution_successful_gb_hours ?? 0) +
+          (d.function_execution_error_gb_hours ?? 0) +
+          (d.function_execution_timeout_gb_hours ?? 0),
+        0,
+      );
+      items.push({
+        category: 'Fluid Provisioned Memory',
+        value: Math.round(gbHours * 100) / 100,
+        unit: HOBBY_LIMITS.fluidMemory.unit,
+        limit: HOBBY_LIMITS.fluidMemory.limit,
       });
     }
 
-    const consumption = await this.fetchBillingConsumption(token);
-    for (const c of consumption) {
-      items.push(c);
+    if (buildsData) {
+      const buildMin = buildsData.reduce(
+        (sum, d) => sum + (d.build_build_seconds ?? 0), 0,
+      ) / 60;
+      items.push({
+        category: 'Build Minutes',
+        value: Math.round(buildMin * 10) / 10,
+        unit: HOBBY_LIMITS.buildMinutes.unit,
+        limit: HOBBY_LIMITS.buildMinutes.limit,
+      });
+    }
+
+    if (deploysToday !== null) {
+      items.push({
+        category: 'Deployments (hoy)',
+        value: deploysToday,
+        unit: HOBBY_LIMITS.deploymentsPerDay.unit,
+        limit: HOBBY_LIMITS.deploymentsPerDay.limit,
+      });
     }
 
     return { items };
   }
 
-  private async countDeploymentsThisMonth(token: string): Promise<number | null> {
+  private async fetchUsageType<T>(token: string, type: string): Promise<T[] | null> {
+    try {
+      const now = new Date();
+      const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00.000Z`;
+      const to = now.toISOString();
+
+      const url =
+        `https://api.vercel.com/v2/usage?type=${type}` +
+        `&from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&teamId=${this.teamId}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        this.logger.warn(`Vercel /v2/usage?type=${type} respondió ${res.status}`);
+        return null;
+      }
+      const json = (await res.json()) as { data: T[] };
+      return json.data ?? [];
+    } catch (err) {
+      this.logger.warn(`Error fetching Vercel usage type=${type}: ${err}`);
+      return null;
+    }
+  }
+
+  private async countDeploymentsToday(token: string): Promise<number | null> {
     try {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -126,7 +244,7 @@ export class VercelCostAdapter implements CostAdapter {
           { headers: { Authorization: `Bearer ${token}` } },
         );
         if (!res.ok) return null;
-        const data = await res.json() as any;
+        const data = (await res.json()) as any;
         count += data.deployments?.length ?? 0;
         next = data.pagination?.next;
       } while (next);
@@ -134,47 +252,6 @@ export class VercelCostAdapter implements CostAdapter {
       return count;
     } catch {
       return null;
-    }
-  }
-
-  private async fetchBillingConsumption(token: string): Promise<UsageItem[]> {
-    const now = new Date();
-    const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00.000Z`;
-    const to = now.toISOString();
-
-    try {
-      const res = await fetch(
-        `https://api.vercel.com/v1/billing/charges?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&teamId=${this.teamId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      if (!res.ok) return [];
-
-      const text = await res.text();
-      const lines = text.trim().split('\n').filter(Boolean);
-
-      const consumed: Record<string, { qty: number; unit: string }> = {};
-      for (const line of lines) {
-        try {
-          const charge = JSON.parse(line);
-          if (charge.ConsumedQuantity && charge.ServiceName) {
-            const svc = charge.ServiceName;
-            if (!consumed[svc]) consumed[svc] = { qty: 0, unit: charge.ConsumedUnit ?? 'units' };
-            consumed[svc].qty += charge.ConsumedQuantity;
-          }
-        } catch { /* skip */ }
-      }
-
-      return Object.entries(consumed).map(([svc, data]) => {
-        const known = HOBBY_LIMITS[svc];
-        return {
-          category: svc,
-          value: Math.round(data.qty * 100) / 100,
-          unit: data.unit,
-          limit: known?.limit,
-        };
-      });
-    } catch {
-      return [];
     }
   }
 }
