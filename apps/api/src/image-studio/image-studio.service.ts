@@ -223,40 +223,26 @@ export class ImageStudioService {
     if (!style) throw new BadRequestException('Estilo de fondo inválido');
 
     // Flujo unificado:
-    // 1. Intenta Workers AI (hasta 6 intentos).
-    // 2. Si falla (error, flag de contenido NSFW, cuota o tras los 6 intentos),
-    //    aplica automáticamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
+    // 1. Intenta Workers AI (1 solo intento rápido con timeout estricto de 7s).
+    // 2. Si falla (error, flag de contenido NSFW, cuota o timeout),
+    //    aplica inmediatamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
     const prompt = this.promptPremium(style, descripcion);
     let workersResult: { buffer: Buffer; mimeType: string } | null = null;
-    const MAX_INTENTOS_WORKERS = 6;
     let ultimoError: any = null;
 
-    for (let intento = 1; intento <= MAX_INTENTOS_WORKERS; intento++) {
-      try {
-        this.logger.log(`[generateBackground] Intento ${intento}/${MAX_INTENTOS_WORKERS} con Workers AI (estilo: ${key})`);
-        const res = await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype);
-        if (res && res.buffer && res.buffer.length > 0) {
-          workersResult = res;
-          break;
-        }
-      } catch (err: any) {
-        ultimoError = err;
-        this.logger.warn(`[generateBackground] Intento ${intento}/${MAX_INTENTOS_WORKERS} falló: ${err?.message || err}`);
-        // Si el filtro de contenido de Cloudflare bloqueó la imagen (código 3030 o flagged),
-        // reintentar la misma imagen no va a cambiar el resultado. Pasamos de inmediato al modelo local.
-        if (err?.message && (err.message.includes('flagged') || err.message.includes('3030') || err.message.includes('NSFW'))) {
-          this.logger.warn(`[generateBackground] Workers AI detectó flag de contenido (falso positivo NSFW). Pasando al modelo local.`);
-          break;
-        }
-        // Si la cuota diaria se agotó (429 / 503 / quota), pasamos directo al modelo local
-        if (err?.status === 429 || err?.status === 503 || (err?.message && err.message.includes('quota'))) {
-          this.logger.warn(`[generateBackground] Cuota de Workers AI agotada o 503. Pasando al modelo local.`);
-          break;
-        }
-        if (intento < MAX_INTENTOS_WORKERS) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
-        }
+    try {
+      this.logger.log(`[generateBackground] Consultando Workers AI (estilo: ${key})`);
+      const workersPromise = this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype, 1);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT_WORKERS_AI')), 7000),
+      );
+      const res = await Promise.race([workersPromise, timeoutPromise]);
+      if (res && res.buffer && res.buffer.length > 0) {
+        workersResult = res;
       }
+    } catch (err: any) {
+      ultimoError = err;
+      this.logger.warn(`[generateBackground] Workers AI no disponible o demorado (${err?.message || err}). Pasando inmediatamente al modelo local.`);
     }
 
     if (workersResult) {
@@ -362,8 +348,19 @@ export class ImageStudioService {
         .png()
         .toBuffer();
     } catch (error) {
-      this.logger.error(`No se pudo componer fondo + producto (negocio ${businessId}): ${error}`);
-      throw new InternalServerErrorException('No se pudo generar el fondo. Probá de nuevo.');
+      this.logger.warn(`Error en sombra orgánica, aplicando composición directa: ${error}`);
+      try {
+        const backgroundResized = await sharp(backgroundBuffer, ENTRADA_IMAGEN)
+          .resize(width, height, { fit: 'cover' })
+          .toBuffer();
+        composedBuffer = await sharp(backgroundResized, ENTRADA_IMAGEN)
+          .composite([{ input: cutout, left, top }])
+          .png()
+          .toBuffer();
+      } catch (fallbackErr) {
+        this.logger.error(`Error crítico en composición: ${fallbackErr}`);
+        return { base64: cutout.toString('base64'), mimeType: 'image/png' };
+      }
     }
 
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };

@@ -199,10 +199,10 @@ export class CloudflareImageService {
    * nombra sus campos de multi-referencia, hasta input_image_3) — NO existe
    * un campo genérico "image" en este modelo.
    */
-  async editImage(prompt: string, image: Buffer, mimeType: string): Promise<CloudflareGeneratedImage> {
+  async editImage(prompt: string, image: Buffer, mimeType: string, maxIntentos = 1): Promise<CloudflareGeneratedImage> {
     const { accountId, apiToken } = this.getCreds();
 
-    const MAX_INTENTOS = MAX_INTENTOS_FILTRO;
+    const MAX_INTENTOS = maxIntentos;
     let ultimoJson: WorkersAiErrorBody | null = null;
     let ultimoStatus = 0;
 

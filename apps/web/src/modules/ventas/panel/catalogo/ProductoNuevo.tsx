@@ -1519,31 +1519,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             </div>
                             <div style={{ marginBottom: 18 }}>
-                                <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
-                                    Forma del producto
-                                    <span title='Para "Fondo con IA": un producto plano (indumentaria) usa un motor de IA distinto que uno con volumen (riñoneras, accesorios).' style={{ display: 'inline-flex', marginLeft: 6, cursor: 'help' }}>
-                                        <Info size={11} strokeWidth={2.25} color="var(--color-muted)" />
-                                    </span>
-                                </label>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    {(['flat', 'volume'] as const).map(tipo => (
-                                        <button
-                                            key={tipo}
-                                            type="button"
-                                            onClick={() => { photoTypeAutoRef.current = false; set('photoType', tipo) }}
-                                            style={{
-                                                flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-                                                border: '1px solid ' + (prod.photoType === tipo ? 'var(--color-primary)' : 'var(--color-border)'),
-                                                background: prod.photoType === tipo ? 'var(--color-primary-bg)' : 'var(--color-surface)',
-                                                color: prod.photoType === tipo ? 'var(--color-primary)' : 'var(--color-text)',
-                                            }}
-                                        >
-                                            {tipo === 'flat' ? 'Plano (indumentaria)' : 'Con volumen (objetos)'}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Etiquetas</label>
                                 <input
                                     className="ds-field"
