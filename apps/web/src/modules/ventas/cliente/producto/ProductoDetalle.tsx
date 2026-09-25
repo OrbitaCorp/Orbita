@@ -792,6 +792,22 @@ export default function ProductoDetalle() {
               </p>
             )}
 
+            {/* Etiquetas del producto — las carga el vendedor (a mano o con
+                Orbi, ver ProductoNuevo.tsx) pero nunca se mostraban en la
+                ficha: el dato ya viajaba en StorefrontProductDetail.tags,
+                simplemente no había ningún JSX que lo pintara (reportado:
+                "no se muestran"). Chips discretos, sin link — el catálogo no
+                filtra por etiqueta hoy, son solo informativas para el cliente. */}
+            {producto.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+                {producto.tags.map(t => (
+                  <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 500, color: 'var(--color-muted)' }}>
+                    {t.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
               <span style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(precio)}</span>
               {precioAnt && <span style={{ fontSize: 16, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(precioAnt)}</span>}
