@@ -657,7 +657,7 @@ export class MailService {
 
   // ── Auth ──────────────────────────────────────────────
 
-  async sendWelcome(to: string, data: { storeName: string }, meta?: MailMeta) {
+  async sendWelcome(to: string, data: { storeName: string; profileUrl?: string }, meta?: MailMeta) {
     await this.sendOrLog(to, `Bienvenido a ${data.storeName}`, 'welcome', data, meta);
   }
 
@@ -741,6 +741,11 @@ export class MailService {
       // El template los imprime tal cual: llegan ya formateados ("$12.500").
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      // "Ver mi pedido" — undefined para un comprador invitado (sin cuenta):
+      // esa página exige sesión de cliente, y un invitado no tiene con qué
+      // loguearse ahí. Quien llama decide (ver orders.service.ts) según si
+      // el pedido tiene customerId.
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ): Promise<boolean> {
@@ -748,8 +753,9 @@ export class MailService {
   }
 
   // "Recibimos tu pedido": el negocio lo cargó desde el panel como pedido
-  // online (nace pendiente). Lleva el detalle igual que la confirmación, pero
-  // no dice "confirmado": eso llega cuando el pedido avance.
+  // online (nace pendiente), o es un checkout real del storefront. Lleva el
+  // detalle igual que la confirmación, pero no dice "confirmado": eso llega
+  // cuando el pedido avance.
   async sendOrderReceived(
     to: string,
     data: {
@@ -757,6 +763,7 @@ export class MailService {
       orderNumber: number;
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ): Promise<boolean> {
@@ -794,6 +801,9 @@ export class MailService {
       orderNumber: number;
       tracking?: string;
       carrier?: string;
+      // El link al pedido en Órbita (cuenta), además del link al buscador
+      // del transportista (siempre externo, sin cuenta) de abajo.
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ) {
@@ -812,6 +822,7 @@ export class MailService {
     data: {
       storeName: string;
       orderNumber: number;
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ) {
@@ -823,6 +834,7 @@ export class MailService {
     data: {
       storeName: string;
       orderNumber: number;
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ) {
@@ -864,6 +876,7 @@ export class MailService {
       orderNumber: number;
       refundMethod: string;
       amount: number;
+      orderUrl?: string;
     },
     meta?: MailMeta,
   ) {

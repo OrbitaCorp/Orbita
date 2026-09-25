@@ -36,7 +36,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'welcome',
     isPlatform: false,
     subject: 'Bienvenido a Panadería López (ficticio)',
-    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName },
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, profileUrl: 'https://panaderialopez.orbita.site/perfil' },
   },
   {
     id: 'reset-password',
@@ -121,6 +121,27 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
         { name: 'Medialunas x12', quantity: 2, price: '$4.500' },
         { name: 'Torta de chocolate', quantity: 1, price: '$17.470' },
       ],
+      orderUrl: 'https://panaderialopez.orbita.site/pedido/1042',
+    },
+  },
+  {
+    id: 'order-received',
+    label: 'Recibimos tu pedido',
+    group: 'Pedidos',
+    template: 'order-received',
+    isPlatform: false,
+    subject: 'Recibimos tu pedido #1042',
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      orderNumber: 1042,
+      total: '$26.470',
+      items: [
+        { name: 'Medialunas x12', quantity: 2, price: '$4.500' },
+        { name: 'Torta de chocolate', quantity: 1, price: '$17.470' },
+      ],
+      // Sin orderUrl a propósito: la variante más común es un comprador
+      // invitado (sin cuenta) — ver la nota en orders.service.ts sobre por
+      // qué ese caso no lleva "Ver mi pedido".
     },
   },
   {
@@ -130,7 +151,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'order-shipped',
     isPlatform: false,
     subject: 'Tu pedido #1042 está en camino',
-    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, tracking: 'OCA-994211AR' },
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, tracking: 'OCA-994211AR', orderUrl: 'https://panaderialopez.orbita.site/pedido/1042' },
   },
   {
     id: 'order-shipped-sin-tracking',
@@ -166,7 +187,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'order-delivered',
     isPlatform: false,
     subject: 'Tu pedido #1042 fue entregado',
-    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042 },
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, orderUrl: 'https://panaderialopez.orbita.site/pedido/1042' },
   },
   {
     id: 'order-cancelled',
@@ -175,7 +196,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'order-cancelled',
     isPlatform: false,
     subject: 'Tu pedido #1042 fue cancelado',
-    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042 },
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, orderUrl: 'https://panaderialopez.orbita.site/pedido/1042' },
   },
   {
     id: 'thanks-for-purchase',
@@ -221,7 +242,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     template: 'return-approved',
     isPlatform: false,
     subject: 'Tu devolución fue aprobada',
-    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, refundMethod: 'Mercado Pago', amount: '$17.470' },
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, refundMethod: 'Mercado Pago', amount: '$17.470', orderUrl: 'https://panaderialopez.orbita.site/pedido/1042' },
   },
   {
     id: 'platform-admin-login-code',

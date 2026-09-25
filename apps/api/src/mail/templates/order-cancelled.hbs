@@ -2,3 +2,6 @@
 <h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Tu pedido #{{orderNumber}} fue cancelado</h2>
 <p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Tu pedido en <strong style="color:#1a1f36;">{{storeName}}</strong> quedó cancelado. Si hiciste un pago, el negocio se va a contactar con vos para resolverlo.</p>
 <p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Ante cualquier duda, escribile a la tienda — estamos para ayudarte.</p>
+{{#if orderUrl}}
+{{> cta-button this url=orderUrl label="Ver el pedido"}}
+{{/if}}

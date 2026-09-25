@@ -14,4 +14,7 @@
 {{#unless tracking}}
 <p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Este envío es una entrega local del negocio, sin código de seguimiento.</p>
 {{/unless}}
+{{#if orderUrl}}
+{{> cta-button this url=orderUrl label="Ver mi pedido"}}
+{{/if}}
 <p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Te vamos a avisar apenas llegue a destino.</p>

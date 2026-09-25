@@ -64,7 +64,7 @@ const INCLUDE_ORDEN = {
       branchId: true,
       customerId: true,
       total: true,
-      business: { select: { name: true } },
+      business: { select: { name: true, subdomain: true } },
       customer: { select: { firstName: true, lastName: true, email: true } },
       onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
       items: { select: { id: true, productName: true, variantLabel: true, quantity: true, isConcept: true, variantId: true } },
@@ -469,11 +469,15 @@ export class ReturnsService {
     const destino = this.emailCliente(r.order);
     if (destino && aprueba) {
       try {
+        // "Ver mi pedido" solo con cuenta — esa página exige sesión de
+        // cliente (RequireAuth); un invitado no tiene con qué loguearse ahí.
+        const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
         await this.mail.sendReturnApproved(destino, {
           storeName: r.order.business.name,
           orderNumber: r.order.orderNumber,
           refundMethod: NOMBRE_METODO[metodo],
           amount: Number(r.amount),
+          orderUrl: r.order.customerId ? `${frontend}/tienda/${r.order.business.subdomain}/pedido/${r.orderId}` : undefined,
         }, { businessId, customerId: r.order.customerId ?? undefined });
       } catch (e) {
         this.logger.warn(`No se pudo avisar la aprobación de la devolución ${r.id}: ${e}`);

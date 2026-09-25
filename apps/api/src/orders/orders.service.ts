@@ -1059,7 +1059,17 @@ export class OrdersService {
         // el mail falla queda en el log y el pedido ya está creado.
         if ((opts?.publicCheckout || dto.notifyCustomer) && buyerEmail) {
           try {
-            const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
+            const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+            // "Ver mi pedido" SOLO si el comprador tiene cuenta (customer.id):
+            // esa página (/pedido/[id]) exige sesión de cliente (RequireAuth) —
+            // sin cuenta no hay con qué loguearse, así que el link sería un
+            // callejón sin salida. Un invitado se queda con el detalle que ya
+            // va adentro del mail (reportado: "cuidado con eso, para invitados
+            // no se puede poner un botón de ver mi pedido").
+            const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+            const orderUrl = customer?.id && negocio?.subdomain
+              ? `${frontend}/tienda/${negocio.subdomain}/pedido/${creado.id}`
+              : undefined;
             const datos = {
               storeName: negocio?.name ?? 'la tienda',
               orderNumber: creado.orderNumber,
@@ -1069,6 +1079,7 @@ export class OrdersService {
                 quantity: r.quantity,
                 price: fmtPesos(Number(r.unitPrice)),
               })),
+              orderUrl,
             };
             const meta = { businessId, customerId: customer?.id };
             if (esPresencial) await this.mail.sendOrderConfirmation(buyerEmail, datos, meta);
@@ -1290,6 +1301,16 @@ export class OrdersService {
     if (destino) {
       const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
       const meta = { businessId, customerId: order.customerId ?? undefined };
+      // "Ver mi pedido" solo para compradores CON cuenta — misma razón que en
+      // create(): esa página exige sesión de cliente (RequireAuth, que
+      // redirige a login y vuelve — RBT-351), un invitado no tiene con qué
+      // loguearse ahí. Se calcula una sola vez, se reusa en los 4 mails de
+      // abajo (antes ninguno llevaba ningún link interno de Órbita —
+      // reportado con captura sobre el aviso de nuevo pedido, que era el
+      // síntoma más visible de lo mismo).
+      const orderUrl = order.customerId
+        ? `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}`
+        : undefined;
       try {
         if (descuentaStock) {
           // Con el detalle completo: es la "factura" informal de la compra.
@@ -1305,6 +1326,7 @@ export class OrdersService {
               quantity: it.quantity,
               price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
             })),
+            orderUrl,
           }, meta);
         }
         if (nuevo === 'SHIPPED') {
@@ -1321,18 +1343,21 @@ export class OrdersService {
             // transportista y el link a su buscador oficial para el template.
             tracking: order.onlineOrderDetails?.tracking ?? undefined,
             carrier: order.onlineOrderDetails?.carrier ?? undefined,
+            orderUrl,
           }, meta);
         }
         if (nuevo === 'CANCELLED') {
           await this.mail.sendOrderCancelled(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
+            orderUrl,
           }, meta);
         }
         if (nuevo === 'DELIVERED') {
           await this.mail.sendOrderDelivered(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
+            orderUrl,
           }, meta);
           // El botón "Dejar mi opinión" lleva a la PÁGINA DEL PRODUCTO (donde
           // están las reseñas), no al pedido — pedido de Ale 19/08. Si el
@@ -1472,8 +1497,8 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: { id, businessId, deletedAt: null },
       select: {
-        id: true, channel: true, status: true, orderNumber: true,
-        business: { select: { name: true } },
+        id: true, channel: true, status: true, orderNumber: true, customerId: true,
+        business: { select: { name: true, subdomain: true } },
         customer: { select: { email: true } },
         onlineOrderDetails: { select: { orderId: true, buyerEmail: true, carrier: true, tracking: true } },
       },
@@ -1505,11 +1530,13 @@ export class OrdersService {
       const destino = order.onlineOrderDetails.buyerEmail ?? order.customer?.email ?? null;
       if (destino) {
         try {
+          const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
           await this.mail.sendOrderShipped(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
             tracking: trackingNuevo,
             carrier: carrierNuevo ?? undefined,
+            orderUrl: order.customerId ? `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}` : undefined,
           }, { businessId });
         } catch (e) {
           // Un mail caído no puede voltear el guardado del envío.
@@ -1555,6 +1582,7 @@ export class OrdersService {
           quantity: it.quantity,
           price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
         })),
+        orderUrl: order.customerId ? url.replace(/\/comprobante$/, '') : undefined,
       }, { businessId, customerId: order.customerId ?? undefined });
     } catch (e) {
       this.logger.warn(`Falló el envío del comprobante del pedido ${id}: ${e}`);

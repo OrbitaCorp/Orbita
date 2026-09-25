@@ -203,7 +203,16 @@ export class AuthService implements OnModuleInit {
     }
 
     const storeName = business.storefrontConfig?.storeName ?? business.name;
-    await this.mail.sendWelcome(dto.email, { storeName }, { businessId: business.id, customerId });
+    // Quien recibe esto SIEMPRE tiene cuenta (se la acaba de crear) — a
+    // diferencia de los mails de pedido, acá el link a "Mi cuenta" es
+    // siempre seguro (RequireAuth ya tiene la sesión recién creada, o la
+    // pide con returnTo si el click llega desde otro dispositivo).
+    const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    await this.mail.sendWelcome(
+      dto.email,
+      { storeName, profileUrl: `${frontend}/tienda/${business.subdomain}/perfil` },
+      { businessId: business.id, customerId },
+    );
 
     // Logueamos directo (mismo criterio que login()): no tiene sentido pedirle
     // al cliente que reingrese la contraseña que acaba de elegir hace 2 segundos.
