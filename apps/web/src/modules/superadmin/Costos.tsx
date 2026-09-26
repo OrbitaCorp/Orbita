@@ -41,6 +41,26 @@ const PROVIDER_DASHBOARD_URLS: Record<string, string> = {
   tavily:     'https://app.tavily.com/home',
 }
 
+function getSavedAccount(slug: string): string {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('orbita_cost_accounts') : null
+    const map = raw ? JSON.parse(raw) : {}
+    return typeof map[slug] === 'string' ? map[slug] : ''
+  } catch {
+    return ''
+  }
+}
+
+function saveAccount(slug: string, cuenta: string) {
+  try {
+    if (typeof window === 'undefined') return
+    const raw = localStorage.getItem('orbita_cost_accounts')
+    const map = raw ? JSON.parse(raw) : {}
+    map[slug] = cuenta
+    localStorage.setItem('orbita_cost_accounts', JSON.stringify(map))
+  } catch {}
+}
+
 // ─── Skeletons ──────────────────────────────────────────────────────────────
 
 const skeletonBase: React.CSSProperties = {
@@ -200,6 +220,7 @@ function ServiceCard({ provider, onClick }: { provider: CostProviderSummary; onC
   const isUp = provider.deltaPercent > 0
   const isDown = provider.deltaPercent < 0
   const deltaColor = isUp ? 'var(--color-error)' : isDown ? '#10B981' : 'var(--color-muted)'
+  const cuentaAsociada = getSavedAccount(provider.slug)
   return (
     <div
       onClick={onClick}
@@ -230,6 +251,11 @@ function ServiceCard({ provider, onClick }: { provider: CostProviderSummary; onC
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {provider.name}
           </div>
+          {cuentaAsociada && (
+            <div style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }} title={cuentaAsociada}>
+              {cuentaAsociada}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
             <span style={{
               fontSize: 22, fontWeight: 800, color: 'var(--color-text)',
@@ -448,15 +474,17 @@ function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
 
 // ─── Manual Snapshot Modal ───────────────────────────────────────────────────
 
-function ManualModal({ providers, onClose, onSaved }: {
+function ManualModal({ providers, initialSlug, onClose, onSaved }: {
   providers: CostProviderSummary[]
+  initialSlug?: string
   onClose: () => void
   onSaved: () => void
 }) {
-  const [slug, setSlug] = useState(providers[0]?.slug ?? '')
+  const defaultSlug = initialSlug || (providers[0]?.slug ?? '')
+  const [slug, setSlug] = useState(defaultSlug)
   const [month, setMonth] = useState(currentMonth())
-  const [amount, setAmount] = useState('')
-  const [cuenta, setCuenta] = useState('')
+  const [amount, setAmount] = useState('0.00')
+  const [cuenta, setCuenta] = useState(() => getSavedAccount(defaultSlug))
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -466,7 +494,15 @@ function ManualModal({ providers, onClose, onSaved }: {
     <ModalShell title="Cargar costo manual" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Servicio">
-          <select value={slug} onChange={(e) => setSlug(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+          <select
+            value={slug}
+            onChange={(e) => {
+              const next = e.target.value
+              setSlug(next)
+              setCuenta(getSavedAccount(next))
+            }}
+            style={{ ...inputStyle, width: '100%' }}
+          >
             {providers.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
           </select>
           {dashboardUrl && (
@@ -489,9 +525,9 @@ function ManualModal({ providers, onClose, onSaved }: {
             </a>
           )}
         </Field>
-        <Field label="Cuenta Gmail asociada" hint="Ej: mateo@gmail.com — para identificar la cuenta origen">
+        <Field label="Cuenta Gmail asociada" hint="Ej: contacto@orbita-corp o mateo@gmail.com para identificar la cuenta origen">
           <input
-            type="email"
+            type="text"
             placeholder="cuenta@gmail.com"
             value={cuenta}
             onChange={(e) => setCuenta(e.target.value)}
@@ -514,19 +550,31 @@ function ManualModal({ providers, onClose, onSaved }: {
           <button
             type="button"
             className="ds-hover"
-            disabled={enviando || !amount}
+            disabled={enviando}
             onClick={async () => {
+              const parsed = amount.trim() === '' ? 0 : Number(amount)
+              if (isNaN(parsed) || parsed < 0) {
+                setError('Ingresá un monto válido (0 o mayor).')
+                return
+              }
               setEnviando(true)
               setError('')
               try {
-                await platformApi.costsManualSnapshot({ providerSlug: slug, month, amountUsd: Number(amount) })
+                if (cuenta.trim()) {
+                  saveAccount(slug, cuenta.trim())
+                }
+                await platformApi.costsManualSnapshot({ providerSlug: slug, month, amountUsd: parsed })
                 onSaved()
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'No se pudo guardar.')
                 setEnviando(false)
               }
             }}
-            style={btnPrimary}
+            style={{
+              ...btnPrimary,
+              opacity: enviando ? 0.6 : 1,
+              cursor: enviando ? 'not-allowed' : 'pointer',
+            }}
           >
             {enviando ? 'Guardando…' : 'Guardar'}
           </button>
@@ -638,6 +686,7 @@ export function TabCostos() {
 
   const [syncing, setSyncing] = useState(false)
   const [showManual, setShowManual] = useState(false)
+  const [manualSlug, setManualSlug] = useState('')
   const [showLimit, setShowLimit] = useState(false)
 
   const handleSync = async () => {
@@ -685,7 +734,12 @@ export function TabCostos() {
         title="Servicios"
         subtitle={`Gasto total: ${fmtUsd(totalUsd)}${deltaPercent !== 0 ? ` (${fmtPercent(deltaPercent)} vs mes anterior)` : ''}`}
         action={
-          <button type="button" className="ds-hover" onClick={() => setShowManual(true)} style={btnGhostSm}>
+          <button
+            type="button"
+            className="ds-hover"
+            onClick={() => { setManualSlug(''); setShowManual(true) }}
+            style={btnGhostSm}
+          >
             <Plus size={13} /> Cargar manual
           </button>
         }
@@ -697,7 +751,13 @@ export function TabCostos() {
         }}>
           {loadingOverview && providers.length === 0
             ? Array.from({ length: 7 }, (_, i) => <ServiceCardSkeleton key={i} />)
-            : providers.map((p) => <ServiceCard key={p.slug} provider={p} />)
+            : providers.map((p) => (
+                <ServiceCard
+                  key={p.slug}
+                  provider={p}
+                  onClick={() => { setManualSlug(p.slug); setShowManual(true) }}
+                />
+              ))
           }
           {providers.length === 0 && !loadingOverview && (
             <Empty text="No hay proveedores configurados. Cargá datos manuales para empezar." />
@@ -792,7 +852,14 @@ export function TabCostos() {
       </Card>
 
       {/* Modales */}
-      {showManual && <ManualModal providers={providers} onClose={() => setShowManual(false)} onSaved={() => { setShowManual(false); reload() }} />}
+      {showManual && (
+        <ManualModal
+          providers={providers}
+          initialSlug={manualSlug}
+          onClose={() => setShowManual(false)}
+          onSaved={() => { setShowManual(false); reload() }}
+        />
+      )}
       {showLimit && <LimitModal providers={providers} onClose={() => setShowLimit(false)} onSaved={() => { setShowLimit(false); reload() }} />}
     </div>
   )
