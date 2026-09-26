@@ -226,11 +226,19 @@ body { margin: 0; min-height: 100vh; }
    Con .admin-locked, html y body quedan sellados a 100dvh sin scroll exterior. */
 html.admin-locked,
 body.admin-locked {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
   height: 100% !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
   overflow: hidden !important;
+  overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
+  -webkit-overflow-scrolling: auto !important;
 }
 
 /* ─── Panel admin · fondo del área de contenido ──────────────────────────

@@ -56,9 +56,15 @@ function FilaMenu({
 
 export function MenuContextual({ items }: Props) {
   const [abierto, setAbierto] = useState(false)
+  const cerradoRecienteRef = useRef(0)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const cerrar = () => {
+    cerradoRecienteRef.current = Date.now()
+    setAbierto(false)
+  }
 
   const actualizarPos = () => {
     const r = btnRef.current?.getBoundingClientRect()
@@ -86,10 +92,10 @@ export function MenuContextual({ items }: Props) {
     function handleClick(e: MouseEvent | TouchEvent) {
       const target = e.target as Node
       if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return
-      setAbierto(false)
+      cerrar()
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setAbierto(false)
+      if (e.key === 'Escape') cerrar()
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('touchstart', handleClick)
@@ -110,7 +116,15 @@ export function MenuContextual({ items }: Props) {
       <button
         ref={btnRef}
         className="ds-hover"
-        onClick={() => setAbierto((a) => !a)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (abierto) {
+            cerrar()
+            return
+          }
+          if (Date.now() - cerradoRecienteRef.current < 450) return
+          setAbierto(true)
+        }}
         style={{
           width: 30,
           height: 30,
@@ -130,7 +144,14 @@ export function MenuContextual({ items }: Props) {
       {abierto && pos && createPortal(
         <>
           <div
-            onClick={() => setAbierto(false)}
+            onPointerDown={(e) => {
+              e.preventDefault()
+              cerrar()
+            }}
+            onClick={(e) => {
+              e.preventDefault()
+              cerrar()
+            }}
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
             aria-hidden="true"
           />

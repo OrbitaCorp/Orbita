@@ -43,6 +43,9 @@ function AdminShell({ children }: { children: ReactNode }) {
     // Al desmontarse (ir al storefront o landing), se desbloquea para no afectar
     // el scroll nativo de la tienda.
     useEffect(() => {
+        window.scrollTo(0, 0)
+        document.documentElement.scrollTop = 0
+        document.body.scrollTop = 0
         document.documentElement.classList.add('admin-locked')
         document.body.classList.add('admin-locked')
         return () => {
@@ -55,6 +58,11 @@ function AdminShell({ children }: { children: ReactNode }) {
         <div
             className="flex overflow-hidden admin-shell"
             style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 height: '100dvh',
                 maxHeight: '100dvh',
                 width: '100%',

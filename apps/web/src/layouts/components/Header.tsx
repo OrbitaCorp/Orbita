@@ -254,6 +254,12 @@ export default function Header({ onMenuClick }: Props) {
                 .admin-bc-full     { display: flex; }
                 .admin-bc-mobile   { display: none; }
                 @media (max-width: 768px) {
+                    .admin-header-bar {
+                        height: auto !important;
+                        min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+                        padding-top: max(6px, env(safe-area-inset-top, 0px)) !important;
+                        padding-bottom: 6px !important;
+                    }
                     /* La campana vive a ~90px del borde derecho, asi que un
                        panel de 340px anclado a ella (right:0) se salia por la
                        IZQUIERDA de la pantalla: el titulo "Notificaciones"
@@ -262,7 +268,7 @@ export default function Header({ onMenuClick }: Props) {
                        borde con 12px de aire, como cualquier hoja del panel. */
                     .admin-notif-pop {
                         position: fixed !important;
-                        top: 68px !important;
+                        top: calc(64px + env(safe-area-inset-top, 0px)) !important;
                         left: 12px !important;
                         right: 12px !important;
                         width: auto !important;
@@ -277,7 +283,17 @@ export default function Header({ onMenuClick }: Props) {
                 }
             `}</style>
 
-            <div className="flex items-center h-16 px-4 shrink-0" style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', gap: 12 }}>
+            <div
+                className="admin-header-bar flex items-center px-4 shrink-0"
+                style={{
+                    background: 'var(--color-bg)',
+                    borderBottom: '1px solid var(--color-border)',
+                    gap: 12,
+                    height: 'calc(64px + env(safe-area-inset-top, 0px))',
+                    minHeight: 'calc(64px + env(safe-area-inset-top, 0px))',
+                    paddingTop: 'env(safe-area-inset-top, 0px)',
+                }}
+            >
 
                 {/* Hamburger — solo mobile */}
                 <button

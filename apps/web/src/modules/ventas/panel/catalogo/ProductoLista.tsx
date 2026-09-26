@@ -246,6 +246,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     const [indice, setIndice] = useState(0)
     const [cargandoImg, setCargandoImg] = useState(false)
     const [menuAbierto, setMenuAbierto] = useState(false)
+    const cerradoRecienteRef = useRef(0)
     const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
     const menuBtnRef = useRef<HTMLButtonElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
@@ -282,6 +283,11 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
         setMenuAbierto(true)
     }
 
+    function cerrarMenu() {
+        cerradoRecienteRef.current = Date.now()
+        setMenuAbierto(false)
+    }
+
     // El botón "···" vive dentro de una card con className="ds-hover", que
     // trae isolation:isolate (ver globals.css) para su velo de hover — eso
     // crea un contexto de apilamiento propio por card, así que un menú
@@ -294,10 +300,10 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
         function handleClick(e: MouseEvent | TouchEvent) {
             const t = e.target as Node
             if (menuBtnRef.current?.contains(t) || menuRef.current?.contains(t)) return
-            setMenuAbierto(false)
+            cerrarMenu()
         }
         function handleKeyDown(e: KeyboardEvent) {
-            if (e.key === 'Escape') setMenuAbierto(false)
+            if (e.key === 'Escape') cerrarMenu()
         }
         function actualizarPos() {
             if (menuBtnRef.current) setMenuPos(calcularPos(menuBtnRef.current))
@@ -510,12 +516,35 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     </button>
                     <button onClick={onResenas} title="Reseñas" aria-label={`Reseñas de ${p.name}`} className="prod-card-actbtn" style={cardActBtn}><MessageSquare size={14} /></button>
                     <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
-                    <button ref={menuBtnRef} onClick={() => menuAbierto ? setMenuAbierto(false) : abrirMenu()} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
+                    <button
+                        ref={menuBtnRef}
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            if (menuAbierto) {
+                                cerrarMenu()
+                                return
+                            }
+                            if (Date.now() - cerradoRecienteRef.current < 450) return
+                            abrirMenu()
+                        }}
+                        title="Más acciones"
+                        className="prod-card-actbtn"
+                        style={cardActBtn}
+                    >
+                        <MoreVertical size={14} />
+                    </button>
 
                     {menuAbierto && menuPos && createPortal(
                         <>
                             <div
-                                onClick={() => setMenuAbierto(false)}
+                                onPointerDown={(e) => {
+                                    e.preventDefault()
+                                    cerrarMenu()
+                                }}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    cerrarMenu()
+                                }}
                                 style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                                 aria-hidden="true"
                             />
@@ -612,6 +641,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [fcat, setFcat] = useState(() => (typeof router.query.cat === 'string' ? router.query.cat : 'todos'))
     const [fest, setFest] = useState(() => (typeof router.query.estado === 'string' ? router.query.estado : 'todos'))
     const [menu, setMenu] = useState<string | null>(null)
+    const cerradoRecienteTablaRef = useRef(0)
     // Posición calculada del botón "···" que abrió el menú (coordenadas de
     // viewport). El menú se renderiza con position:fixed usando estas
     // coordenadas — antes usaba position:absolute anclado a la fila, y como
@@ -1227,7 +1257,13 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 <button onClick={() => irEditar(p.id)} className="prod-list-actbtn" style={iconBtn} title="Editar"><Edit2 size={15} /></button>
                                 <button
                                     onClick={e => {
-                                        if (menu === p.id) { setMenu(null); return }
+                                        e.stopPropagation()
+                                        if (menu === p.id) {
+                                            cerradoRecienteTablaRef.current = Date.now()
+                                            setMenu(null)
+                                            return
+                                        }
+                                        if (Date.now() - cerradoRecienteTablaRef.current < 450) return
                                         const r = e.currentTarget.getBoundingClientRect()
                                         const anchoMenu = 180
                                         const altoEstimado = 180
@@ -1246,7 +1282,19 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 </button>
                                 {menu === p.id && menuPos && (
                                     <>
-                                        <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+                                        <div
+                                            onPointerDown={e => {
+                                                e.preventDefault()
+                                                cerradoRecienteTablaRef.current = Date.now()
+                                                setMenu(null)
+                                            }}
+                                            onClick={e => {
+                                                e.preventDefault()
+                                                cerradoRecienteTablaRef.current = Date.now()
+                                                setMenu(null)
+                                            }}
+                                            style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+                                        />
                                         <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180, maxWidth: 'calc(100vw - 24px)' }}>
                                             <button className="ds-hover" onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
