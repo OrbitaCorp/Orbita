@@ -67,68 +67,46 @@ export class SupabaseCostAdapter implements CostAdapter {
 
     const items: UsageItem[] = [];
 
-    const dbRows = await this.execSql<{ bytes: number | string }>(
-      ref,
-      token,
-      'SELECT pg_database_size(current_database()) AS bytes',
-    );
-    if (dbRows?.[0]) {
+    const disk = await this.fetchDiskUsage(ref, token);
+    const diskConfig = await this.fetchDiskConfig(ref, token);
+    if (disk !== null) {
+      const usedMb = Math.round(disk / (1024 * 1024));
+      const limitMb = diskConfig ? diskConfig * 1024 : 500;
       items.push({
         category: 'Database Size',
-        value: Math.round(Number(dbRows[0].bytes) / (1024 * 1024)),
+        value: usedMb,
         unit: 'MB',
-        limit: 500,
+        limit: limitMb,
       });
     }
 
-    const storageRows = await this.execSql<{ bytes: string }>(
-      ref,
-      token,
-      "SELECT coalesce(sum((metadata->>'size')::bigint), 0) AS bytes FROM storage.objects",
+    const storageBytes = await this.execSql<{ bytes: number | string }>(
+      ref, token,
+      `select coalesce(sum((metadata->>'size')::bigint), 0) as bytes from storage.objects`,
     );
-    if (storageRows?.[0]) {
-      const mb = Number(storageRows[0].bytes) / (1024 * 1024);
-      items.push({
-        category: 'File Storage',
-        value: Math.round(mb * 100) / 100,
-        unit: 'MB',
-        limit: 1024,
-      });
+    if (storageBytes) {
+      const usedMb = Math.round(Number(storageBytes[0]?.bytes ?? 0) / (1024 * 1024));
+      items.push({ category: 'File Storage', value: usedMb, unit: 'MB', limit: 1024 });
     }
 
-    const mauRows = await this.execSql<{ mau: number | string }>(
-      ref,
-      token,
-      "SELECT count(*) AS mau FROM auth.users WHERE last_sign_in_at >= date_trunc('month', now())",
+    const mau = await this.execSql<{ count: number | string }>(
+      ref, token,
+      `select count(*) as count from auth.users where last_sign_in_at >= date_trunc('month', now())`,
     );
-    if (mauRows?.[0]) {
+    if (mau) {
       items.push({
         category: 'Monthly Active Users',
-        value: Number(mauRows[0].mau),
-        unit: 'usuarios',
+        value: Number(mau[0]?.count ?? 0),
+        unit: 'users',
         limit: 50_000,
       });
     }
 
-    return { items };
-  }
+    // Egress, Log Ingestion y Log Query del Free Plan no tienen endpoint público en la
+    // Management API de Supabase (ni REST ni SQL vía pg-meta) — se omiten en vez de
+    // mostrar un 0 falso que sugeriría consumo nulo.
 
-  private async execSql<T>(ref: string, key: string, query: string): Promise<T[] | null> {
-    try {
-      const res = await fetch(`${SUPABASE_MGMT_BASE}/projects/${ref}/database/query`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      if (!res.ok) {
-        this.logger.warn(`Supabase database/query respondió ${res.status}`);
-        return null;
-      }
-      return (await res.json()) as T[];
-    } catch (err) {
-      this.logger.warn(`Error ejecutando SQL en Supabase: ${err}`);
-      return null;
-    }
+    return { items };
   }
 
   private async fetchAddons(ref: string, key: string): Promise<{ type: string; price: number }[] | null> {
@@ -173,6 +151,29 @@ export class SupabaseCostAdapter implements CostAdapter {
       const data = await res.json() as any;
       return data.attributes?.size_gb ?? null;
     } catch {
+      return null;
+    }
+  }
+
+  private async execSql<T = Record<string, unknown>>(
+    ref: string, key: string, sql: string,
+  ): Promise<T[] | null> {
+    try {
+      const res = await fetch(`${SUPABASE_MGMT_BASE}/projects/${ref}/database/query`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: sql }),
+      });
+      if (!res.ok) {
+        this.logger.debug(`Supabase database/query respondió ${res.status} para: ${sql}`);
+        return null;
+      }
+      return await res.json() as T[];
+    } catch (err) {
+      this.logger.warn(`Error ejecutando SQL en Supabase: ${err}`);
       return null;
     }
   }
