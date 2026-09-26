@@ -29,6 +29,18 @@ const PROVIDER_ICONS: Record<string, string> = {
   vercel: '▲', resend: '✉', groq: '⚙', serper: '🔍', tavily: '🌐',
 }
 
+const PROVIDER_DASHBOARD_URLS: Record<string, string> = {
+  gcloud:     'https://console.cloud.google.com/billing',
+  cloudflare: 'https://dash.cloudflare.com/?to=/:account/billing',
+  supabase:   'https://supabase.com/dashboard/account/billing',
+  gemini:     'https://aistudio.google.com/app/apikey',
+  vercel:     'https://vercel.com/account/billing',
+  resend:     'https://resend.com/overview',
+  groq:       'https://console.groq.com/usage',
+  serper:     'https://serper.dev/dashboard',
+  tavily:     'https://app.tavily.com/home',
+}
+
 // ─── Skeletons ──────────────────────────────────────────────────────────────
 
 const skeletonBase: React.CSSProperties = {
@@ -444,8 +456,11 @@ function ManualModal({ providers, onClose, onSaved }: {
   const [slug, setSlug] = useState(providers[0]?.slug ?? '')
   const [month, setMonth] = useState(currentMonth())
   const [amount, setAmount] = useState('')
+  const [cuenta, setCuenta] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+
+  const dashboardUrl = PROVIDER_DASHBOARD_URLS[slug]
 
   return (
     <ModalShell title="Cargar costo manual" onClose={onClose}>
@@ -454,6 +469,34 @@ function ManualModal({ providers, onClose, onSaved }: {
           <select value={slug} onChange={(e) => setSlug(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
             {providers.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
           </select>
+          {dashboardUrl && (
+            <a
+              href={dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 6,
+                fontSize: 12,
+                color: 'var(--color-primary)',
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Ver panel de {providers.find(p => p.slug === slug)?.name ?? slug} ↗
+            </a>
+          )}
+        </Field>
+        <Field label="Cuenta Gmail asociada" hint="Ej: mateo@gmail.com — para identificar la cuenta origen">
+          <input
+            type="email"
+            placeholder="cuenta@gmail.com"
+            value={cuenta}
+            onChange={(e) => setCuenta(e.target.value)}
+            style={{ ...inputStyle, width: '100%' }}
+          />
         </Field>
         <Field label="Mes">
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inputStyle, width: '100%' }} />
