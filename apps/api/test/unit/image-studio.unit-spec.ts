@@ -196,6 +196,15 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
         svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'estilo-inventado'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('"blanco_liso" le pega a Workers AI con prompt de fondo blanco puro', async () => {
+      const { svc, cloudflareImage, geminiImage } = makeService(true);
+      await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'blanco_liso');
+      expect(cloudflareImage.editImage).toHaveBeenCalledTimes(1);
+      expect(geminiImage.editImage).not.toHaveBeenCalled();
+      const [prompt] = cloudflareImage.editImage.mock.calls[0];
+      expect(prompt).toMatch(/pure white/i);
+    });
   });
 
   describe('mejorarRecorte — Gemini pone fondo blanco, después recorte local', () => {

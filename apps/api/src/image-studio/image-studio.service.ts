@@ -15,6 +15,7 @@ import {
   DEFAULT_BACKGROUND_STYLE,
   PREMIUM_ONLY_STYLES,
   SIN_FONDO_KEY,
+  BLANCO_LISO_KEY,
   type BackgroundStyle,
   type PremiumOnlyStyle,
 } from './background-styles';
@@ -220,13 +221,15 @@ export class ImageStudioService {
 
     const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
     const style: BackgroundStyle | undefined = BACKGROUND_STYLES[key] ?? (PREMIUM_ONLY_STYLES as any)[key];
-    if (!style) throw new BadRequestException('Estilo de fondo inválido');
+    if (!style && key !== BLANCO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
 
     // Flujo unificado:
     // 1. Intenta Workers AI (1 solo intento rápido con timeout estricto de 7s).
     // 2. Si falla (error, flag de contenido NSFW, cuota o timeout),
     //    aplica inmediatamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
-    const prompt = this.promptPremium(style, descripcion);
+    const prompt = key === BLANCO_LISO_KEY
+      ? this.promptFondoBlancoLiso(descripcion)
+      : this.promptPremium(style!, descripcion);
     let workersResult: { buffer: Buffer; mimeType: string } | null = null;
     let ultimoError: any = null;
 
@@ -256,7 +259,10 @@ export class ImageStudioService {
     this.logger.log(
       `[generateBackground] Fallback al modelo local (BiRefNet-Lite + sombra orgánica + composición) para estilo: ${key} (${ultimoError?.message})`,
     );
-    return await this.componerConModeloLocal(businessId, origen.buffer, style, descripcion);
+    if (key === BLANCO_LISO_KEY) {
+      return await this.componerFondoBlanco(origen.buffer, businessId);
+    }
+    return await this.componerConModeloLocal(businessId, origen.buffer, style!, descripcion);
   }
 
   private async componerConModeloLocal(
@@ -366,6 +372,113 @@ export class ImageStudioService {
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
   }
 
+  private async componerFondoBlanco(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
+    const { png: cutout, dificil } = await this.backgroundRemoval.removeBackgroundConAnalisis(origenBuffer, businessId);
+    const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
+    const cutoutWidth = meta.width ?? 1024;
+    const cutoutHeight = meta.height ?? 1024;
+
+    const MARGEN_FONDO = 1.35;
+    const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
+    const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
+
+    const ASPECT_OBJETIVO = 3 / 4;
+    const productoEsMasAnchoQueElObjetivo = anchoConMargen / altoConMargen > ASPECT_OBJETIVO;
+    const width = productoEsMasAnchoQueElObjetivo ? anchoConMargen : Math.round(altoConMargen * ASPECT_OBJETIVO);
+    const height = productoEsMasAnchoQueElObjetivo ? Math.round(anchoConMargen / ASPECT_OBJETIVO) : altoConMargen;
+    const left = Math.round((width - cutoutWidth) / 2);
+    const top = Math.round((height - cutoutHeight) / 2);
+
+    let composedBuffer: Buffer;
+    try {
+      const prodFull = await sharp({
+        create: {
+          width,
+          height,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .composite([{ input: cutout, left, top }])
+        .png()
+        .toBuffer();
+
+      const alphaFull = await sharp(prodFull).extractChannel(3).raw().toBuffer();
+
+      const alphaContacto = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(4)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      const alphaAmbiente = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(22)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      const contactoRgba = Buffer.alloc(width * height * 4);
+      const ambienteRgba = Buffer.alloc(width * height * 4);
+      for (let i = 0; i < width * height; i++) {
+        contactoRgba[i * 4] = 15;
+        contactoRgba[i * 4 + 1] = 15;
+        contactoRgba[i * 4 + 2] = 15;
+        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.25);
+
+        ambienteRgba[i * 4] = 20;
+        ambienteRgba[i * 4 + 1] = 20;
+        ambienteRgba[i * 4 + 2] = 20;
+        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.10);
+      }
+
+      const sombraContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+      const sombraAmbiente = await sharp(ambienteRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+
+      const fondoBlanco = await sharp({
+        create: {
+          width,
+          height,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      composedBuffer = await sharp(fondoBlanco)
+        .composite([
+          { input: sombraAmbiente, top: 6, left: 0 },
+          { input: sombraContacto, top: 2, left: 0 },
+          { input: prodFull, top: 0, left: 0 },
+        ])
+        .png()
+        .toBuffer();
+    } catch (error) {
+      this.logger.warn(`Error en sombra orgánica para fondo blanco, aplicando composición directa: ${error}`);
+      try {
+        const fondoBlanco = await sharp({
+          create: {
+            width,
+            height,
+            channels: 3,
+            background: { r: 255, g: 255, b: 255 },
+          },
+        })
+          .composite([{ input: cutout, left, top }])
+          .png()
+          .toBuffer();
+        composedBuffer = fondoBlanco;
+      } catch (fallbackErr) {
+        this.logger.error(`Error crítico en composición fondo blanco: ${fallbackErr}`);
+        return { base64: cutout.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+      }
+    }
+
+    return { base64: composedBuffer.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+  }
+
   // Instrucción de edición para el modo premium — validada a mano en esta
   // misma tarea contra Gemini (jersey 49ers, texto/logos densos) y Workers AI
   // (riñonera en ángulo): un solo call de edición sobre la foto COMPLETA
@@ -391,6 +504,20 @@ export class ImageStudioService {
       'background with a soft realistic contact shadow. Keep the EXACT original color of the product (same hue, ' +
       'saturation and brightness as the source photo) — do not shift white balance, do not recolor, do not apply ' +
       `any color grading or tint to the product to match the new background. Background scene: ${escena}`
+    );
+  }
+
+  private promptFondoBlancoLiso(descripcion?: string): string {
+    const extra = descripcion ? ` Additional style note: ${descripcion}.` : '';
+    return (
+      'This is a product photo. Replace ONLY the background with a seamless, solid, perfectly flat, uniform, pure white (#FFFFFF) ' +
+      'studio background, with no texture, no patterns, no props, and no scene details. ' +
+      'Keep the product itself pixel-perfect: same shape, same angle, same text, same numbers, same logos, same stitching, same zippers ' +
+      '— do not redraw, restyle, recolor or reinterpret the product in any way. ' +
+      'Keep the EXACT original color of the product (same hue, saturation and brightness as the source photo) — do not shift white balance, ' +
+      'do not recolor, do not apply any color grading or tint to the product. ' +
+      'Add only a subtle, clean, soft realistic contact shadow directly underneath the product so it rests naturally on the pure white floor.' +
+      extra
     );
   }
 
@@ -432,19 +559,21 @@ export class ImageStudioService {
     // sin backgroundKeys porque el modo premium no compone contra R2).
     const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
     const style: BackgroundStyle | PremiumOnlyStyle | undefined = BACKGROUND_STYLES[key] ?? PREMIUM_ONLY_STYLES[key];
-    if (!style) throw new BadRequestException('Estilo de fondo inválido');
+    if (!style && key !== BLANCO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
 
     // "podio_*" está pensado para un producto apoyado sobre una superficie
     // real (perspectiva, profundidad) — no tiene sentido para indumentaria
     // plana. Mismo criterio que la regla firme 2D=Gemini/3D=Workers AI, pero
     // a nivel de catálogo en vez de motor.
-    if ('soloVolumen' in style && style.soloVolumen && photoType !== 'volume') {
+    if (style && 'soloVolumen' in style && style.soloVolumen && photoType !== 'volume') {
       throw new BadRequestException('Este estilo es solo para productos con volumen');
     }
 
-    const prompt = this.promptPremium(style, descripcion);
+    const prompt = key === BLANCO_LISO_KEY
+      ? this.promptFondoBlancoLiso(descripcion)
+      : this.promptPremium(style!, descripcion);
     const result =
-      photoType === 'volume' || fondoIaMotor() === 'workers'
+      photoType === 'volume' || fondoIaMotor() === 'workers' || key === BLANCO_LISO_KEY
         ? await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype)
         : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
 

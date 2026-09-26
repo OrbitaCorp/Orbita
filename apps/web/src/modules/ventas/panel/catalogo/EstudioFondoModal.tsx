@@ -42,6 +42,7 @@ import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, pa
 // también llegan con previewUrl null (no tienen thumbnail en R2) pero NO son
 // "sin fondo" — se distinguen por key, no por previewUrl===null.
 const SIN_FONDO_KEY = 'sin_fondo'
+const BLANCO_LISO_KEY = 'blanco_liso'
 
 export type ImagenParaFondo =
     | { key: string; tipo: 'pendiente'; file: File; preview: string }
@@ -386,13 +387,17 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                 'linear-gradient(-45deg, transparent 75%, var(--color-border) 75%)',
                                             backgroundSize: '12px 12px',
                                             backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                                        } : e.key === BLANCO_LISO_KEY ? {
+                                            background: '#ffffff',
                                         } : !e.previewUrl ? { background: 'var(--color-primary-bg)' } : {}),
                                     }}>
                                         {e.previewUrl
                                             ? <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                             : e.key === SIN_FONDO_KEY
                                                 ? <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />
-                                                : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
+                                                : e.key === BLANCO_LISO_KEY
+                                                    ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.08)' }} />
+                                                    : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
                                     </div>
                                     <span style={{
                                         fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',
@@ -458,7 +463,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                 </div>
                                             )}
                                         </div>
-                                        {p?.estado === 'listo' && estiloElegido === SIN_FONDO_KEY && p.recorteDificil && (
+                                        {p?.estado === 'listo' && (estiloElegido === SIN_FONDO_KEY || estiloElegido === BLANCO_LISO_KEY) && p.recorteDificil && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 11.5, color: 'var(--color-text)', lineHeight: 1.4 }}>
                                                 <span>Recorte difícil: la prenda y el fondo tienen colores muy parecidos o mucha textura. Para mejores resultados, usá un fondo liso que contraste con la prenda.</span>
                                                 <Button variant="secondary" size="sm" onClick={() => void mejorarRecorteConIA(img)} loading={!!p.mejorando} disabled={aplicando}>

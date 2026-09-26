@@ -52,6 +52,11 @@ const CENTRO_VACIO =
   'surface, ready for a product photo to be placed on top of later.';
 
 export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
+  blanco_liso: {
+    label: 'Blanco liso',
+    prompt:
+      'a seamless, solid, perfectly flat, uniform, pure white (#FFFFFF) studio background, with no texture, no patterns, no props, and no scene details, clean studio lighting with a subtle soft contact shadow under the product',
+  },
   podio_lujo_flores: {
     label: 'Podio de lujo con flores (cosmética, joyas, tech)',
     prompt:
@@ -302,3 +307,7 @@ export const PREMIUM_STYLE_KEYS = Object.keys(PREMIUM_ONLY_STYLES);
 // ese botón (ya existente, en cada miniatura) pueda llegar a lo mismo desde
 // el selector de "Fondo con IA".
 export const SIN_FONDO_KEY = 'sin_fondo';
+
+// "Blanco liso": recorte local montado sobre un lienzo blanco puro (#ffffff)
+// con sombra orgánica de contacto sutil. Sin texturas ni elementos distractores.
+export const BLANCO_LISO_KEY = 'blanco_liso';
