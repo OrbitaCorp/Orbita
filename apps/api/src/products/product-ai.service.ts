@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiError } from '@google/genai';
+import { ApiError, ThinkingLevel } from '@google/genai';
 import { DEFAULT_MODEL, createGeminiClient, THINKING_MINIMO } from '../orbi/llm/gemini-client';
 import { generarTexto } from '../orbi/llm/text-generation';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
@@ -247,7 +247,7 @@ export class ProductAiService {
           config: {
             systemInstruction: SCAN_SYSTEM_PROMPT,
             maxOutputTokens: 3000,
-            thinkingConfig: { thinkingLevel: THINKING_MINIMO },
+            thinkingConfig: { thinkingLevel: (model.includes('3.7') || model.includes('3.8')) ? ThinkingLevel.LOW : THINKING_MINIMO },
             responseMimeType: 'application/json',
           },
         });
