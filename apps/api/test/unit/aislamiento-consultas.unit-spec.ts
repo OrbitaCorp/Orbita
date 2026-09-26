@@ -41,6 +41,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/games/games-play.service.ts': { max: 1, motivo: 'El juego se resuelve desde una sesión que el caller ya verificó' },
   'src/internal-cron/retencion-logs.service.ts': { max: 2, motivo: 'Purga por antigüedad de audit_logs y email_logs (hallazgo logs-sin-retencion): borra por fecha de creación para todos los negocios a la vez, nunca por negocio, entidad ni acción' },
   'src/storefront/storefront.service.ts': { max: 1, motivo: 'Helper que recibe el where ya armado por quien lo llama' },
+  'src/platform/costs/costs.service.ts': { max: 1, motivo: 'Uso mensual de Groq agregado desde usage_events para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
   'src/platform/costs/adapters/internal.adapter.ts': { max: 1, motivo: 'Agrega usage_events por proveedor para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
 };
 
