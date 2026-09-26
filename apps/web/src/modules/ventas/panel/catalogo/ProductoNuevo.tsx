@@ -296,6 +296,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
     const [step, setStep] = useState(1)
+    // En pantallas angostas el layout apila el formulario y el preview en una
+    // sola columna (.pn-layout de arriba baja a una columna debajo de
+    // 1080px) — sin esto, tocar "Siguiente" viendo el preview al fondo del
+    // paso anterior te dejaba en el mismo scroll, ahora mirando el preview
+    // del paso NUEVO en vez de su contenido (reportado: "arruina la UX").
+    // El que scrollea es .admin-main, NO la ventana — AdminLayout bloquea el
+    // scroll de html/body (.admin-locked, ver globals.css) para no duplicar
+    // el scroll vertical en celular; `window.scrollTo` quedaría pisando un
+    // scroll que ya está fijo en 0.
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        if (!window.matchMedia('(max-width: 1080px)').matches) return
+        const contenedor = document.querySelector('.admin-main')
+        if (contenedor) contenedor.scrollTo({ top: 0, behavior: 'smooth' })
+        else window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, [step])
     const [done, setDone] = useState<number[]>([])
     const [orbiGen, setOrbiGen] = useState(false)
     // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
