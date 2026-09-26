@@ -1985,10 +1985,32 @@ export type SuggestedProductImage = {
 export async function panelAiScanProduct(file: Blob, filename = 'scan.jpg'): Promise<AiScanProductResult> {
   const form = new FormData()
   form.append('file', file, filename)
-  const res = await authedFetch(`${API_BASE}/products/ai-scan`, { method: 'POST', body: form })
-  const body = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(res.status, mensajeDeError(res.status, body))
-  return body as AiScanProductResult
+
+  let ultimoError: unknown = null
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await authedFetch(`${API_BASE}/products/ai-scan`, { method: 'POST', body: form })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) {
+        // Si el backend devuelve un error transitorio de servidor (500, 502, 503, 504),
+        // reintentamos automáticamente una vez tras 1.2 segundos sin alertar al usuario innecesariamente
+        if (intento === 0 && res.status >= 500) {
+          await new Promise(r => setTimeout(r, 1200))
+          continue
+        }
+        throw new ApiError(res.status, mensajeDeError(res.status, body))
+      }
+      return body as AiScanProductResult
+    } catch (err) {
+      ultimoError = err
+      if (intento === 0 && !(err instanceof ApiError && err.status < 500)) {
+        await new Promise(r => setTimeout(r, 1200))
+        continue
+      }
+      throw err
+    }
+  }
+  throw ultimoError
 }
 
 export function panelGetSuggestedImages(query: string, model?: string, brand?: string, color?: string) {

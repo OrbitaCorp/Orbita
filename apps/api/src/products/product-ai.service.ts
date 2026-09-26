@@ -195,16 +195,15 @@ export class ProductAiService {
       throw new BadRequestException('Falta la imagen a escanear');
     }
 
-    let categorias: CategoryListItem[];
-    let tagsUsados: Awaited<ReturnType<TagsService['findAll']>>;
+    let categorias: CategoryListItem[] = [];
+    let tagsUsados: Awaited<ReturnType<TagsService['findAll']>> = [];
     try {
       [categorias, tagsUsados] = await Promise.all([
         this.categoriesService.findAll(businessId, true) as Promise<CategoryListItem[]>,
         this.tagsService.findAll(businessId),
       ]);
     } catch (error) {
-      this.logger.error(`No se pudieron resolver categorías/etiquetas del negocio ${businessId} para Orbi: ${error}`);
-      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+      this.logger.warn(`No se pudieron resolver categorías/etiquetas del negocio ${businessId} para Orbi: ${error}`);
     }
 
     const client = createGeminiClient(this.config);
@@ -223,8 +222,10 @@ export class ProductAiService {
 
     let raw: string | undefined;
     let finishReason: string | undefined;
+    let parsed: unknown = null;
 
-    for (const model of modelsToTry) {
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const model = modelsToTry[i];
       try {
         const response = await client.models.generateContent({
           model,
@@ -246,14 +247,21 @@ export class ProductAiService {
           ],
           config: {
             systemInstruction: SCAN_SYSTEM_PROMPT,
-            maxOutputTokens: 3000,
+            // 8192 tokens para que el thinking de Gemini 3.x no consuma el presupuesto y corte el JSON
+            maxOutputTokens: 8192,
             thinkingConfig: { thinkingLevel: (model.includes('3.7') || model.includes('3.8')) ? ThinkingLevel.LOW : THINKING_MINIMO },
             responseMimeType: 'application/json',
           },
         });
         raw = response.text?.trim();
         finishReason = response.candidates?.[0]?.finishReason;
-        if (raw) break;
+        if (raw) {
+          const candidato = intentarParsearJsonScan(raw);
+          if (candidato && typeof candidato === 'object' && ('name' in candidato || 'description' in candidato)) {
+            parsed = candidato;
+            break;
+          }
+        }
       } catch (error) {
         if (error instanceof ServiceUnavailableException) throw error;
         const status = error instanceof ApiError ? error.status : undefined;
@@ -261,27 +269,23 @@ export class ProductAiService {
         if (status === 401 || status === 403) {
           throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
         }
-        if (modelsToTry.indexOf(model) === modelsToTry.length - 1) {
-          throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+        // Si falló por límite de cuota o rate limit (429/503), esperar 600ms antes del siguiente modelo
+        if (status === 429 || status === 503) {
+          await new Promise((r) => setTimeout(r, 600));
         }
       }
     }
 
-    if (!raw) {
-      this.logger.error(`Gemini no devolvió contenido para el escaneo de producto (finish_reason=${finishReason ?? 'desconocido'})`);
-      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
-    }
-
-    const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(limpio);
-    } catch (error) {
-      this.logger.error(
-        `Gemini devolvió algo que no es JSON válido para escaneo (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
-      );
-      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+    if (!parsed) {
+      if (raw) {
+        parsed = intentarParsearJsonScan(raw);
+      }
+      if (!parsed) {
+        this.logger.error(
+          `Gemini no devolvió JSON válido para el escaneo de producto (finish_reason=${finishReason ?? 'desconocido'}): contenido=${raw?.slice(0, 500) ?? 'vacío'}`,
+        );
+        throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+      }
     }
 
     const result = parsed as Partial<AiScanProductResult>;
@@ -384,3 +388,63 @@ const SCAN_SYSTEM_PROMPT =
   'devolvé un array vacío [] porque la ropa no suele llevar tabla de especificaciones técnicas.\n' +
   'Devolvé ÚNICAMENTE un JSON válido con la siguiente estructura: ' +
   '{"name": "...", "description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["..."], "detectedBrand": "...", "detectedModel": "...", "detectedColor": "...", "imageSearchQuery": "...", "suggestedSpecs": [{"label": "...", "value": "..."}]}';
+
+function intentarParsearJsonScan(raw: string): unknown {
+  const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  try {
+    return JSON.parse(limpio);
+  } catch {
+    return repararJsonIncompleto(limpio);
+  }
+}
+
+function repararJsonIncompleto(str: string): unknown {
+  let s = str.trim().replace(/,\s*$/, '');
+  let inString = false;
+  let escape = false;
+  const stack: ('{' | '[')[] = [];
+
+  for (let i = 0; i < s.length; i++) {
+    const char = s[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}' && stack.length > 0 && stack[stack.length - 1] === '{') {
+        stack.pop();
+      } else if (char === ']' && stack.length > 0 && stack[stack.length - 1] === '[') {
+        stack.pop();
+      }
+    }
+  }
+
+  if (inString) {
+    s += '"';
+  }
+
+  s = s.replace(/,\s*$/, '');
+
+  while (stack.length > 0) {
+    const top = stack.pop();
+    if (top === '{') s += '}';
+    else if (top === '[') s += ']';
+  }
+
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+

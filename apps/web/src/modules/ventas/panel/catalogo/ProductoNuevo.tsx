@@ -18,7 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
-import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
+import { esArchivoDeImagen, normalizarImagen, optimizarImagenParaScan, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -694,7 +694,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setOrbiScanSuccess(false)
         try {
             const normalizado = await normalizarImagen(file)
-            const result = await panelAiScanProduct(normalizado, file.name)
+            const paraScan = await optimizarImagenParaScan(file)
+            const result = await panelAiScanProduct(paraScan, file.name)
 
             setProd(p => {
                 const yaEstanTags = new Set(p.tags.map(t => t.trim().toLowerCase()))
