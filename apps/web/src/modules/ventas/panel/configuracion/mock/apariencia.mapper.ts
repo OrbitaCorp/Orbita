@@ -41,7 +41,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         ...(ap.nombreTienda.trim() ? { storeName: ap.nombreTienda.trim() } : {}),
         ...(ap.tagline.trim() ? { tagline: ap.tagline.trim() } : {}),
         logoUrl: sinDataUrl(ap.logo),
-        faviconUrl: sinDataUrl(ap.favicon),
+        faviconUrl: sinDataUrl(ap.logo ?? ap.favicon),
         colorPrimary: ap.colorPrimario,
         colorSecondary: ap.colorSecundario,
         colorAccent: ap.colorAccent,
@@ -146,7 +146,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         nombreTienda: dto.storeName ?? defaults.nombreTienda,
         tagline: dto.tagline ?? defaults.tagline,
         logo: dto.logoUrl,
-        favicon: dto.faviconUrl,
+        favicon: dto.logoUrl ?? dto.faviconUrl,
         // heroSlides/headerLinks pueden llegar null (negocio que nunca los
         // guardó) en vez de un array vacío — la columna es un Json? nullable.
         // ctaLink/imageStyle/imagePosition/bgPattern/bgColor son opcionales en

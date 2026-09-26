@@ -473,7 +473,7 @@ export class BusinessesService {
     const url = await this.uploadToStorage(businessId, file, 'No se pudo subir el logo');
     const config = await this.prisma.storefrontConfig.update({
       where: { businessId },
-      data: { logoUrl: url },
+      data: { logoUrl: url, faviconUrl: url },
     });
     return { logoUrl: config.logoUrl };
   }
@@ -607,10 +607,12 @@ export class BusinessesService {
     if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');
 
     const { showReviews, heroSlides, headerLinks, statsBar, brands, videos, homeTemplateData, ...rest } = dto;
+    const faviconUrl = dto.logoUrl !== undefined ? (dto.faviconUrl ?? dto.logoUrl) : dto.faviconUrl;
     const config = await this.prisma.storefrontConfig.update({
       where: { businessId },
       data: {
         ...rest,
+        ...(faviconUrl !== undefined ? { faviconUrl } : {}),
         ...(showReviews !== undefined ? { showRating: showReviews } : {}),
         ...(heroSlides !== undefined ? { heroSlides: heroSlides as object[] } : {}),
         ...(headerLinks !== undefined ? { headerLinks: headerLinks as object[] } : {}),

@@ -1,4 +1,4 @@
-﻿// src/modules/ventas/panel/configuracion/Apariencia.tsx — Vista 16
+// src/modules/ventas/panel/configuracion/Apariencia.tsx — Vista 16
 // Apariencia pública de la tienda: identidad de marca, paleta, tipografía,
 // layout, visibilidad, textos y CSS custom — con vista previa en vivo.
 
@@ -552,11 +552,19 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const heroCard = (
         <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette} ayuda={AYUDA_SECCIONES[soloContenido ? 'hero' : 'identidad']}>
             {!soloContenido && (<>
-                <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG o HEIC · máx 10MB" onToast={onToast} />
-                <Divider />
-                <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
-                <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" onToast={onToast} />
+                <FieldLabel help="Aparece en el header, en la pestaña del navegador (favicon), emails y comprobantes">Logo de la tienda</FieldLabel>
+                <ImgUploader
+                    value={ap.logo}
+                    onChange={v => {
+                        set('logo', v)
+                        set('favicon', v)
+                    }}
+                    onUpload={subirImagenApariencia}
+                    shape="circle"
+                    size={96}
+                    formats="PNG, JPG, SVG o HEIC · máx 10MB"
+                    onToast={onToast}
+                />
                 <Divider />
                 <div>
                     <FieldLabel help="Es opcional. Si lo dejás vacío se usa el nombre de tu negocio. Y si tu logo ya dice el nombre, podés mostrar solo el logo (acá abajo).">Nombre de la tienda <span style={{ color: 'var(--color-subtle)', fontWeight: 400 }}>· opcional</span></FieldLabel>

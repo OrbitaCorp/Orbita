@@ -141,8 +141,8 @@ export function StorePreview({ ap, publicado, full, subdomain }: StorePreviewPro
                     <ToggleDispositivo valor={dispositivo} onChange={setDispositivo} />
                 </div>
                 <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280, overflow: 'hidden' }}>
-                    {ap.favicon
-                        ? <img src={ap.favicon} alt="" style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
+                    {(ap.logo ?? ap.favicon)
+                        ? <img src={(ap.logo ?? ap.favicon)!} alt="" style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
                         : <span aria-hidden style={{ fontSize: 11 }}>🔒</span>}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {subdomain ? `${subdomain}.${ROOT_DOMAIN}` : (ap.nombreTienda || 'tu-tienda')}

@@ -27,8 +27,8 @@ import type { Ayuda } from './AyudaSeccion'
 // logo ni nombre adentro.
 export const AYUDA_SECCIONES: Record<string, Ayuda> = {
     identidad: {
-        que: 'El logo, el ícono de la pestaña (favicon), el nombre de tu tienda y las imágenes grandes que rotan arriba del inicio (los sliders del hero).',
-        donde: 'El logo, en el header de todas las páginas, y también en los emails y comprobantes que reciben tus clientes. El favicon, en la pestaña del navegador. Los sliders, en el bloque grande de arriba del inicio.',
+        que: 'El logo de tu tienda (que también se usa como ícono de la pestaña en el navegador), el nombre y las imágenes grandes que rotan arriba del inicio (los sliders del hero).',
+        donde: 'El logo, en el header de todas las páginas, en la pestaña del navegador, y también en los emails y comprobantes que reciben tus clientes. Los sliders, en el bloque grande de arriba del inicio.',
         afecta: 'Es lo primero que ve alguien que entra. Si no cargás ningún slider, ese bloque grande no se dibuja y el inicio arranca directo con las secciones de abajo.',
     },
     hero: {
