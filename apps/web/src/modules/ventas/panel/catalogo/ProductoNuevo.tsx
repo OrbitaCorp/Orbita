@@ -2366,13 +2366,20 @@ function PreviewProducto({
                             className="ds-hover"
                             onClick={() => { setHoverValor(null); setIdx(i => (i - 1 + secuencia.length) % secuencia.length) }}
                             title="Foto anterior"
-                            style={{ position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                            // Círculo blanco fijo a propósito (tiene que resaltar sobre
+                            // CUALQUIER foto de producto, no solo con el tema claro) —
+                            // por eso el ícono también es un color fijo, no
+                            // var(--color-text): en oscuro esa variable es clara, y un
+                            // ícono claro sobre un círculo blanco quedaba invisible
+                            // (reportado, con captura). Mismo criterio que el carrusel
+                            // real del storefront (ProductoDetalle.tsx).
+                            style={{ position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
                         ><ChevronLeft size={14} /></button>
                         <button
                             className="ds-hover"
                             onClick={() => { setHoverValor(null); setIdx(i => (i + 1) % secuencia.length) }}
                             title="Foto siguiente"
-                            style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                            style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: '#0F172A', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
                         ><ChevronRight size={14} /></button>
                     </>
                 )}
