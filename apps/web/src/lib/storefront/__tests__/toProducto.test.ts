@@ -43,10 +43,14 @@ describe('toProducto — badge de oferta con porcentaje', () => {
 
 describe('toProducto — indicador de stock bajo', () => {
   it('con el toggle encendido, la tarjeta marca stock bajo', () => {
-    expect(toProducto(item()).lowStock).toBe(true)
+    expect(toProducto(item(), { showLowStock: true }).lowStock).toBe(true)
   })
 
   it('con el toggle apagado, la tarjeta no lo marca', () => {
     expect(toProducto(item(), { showLowStock: false }).lowStock).toBe(false)
+  })
+
+  it('por default sin badges configurados, está deshabilitado', () => {
+    expect(toProducto(item()).lowStock).toBe(false)
   })
 })

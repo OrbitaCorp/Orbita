@@ -185,7 +185,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarResenas: dto.showReviews,
         mostrarBadgeNuevo: dto.showNewBadge,
         mostrarBadgeOferta: dto.showOfferBadge,
-        mostrarStockBajo: dto.showLowStock,
+        mostrarStockBajo: dto.showLowStock ?? defaults.mostrarStockBajo,
         mostrarWhatsapp: dto.showWhatsapp,
         mostrarBuscador: dto.showSearch,
         mostrarCategorias: dto.showCategoriesSection,

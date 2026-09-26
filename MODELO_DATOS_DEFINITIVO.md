@@ -345,7 +345,7 @@ model StorefrontConfig {
   showRating             Boolean  @default(true)  @map("show_rating")
   showNewBadge           Boolean  @default(true)  @map("show_new_badge")
   showWhatsapp           Boolean  @default(true)  @map("show_whatsapp")
-  showLowStock           Boolean  @default(true)  @map("show_low_stock")
+  showLowStock           Boolean  @default(false) @map("show_low_stock")
   showOfferBadge         Boolean  @default(true)  @map("show_offer_badge")
   showSearch             Boolean  @default(true)  @map("show_search")
   showCategoriesSection  Boolean  @default(true)  @map("show_categories_section")

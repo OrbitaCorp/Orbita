@@ -629,7 +629,7 @@ export function toProducto(
   const bajoStock = 'inStock' in p ? p.lowStock : p.variants.some(v => v.lowStock)
   const showOffer = badges?.showOffer ?? true
   const showNew = badges?.showNew ?? true
-  const showLowStock = badges?.showLowStock ?? true
+  const showLowStock = badges?.showLowStock ?? false
   return {
     id: p.id,
     nombre: p.name,

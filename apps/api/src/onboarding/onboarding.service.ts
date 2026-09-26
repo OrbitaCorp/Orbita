@@ -355,6 +355,7 @@ export class OnboardingService {
             showRating: true,
             showNewBadge: true,
             showWhatsapp: true,
+            showLowStock: false,
           },
         });
 
