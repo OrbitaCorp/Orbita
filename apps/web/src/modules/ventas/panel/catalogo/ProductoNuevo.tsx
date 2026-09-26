@@ -1571,6 +1571,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-wizard-nav { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
                     .pn-wizard-nav > span { grid-column: 1 / -1 !important; order: 3; margin-top: 2px; }
                     .pn-wizard-nav > div > button { width: 100% !important; justify-content: center !important; }
+                    .pn-sugeridas-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
                 }
             `}</style>
 
@@ -2114,40 +2115,80 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             {/* Apartado nuevo: Fotos oficiales sugeridas en la web */}
                             {(sugeridasWeb.length > 0 || buscandoSugeridas) && (
                                 <div style={{
-                                    marginTop: 20,
-                                    marginBottom: 16,
+                                    marginTop: 22,
+                                    marginBottom: 18,
                                     padding: '16px 18px',
-                                    borderRadius: 12,
+                                    borderRadius: 14,
                                     border: '1px solid var(--color-border)',
                                     background: 'var(--color-bg)',
+                                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
                                 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 16 }}>📷</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{
+                                                width: 34,
+                                                height: 34,
+                                                borderRadius: 10,
+                                                background: 'rgba(139, 92, 246, 0.12)',
+                                                border: '1px solid rgba(139, 92, 246, 0.22)',
+                                                display: 'grid',
+                                                placeItems: 'center',
+                                                color: '#8B5CF6',
+                                                flexShrink: 0,
+                                            }}>
+                                                <Camera size={17} strokeWidth={2.2} />
+                                            </div>
                                             <div>
-                                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 7 }}>
                                                     Fotos oficiales sugeridas en la web
+                                                    <span style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 700,
+                                                        padding: '1px 6px',
+                                                        borderRadius: 9999,
+                                                        background: 'rgba(139, 92, 246, 0.14)',
+                                                        color: '#8B5CF6',
+                                                        letterSpacing: '0.02em',
+                                                    }}>
+                                                        Orbi
+                                                    </span>
                                                 </div>
-                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>
+                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.35 }}>
                                                     {buscandoSugeridas
                                                         ? 'Buscando fotos oficiales del producto en segundo plano...'
                                                         : 'Encontradas para este modelo. Sumalas a tu galería con un clic.'}
                                                 </div>
                                             </div>
                                         </div>
-                                        {buscandoSugeridas && (
-                                            <span style={{ fontSize: 11.5, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                        {buscandoSugeridas ? (
+                                            <span style={{ fontSize: 11.5, color: '#8B5CF6', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
                                                 <Sparkles size={12} className="animate-spin" /> Buscando...
                                             </span>
-                                        )}
+                                        ) : sugeridasWeb.length > 0 ? (
+                                            <span style={{
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                                color: 'var(--color-muted)',
+                                                background: 'var(--color-surface)',
+                                                padding: '3px 9px',
+                                                borderRadius: 9999,
+                                                border: '1px solid var(--color-border)',
+                                            }}>
+                                                {sugeridasWeb.length} fotos
+                                            </span>
+                                        ) : null}
                                     </div>
 
                                     {sugeridasWeb.length > 0 && (
-                                        <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                                            gap: 12,
-                                        }}>
+                                        <div
+                                            className="pn-sugeridas-grid"
+                                            style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: `repeat(${Math.max(1, Math.min(sugeridasWeb.length, 3))}, minmax(0, 1fr))`,
+                                                gap: 14,
+                                                width: '100%',
+                                            }}
+                                        >
                                             {sugeridasWeb.map((sug, idx) => {
                                                 const yaAgregada = sugeridasAgregadas.has(sug.url)
                                                 const descargando = agregandoSugeridaUrl === sug.url
@@ -2156,22 +2197,25 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                         key={idx}
                                                         style={{
                                                             border: '1px solid var(--color-border)',
-                                                            borderRadius: 10,
+                                                            borderRadius: 12,
                                                             overflow: 'hidden',
                                                             background: 'var(--color-surface)',
                                                             display: 'flex',
                                                             flexDirection: 'column',
+                                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                                            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                                                         }}
                                                     >
                                                         <div style={{
                                                             position: 'relative',
                                                             width: '100%',
-                                                            height: 130,
+                                                            height: 160,
                                                             background: '#ffffff',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
                                                             overflow: 'hidden',
+                                                            padding: 10,
                                                         }}>
                                                             <img
                                                                 src={sug.url}
@@ -2180,28 +2224,38 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                 loading="lazy"
                                                             />
                                                             {sug.domain && (
-                                                                <span style={{
+                                                                <div style={{
                                                                     position: 'absolute',
-                                                                    bottom: 6,
-                                                                    left: 6,
-                                                                    background: 'rgba(0, 0, 0, 0.7)',
+                                                                    bottom: 8,
+                                                                    left: 8,
+                                                                    background: 'rgba(15, 23, 42, 0.78)',
+                                                                    backdropFilter: 'blur(6px)',
                                                                     color: '#ffffff',
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: 4,
-                                                                    fontSize: 10,
-                                                                    fontWeight: 500,
+                                                                    padding: '2.5px 7.5px',
+                                                                    borderRadius: 6,
+                                                                    fontSize: 10.5,
+                                                                    fontWeight: 600,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 4.5,
+                                                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
                                                                 }}>
-                                                                    {sug.domain}
-                                                                </span>
+                                                                    <Globe size={11} strokeWidth={2.2} />
+                                                                    <span>{sug.domain}</span>
+                                                                </div>
                                                             )}
                                                         </div>
-                                                        <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, justifyContent: 'space-between' }}>
+                                                        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, justifyContent: 'space-between', borderTop: '1px solid var(--color-border)' }}>
                                                             <div
                                                                 style={{
-                                                                    fontSize: 11,
+                                                                    fontSize: 11.5,
+                                                                    fontWeight: 500,
                                                                     color: 'var(--color-text)',
-                                                                    lineHeight: 1.3,
-                                                                    maxHeight: 28,
+                                                                    lineHeight: 1.35,
+                                                                    height: 32,
+                                                                    display: '-webkit-box',
+                                                                    WebkitLineClamp: 2,
+                                                                    WebkitBoxOrient: 'vertical',
                                                                     overflow: 'hidden',
                                                                     textOverflow: 'ellipsis',
                                                                 }}
@@ -2214,9 +2268,35 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                 size="sm"
                                                                 disabled={yaAgregada || descargando}
                                                                 onClick={() => agregarFotoSugerida(sug)}
-                                                                style={{ width: '100%', fontSize: 11, height: 28, padding: '0 8px' }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    fontSize: 11.5,
+                                                                    fontWeight: 600,
+                                                                    height: 30,
+                                                                    padding: '0 10px',
+                                                                    borderRadius: 8,
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: 5,
+                                                                }}
                                                             >
-                                                                {descargando ? 'Descargando...' : yaAgregada ? '✓ Agregada' : '+ Agregar a mi producto'}
+                                                                {descargando ? (
+                                                                    <>
+                                                                        <Sparkles size={12} className="animate-spin" />
+                                                                        <span>Descargando...</span>
+                                                                    </>
+                                                                ) : yaAgregada ? (
+                                                                    <>
+                                                                        <Check size={13} strokeWidth={2.5} color="var(--color-success)" />
+                                                                        <span>Agregada</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Plus size={13} strokeWidth={2.5} />
+                                                                        <span>Agregar a mi producto</span>
+                                                                    </>
+                                                                )}
                                                             </Button>
                                                         </div>
                                                     </div>
