@@ -12,13 +12,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, RotateCw, Loader2 } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
-import { esArchivoDeImagen, normalizarImagen, rotarImagenFile, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
+import { esArchivoDeImagen, normalizarImagen, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -26,7 +26,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import { EstudioFondoModal, type ImagenParaFondo } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
-    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelRotateProductImage, panelReorderProductImages,
+    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
     panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     panelGetBusiness, getRubrosCatalog,
@@ -826,40 +826,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     function marcarPrincipal(key: string) {
         setImagenes(prev => prev.map(i => ({ ...i, principal: i.key === key })))
         setGuardadas(prev => prev.map(g => ({ ...g, principal: false })))
-    }
-
-    const [rotandoId, setRotandoId] = useState<string | null>(null)
-
-    async function rotarPendiente(key: string) {
-        const target = imagenes.find(i => i.key === key)
-        if (!target || rotandoId) return
-        setRotandoId(key)
-        try {
-            const rotado = await rotarImagenFile(target.file, 90)
-            URL.revokeObjectURL(target.preview)
-            const preview = URL.createObjectURL(rotado)
-            setImagenes(prev => prev.map(img => img.key === key ? { ...img, file: rotado, preview } : img))
-            onToast('Foto girada 90°')
-        } catch {
-            onToast('No se pudo girar la foto')
-        } finally {
-            setRotandoId(null)
-        }
-    }
-
-    async function rotarGuardada(id: string) {
-        if (!editarId || rotandoId) return
-        setRotandoId(id)
-        try {
-            const res = await panelRotateProductImage(editarId, id)
-            const nuevaUrl = `${res.url}?t=${Date.now()}`
-            setGuardadas(prev => prev.map(g => g.id === id ? { ...g, url: nuevaUrl } : g))
-            onToast('Foto girada 90°')
-        } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo girar la foto')
-        } finally {
-            setRotandoId(null)
-        }
     }
 
     // Paquete "Avanzado" — "Quitar fondo" se aplica AL INSTANTE: corre el recorte
@@ -1876,9 +1842,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 onReorder={reordenarVariante}
                                                 onQuitarFondo={alternarQuitarFondo}
                                                 onQuitarFondoGuardada={alternarQuitarFondoGuardada}
-                                                onRotarPendiente={rotarPendiente}
-                                                onRotarGuardada={rotarGuardada}
-                                                rotandoId={rotandoId}
                                                 fondoEnProceso={fondoEnProceso}
                                                 avanzadoDisponible={avanzado}
                                             />
@@ -1931,9 +1894,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     orden={ordenGeneral}
                                     onQuitarFondo={alternarQuitarFondo}
                                     onQuitarFondoGuardada={alternarQuitarFondoGuardada}
-                                    onRotarPendiente={rotarPendiente}
-                                    onRotarGuardada={rotarGuardada}
-                                    rotandoId={rotandoId}
                                     fondoEnProceso={fondoEnProceso}
                                     avanzadoDisponible={avanzado}
                                     permitePrincipal
@@ -2559,7 +2519,7 @@ function TipQuitarFondo() {
     )
 }
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, onRotarPendiente, onRotarGuardada, rotandoId, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
@@ -2578,9 +2538,6 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     onQuitarFondo?: (key: string) => void
     /** Quitar/devolver el fondo de una foto ya guardada (id de ProductImage). */
     onQuitarFondoGuardada?: (id: string) => void
-    onRotarPendiente?: (key: string) => void
-    onRotarGuardada?: (id: string) => void
-    rotandoId?: string | null
     fondoEnProceso?: Set<string>
     avanzadoDisponible?: boolean
     permitePrincipal?: boolean
@@ -2656,19 +2613,6 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                                 <Star size={12} fill={it.principal ? '#fff' : 'none'} />
                             </button>
                         )}
-                        {/* Botón Girar 90° */}
-                        {(onRotarGuardada || onRotarPendiente) && (
-                            <button
-                                type="button"
-                                className="ds-hover"
-                                onClick={() => (it.tipo === 'guardada' ? onRotarGuardada?.(it.id) : onRotarPendiente?.(it.id))}
-                                disabled={rotandoId === it.id}
-                                title="Girar 90°"
-                                style={{ ...btnSobreImg, right: 26 }}
-                            >
-                                {rotandoId === it.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCw size={11} />}
-                            </button>
-                        )}
                         {it.tipo === 'guardada'
                             ? <button className="ds-hover" onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
                             : <button className="ds-hover" onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
@@ -2718,7 +2662,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
 // componente aparte (no una variante más de GaleriaImagenes) porque el layout
 // de cada card es distinto (imagen + tira de etiqueta abajo, sin estrella de
 // principal) y mezclar los dos hacía ese componente difícil de leer.
-function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder, onQuitarFondo, onQuitarFondoGuardada, onRotarPendiente, onRotarGuardada, rotandoId, fondoEnProceso, avanzadoDisponible }: {
+function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     opciones: string[]
@@ -2739,9 +2683,6 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     onQuitarFondo?: (key: string) => void
     /** Quitar/devolver el fondo de una foto ya guardada (id de ProductImage). */
     onQuitarFondoGuardada?: (id: string) => void
-    onRotarPendiente?: (key: string) => void
-    onRotarGuardada?: (id: string) => void
-    rotandoId?: string | null
     fondoEnProceso?: Set<string>
     avanzadoDisponible?: boolean
 }) {
@@ -2797,19 +2738,6 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         }}>
                             {i + 1}
                         </span>
-                        {/* Botón Girar 90° */}
-                        {(onRotarGuardada || onRotarPendiente) && (
-                            <button
-                                type="button"
-                                className="ds-hover"
-                                onClick={() => (it.tipo === 'guardada' ? onRotarGuardada?.(it.id) : onRotarPendiente?.(it.id))}
-                                disabled={rotandoId === it.id}
-                                title="Girar 90°"
-                                style={{ ...btnSobreImg, right: 26 }}
-                            >
-                                {rotandoId === it.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCw size={11} />}
-                            </button>
-                        )}
                         <button
                             className="ds-hover"
                             onClick={() => (it.tipo === 'guardada' ? onQuitarGuardada(it.id) : onQuitarPendiente(it.id))}
