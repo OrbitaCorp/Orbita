@@ -31,7 +31,7 @@ import { AyudaBoton, AyudaPanel, type Ayuda } from './components/apariencia/Ayud
 import { AYUDA_SECCIONES, AYUDA_OPCIONES } from './components/apariencia/ayudas'
 import {
     AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
-    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX, VIDEO_LAYOUTS, WHATSAPP_LAYOUTS,
+    CATEGORY_LAYOUTS, CATEGORY_LAYOUT_MAX, OPCIONES_MAX_NUEVOS, VIDEO_LAYOUTS, WHATSAPP_LAYOUTS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type CategoryLayout as CategoryLayoutT, type HeroSlide,
@@ -411,6 +411,62 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                         ))}
                     </div>
+                    {ap.mostrarNuevos && (
+                        <div style={{
+                            marginTop: 14,
+                            padding: '12px 14px',
+                            borderRadius: 8,
+                            background: 'var(--color-surface-alt)',
+                            border: '1px solid var(--color-border)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                    Cantidad de productos en Nuevos ingresos
+                                </span>
+                                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                    {ap.layoutGrid === '3col' ? 'Grilla de 3 columnas' : ap.layoutGrid === 'list' ? 'Diseño de lista' : 'Grilla de 4 columnas'}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {(OPCIONES_MAX_NUEVOS[ap.layoutGrid] ?? OPCIONES_MAX_NUEVOS['4col']).map(opt => {
+                                    const opts = OPCIONES_MAX_NUEVOS[ap.layoutGrid] ?? OPCIONES_MAX_NUEVOS['4col']
+                                    const valorActual = (ap.maxNuevosIngresos && opts.some(o => o.valor === ap.maxNuevosIngresos))
+                                        ? ap.maxNuevosIngresos
+                                        : opts[0].valor
+                                    const activo = valorActual === opt.valor
+                                    return (
+                                        <button
+                                            key={opt.valor}
+                                            type="button"
+                                            onClick={() => set('maxNuevosIngresos', opt.valor)}
+                                            className="ds-hover"
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: 6,
+                                                border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                                color: activo ? 'var(--color-primary)' : 'var(--color-text)',
+                                                fontSize: 12,
+                                                fontWeight: activo ? 600 : 500,
+                                                cursor: 'pointer',
+                                                fontFamily: 'inherit',
+                                                transition: 'all 0.15s ease',
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--color-muted)', lineHeight: 1.4 }}>
+                                {ap.layoutGrid === '3col'
+                                    ? 'Opciones en múltiplos de 3 para asegurar filas completas en tu diseño de 3 columnas.'
+                                    : ap.layoutGrid === 'list'
+                                    ? 'Cantidad máxima de productos a listar en esta sección del inicio.'
+                                    : 'Opciones en múltiplos de 4 para asegurar filas completas en tu diseño de 4 columnas.'}
+                            </p>
+                        </div>
+                    )}
                 </>
             )}
         </SecCard>
@@ -1187,11 +1243,25 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         )}
                         <FieldLabel>Grilla de productos</FieldLabel>
                         <div style={{ marginBottom: 18 }}>
-                            <VisualPick value={ap.layoutGrid} onChange={v => set('layoutGrid', v as LayoutGridT)} options={[
-                                { id: '3col', label: '3 columnas', svg: hline(<g>{[8, 26, 44].map(x => <rect key={x} x={x} y="10" width="14" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
-                                { id: '4col', label: '4 columnas', svg: hline(<g>{[6, 20, 34, 48].map(x => <rect key={x} x={x} y="10" width="10" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
-                                { id: 'list', label: 'Lista', svg: hline(<g>{[8, 18, 28].map(y => <rect key={y} x="8" y={y} width="44" height="6" rx="1.5" fill="var(--color-border)" />)}</g>) },
-                            ]} />
+                            <VisualPick
+                                value={ap.layoutGrid}
+                                onChange={v => {
+                                    const nuevoLayout = v as LayoutGridT
+                                    const opts = OPCIONES_MAX_NUEVOS[nuevoLayout] ?? OPCIONES_MAX_NUEVOS['4col']
+                                    const compatible = ap.maxNuevosIngresos && opts.some(o => o.valor === ap.maxNuevosIngresos)
+                                    setApRaw(p => ({
+                                        ...p,
+                                        layoutGrid: nuevoLayout,
+                                        maxNuevosIngresos: compatible ? p.maxNuevosIngresos : opts[0].valor,
+                                    }))
+                                    setDirty(true)
+                                }}
+                                options={[
+                                    { id: '3col', label: '3 columnas', svg: hline(<g>{[8, 26, 44].map(x => <rect key={x} x={x} y="10" width="14" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
+                                    { id: '4col', label: '4 columnas', svg: hline(<g>{[6, 20, 34, 48].map(x => <rect key={x} x={x} y="10" width="10" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
+                                    { id: 'list', label: 'Lista', svg: hline(<g>{[8, 18, 28].map(y => <rect key={y} x="8" y={y} width="44" height="6" rx="1.5" fill="var(--color-border)" />)}</g>) },
+                                ]}
+                            />
                         </div>
 
                         {/* Estilo de la sección "Comprá por categoría" del home

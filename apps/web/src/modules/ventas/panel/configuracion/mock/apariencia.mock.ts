@@ -127,6 +127,31 @@ export const CATEGORY_LAYOUT_MAX: Partial<Record<CategoryLayout, number>> = {
     tarjetas: 4,
 }
 
+// Opciones de cantidad de productos a mostrar en el estante "Nuevos ingresos"
+// según el diseño de grilla activo. En 3 y 4 columnas se ofrecen múltiplos
+// exactos para asegurar filas completas sin dejar productos huérfanos.
+export const OPCIONES_MAX_NUEVOS: Record<LayoutGrid, { valor: number; label: string }[]> = {
+    '3col': [
+        { valor: 3, label: '3 (1 fila)' },
+        { valor: 6, label: '6 (2 filas)' },
+        { valor: 9, label: '9 (3 filas)' },
+        { valor: 12, label: '12 (4 filas)' },
+    ],
+    '4col': [
+        { valor: 4, label: '4 (1 fila)' },
+        { valor: 8, label: '8 (2 filas)' },
+        { valor: 12, label: '12 (3 filas)' },
+        { valor: 16, label: '16 (4 filas)' },
+    ],
+    'list': [
+        { valor: 3, label: '3 productos' },
+        { valor: 4, label: '4 productos' },
+        { valor: 6, label: '6 productos' },
+        { valor: 8, label: '8 productos' },
+        { valor: 12, label: '12 productos' },
+    ],
+}
+
 export interface HeaderLink {
     id:    string
     label: string
@@ -217,6 +242,8 @@ export interface Apariencia {
     mostrarNuevos:       boolean
     mostrarRecomendados: boolean
     mostrarTopVentas:    boolean
+    // Cantidad máxima de productos en "Nuevos ingresos" (null = usa el valor por defecto de la grilla)
+    maxNuevosIngresos:   number | null
     // Estilo de esa sección, cuando está encendida (ver CATEGORY_LAYOUTS).
     estiloCategorias:   CategoryLayout
     // Categorías elegidas a mano, solo para índice/mosaico/tarjetas — [] =
@@ -339,7 +366,9 @@ export const AP_DEFAULTS: Apariencia = {
     layoutGrid: '4col',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: false,
     mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true,
-    mostrarDestacados: true, mostrarNuevos: true, mostrarRecomendados: true, mostrarTopVentas: true, estiloCategorias: 'pills', categoriasIds: [], mostrarFooter: true, mostrarRedesFooter: true,
+    mostrarDestacados: true, mostrarNuevos: true, mostrarRecomendados: true, mostrarTopVentas: true,
+    maxNuevosIngresos: null,
+    estiloCategorias: 'pills', categoriasIds: [], mostrarFooter: true, mostrarRedesFooter: true,
     mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
     stats: [
         { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },

@@ -17,6 +17,14 @@ export function columnasDeGrilla(gridLayout: string | null | undefined): string 
   return gridLayout === '4col' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'
 }
 
+// Cuántos productos entran por fila en tablet/desktop según el layout de
+// grilla elegido. Guarda exacta coherencia con columnasDeGrilla(): si
+// columnasDeGrilla devuelve 4 columnas ('4col'), entran 4 por fila; si
+// devuelve 3 columnas ('3col' o fallback null/undefined), entran 3 por fila.
+export function itemsPorFilaGrilla(gridLayout: string | null | undefined): number {
+  return gridLayout === '4col' ? 4 : 3
+}
+
 // 'list': el listado se dibuja como filas (ProductCard layout="list") en vez
 // de grilla — en Catalogo.tsx el shopper puede además cambiarlo a mano con
 // su propio selector (viewMode), que arranca en este valor pero después

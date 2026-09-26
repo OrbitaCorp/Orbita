@@ -17,7 +17,7 @@ import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaS
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { openWpp, columnasDeGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
+import { openWpp, columnasDeGrilla, itemsPorFilaGrilla, esGrillaDeLista } from '@/lib/storefront/utils'
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
@@ -303,23 +303,31 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const gridLayoutCfg = config?.appearance?.gridLayout
     const columnasEstante = columnasDeGrilla(gridLayoutCfg)
     const modoListaEstante = esGrillaDeLista(gridLayoutCfg)
-    // Cuántos productos entran por estante: en 3 columnas se corta de a 3 (no
-    // de a 4) para no dejar un 4to producto huérfano en su propia fila — ese
-    // era justo el bug real que llevó a fijar esto en 4 en primer lugar (ver
-    // comentario de .sf-g4 más abajo). En lista no hay columnas de por medio,
-    // así que se mantiene el corte de a 4 de siempre.
-    const porEstante = gridLayoutCfg === '3col' ? 3 : 4
+    // Cuántos productos entran por fila por defecto: en 3 columnas o fallback
+    // se corta de a 3, en 4 columnas de a 4, manteniendo exacta paridad con
+    // columnasDeGrilla() para no dejar productos huérfanos en filas incompletas.
+    const porEstante = itemsPorFilaGrilla(gridLayoutCfg)
 
     // ── Estantes de productos ──
     // Cuatro, cada uno con su interruptor en Apariencia y cada uno con lo que
     // dice su nombre (Ale, 19/09 — antes "Más vendidos", "Lanzamientos" y
     // "Más para vos" eran tandas de la misma lista de lo más nuevo):
     //   - Destacados:      los marcados con la estrella (isFeatured).
-    //   - Nuevos ingresos: lo último cargado (`productos` ya viene así).
+    //   - Nuevos ingresos: lo último cargado (`productos` ya viene así). Permite
+    //                      configurar su máximo desde Apariencia (múltiplos de 3 o 4 según grilla).
     //   - Recomendados:    con reseñas o en oferta (sort 'recommended').
     //   - Top ventas:      con al menos una venta, por unidades vendidas.
     const ap = config?.appearance
-    const nuevosIngresos = productos.slice(0, porEstante)
+    const maxNuevosCfg = config?.appearance?.homeTemplateData?.maxNuevosIngresos
+    let limiteNuevos = (typeof maxNuevosCfg === 'number' && maxNuevosCfg > 0) ? maxNuevosCfg : porEstante
+    // Cinturón defensivo: en 3 o 4 columnas, asegurar que siempre sea múltiplo de columnas
+    // para nunca dejar una fila incompleta con un producto huérfano.
+    if (gridLayoutCfg === '3col' && limiteNuevos % 3 !== 0) {
+        limiteNuevos = Math.max(3, Math.floor(limiteNuevos / 3) * 3)
+    } else if (gridLayoutCfg === '4col' && limiteNuevos % 4 !== 0) {
+        limiteNuevos = Math.max(4, Math.floor(limiteNuevos / 4) * 4)
+    }
+    const nuevosIngresos = productos.slice(0, limiteNuevos)
     const badgesEstante = { showNew: ap?.showNewBadge, showOffer: ap?.showOfferBadge, showLowStock: ap?.showLowStock }
     const estanteRecomendados = recomendados.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
     const estanteTopVentas = topVentas.slice(0, porEstante).map(p => toProducto(p, badgesEstante))

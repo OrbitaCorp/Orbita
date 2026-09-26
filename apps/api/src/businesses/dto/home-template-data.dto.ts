@@ -1,6 +1,7 @@
 import {
   IsString, IsOptional, IsBoolean, MaxLength, ValidateNested, IsObject,
   Validate, ValidatorConstraint, type ValidatorConstraintInterface,
+  IsInt, Min, Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -91,4 +92,12 @@ export class HomeTemplateDataDto {
   @IsObject()
   @Validate(SeccionesPlantillaValidas)
   secciones?: Record<string, Record<string, string>>;
+
+  // Cantidad máxima de productos a mostrar en la fila "Nuevos ingresos" de la portada.
+  // Se adapta al diseño de la grilla (múltiplos de 3 para 3 columnas, múltiplos de 4 para 4 columnas, o lista).
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  maxNuevosIngresos?: number;
 }

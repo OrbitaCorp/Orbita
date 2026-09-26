@@ -73,6 +73,8 @@ export type HomeTemplateData = {
   // indexado por sección y campo (ver plantillas/secciones.ts). Lo que falte
   // cae al texto con el que se diseñó la sección.
   secciones?: Record<string, Record<string, string>> | null
+  // Máximo de productos a mostrar en el estante "Nuevos ingresos" del home
+  maxNuevosIngresos?: number | null
 }
 
 export type StorefrontConfigResponse = {

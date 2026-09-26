@@ -128,6 +128,9 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
             // La marca del header viaja en la misma bolsa (clave `_marca`, ver
             // marca.tsx): no hace falta un campo nuevo en la API.
             secciones: escribirMarca(limpiarSecciones(ap.seccionesPlantilla), marcaValida(ap.marcaModo, ap.marcaEstilo)),
+            ...(typeof ap.maxNuevosIngresos === 'number' && ap.maxNuevosIngresos > 0
+                ? { maxNuevosIngresos: ap.maxNuevosIngresos }
+                : {}),
         },
     }
 }
@@ -244,5 +247,6 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         seccionesPlantilla: sinMarca(dto.homeTemplateData?.secciones ?? defaults.seccionesPlantilla),
         marcaModo: leerMarca(dto.homeTemplateData?.secciones).modo,
         marcaEstilo: leerMarca(dto.homeTemplateData?.secciones).estilo,
+        maxNuevosIngresos: (dto.homeTemplateData as any)?.maxNuevosIngresos ?? defaults.maxNuevosIngresos,
     }
 }

@@ -1121,6 +1121,7 @@ export type ApiAppearanceConfig = {
     // plantillas/secciones.ts, que es donde cada plantilla declara cuáles
     // tiene. Lo que no esté acá cae al texto con el que se diseñó.
     secciones?: Record<string, Record<string, string>>
+    maxNuevosIngresos?: number | null
   } | null
   // Json? nullable en el schema — un negocio que nunca guardó slides/links
   // los trae en null, no un array vacío.
