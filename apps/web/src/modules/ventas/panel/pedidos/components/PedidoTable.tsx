@@ -115,7 +115,7 @@ interface PedidoTableProps {
 }
 
 // ── Card mobile ────────────────────────────────────────────────────────────────
-function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & Omit<PedidoTableProps, 'rows'>) {
+function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, cambiandoEstadoId, onVerPostventa, onAbrirEstado }: { p: Pedido } & Omit<PedidoTableProps, 'rows'> & { onAbrirEstado?: (p: Pedido, e: React.MouseEvent<HTMLElement>) => void }) {
     const accentColor = ESTADO_COLORS[p.estado] ?? 'var(--color-border)'
     return (
         <div
@@ -139,8 +139,34 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
             </div>
 
             {/* Estado — reemplazado por "Devolución pendiente/aprobada" cuando
-                corresponde, mismo lugar y tamaño que el chip de siempre. */}
-            <div><Badge {...estadoBadgeProps(p)} size="sm" /></div>
+                corresponde, con soporte de menú desplegable responsive también en mobile. */}
+            <div onClick={e => e.stopPropagation()} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center' }}>
+                {onCambiarEstado && !p.devolucionAprobada && !p.devolucionPendiente && !p.cancelacionPendiente && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
+                    <button
+                        className="ped-estado-btn"
+                        title="Cambiar estado"
+                        disabled={cambiandoEstadoId === p.id}
+                        onClick={e => {
+                            e.stopPropagation()
+                            onAbrirEstado?.(p, e)
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1, transition: 'filter 150ms' }}
+                    >
+                        <Badge {...estadoBadgeProps(p)} size="sm" caret />
+                    </button>
+                ) : (p.devolucionPendiente || p.cancelacionPendiente) && onVerPostventa ? (
+                    <button
+                        className="ped-estado-btn"
+                        title={p.cancelacionPendiente ? tituloCancelacion(p) : 'Resolver en Cancelaciones y devoluciones'}
+                        onClick={e => { e.stopPropagation(); onVerPostventa(p) }}
+                        style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                        <Badge {...estadoBadgeProps(p)} size="sm" caret />
+                    </button>
+                ) : (
+                    <Badge {...estadoBadgeProps(p)} size="sm" />
+                )}
+            </div>
 
             {/* Cliente */}
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.cliente}</div>
@@ -182,14 +208,32 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
     const idsKey = useMemo(() => rows.map(r => r.id).join(','), [rows])
     useEffect(() => { setSel(new Set()); setMenuEstado(null) }, [idsKey])
 
-    // Un click en cualquier otro lado cierra el menú de estado (el botón que
-    // lo abre corta la propagación, así que no se pisa con esta escucha).
+    // Un click en cualquier otro lado o tecla Escape cierra el menú de estado.
     useEffect(() => {
         if (!menuEstado) return
         const cerrar = () => setMenuEstado(null)
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuEstado(null) }
         document.addEventListener('click', cerrar)
-        return () => document.removeEventListener('click', cerrar)
+        window.addEventListener('keydown', onKeyDown)
+        return () => {
+            document.removeEventListener('click', cerrar)
+            window.removeEventListener('keydown', onKeyDown)
+        }
     }, [menuEstado])
+
+    const abrirMenuEstado = (p: Pedido, e: React.MouseEvent<HTMLElement>) => {
+        if (menuEstado?.id === p.id) {
+            setMenuEstado(null)
+            return
+        }
+        const r = e.currentTarget.getBoundingClientRect()
+        const anchoMenu = 180
+        const altoEstimado = 190
+        const x = Math.max(12, Math.min(r.left, window.innerWidth - anchoMenu - 12))
+        const haciaArriba = (window.innerHeight - r.bottom < altoEstimado) && (r.top > altoEstimado)
+        const y = haciaArriba ? Math.max(12, r.top - altoEstimado) : Math.min(r.bottom + 4, window.innerHeight - altoEstimado)
+        setMenuEstado({ id: p.id, x, y })
+    }
 
     const toggle = (id: string) => setSel(s => {
         const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n
@@ -279,30 +323,11 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                         className="ped-estado-btn"
                                         title="Cambiar estado"
                                         disabled={cambiandoEstadoId === p.id}
-                                        onClick={e => {
-                                            const r = e.currentTarget.getBoundingClientRect()
-                                            setMenuEstado(m => m?.id === p.id ? null : { id: p.id, x: r.left, y: r.bottom + 4 })
-                                        }}
+                                        onClick={e => abrirMenuEstado(p, e)}
                                         style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1, transition: 'filter 150ms' }}
                                     >
                                         <Badge {...estadoBadgeProps(p)} size="sm" caret width={ANCHO_ESTADO} />
                                     </button>
-                                    {menuEstado?.id === p.id && (
-                                        <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
-                                            {(PERMITIDAS[p.estado] ?? []).filter(x => x !== 'cancelado').map(x => (
-                                                <button key={x} className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado(p, x) }} style={menuItem}>
-                                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS[x], flexShrink: 0 }} />
-                                                    {ESTADO_LABEL[x]}
-                                                </button>
-                                            ))}
-                                            {(PERMITIDAS[p.estado] ?? []).includes('cancelado') && (
-                                                <button className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado(p, 'cancelado') }} style={{ ...menuItem, color: 'var(--color-error)', borderTop: '1px solid var(--color-border)' }}>
-                                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS.cancelado, flexShrink: 0 }} />
-                                                    Cancelar pedido
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
                             ) : (
                                 (p.devolucionPendiente || p.cancelacionPendiente) && onVerPostventa ? (
@@ -345,9 +370,57 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                         onRowClick={onRowClick}
                         onComprobante={onComprobante}
                         onEmail={onEmail}
+                        onCambiarEstado={onCambiarEstado}
+                        cambiandoEstadoId={cambiandoEstadoId}
+                        onVerPostventa={onVerPostventa}
+                        onAbrirEstado={abrirMenuEstado}
                     />
                 ))}
             </div>
+
+            {/* ── Menú flotante de estado (compartido desktop y mobile, posicionado sin desbordar) ── */}
+            {menuEstado && (() => {
+                const pedidoSel = rows.find(r => r.id === menuEstado.id)
+                if (!pedidoSel) return null
+                const permitidas = PERMITIDAS[pedidoSel.estado] ?? []
+                return (
+                    <>
+                        <div
+                            onClick={() => setMenuEstado(null)}
+                            style={{ position: 'fixed', inset: 0, zIndex: 399 }}
+                            aria-hidden="true"
+                        />
+                        <div
+                            style={{
+                                position: 'fixed',
+                                left: menuEstado.x,
+                                top: menuEstado.y,
+                                zIndex: 400,
+                                minWidth: 176,
+                                maxWidth: 'calc(100vw - 24px)',
+                                background: 'var(--color-bg)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 10,
+                                boxShadow: '0 8px 24px rgba(15,23,42,.14)',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            {permitidas.filter(x => x !== 'cancelado').map(x => (
+                                <button key={x} className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado?.(pedidoSel, x) }} style={menuItem}>
+                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS[x], flexShrink: 0 }} />
+                                    {ESTADO_LABEL[x]}
+                                </button>
+                            ))}
+                            {permitidas.includes('cancelado') && (
+                                <button className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado?.(pedidoSel, 'cancelado') }} style={{ ...menuItem, color: 'var(--color-error)', borderTop: '1px solid var(--color-border)' }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS.cancelado, flexShrink: 0 }} />
+                                    Cancelar pedido
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )
+            })()}
         </>
     )
 }

@@ -190,6 +190,16 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         return () => { cancelado = true }
     }, [id, recarga])
 
+    // Cerrar menú de estados al presionar Escape
+    useEffect(() => {
+        if (!menuAbierto) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMenuAbierto(false)
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [menuAbierto])
+
     // Sincroniza el formulario de envío con lo que trae el pedido — tanto en
     // la carga inicial como después de guardar (setPedido() en guardarEnvio
     // dispara este mismo efecto con los valores ya confirmados por el back).
@@ -471,13 +481,10 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 .det-header  { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
                 .det-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
                 .det-grid    { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start; }
-                .det-estado-menu { position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:300;
-                    background:var(--color-bg); border:1px solid var(--color-border); border-radius:10px;
-                    box-shadow:0 8px 24px rgba(15,23,42,.14); overflow:hidden; }
                 .det-banda { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
                     padding:14px 16px; border:1px solid var(--color-primary); border-radius:12px;
                     margin-bottom:16px; }
-                .det-banda-menu { position:absolute; top:calc(100% + 6px); right:0; width:240px; z-index:300;
+                .det-banda-menu { position:absolute; top:calc(100% + 6px); right:0; min-width:220px; width:max-content; max-width:min(280px, calc(100vw - 32px)); z-index:300;
                     background:var(--color-bg); border:1px solid var(--color-border); border-radius:10px;
                     box-shadow:0 8px 24px rgba(15,23,42,.14); overflow:hidden; }
                 @media (max-width:900px) {
@@ -493,16 +500,15 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     .det-header h1 { font-size:22px !important; }
                     .det-actions { width:100%; }
                     .det-actions > * { flex:1; }
-                    /* La banda del proximo paso: el boton de accion a lo ancho
-                       debajo del texto, no espichado contra el borde. */
-                    .det-banda { padding:12px 14px !important; }
-                    .det-banda > button, .det-banda > div > button { width:100% !important; }
-                    /* Imprimir, email, copiar y WhatsApp quedaban de 40px
-                       perdidos en una banda a todo el ancho. Se reparten el
-                       renglon y crecen a 48 de alto: el icono es el mismo, lo
-                       que crece es el area donde cae el dedo. */
-                    .det-acc { width:100% !important; gap:8px !important; }
-                    .det-acc > * { flex:1 1 0 !important; width:auto !important; height:48px !important; }
+                    /* Banda de acción en móvil: vertical, botones 100% ancho y menú sin desbordar */
+                    .det-banda { display:flex !important; flex-direction:column !important; align-items:stretch !important; gap:12px !important; padding:14px !important; }
+                    .det-banda > span { min-width:0 !important; width:100% !important; }
+                    .det-banda-btn-primario { width:100% !important; height:44px !important; justify-content:center !important; font-size:14px !important; }
+                    .det-banda-estado-wrap { width:100% !important; position:relative !important; }
+                    .det-banda-estado-btn { width:100% !important; height:42px !important; justify-content:space-between !important; padding:0 14px !important; font-size:13px !important; }
+                    .det-banda-menu { position:absolute !important; top:calc(100% + 6px) !important; left:0 !important; right:0 !important; width:100% !important; max-width:100% !important; min-width:0 !important; box-sizing:border-box !important; z-index:300 !important; }
+                    .det-acc { width:100% !important; display:grid !important; grid-template-columns:repeat(4, 1fr) !important; gap:8px !important; }
+                    .det-acc > * { width:100% !important; height:44px !important; display:grid !important; place-items:center !important; }
                 }
             `}</style>
 
@@ -535,7 +541,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                 {puedeGestionar && accionLabel && siguiente && (
                     <button
-                        className="ds-hover"
+                        className="ds-hover det-banda-btn-primario"
                         onClick={() => iniciarCambio(siguiente)}
                         disabled={guardando}
                         style={{ height:40, padding:'0 20px', borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13.5, fontWeight:700, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardando ? 0.7 : 1, boxShadow:'0 4px 14px rgba(59,130,246,0.25)', flexShrink:0 }}
@@ -545,9 +551,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 )}
 
                 {puedeGestionar && !finalizado && (
-                    <div style={{ position:'relative', flexShrink:0 }}>
+                    <div className="det-banda-estado-wrap" style={{ position:'relative', flexShrink:0 }}>
                         <button
-                            className="ds-hover"
+                            className="ds-hover det-banda-estado-btn"
                             onClick={() => setMenuAbierto(o => !o)}
                             style={{ height:40, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-body)', fontSize:12.5, fontWeight:500, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:8, padding:'0 12px' }}
                         >
@@ -556,34 +562,41 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         </button>
 
                         {menuAbierto && (
-                            <div className="det-banda-menu">
-                                {permitidas.filter(e => e !== 'cancelado').map(e => (
-                                    <button
-                                        key={e}
-                                        className="ds-hover"
-                                        onClick={() => iniciarCambio(e)}
-                                        style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
-                                    >
-                                        <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
-                                        <span style={{ flex:1 }}>{ESTADO_LABEL[e]}</span>
-                                    </button>
-                                ))}
-                                {puedeCancelar && (
-                                    <div style={{ borderTop:'1px solid var(--color-border)' }}>
+                            <>
+                                <div
+                                    onClick={() => setMenuAbierto(false)}
+                                    style={{ position:'fixed', inset:0, zIndex:299 }}
+                                    aria-hidden="true"
+                                />
+                                <div className="det-banda-menu">
+                                    {permitidas.filter(e => e !== 'cancelado').map(e => (
                                         <button
+                                            key={e}
                                             className="ds-hover"
-                                            onClick={() => cambiarEstado('cancelado')}
-                                            style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-error)', textAlign:'left' }}
+                                            onClick={() => iniciarCambio(e)}
+                                            style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
                                         >
-                                            <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR.cancelado, flexShrink:0 }} />
-                                            Cancelar pedido
+                                            <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
+                                            <span style={{ flex:1 }}>{ESTADO_LABEL[e]}</span>
                                         </button>
-                                    </div>
-                                )}
-                                {permitidas.filter(e => e !== 'cancelado').length === 0 && !puedeCancelar && (
-                                    <div style={{ padding:'9px 14px', fontSize:12.5, color:'var(--color-muted)' }}>No hay más cambios posibles.</div>
-                                )}
-                            </div>
+                                    ))}
+                                    {puedeCancelar && (
+                                        <div style={{ borderTop:'1px solid var(--color-border)' }}>
+                                            <button
+                                                className="ds-hover"
+                                                onClick={() => cambiarEstado('cancelado')}
+                                                style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-error)', textAlign:'left' }}
+                                            >
+                                                <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR.cancelado, flexShrink:0 }} />
+                                                Cancelar pedido
+                                            </button>
+                                        </div>
+                                    )}
+                                    {permitidas.filter(e => e !== 'cancelado').length === 0 && !puedeCancelar && (
+                                        <div style={{ padding:'9px 14px', fontSize:12.5, color:'var(--color-muted)' }}>No hay más cambios posibles.</div>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
                 )}

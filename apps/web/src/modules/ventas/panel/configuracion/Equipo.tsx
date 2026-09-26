@@ -482,25 +482,35 @@ function RowMenu({ m, esDueno, onReenviar, onReset, onQuitar }: { m: Miembro; es
 
     useEffect(() => {
         if (!open) return
-        const c = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+        const c = (e: MouseEvent | TouchEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
         window.addEventListener('mousedown', c)
-        return () => window.removeEventListener('mousedown', c)
+        window.addEventListener('touchstart', c)
+        window.addEventListener('keydown', onKeyDown)
+        return () => {
+            window.removeEventListener('mousedown', c)
+            window.removeEventListener('touchstart', c)
+            window.removeEventListener('keydown', onKeyDown)
+        }
     }, [open])
 
     return (
         <div ref={ref} style={{ position: 'relative' }}>
             <button onClick={() => setOpen(!open)} className="ds-hover" style={iconBtn}><MoreVertical size={14} strokeWidth={1.6} /></button>
             {open && (
-                <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 200 }}>
-                    {m.estado === 'pendiente' && <MenuItem icon={<Mail size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReenviar() }}>Reenviar invitación</MenuItem>}
-                    {!esDueno && <MenuItem icon={<Key size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReset() }}>Resetear contraseña</MenuItem>}
-                    {!esDueno && (
-                        <>
-                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                            <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.6} style={{ color: 'var(--color-error)' }} />} onClick={() => { setOpen(false); onQuitar() }}>Quitar del equipo</MenuItem>
-                        </>
-                    )}
-                </div>
+                <>
+                    <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} aria-hidden="true" />
+                    <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 200, maxWidth: 'calc(100vw - 32px)' }}>
+                        {m.estado === 'pendiente' && <MenuItem icon={<Mail size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReenviar() }}>Reenviar invitación</MenuItem>}
+                        {!esDueno && <MenuItem icon={<Key size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReset() }}>Resetear contraseña</MenuItem>}
+                        {!esDueno && (
+                            <>
+                                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                                <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.6} style={{ color: 'var(--color-error)' }} />} onClick={() => { setOpen(false); onQuitar() }}>Quitar del equipo</MenuItem>
+                            </>
+                        )}
+                    </div>
+                </>
             )}
         </div>
     )

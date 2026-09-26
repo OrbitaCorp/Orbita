@@ -63,7 +63,17 @@ export function MenuContextual({ items }: Props) {
   const actualizarPos = () => {
     const r = btnRef.current?.getBoundingClientRect()
     if (!r) return
-    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    const anchoMenu = 192
+    const altoEstimado = items.length * 40 + 16
+    const viewportW = window.innerWidth
+    const viewportH = window.innerHeight
+
+    // Clampeado para que nunca desborde la pantalla ni a izquierda ni a derecha
+    const right = Math.max(12, Math.min(viewportW - r.right, viewportW - anchoMenu - 12))
+    const haciaArriba = (viewportH - r.bottom < altoEstimado) && (r.top > altoEstimado)
+    const top = haciaArriba ? Math.max(12, r.top - altoEstimado) : Math.min(r.bottom + 4, viewportH - altoEstimado)
+
+    setPos({ top, right })
   }
 
   // Portal a document.body + position:fixed: si se posicionara relativo al
@@ -73,16 +83,23 @@ export function MenuContextual({ items }: Props) {
   useEffect(() => {
     if (!abierto) return
     actualizarPos()
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       const target = e.target as Node
       if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return
       setAbierto(false)
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false)
+    }
     document.addEventListener('mousedown', handleClick)
+    document.addEventListener('touchstart', handleClick)
+    window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('scroll', actualizarPos, true)
     window.addEventListener('resize', actualizarPos)
     return () => {
       document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('touchstart', handleClick)
+      window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('scroll', actualizarPos, true)
       window.removeEventListener('resize', actualizarPos)
     }
@@ -111,36 +128,44 @@ export function MenuContextual({ items }: Props) {
       </button>
 
       {abierto && pos && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: 'fixed',
-            top: pos.top,
-            right: pos.right,
-            width: 192,
-            borderRadius: 10,
-            zIndex: 9999,
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            boxShadow: '0 4px 16px rgba(0,0,0,.12)',
-            padding: 4,
-          }}
-        >
-          {items.map((item, i) => (
-            <div key={i}>
-              {item.separadorAntes && (
-                <div
-                  style={{
-                    height: 1,
-                    background: 'var(--color-border)',
-                    margin: '4px 0',
-                  }}
-                />
-              )}
-              <FilaMenu item={item} onClose={() => setAbierto(false)} />
-            </div>
-          ))}
-        </div>,
+        <>
+          <div
+            onClick={() => setAbierto(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            aria-hidden="true"
+          />
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: pos.top,
+              right: pos.right,
+              width: 192,
+              maxWidth: 'calc(100vw - 24px)',
+              borderRadius: 10,
+              zIndex: 9999,
+              background: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+              padding: 4,
+            }}
+          >
+            {items.map((item, i) => (
+              <div key={i}>
+                {item.separadorAntes && (
+                  <div
+                    style={{
+                      height: 1,
+                      background: 'var(--color-border)',
+                      margin: '4px 0',
+                    }}
+                  />
+                )}
+                <FilaMenu item={item} onClose={() => setAbierto(false)} />
+              </div>
+            ))}
+          </div>
+        </>,
         document.body
       )}
     </>

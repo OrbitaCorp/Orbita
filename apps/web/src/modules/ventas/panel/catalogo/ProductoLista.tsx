@@ -233,9 +233,20 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
         setIndice(i => (i + 1) % p.images.length)
     }
 
+    function calcularPos(el: HTMLElement) {
+        const r = el.getBoundingClientRect()
+        const anchoMenu = 180
+        const altoEstimado = 160
+        const viewportW = window.innerWidth
+        const viewportH = window.innerHeight
+        const right = Math.max(12, Math.min(viewportW - r.right, viewportW - anchoMenu - 12))
+        const haciaArriba = (viewportH - r.bottom < altoEstimado) && (r.top > altoEstimado)
+        const top = haciaArriba ? Math.max(12, r.top - altoEstimado) : Math.min(r.bottom + 4, viewportH - altoEstimado)
+        return { top, right }
+    }
+
     function abrirMenu() {
-        const r = menuBtnRef.current?.getBoundingClientRect()
-        if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+        if (menuBtnRef.current) setMenuPos(calcularPos(menuBtnRef.current))
         setMenuAbierto(true)
     }
 
@@ -248,20 +259,26 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     // y el menú "···" de la vista en tabla) para escapar de ese contexto.
     useEffect(() => {
         if (!menuAbierto) return
-        function handleClick(e: MouseEvent) {
+        function handleClick(e: MouseEvent | TouchEvent) {
             const t = e.target as Node
             if (menuBtnRef.current?.contains(t) || menuRef.current?.contains(t)) return
             setMenuAbierto(false)
         }
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key === 'Escape') setMenuAbierto(false)
+        }
         function actualizarPos() {
-            const r = menuBtnRef.current?.getBoundingClientRect()
-            if (r) setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+            if (menuBtnRef.current) setMenuPos(calcularPos(menuBtnRef.current))
         }
         document.addEventListener('mousedown', handleClick)
+        document.addEventListener('touchstart', handleClick)
+        window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('scroll', actualizarPos, true)
         window.addEventListener('resize', actualizarPos)
         return () => {
             document.removeEventListener('mousedown', handleClick)
+            document.removeEventListener('touchstart', handleClick)
+            window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('scroll', actualizarPos, true)
             window.removeEventListener('resize', actualizarPos)
         }
@@ -415,12 +432,19 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     <button ref={menuBtnRef} onClick={() => menuAbierto ? setMenuAbierto(false) : abrirMenu()} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
 
                     {menuAbierto && menuPos && createPortal(
-                        <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
-                            <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
-                            {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
-                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                            <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
-                        </div>,
+                        <>
+                            <div
+                                onClick={() => setMenuAbierto(false)}
+                                style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+                                aria-hidden="true"
+                            />
+                            <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170, maxWidth: 'calc(100vw - 24px)' }}>
+                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                                {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
+                                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                            </div>
+                        </>,
                         document.body
                     )}
                 </div>
@@ -513,6 +537,13 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // la tabla tiene overflow:hidden (para las esquinas redondeadas), el
     // menú quedaba recortado y "Eliminar" (el último ítem) no se veía.
     const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+
+    useEffect(() => {
+        if (!menu) return
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null) }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [menu])
     const [pagina, setPagina] = useState(() => {
         const n = Number(router.query.pagina)
         return Number.isInteger(n) && n > 0 ? n : 1
@@ -1113,7 +1144,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                     onClick={e => {
                                         if (menu === p.id) { setMenu(null); return }
                                         const r = e.currentTarget.getBoundingClientRect()
-                                        setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                                        const anchoMenu = 180
+                                        const altoEstimado = 180
+                                        const viewportW = window.innerWidth
+                                        const viewportH = window.innerHeight
+                                        const right = Math.max(12, Math.min(viewportW - r.right, viewportW - anchoMenu - 12))
+                                        const haciaArriba = (viewportH - r.bottom < altoEstimado) && (r.top > altoEstimado)
+                                        const top = haciaArriba ? Math.max(12, r.top - altoEstimado) : Math.min(r.bottom + 4, viewportH - altoEstimado)
+                                        setMenuPos({ top, right })
                                         setMenu(p.id)
                                     }}
                                     className="prod-list-actbtn"
@@ -1124,7 +1162,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 {menu === p.id && menuPos && (
                                     <>
                                         <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                                        <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180 }}>
+                                        <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180, maxWidth: 'calc(100vw - 24px)' }}>
                                             <button className="ds-hover" onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); setContenidoDe(p.id) }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>

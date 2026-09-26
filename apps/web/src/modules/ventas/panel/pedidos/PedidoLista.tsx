@@ -1,4 +1,4 @@
-﻿// src/modules/ventas/panel/pedidos/PedidoLista.tsx — Vista 02 + hub del módulo
+// src/modules/ventas/panel/pedidos/PedidoLista.tsx — Vista 02 + hub del módulo
 //
 // Este componente es el punto de entrada del módulo `pedidos` (registrado en el
 // componentMap del router admin). Funciona como HUB: según `router.query.vista`
@@ -159,6 +159,14 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
     // Cualquier cambio de filtro vuelve a la primera página.
     useEffect(() => { setPage(1) }, [tab, canal, busquedaLista, rango])
+
+    // Cerrar menú de rango de fechas al presionar Escape
+    useEffect(() => {
+        if (!rangoAbierto) return
+        const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setRangoAbierto(false) }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [rangoAbierto])
 
     // La carga de verdad: cada cambio de filtro o de página vuelve a pedir la lista.
     useEffect(() => {
@@ -323,7 +331,9 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     .ped-search     { max-width: 100% !important; flex: none !important; }
                     .ped-canal-wrap { width: 100% !important; justify-content: stretch; }
                     .ped-canal-wrap button { flex: 1 !important; }
+                    .ped-date-wrap  { width: 100% !important; }
                     .ped-date-btn   { width: 100% !important; justify-content: center !important; }
+                    .ped-date-menu  { width: 100% !important; left: 0 !important; right: 0 !important; box-sizing: border-box !important; }
                 }
             `}</style>
 
@@ -365,18 +375,25 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 <TiraScrollHint hintRef={tabsHintRef} style={{ borderBottom: '1px solid var(--color-border)' }} />
                 <div className="ped-filter-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', flexWrap: 'wrap' }}>
                     {/* Filtro de fecha real: hoy / 7 días / 30 días / todo */}
-                    <div style={{ position: 'relative' }}>
+                    <div className="ped-date-wrap" style={{ position: 'relative' }}>
                         <button className="ds-hover ped-date-btn" onClick={() => setRangoAbierto(o => !o)} style={{ height: 36, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, fontWeight: 500, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit' }}>
                             <Clock size={15} /> {RANGOS.find(r => r.id === rango)?.label} <ChevronDown size={13} style={{ opacity: 0.6, transform: rangoAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 180ms' }} />
                         </button>
                         {rangoAbierto && (
-                            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 300, minWidth: 180, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
-                                {RANGOS.map(r => (
-                                    <button key={r.id} className="ds-hover" onClick={() => { setRango(r.id); setRangoAbierto(false) }} style={{ width: '100%', padding: '9px 14px', border: 'none', background: rango === r.id ? 'var(--color-surface-alt)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', textAlign: 'left', fontWeight: rango === r.id ? 600 : 400 }}>
-                                        {r.label}
-                                    </button>
-                                ))}
-                            </div>
+                            <>
+                                <div
+                                    onClick={() => setRangoAbierto(false)}
+                                    style={{ position: 'fixed', inset: 0, zIndex: 299 }}
+                                    aria-hidden="true"
+                                />
+                                <div className="ped-date-menu" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 300, minWidth: 180, maxWidth: 'calc(100vw - 28px)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
+                                    {RANGOS.map(r => (
+                                        <button key={r.id} className="ds-hover" onClick={() => { setRango(r.id); setRangoAbierto(false) }} style={{ width: '100%', padding: '9px 14px', border: 'none', background: rango === r.id ? 'var(--color-surface-alt)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', textAlign: 'left', fontWeight: rango === r.id ? 600 : 400 }}>
+                                            {r.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
                         )}
                     </div>
                     <div className="ped-canal-wrap" style={{ display: 'flex', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 2, height: 36 }}>
