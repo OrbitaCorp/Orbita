@@ -48,7 +48,7 @@ function aConversacion(c: ConversationRow): Conversacion {
 }
 
 function BandejaSkeleton() {
-  const panelH = 'calc(100vh - 138px)'
+  const panelH = 'calc(100dvh - 138px)'
   return (
     <div style={{ display: 'flex', height: panelH, minHeight: 480, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
       {/* Lista skeleton */}
@@ -178,7 +178,7 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil, onP
           .msg-split:not(.has-conv) .msg-chat { display: none !important; }
         }
       `}</style>
-      <div className={`msg-split ${activaCV ? 'has-conv' : ''}`} style={{ display: 'flex', height: 'calc(100vh - 138px)', minHeight: 480, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
+      <div className={`msg-split ${activaCV ? 'has-conv' : ''}`} style={{ display: 'flex', height: 'calc(100dvh - 138px)', minHeight: 480, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
         <div className="msg-list">
           <BandejaLista conversaciones={conversaciones} activaId={convId} onSelect={handleSelect} onArchivar={handleArchivar} />
         </div>

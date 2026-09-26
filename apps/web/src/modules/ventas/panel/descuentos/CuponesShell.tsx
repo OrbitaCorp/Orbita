@@ -19,7 +19,7 @@ export function CuponesShell() {
   const irAMetricas = useCallback(() => router.push({ pathname: metricasPath, query: { vista: 'metricas' } }), [router, metricasPath])
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0 }}>
+    <div style={{ flex: 1, padding: 24, minHeight: 0 }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
         {!vista && (

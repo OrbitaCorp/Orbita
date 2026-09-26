@@ -25,7 +25,7 @@ export function DescuentosShell() {
   const irAMetricas  = useCallback(() => router.push({ pathname: basePath, query: { vista: 'metricas' } }), [router, basePath])
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0 }}>
+    <div style={{ flex: 1, padding: 24, minHeight: 0 }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
         {!vista && (

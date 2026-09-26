@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ReactNode } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
@@ -37,8 +37,30 @@ function AdminShell({ children }: { children: ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     useOrbiKeyboardShortcut()
 
+    // Bloquea el scroll del body/html mientras se esté en el panel admin.
+    // Esto elimina el doble scroll en Y (ventana vs .admin-main) y evita
+    // que el Navbar suba o baile cuando el usuario arrastra la pantalla en celular.
+    // Al desmontarse (ir al storefront o landing), se desbloquea para no afectar
+    // el scroll nativo de la tienda.
+    useEffect(() => {
+        document.documentElement.classList.add('admin-locked')
+        document.body.classList.add('admin-locked')
+        return () => {
+            document.documentElement.classList.remove('admin-locked')
+            document.body.classList.remove('admin-locked')
+        }
+    }, [])
+
     return (
-        <div className="flex h-screen overflow-hidden">
+        <div
+            className="flex overflow-hidden admin-shell"
+            style={{
+                height: '100dvh',
+                maxHeight: '100dvh',
+                width: '100%',
+                maxWidth: '100vw',
+            }}
+        >
             <style>{`
                 @media (min-width: 769px) {
                     .admin-backdrop { display: none !important; }
@@ -60,13 +82,19 @@ function AdminShell({ children }: { children: ReactNode }) {
 
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex flex-col flex-1 overflow-hidden" style={{ minWidth: 0, height: '100%' }}>
                 <Header onMenuClick={() => setSidebarOpen(o => !o)} />
                 <SubscriptionStatusBanner />
                 {/* El fondo vive en .admin-main (globals.css): en claro es el
                     surface plano de siempre; en oscuro suma un resplandor
                     ambiental sutil de marca — ver "Modo oscuro premium". */}
-                <main className="admin-main flex-1 overflow-auto">
+                <main
+                    className="admin-main flex-1 overflow-auto"
+                    style={{
+                        overscrollBehaviorY: 'contain',
+                        WebkitOverflowScrolling: 'touch',
+                    }}
+                >
                     {children}
                 </main>
             </div>

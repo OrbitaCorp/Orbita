@@ -216,12 +216,33 @@ html::-webkit-scrollbar { display: none; }
    fijo arriba. */
 body { margin: 0; min-height: 100vh; }
 
+/* ─── Bloqueo de scroll exterior en panel admin ─────────────────────────
+   En el panel admin (AdminLayout), el scroll debe ocurrir ÚNICAMENTE dentro
+   de <main class="admin-main">. Si html y body quedan libres con min-height: 100vh,
+   en navegadores móviles (iOS Safari / Android Chrome) la barra de URL hace que
+   100vh supere el viewport visible y la ventana del navegador genere un scroll
+   vertical parásito (~80px). Al arrastrar cerca del Header o al rebotar arriba,
+   la ventana exterior se desplazaba y el Navbar se iba de la pantalla.
+   Con .admin-locked, html y body quedan sellados a 100dvh sin scroll exterior. */
+html.admin-locked,
+body.admin-locked {
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  overscroll-behavior-y: none !important;
+}
+
 /* ─── Panel admin · fondo del área de contenido ──────────────────────────
    En claro: el surface plano de siempre. En oscuro: el mismo surface con un
    resplandor ambiental muy sutil (azul de marca arriba a la derecha, violeta
    abajo a la izquierda) — profundidad de "espacio" sin ensuciar la lectura.
    Vive acá y no inline porque el inline pisaría a la variante .dark. */
-.admin-main { background: var(--color-surface); }
+.admin-main {
+  background: var(--color-surface);
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* El sidebar proyecta una sombra suave sobre el contenido en oscuro — separa
    los dos planos sin engrosar el borde. En claro no hace falta. */
