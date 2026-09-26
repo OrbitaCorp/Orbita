@@ -30,6 +30,7 @@
 // la foto completa — Gemini si el producto es plano (`photoType`), Workers
 // AI si tiene volumen. "Sin fondo" es igual en los dos modos (siempre ONNX).
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
@@ -486,50 +487,73 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             </div>
         </Modal>
 
-        {/* Lightbox: imagen entera, SIN recortar (contain) — el punto de esto
-            es justamente ver lo que el thumbnail recortado no deja ver.
-            z-index 400, por encima del Modal (300, ver Modal.tsx). */}
-        {previewZoom?.estado === 'listo' && (
+        {/* Lightbox: imagen entera, SIN recortar (contain) — renderizado via createPortal en document.body para superar el z-index del Modal. */}
+        {previewZoom?.estado === 'listo' && typeof document !== 'undefined' && createPortal(
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Preview del fondo, tamaño completo"
                 onClick={() => setZoomKey(null)}
                 style={{
-                    position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(15,23,42,0.6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    background: 'rgba(15,23,42,0.75)',
+                    backdropFilter: 'blur(3px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 24,
                 }}
             >
-                {/* Modal mediano (no pantalla completa): la imagen se ve entera
-                    (contain), pero acotada a ~520px de ancho y ~60% del alto. */}
+                {/* Modal mediano (no pantalla completa): la imagen se ve entera (contain) */}
                 <div
                     onClick={e => e.stopPropagation()}
                     style={{
-                        position: 'relative', width: 'min(560px, 100%)', maxHeight: '80vh',
-                        background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14,
-                        padding: 16, boxShadow: '0 20px 50px rgba(15,23,42,0.35)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        position: 'relative',
+                        width: 'min(580px, 100%)',
+                        maxHeight: '85vh',
+                        background: 'var(--color-bg)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 14,
+                        padding: 16,
+                        boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                 >
                     <img
                         src={previewZoom.url}
                         alt="Preview con el nuevo fondo, tamaño completo"
-                        style={{ maxWidth: '100%', maxHeight: 'calc(80vh - 32px)', objectFit: 'contain', borderRadius: 8, display: 'block' }}
+                        style={{ maxWidth: '100%', maxHeight: 'calc(85vh - 32px)', objectFit: 'contain', borderRadius: 8, display: 'block' }}
                     />
                     <button
                         type="button"
                         onClick={() => setZoomKey(null)}
                         aria-label="Cerrar"
+                        className="ds-hover"
                         style={{
-                            position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: '50%',
-                            border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)',
-                            display: 'grid', placeItems: 'center', cursor: 'pointer',
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            border: '1px solid var(--color-border)',
+                            background: 'var(--color-surface)',
+                            color: 'var(--color-text)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                         }}
                     >
                         <X size={16} strokeWidth={2.2} />
                     </button>
                 </div>
-            </div>
+            </div>,
+            document.body
         )}
         </Fragment>
     )
