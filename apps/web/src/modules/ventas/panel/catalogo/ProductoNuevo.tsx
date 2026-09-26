@@ -1907,6 +1907,31 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     </span>
                                 </div>
                             </div>
+                            <div style={{ marginBottom: 10 }}>
+                                <button
+                                    type="button"
+                                    onClick={orbiAsistir}
+                                    disabled={!prod.nombre.trim() || orbiGen}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: prod.nombre.trim() && !orbiGen ? 'pointer' : 'default',
+                                        padding: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        fontSize: 12.5,
+                                        color: prod.nombre.trim() && !orbiGen ? 'var(--color-primary)' : 'var(--color-muted)',
+                                        fontFamily: 'inherit',
+                                        fontWeight: 500,
+                                        opacity: prod.nombre.trim() && !orbiGen ? 1 : 0.55,
+                                        transition: 'opacity 0.15s',
+                                    }}
+                                >
+                                    <Sparkles size={12} />
+                                    {orbiGen ? 'Generando…' : 'Generar descripción con Orbi'}
+                                </button>
+                            </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Descripción</label>
                                 <textarea className="ds-field" value={prod.descripcion} onChange={e => set('descripcion', e.target.value.slice(0, 2000))} rows={5} style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 110, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }} />
