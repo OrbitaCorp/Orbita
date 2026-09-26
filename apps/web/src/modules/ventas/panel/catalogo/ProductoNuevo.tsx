@@ -325,16 +325,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [orbiSpecsGen, setOrbiSpecsGen] = useState(false)
     const [tagInput, setTagInput] = useState('')
     const [prod, setProd] = useState<ProdForm>(formInicialConDefaults)
-
-    // Ajuste dinámico de altura para el nombre del producto: en móviles o títulos
-    // largos (60-80 caracteres), permite que el texto haga wrap y se extienda hacia
-    // abajo en vez de quedar recortado horizontalmente, facilitando editar y ver todo.
-    useEffect(() => {
-        if (nombreInputRef.current) {
-            nombreInputRef.current.style.height = 'auto'
-            nombreInputRef.current.style.height = `${Math.max(26, nombreInputRef.current.scrollHeight)}px`
-        }
-    }, [prod.nombre])
     // El SKU se autogenera a partir del nombre mientras el usuario no haya
     // tocado el campo a mano — apenas escribe algo propio, se respeta y se
     // deja de pisarlo en cada cambio de nombre (ver efecto más abajo).
@@ -374,6 +364,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [tagsUsadas, setTagsUsadas] = useState<ApiTag[]>([])
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
+
+    // Ajuste dinámico de altura para el nombre del producto: tanto al crear como
+    // al EDITAR un producto existente con nombre largo (60-80 caracteres), permite
+    // que el texto haga wrap y se extienda hacia abajo en vez de quedar recortado
+    // horizontalmente, facilitando editar y ver todo sin importar la pantalla.
+    useEffect(() => {
+        if (nombreInputRef.current) {
+            nombreInputRef.current.style.height = 'auto'
+            nombreInputRef.current.style.height = `${Math.max(26, nombreInputRef.current.scrollHeight)}px`
+        }
+    }, [prod.nombre, cargando, step])
     // Paquete "Avanzado" — habilita el toggle de "quitar fondo con IA" en la
     // galería de fotos. false por default: mejor no mostrar el botón un
     // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
@@ -1819,11 +1820,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     }}
                                 >
                                     <textarea
-                                        ref={nombreInputRef}
+                                        ref={el => {
+                                            (nombreInputRef as any).current = el
+                                            if (el) {
+                                                el.style.height = 'auto'
+                                                el.style.height = `${Math.max(26, el.scrollHeight)}px`
+                                            }
+                                        }}
                                         value={prod.nombre}
                                         onChange={e => {
                                             const clean = e.target.value.replace(/[\r\n]+/g, ' ').slice(0, 80)
                                             set('nombre', clean)
+                                        }}
+                                        onInput={e => {
+                                            const t = e.currentTarget
+                                            t.style.height = 'auto'
+                                            t.style.height = `${Math.max(26, t.scrollHeight)}px`
                                         }}
                                         onKeyDown={e => {
                                             if (e.key === 'Enter') {
