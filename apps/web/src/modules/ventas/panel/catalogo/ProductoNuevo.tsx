@@ -317,6 +317,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [orbiScanGen, setOrbiScanGen] = useState(false)
     const [orbiScanSuccess, setOrbiScanSuccess] = useState(false)
     const fileInputScanRef = useRef<HTMLInputElement>(null)
+    const nombreInputRef = useRef<HTMLTextAreaElement>(null)
     // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
     // Se prende solo si el vendedor lo pide, o al editar uno que ya la tenía
     // cargada (ver la precarga más abajo).
@@ -324,6 +325,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [orbiSpecsGen, setOrbiSpecsGen] = useState(false)
     const [tagInput, setTagInput] = useState('')
     const [prod, setProd] = useState<ProdForm>(formInicialConDefaults)
+
+    // Ajuste dinámico de altura para el nombre del producto: en móviles o títulos
+    // largos (60-80 caracteres), permite que el texto haga wrap y se extienda hacia
+    // abajo en vez de quedar recortado horizontalmente, facilitando editar y ver todo.
+    useEffect(() => {
+        if (nombreInputRef.current) {
+            nombreInputRef.current.style.height = 'auto'
+            nombreInputRef.current.style.height = `${Math.max(26, nombreInputRef.current.scrollHeight)}px`
+        }
+    }, [prod.nombre])
     // El SKU se autogenera a partir del nombre mientras el usuario no haya
     // tocado el campo a mano — apenas escribe algo propio, se respeta y se
     // deja de pisarlo en cada cambio de nombre (ver efecto más abajo).
@@ -1757,10 +1768,130 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             )}
 
                             <div style={{ marginBottom: 18 }}>
-                                <PField label="Nombre del producto" value={prod.nombre} onChange={v => set('nombre', v.slice(0, 80))} placeholder="Ej: Remera oversize negra" h={44} />
+                                <label style={{ ...lbl, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <span>
+                                        Nombre del producto <span style={{ color: 'var(--color-error)' }}>*</span>
+                                    </span>
+                                    {prod.nombre.trim().length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                set('nombre', '')
+                                                nombreInputRef.current?.focus()
+                                            }}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--color-muted)',
+                                                fontSize: 11.5,
+                                                fontWeight: 500,
+                                                cursor: 'pointer',
+                                                padding: '2px 4px',
+                                                fontFamily: 'inherit',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                borderRadius: 4,
+                                            }}
+                                            className="ds-hover"
+                                            title="Borrar nombre"
+                                        >
+                                            <X size={12} strokeWidth={2.5} />
+                                            <span>Borrar todo</span>
+                                        </button>
+                                    )}
+                                </label>
+                                <div
+                                    className="ds-field"
+                                    onClick={() => nombreInputRef.current?.focus()}
+                                    style={{
+                                        position: 'relative',
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        minHeight: 46,
+                                        padding: '10px 12px',
+                                        background: 'var(--color-bg)',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 8,
+                                        gap: 8,
+                                        cursor: 'text',
+                                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                                    }}
+                                >
+                                    <textarea
+                                        ref={nombreInputRef}
+                                        value={prod.nombre}
+                                        onChange={e => {
+                                            const clean = e.target.value.replace(/[\r\n]+/g, ' ').slice(0, 80)
+                                            set('nombre', clean)
+                                        }}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault()
+                                            }
+                                        }}
+                                        placeholder="Ej: Remera oversize negra"
+                                        rows={1}
+                                        style={{
+                                            flex: 1,
+                                            width: '100%',
+                                            minHeight: 24,
+                                            border: 'none',
+                                            outline: 'none',
+                                            background: 'transparent',
+                                            fontSize: 14.5,
+                                            fontWeight: 500,
+                                            color: 'var(--color-text)',
+                                            fontFamily: 'inherit',
+                                            resize: 'none',
+                                            lineHeight: 1.45,
+                                            padding: 0,
+                                            margin: 0,
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                            overflowY: 'hidden',
+                                        }}
+                                    />
+                                    {prod.nombre.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={e => {
+                                                e.stopPropagation()
+                                                set('nombre', '')
+                                                nombreInputRef.current?.focus()
+                                            }}
+                                            style={{
+                                                background: 'var(--color-surface)',
+                                                border: '1px solid var(--color-border)',
+                                                color: 'var(--color-muted)',
+                                                cursor: 'pointer',
+                                                width: 22,
+                                                height: 22,
+                                                borderRadius: '50%',
+                                                display: 'grid',
+                                                placeItems: 'center',
+                                                flexShrink: 0,
+                                                marginTop: 1,
+                                                padding: 0,
+                                                transition: 'all 0.15s ease',
+                                            }}
+                                            className="ds-hover"
+                                            title="Borrar nombre"
+                                        >
+                                            <X size={12} strokeWidth={2.5} />
+                                        </button>
+                                    )}
+                                </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                                     <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Usá palabras que tus clientes buscarían</span>
-                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.nombre.length}/80</span>
+                                    <span style={{
+                                        fontSize: 11,
+                                        color: prod.nombre.length >= 75 ? 'var(--color-warning, #f59e0b)' : 'var(--color-subtle)',
+                                        fontFamily: '"Geist Mono", monospace',
+                                        fontWeight: prod.nombre.length >= 75 ? 600 : 400,
+                                    }}>
+                                        {prod.nombre.length}/80
+                                    </span>
                                 </div>
                             </div>
                             <div style={{ marginBottom: 18 }}>
