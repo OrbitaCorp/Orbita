@@ -2243,7 +2243,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 avanzadoDisponible={avanzado}
                                             />
                                             <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                                PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
+                                                Arrastrá las fotos o usá las flechas ◀ ▶ para cambiar el orden. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
                                             </div>
                                             {valoresConFotoDuplicada.length > 0 && (
                                                 <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
@@ -2491,7 +2491,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     permitePrincipal
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
+                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos o usá las flechas ◀ ▶ para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
                                 </div>
                             </div>
 
@@ -3111,6 +3111,242 @@ function TipQuitarFondo() {
     )
 }
 
+// Hook reutilizable para soportar drag-and-drop táctil en celulares (iOS y Android),
+// donde la API nativa HTML5 DnD no funciona. Detecta pulsación prolongada (~180ms)
+// para no interferir con el scroll de la página y calcula la card destino sobrevolada.
+function useTouchReorder({
+    enabled,
+    itemsLength,
+    onMover,
+}: {
+    enabled: boolean
+    itemsLength: number
+    onMover: (origen: number, destino: number) => void
+}) {
+    const [arrastrando, setArrastrando] = useState<number | null>(null)
+    const [sobre, setSobre] = useState<number | null>(null)
+    const [isTouchDragging, setIsTouchDragging] = useState(false)
+
+    const touchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const touchOriginRef = useRef<number | null>(null)
+    const touchTargetRef = useRef<number | null>(null)
+    const touchPosRef = useRef<{ x: number; y: number } | null>(null)
+    const activeListenersRef = useRef<{ move: (e: TouchEvent) => void; end: () => void } | null>(null)
+
+    useEffect(() => {
+        return () => {
+            if (touchTimer.current) clearTimeout(touchTimer.current)
+            if (activeListenersRef.current) {
+                window.removeEventListener('touchmove', activeListenersRef.current.move)
+                window.removeEventListener('touchend', activeListenersRef.current.end)
+                window.removeEventListener('touchcancel', activeListenersRef.current.end)
+            }
+        }
+    }, [])
+
+    const iniciarTouchDrag = useCallback((e: React.TouchEvent, idx: number) => {
+        if (!enabled || itemsLength <= 1) return
+        if ((e.target as HTMLElement).closest('button, select, input, label')) return
+
+        const touch = e.touches[0]
+        if (!touch) return
+
+        touchPosRef.current = { x: touch.clientX, y: touch.clientY }
+        touchOriginRef.current = idx
+        touchTargetRef.current = idx
+
+        if (touchTimer.current) clearTimeout(touchTimer.current)
+        touchTimer.current = setTimeout(() => {
+            setIsTouchDragging(true)
+            setArrastrando(idx)
+            setSobre(idx)
+            try { navigator.vibrate?.(35) } catch {}
+
+            const onWindowTouchMove = (ev: TouchEvent) => {
+                if (ev.cancelable) ev.preventDefault()
+                const t = ev.touches[0]
+                if (!t) return
+                const elem = document.elementFromPoint(t.clientX, t.clientY)
+                const card = elem?.closest('[data-galeria-index]')
+                if (card) {
+                    const targetIdx = Number(card.getAttribute('data-galeria-index'))
+                    if (!Number.isNaN(targetIdx) && targetIdx !== touchTargetRef.current) {
+                        touchTargetRef.current = targetIdx
+                        setSobre(targetIdx)
+                    }
+                }
+            }
+
+            const onWindowTouchEnd = () => {
+                window.removeEventListener('touchmove', onWindowTouchMove)
+                window.removeEventListener('touchend', onWindowTouchEnd)
+                window.removeEventListener('touchcancel', onWindowTouchEnd)
+                activeListenersRef.current = null
+
+                const origen = touchOriginRef.current
+                const destino = touchTargetRef.current
+                if (origen !== null && destino !== null && origen !== destino) {
+                    onMover(origen, destino)
+                }
+
+                setIsTouchDragging(false)
+                setArrastrando(null)
+                setSobre(null)
+                touchOriginRef.current = null
+                touchTargetRef.current = null
+                touchPosRef.current = null
+            }
+
+            activeListenersRef.current = { move: onWindowTouchMove, end: onWindowTouchEnd }
+            window.addEventListener('touchmove', onWindowTouchMove, { passive: false })
+            window.addEventListener('touchend', onWindowTouchEnd)
+            window.addEventListener('touchcancel', onWindowTouchEnd)
+        }, 180)
+    }, [enabled, itemsLength, onMover])
+
+    const verificarMovimientoTouch = useCallback((e: React.TouchEvent) => {
+        if (!touchPosRef.current || isTouchDragging) return
+        const touch = e.touches[0]
+        if (!touch) return
+        const dx = touch.clientX - touchPosRef.current.x
+        const dy = touch.clientY - touchPosRef.current.y
+        if (Math.hypot(dx, dy) > 8) {
+            // Usuario está haciendo scroll vertical u horizontal; cancelar arrastre
+            if (touchTimer.current) {
+                clearTimeout(touchTimer.current)
+                touchTimer.current = null
+            }
+            touchPosRef.current = null
+            touchOriginRef.current = null
+            touchTargetRef.current = null
+        }
+    }, [isTouchDragging])
+
+    const cancelarTouchAntesDeIniciar = useCallback(() => {
+        if (touchTimer.current) {
+            clearTimeout(touchTimer.current)
+            touchTimer.current = null
+        }
+        touchPosRef.current = null
+        touchOriginRef.current = null
+        touchTargetRef.current = null
+    }, [])
+
+    return {
+        arrastrando,
+        sobre,
+        isTouchDragging,
+        setArrastrando,
+        setSobre,
+        iniciarTouchDrag,
+        verificarMovimientoTouch,
+        cancelarTouchAntesDeIniciar,
+    }
+}
+
+// Botonera de orden sobre la imagen: muestra el número de posición y flechas
+// izquierda/derecha para reordenar con un toque directo en celulares o desktop.
+function ControlOrdenFoto({
+    posicion,
+    total,
+    onMoverAntes,
+    onMoverDespues,
+}: {
+    posicion: number
+    total: number
+    onMoverAntes: () => void
+    onMoverDespues: () => void
+}) {
+    return (
+        <div
+            style={{
+                position: 'absolute',
+                bottom: 3,
+                right: 3,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                background: 'rgba(15, 23, 42, 0.78)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: 999,
+                padding: '1px 3px',
+                color: '#fff',
+                zIndex: 4,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+            }}
+        >
+            {total > 1 && posicion > 0 && (
+                <button
+                    type="button"
+                    className="ds-hover"
+                    onClick={e => {
+                        e.stopPropagation()
+                        onMoverAntes()
+                    }}
+                    title="Mover antes"
+                    aria-label="Mover foto a la izquierda"
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        display: 'grid',
+                        placeItems: 'center',
+                        padding: 0,
+                        width: 17,
+                        height: 17,
+                        borderRadius: 999,
+                    }}
+                >
+                    <ChevronLeft size={12} strokeWidth={2.5} />
+                </button>
+            )}
+            <span
+                style={{
+                    minWidth: 14,
+                    height: 17,
+                    padding: '0 2px',
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontFamily: '"Geist Mono", monospace',
+                    userSelect: 'none',
+                    lineHeight: 1,
+                }}
+            >
+                {posicion + 1}
+            </span>
+            {total > 1 && posicion < total - 1 && (
+                <button
+                    type="button"
+                    className="ds-hover"
+                    onClick={e => {
+                        e.stopPropagation()
+                        onMoverDespues()
+                    }}
+                    title="Mover después"
+                    aria-label="Mover foto a la derecha"
+                    style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        display: 'grid',
+                        placeItems: 'center',
+                        padding: 0,
+                        width: 17,
+                        height: 17,
+                        borderRadius: 999,
+                    }}
+                >
+                    <ChevronRight size={12} strokeWidth={2.5} />
+                </button>
+            )}
+        </div>
+    )
+}
+
 function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
@@ -3147,15 +3383,28 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
             return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib)
         })
         : natural
-    const [arrastrando, setArrastrando] = useState<number | null>(null)
-    const [sobre, setSobre] = useState<number | null>(null)
+
+    const mover = useCallback((origen: number, destino: number) => {
+        if (!onReorder || destino < 0 || destino >= items.length || origen === destino) return
+        const nuevo = [...items]
+        const [movido] = nuevo.splice(origen, 1)
+        nuevo.splice(destino, 0, movido)
+        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+    }, [items, onReorder])
+
+    const {
+        arrastrando, sobre, isTouchDragging,
+        setArrastrando, setSobre,
+        iniciarTouchDrag, verificarMovimientoTouch, cancelarTouchAntesDeIniciar,
+    } = useTouchReorder({
+        enabled: !!onReorder,
+        itemsLength: items.length,
+        onMover: mover,
+    })
 
     function soltar(destino: number) {
         if (arrastrando === null || arrastrando === destino || !onReorder) { setArrastrando(null); setSobre(null); return }
-        const nuevo = [...items]
-        const [movido] = nuevo.splice(arrastrando, 1)
-        nuevo.splice(destino, 0, movido)
-        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+        mover(arrastrando, destino)
         setArrastrando(null)
         setSobre(null)
     }
@@ -3165,36 +3414,42 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
             {items.map((it, i) => (
                 <div key={`${it.tipo}-${it.id}`} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: alto }}>
                     <div
+                        data-galeria-index={i}
                         draggable={!!onReorder}
                         onDragStart={() => setArrastrando(i)}
                         onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
                         onDragLeave={() => setSobre(s => (s === i ? null : s))}
                         onDrop={e => { e.preventDefault(); soltar(i) }}
                         onDragEnd={() => { setArrastrando(null); setSobre(null) }}
-                        title={onReorder ? 'Arrastrá para cambiar el orden' : undefined}
+                        onTouchStart={e => iniciarTouchDrag(e, i)}
+                        onTouchMove={verificarMovimientoTouch}
+                        onTouchEnd={cancelarTouchAntesDeIniciar}
+                        onTouchCancel={cancelarTouchAntesDeIniciar}
+                        title={onReorder ? 'Arrastrá o usá las flechas para cambiar el orden' : undefined}
                         style={{
                             position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
                             border: it.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                             cursor: onReorder ? 'grab' : 'default',
-                            opacity: arrastrando === i ? 0.4 : 1,
+                            opacity: arrastrando === i ? (isTouchDragging ? 0.75 : 0.4) : 1,
+                            transform: isTouchDragging && arrastrando === i ? 'scale(1.05)' : sobre === i && arrastrando !== null && arrastrando !== i ? 'scale(0.96)' : 'none',
                             outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
                             outlineOffset: 2,
-                            transition: 'opacity 120ms ease',
+                            zIndex: isTouchDragging && arrastrando === i ? 10 : 1,
+                            boxShadow: isTouchDragging && arrastrando === i ? '0 8px 18px rgba(0,0,0,0.35)' : 'none',
+                            transition: 'opacity 120ms ease, transform 120ms ease',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {/* Número de orden — en qué lugar se ve esta foto en el
-                            catálogo (1 = primera). Siempre visible, no solo al
-                            arrastrar, para que se entienda de un vistazo. */}
+                        {/* Controles de orden: número de posición y flechas táctiles */}
                         {onReorder && (
-                            <span style={{
-                                position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
-                                borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
-                                fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
-                                fontFamily: '"Geist Mono", monospace',
-                            }}>
-                                {i + 1}
-                            </span>
+                            <ControlOrdenFoto
+                                posicion={i}
+                                total={items.length}
+                                onMoverAntes={() => mover(i, i - 1)}
+                                onMoverDespues={() => mover(i, i + 1)}
+                            />
                         )}
                         {/* El toggle de estrella solo aplica a las pendientes (mismo
                             comportamiento de siempre) — una ya guardada solo se
@@ -3284,15 +3539,28 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
         ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
         ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo })),
     ]
-    const [arrastrando, setArrastrando] = useState<number | null>(null)
-    const [sobre, setSobre] = useState<number | null>(null)
+
+    const mover = useCallback((origen: number, destino: number) => {
+        if (destino < 0 || destino >= items.length || origen === destino) return
+        const nuevo = [...items]
+        const [movido] = nuevo.splice(origen, 1)
+        nuevo.splice(destino, 0, movido)
+        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+    }, [items, onReorder])
+
+    const {
+        arrastrando, sobre, isTouchDragging,
+        setArrastrando, setSobre,
+        iniciarTouchDrag, verificarMovimientoTouch, cancelarTouchAntesDeIniciar,
+    } = useTouchReorder({
+        enabled: true,
+        itemsLength: items.length,
+        onMover: mover,
+    })
 
     function soltar(destino: number) {
         if (arrastrando === null || arrastrando === destino) { setArrastrando(null); setSobre(null); return }
-        const nuevo = [...items]
-        const [movido] = nuevo.splice(arrastrando, 1)
-        nuevo.splice(destino, 0, movido)
-        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+        mover(arrastrando, destino)
         setArrastrando(null)
         setSobre(null)
     }
@@ -3306,30 +3574,42 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
             {items.map((it, i) => (
                 <div
                     key={`${it.tipo}-${it.id}`}
-                    draggable
-                    onDragStart={() => setArrastrando(i)}
-                    onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
-                    onDragLeave={() => setSobre(s => (s === i ? null : s))}
-                    onDrop={e => { e.preventDefault(); soltar(i) }}
-                    onDragEnd={() => { setArrastrando(null); setSobre(null) }}
-                    title="Arrastrá para cambiar el orden"
-                    style={{ width: alto, display: 'flex', flexDirection: 'column', gap: 3, opacity: arrastrando === i ? 0.4 : 1, transition: 'opacity 120ms ease' }}
+                    style={{ width: alto, display: 'flex', flexDirection: 'column', gap: 3 }}
                 >
-                    <div style={{
-                        position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
-                        border: '1px solid var(--color-border)', cursor: 'grab',
-                        outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
-                        outlineOffset: 2,
-                    }}>
+                    <div
+                        data-galeria-index={i}
+                        draggable
+                        onDragStart={() => setArrastrando(i)}
+                        onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                        onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                        onDrop={e => { e.preventDefault(); soltar(i) }}
+                        onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                        onTouchStart={e => iniciarTouchDrag(e, i)}
+                        onTouchMove={verificarMovimientoTouch}
+                        onTouchEnd={cancelarTouchAntesDeIniciar}
+                        onTouchCancel={cancelarTouchAntesDeIniciar}
+                        title="Arrastrá o usá las flechas para cambiar el orden"
+                        style={{
+                            position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
+                            border: '1px solid var(--color-border)', cursor: 'grab',
+                            opacity: arrastrando === i ? (isTouchDragging ? 0.75 : 0.4) : 1,
+                            transform: isTouchDragging && arrastrando === i ? 'scale(1.05)' : sobre === i && arrastrando !== null && arrastrando !== i ? 'scale(0.96)' : 'none',
+                            outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
+                            outlineOffset: 2,
+                            zIndex: isTouchDragging && arrastrando === i ? 10 : 1,
+                            boxShadow: isTouchDragging && arrastrando === i ? '0 8px 18px rgba(0,0,0,0.35)' : 'none',
+                            transition: 'opacity 120ms ease, transform 120ms ease',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                        }}
+                    >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        <span style={{
-                            position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
-                            borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
-                            fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
-                            fontFamily: '"Geist Mono", monospace',
-                        }}>
-                            {i + 1}
-                        </span>
+                        <ControlOrdenFoto
+                            posicion={i}
+                            total={items.length}
+                            onMoverAntes={() => mover(i, i - 1)}
+                            onMoverDespues={() => mover(i, i + 1)}
+                        />
                         <button
                             className="ds-hover"
                             onClick={() => (it.tipo === 'guardada' ? onQuitarGuardada(it.id) : onQuitarPendiente(it.id))}
