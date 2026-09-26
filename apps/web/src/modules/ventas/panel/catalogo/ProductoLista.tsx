@@ -152,6 +152,35 @@ function ProductoFilaSkeleton({ ultima }: { ultima: boolean }) {
     )
 }
 
+function ProductoMobileCardSkeleton() {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Skeleton width={44} height={44} radius={8} />
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Skeleton width="65%" height={13} radius={6} />
+                    <Skeleton width="40%" height={10} radius={6} />
+                </div>
+                <Skeleton width={64} height={20} radius={9999} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
+                    <Skeleton width="50%" height={9} radius={4} style={{ marginBottom: 4 }} />
+                    <Skeleton width="70%" height={12} radius={4} />
+                </div>
+                <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
+                    <Skeleton width="50%" height={9} radius={4} style={{ marginBottom: 4 }} />
+                    <Skeleton width="60%" height={12} radius={4} />
+                </div>
+                <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
+                    <Skeleton width="50%" height={9} radius={4} style={{ marginBottom: 4 }} />
+                    <Skeleton width="50%" height={12} radius={4} />
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // El estado que ve el dueño mezcla dos cosas del backend: el status del
 // producto y si le queda stock. Sin stock manda sobre "publicado" porque es lo
 // que necesita accionar.
@@ -215,6 +244,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     onContenido?: () => void
 }) {
     const [indice, setIndice] = useState(0)
+    const [cargandoImg, setCargandoImg] = useState(false)
     const [menuAbierto, setMenuAbierto] = useState(false)
     const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
     const menuBtnRef = useRef<HTMLButtonElement>(null)
@@ -226,10 +256,12 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
     function anterior(e: React.MouseEvent) {
         e.stopPropagation()
+        setCargandoImg(true)
         setIndice(i => (i - 1 + p.images.length) % p.images.length)
     }
     function siguiente(e: React.MouseEvent) {
         e.stopPropagation()
+        setCargandoImg(true)
         setIndice(i => (i + 1) % p.images.length)
     }
 
@@ -286,7 +318,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
     return (
         <div
-            className="ds-hover prod-grid-card"
+            className="prod-grid-card"
             data-disabled={bloqueada || undefined}
             onClick={bloqueada ? undefined : onEditar}
             style={{
@@ -345,11 +377,60 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                                 </div>
                             )}
                         </div>
-                    ) : hayFotos
-                        ? <img src={p.images[indice]} alt={p.name} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
-                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    ) : hayFotos ? (
+                        <>
+                            <img
+                                key={`${p.id}-${indice}-${p.images[indice]}`}
+                                src={p.images[indice]}
+                                alt={p.name}
+                                onLoad={() => setCargandoImg(false)}
+                                onError={() => setCargandoImg(false)}
+                                style={{
+                                    position: 'absolute',
+                                    inset: '6%',
+                                    width: '88%',
+                                    height: '88%',
+                                    objectFit: 'contain',
+                                    display: 'block',
+                                    opacity: cargandoImg ? 0.35 : 1,
+                                    transition: 'opacity 150ms ease',
+                                }}
+                            />
+                            {cargandoImg && (
+                                <div
+                                    aria-hidden="true"
+                                    style={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        zIndex: 2,
+                                        pointerEvents: 'none',
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: '50%',
+                                            background: 'rgba(15, 23, 42, 0.65)',
+                                            backdropFilter: 'blur(4px)',
+                                            display: 'grid',
+                                            placeItems: 'center',
+                                            color: '#fff',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                                        }}
+                                    >
+                                        <Loader2 size={18} style={{ animation: 'spin 0.8s linear infinite' }} />
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
-                        </div>}
+                        </div>
+                    )}
 
                     {!upload && (
                         <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
@@ -459,7 +540,7 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: Api
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
-        <div className="ds-hover prod-mobile-card" data-disabled={bloqueada || undefined} onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, opacity: upload ? 0.85 : 1 }}>
+        <div className="prod-mobile-card" data-disabled={bloqueada || undefined} onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, opacity: upload ? 0.85 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -926,11 +1007,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                    Todo detrás de (hover: hover): sin esto, tocar una card en
                    celular la dejaba con el hover "pegado" hasta tocar otro
                    lado — mismo criterio que .ds-hover en globals.css. */
-                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
-                @media (hover: hover) {
-                    .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; box-shadow: var(--shadow-card-hover); }
+                .prod-grid-card, .prod-table-row { transition: border-color 160ms ease, background 160ms ease; }
+                @media (hover: hover) and (min-width: 769px) {
+                    .prod-grid-card:hover { border-color: var(--color-border-strong) !important; }
                     .prod-table-row:hover { background: var(--color-surface) !important; }
                 }
+                /* En celulares y mobile: sin hover en cards */
+                .prod-mobile-card { transition: none !important; }
+                .prod-mobile-card:hover { border-color: var(--color-border) !important; box-shadow: none !important; background: var(--color-bg) !important; }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -941,7 +1025,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     .prod-filter-row select, .prod-filter-row input { width: 100%; }
                     .prod-table-wrap { display: none !important; }
                     .prod-cards-wrap { display: flex !important; flex-direction: column; gap: 10px; }
-                    .prod-grid-wrap  { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; }
+                    .prod-grid-wrap  { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 10px !important; }
+                    .prod-grid-card:hover { border-color: var(--color-border) !important; box-shadow: none !important; }
                 }
                 @media (max-width: 460px) {
                     .prod-kpis { grid-template-columns: minmax(0,1fr) !important; }
@@ -1180,9 +1265,12 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
             {/* ── MOBILE: cards ── */}
             <div className="prod-cards-wrap">
-                {!cargando && filas.length === 0 && uploads.length === 0
-                    ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
-                    : <>
+                {cargando && filas.length === 0 ? (
+                    Array.from({ length: 5 }).map((_, i) => <ProductoMobileCardSkeleton key={i} />)
+                ) : filas.length === 0 && uploads.length === 0 ? (
+                    <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
+                ) : (
+                    <>
                         {uploads.map(u => (
                             <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} onEditarStock={() => {}} />
                         ))}
@@ -1190,7 +1278,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <ProductoCard key={p.id} p={p} editando={editsPorId.get(p.id)} onEditar={() => irEditar(p.id)} onEditarStock={() => setStockDe(p)} />
                         ))}
                     </>
-                }
+                )}
             </div>
             </>}
 
@@ -1288,4 +1376,4 @@ const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, b
 const menuItem: React.CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }
 const cardActBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const vistaBtn: React.CSSProperties = { width: 32, height: 32, border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }
-const navBtnImg: React.CSSProperties = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const navBtnImg: React.CSSProperties = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', zIndex: 3 }

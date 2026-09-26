@@ -622,7 +622,7 @@ export default function CheckoutPago() {
                     return (
                       <div
                         key={id}
-                        className="ds-hover"
+                        className={active ? undefined : 'ds-hover'}
                         onClick={() => setEnvio(id)}
                         style={{
                           padding: 16, borderRadius: 10, cursor: 'pointer',
@@ -697,7 +697,7 @@ export default function CheckoutPago() {
                                   return (
                                     <button
                                       key={c} type="button"
-                                      className="ds-hover"
+                                      className={activeC ? undefined : 'ds-hover'}
                                       onClick={() => { setCarrierSel(c); if (errorCarrier) setErrorCarrier('') }}
                                       style={{
                                         height: 38, padding: '0 16px', borderRadius: 999,
@@ -728,7 +728,7 @@ export default function CheckoutPago() {
                                     return (
                                       <button
                                         key={m} type="button"
-                                        className="ds-hover"
+                                        className={activeM ? undefined : 'ds-hover'}
                                         onClick={() => { setCarrierModeSel(m); if (errorCarrierMode) setErrorCarrierMode('') }}
                                         style={{
                                           height: 38, padding: '0 16px', borderRadius: 999,
@@ -772,7 +772,7 @@ export default function CheckoutPago() {
                                       return (
                                         <label
                                           key={d.id}
-                                          className="ds-hover"
+                                          className={activeDir ? undefined : 'ds-hover'}
                                           style={{
                                             display: 'flex', alignItems: 'center', gap: 14,
                                             padding: 16, borderRadius: 10, cursor: 'pointer',
@@ -888,7 +888,7 @@ export default function CheckoutPago() {
                     return (
                       <label
                         key={n.id}
-                        className="ds-hover"
+                        className={on ? undefined : 'ds-hover'}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, cursor: 'pointer',
                           background: on ? 'var(--color-primary-bg)' : 'var(--color-bg)',
@@ -981,7 +981,7 @@ export default function CheckoutPago() {
                   return (
                     <div
                       key={id}
-                      className="ds-hover"
+                      className={active ? undefined : 'ds-hover'}
                       onClick={() => setMetodo(id)}
                       style={{
                         padding: 16, borderRadius: 10, cursor: 'pointer',

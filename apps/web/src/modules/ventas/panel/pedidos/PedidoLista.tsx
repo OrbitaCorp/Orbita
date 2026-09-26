@@ -18,7 +18,7 @@ import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { toastEsError } from '@/lib/utils'
-import { SkeletonFilas } from '@/design-system/components/Skeleton'
+import { SkeletonFilas, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, exportOrders, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
@@ -121,6 +121,34 @@ function fromDeRango(rango: 'todo' | 'hoy' | '7d' | '30d'): string | undefined {
     if (rango === 'hoy') d.setHours(0, 0, 0, 0)
     else d.setDate(d.getDate() - (rango === '7d' ? 7 : 30))
     return d.toISOString()
+}
+
+function PedidoCardSkeleton({ delay = 0 }: { delay?: number }) {
+    return (
+        <div
+            style={{
+                background: 'var(--color-bg)',
+                border: '1px solid var(--color-border)',
+                borderLeft: '3px solid var(--color-border-strong)',
+                borderRadius: 10,
+                padding: '12px 12px 10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <SkeletonText width={54} height={13} delay={delay} />
+                <SkeletonChip width={56} delay={delay + 30} />
+            </div>
+            <SkeletonChip width={96} delay={delay + 60} />
+            <SkeletonText width="70%" height={13} delay={delay + 90} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <SkeletonText width={64} height={14} delay={delay + 120} />
+                <SkeletonText width={68} height={11} delay={delay + 150} />
+            </div>
+        </div>
+    )
 }
 
 function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void; onToast?: (m: string) => void }) {
@@ -324,7 +352,11 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             <style>{`
                 .ped-tabs-row { -ms-overflow-style: none; scrollbar-width: none; }
                 .ped-tabs-row::-webkit-scrollbar { display: none; }
+                .ped-table-wrap { display: block; }
+                .ped-cards-wrap { display: none; }
                 @media (max-width: 768px) {
+                    .ped-table-wrap { display: none !important; }
+                    .ped-cards-wrap { display: grid !important; grid-template-columns: minmax(0,1fr) !important; gap: 10px !important; }
                     .ped-page       { padding: 16px 14px 48px !important; }
                     .ped-header-btn { display: none !important; }
                     .ped-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
@@ -422,10 +454,18 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             )}
 
             {cargando && !datos ? (
-                /* Silueta de la tabla real: avatar, cliente, estado y monto. */
-                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-                    <SkeletonFilas filas={6} />
-                </div>
+                <>
+                    {/* Silueta de la tabla real: avatar, cliente, estado y monto (desktop) */}
+                    <div className="ped-table-wrap" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                        <SkeletonFilas filas={6} />
+                    </div>
+                    {/* Silueta de tarjetas adaptada para celulares (mobile) */}
+                    <div className="ped-cards-wrap">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <PedidoCardSkeleton key={i} delay={i * 70} />
+                        ))}
+                    </div>
+                </>
             ) : (
             /* Al cambiar un filtro con datos ya en pantalla, la tabla se atenúa
                y no se puede clickear hasta que llega lo nuevo — sin esto, en una

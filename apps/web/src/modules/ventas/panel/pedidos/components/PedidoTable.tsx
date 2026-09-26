@@ -119,7 +119,6 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, ca
     const accentColor = ESTADO_COLORS[p.estado] ?? 'var(--color-border)'
     return (
         <div
-            className="ds-hover"
             onClick={() => onRowClick(p)}
             style={{
                 background:   'var(--color-bg)',
@@ -130,6 +129,7 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail, onCambiarEstado, ca
                 display:      'flex',
                 flexDirection:'column',
                 gap:          5,
+                cursor:       'pointer',
             }}
         >
             {/* id + canal */}

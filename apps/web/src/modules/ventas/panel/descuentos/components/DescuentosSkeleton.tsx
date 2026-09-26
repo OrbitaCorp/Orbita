@@ -84,14 +84,83 @@ function FilaCuponSkeleton({ delay, ultima }: { delay: number; ultima: boolean }
   )
 }
 
+function FilaDescuentoCardSkeleton({ delay }: { delay: number }) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-bg)',
+        border: '1px solid var(--color-border)',
+        borderLeft: '3px solid var(--color-border-strong)',
+        borderRadius: 10,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <SkeletonText width="55%" height={15} delay={delay} />
+        <SkeletonChip width={68} delay={delay + 30} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <SkeletonChip width={95} delay={delay + 60} />
+        <SkeletonText width={60} height={12} delay={delay + 90} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <SkeletonText width="40%" height={11} delay={delay + 120} />
+        <SkeletonText width="60%" height={11} delay={delay + 150} />
+      </div>
+    </div>
+  )
+}
+
+function FilaCuponCardSkeleton({ delay }: { delay: number }) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-bg)',
+        border: '1px solid var(--color-border)',
+        borderLeft: '3px solid var(--color-border-strong)',
+        borderRadius: 10,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <SkeletonText width={80} height={15} delay={delay} />
+        <SkeletonChip width={64} delay={delay + 30} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <SkeletonChip width={85} delay={delay + 60} />
+        <SkeletonText width={50} height={13} delay={delay + 90} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <SkeletonText width="65%" height={12} delay={delay + 120} />
+        <SkeletonText width="45%" height={11} delay={delay + 150} />
+      </div>
+    </div>
+  )
+}
+
 /** Tabla completa de descuentos mientras carga — header real + filas shimmer, mismo contenedor que la tabla real. */
 export function SkeletonTablaDescuentos({ filas = 6 }: { filas?: number }) {
   return (
-    <div aria-hidden="true" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ height: 42, background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)' }} />
-      {Array.from({ length: filas }).map((_, i) => (
-        <FilaDescuentoSkeleton key={i} delay={i * 90} ultima={i === filas - 1} />
-      ))}
+    <div aria-hidden="true">
+      <div className="desc-table-wrap">
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ height: 42, background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)' }} />
+          {Array.from({ length: filas }).map((_, i) => (
+            <FilaDescuentoSkeleton key={i} delay={i * 90} ultima={i === filas - 1} />
+          ))}
+        </div>
+      </div>
+      <div className="desc-cards-wrap" style={{ display: 'none' }}>
+        {Array.from({ length: Math.min(filas, 4) }).map((_, i) => (
+          <FilaDescuentoCardSkeleton key={i} delay={i * 90} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -99,11 +168,20 @@ export function SkeletonTablaDescuentos({ filas = 6 }: { filas?: number }) {
 /** Tabla completa de cupones mientras carga. */
 export function SkeletonTablaCupones({ filas = 6 }: { filas?: number }) {
   return (
-    <div aria-hidden="true" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ height: 42, background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)' }} />
-      {Array.from({ length: filas }).map((_, i) => (
-        <FilaCuponSkeleton key={i} delay={i * 90} ultima={i === filas - 1} />
-      ))}
+    <div aria-hidden="true">
+      <div className="cup-table-wrap">
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ height: 42, background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)' }} />
+          {Array.from({ length: filas }).map((_, i) => (
+            <FilaCuponSkeleton key={i} delay={i * 90} ultima={i === filas - 1} />
+          ))}
+        </div>
+      </div>
+      <div className="cup-cards-wrap" style={{ display: 'none' }}>
+        {Array.from({ length: Math.min(filas, 4) }).map((_, i) => (
+          <FilaCuponCardSkeleton key={i} delay={i * 90} />
+        ))}
+      </div>
     </div>
   )
 }

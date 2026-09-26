@@ -107,10 +107,10 @@ export function SkeletonTarjetas({ tarjetas = 3 }: { tarjetas?: number }) {
             key={i}
             style={{
               background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-              borderRadius: 12, padding: 20,
+              borderRadius: 12, padding: '16px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
               <SkeletonText width={92} height={14} delay={d} />
               <SkeletonChip width={78} delay={d + 40} />
               <SkeletonText width={46} height={10} delay={d + 60} />
@@ -231,7 +231,7 @@ export function SkeletonProductCard({
  * por su cuenta sin necesitar ninguna media query).
  */
 export function SkeletonProductGrid({
-  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))', className,
+  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(min(100%, 160px), 1fr))', className,
 }: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string; className?: string }) {
   return (
     <div
