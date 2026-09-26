@@ -347,6 +347,33 @@ export class CostsService {
       }
     }
 
+    // Groq no tiene API pública de uso: se arma con los usage_events propios.
+    try {
+      const start = new Date();
+      start.setUTCDate(1);
+      start.setUTCHours(0, 0, 0, 0);
+      const rows = await this.prisma.usageEvent.groupBy({
+        by: ['category'],
+        where: { provider: { slug: 'groq' }, timestamp: { gte: start } },
+        _sum: { quantity: true },
+        _count: { _all: true },
+      });
+      if (rows.length > 0) {
+        const prompt = rows.find((r) => r.category === 'prompt_tokens');
+        const completion = rows.find((r) => r.category === 'completion_tokens');
+        result['groq'] = {
+          slug: 'groq',
+          items: [
+            { category: 'Requests (mes)', value: prompt?._count._all ?? 0, unit: 'requests' },
+            { category: 'Tokens de entrada (mes)', value: Number(prompt?._sum.quantity ?? 0), unit: 'tokens' },
+            { category: 'Tokens de salida (mes)', value: Number(completion?._sum.quantity ?? 0), unit: 'tokens' },
+          ],
+        };
+      }
+    } catch (err) {
+      this.logger.warn(`Error obteniendo usage de groq: ${err}`);
+    }
+
     return { providers: result };
   }
 

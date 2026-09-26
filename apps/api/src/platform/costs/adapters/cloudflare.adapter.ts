@@ -85,7 +85,77 @@ export class CloudflareCostAdapter implements CostAdapter {
       });
     }
 
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const [aiToday, aiMonth] = await Promise.all([
+      this.fetchAiInference(accountId, token, startOfDay, now),
+      this.fetchAiInference(accountId, token, startOfMonth, now),
+    ]);
+    if (aiToday) {
+      items.push({
+        category: 'Workers AI · Neuronas (hoy)',
+        value: Math.round(aiToday.neurons),
+        unit: 'neuronas',
+        limit: 10_000,
+      });
+    }
+    if (aiMonth) {
+      items.push({
+        category: 'Workers AI · Neuronas (mes)',
+        value: Math.round(aiMonth.neurons),
+        unit: 'neuronas',
+      });
+      items.push({
+        category: 'Workers AI · Requests (mes)',
+        value: aiMonth.requests,
+        unit: 'requests',
+      });
+    }
+
     return { items };
+  }
+
+  private async fetchAiInference(
+    accountId: string,
+    token: string,
+    from: Date,
+    to: Date,
+  ): Promise<{ neurons: number; requests: number } | null> {
+    const query = `{
+      viewer {
+        accounts(filter: {accountTag: "${accountId}"}) {
+          aiInferenceAdaptiveGroups(
+            limit: 1000
+            filter: { datetime_geq: "${from.toISOString()}", datetime_leq: "${to.toISOString()}" }
+          ) {
+            count
+            sum { totalNeurons }
+          }
+        }
+      }
+    }`;
+    try {
+      const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as any;
+      const groups = data?.data?.viewer?.accounts?.[0]?.aiInferenceAdaptiveGroups;
+      if (!Array.isArray(groups)) return null;
+      let neurons = 0;
+      let requests = 0;
+      for (const g of groups) {
+        neurons += g.sum?.totalNeurons ?? 0;
+        requests += g.count ?? 0;
+      }
+      return { neurons, requests };
+    } catch (err) {
+      this.logger.warn(`Error fetching Workers AI neurons: ${err}`);
+      return null;
+    }
   }
 
   private async fetchR2Metrics(accountId: string, token: string): Promise<number | null> {
