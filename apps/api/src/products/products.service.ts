@@ -751,7 +751,10 @@ export class ProductsService {
     let webpBuffer: Buffer;
     try {
       // Con tope de píxeles (ver ENTRADA_IMAGEN en subida-imagen.ts).
+      // .rotate() auto-orienta la imagen respetando los metadatos EXIF de orientación
+      // (evita que fotos sacadas con celular en vertical se guarden de costado/horizontales).
       webpBuffer = await sharp(source, ENTRADA_IMAGEN)
+        .rotate()
         .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 82 })
         .toBuffer();
@@ -813,6 +816,58 @@ export class ProductsService {
       data: { url, originalUrl: image.url, backgroundRemoved: true },
     });
     return { id: updated.id, url: updated.url, backgroundRemoved: true };
+  }
+
+  // Rota 90° en sentido horario una foto ya guardada (útil si se subió
+  // desde un dispositivo o ángulo sin metadatos y quedó de costado).
+  async rotateImage(businessId: string, productId: string, imageId: string, degrees = 90) {
+    await this.findOneRaw(businessId, productId);
+    const image = await this.prisma.productImage.findFirst({ where: { id: imageId, productId } });
+    if (!image) throw new NotFoundException('Imagen no encontrada');
+
+    const path = this.extractStoragePath(image.url);
+    if (!path) throw new BadRequestException('La foto no está en el almacenamiento del sistema');
+    const { data: blob, error } = await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).download(path);
+    if (error || !blob) throw new ServiceUnavailableException('No se pudo leer la foto: el almacenamiento no respondió, probá de nuevo en un rato');
+
+    let rotatedBuffer: Buffer;
+    try {
+      rotatedBuffer = await sharp(Buffer.from(await blob.arrayBuffer()), ENTRADA_IMAGEN)
+        .rotate(degrees)
+        .toBuffer();
+    } catch {
+      throw new BadRequestException('No se pudo rotar la imagen');
+    }
+
+    const newUrl = await this.subirImagenWebp(businessId, productId, rotatedBuffer);
+    if (path) {
+      await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]).catch(() => {});
+    }
+
+    let rotatedOriginalUrl = image.originalUrl;
+    if (image.originalUrl) {
+      const origPath = this.extractStoragePath(image.originalUrl);
+      if (origPath) {
+        const { data: origBlob } = await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).download(origPath);
+        if (origBlob) {
+          try {
+            const rotOrig = await sharp(Buffer.from(await origBlob.arrayBuffer()), ENTRADA_IMAGEN)
+              .rotate(degrees)
+              .toBuffer();
+            rotatedOriginalUrl = await this.subirImagenWebp(businessId, productId, rotOrig);
+            await this.supabase.adminClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([origPath]).catch(() => {});
+          } catch {
+            // si falla el original, mantenemos lo que había
+          }
+        }
+      }
+    }
+
+    const updated = await this.prisma.productImage.update({
+      where: { id: image.id },
+      data: { url: newUrl, originalUrl: rotatedOriginalUrl },
+    });
+    return { id: updated.id, url: updated.url };
   }
 
   async removeImage(businessId: string, productId: string, imageId: string) {

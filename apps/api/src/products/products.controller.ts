@@ -164,6 +164,14 @@ export class ProductsController {
     return this.productsService.removeImage(member.businessId, id, imageId);
   }
 
+  // Rota 90° en sentido horario una foto ya guardada.
+  @Post(':id/images/:imageId/rotate')
+  @RequirePermission('catalog.manage')
+  rotateImage(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Param('imageId') imageId: string) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.rotateImage(member.businessId, id, imageId);
+  }
+
   // Quitar / devolver el fondo de una foto ya guardada (miniaturas al editar).
   @Patch(':id/images/:imageId/background')
   @RequirePermission('catalog.manage')

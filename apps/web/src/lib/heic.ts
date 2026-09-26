@@ -46,3 +46,49 @@ export async function normalizarImagen(file: File): Promise<File> {
     const nombre = file.name.replace(/\.hei[cf]$/i, '.jpg')
     return new File([blob], nombre, { type: 'image/jpeg' })
 }
+
+/**
+ * Rota un File de imagen en el browser usando un Canvas (ej. 90° en sentido horario).
+ * Útil para corregir fotos sacadas de costado antes de subirlas.
+ */
+export async function rotarImagenFile(file: File, grados = 90): Promise<File> {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file)
+        const img = new Image()
+        img.onload = () => {
+            URL.revokeObjectURL(url)
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+            if (!ctx) {
+                resolve(file)
+                return
+            }
+            const rotRad = (grados * Math.PI) / 180
+            const es90o270 = Math.abs(grados % 180) === 90
+            canvas.width = es90o270 ? img.naturalHeight : img.naturalWidth
+            canvas.height = es90o270 ? img.naturalWidth : img.naturalHeight
+
+            ctx.translate(canvas.width / 2, canvas.height / 2)
+            ctx.rotate(rotRad)
+            ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2)
+
+            canvas.toBlob(blob => {
+                if (!blob) {
+                    resolve(file)
+                    return
+                }
+                const mime = file.type.startsWith('image/') ? file.type : 'image/jpeg'
+                const nuevoFile = new File([blob], file.name, {
+                    type: mime,
+                    lastModified: Date.now(),
+                })
+                resolve(nuevoFile)
+            }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.92)
+        }
+        img.onerror = () => {
+            URL.revokeObjectURL(url)
+            resolve(file)
+        }
+        img.src = url
+    })
+}

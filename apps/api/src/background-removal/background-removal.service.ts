@@ -156,6 +156,14 @@ export class BackgroundRemovalService {
   }
 
   private async procesar(buffer: Buffer): Promise<{ png: Buffer; senales: SenalesRecorte }> {
+    // Si la imagen de entrada tiene orientación EXIF (típica de fotos tomadas con
+    // celular en vertical), auto-orientamos los píxeles antes de calcular dimensiones
+    // y máscaras para que queden físicamente derechos.
+    const metaInicial = await sharp(buffer, ENTRADA_IMAGEN).metadata();
+    if (metaInicial.orientation && metaInicial.orientation > 1) {
+      buffer = await sharp(buffer, ENTRADA_IMAGEN).rotate().toBuffer();
+    }
+
     // Todas las lecturas del original con el tope de píxeles de las subidas
     // (ENTRADA_IMAGEN): un PNG chico puede declarar cientos de megapíxeles.
     const meta = await sharp(buffer, ENTRADA_IMAGEN).metadata();

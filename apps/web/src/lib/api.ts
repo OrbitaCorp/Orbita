@@ -2152,6 +2152,14 @@ export function panelSetProductImageBackground(productId: string, imageId: strin
   )
 }
 
+// Rota 90° en sentido horario una foto ya guardada.
+export function panelRotateProductImage(productId: string, imageId: string) {
+  return panelRequest<{ id: string; url: string }>(
+    `/products/${productId}/images/${imageId}/rotate`,
+    { method: 'POST' },
+  )
+}
+
 export function panelReorderProductImages(
   productId: string,
   items: { id: string; position: number }[],

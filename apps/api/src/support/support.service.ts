@@ -191,7 +191,7 @@ export class SupportService {
     }
     let webp: Buffer;
     try {
-      webp = await sharp(file.buffer, ENTRADA_IMAGEN).webp({ quality: 82 }).toBuffer();
+      webp = await sharp(file.buffer, ENTRADA_IMAGEN).rotate().webp({ quality: 82 }).toBuffer();
     } catch {
       throw new BadRequestException('No se pudo subir el adjunto: el archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles');
     }

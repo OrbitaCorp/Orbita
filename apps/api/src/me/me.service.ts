@@ -154,8 +154,8 @@ export class MeService {
     let webp: Buffer;
     try {
       // Con tope de píxeles: cualquier cliente registrado puede subir un avatar,
-      // y un PNG chico puede declarar cientos de megapíxeles (ver ENTRADA_IMAGEN).
-      webp = await sharp(file.buffer, ENTRADA_IMAGEN).resize(512, 512, { fit: 'cover' }).webp({ quality: 82 }).toBuffer();
+      // y un PNG chico puede declarar cientos de megapíxeles (ver ENTRADA_IMAGEN). .rotate() auto-orienta según EXIF.
+      webp = await sharp(file.buffer, ENTRADA_IMAGEN).rotate().resize(512, 512, { fit: 'cover' }).webp({ quality: 82 }).toBuffer();
     } catch {
       throw new BadRequestException('El archivo no es una imagen válida, está corrupta o supera los 60 megapíxeles.');
     }

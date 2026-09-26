@@ -571,8 +571,8 @@ export class BusinessesService {
     try {
       // Con tope de píxeles: el archivo ya viene acotado a 10 MB, pero un PNG
       // chico puede declarar cientos de megapíxeles (auditoría interna 10/09,
-      // ítem api.background-removal).
-      webpBuffer = await sharp(file.buffer, ENTRADA_IMAGEN).webp({ quality: 82 }).toBuffer();
+      // ítem api.background-removal). .rotate() auto-orienta según EXIF.
+      webpBuffer = await sharp(file.buffer, ENTRADA_IMAGEN).rotate().webp({ quality: 82 }).toBuffer();
     } catch {
       throw new BadRequestException(`${errorPrefix}: el archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles`);
     }
