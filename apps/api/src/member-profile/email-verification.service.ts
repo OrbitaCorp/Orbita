@@ -170,6 +170,106 @@ export class EmailVerificationService {
   }
 
   /**
+   * Envía recordatorios automáticos por correo a los miembros activos que no han
+   * verificado su email cuando faltan 7, 3 y 1 días para que expire su plazo.
+   * Corre dentro de `nightly-subscriptions-maintenance` a las 3 AM UTC.
+   */
+  async avisarRecordatorios(ahora: Date = new Date()): Promise<{ avisados: number; omitidos: number; fallidos: number }> {
+    const members = await this.prisma.member.findMany({
+      where: {
+        status: 'ACTIVE',
+        emailVerified: false,
+        emailVerifyDueAt: { not: null, gt: ahora },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        emailVerifyDueAt: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+          },
+        },
+      },
+    });
+
+    let avisados = 0;
+    let omitidos = 0;
+    let fallidos = 0;
+    const DIA_MS = 24 * 60 * 60 * 1000;
+
+    for (const m of members) {
+      if (!m.emailVerifyDueAt) continue;
+      const msRestantes = m.emailVerifyDueAt.getTime() - ahora.getTime();
+      const diasRestantes = Math.ceil(msRestantes / DIA_MS);
+
+      let hito: number | null = null;
+      if (diasRestantes <= 1) hito = 1;
+      else if (diasRestantes <= 3) hito = 3;
+      else if (diasRestantes <= 7) hito = 7;
+
+      if (hito === null) {
+        omitidos++;
+        continue;
+      }
+
+      const inicioHito = new Date(m.emailVerifyDueAt.getTime() - hito * DIA_MS);
+
+      try {
+        const yaEnviado = await this.prisma.emailLog.findFirst({
+          where: {
+            to: m.email,
+            template: 'member-email-verification-reminder',
+            status: 'SENT',
+            createdAt: { gte: inicioHito },
+          },
+          select: { id: true },
+        });
+
+        if (yaEnviado) {
+          omitidos++;
+          continue;
+        }
+
+        const diasTexto = hito === 1 ? '1 día' : `${hito} días`;
+        const perfilUrl = `https://${m.business.subdomain}.orbita.site/admin/ventas/perfil`;
+
+        if (this.mail) {
+          await this.mail.sendMemberEmailVerificationReminder(
+            m.email,
+            {
+              nombre: m.name,
+              storeName: m.business.name,
+              email: m.email,
+              diasRestantes: diasTexto,
+              perfilUrl,
+            },
+            { businessId: m.business.id, memberId: m.id },
+          );
+          avisados++;
+          this.logger.log(`Aviso de verificación enviado a ${m.email} (hito ${diasTexto} restantes)`);
+        }
+      } catch (err) {
+        fallidos++;
+        this.logger.error(
+          `Error enviando aviso de verificación a ${m.email}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    if (avisados > 0 || fallidos > 0) {
+      this.logger.log(
+        `Recordatorios de verificación de email: ${avisados} enviados, ${fallidos} fallidos, ${omitidos} omitidos`,
+      );
+    }
+
+    return { avisados, omitidos, fallidos };
+  }
+
+  /**
    * Arranca el plazo de nuevo. La llama member-profile cuando el member cambia
    * su email: el nuevo tampoco está probado, así que vuelve a correr el reloj.
    * Va dentro de la misma transacción que el cambio, por eso recibe el `tx`.
@@ -182,3 +282,4 @@ export class EmailVerificationService {
     return createHash('sha256').update(code).digest('hex');
   }
 }
+

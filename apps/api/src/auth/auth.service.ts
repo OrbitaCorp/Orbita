@@ -568,6 +568,13 @@ export class AuthService implements OnModuleInit {
       data: { revokedAt: stored.revokedAt ?? ahora, replacedAt: ahora },
     });
 
+    if (stored.userType === 'MEMBER' && this.prisma.member?.update) {
+      await this.prisma.member.update({
+        where: { id: stored.userId },
+        data: { lastAccessAt: ahora },
+      }).catch((e) => this.logger.warn(`No se pudo actualizar lastAccessAt en refresh para member ${stored.userId}: ${e}`));
+    }
+
     const jwtType =
       stored.userType === 'MEMBER' ? 'member' : stored.userType === 'CUSTOMER' ? 'customer' : 'platform_admin';
     const token = this.signToken({ sub: stored.userId, type: jwtType, businessId: stored.businessId ?? undefined });
@@ -990,9 +997,13 @@ export class AuthService implements OnModuleInit {
     }
     if (!member) return null;
 
-    if (!member.googleId) {
-      await this.prisma.member.update({ where: { id: member.id }, data: { googleId: identity.googleId } });
-    }
+    await this.prisma.member.update({
+      where: { id: member.id },
+      data: {
+        ...(member.googleId ? {} : { googleId: identity.googleId }),
+        lastAccessAt: new Date(),
+      },
+    });
 
     const { token, refreshToken } = await this.issueSession(member.id, 'member', member.businessId);
     return {
@@ -1017,6 +1028,12 @@ export class AuthService implements OnModuleInit {
     businessId: string,
     deviceInfo?: DeviceInfo,
   ): Promise<{ token: string; refreshToken: string }> {
+    if (type === 'member' && this.prisma.member?.update) {
+      await this.prisma.member.update({
+        where: { id: userId },
+        data: { lastAccessAt: new Date() },
+      }).catch((e) => this.logger.warn(`No se pudo actualizar lastAccessAt en issueSession para member ${userId}: ${e}`));
+    }
     const token = this.signToken({ sub: userId, type, businessId });
     const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId, deviceInfo);
     return { token, refreshToken };

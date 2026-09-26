@@ -6,5 +6,6 @@ import { EmailVerificationService } from './email-verification.service';
 @Module({
   controllers: [MemberProfileController],
   providers: [MemberProfileService, EmailVerificationService],
+  exports: [EmailVerificationService],
 })
 export class MemberProfileModule {}

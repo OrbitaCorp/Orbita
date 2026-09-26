@@ -66,6 +66,30 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName },
   },
   {
+    id: 'member-email-verification',
+    label: 'Código para verificar correo',
+    group: 'Cuenta',
+    template: 'member-email-verification',
+    isPlatform: false,
+    subject: 'Confirmá tu email',
+    data: { code: '849201', nombre: 'Lucas', storeName: FIXTURE_BUSINESS_BRANDING.storeName, expiresIn: '30 minutos' },
+  },
+  {
+    id: 'member-email-verification-reminder',
+    label: 'Recordatorio: verificar correo',
+    group: 'Cuenta',
+    template: 'member-email-verification-reminder',
+    isPlatform: false,
+    subject: 'Confirmá tu correo en Órbita',
+    data: {
+      nombre: 'Lucas',
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      email: 'lucas@panaderialopez.com',
+      diasRestantes: 14,
+      perfilUrl: 'https://panaderialopez.orbita.site/admin/ventas/perfil',
+    },
+  },
+  {
     id: 'suspicious-login',
     label: 'Alerta de dispositivo nuevo',
     group: 'Equipo',
@@ -319,6 +343,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
       motivo: 'Tu período de bienvenida',
       endDate: '20/09/2026',
       manageUrl: 'https://panel.orbita.site/facturacion',
+      daysLeftText: '3 días',
     },
   },
   {

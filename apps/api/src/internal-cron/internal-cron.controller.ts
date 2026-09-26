@@ -8,6 +8,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { DomainExpiryService } from '../domains/domain-expiry.service';
+import { EmailVerificationService } from '../member-profile/email-verification.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -60,6 +61,9 @@ export class InternalCronController {
     // renovacion`): aviso a cada owner a los 30 y a los 7 días. Opcional por
     // el mismo motivo que retencionLogs (specs viejos con menos argumentos).
     private readonly domainExpiry?: DomainExpiryService,
+    // Recordatorios de verificación de correo (a los 7, 3 y 1 días restantes).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly emailVerification?: EmailVerificationService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -102,6 +106,13 @@ export class InternalCronController {
           await this.domainExpiry?.avisarVencimientos();
         } catch (e) {
           this.logger.error(`Vencimiento de dominios: no se pudo correr — ${describeError(e)}`);
+        }
+        // Recordatorios de verificación de email pendientes (a los 7, 3 y 1 días restantes):
+        // mismo disparo y mismo criterio que los dominios y la retención. Idempotente por email_logs.
+        try {
+          await this.emailVerification?.avisarRecordatorios();
+        } catch (e) {
+          this.logger.error(`Recordatorios de verificación de email: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

@@ -1673,30 +1673,66 @@ export class SubscriptionsService {
   async processLifecycleNotices(): Promise<void> {
     const now = new Date();
 
-    // ── PRE_AVISO: 3 días antes de que venza un período que no es un ciclo
-    // de facturación recurrente ya en marcha — o sea, el beneficio de
-    // bienvenida (planActive=false) o una cortesía (origin COMP). Una
-    // suscripción paga con plan ya activo no tiene "aviso previo": ese cobro
-    // lo intenta MP solo, el primer aviso nuestro es si falla (GRACIA_INICIO).
-    const enTresDias = new Date(now);
-    enTresDias.setDate(enTresDias.getDate() + 3);
+    // ── PRE_AVISO: avisos previos (7, 4, 2 y 1 días antes) de que venza un
+    // período que requiere activación/pago — o sea, el beneficio de
+    // bienvenida (planActive=false), una cortesía (origin COMP) o una cuenta
+    // sin preapproval automática activa.
+    const DIA_MS = 24 * 60 * 60 * 1000;
+    const enSieteDias = new Date(now.getTime() + 7 * DIA_MS);
     const porVencer = await this.prisma.subscription.findMany({
       where: {
         status: 'ACTIVE',
-        currentPeriodEnd: { gt: now, lte: enTresDias },
-        OR: [{ origin: 'COMP' }, { planActive: false }],
+        currentPeriodEnd: { gt: now, lte: enSieteDias },
+        OR: [{ origin: 'COMP' }, { planActive: false }, { mpPreapprovalId: null }],
       },
     });
     for (const sub of porVencer) {
       try {
-        if (!(await this.reservarAviso(sub.id, 'PRE_AVISO', sub.currentPeriodEnd))) continue;
+        const msRestantes = sub.currentPeriodEnd.getTime() - now.getTime();
+        const diasRestantes = Math.ceil(msRestantes / DIA_MS);
+
+        let hito: number | null = null;
+        if (diasRestantes <= 1) hito = 1;
+        else if (diasRestantes <= 2) hito = 2;
+        else if (diasRestantes <= 4) hito = 4;
+        else if (diasRestantes <= 7) hito = 7;
+
+        if (hito === null) continue;
+
+        const inicioHito = new Date(sub.currentPeriodEnd.getTime() - hito * DIA_MS);
+
+        if ((this.prisma as any).emailLog?.findFirst) {
+          const yaAvisado = await this.prisma.emailLog.findFirst({
+            where: {
+              businessId: sub.businessId,
+              template: 'subscription-ending-soon',
+              status: 'SENT',
+              createdAt: { gte: inicioHito },
+            },
+            select: { id: true },
+          });
+          if (yaAvisado) continue;
+        } else {
+          if (!(await this.reservarAviso(sub.id, 'PRE_AVISO', sub.currentPeriodEnd))) continue;
+        }
+
         const { business, emails } = await this.destinatarios(sub.businessId);
         if (!business || emails.length === 0) continue;
-        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : 'Tu período de bienvenida';
-        const endDate = sub.currentPeriodEnd.toISOString().slice(0, 10);
+        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu período de bienvenida' : 'Tu suscripción';
+        const endDate = sub.currentPeriodEnd.toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          timeZone: 'America/Argentina/Buenos_Aires',
+        });
+        const daysLeftText = hito === 1 ? '1 día' : `${hito} días`;
         const manageUrl = this.manageUrl(business.subdomain);
         for (const email of emails) {
-          await this.mail.sendSubscriptionEndingSoon(email, { businessName: business.name, motivo, endDate, manageUrl }, { businessId: sub.businessId });
+          await this.mail.sendSubscriptionEndingSoon(
+            email,
+            { businessName: business.name, motivo, endDate, manageUrl, daysLeftText },
+            { businessId: sub.businessId },
+          );
         }
       } catch (err) {
         this.logger.error(`No se pudo mandar el PRE_AVISO de la suscripción ${sub.id}`, err as Error);

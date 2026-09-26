@@ -233,6 +233,10 @@ export class MailService {
     'member-access-reminder': this.svgIcon(
       '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
     ),
+    // Mail — recordatorio de verificación de correo.
+    'member-email-verification-reminder': this.svgIcon(
+      '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+    ),
     // Misma llave: el reset pedido por el admin es el mismo lenguaje "acceso".
     'member-password-reset': this.svgIcon(
       '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
@@ -720,6 +724,17 @@ export class MailService {
     await this.sendOrLog(to, 'Confirmá tu email', 'member-email-verification', data, meta);
   }
 
+  async sendMemberEmailVerificationReminder(
+    to: string,
+    data: { nombre: string; storeName: string; email: string; diasRestantes: number | string | null; perfilUrl: string },
+    meta?: MailMeta,
+  ) {
+    const formattedDias = typeof data.diasRestantes === 'number'
+      ? `${data.diasRestantes} ${data.diasRestantes === 1 ? 'día' : 'días'}`
+      : data.diasRestantes;
+    await this.sendOrLog(to, 'Recordatorio: confirmá tu email en Órbita', 'member-email-verification-reminder', { ...data, diasRestantes: formattedDias }, meta);
+  }
+
   async sendMemberInvitation(
     to: string,
     data: {
@@ -1062,10 +1077,14 @@ export class MailService {
   // gramática dentro de la plantilla.
   async sendSubscriptionEndingSoon(
     to: string,
-    data: { businessName: string; motivo: string; endDate: string; manageUrl: string },
+    data: { businessName: string; motivo: string; endDate: string; manageUrl: string; daysLeftText?: string },
     meta?: MailMeta,
   ) {
-    await this.sendOrLog(to, `${data.motivo} termina pronto`, 'subscription-ending-soon', data, meta);
+    const subject = data.daysLeftText
+      ? `${data.motivo} termina en ${data.daysLeftText}`
+      : `${data.motivo} termina pronto`;
+    const daysLeftText = data.daysLeftText ?? '';
+    await this.sendOrLog(to, subject, 'subscription-ending-soon', { ...data, daysLeftText }, meta);
   }
 
   // Dominio comprado desde el panel por vencer (auditoría interna, hallazgo

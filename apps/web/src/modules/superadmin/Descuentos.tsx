@@ -27,7 +27,7 @@ const LABEL_ESTADO: Record<DiscountCodeEstado, string> = {
   ACTIVO: 'Activo',
   DESACTIVADO: 'Desactivado',
   VENCIDO: 'Vencido',
-  AGOTADO: 'Sin usos',
+  AGOTADO: 'Agotado',
 }
 
 type Aviso = { variant: ToastVariant; title: string; description?: string }

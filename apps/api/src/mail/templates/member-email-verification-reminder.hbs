@@ -1,0 +1,14 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Confirmá tu correo en Órbita</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Hola {{nombre}}. Te recordamos que todavía tenés pendiente confirmar tu correo electrónico (<strong style="color:#1a1f36;">{{email}}</strong>) para la gestión de <strong style="color:#1a1f36;">{{storeName}}</strong>.</p>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Verificar tu cuenta es clave para garantizar la seguridad de tu tienda y poder recuperar tu contraseña o acceso en caso de pérdida. {{#if diasRestantes}}Tenés hasta 14 días para hacerlo; te quedan <strong style="color:#1a1f36;">{{diasRestantes}}</strong>.{{/if}}</p>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:14px 16px;">
+  <p style="margin:0; color:#4f566b; font-size:13px; line-height:1.6;">
+    <strong style="color:#1a1f36;">¿Cómo verificarlo?</strong><br>
+    1. Entrá a tu panel en <strong style="color:#1a1f36;">Mi perfil</strong>.<br>
+    2. En la sección de confirmación, presioná <strong style="color:#1a1f36;">"Enviar código"</strong>.<br>
+    3. Pegá los 6 dígitos que te enviamos y tu cuenta quedará asegurada.
+  </p>
+</div>
+{{> cta-button this url=perfilUrl label="Ir a Mi perfil para verificar"}}
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Si ya confirmaste tu correo o no reconocés esta tienda, podés ignorar este aviso de manera segura.</p>

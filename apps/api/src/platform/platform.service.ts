@@ -364,25 +364,72 @@ export class PlatformService {
   async listOwners() {
     const owners = await this.prisma.member.findMany({
       where: { role: { name: 'owner' } },
-      include: { business: { select: { id: true, name: true, subdomain: true, isActive: true, isPaused: true } } },
+      include: {
+        business: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+            isActive: true,
+            isPaused: true,
+            products: {
+              select: { updatedAt: true, createdAt: true },
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
-    return owners.map((m) => ({
-      id: m.id,
-      name: m.name,
-      email: m.email,
-      emailVerified: m.emailVerified,
-      lastAccessAt: m.lastAccessAt,
-      business: m.business
-        ? {
-            id: m.business.id,
-            name: m.business.name,
-            subdomain: m.business.subdomain,
-            status: !m.business.isActive ? 'draft' : m.business.isPaused ? 'paused' : 'active',
-          }
-        : null,
-    }));
+    // Para los dueños cuyo lastAccessAt esté en null (ej. altas anteriores al fix
+    // o sesiones mantenidas por cookie), resolvemos su última actividad real:
+    // último refresh token, creación/edición de producto, o creación del negocio en onboarding.
+    const sinAcceso = owners.filter((m) => !m.lastAccessAt);
+    const memberIdsSinAcceso = sinAcceso.map((m) => m.id);
+    const ultimosTokens = memberIdsSinAcceso.length
+      ? await this.prisma.refreshToken.findMany({
+          where: { userId: { in: memberIdsSinAcceso }, userType: 'MEMBER' },
+          orderBy: { createdAt: 'desc' },
+          distinct: ['userId'],
+          select: { userId: true, createdAt: true, replacedAt: true },
+        })
+      : [];
+    const tokenPorUserId = new Map(
+      ultimosTokens.map((t) => [t.userId, t.replacedAt ?? t.createdAt]),
+    );
+
+    return owners.map((m) => {
+      let ultimoAcceso = m.lastAccessAt;
+      if (!ultimoAcceso) {
+        const tokenDate = tokenPorUserId.get(m.id);
+        const productoDate = m.business?.products?.[0]?.updatedAt ?? m.business?.products?.[0]?.createdAt;
+        if (tokenDate) {
+          ultimoAcceso = tokenDate;
+        } else if (productoDate) {
+          ultimoAcceso = productoDate;
+        } else if (m.business) {
+          ultimoAcceso = m.createdAt;
+        }
+      }
+
+      return {
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        emailVerified: m.emailVerified,
+        lastAccessAt: ultimoAcceso,
+        business: m.business
+          ? {
+              id: m.business.id,
+              name: m.business.name,
+              subdomain: m.business.subdomain,
+              status: !m.business.isActive ? 'draft' : m.business.isPaused ? 'paused' : 'active',
+            }
+          : null,
+      };
+    });
   }
 
   // ── Suscripciones (cross-negocio) ───────────────────────────────────────────

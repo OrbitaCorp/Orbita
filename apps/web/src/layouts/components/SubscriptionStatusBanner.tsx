@@ -70,7 +70,7 @@ export default function SubscriptionStatusBanner() {
             <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>
                 {mensaje}
                 {diasDeGracia !== null && (
-                    <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> antes de que se pause.</>
+                    <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                 )}
             </span>
             <span style={{ marginLeft: 'auto', fontWeight: 700, color: suspendida ? 'var(--color-error)' : 'var(--color-primary)', whiteSpace: 'nowrap' }}>

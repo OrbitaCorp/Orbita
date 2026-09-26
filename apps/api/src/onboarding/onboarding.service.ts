@@ -17,7 +17,7 @@ import * as argon2 from 'argon2';
 
 // Plazo para verificar el email desde "Mi perfil" del panel. Vive acá porque
 // acá nace el member; member-profile lo vuelve a aplicar si cambia el email.
-export const DIAS_PARA_VERIFICAR_EMAIL = 7;
+export const DIAS_PARA_VERIFICAR_EMAIL = 14;
 
 // ─── Catálogo de rubros (RBT-292/293) ──────────────────────────────────────
 // Única fuente de verdad para el selector de rubros del onboarding (antes
@@ -326,12 +326,14 @@ export class OnboardingService {
             status: 'ACTIVE',
             hasTempPassword: false,
             passwordHash,
-            // Nace SIN verificar, con 7 días para hacerlo desde "Mi perfil"
+            // Nace SIN verificar, con 14 días para hacerlo desde "Mi perfil"
             // (hallazgo `alta-sin-verificar-email`, decisión del 16/09). La
             // verificación NO va acá a propósito: pedir un código en el medio
             // del wizard le suma fricción al alta paga justo antes de cobrar.
             emailVerified: false,
             emailVerifyDueAt: new Date(Date.now() + DIAS_PARA_VERIFICAR_EMAIL * 24 * 60 * 60 * 1000),
+            // El dueño entra al panel inmediatamente con el token emitido tras el alta.
+            lastAccessAt: new Date(),
           },
         });
 

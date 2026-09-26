@@ -1093,7 +1093,7 @@ function Perfil() {
             {/* Confirmar el email */}
             <Tarjeta x={66} y={75} w={178} h={36} />
             <Rotulo x={71} y={84} size={5.5} fuerte>Confirmar tu email</Rotulo>
-            <Rotulo x={71} y={91} size={4.4}>Te mandamos un código de 6 números. Tenés 7 días.</Rotulo>
+            <Rotulo x={71} y={91} size={4.4}>Te mandamos un código de 6 números. Tenés 14 días.</Rotulo>
             <Boton x={71} y={95} w={60} h={10} label="Enviarme el código" size={4.8} />
             {[0, 1, 2, 3, 4, 5].map(i => (
                 <g key={i}>
@@ -1374,7 +1374,7 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         leyenda: [
             'El menú del avatar: Mi perfil, "Ir a la tienda" y Cerrar sesión.',
             '"Ir a la tienda": la ves tal cual la ve un comprador.',
-            'Confirmar tu email: "Enviarme el código", te llega uno de 6 números y lo pegás. Tenés 7 días.',
+            'Confirmar tu email: "Enviarme el código", te llega uno de 6 números y lo pegás. Tenés 14 días.',
             'El tema, claro u oscuro: queda guardado en tu cuenta y te sigue a cualquier dispositivo.',
             'Cambiar la contraseña, sin pasar por "olvidé mi contraseña".',
         ],

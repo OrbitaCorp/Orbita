@@ -263,7 +263,7 @@ export default function Suscripcion() {
                                             ? `Activá el plan ${PLANES[planMostrado].nombre} (${fmtPesos(PLANES[planMostrado].precioMes)}${PLANES[planMostrado].total ? '/mes' : ` · ${PLANES[planMostrado].periodo}`}) para seguir usando Órbita sin cortes.`
                                             : 'Activá tu plan para seguir usando Órbita sin cortes.'}
                                     {diasDeGracia !== null && (
-                                        <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> antes de que se pause.</>
+                                        <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                                     )}
                                 </p>
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
