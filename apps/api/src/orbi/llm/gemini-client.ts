@@ -6,12 +6,9 @@ import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 // OpenAI-compatible: las API keys nuevas de Google AI Studio (prefijo `AQ.`)
 // son rechazadas con "Invalid Auth key" en la capa OpenAI-compat, pero andan
 // bien en el endpoint nativo. Ver discuss.ai.google.dev sobre el tema.
-// gemini-3.6-flash y no 2.5-flash: al 2026-09 el 2.5-flash ya no está
-// disponible para cuentas nuevas ("no longer available to new users", 404) y
-// Google recomienda 3.6-flash como reemplazo. Hay 3.7 y 3.8 también; subir por
-// env (ORBI_MODEL / ORBI_MODEL_PANEL / ORBI_MODEL_WIZARD / PRODUCT_AI_MODEL) si
-// se quiere. Para el panel se puede poner un pro con ORBI_MODEL_PANEL.
-export const DEFAULT_MODEL = 'gemini-3.6-flash';
+// gemini-3.7-flash: alta disponibilidad y soporte nativo multimodal en el free tier.
+// Hay 3.8 también; subir por env (ORBI_MODEL / PRODUCT_AI_MODEL) si se quiere.
+export const DEFAULT_MODEL = 'gemini-3.7-flash';
 
 /**
  * Cliente Gemini lazy compartido por el adapter de Orbi, ProductAiService y las
@@ -28,7 +25,7 @@ export function createGeminiClient(config: ConfigService): GoogleGenAI {
 // y a diferencia del 2.5 no deja apagar el thinking del todo (thinkingBudget: 0
 // da 400). Las tareas estructuradas (product-ai, tools del wizard) van con
 // MINIMAL; el chat de Orbi con el knob traducido.
-export const THINKING_MINIMO = ThinkingLevel.MINIMAL;
+export const THINKING_MINIMO = ThinkingLevel.LOW;
 
 export function thinkingLevelFor(effort: 'low' | 'medium' | 'high'): ThinkingLevel {
   if (effort === 'high') return ThinkingLevel.HIGH;

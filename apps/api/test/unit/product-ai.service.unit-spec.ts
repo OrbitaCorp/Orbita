@@ -3,12 +3,21 @@ import { ApiError } from '@google/genai';
 import { ProductAiService } from '../../src/products/product-ai.service';
 import type { CategoryListItem } from '../../src/categories/categories.service';
 import { generarTexto } from '../../src/orbi/llm/text-generation';
+import { createGeminiClient } from '../../src/orbi/llm/gemini-client';
 
 // Unit test de ProductAiService (RBT-684 — Orbi asiste descripción + categoría +
-// etiquetas). No pega a ninguna API: mockea generarTexto (Gemini con fallback a
-// Groq) y CategoriesService/TagsService como objetos simples.
+// etiquetas y escaneo con imagen). No pega a ninguna API: mockea generarTexto/createGeminiClient
+// y CategoriesService/TagsService como objetos simples.
 jest.mock('../../src/orbi/llm/text-generation');
+jest.mock('../../src/orbi/llm/gemini-client', () => {
+  const actual = jest.requireActual('../../src/orbi/llm/gemini-client');
+  return {
+    ...actual,
+    createGeminiClient: jest.fn(),
+  };
+});
 const generarTextoMock = generarTexto as jest.MockedFunction<typeof generarTexto>;
+const createGeminiClientMock = createGeminiClient as jest.MockedFunction<typeof createGeminiClient>;
 
 type TagUsado = { id: string; name: string; createdAt: string; usageCount: number };
 
@@ -231,3 +240,80 @@ describe('ProductAiService.assist (unit)', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('esto no es json'));
   });
 });
+
+describe('ProductAiService.scanProductImage (unit)', () => {
+  const fakeFile = {
+    buffer: Buffer.from('fake-image-bytes'),
+    mimetype: 'image/jpeg',
+    originalname: 'test.jpg',
+  } as any;
+
+  beforeEach(() => {
+    createGeminiClientMock.mockReset();
+  });
+
+  it('rechaza con 400 si falta el archivo', async () => {
+    const svc = makeService('test-key');
+    await expect(svc.scanProductImage('biz-1', undefined as any)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('devuelve nombre, descripción, categoría, tags y specs para productos técnicos', async () => {
+    const svc = makeService('test-key', [cat('cat-relojes', 'Relojes')]);
+    createGeminiClientMock.mockReturnValue({
+      models: {
+        generateContent: jest.fn().mockResolvedValue({
+          text: JSON.stringify({
+            name: 'Reloj Q&Q KW89J205Y Dama',
+            description: 'Reloj elegante con incrustaciones.',
+            suggestedCategoryId: 'cat-relojes',
+            suggestedTags: ['reloj', 'q&q'],
+            suggestedSpecs: [{ label: 'Modelo', value: 'KW89J205Y' }, { label: 'Movimiento', value: 'Cuarzo' }],
+          }),
+        }),
+      },
+    } as any);
+
+    const result = await svc.scanProductImage('biz-1', fakeFile);
+
+    expect(result.name).toBe('Reloj Q&Q KW89J205Y Dama');
+    expect(result.description).toBe('Reloj elegante con incrustaciones.');
+    expect(result.suggestedCategoryId).toBe('cat-relojes');
+    expect(result.suggestedTags).toEqual(['reloj', 'q&q']);
+    expect(result.suggestedSpecs).toEqual([
+      { label: 'Modelo', value: 'KW89J205Y' },
+      { label: 'Movimiento', value: 'Cuarzo' },
+    ]);
+  });
+
+  it('permite specs vacíos cuando es indumentaria u objeto sin ficha técnica', async () => {
+    const svc = makeService('test-key', [cat('cat-ropa', 'Ropa')]);
+    createGeminiClientMock.mockReturnValue({
+      models: {
+        generateContent: jest.fn().mockResolvedValue({
+          text: JSON.stringify({
+            name: 'Remera básica lisa',
+            description: 'Remera 100% algodón suave.',
+            suggestedCategoryId: 'cat-ropa',
+            suggestedTags: ['remera', 'algodon'],
+            suggestedSpecs: [],
+          }),
+        }),
+      },
+    } as any);
+
+    const result = await svc.scanProductImage('biz-1', fakeFile);
+
+    expect(result.name).toBe('Remera básica lisa');
+    expect(result.suggestedSpecs).toEqual([]);
+  });
+
+  it('rechaza con 503 si createGeminiClient tira ServiceUnavailableException', async () => {
+    const svc = makeService(undefined);
+    createGeminiClientMock.mockImplementation(() => {
+      throw new ServiceUnavailableException('GEMINI_API_KEY no configurada');
+    });
+
+    await expect(svc.scanProductImage('biz-1', fakeFile)).rejects.toMatchObject({ status: 503 });
+  });
+});
+

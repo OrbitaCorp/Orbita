@@ -17,6 +17,14 @@ const PRICING: Record<string, Record<string, number>> = {
     // Resend: free tier 100/day, $0.001/email after (rough estimate)
     'email_sent': 0,
   },
+  serper: {
+    // Serper: 2,500 free tier queries, then $0.001/query
+    'search_query': 0.001,
+  },
+  tavily: {
+    // Tavily: 1,000 free tier queries/mo, then $0.008/query
+    'search_query': 0.008,
+  },
 };
 
 @Injectable()

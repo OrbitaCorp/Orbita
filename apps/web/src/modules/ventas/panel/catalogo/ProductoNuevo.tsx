@@ -12,7 +12,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -28,11 +28,11 @@ import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
     panelPresignProductVideo,
-    panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
+    panelGetTags, panelCreateTag, panelAiAssist, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
     panelGetBusiness, getRubrosCatalog,
     ApiError,
     panelGenerateProductBackground,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage,
 } from '@/lib/api'
 import { presetsDelNegocio, specsDelNegocio, type GrupoPresets, type PresetVariantes } from './presetsVariantes'
 import {
@@ -314,6 +314,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }, [step])
     const [done, setDone] = useState<number[]>([])
     const [orbiGen, setOrbiGen] = useState(false)
+    const [orbiScanGen, setOrbiScanGen] = useState(false)
+    const [orbiScanSuccess, setOrbiScanSuccess] = useState(false)
+    const fileInputScanRef = useRef<HTMLInputElement>(null)
     // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
     // Se prende solo si el vendedor lo pide, o al editar uno que ya la tenía
     // cargada (ver la precarga más abajo).
@@ -381,6 +384,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Ahí no se ofrecen modelos: aplicar uno reemplaza las opciones, y al
     // guardar se borrarían las variantes que hoy tienen stock cargado.
     const [opcionesGuardadas, setOpcionesGuardadas] = useState(false)
+
+    // Fotos oficiales encontradas en la web en segundo plano al escanear con Orbi
+    const [sugeridasWeb, setSugeridasWeb] = useState<SuggestedProductImage[]>([])
+    const [buscandoSugeridas, setBuscandoSugeridas] = useState(false)
+    const [agregandoSugeridaUrl, setAgregandoSugeridaUrl] = useState<string | null>(null)
+    const [sugeridasAgregadas, setSugeridasAgregadas] = useState<Set<string>>(new Set())
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
@@ -657,6 +666,134 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             onToast(err instanceof ApiError ? err.message : 'No se pudo generar con Orbi. Probá de nuevo.')
         } finally {
             setOrbiGen(false)
+        }
+    }
+
+    // Escaneo inteligente con foto (Google Lens / Orbi): sube la imagen al backend,
+    // Gemini Flash identifica marca, modelo/SKU comercial, título, descripción,
+    // categoría y especificaciones técnicas.
+    const orbiEscanearFoto = async (file: File) => {
+        if (!file) return
+        if (!esArchivoDeImagen(file)) {
+            onToast('El archivo seleccionado no es una imagen soportada')
+            return
+        }
+        setOrbiScanGen(true)
+        setOrbiScanSuccess(false)
+        try {
+            const normalizado = await normalizarImagen(file)
+            const result = await panelAiScanProduct(normalizado, file.name)
+
+            setProd(p => {
+                const yaEstanTags = new Set(p.tags.map(t => t.trim().toLowerCase()))
+                const nuevasTags = result.suggestedTags.filter(t => !yaEstanTags.has(t.trim().toLowerCase()))
+                return {
+                    ...p,
+                    nombre: result.name.slice(0, 80),
+                    descripcion: result.description.slice(0, 2000),
+                    categoriaId: result.suggestedCategoryId || p.categoriaId,
+                    tags: nuevasTags.length ? [...p.tags, ...nuevasTags] : p.tags,
+                    specs: result.suggestedSpecs && result.suggestedSpecs.length > 0 ? result.suggestedSpecs : p.specs,
+                }
+            })
+
+            // Especificaciones técnicas: si la IA detectó especificaciones técnicas reales (ej. relojes, tecnología),
+            // encendemos el toggle automáticamente; si es indumentaria u objeto sin ficha, permanece apagado.
+            if (result.suggestedSpecs && result.suggestedSpecs.length > 0) {
+                setMostrarSpecs(true)
+            } else {
+                setMostrarSpecs(false)
+            }
+
+            // Agregamos la foto escaneada a la galería de imágenes del producto
+            // para que el vendedor no tenga que volver a subirla en el Paso 2
+            const dataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(normalizado)
+            })
+
+            setImagenes(prev => {
+                const tienePrincipal = prev.some(i => i.principal) || guardadas.some(g => g.principal)
+                const nuevaImg: ImagenPendiente = {
+                    key: `scan-${Date.now()}`,
+                    file: normalizado,
+                    preview: dataUrl,
+                    principal: !tienePrincipal,
+                }
+                return [...prev, nuevaImg]
+            })
+
+            // Búsqueda en segundo plano de imágenes oficiales de la web para el Paso 2
+            const queryBusqueda = result.imageSearchQuery || result.name
+            const modelDetectado = result.detectedModel || result.suggestedSpecs.find(s => /modelo|código|codigo|sku|referencia/i.test(s.label))?.value
+            const brandDetectado = result.detectedBrand || result.suggestedSpecs.find(s => /marca|fabricante/i.test(s.label))?.value
+            const colorDetectado = result.detectedColor || result.suggestedSpecs.find(s => /color|dial|acabado/i.test(s.label))?.value
+
+            if (modelDetectado || queryBusqueda) {
+                setBuscandoSugeridas(true)
+                setSugeridasWeb([])
+                panelGetSuggestedImages(queryBusqueda, modelDetectado, brandDetectado, colorDetectado)
+                    .then(imgs => {
+                        if (Array.isArray(imgs) && imgs.length > 0) {
+                            setSugeridasWeb(imgs)
+                        } else {
+                            setSugeridasWeb([])
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Error al buscar fotos sugeridas en segundo plano:', err)
+                        setSugeridasWeb([])
+                    })
+                    .finally(() => {
+                        setBuscandoSugeridas(false)
+                    })
+            }
+
+            setOrbiScanSuccess(true)
+            onToast('¡Listo! Revisá si está todo ok 👀')
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+        } finally {
+            setOrbiScanGen(false)
+            if (fileInputScanRef.current) {
+                fileInputScanRef.current.value = ''
+            }
+        }
+    }
+
+    const agregarFotoSugerida = async (sug: SuggestedProductImage) => {
+        setAgregandoSugeridaUrl(sug.url)
+        try {
+            const proxied = await panelProxyImage(sug.url)
+            const arr = proxied.dataUrl.split(',')
+            const mime = arr[0].match(/:(.*?);/)?.[1] || proxied.mimeType || 'image/jpeg'
+            const bstr = atob(arr[1])
+            let n = bstr.length
+            const u8arr = new Uint8Array(n)
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n)
+            }
+            const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
+            const file = new File([u8arr], `sugerida-${Date.now()}.${ext}`, { type: mime })
+
+            setImagenes(prev => {
+                const tienePrincipal = prev.some(i => i.principal) || guardadas.some(g => g.principal)
+                const nuevaImg: ImagenPendiente = {
+                    key: `sug-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    file,
+                    preview: proxied.dataUrl,
+                    principal: !tienePrincipal,
+                }
+                return [...prev, nuevaImg]
+            })
+
+            setSugeridasAgregadas(prev => new Set([...prev, sug.url]))
+            onToast('Foto agregada a tu catálogo ✓')
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo descargar la foto sugerida')
+        } finally {
+            setAgregandoSugeridaUrl(null)
         }
     }
 
@@ -1499,15 +1636,131 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         ) : (
                         <div>
                             <StepHd icon={Package} title="¿Qué estás vendiendo?" sub="Lo básico de tu producto." />
+
+                            {/* Banner Escanear producto con foto (Orbi) */}
+                            <div style={{
+                                margin: '0 0 20px 0',
+                                padding: '16px 18px',
+                                borderRadius: 12,
+                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%)',
+                                border: '1px solid rgba(139, 92, 246, 0.28)',
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 14,
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: 1 }}>
+                                    <div style={{
+                                        width: 42,
+                                        height: 42,
+                                        borderRadius: 11,
+                                        background: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+                                        color: '#fff',
+                                        display: 'grid',
+                                        placeItems: 'center',
+                                        flexShrink: 0,
+                                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
+                                    }}>
+                                        <Camera size={20} strokeWidth={2.2} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            Rellená este paso solo con una foto de tu producto
+                                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 9999, background: 'rgba(139, 92, 246, 0.16)', color: '#8B5CF6', letterSpacing: '0.02em' }}>Orbi</span>
+                                        </div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.4 }}>
+                                            Sacá o subí una foto y Orbi detecta el producto, nombre, descripción, categoría y especificaciones técnicas.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <input
+                                        ref={fileInputScanRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={e => {
+                                            const f = e.target.files?.[0]
+                                            if (f) orbiEscanearFoto(f)
+                                        }}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={orbiScanGen}
+                                        onClick={() => fileInputScanRef.current?.click()}
+                                        className="ds-hover"
+                                        style={{
+                                            height: 40,
+                                            padding: '0 18px',
+                                            borderRadius: 9,
+                                            border: 'none',
+                                            background: '#8B5CF6',
+                                            color: '#fff',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            cursor: orbiScanGen ? 'not-allowed' : 'pointer',
+                                            fontFamily: 'inherit',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            boxShadow: '0 3px 10px rgba(139, 92, 246, 0.3)',
+                                            opacity: orbiScanGen ? 0.75 : 1,
+                                            transition: 'all 0.15s ease',
+                                        }}
+                                    >
+                                        {orbiScanGen ? (
+                                            <>
+                                                <Sparkles size={15} className="animate-spin" />
+                                                Escaneando producto…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Camera size={15} />
+                                                Escanear producto con foto
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Banner de aviso tras escaneo exitoso */}
+                            {orbiScanSuccess && (
+                                <div style={{
+                                    margin: '-8px 0 20px 0',
+                                    padding: '11px 14px',
+                                    borderRadius: 9,
+                                    background: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
+                                    border: '1px solid color-mix(in srgb, var(--color-success) 35%, transparent)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 10,
+                                    fontSize: 13,
+                                    color: 'var(--color-heading)',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Check size={16} color="var(--color-success)" strokeWidth={2.5} />
+                                        <span><strong>¡Listo!</strong> Revisá si está todo ok y ajustá los detalles que quieras.</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrbiScanSuccess(false)}
+                                        style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'grid', placeItems: 'center' }}
+                                        title="Cerrar aviso"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
+
                             <div style={{ marginBottom: 18 }}>
                                 <PField label="Nombre del producto" value={prod.nombre} onChange={v => set('nombre', v.slice(0, 80))} placeholder="Ej: Remera oversize negra" h={44} />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                                     <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Usá palabras que tus clientes buscarían</span>
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.nombre.length}/80</span>
                                 </div>
-                                <button className="ds-link" onClick={orbiAsistir} disabled={orbiGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                                    {orbiGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
-                                </button>
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Descripción</label>
@@ -1854,6 +2107,122 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 </div>
                                             )}
                                         </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Apartado nuevo: Fotos oficiales sugeridas en la web */}
+                            {(sugeridasWeb.length > 0 || buscandoSugeridas) && (
+                                <div style={{
+                                    marginTop: 20,
+                                    marginBottom: 16,
+                                    padding: '16px 18px',
+                                    borderRadius: 12,
+                                    border: '1px solid var(--color-border)',
+                                    background: 'var(--color-bg)',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ fontSize: 16 }}>📷</span>
+                                            <div>
+                                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                    Fotos oficiales sugeridas en la web
+                                                </div>
+                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>
+                                                    {buscandoSugeridas
+                                                        ? 'Buscando fotos oficiales del producto en segundo plano...'
+                                                        : 'Encontradas para este modelo. Sumalas a tu galería con un clic.'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {buscandoSugeridas && (
+                                            <span style={{ fontSize: 11.5, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                <Sparkles size={12} className="animate-spin" /> Buscando...
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {sugeridasWeb.length > 0 && (
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                                            gap: 12,
+                                        }}>
+                                            {sugeridasWeb.map((sug, idx) => {
+                                                const yaAgregada = sugeridasAgregadas.has(sug.url)
+                                                const descargando = agregandoSugeridaUrl === sug.url
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        style={{
+                                                            border: '1px solid var(--color-border)',
+                                                            borderRadius: 10,
+                                                            overflow: 'hidden',
+                                                            background: 'var(--color-surface)',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                        }}
+                                                    >
+                                                        <div style={{
+                                                            position: 'relative',
+                                                            width: '100%',
+                                                            height: 130,
+                                                            background: '#ffffff',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            overflow: 'hidden',
+                                                        }}>
+                                                            <img
+                                                                src={sug.url}
+                                                                alt={sug.title || 'Foto sugerida'}
+                                                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                                                loading="lazy"
+                                                            />
+                                                            {sug.domain && (
+                                                                <span style={{
+                                                                    position: 'absolute',
+                                                                    bottom: 6,
+                                                                    left: 6,
+                                                                    background: 'rgba(0, 0, 0, 0.7)',
+                                                                    color: '#ffffff',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: 4,
+                                                                    fontSize: 10,
+                                                                    fontWeight: 500,
+                                                                }}>
+                                                                    {sug.domain}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, justifyContent: 'space-between' }}>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: 11,
+                                                                    color: 'var(--color-text)',
+                                                                    lineHeight: 1.3,
+                                                                    maxHeight: 28,
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                }}
+                                                                title={sug.title}
+                                                            >
+                                                                {sug.title || 'Foto de producto'}
+                                                            </div>
+                                                            <Button
+                                                                variant={yaAgregada ? 'outline' : 'primary'}
+                                                                size="sm"
+                                                                disabled={yaAgregada || descargando}
+                                                                onClick={() => agregarFotoSugerida(sug)}
+                                                                style={{ width: '100%', fontSize: 11, height: 28, padding: '0 8px' }}
+                                                            >
+                                                                {descargando ? 'Descargando...' : yaAgregada ? '✓ Agregada' : '+ Agregar a mi producto'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             )}

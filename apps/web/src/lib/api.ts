@@ -1961,6 +1961,49 @@ export function panelAiAssist(input: AiAssistInput) {
   return panelRequest<AiAssistResult>('/products/ai-assist', { method: 'POST', body: JSON.stringify(input) })
 }
 
+export type AiScanProductResult = {
+  name: string
+  description: string
+  suggestedCategoryId: string | null
+  suggestedTags: string[]
+  suggestedSpecs: { label: string; value: string }[]
+  detectedBrand?: string
+  detectedModel?: string
+  detectedColor?: string
+  imageSearchQuery?: string
+}
+
+export type SuggestedProductImage = {
+  url: string
+  title: string
+  sourceUrl?: string
+  domain?: string
+  provider: 'serper' | 'tavily' | 'duckduckgo'
+}
+
+export async function panelAiScanProduct(file: Blob, filename = 'scan.jpg'): Promise<AiScanProductResult> {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/products/ai-scan`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, mensajeDeError(res.status, body))
+  return body as AiScanProductResult
+}
+
+export function panelGetSuggestedImages(query: string, model?: string, brand?: string, color?: string) {
+  return panelRequest<SuggestedProductImage[]>('/products/suggested-images', {
+    method: 'POST',
+    body: JSON.stringify({ query, model, brand, color }),
+  })
+}
+
+export function panelProxyImage(url: string) {
+  return panelRequest<{ dataUrl: string; mimeType: string; size: number }>('/products/proxy-image', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  })
+}
+
 export function panelUpdateProduct(id: string, input: UpsertProductInput) {
   return panelRequest<ApiProductFull>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(input) })
 }

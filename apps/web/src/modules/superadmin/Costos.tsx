@@ -26,7 +26,7 @@ const MONTHS_RANGES = [
 
 const PROVIDER_ICONS: Record<string, string> = {
   gcloud: '☁️', cloudflare: '🔶', supabase: '⚡', gemini: '✦',
-  vercel: '▲', resend: '✉', groq: '⚙',
+  vercel: '▲', resend: '✉', groq: '⚙', serper: '🔍', tavily: '🌐',
 }
 
 // ─── Skeletons ──────────────────────────────────────────────────────────────
@@ -282,11 +282,14 @@ const PROVIDER_CARD_STYLES: Record<string, { bg: string; accent: string; text: s
   gemini:     { bg: '#f0ecfd', accent: '#886ef8', text: '#2a1f4e' },
   resend:     { bg: '#f0f0f0', accent: '#111111', text: '#1a1a1a' },
   groq:       { bg: '#fdeeed', accent: '#f55036', text: '#4a1008' },
+  serper:     { bg: '#fdf2f2', accent: '#ea4335', text: '#3c1010' },
+  tavily:     { bg: '#e6f9fd', accent: '#00b4d8', text: '#05313d' },
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
   vercel: 'Vercel', cloudflare: 'Cloudflare', supabase: 'Supabase',
   gcloud: 'Google Cloud', gemini: 'Gemini', resend: 'Resend', groq: 'Groq',
+  serper: 'Serper (Google Images)', tavily: 'Tavily Search',
 }
 
 function fmtValue(n: number): string {

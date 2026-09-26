@@ -25,7 +25,7 @@ import { COST_ADAPTERS } from './costs.constants';
       inject: [VercelCostAdapter, CloudflareCostAdapter, SupabaseCostAdapter],
     },
   ],
-  exports: [UsageMeteringService],
+  exports: [UsageMeteringService, CostsService],
 })
 export class CostsModule implements OnModuleInit {
   private readonly logger = new Logger(CostsModule.name);

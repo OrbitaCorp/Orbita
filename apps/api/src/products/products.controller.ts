@@ -13,6 +13,7 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  Optional,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
@@ -24,6 +25,7 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ProductsService } from './products.service';
 import { ProductAiService } from './product-ai.service';
+import { ProductImageSearchService } from './product-image-search.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
@@ -33,6 +35,8 @@ import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
+import { SuggestedImagesDto } from './dto/suggested-images.dto';
+import { ProxyImageDto } from './dto/proxy-image.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
 
@@ -49,6 +53,7 @@ export class ProductsController {
     private readonly productsService: ProductsService,
     private readonly productAiService: ProductAiService,
     private readonly businessesService: BusinessesService,
+    @Optional() private readonly productImageSearchService?: ProductImageSearchService,
   ) {}
 
   // Alternativa a pegar un link de video en el producto (Variantes e imágenes)
@@ -77,7 +82,6 @@ export class ProductsController {
     return this.businessesService.presignStorefrontVideo(member.businessId, dto.mimetype);
   }
 
-  // Antes de ':id' — no es un id real, pero evita cualquier ambigüedad de ruta.
   @Post('ai-assist')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
@@ -87,6 +91,52 @@ export class ProductsController {
       throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.productAiService.assist(member.businessId, dto);
+  }
+
+  @Post('ai-scan')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  aiScan(
+    @CurrentBusiness() ctx: AuthContext,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const member = assertMemberContext(ctx);
+    if (!file) throw new BadRequestException('Falta la imagen a escanear');
+    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+      throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    return this.productAiService.scanProductImage(member.businessId, file);
+  }
+
+  @Post('suggested-images')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 25, ttl: 60000 } })
+  suggestedImages(
+    @CurrentBusiness() ctx: AuthContext,
+    @Body() dto: SuggestedImagesDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    if (!this.productImageSearchService) return [];
+    return this.productImageSearchService.searchSuggestedImages({
+      query: dto.query,
+      model: dto.model,
+      brand: dto.brand,
+      color: dto.color,
+      businessId: member.businessId,
+    });
+  }
+
+  @Post('proxy-image')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 40, ttl: 60000 } })
+  proxyImage(
+    @CurrentBusiness() ctx: AuthContext,
+    @Body() dto: ProxyImageDto,
+  ) {
+    assertMemberContext(ctx);
+    if (!this.productImageSearchService) throw new BadRequestException('Servicio de imágenes no disponible');
+    return this.productImageSearchService.proxyImage(dto.url);
   }
 
   @Get()

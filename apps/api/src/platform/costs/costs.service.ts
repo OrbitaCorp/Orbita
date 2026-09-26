@@ -15,6 +15,8 @@ const DEFAULT_PROVIDERS = [
   { slug: 'vercel', name: 'Vercel', color: '#000000', apiType: 'MANUAL' as const },
   { slug: 'resend', name: 'Resend', color: '#111111', apiType: 'MANUAL' as const },
   { slug: 'groq', name: 'Groq', color: '#f55036', apiType: 'MANUAL' as const },
+  { slug: 'serper', name: 'Serper (Google Images)', color: '#ea4335', apiType: 'MANUAL' as const },
+  { slug: 'tavily', name: 'Tavily Search', color: '#00d2ff', apiType: 'MANUAL' as const },
 ];
 
 function currentMonth(): string {
@@ -43,11 +45,29 @@ export class CostsService {
 
   async seedProviders(): Promise<void> {
     for (const p of DEFAULT_PROVIDERS) {
-      await this.prisma.costProvider.upsert({
+      const provider = await this.prisma.costProvider.upsert({
         where: { slug: p.slug },
         update: {},
         create: { slug: p.slug, name: p.name, color: p.color, apiType: p.apiType },
       });
+
+      if (p.slug === 'serper' || p.slug === 'tavily') {
+        const existingLimit = await this.prisma.costLimit.findFirst({
+          where: { providerId: provider.id, type: 'USAGE' },
+        });
+        if (!existingLimit) {
+          await this.prisma.costLimit.create({
+            data: {
+              providerId: provider.id,
+              type: 'USAGE',
+              category: 'search_query',
+              threshold: p.slug === 'serper' ? 2500 : 1000,
+              unit: 'queries',
+              alertAtPercent: [80, 100],
+            },
+          });
+        }
+      }
     }
     this.logger.log(`Seed: ${DEFAULT_PROVIDERS.length} proveedores verificados`);
   }
@@ -347,34 +367,133 @@ export class CostsService {
       }
     }
 
-    // Groq no tiene API pública de uso: se arma con los usage_events propios.
+    // Groq, Serper y Tavily: se arman con los usage_events propios.
     try {
       const start = new Date();
       start.setUTCDate(1);
       start.setUTCHours(0, 0, 0, 0);
-      const rows = await this.prisma.usageEvent.groupBy({
-        by: ['category'],
-        where: { provider: { slug: 'groq' }, timestamp: { gte: start } },
-        _sum: { quantity: true },
-        _count: { _all: true },
+
+      const targetProviders = await this.prisma.costProvider.findMany({
+        where: { slug: { in: ['groq', 'serper', 'tavily'] } },
+        select: { id: true, slug: true },
       });
-      if (rows.length > 0) {
-        const prompt = rows.find((r) => r.category === 'prompt_tokens');
-        const completion = rows.find((r) => r.category === 'completion_tokens');
-        result['groq'] = {
-          slug: 'groq',
-          items: [
-            { category: 'Requests (mes)', value: prompt?._count._all ?? 0, unit: 'requests' },
-            { category: 'Tokens de entrada (mes)', value: Number(prompt?._sum.quantity ?? 0), unit: 'tokens' },
-            { category: 'Tokens de salida (mes)', value: Number(completion?._sum.quantity ?? 0), unit: 'tokens' },
-          ],
-        };
+
+      if (targetProviders.length > 0) {
+        const rows = await this.prisma.usageEvent.groupBy({
+          by: ['providerId', 'category'],
+          where: {
+            providerId: { in: targetProviders.map((p) => p.id) },
+            timestamp: { gte: start },
+          },
+          _sum: { quantity: true },
+          _count: { _all: true },
+        });
+
+        // Groq
+        const groqId = targetProviders.find((p) => p.slug === 'groq')?.id;
+        if (groqId) {
+          const groqRows = rows.filter((r) => r.providerId === groqId);
+          if (groqRows.length > 0) {
+            const prompt = groqRows.find((r) => r.category === 'prompt_tokens');
+            const completion = groqRows.find((r) => r.category === 'completion_tokens');
+            result['groq'] = {
+              slug: 'groq',
+              items: [
+                { category: 'Requests (mes)', value: prompt?._count._all ?? 0, unit: 'requests' },
+                { category: 'Tokens de entrada (mes)', value: Number(prompt?._sum.quantity ?? 0), unit: 'tokens' },
+                { category: 'Tokens de salida (mes)', value: Number(completion?._sum.quantity ?? 0), unit: 'tokens' },
+              ],
+            };
+          }
+        }
+
+        // Serper (Google Images)
+        const serperId = targetProviders.find((p) => p.slug === 'serper')?.id;
+        if (serperId) {
+          const serperRows = rows.filter((r) => r.providerId === serperId);
+          const queries = serperRows.find((r) => r.category === 'search_query');
+          const errors = serperRows.filter((r) => r.category === 'search_error' || r.category === 'quota_exceeded');
+          const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
+          const queryCount = Number(queries?._sum.quantity ?? 0);
+
+          if (queryCount > 0 || errorCount > 0) {
+            result['serper'] = {
+              slug: 'serper',
+              items: [
+                { category: 'Búsquedas de imágenes (mes)', value: queryCount, unit: 'queries', limit: 2500 },
+                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+              ],
+            };
+          }
+        }
+
+        // Tavily Search
+        const tavilyId = targetProviders.find((p) => p.slug === 'tavily')?.id;
+        if (tavilyId) {
+          const tavilyRows = rows.filter((r) => r.providerId === tavilyId);
+          const queries = tavilyRows.find((r) => r.category === 'search_query');
+          const errors = tavilyRows.filter((r) => r.category === 'search_error' || r.category === 'quota_exceeded');
+          const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
+          const queryCount = Number(queries?._sum.quantity ?? 0);
+
+          if (queryCount > 0 || errorCount > 0) {
+            result['tavily'] = {
+              slug: 'tavily',
+              items: [
+                { category: 'Búsquedas web (mes)', value: queryCount, unit: 'queries', limit: 1000 },
+                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+              ],
+            };
+          }
+        }
       }
     } catch (err) {
-      this.logger.warn(`Error obteniendo usage de groq: ${err}`);
+      this.logger.warn(`Error obteniendo usage de proveedores internos: ${err}`);
     }
 
     return { providers: result };
+  }
+
+  async reportQuotaExceeded(providerSlug: string, reason: string): Promise<void> {
+    try {
+      const provider = await this.prisma.costProvider.findUnique({
+        where: { slug: providerSlug },
+        include: { limits: true },
+      });
+      if (!provider) return;
+
+      let limit = provider.limits.find((l) => l.type === 'USAGE');
+      if (!limit) {
+        limit = await this.prisma.costLimit.create({
+          data: {
+            providerId: provider.id,
+            type: 'USAGE',
+            category: 'search_query',
+            threshold: providerSlug === 'serper' ? 2500 : 1000,
+            unit: 'queries',
+            alertAtPercent: [80, 100],
+          },
+        });
+      }
+
+      const existingAlert = await this.prisma.costAlert.findFirst({
+        where: { limitId: limit.id, acknowledgedAt: null },
+      });
+
+      if (!existingAlert) {
+        await this.prisma.costAlert.create({
+          data: {
+            limitId: limit.id,
+            percentReached: 100,
+            currentValue: limit.threshold,
+            notifiedAt: new Date(),
+          },
+        });
+        this.logger.warn(`Alerta de cuota superada registrada para ${providerSlug}: ${reason}`);
+      }
+    } catch (err) {
+      this.logger.error(`Error reportando cuota superada para ${providerSlug}: ${err}`);
+    }
   }
 
   async syncAll() {

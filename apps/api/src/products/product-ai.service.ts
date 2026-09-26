@@ -1,11 +1,23 @@
-import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiError } from '@google/genai';
-import { DEFAULT_MODEL } from '../orbi/llm/gemini-client';
+import { DEFAULT_MODEL, createGeminiClient, THINKING_MINIMO } from '../orbi/llm/gemini-client';
 import { generarTexto } from '../orbi/llm/text-generation';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
 import { AiAssistDto } from './dto/ai-assist.dto';
+
+export interface AiScanProductResult {
+  name: string;
+  description: string;
+  suggestedCategoryId: string | null;
+  suggestedTags: string[];
+  suggestedSpecs: { label: string; value: string }[];
+  detectedBrand?: string;
+  detectedModel?: string;
+  detectedColor?: string;
+  imageSearchQuery?: string;
+}
 
 export interface AiAssistResult {
   description: string;
@@ -177,4 +189,198 @@ export class ProductAiService {
 
     return { description, suggestedCategoryId, suggestedTags, suggestedSpecs };
   }
+
+  async scanProductImage(businessId: string, file: Express.Multer.File): Promise<AiScanProductResult> {
+    if (!file || !file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Falta la imagen a escanear');
+    }
+
+    let categorias: CategoryListItem[];
+    let tagsUsados: Awaited<ReturnType<TagsService['findAll']>>;
+    try {
+      [categorias, tagsUsados] = await Promise.all([
+        this.categoriesService.findAll(businessId, true) as Promise<CategoryListItem[]>,
+        this.tagsService.findAll(businessId),
+      ]);
+    } catch (error) {
+      this.logger.error(`No se pudieron resolver categorías/etiquetas del negocio ${businessId} para Orbi: ${error}`);
+      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+    }
+
+    const client = createGeminiClient(this.config);
+
+    const contexto: string[] = [
+      'Categorías del negocio (elegí un id de esta lista para "suggestedCategoryId", o null si ninguna encaja):\n' +
+        (categorias.map((c) => `${c.id}: ${c.name}`).join('\n') || '(el negocio no tiene categorías cargadas)'),
+    ];
+    if (tagsUsados.length) {
+      contexto.push(`Etiquetas ya usadas por el negocio (preferí reusarlas si aplican): ${tagsUsados.map((t) => t.name).join(', ')}`);
+    }
+
+    const modelsToTry = Array.from(new Set(['gemini-3.6-flash', this.modelo, 'gemini-3.7-flash', 'gemini-3.8-flash']));
+    const imageBase64 = file.buffer.toString('base64');
+    const mimeType = file.mimetype || 'image/jpeg';
+
+    let raw: string | undefined;
+    let finishReason: string | undefined;
+
+    for (const model of modelsToTry) {
+      try {
+        const response = await client.models.generateContent({
+          model,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType,
+                    data: imageBase64,
+                  },
+                },
+                {
+                  text: contexto.join('\n'),
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: SCAN_SYSTEM_PROMPT,
+            maxOutputTokens: 3000,
+            thinkingConfig: { thinkingLevel: THINKING_MINIMO },
+            responseMimeType: 'application/json',
+          },
+        });
+        raw = response.text?.trim();
+        finishReason = response.candidates?.[0]?.finishReason;
+        if (raw) break;
+      } catch (error) {
+        if (error instanceof ServiceUnavailableException) throw error;
+        const status = error instanceof ApiError ? error.status : undefined;
+        this.logger.warn(`Modelo ${model} no pudo procesar la imagen (status ${status ?? 'desconocido'}): ${error}`);
+        if (status === 401 || status === 403) {
+          throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
+        }
+        if (modelsToTry.indexOf(model) === modelsToTry.length - 1) {
+          throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+        }
+      }
+    }
+
+    if (!raw) {
+      this.logger.error(`Gemini no devolvió contenido para el escaneo de producto (finish_reason=${finishReason ?? 'desconocido'})`);
+      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+    }
+
+    const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(limpio);
+    } catch (error) {
+      this.logger.error(
+        `Gemini devolvió algo que no es JSON válido para escaneo (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
+      );
+      throw new InternalServerErrorException('No se pudo escanear el producto con Orbi. Probá de nuevo.');
+    }
+
+    const result = parsed as Partial<AiScanProductResult>;
+    const name = typeof result.name === 'string' && result.name.trim() ? result.name.trim().slice(0, 80) : 'Producto escaneado';
+    const description = typeof result.description === 'string' ? result.description.trim().slice(0, 2000) : '';
+
+    const categoryIds = new Set(categorias.map((c) => c.id));
+    const suggestedCategoryId =
+      typeof result.suggestedCategoryId === 'string' && categoryIds.has(result.suggestedCategoryId)
+        ? result.suggestedCategoryId
+        : null;
+
+    const suggestedTags = Array.isArray(result.suggestedTags)
+      ? Array.from(
+          new Set(
+            result.suggestedTags
+              .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+              .map((t) => t.trim().toLowerCase()),
+          ),
+        ).slice(0, 5)
+      : [];
+
+    const suggestedSpecs = Array.isArray(result.suggestedSpecs)
+      ? result.suggestedSpecs
+          .filter(
+            (s): s is { label: string; value: string } =>
+              typeof s === 'object' &&
+              s !== null &&
+              typeof (s as Record<string, unknown>).label === 'string' &&
+              (s as Record<string, unknown>).label !== '' &&
+              typeof (s as Record<string, unknown>).value === 'string' &&
+              (s as Record<string, unknown>).value !== '',
+          )
+          .map((s) => ({ label: s.label.trim().slice(0, 60), value: s.value.trim().slice(0, 300) }))
+          .slice(0, 20)
+      : [];
+
+    const detectedBrand =
+      (typeof result.detectedBrand === 'string' && result.detectedBrand.trim()
+        ? result.detectedBrand.trim().slice(0, 80)
+        : undefined) ||
+      suggestedSpecs.find((s) => /marca|brand|fabricante/i.test(s.label))?.value;
+
+    const detectedModel =
+      (typeof result.detectedModel === 'string' && result.detectedModel.trim()
+        ? result.detectedModel.trim().slice(0, 80)
+        : undefined) ||
+      suggestedSpecs.find((s) => /modelo|model|código|codigo|sku|referencia|reference/i.test(s.label))?.value;
+
+    const detectedColor =
+      (typeof result.detectedColor === 'string' && result.detectedColor.trim()
+        ? result.detectedColor.trim().slice(0, 100)
+        : undefined) ||
+      suggestedSpecs.find((s) => /color|dial|acabado|esfera/i.test(s.label))?.value;
+
+    const imageSearchQuery =
+      typeof result.imageSearchQuery === 'string' && result.imageSearchQuery.trim()
+        ? result.imageSearchQuery.trim().slice(0, 200)
+        : undefined;
+
+    return {
+      name,
+      description,
+      suggestedCategoryId,
+      suggestedTags,
+      suggestedSpecs,
+      ...(detectedBrand ? { detectedBrand } : {}),
+      ...(detectedModel ? { detectedModel } : {}),
+      ...(detectedColor ? { detectedColor } : {}),
+      ...(imageSearchQuery ? { imageSearchQuery } : {}),
+    };
+  }
 }
+
+const SCAN_SYSTEM_PROMPT =
+  'Asistís a un vendedor que está cargando un producto en la tienda online de su comercio en Argentina. ' +
+  'Analizás la fotografía de un producto físico para identificarlo con máxima precisión comercial y ayudarlo a completar la ficha.\n' +
+  'REGLA DE PRECISIÓN VISUAL CRÍTICA: ' +
+  'Examiná minuciosamente acabados, materiales reales, geometría y esfera/pantalla: ' +
+  '1) Distinguí materiales y geometrías específicas (ej. en relojería: caja de acero macizo con biseles cepillados y bordes pulidos vs resina plástica cromada; tipo de eslabón o malla milanesa). ' +
+  '2) Inspeccioná la textura y color exacto del dial/fondo (ej. nácar / madreperla / mother-of-pearl, rayos de sol, textura mate) y la ubicación exacta de inscripciones y pantalla (positivo vs invertido). ' +
+  '3) En familias de productos con variantes similares (ej. Casio Vintage: serie premium A1000 de acero macizo con nácar vs series A168/A158 de resina; zapatillas con múltiples colorways; modelos de smartphones), ' +
+  'identificá la serie y el código de modelo/color comercial exacto (ej. A1000D-7, no A168).\n' +
+  'Generás un JSON con los siguientes campos:\n' +
+  '1) "name": Título de venta optimizado, claro y atractivo (Marca + Tipo de producto + Modelo específico con código de color o atributo clave, ' +
+  'máximo 70 caracteres). Si identificás el modelo comercial exacto o SKU (ej. A1000D-7), incluilo en el nombre.\n' +
+  '2) "description": Descripción comercial en español rioplatense, tono profesional y directo, sin exclamaciones ni emojis, ' +
+  '2 a 4 oraciones destacando los atributos reales visibles en la foto (materiales, acabado, estilo, dial).\n' +
+  '3) "suggestedCategoryId": el id que mejor coincida de la lista de categorías del negocio provista, o null si ninguna encaja.\n' +
+  '4) "suggestedTags": entre 2 y 5 etiquetas cortas en minúscula (marca, tipo de producto, estilo, material).\n' +
+  '5) "detectedBrand": Marca detectada si es visible o identificable (ej. "Casio").\n' +
+  '6) "detectedModel": Modelo comercial exacto o SKU con variante de color (ej. "A1000D-7").\n' +
+  '7) "detectedColor": Color principal, acabado y tipo de dial visible (ej. "Plateado con dial nácar blanco / mother of pearl").\n' +
+  '8) "imageSearchQuery": Frase de búsqueda ultra-específica para Google Imágenes que encuentre fotos oficiales idénticas de estudio de este modelo y color exacto (Marca + Modelo exacto/SKU + palabras clave de color/dial en inglés y español, ej. "Casio A1000D-7 mother of pearl silver stainless steel watch").\n' +
+  '9) "suggestedSpecs": Array de objetos {"label": "...", "value": "..."}. ' +
+  'REGLA CRÍTICA PARA ESPECIFICACIONES: ' +
+  'SOLO si el producto es de un rubro que utiliza ficha técnica (relojes, electrónica, tecnología, herramientas, electrodomésticos, accesorios mecánicos, óptica), ' +
+  'extraé entre 6 y 14 especificaciones técnicas reales (Marca, Modelo con SKU específico, Material de caja, Malla, Color del dial, Pantalla, Resistencia al agua, etc.). ' +
+  'Si el producto es indumentaria / ropa común (remera, buzo, pollera, short básico, pantalón, campera básica) o artículos simples sin ficha técnica, ' +
+  'devolvé un array vacío [] porque la ropa no suele llevar tabla de especificaciones técnicas.\n' +
+  'Devolvé ÚNICAMENTE un JSON válido con la siguiente estructura: ' +
+  '{"name": "...", "description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["..."], "detectedBrand": "...", "detectedModel": "...", "detectedColor": "...", "imageSearchQuery": "...", "suggestedSpecs": [{"label": "...", "value": "..."}]}';
