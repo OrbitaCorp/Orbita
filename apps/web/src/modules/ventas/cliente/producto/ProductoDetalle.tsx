@@ -388,11 +388,11 @@ export default function ProductoDetalle() {
             (ver CSS_FICHA arriba): este es un return aparte, así que sin
             esto se quedaba con las dos columnas de escritorio en celular. */}
         <style>{CSS_FICHA}</style>
-        <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+        <div className="sf-pd-wrap" style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
-          <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60 }}>
+          <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 480px', gap: 48 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <Skeleton width="100%" height={620} radius={14} className="sf-pd-sk-img" />
+              <Skeleton width="100%" height={480} radius={14} className="sf-pd-sk-img" />
               <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <SkeletonText width={110} height={12} />
                 {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${70 - i * 6}%`} height={11} delay={i * 60} />)}
@@ -551,7 +551,7 @@ export default function ProductoDetalle() {
   return (
     <StorefrontChrome tienda={tienda} config={config}>
       <style>{CSS_FICHA}</style>
-      <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }}>
+      <div className="sf-pd-wrap" style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
           { label: 'Catálogo', href: `${base}/catalogo` },
@@ -560,7 +560,7 @@ export default function ProductoDetalle() {
         ]} />
 
         {/* ══ GRILLA PRINCIPAL ══ */}
-        <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60, marginBottom: 72 }}>
+        <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 480px', gap: 48, marginBottom: 72 }}>
 
           {/* ── Galería + Características ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -568,7 +568,7 @@ export default function ProductoDetalle() {
             <div className="sf-pd-gallery" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
 
               {hayMiniaturas && (
-                <div className="sf-pd-thumbs" style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                <div className="sf-pd-thumbs" style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, maxHeight: 480, overflowY: 'auto' }}>
                   {imagenes?.map((img, i) => (
                     <button
                       key={img.url + i}
@@ -624,9 +624,9 @@ export default function ProductoDetalle() {
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
                 {esSlideVideo && videoEmbed ? (
-                  // Mismo contenedor 620/14 que ProdImage, para que el salto
+                  // Mismo contenedor 480/14 que ProdImage, para que el salto
                   // entre foto y video no mueva el layout de alrededor.
-                  <div style={{ width: '100%', height: 620, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                  <div style={{ width: '100%', height: 480, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
                     {videoEmbed.tipo === 'file' ? (
                       <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
                         <source src={videoEmbed.src} />
@@ -662,7 +662,7 @@ export default function ProductoDetalle() {
                     )}
                   </div>
                 ) : (
-                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={620} radius={14} cover={imagenes?.[idxMostrado]?.hasAiBackground}>
+                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={480} radius={14} cover={imagenes?.[idxMostrado]?.hasAiBackground}>
                     {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
                         específico, mismo criterio de prioridad que el badge
                         del catálogo (toProducto()). */}
