@@ -121,7 +121,7 @@ function Franja({ wpp, msg }: VariantProps) {
   return (
     <div className="sf-wpp-franja">
       <span className="sf-wpp-franja-icon"><WppIcon size={16} /></span>
-      <p className="sf-wpp-franja-txt">Consultanos por WhatsApp — te respondemos en el momento, sin bots.</p>
+      <p className="sf-wpp-franja-txt">Escribinos por WhatsApp — te respondemos en el momento.</p>
       <button className="sf-wpp-franja-btn" onClick={() => openWpp(wpp, msg)}>
         Escribir <ArrowRight size={14} />
       </button>
