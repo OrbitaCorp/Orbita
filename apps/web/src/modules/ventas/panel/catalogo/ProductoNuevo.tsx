@@ -16,7 +16,7 @@ import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDow
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { fmtMoney } from '@/lib/utils'
+import { fmtMoney, formatMiles } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { esArchivoDeImagen, normalizarImagen, optimizarImagenParaScan, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
@@ -511,8 +511,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     tags: p.tags.map(t => t.name),
                     estado: p.status,
                     photoType: p.photoType,
-                    precio: String(p.basePrice),
-                    costo: p.cost != null ? String(p.cost) : '',
+                    // Math.round: basePrice/cost son Decimal(12,2) en la base y pueden
+                    // traer centavos (ej. cargados por Orbi o la API directa) — si llega
+                    // un "1500.5" acá, formatMiles trata el punto como separador de miles
+                    // y lo infla a "15.005" en el input.
+                    precio: String(Math.round(Number(p.basePrice))),
+                    costo: p.cost != null ? String(Math.round(Number(p.cost))) : '',
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
                     stock: String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
                     stockMinimo: String(p.variants[0]?.stock[0]?.stockMin ?? 5),
@@ -534,7 +538,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             valores: v.optionValues.map(ov => ov.value),
                             id: v.id,
                             sku: v.sku ?? '',
-                            precio: String(v.price),
+                            precio: String(Math.round(Number(v.price))),
                             stock: String(v.stock.reduce((s, st) => s + st.quantity, 0)),
                             stockMin: String(v.stock[0]?.stockMin ?? 0),
                             activa: v.isActive,
@@ -2573,13 +2577,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <div style={{ marginBottom: 14 }}>
                                         <label style={lbl}>Aplicar un precio a todas las variantes</label>
                                         <div style={{ display: 'flex', gap: 8 }}>
-                                            <div style={{ flex: 1 }}>
-                                                <input
-                                                    className="ds-field"
+                                            <div className="ds-field" style={{ flex: 1, display: 'flex', alignItems: 'center', height: 40, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6, boxSizing: 'border-box' }}>
+                                                <span style={{ color: 'var(--color-muted)', fontSize: 14, fontFamily: '"Geist Mono", monospace' }}>$</span>
+                                                <InputPrecio
                                                     value={precioMasivo}
-                                                    onChange={e => setPrecioMasivo(e.target.value.replace(/\D/g, ''))}
+                                                    onChange={setPrecioMasivo}
                                                     placeholder="0"
-                                                    style={{ width: '100%', height: 40, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
+                                                    mono
+                                                    style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)' }}
                                                 />
                                             </div>
                                             <Button
@@ -2599,10 +2604,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     </div>
                                 ) : (
                                     <div style={{ marginBottom: 14 }}>
-                                        <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v.replace(/\D/g, ''))} prefix="$" mono big h={44} placeholder="0" />
+                                        <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v)} prefix="$" mono big h={44} placeholder="0" miles />
                                     </div>
                                 )}
-                                <PField label="Costo del producto (opcional)" value={prod.costo} onChange={v => set('costo', v.replace(/\D/g, ''))} prefix="$" mono h={40} />
+                                <PField label="Costo del producto (opcional)" value={prod.costo} onChange={v => set('costo', v)} prefix="$" mono h={40} placeholder="0" miles />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
                                     Solo vos podés verlo. Si lo cargás, sirve para el margen y para calcular el valor de tu inventario — no hace falta para publicar.
                                 </div>
@@ -2702,7 +2707,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 <input className="ds-field" value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
                                             </div>
                                             <div data-col="Precio" style={{ minWidth: 0 }}>
-                                                <input className="ds-field" value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                                <InputPrecio className="ds-field" value={f.precio} disabled={!f.activa} onChange={v => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: v } : x))} style={celda} placeholder="0" mono />
                                             </div>
                                             <div data-col="Stock" style={{ minWidth: 0 }}>
                                                 <input className="ds-field" value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
@@ -3742,16 +3747,144 @@ function Resumen({ etiqueta, valor, mono }: { etiqueta: string; valor: string; m
     )
 }
 
-function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big }: {
+interface InputPrecioProps {
+    value: string
+    onChange: (value: string) => void
+    placeholder?: string
+    disabled?: boolean
+    className?: string
+    style?: React.CSSProperties
+    mono?: boolean
+    autoFocus?: boolean
+    id?: string
+}
+
+function posicionarCursor(input: HTMLInputElement, nuevoTexto: string, digitosAntes: number) {
+    if (!input) return
+    if (digitosAntes <= 0) {
+        input.setSelectionRange(0, 0)
+        return
+    }
+    let vistos = 0
+    let targetIndex = nuevoTexto.length
+    for (let i = 0; i < nuevoTexto.length; i++) {
+        if (/\d/.test(nuevoTexto[i])) {
+            vistos++
+            if (vistos === digitosAntes) {
+                targetIndex = i + 1
+                break
+            }
+        }
+    }
+    input.setSelectionRange(targetIndex, targetIndex)
+}
+
+function InputPrecio({
+    value,
+    onChange,
+    placeholder,
+    disabled,
+    className,
+    style,
+    mono,
+    autoFocus,
+    id,
+}: InputPrecioProps) {
+    const displayValue = formatMiles(value)
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const input = e.target
+        const rawVal = input.value
+        const selectionStart = input.selectionStart ?? rawVal.length
+
+        // Cantidad de dígitos antes de la posición del cursor en rawVal
+        const digitosAntes = rawVal.slice(0, selectionStart).replace(/\D/g, '').length
+
+        // Limpiar a solo dígitos numéricos eliminando ceros no significativos a la izquierda
+        const digitos = rawVal.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+
+        onChange(digitos)
+
+        const nuevoFormateado = formatMiles(digitos)
+
+        requestAnimationFrame(() => {
+            if (!input) return
+            posicionarCursor(input, nuevoFormateado, digitosAntes)
+        })
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        const input = e.currentTarget
+        const { selectionStart, selectionEnd, value: val } = input
+        if (selectionStart != null && selectionStart === selectionEnd) {
+            if (e.key === 'Backspace' && selectionStart > 0 && val[selectionStart - 1] === '.') {
+                e.preventDefault()
+                // Borrar el dígito que está justo antes del punto
+                const nuevoRaw = val.slice(0, selectionStart - 2) + val.slice(selectionStart)
+                const digitos = nuevoRaw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+                const digitosAntes = val.slice(0, selectionStart - 2).replace(/\D/g, '').length
+                onChange(digitos)
+                requestAnimationFrame(() => {
+                    if (!input) return
+                    const nuevoFormateado = formatMiles(digitos)
+                    posicionarCursor(input, nuevoFormateado, digitosAntes)
+                })
+            } else if (e.key === 'Delete' && selectionStart < val.length && val[selectionStart] === '.') {
+                e.preventDefault()
+                // Borrar el dígito que está justo después del punto
+                const nuevoRaw = val.slice(0, selectionStart) + val.slice(selectionStart + 2)
+                const digitos = nuevoRaw.replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+                const digitosAntes = val.slice(0, selectionStart).replace(/\D/g, '').length
+                onChange(digitos)
+                requestAnimationFrame(() => {
+                    if (!input) return
+                    const nuevoFormateado = formatMiles(digitos)
+                    posicionarCursor(input, nuevoFormateado, digitosAntes)
+                })
+            }
+        }
+    }
+
+    return (
+        <input
+            id={id}
+            type="text"
+            inputMode="numeric"
+            className={className}
+            value={displayValue}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            autoFocus={autoFocus}
+            style={{
+                fontFamily: mono ? '"Geist Mono", monospace' : 'inherit',
+                ...style,
+            }}
+        />
+    )
+}
+
+function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles }: {
     label: string; value: string; onChange: (v: string) => void; placeholder?: string
-    prefix?: string; mono?: boolean; h?: number; big?: boolean
+    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean
 }) {
     return (
         <div>
             <label style={lbl}>{label}</label>
             <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: h, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6 }}>
                 {prefix && <span style={{ color: 'var(--color-muted)', fontSize: big ? 18 : 14, fontFamily: '"Geist Mono", monospace' }}>{prefix}</span>}
-                <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
+                {miles ? (
+                    <InputPrecio
+                        value={value}
+                        onChange={onChange}
+                        placeholder={placeholder}
+                        mono={mono}
+                        style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)' }}
+                    />
+                ) : (
+                    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
+                )}
             </div>
         </div>
     )

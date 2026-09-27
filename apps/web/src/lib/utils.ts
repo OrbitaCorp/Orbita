@@ -16,6 +16,16 @@ export function fmtMoney(n: number): string {
     return '$' + Math.round(n).toLocaleString('es-AR')
 }
 
+// Formatea un string de dígitos o número con separador de miles argentino (puntos) sin signo $
+// Ej: "124300" → "124.300", 124300 → "124.300", "" → ""
+export function formatMiles(valor: string | number | undefined | null): string {
+    if (valor == null) return ''
+    const s = String(valor).replace(/\D/g, '')
+    if (!s) return ''
+    const limpio = s.replace(/^0+(?=\d)/, '')
+    return limpio.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 // Deja cualquier teléfono argentino listo para armar un link de wa.me.
 // WhatsApp exige el formato completo "549" + código de área + número, y a
 // mano casi nadie lo escribe así — reportado: un mismo negocio recibe
