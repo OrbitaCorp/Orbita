@@ -1004,7 +1004,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
         setFondoEnProceso(prev => new Set(prev).add(key))
         try {
-            const r = await panelGenerateProductBackground({ file: img.file, filename: img.file.name }, { estilo: 'sin_fondo', modo: 'gratis' })
+            const r = await panelGenerateProductBackground({ file: img.file, filename: img.file.name }, { estilo: 'sin_fondo' })
             const bytes = atob(r.base64)
             const arr = new Uint8Array(bytes.length)
             for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)

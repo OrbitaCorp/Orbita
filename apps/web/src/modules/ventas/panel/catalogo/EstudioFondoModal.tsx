@@ -24,11 +24,10 @@
 // CloudflareQuotaExhaustedException en el backend: ese error viene con un
 // mensaje ya armado para mostrar tal cual, no hace falta traducirlo acá).
 //
-// Modo "Gratis" vs "Premium" (24/09/2026, ver el plan "Fondo con IA:
-// pipeline 2D/3D"): gratis es el pipeline de siempre (compone local contra
-// el catálogo cacheado en R2); premium le pega a un modelo generativo sobre
-// la foto completa — Gemini si el producto es plano (`photoType`), Workers
-// AI si tiene volumen. "Sin fondo" es igual en los dos modos (siempre ONNX).
+// Flujo unificado (ver ImageStudioService.generateBackground()): para
+// cualquier estilo, primero intenta Workers AI (timeout de 7s) y si falla
+// (error, NSFW, cuota o timeout) cae al modelo local — sin Gemini, sin
+// distinción de "modo" gratis/premium. "Sin fondo" es siempre ONNX directo.
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-react'
@@ -39,9 +38,7 @@ import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, ty
 
 // Mismo valor que SIN_FONDO_KEY en apps/api/src/image-studio/background-styles.ts
 // — no compone nada, es el único estilo que se muestra con el checkerboard de
-// transparencia. Los estilos premium nuevos (Fase 2: texturas + "podio")
-// también llegan con previewUrl null (no tienen thumbnail en R2) pero NO son
-// "sin fondo" — se distinguen por key, no por previewUrl===null.
+// transparencia.
 const SIN_FONDO_KEY = 'sin_fondo'
 const BLANCO_LISO_KEY = 'blanco_liso'
 
@@ -62,9 +59,8 @@ interface Props {
      *  (pendiente) o agregar como una foto pendiente nueva (guardada). */
     onAplicar: (origen: ImagenParaFondo, file: File, preview: string) => void
     onToast: (m: string) => void
-    /** Plano o con volumen (Product.photoType) — solo importa en modo premium,
-     *  decide si el backend le pega a Gemini o a Workers AI (ver
-     *  ImageStudioService.generatePremiumBackground()). */
+    /** Plano o con volumen (Product.photoType) — se manda al backend pero
+     *  generateBackground() no lo usa hoy (queda como dato, sin efecto). */
     photoType?: 'flat' | 'volume'
 }
 

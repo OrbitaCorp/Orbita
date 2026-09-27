@@ -1,22 +1,13 @@
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
-import { BACKGROUND_STYLE_KEYS, PREMIUM_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY } from '../background-styles';
+import { BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY } from '../background-styles';
 
 export class GenerateBackgroundDto {
-  // "gratis" (default, compone local contra el catálogo cacheado en R2 — el
-  // pipeline de siempre, sin cambios) o "premium" (llamada generativa directa
-  // — Gemini para productos planos, Workers AI para productos con volumen,
-  // ver ImageStudioService.generatePremiumBackground()). Default "gratis"
-  // a propósito: un cliente viejo que no mande este campo sigue viendo
-  // exactamente el mismo comportamiento de siempre.
-  @IsOptional()
-  @IsIn(['gratis', 'premium'])
-  modo?: 'gratis' | 'premium';
-
-  // Solo relevante en modo "premium": si el producto es plano (indumentaria,
-  // la mayoría del catálogo) o tiene volumen (riñoneras, accesorios) — lo
-  // decide el vendedor al cargar el producto, ver Product.photoType. Sin
-  // esto no hay forma de saber qué motor usar para una foto que todavía no
-  // se guardó (alta de producto, sin id contra el que consultar).
+  // Sin efecto en el flujo actual (ImageStudioService.generateBackground()
+  // es único: Workers AI con fallback a modelo local, sin distinción por
+  // photoType) — se acepta igual porque el panel lo sigue mandando desde
+  // Product.photoType, y con `whitelist: true` (sin forbidNonWhitelisted)
+  // el ValidationPipe lo descarta solo si algún día se saca del lado del
+  // panel. No reactivar sin revisar generateBackground() primero.
   @IsOptional()
   @IsIn(['flat', 'volume'])
   photoType?: 'flat' | 'volume';
@@ -24,12 +15,10 @@ export class GenerateBackgroundDto {
   // Key del catálogo curado (ver background-styles.ts) — "madera",
   // "marmol_plantas", "lino_flores", etc. — o SIN_FONDO_KEY para no
   // componer nada (mismo resultado que el toggle "Quitar fondo" de
-  // siempre), o BLANCO_LISO_KEY para fondo blanco puro de estudio. Si viene vacío, se usa DEFAULT_BACKGROUND_STYLE. Incluye
-  // también PREMIUM_STYLE_KEYS (Fase 2: texturas + familia "podio") —
-  // esas keys solo existen en modo "premium", ImageStudioService valida
-  // eso además de esta lista de sintaxis.
+  // siempre), o BLANCO_LISO_KEY para fondo blanco puro de estudio. Si
+  // viene vacío, se usa DEFAULT_BACKGROUND_STYLE.
   @IsOptional()
-  @IsIn([...BACKGROUND_STYLE_KEYS, ...PREMIUM_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY])
+  @IsIn([...BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY])
   estilo?: string;
 
   // Ajuste libre ADEMÁS del estilo elegido (ej. "con tonos más fríos", "sin

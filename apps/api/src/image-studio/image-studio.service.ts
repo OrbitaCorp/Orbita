@@ -6,18 +6,15 @@ import sharp from 'sharp';
 import { BusinessesService } from '../businesses/businesses.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { CloudflareImageService } from '../cloudflare/cloudflare-image.service';
-import { GeminiImageService } from '../gemini-image/gemini-image.service';
 import { R2Service } from '../r2/r2.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { fondoIaEnMantenimiento, fondoIaMotor, MENSAJE_FONDO_IA_MANTENIMIENTO } from '../common/utils/fondo-ia-mantenimiento';
 import {
   BACKGROUND_STYLES,
   DEFAULT_BACKGROUND_STYLE,
-  PREMIUM_ONLY_STYLES,
   SIN_FONDO_KEY,
   BLANCO_LISO_KEY,
   type BackgroundStyle,
-  type PremiumOnlyStyle,
 } from './background-styles';
 
 export interface ImageStudioResult {
@@ -46,7 +43,6 @@ export class ImageStudioService {
     private readonly businesses: BusinessesService,
     private readonly backgroundRemoval: BackgroundRemovalService,
     private readonly cloudflareImage: CloudflareImageService,
-    private readonly geminiImage: GeminiImageService,
     private readonly r2: R2Service,
     private readonly config: ConfigService,
   ) {}
@@ -206,7 +202,7 @@ export class ImageStudioService {
     if (estilo === SIN_FONDO_KEY) return this.recorteSinFondo(origen.buffer, businessId);
 
     const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
-    const style: BackgroundStyle | undefined = BACKGROUND_STYLES[key] ?? (PREMIUM_ONLY_STYLES as any)[key];
+    const style: BackgroundStyle | undefined = BACKGROUND_STYLES[key];
     if (!style && key !== BLANCO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
 
     // Flujo unificado:
@@ -465,23 +461,18 @@ export class ImageStudioService {
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
   }
 
-  // Instrucción de edición para el modo premium — validada a mano en esta
-  // misma tarea contra Gemini (jersey 49ers, texto/logos densos) y Workers AI
-  // (riñonera en ángulo): un solo call de edición sobre la foto COMPLETA
-  // preserva el producto igual de bien que componer local, y de paso resuelve
-  // 3D sin la metadata de superficie que generateBackground() necesitaría.
-  // Reusa style.prompt tal cual (pensado para el catálogo gratis, con
+  // Instrucción de edición para Workers AI (generateBackground(), 1er intento
+  // del flujo unificado): un solo call de edición sobre la foto COMPLETA,
+  // reusando style.prompt tal cual (pensado para el catálogo gratis, con
   // VISTA_CENITAL) — en la práctica el modelo lo interpreta como la textura
   // del fondo, no como un mandato de cámara para toda la foto, así que sirve
-  // igual para productos en ángulo (ver resumen de la tarea). Catálogo de
-  // estilos dedicado a premium (más realista, "podio" para 3D) es la Fase 2.
-  // Refuerzo de preservación de color (Fase 2, pedido explícito del
-  // vendedor): antes solo decía "same colors" en la misma frase que forma/
-  // texto/logos — se lo separa en su propia oración, explícito sobre qué NO
-  // hacer (viraje de balance de blancos, recoloreo "para combinar" con el
-  // fondo nuevo), porque es el punto más fácil de perder en una edición
-  // generativa de la foto completa.
-  private promptPremium(style: BackgroundStyle | PremiumOnlyStyle, descripcion?: string): string {
+  // igual para productos en ángulo. Refuerzo de preservación de color (pedido
+  // explícito del vendedor): antes solo decía "same colors" en la misma frase
+  // que forma/texto/logos — se lo separa en su propia oración, explícito
+  // sobre qué NO hacer (viraje de balance de blancos, recoloreo "para
+  // combinar" con el fondo nuevo), porque es el punto más fácil de perder en
+  // una edición generativa de la foto completa.
+  private promptPremium(style: BackgroundStyle, descripcion?: string): string {
     const escena = descripcion ? `${style.prompt} Additional style note: ${descripcion}.` : style.prompt;
     return (
       'This is a product photo. Replace ONLY the background with the following scene, keeping the product ' +
@@ -505,65 +496,6 @@ export class ImageStudioService {
       'Add only a subtle, clean, soft realistic contact shadow directly underneath the product so it rests naturally on the pure white floor.' +
       extra
     );
-  }
-
-  /**
-   * Modo premium de "Fondo con IA": en vez de componer local (ver
-   * generateBackground()), le pide a un modelo generativo que edite la foto
-   * completa de una sola vez. Dos motores según `photoType` (Product.photoType,
-   * decisión del vendedor al cargar el producto — ver el plan "Fondo con IA:
-   * pipeline 2D/3D"):
-   * - `flat` (indumentaria, la mayoría del catálogo) → Gemini: Workers AI
-   *   bloquea con falsos positivos de NSFW la indumentaria femenina ajustada
-   *   (confirmado por el vendedor), Gemini no.
-   * - `volume` (riñoneras, accesorios) → Workers AI: gratis dentro del free
-   *   tier de Cloudflare, y ya resolvió bien un producto en ángulo sin la
-   *   metadata de superficie que necesitaría el modo gratis.
-   *
-   * El caso "Sin fondo" sigue siendo SIEMPRE BackgroundRemovalService (ONNX)
-   * acá también — ni Gemini ni Workers AI garantizan canal alfa real, son
-   * generativos, no segmentadores.
-   */
-  async generatePremiumBackground(
-    businessId: string,
-    photoType?: 'flat' | 'volume',
-    file?: { buffer: Buffer; mimetype: string },
-    estilo?: string,
-    descripcion?: string,
-    imageUrl?: string,
-  ): Promise<ImageStudioResult> {
-    await this.requireAddonAvanzado(businessId);
-    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException(MENSAJE_FONDO_IA_MANTENIMIENTO);
-
-    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
-    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
-
-    if (estilo === SIN_FONDO_KEY) return this.recorteSinFondo(origen.buffer, businessId);
-
-    // Catálogo combinado: BACKGROUND_STYLES (compartido con el modo gratis)
-    // + PREMIUM_ONLY_STYLES (Fase 2 — texturas premium y familia "podio",
-    // sin backgroundKeys porque el modo premium no compone contra R2).
-    const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
-    const style: BackgroundStyle | PremiumOnlyStyle | undefined = BACKGROUND_STYLES[key] ?? PREMIUM_ONLY_STYLES[key];
-    if (!style && key !== BLANCO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
-
-    // "podio_*" está pensado para un producto apoyado sobre una superficie
-    // real (perspectiva, profundidad) — no tiene sentido para indumentaria
-    // plana. Mismo criterio que la regla firme 2D=Gemini/3D=Workers AI, pero
-    // a nivel de catálogo en vez de motor.
-    if (style && 'soloVolumen' in style && style.soloVolumen && photoType !== 'volume') {
-      throw new BadRequestException('Este estilo es solo para productos con volumen');
-    }
-
-    const prompt = key === BLANCO_LISO_KEY
-      ? this.promptFondoBlancoLiso(descripcion)
-      : this.promptPremium(style!, descripcion);
-    const result =
-      photoType === 'volume' || fondoIaMotor() === 'workers' || key === BLANCO_LISO_KEY
-        ? await this.cloudflareImage.editImage(prompt, origen.buffer, origen.mimetype)
-        : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
-
-    return { base64: result.buffer.toString('base64'), mimeType: result.mimeType };
   }
 
   /**

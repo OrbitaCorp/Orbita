@@ -1,20 +1,11 @@
 import { IsIn, IsOptional } from 'class-validator';
 
-// Query params de GET /image-studio/background-styles (Fase 2, 24/09/2026):
-// antes devolvía siempre el mismo catálogo (BACKGROUND_STYLES) sin importar
-// el modo. Desde que existe el modo premium con catálogo propio
-// (PREMIUM_ONLY_STYLES, sin backgroundKeys en R2 — ver background-styles.ts),
-// el panel necesita pedir explícitamente cuál quiere ver.
+// Query params de GET /image-studio/background-styles. Catálogo unificado
+// (ver ImageStudioController.listBackgroundStyles()): siempre devuelve el
+// mismo BACKGROUND_STYLES, sin distinción de modo.
 export class ListBackgroundStylesDto {
-  // Default 'gratis' — un caller viejo que no mande el query param sigue
-  // viendo exactamente el mismo catálogo de siempre.
-  @IsOptional()
-  @IsIn(['gratis', 'premium'])
-  modo?: 'gratis' | 'premium';
-
-  // Solo relevante en modo 'premium': filtra los estilos "podio" (solo
-  // productos con volumen) cuando el producto es plano — ver
-  // PremiumOnlyStyle.soloVolumen.
+  // Sin efecto hoy — el catálogo no filtra por photoType (ver comentario de
+  // listBackgroundStyles()). Se acepta porque el panel lo sigue mandando.
   @IsOptional()
   @IsIn(['flat', 'volume'])
   photoType?: 'flat' | 'volume';

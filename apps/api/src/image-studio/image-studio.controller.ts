@@ -11,7 +11,7 @@ import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { ListBackgroundStylesDto } from './dto/list-background-styles.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
-import { BACKGROUND_STYLES, PREMIUM_ONLY_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY } from './background-styles';
+import { BACKGROUND_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
@@ -41,14 +41,6 @@ export class ImageStudioController {
   // primera de las 3 variantes cacheadas en R2 (ver background-styles.ts) —
   // el panel la usa como thumbnail del selector, no hace falta pedirle nada
   // a Flux para mostrar de qué se trata cada estilo.
-  //
-  // Fase 2 (24/09/2026): en modo 'premium' se suma PREMIUM_ONLY_STYLES
-  // (texturas + familia "podio") — esos no tienen backgroundKeys (el modo
-  // premium no compone contra R2), así que previewUrl siempre va null ahí;
-  // el panel les da un tratamiento visual propio (ver EstudioFondoModal, ya
-  // no confundido con el checkerboard de "Sin fondo" — ese chequea la key,
-  // no previewUrl===null). "podio_*" se filtra si photoType es 'flat': no
-  // tiene sentido pararse un producto plano sobre un podio.
   @Get('background-styles')
   listBackgroundStyles(@Query() query: ListBackgroundStylesDto) {
     // "Sin fondo" no es un estilo del catálogo (no compone nada, ver
