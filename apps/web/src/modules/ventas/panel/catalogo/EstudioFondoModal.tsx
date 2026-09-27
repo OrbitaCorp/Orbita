@@ -35,7 +35,7 @@ import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-rea
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, panelMejorarRecorte, type ApiBackgroundStyle } from '@/lib/api'
+import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, type ApiBackgroundStyle } from '@/lib/api'
 
 // Mismo valor que SIN_FONDO_KEY en apps/api/src/image-studio/background-styles.ts
 // — no compone nada, es el único estilo que se muestra con el checkerboard de
@@ -51,7 +51,7 @@ export type ImagenParaFondo =
 
 type EstadoPreview =
     | { estado: 'cargando' }
-    | { estado: 'listo'; file: File; url: string; recorteDificil: boolean; mejorando?: boolean }
+    | { estado: 'listo'; file: File; url: string }
     | { estado: 'error'; mensaje: string }
 
 interface Props {
@@ -94,11 +94,6 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
     // propio estado (cargando / lista / error) porque pueden fallar por separado
     // (red, filtro de contenido). `corridaRef` invalida las respuestas de una
     // corrida vieja cuando se cambia de estilo a mitad de camino.
-    // "Sin fondo" con el recorte local dudoso (producto y fondo parecidos, ver
-    // BackgroundRemovalService.removeBackgroundConAnalisis) deja `recorteDificil`
-    // en la preview: el vendedor decide si gasta una generación IA para mejorarlo
-    // (Gemini/Workers pone fondo blanco y se recorta de nuevo, ver
-    // ImageStudioService.mejorarRecorte).
     const [previews, setPreviews] = useState<Record<string, EstadoPreview>>({})
     const corridaRef = useRef(0)
 
@@ -196,7 +191,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             const r = await panelGenerateProductBackground(origenParaApi(img), { estilo, photoType })
             if (corrida !== corridaRef.current) return
             const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
-            setPreviews(p => ({ ...p, [img.key]: { estado: 'listo', file, url: URL.createObjectURL(file), recorteDificil: !!r.recorteDificil } }))
+            setPreviews(p => ({ ...p, [img.key]: { estado: 'listo', file, url: URL.createObjectURL(file) } }))
         } catch (e) {
             if (corrida !== corridaRef.current) return
             setPreviews(p => ({ ...p, [img.key]: { estado: 'error', mensaje: e instanceof ApiError ? e.message : 'No se pudo generar el preview. Probá de nuevo.' } }))
@@ -216,20 +211,6 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                 await generarUna(img, estilo, corrida)
             }
         }))
-    }
-
-    async function mejorarRecorteConIA(img: ImagenParaFondo) {
-        const actual = previews[img.key]
-        if (actual?.estado !== 'listo') return
-        setPreviews(p => ({ ...p, [img.key]: { ...actual, mejorando: true } }))
-        try {
-            const r = await panelMejorarRecorte(origenParaApi(img))
-            const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
-            setPreviews(p => ({ ...p, [img.key]: { estado: 'listo', file, url: URL.createObjectURL(file), recorteDificil: false } }))
-        } catch (e) {
-            setPreviews(p => ({ ...p, [img.key]: { ...actual, mejorando: false } }))
-            onToast(e instanceof ApiError ? e.message : 'No se pudo mejorar el recorte. Probá de nuevo.')
-        }
     }
 
     function elegirEstilo(key: string) {
@@ -445,7 +426,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                     title="Ver completo"
                                                     style={{ position: 'absolute', inset: 0, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
                                                 >
-                                                    <img src={p.url} alt="Preview con el nuevo fondo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: p.mejorando ? 0.5 : 1 }} />
+                                                    <img src={p.url} alt="Preview con el nuevo fondo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                                     <span style={{
                                                         position: 'absolute', bottom: 6, right: 6, width: 28, height: 28, borderRadius: 8,
                                                         background: 'rgba(15,23,42,0.65)', color: '#fff', display: 'grid', placeItems: 'center',
@@ -464,14 +445,6 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                 </div>
                                             )}
                                         </div>
-                                        {p?.estado === 'listo' && (estiloElegido === SIN_FONDO_KEY || estiloElegido === BLANCO_LISO_KEY) && p.recorteDificil && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 8px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 11.5, color: 'var(--color-text)', lineHeight: 1.4 }}>
-                                                <span>Recorte difícil: la prenda y el fondo tienen colores muy parecidos o mucha textura. Para mejores resultados, usá un fondo liso que contraste con la prenda.</span>
-                                                <Button variant="secondary" size="sm" onClick={() => void mejorarRecorteConIA(img)} loading={!!p.mejorando} disabled={aplicando}>
-                                                    Mejorar con IA (usa 1 generación)
-                                                </Button>
-                                            </div>
-                                        )}
                                     </div>
                                 )
                             })}

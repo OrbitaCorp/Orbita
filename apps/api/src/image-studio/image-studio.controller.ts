@@ -10,7 +10,6 @@ import { ImageStudioService } from './image-studio.service';
 import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { ListBackgroundStylesDto } from './dto/list-background-styles.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
-import { MejorarRecorteDto } from './dto/mejorar-recorte.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { BACKGROUND_STYLES, PREMIUM_ONLY_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
@@ -100,25 +99,6 @@ export class ImageStudioController {
       dto.imageUrl,
       dto.photoType,
     );
-  }
-
-  // Mejorar un recorte local dudoso con Gemini (ver
-  // ImageStudioService.mejorarRecorte). Comparte el tope diario con 'background'
-  // y 'model' — el cupo mensual de generaciones gratis por negocio se define en
-  // la fase de precios; hasta entonces este contador en memoria es el guardrail.
-  @Post('mejorar-recorte')
-  @RequirePermission('advanced.manage')
-  @RequiresAddon('ADVANCED')
-  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
-  async mejorarRecorte(
-    @CurrentBusiness() ctx: AuthContext,
-    @Body() dto: MejorarRecorteDto,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    const member = assertMemberContext(ctx);
-    if (!file && !dto.imageUrl) throw new BadRequestException('Falta el archivo "file" o "imageUrl"');
-    this.consumirCuota(member.businessId);
-    return this.imageStudio.mejorarRecorte(member.businessId, file, dto.imageUrl);
   }
 
   @Post('model')

@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { yaEsRecorteConAlfa } from './transparencia';
-import { analizarSenales, endurecer, completarHuecos, guidedFilter, recuperarFinos, type SenalesRecorte } from './mask-refine';
+import { endurecer, completarHuecos, guidedFilter, recuperarFinos } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -30,11 +30,6 @@ const MAX_INPUT_EDGE = 2000;
 const VENTANA_MS = 10 * 60 * 1000;
 const MAX_POR_VENTANA = 30;
 const MAX_SIMULTANEOS = 2;
-
-// Producto y fondo casi del mismo color (distancia RGB media) Y fondo con
-// textura (desvío de luminosidad): ahí el modelo local no distingue uno de otro.
-const UMBRAL_DISTANCIA_COLOR = 60;
-const UMBRAL_TEXTURA_FONDO = 12;
 
 // Erosión morfológica (filtro de mínimo) sobre un buffer de 1 canal —
 // separable en pasada horizontal + vertical, O(w·h·radio) en vez de
@@ -103,23 +98,10 @@ export class BackgroundRemovalService {
   // Devuelve un buffer PNG con canal alfa (RGBA) — SIN codificar a webp, eso
   // lo hace uploadToStorage() en businesses.service.ts, para no codificar dos veces.
   async removeBackground(buffer: Buffer, businessId: string): Promise<Buffer> {
-    return (await this.removeBackgroundConAnalisis(buffer, businessId)).png;
-  }
-
-  // Igual que removeBackground() pero además dice si el recorte local
-  // PROBABLEMENTE salió mal (producto y fondo del mismo color con textura,
-  // ej. prenda beige sobre alfombra beige — el modelo local no los separa):
-  // ahí el panel ofrece "mejorar con IA" (ImageStudioService.mejorarRecorte),
-  // que consume del cupo de generaciones. Calibrado con solo dos fotos reales
-  // (conjunto beige sobre alfombra → dificil; remera negra sobre blanco →
-  // no): si aparecen falsos positivos/negativos, ajustar los umbrales de acá.
-  async removeBackgroundConAnalisis(buffer: Buffer, businessId: string): Promise<{ png: Buffer; senales: SenalesRecorte; dificil: boolean }> {
     this.registrarUso(businessId);
     await this.esperarTurno();
     try {
-      const { png, senales } = await this.procesar(buffer);
-      const dificil = senales.distanciaColor < UMBRAL_DISTANCIA_COLOR && senales.texturaFondo > UMBRAL_TEXTURA_FONDO;
-      return { png, senales, dificil };
+      return await this.procesar(buffer);
     } catch (e) {
       if (e instanceof HttpException) throw e;
       // sharp u onnx: archivo que no es imagen, corrupto o con más píxeles
@@ -155,7 +137,7 @@ export class BackgroundRemovalService {
     else this.enCurso--;
   }
 
-  private async procesar(buffer: Buffer): Promise<{ png: Buffer; senales: SenalesRecorte }> {
+  private async procesar(buffer: Buffer): Promise<Buffer> {
     // Si la imagen de entrada tiene orientación EXIF (típica de fotos tomadas con
     // celular en vertical), auto-orientamos los píxeles antes de calcular dimensiones
     // y máscaras para que queden físicamente derechos.
@@ -173,12 +155,10 @@ export class BackgroundRemovalService {
     // Ya viene recortada (fondo transparente): no se le pasa el modelo, solo se
     // le quita el margen vacío como al resto — ver yaEsRecorteConAlfa.
     if (await yaEsRecorteConAlfa(buffer)) {
-      const senalesRecorte: SenalesRecorte = { distanciaColor: 441, texturaFondo: 0, indecision: 0 };
       try {
-        const png = await sharp(buffer, ENTRADA_IMAGEN).trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
-        return { png, senales: senalesRecorte };
+        return await sharp(buffer, ENTRADA_IMAGEN).trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
       } catch {
-        return { png: await sharp(buffer, ENTRADA_IMAGEN).png().toBuffer(), senales: senalesRecorte };
+        return await sharp(buffer, ENTRADA_IMAGEN).png().toBuffer();
       }
     }
 
@@ -253,8 +233,6 @@ export class BackgroundRemovalService {
       }
     }
 
-    const senales = analizarSenales(raw, maskBytes);
-
     // Con BiRefNet-Lite (1024x1024), la máscara nativa ya tiene definición sub-píxel.
     // Se compone directamente sin necesidad de guided-filter ni erosión agresiva.
     if (modelConfig.isBiRefNet) {
@@ -278,13 +256,12 @@ export class BackgroundRemovalService {
         .toBuffer();
 
       try {
-        const png = await sharp(compuesta)
+        return await sharp(compuesta)
           .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
           .png()
           .toBuffer();
-        return { png, senales };
       } catch {
-        return { png: compuesta, senales };
+        return compuesta;
       }
     }
 
@@ -458,17 +435,16 @@ export class BackgroundRemovalService {
     // esquina superior izquierda) porque el borde de la máscara puede no ser
     // 100% transparente ahí si el fondo original no llegaba a esa esquina.
     try {
-      const png = await sharp(compuesta)
+      return await sharp(compuesta)
         .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
-      return { png, senales };
     } catch {
       // Puede fallar si el modelo no detectó NADA de fondo para recortar
       // (imagen ya sin margen, o la máscara salió toda opaca/transparente
       // pareja) — en ese caso la foto compuesta sin recortar sigue siendo
       // correcta, solo sin este paso extra.
-      return { png: compuesta, senales };
+      return compuesta;
     }
   }
 }

@@ -2128,23 +2128,7 @@ export function panelListBackgroundStyles(opts: { modo?: 'gratis' | 'premium'; p
   return panelRequest<ApiBackgroundStyle[]>(`/image-studio/background-styles${qs ? `?${qs}` : ''}`)
 }
 
-// "Recorte difícil: mejorar con IA": Gemini pone fondo blanco y se recorta local
-// sobre eso — devuelve el PNG ya con transparencia. Consume una generación IA
-// del negocio (cupo compartido con Fondo con IA, ver ImageStudioController).
-export async function panelMejorarRecorte(origen: { file: Blob; filename: string } | { imageUrl: string }) {
-  const form = new FormData()
-  if ('imageUrl' in origen) form.append('imageUrl', origen.imageUrl)
-  else form.append('file', origen.file, origen.filename)
-  const res = await authedFetch(`${API_BASE}/image-studio/mejorar-recorte`, { method: 'POST', body: form })
-  const body = await res.json().catch(() => null)
-  if (!res.ok) {
-    const message = mensajeDeError(res.status, body)
-    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
-  }
-  return body as ApiImageStudioResult
-}
-
-export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string; recorteDificil?: boolean }
+export type ApiImageStudioResult = { base64: string; mimeType: string; advertencia?: string }
 
 // `{ file, filename }` para una foto pendiente (recién elegida, todavía no
 // subida) o `{ imageUrl }` para una YA GUARDADA de un producto en edición —

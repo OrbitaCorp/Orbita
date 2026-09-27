@@ -26,19 +26,7 @@ export interface ImageStudioResult {
   mimeType: string;
   /** Solo en generateModelWearing(): el resultado no es determinístico, avisar antes de publicar. */
   advertencia?: string;
-  /** Solo en "Sin fondo": el recorte local probablemente salió mal — el panel ofrece mejorarRecorte(). */
-  recorteDificil?: boolean;
 }
-
-// Mejorar recorte: solo cambia el fondo, sin tocar el producto (mismo lenguaje
-// de preservación que promptPremium) — el blanco liso es lo que hace fácil el
-// recorte local posterior.
-const PROMPT_FONDO_BLANCO =
-  'This is a product photo. Replace ONLY the background with a perfectly flat, uniform, pure white (#FFFFFF) ' +
-  'background, with no shadows, no texture and no gradient. Keep the product itself pixel-perfect: same shape, ' +
-  'same angle, same text, same logos, same stitching, and the EXACT original colors (same hue, saturation and ' +
-  'brightness) — do not redraw, restyle, recolor or reinterpret it in any way. Remove everything that is not the ' +
-  'product, including anything visible through gaps, straps or openings of the product.';
 
 const PROMPT_MODELO_DEFAULT =
   'a photorealistic person wearing this exact garment, natural studio lighting, e-commerce fashion photography, neutral background';
@@ -99,12 +87,10 @@ export class ImageStudioService {
   }
 
   // "Sin fondo": siempre el recorte local (ONNX), en los dos modos — ni Gemini ni
-  // Workers AI garantizan canal alfa real. Además avisa si el recorte
-  // probablemente salió mal (producto y fondo parecidos, ver
-  // BackgroundRemovalService.removeBackgroundConAnalisis).
+  // Workers AI garantizan canal alfa real.
   private async recorteSinFondo(buffer: Buffer, businessId: string): Promise<ImageStudioResult> {
-    const { png, dificil } = await this.backgroundRemoval.removeBackgroundConAnalisis(buffer, businessId);
-    return { base64: png.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+    const png = await this.backgroundRemoval.removeBackground(buffer, businessId);
+    return { base64: png.toString('base64'), mimeType: 'image/png' };
   }
 
   // Elige una de las variantes pre-generadas al azar (no siempre la misma,
@@ -373,7 +359,7 @@ export class ImageStudioService {
   }
 
   private async componerFondoBlanco(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
-    const { png: cutout, dificil } = await this.backgroundRemoval.removeBackgroundConAnalisis(origenBuffer, businessId);
+    const cutout = await this.backgroundRemoval.removeBackground(origenBuffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
     const cutoutWidth = meta.width ?? 1024;
     const cutoutHeight = meta.height ?? 1024;
@@ -472,11 +458,11 @@ export class ImageStudioService {
         composedBuffer = fondoBlanco;
       } catch (fallbackErr) {
         this.logger.error(`Error crítico en composición fondo blanco: ${fallbackErr}`);
-        return { base64: cutout.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+        return { base64: cutout.toString('base64'), mimeType: 'image/png' };
       }
     }
 
-    return { base64: composedBuffer.toString('base64'), mimeType: 'image/png', recorteDificil: dificil };
+    return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
   }
 
   // Instrucción de edición para el modo premium — validada a mano en esta
@@ -578,35 +564,6 @@ export class ImageStudioService {
         : await this.geminiImage.editImage(prompt, origen.buffer, origen.mimetype);
 
     return { base64: result.buffer.toString('base64'), mimeType: result.mimeType };
-  }
-
-  /**
-   * "Recorte difícil: mejorar con IA": para fotos donde el recorte local no
-   * separa producto de fondo (ej. prenda beige sobre alfombra beige, ver
-   * BackgroundRemovalService.removeBackgroundConAnalisis). Gemini reemplaza el
-   * fondo por blanco liso (mucho más fácil de recortar que la alfombra) y
-   * después se corre el recorte local sobre ESE resultado — devuelve el PNG
-   * con transparencia. Siempre Gemini (no Workers AI): sigue la regla de no
-   * mandar indumentaria por el filtro NSFW de Cloudflare. Cada llamada cuenta
-   * contra el cupo compartido de generaciones IA (ver el controller).
-   */
-  async mejorarRecorte(
-    businessId: string,
-    file?: { buffer: Buffer; mimetype: string },
-    imageUrl?: string,
-  ): Promise<ImageStudioResult> {
-    await this.requireAddonAvanzado(businessId);
-    if (fondoIaEnMantenimiento()) throw new ServiceUnavailableException(MENSAJE_FONDO_IA_MANTENIMIENTO);
-
-    const origen = file ?? (imageUrl ? await this.resolverImagenPorUrl(imageUrl) : undefined);
-    if (!origen) throw new BadRequestException('Falta la imagen a procesar');
-
-    const conFondoBlanco =
-      fondoIaMotor() === 'workers'
-        ? await this.cloudflareImage.editImage(PROMPT_FONDO_BLANCO, origen.buffer, origen.mimetype)
-        : await this.geminiImage.editImage(PROMPT_FONDO_BLANCO, origen.buffer, origen.mimetype);
-    const cutout = await this.backgroundRemoval.removeBackground(conFondoBlanco.buffer, businessId);
-    return { base64: cutout.toString('base64'), mimeType: 'image/png' };
   }
 
   /**

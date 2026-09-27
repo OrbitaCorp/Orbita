@@ -79,46 +79,6 @@ export function endurecer(mascara: Float32Array, centro: number, ancho: number):
   }
 }
 
-export interface SenalesRecorte {
-  /** Distancia RGB entre el color medio del producto y el del fondo (0-441): chica = se parecen. */
-  distanciaColor: number;
-  /** Desvío estándar de la luminosidad del fondo (0-255): alto = fondo con textura. */
-  texturaFondo: number;
-  /** Fracción de píxeles "indecisos" del modelo (ni producto ni fondo) sobre producto + indecisos. */
-  indecision: number;
-}
-
-/**
- * Señales baratas (sobre la máscara y la foto de 320x320 que ya se calcularon)
- * para decidir si un recorte local probablemente salió mal — ver
- * BackgroundRemovalService.removeBackgroundConAnalisis().
- */
-export function analizarSenales(rgb: Uint8Array | Buffer, mascara: Uint8Array | Buffer): SenalesRecorte {
-  const n = mascara.length;
-  let nFg = 0, nBg = 0, nMid = 0;
-  const fg = [0, 0, 0], bg = [0, 0, 0];
-  let sumL = 0, sumL2 = 0;
-  for (let i = 0; i < n; i++) {
-    const m = mascara[i];
-    const r = rgb[i * 3], g = rgb[i * 3 + 1], b = rgb[i * 3 + 2];
-    if (m >= 150) {
-      nFg++; fg[0] += r; fg[1] += g; fg[2] += b;
-    } else if (m <= 60) {
-      nBg++; bg[0] += r; bg[1] += g; bg[2] += b;
-      const l = 0.299 * r + 0.587 * g + 0.114 * b;
-      sumL += l; sumL2 += l * l;
-    } else nMid++;
-  }
-  if (nFg === 0 || nBg === 0) return { distanciaColor: 441, texturaFondo: 0, indecision: 0 };
-  const d = Math.hypot(fg[0] / nFg - bg[0] / nBg, fg[1] / nFg - bg[1] / nBg, fg[2] / nFg - bg[2] / nBg);
-  const meanL = sumL / nBg;
-  return {
-    distanciaColor: d,
-    texturaFondo: Math.sqrt(Math.max(0, sumL2 / nBg - meanL * meanL)),
-    indecision: nMid / (nFg + nMid),
-  };
-}
-
 /**
  * Recupera estructuras finas (brazo de un micrófono, un cable) que la erosión
  * de borde borra: el modelo (320 px) las ve como ~1 px, y un choke de varios

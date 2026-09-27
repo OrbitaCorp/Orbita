@@ -17,7 +17,6 @@ function makeService(hasActiveAddon: boolean) {
   const businesses = { hasActiveAddon: jest.fn().mockResolvedValue(hasActiveAddon) };
   const backgroundRemoval = {
     removeBackground: jest.fn().mockResolvedValue(FAKE_JPEG),
-    removeBackgroundConAnalisis: jest.fn().mockResolvedValue({ png: FAKE_JPEG, dificil: false, senales: {} }),
   };
   const cloudflareImage = {
     generateImage: jest.fn().mockResolvedValue({ buffer: FAKE_JPEG, mimeType: 'image/jpeg' }),
@@ -162,17 +161,10 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
     it('"sin_fondo" sigue siendo el recorte local (ONNX), no le pega a ningún motor de IA', async () => {
       const { svc, backgroundRemoval, geminiImage, cloudflareImage } = makeService(true);
       const result = await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'sin_fondo');
-      expect(backgroundRemoval.removeBackgroundConAnalisis).toHaveBeenCalledTimes(1);
+      expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
       expect(geminiImage.editImage).not.toHaveBeenCalled();
       expect(cloudflareImage.editImage).not.toHaveBeenCalled();
       expect(result.mimeType).toBe('image/png');
-    });
-
-    it('"sin_fondo" avisa recorteDificil cuando el análisis del recorte local lo marca', async () => {
-      const { svc, backgroundRemoval } = makeService(true);
-      backgroundRemoval.removeBackgroundConAnalisis.mockResolvedValueOnce({ png: FAKE_JPEG, dificil: true, senales: {} });
-      const result = await svc.generatePremiumBackground('biz-1', 'flat', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'sin_fondo');
-      expect(result.recorteDificil).toBe(true);
     });
 
     it('en mantenimiento (sin FONDO_IA_MANTENIMIENTO=false): 503 y no llama a ningún motor', async () => {
@@ -204,50 +196,6 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
       expect(geminiImage.editImage).not.toHaveBeenCalled();
       const [prompt] = cloudflareImage.editImage.mock.calls[0];
       expect(prompt).toMatch(/pure white/i);
-    });
-  });
-
-  describe('mejorarRecorte — Gemini pone fondo blanco, después recorte local', () => {
-    // Fuera de mantenimiento (FONDO_IA_MANTENIMIENTO=false, ver fondo-ia-mantenimiento.ts).
-    beforeEach(() => { process.env.FONDO_IA_MANTENIMIENTO = 'false'; delete process.env.FONDO_IA_MOTOR; });
-    afterEach(() => { delete process.env.FONDO_IA_MANTENIMIENTO; });
-
-    it('le pide a Gemini fondo blanco liso y corre el recorte local sobre SU resultado', async () => {
-      const { svc, geminiImage, backgroundRemoval, cloudflareImage } = makeService(true);
-      const gemini = Buffer.from('gemini-result');
-      geminiImage.editImage.mockResolvedValueOnce({ buffer: gemini, mimeType: 'image/png' });
-      const result = await svc.mejorarRecorte('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' });
-      const [prompt] = geminiImage.editImage.mock.calls[0];
-      expect(prompt).toMatch(/pure white/i);
-      expect(prompt).toMatch(/EXACT original colors/i);
-      expect(backgroundRemoval.removeBackground).toHaveBeenCalledWith(gemini, 'biz-1');
-      expect(cloudflareImage.editImage).not.toHaveBeenCalled();
-      expect(result.mimeType).toBe('image/png');
-    });
-
-    it('FONDO_IA_MOTOR=workers: el fondo blanco lo pide a Workers AI, no a Gemini', async () => {
-      process.env.FONDO_IA_MOTOR = 'workers';
-      try {
-        const { svc, geminiImage, cloudflareImage } = makeService(true);
-        await svc.mejorarRecorte('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' });
-        const [prompt] = cloudflareImage.editImage.mock.calls[0];
-        expect(prompt).toMatch(/pure white/i);
-        expect(geminiImage.editImage).not.toHaveBeenCalled();
-      } finally {
-        delete process.env.FONDO_IA_MOTOR;
-      }
-    });
-
-    it('sin el add-on, 403 y no gasta Gemini', async () => {
-      const { svc, geminiImage } = makeService(false);
-      await expect(svc.mejorarRecorte('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' })).rejects.toBeInstanceOf(ForbiddenException);
-      expect(geminiImage.editImage).not.toHaveBeenCalled();
-    });
-
-    it('sin file ni imageUrl, 400 y no gasta Gemini', async () => {
-      const { svc, geminiImage } = makeService(true);
-      await expect(svc.mejorarRecorte('biz-1')).rejects.toBeInstanceOf(BadRequestException);
-      expect(geminiImage.editImage).not.toHaveBeenCalled();
     });
   });
 

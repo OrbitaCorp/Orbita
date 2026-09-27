@@ -1,6 +1,6 @@
 import {
   recuperarFinos,
-  completarHuecos, analizarSenales, boxFilter, endurecer, guidedFilter } from '../../src/background-removal/mask-refine';
+  completarHuecos, boxFilter, endurecer, guidedFilter } from '../../src/background-removal/mask-refine';
 
 // Fase 3 de "Fondo con IA": refinamiento de la máscara de recorte (bordes
 // pixelados al agrandar la máscara de 320x320 de U2Netp).
@@ -39,38 +39,6 @@ describe('mask-refine', () => {
     expect(m[4]).toBe(1);
   });
 
-  describe('analizarSenales', () => {
-    // Mitad izquierda = producto (máscara 255), mitad derecha = fondo (máscara 0).
-    function escena(colorProducto: number[], fondo: (i: number) => number[]) {
-      const n = 100;
-      const rgb = new Uint8Array(n * 3);
-      const mascara = new Uint8Array(n);
-      for (let i = 0; i < n; i++) {
-        const esProducto = i < n / 2;
-        const c = esProducto ? colorProducto : fondo(i);
-        rgb.set(c, i * 3);
-        mascara[i] = esProducto ? 255 : 0;
-      }
-      return analizarSenales(rgb, mascara);
-    }
-
-    it('producto oscuro sobre fondo blanco liso: colores lejanos y fondo sin textura', () => {
-      const s = escena([10, 10, 10], () => [255, 255, 255]);
-      expect(s.distanciaColor).toBeGreaterThan(300);
-      expect(s.texturaFondo).toBeLessThan(1);
-    });
-
-    it('producto beige sobre fondo beige con textura: colores parecidos y fondo texturado', () => {
-      const s = escena([180, 160, 130], (i) => (i % 2 ? [200, 180, 150] : [150, 130, 100]));
-      expect(s.distanciaColor).toBeLessThan(60);
-      expect(s.texturaFondo).toBeGreaterThan(12);
-    });
-
-    it('sin producto o sin fondo detectado: distancia máxima, sin textura (no marca dificil)', () => {
-      const s = analizarSenales(new Uint8Array(30), new Uint8Array(10));
-      expect(s.distanciaColor).toBe(441);
-    });
-  });
 });
 
 describe('recuperarFinos', () => {
