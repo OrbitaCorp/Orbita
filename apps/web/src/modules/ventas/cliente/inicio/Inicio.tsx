@@ -468,7 +468,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
                 /* Índice: dos columnas de nombres grandes con filete. */
                 .sf-cat-indice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:40px; }
-                .sf-cat-indice-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
+                .sf-cat-indice-row { display:flex; align-items:baseline; gap:12px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
                 .sf-cat-indice-row:hover { border-bottom-color:var(--color-text); }
                 .sf-cat-indice-nombre { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--color-text); transition:color 150ms; }
                 .sf-cat-indice-row:hover .sf-cat-indice-nombre { color:var(--color-primary); }
@@ -1490,9 +1490,8 @@ function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void })
         <div className="sf-w">
             <div className="sf-cat-indice">
                 {cats.map(c => (
-                    <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo/${c.slug}`)}>
+                    <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.nombre)}`)}>
                         <span className="sf-cat-indice-nombre">{c.nombre}</span>
-                        <span className="sf-cat-indice-count">{c.count}</span>
                     </button>
                 ))}
             </div>
