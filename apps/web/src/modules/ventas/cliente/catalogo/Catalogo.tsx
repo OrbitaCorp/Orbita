@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { SkeletonProductGrid, SkeletonText } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { columnasDeGrilla } from '@/lib/storefront/utils'
+import { columnasDeGrilla, resolverIdsDeCategorias } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
   toTiendaConfig, toProducto,
@@ -146,35 +146,38 @@ export default function Catalogo() {
   // `catsActivas` guarda ids. Sin esto el link llevaba al catálogo completo,
   // sin filtrar nada — se veía como si el enlace no hiciera nada.
   //
-  // Una sola vez (`catAplicada`): después manda lo que el usuario toque en el
-  // panel de filtros, no la URL con la que entró.
-  const catAplicada = useRef(false)
+  // ?cat=<slug|nombre|id> — lo mandan las secciones de categoría del home,
+  // plantillas avanzadas y enlaces del header (ver AccionesHome#irACategoria).
+  // Resuelve con resiliencia: por slug exacto, por nombre (ej: "Camisas street"),
+  // por slug normalizado, o por id directo.
+  const ultimaQueryCatRef = useRef<string | null>(null)
   // ?vista= en la URL con la que se entró: manda sobre el default de Apariencia.
   const vistaEnUrl = useRef(false)
   useEffect(() => {
-    if (!router.isReady || catAplicada.current || categorias.length === 0) return
+    if (!router.isReady || categorias.length === 0) return
     const crudo = router.query.cat
-    const slugs = (typeof crudo === 'string' ? crudo : Array.isArray(crudo) ? crudo.join(',') : '')
-      .split(',').map(x => x.trim()).filter(Boolean)
-    if (slugs.length === 0) return
-    const ids = slugs
-      .map(sl => categorias.find(c => c.slug === sl)?.id)
-      .filter((x): x is string => !!x)
-    catAplicada.current = true
+    const catQueryStr = (typeof crudo === 'string' ? crudo : Array.isArray(crudo) ? crudo.join(',') : '').trim()
+
+    if (ultimaQueryCatRef.current === catQueryStr) return
+    ultimaQueryCatRef.current = catQueryStr
+
+    if (!catQueryStr) return
+
+    const ids = resolverIdsDeCategorias(catQueryStr, categorias)
     if (ids.length > 0) setCatsActivas(ids)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, categorias])
+  }, [router.isReady, categorias, router.query.cat])
 
   // La URL está lista cuando ya no falta nada por aplicar: sin `cat` es
   // inmediato; con `cat` hay que esperar las categorías (el efecto de arriba
-  // convierte el slug en id en ESTE mismo render, así el primer pedido de
+  // convierte el slug/nombre en id en ESTE mismo render, así el primer pedido de
   // productos ya sale con todo aplicado).
   useEffect(() => {
     if (!router.isReady || urlListo) return
     const conCat = typeof router.query.cat === 'string' || Array.isArray(router.query.cat)
-    if (!conCat || catAplicada.current || !catsCargando) setUrlListo(true)
+    if (!conCat || ultimaQueryCatRef.current !== null || !catsCargando) setUrlListo(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, categorias, catsCargando])
+  }, [router.isReady, categorias, catsCargando, router.query.cat])
 
   useEffect(() => {
     if (!slug) return
@@ -287,7 +290,9 @@ export default function Catalogo() {
     if (!router.isReady || !urlListo) return
     const q = new URLSearchParams()
     const slugsCat = catsActivas.map(id => categorias.find(c => c.id === id)?.slug).filter((x): x is string => !!x)
-    if (slugsCat.length > 0) q.set('cat', slugsCat.join(','))
+    const catStr = slugsCat.join(',')
+    if (catStr) q.set('cat', catStr)
+    ultimaQueryCatRef.current = catStr
     if (opcionesActivas.length > 0) q.set('opt', opcionesActivas.join(','))
     if (orden !== 'relevancia') q.set('sort', orden)
     if (soloOferta) q.set('onSale', '1')

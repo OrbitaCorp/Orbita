@@ -304,7 +304,7 @@ function pieReal({ base, cats, contacto }: {
   if (cats.length > 0) {
     columnas.push(['Categorías', cats.slice(0, 5).map(([nombre, , slug]) => ({
       label: nombre,
-      href: slug ? `${base}/categoria/${slug}` : `${base}/catalogo`,
+      href: slug ? `${base}/catalogo?cat=${encodeURIComponent(slug)}` : `${base}/catalogo`,
     }))])
   }
 

@@ -147,3 +147,37 @@ export function parseVideoEmbed(url: string | null | undefined): VideoEmbed | nu
   if (ARCHIVO_VIDEO.test(v)) return { tipo: 'file', src: v }
   return null
 }
+
+// Resuelve los IDs reales de categorías a partir del parámetro de URL `cat`
+// (soporta slug, nombre, ID o valores codificados con espacios/guiones).
+export function resolverIdsDeCategorias(
+  catQuery: string | string[] | undefined | null,
+  categorias: { id: string; name: string; slug: string }[]
+): string[] {
+  if (!catQuery) return []
+  const catQueryStr = (typeof catQuery === 'string' ? catQuery : Array.isArray(catQuery) ? catQuery.join(',') : '').trim()
+  if (!catQueryStr) return []
+
+  const terminos = catQueryStr.split(',').map(x => x.trim()).filter(Boolean)
+  if (terminos.length === 0) return []
+
+  return terminos
+    .map(sl => {
+      const decoded = decodeURIComponent(sl).trim().toLowerCase()
+      const conGuiones = decoded.replace(/\s+/g, '-')
+      const sinGuiones = decoded.replace(/-/g, ' ')
+      return categorias.find(c => {
+        const cSlug = c.slug.toLowerCase().trim()
+        const cName = c.name.toLowerCase().trim()
+        return (
+          c.id === sl ||
+          cSlug === decoded ||
+          cSlug === conGuiones ||
+          cName === decoded ||
+          cName === sinGuiones ||
+          cName.replace(/\s+/g, '-') === conGuiones
+        )
+      })?.id
+    })
+    .filter((x): x is string => !!x)
+}

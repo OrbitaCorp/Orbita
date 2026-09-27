@@ -1374,7 +1374,7 @@ const CAT_MIN_MARQUEE = 4
 function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
     return (
         <button
-            onClick={() => go(`/catalogo/${c.slug}`)}
+            onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 9, height: 50, padding: '0 14px 0 7px', cursor: 'pointer', borderRadius: 999, border: '1px solid var(--color-border)', background: 'var(--color-bg)', transition: 'border-color 150ms' }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-strong)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
@@ -1490,7 +1490,7 @@ function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void })
         <div className="sf-w">
             <div className="sf-cat-indice">
                 {cats.map(c => (
-                    <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.nombre)}`)}>
+                    <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                         <span className="sf-cat-indice-nombre">{c.nombre}</span>
                     </button>
                 ))}
@@ -1507,7 +1507,7 @@ function CatChips({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) 
     if (cats.length > CAT_MIN_MARQUEE) {
         return (
             <MarqueeLoop items={cats} gap={8} render={(c, key) => (
-                <button key={key} className="sf-cat-chip" onClick={() => go(`/catalogo/${c.slug}`)}>{c.nombre}</button>
+                <button key={key} className="sf-cat-chip" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>{c.nombre}</button>
             )} />
         )
     }
@@ -1515,7 +1515,7 @@ function CatChips({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) 
         <div className="sf-cat-chips-wrap">
             <div className="sf-w sf-cat-chips">
                 {cats.map(c => (
-                    <button key={c.id} className="sf-cat-chip" onClick={() => go(`/catalogo/${c.slug}`)}>
+                    <button key={c.id} className="sf-cat-chip" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                         {c.nombre}
                     </button>
                 ))}
@@ -1535,7 +1535,7 @@ function CatMosaico({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }
                     <button
                         key={c.id}
                         className={`sf-cat-tile${i === 0 ? ' sf-cat-tile--grande' : ''}`}
-                        onClick={() => go(`/catalogo/${c.slug}`)}
+                        onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}
                     >
                         {/* Solo `backgroundImage`, nunca mezclado con el
                             shorthand `background`: React aplica las dos
@@ -1566,7 +1566,7 @@ function CatTarjetas({ cats, go }: { cats: CatVisual[]; go: (p: string) => void 
         <div className="sf-w">
             <div className="sf-cat-tarjetas">
                 {cats.map(c => (
-                    <button key={c.id} className="sf-cat-tarjeta" onClick={() => go(`/catalogo/${c.slug}`)}>
+                    <button key={c.id} className="sf-cat-tarjeta" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                         <span className="sf-cat-tarjeta-marco">
                             {/* Una sola clave, igual que en el mosaico — ver
                                 el comentario de arriba sobre el shorthand. */}
@@ -1590,7 +1590,7 @@ function CatCirculos({ cats, go }: { cats: CatVisual[]; go: (p: string) => void 
     if (cats.length > CAT_MIN_MARQUEE) {
         return (
             <MarqueeLoop items={cats} gap={22} render={(c, key) => (
-                <button key={key} className="sf-cat-circulo" onClick={() => go(`/catalogo/${c.slug}`)}>
+                <button key={key} className="sf-cat-circulo" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                     <CatMedallon c={c} size={76} />
                     <span className="sf-cat-circulo-nombre">{c.nombre}</span>
                 </button>
@@ -1601,7 +1601,7 @@ function CatCirculos({ cats, go }: { cats: CatVisual[]; go: (p: string) => void 
         <div className="sf-cat-circulos-wrap">
             <div className="sf-w sf-cat-circulos">
                 {cats.map(c => (
-                    <button key={c.id} className="sf-cat-circulo" onClick={() => go(`/catalogo/${c.slug}`)}>
+                    <button key={c.id} className="sf-cat-circulo" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                         <CatMedallon c={c} size={76} />
                         <span className="sf-cat-circulo-nombre">{c.nombre}</span>
                     </button>
