@@ -381,13 +381,11 @@ export default function Catalogo() {
         .sf-cat-filter-btn { display: none; }
         /* Barra de herramientas: va ARRIBA del layout de dos columnas (no
            adentro de la columna de productos) por dos motivos - en escritorio
-           el conteo queda alineado con el titulo y el orden pegado al borde
-           derecho de la grilla; en celular el boton "Filtros" queda justo
-           encima del panel de filtros, que es el primer bloque del layout, asi
-           al tocarlo se abre abajo del boton y no en otro lado de la pagina.
-           Antes el conteo, el select y los dos iconos peleaban por 358px y el
-           renglon se rompia ("5 / productos" cortado en dos lineas). */
-        .sf-cat-toolbar  { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+           el orden queda pegado al borde derecho de la grilla; en celular el
+           boton "Filtros" queda justo encima del panel de filtros, que es el
+           primer bloque del layout, asi al tocarlo se abre abajo del boton y
+           no en otro lado de la pagina. */
+        .sf-cat-toolbar  { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
         .sf-cat-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .sf-cat-sort     { flex: 0 0 auto; }
         @media (max-width: 768px) {
@@ -437,9 +435,6 @@ export default function Catalogo() {
         )}
 
         <div className="sf-cat-toolbar">
-          <div style={{ fontSize: 13, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>
-            {cargando ? '···' : <strong style={{ color: 'var(--color-text)' }}>{total}</strong>} {total === 1 ? 'producto' : 'productos'}
-          </div>
           <div className="sf-cat-controls">
             {/* Solo celular (.sf-cat-filter-btn) - en escritorio el panel de
                 filtros ya esta siempre a la vista en la columna izquierda. */}
