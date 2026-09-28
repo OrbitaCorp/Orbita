@@ -522,8 +522,7 @@ export class ProductsService {
       select: {
         status: true,
         cost: true,
-        basePrice: true,
-        variants: { select: { price: true, stock: { select: { quantity: true } } } },
+        variants: { select: { stock: { select: { quantity: true } } } },
       },
     });
 
@@ -531,6 +530,9 @@ export class ProductsService {
     let borradores = 0;
     let sinStock = 0;
     let valorInventario = 0;
+    // Productos con stock a los que les falta el costo: no entran en el valor de
+    // inventario y la tarjeta del panel avisa cuántos son.
+    let sinCostoCargado = 0;
 
     for (const p of products) {
       if (p.status === 'PUBLISHED') publicados++;
@@ -538,15 +540,18 @@ export class ProductsService {
 
       let stockProducto = 0;
       for (const v of p.variants) {
-        const stockVariante = v.stock.reduce((s, st) => s + st.quantity, 0);
-        stockProducto += stockVariante;
-        // Valor a costo (lo que hay invertido en mercadería). Si el producto no
-        // tiene costo cargado se usa el precio de la variante como aproximación
-        // — decisión acordada con el usuario, ver PENDIENTES.md.
-        const unitario = p.cost !== null ? Number(p.cost) : Number(v.price);
-        valorInventario += stockVariante * unitario;
+        stockProducto += v.stock.reduce((s, st) => s + st.quantity, 0);
       }
       if (stockProducto === 0) sinStock++;
+      // Valor de inventario = costo cargado × unidades en stock, y NADA MÁS: un
+      // producto sin costo cargado no se suma (antes se estimaba con el precio de
+      // venta, y el número mezclaba plata invertida con plata a cobrar). El costo
+      // es uno solo por producto, vale para todas sus variantes. Stock negativo
+      // (sobreventa) no resta valor.
+      if (stockProducto > 0) {
+        if (p.cost !== null) valorInventario += stockProducto * Number(p.cost);
+        else sinCostoCargado++;
+      }
     }
 
     return {
@@ -555,6 +560,7 @@ export class ProductsService {
       borradores,
       sinStock,
       valorInventario: Math.round(valorInventario * 100) / 100,
+      sinCostoCargado,
     };
   }
 

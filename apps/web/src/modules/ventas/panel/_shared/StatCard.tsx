@@ -6,6 +6,7 @@
 
 import type { ComponentType, ReactNode } from 'react'
 import { Card } from '@/design-system/components/Card'
+import { InfoTip } from './InfoTip'
 
 interface StatCardProps {
     label:    string
@@ -15,13 +16,20 @@ interface StatCardProps {
     delta?:   string
     deltaPos?: boolean
     sub?:     ReactNode
+    // Explicación que se abre al pasar el mouse por el ícono de exclamación que
+    // queda al lado del nombre de la métrica (ver InfoTip).
+    info?:    ReactNode
 }
 
-export function StatCard({ label, value, icon: Icon, accent = '#3B82F6', delta, deltaPos, sub }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, accent = '#3B82F6', delta, deltaPos, sub, info }: StatCardProps) {
     return (
-        <Card padding="sm">
+        // position: relative — el cuadro del InfoTip se ancla a la tarjeta.
+        <Card padding="sm" style={info ? { position: 'relative' } : undefined}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {label}
+                    {info && <InfoTip titulo={label}>{info}</InfoTip>}
+                </span>
                 {Icon && (
                     <div style={{ width: 30, height: 30, borderRadius: 8, background: `${accent}1A`, color: accent, display: 'grid', placeItems: 'center' }}>
                         <Icon size={15} strokeWidth={1.6} />

@@ -1098,7 +1098,30 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             OUT_OF_STOCK). Nombre corregido para reflejar lo que
                             realmente suma. */}
                         <StatCard label="No publicados" value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
-                        <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '-'} icon={Wallet} accent="#8B5CF6" />
+                        <StatCard
+                            label="Valor de inventario"
+                            value={stats ? fmtMoney(stats.valorInventario) : '-'}
+                            icon={Wallet}
+                            accent="#8B5CF6"
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Es la plata que tenés invertida en la mercadería que hay en stock: el <strong>costo</strong> de cada producto por las unidades que te quedan, todo sumado.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Solo cuentan los productos que tienen cargado el campo <strong>Costo</strong> (al crear o editar el producto) y que tienen stock. Los que no tienen costo no se suman, así que el número puede quedar por debajo de lo que realmente tenés.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        No usa el precio de venta: no es lo que vas a cobrar, sino lo que te costó.
+                                    </p>
+                                    {!!stats?.sinCostoCargado && (
+                                        <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
+                                            Ahora hay <strong>{stats.sinCostoCargado} {stats.sinCostoCargado === 1 ? 'producto con stock sin costo cargado' : 'productos con stock sin costo cargado'}</strong> que no se {stats.sinCostoCargado === 1 ? 'está sumando' : 'están sumando'}.
+                                        </p>
+                                    )}
+                                </>
+                            }
+                        />
                     </>
                 )}
             </div>

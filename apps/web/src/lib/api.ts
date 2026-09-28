@@ -1859,14 +1859,16 @@ export function panelListProducts(filters: ProductListFilters = {}) {
   )
 }
 
-// Métricas del encabezado. `valorInventario` va a costo; si un producto no
-// tiene costo cargado, el backend usa su precio de venta.
+// Métricas del encabezado. `valorInventario` = costo cargado × stock, solo de
+// los productos que tienen costo; `sinCostoCargado` cuenta los que tienen stock
+// pero no costo (no se suman).
 export type ApiProductStats = {
   total: number
   publicados: number
   borradores: number
   sinStock: number
   valorInventario: number
+  sinCostoCargado?: number
 }
 
 export function panelGetProductStats() {

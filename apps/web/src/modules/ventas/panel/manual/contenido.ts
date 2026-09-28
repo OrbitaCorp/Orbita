@@ -378,7 +378,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Publicados', texto: 'Los que tu cliente ve en la tienda ahora mismo.' },
                     { label: 'Sin stock', texto: 'Se quedaron en cero. Es tu lista de reposición.' },
                     { label: 'No publicados', texto: 'Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.' },
-                    { label: 'Valor de inventario', texto: 'Cuánta plata tenés parada en mercadería, sumando precio por stock de cada producto.' },
+                    { label: 'Valor de inventario', texto: 'Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.' },
                 ] },
             ],
         },
