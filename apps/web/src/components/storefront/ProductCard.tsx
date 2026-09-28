@@ -684,11 +684,16 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           hecho), la CARD entera: sin caja con borde, imagen más grande y
           protagonista, acciones como íconos flotantes sobre la foto en vez
           de un renglón de botones fijo abajo. aspectRatio 3:4 (no un alto
-          fijo en px): escala sola con cualquier ancho de columna. Mismo
-          contrato visual que ProdImage.tsx en el resto (fondo neutro +
-          object-fit:contain, NO cover — ver la decisión documentada en
-          Thumb.tsx: fotos sin estándar de recorte entre productos, cover
-          las recortaría de forma pareja e incorrecta).
+          fijo en px): escala sola con cualquier ancho de columna.
+          object-fit:cover a propósito acá — distinto de ProdImage.tsx
+          (ficha de producto, siempre contain, ver Thumb.tsx): ahí SÍ importa
+          que la prenda nunca se recorte por más que el contenedor no sea
+          cuadrado; en la grilla del catálogo el dueño prefiere la card
+          "llena" — el estandarizador de encuadre (imageStandardizer.ts) le
+          da a cada foto un margen parejo antes de subirla, así que el
+          recorte de cover es leve y consistente entre productos, no la
+          diferencia brusca que tenía sentido evitar antes de que existiera
+          ese estándar.
           Inset del 2% (antes 6%): pedido explícito, "las imágenes no
           ocupan todo el espacio del product card que tienen, lo veo muy
           chiquito" — sigue habiendo un margen mínimo para que el fondo
@@ -703,7 +708,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             src={imgMostrada} alt=""
             loading="lazy" decoding="async"
             style={{
-              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
+              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'cover',
               opacity: hoverMuestraSegunda ? 0 : 1,
             }}
           />
@@ -718,7 +723,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             src={producto.imgUrl2} alt=""
             loading="lazy" decoding="async"
             style={{
-              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
+              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'cover',
               opacity: hoverMuestraSegunda ? 1 : 0,
             }}
           />
