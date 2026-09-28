@@ -121,24 +121,31 @@ export class StorefrontController {
         );
       }
       // Todavía no hay cotización real (ver Jira) — esto es solo la
-      // preferencia del cliente sobre con quién coordinar el envío, pero con
-      // domicilio sí o sí tiene que elegir uno.
-      if (!dto.carrier) {
-        throw new UnprocessableEntityException('Elegí con qué transportista coordinar el envío.');
-      }
-      // Nunca se confía en qué transportista dice el cliente que puede
-      // elegir — igual criterio que con paymentMethod más abajo. Lista
-      // vacía = todos habilitados (retrocompatible).
-      if (pago.enabledCarriers.length && !pago.enabledCarriers.includes(dto.carrier)) {
-        throw new UnprocessableEntityException('Ese transportista no está disponible en esta tienda');
-      }
-      // Con el transportista ya elegido, además: a domicilio o retira en una
-      // sucursal DE ESE TRANSPORTISTA (distinto del "Retiro en local" de la
-      // tienda, que es `shippingMethod === 'PICKUP'` de arriba). No aplica a
-      // DELIVERY_APP (delivery local en moto/app): no tiene red de
-      // sucursales propia, siempre es a domicilio.
-      if (dto.carrier !== 'DELIVERY_APP' && !dto.carrierDeliveryMode) {
-        throw new UnprocessableEntityException('Elegí si lo recibís a domicilio o en una sucursal del transportista.');
+      // preferencia del cliente sobre con quién coordinar el envío. Solo se
+      // exige si el negocio armó de verdad su lista de transportistas en
+      // Configuración > Envíos — lista vacía (nunca configurada) significa
+      // que el negocio no tiene eso resuelto todavía, así que no tiene
+      // sentido pedirle al cliente que elija entre opciones que el negocio ni
+      // siquiera decidió ofrecer (antes exigía igual, mostrando TODOS los
+      // transportistas como si el negocio los ofreciera — pedido explícito
+      // 28/09/2026, ver CheckoutPago.tsx `requiereTransportista`).
+      if (pago.enabledCarriers.length) {
+        if (!dto.carrier) {
+          throw new UnprocessableEntityException('Elegí con qué transportista coordinar el envío.');
+        }
+        // Nunca se confía en qué transportista dice el cliente que puede
+        // elegir — igual criterio que con paymentMethod más abajo.
+        if (!pago.enabledCarriers.includes(dto.carrier)) {
+          throw new UnprocessableEntityException('Ese transportista no está disponible en esta tienda');
+        }
+        // Con el transportista ya elegido, además: a domicilio o retira en una
+        // sucursal DE ESE TRANSPORTISTA (distinto del "Retiro en local" de la
+        // tienda, que es `shippingMethod === 'PICKUP'` de arriba). No aplica a
+        // DELIVERY_APP (delivery local en moto/app): no tiene red de
+        // sucursales propia, siempre es a domicilio.
+        if (dto.carrier !== 'DELIVERY_APP' && !dto.carrierDeliveryMode) {
+          throw new UnprocessableEntityException('Elegí si lo recibís a domicilio o en una sucursal del transportista.');
+        }
       }
     }
     // Con retiro en local, cualquier dirección que haya llegado (de un draft

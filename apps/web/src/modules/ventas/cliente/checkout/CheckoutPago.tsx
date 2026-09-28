@@ -131,11 +131,16 @@ export default function CheckoutPago() {
   // aparte, ver aviso más abajo): es la preferencia del cliente nomás, para
   // que el negocio sepa con quién coordinar sin tener que preguntarlo.
   // Transportistas que el negocio activó de verdad en Configuración — vacío
-  // (nunca configurado) = mostrar todos, igual criterio que el backend.
+  // (nunca configurado) = el negocio no armó esa lista todavía, así que NO
+  // se le pregunta nada al cliente sobre transportista (antes se mostraban
+  // TODOS como si el negocio los ofreciera a todos, algo que nunca decidió;
+  // pedido explícito 28/09/2026). Con la lista vacía se salta directo a
+  // pedir la dirección — mismo criterio en storefront.controller.ts.
+  const requiereTransportista = !!config?.shipping?.enabledCarriers?.length
   const carriersDisponibles = useMemo<ApiCarrier[]>(() => {
     const todos = Object.keys(CARRIER_LABEL) as ApiCarrier[]
     const enabled = config?.shipping?.enabledCarriers
-    return enabled && enabled.length > 0 ? todos.filter(c => enabled.includes(c)) : todos
+    return enabled && enabled.length > 0 ? todos.filter(c => enabled.includes(c)) : []
   }, [config])
   const [carrierSel, setCarrierSel] = useState<ApiCarrier | null>(null)
   const [errorCarrier, setErrorCarrier] = useState('')
@@ -362,7 +367,7 @@ export default function CheckoutPago() {
     // las notas de crédito Y el negocio no tiene "coordinar el pago después"
     // activado — con ese flujo no hay método que elegir en absoluto.
     if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !coordinarDespuesActivo && !metodo) || enviando) return
-    if (envio === 'DELIVERY' && !carrierSel) {
+    if (envio === 'DELIVERY' && requiereTransportista && !carrierSel) {
       setErrorCarrier('Elegí con qué transportista coordinar el envío')
       return
     }
@@ -687,6 +692,11 @@ export default function CheckoutPago() {
                         {/* ── Envío a domicilio: aviso de costo + dirección ── */}
                         {active && id === 'DELIVERY' && (
                           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {/* El negocio nunca armó su lista de transportistas en
+                                Configuración > Envíos — no tiene sentido preguntarle
+                                al cliente algo que el negocio no decidió, se salta
+                                directo al aviso de costo + dirección de más abajo. */}
+                            {requiereTransportista && (
                             <div>
                               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
                                 ¿Con qué transportista preferís que coordinemos? <span style={{ color: '#EF4444' }}>*</span>
@@ -714,6 +724,7 @@ export default function CheckoutPago() {
                               </div>
                               {errorCarrier && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>{errorCarrier}</div>}
                             </div>
+                            )}
 
                             {/* Delivery local (moto/app) no tiene red de sucursales propia —
                                 siempre es a domicilio, no hace falta preguntar. */}
@@ -1108,8 +1119,8 @@ export default function CheckoutPago() {
               const puedeConfirmar = !!envio
                 && (cubiertoPorCompleto || coordinarDespuesActivo || (!!metodo && metodosDisponibles.length > 0))
                 && direccionCompleta
-                && (envio !== 'DELIVERY' || !!carrierSel)
-                && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !!carrierModeSel)
+                && (envio !== 'DELIVERY' || !requiereTransportista || !!carrierSel)
+                && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !carrierSel || !!carrierModeSel)
               return (
                 <button
                   className="ds-hover"
