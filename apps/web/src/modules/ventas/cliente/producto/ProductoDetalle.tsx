@@ -82,18 +82,22 @@ function hueFromId(id: string): number {
 // specs, para no dejar un hueco vacío en esa columna). Mismo contenido,
 // mismo componente — solo cambia el margen según dónde se use.
 // "Envíos" y "Cambios" son configurables por el dueño (Configuración →
-// Envíos / Cancelaciones y devoluciones, ver ConfigGeneral.tsx) — los
-// defaults de acá son el mismo texto fijo que había antes, para las tiendas
-// que nunca los cargaron. "Pago" queda fijo: no depende de ningún dato del
-// negocio, es una garantía genérica del checkout.
+// Envíos / Cancelaciones y devoluciones, ver ConfigGeneral.tsx). Si no cargó
+// ninguno de los dos, la caja no se muestra: antes salía igual con un "24-72 hs"
+// y un "30 días gratis" inventados, que el negocio nunca prometió. Si cargó solo
+// uno, aparece ese. "Pago" queda fijo: no depende de ningún dato del negocio, es
+// una garantía genérica del checkout — pero sola no justifica la caja.
 function CajaEnvios({ className, marginLeft = 0, marginBottom = 0, envioTexto, cambiosTexto }: { className?: string; marginLeft?: number; marginBottom?: number; envioTexto?: string | null; cambiosTexto?: string | null }) {
+  const envio = envioTexto?.trim()
+  const cambios = cambiosTexto?.trim()
+  if (!envio && !cambios) return null
+  const items: [React.ReactNode, string, string][] = []
+  if (envio) items.push([<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', envio])
+  if (cambios) items.push([<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', cambios])
+  items.push([<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'])
   return (
-    <div className={className} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft, marginBottom }}>
-      {([
-        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', envioTexto?.trim() || '24-72 hs'],
-        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', cambiosTexto?.trim() || '30 días gratis'],
-        [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
-      ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
+    <div className={className} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 14, marginLeft, marginBottom }}>
+      {items.map(([icon, t1, t2]) => (
         <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {icon}
           <div>
