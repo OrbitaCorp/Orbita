@@ -22,11 +22,12 @@ type ProdImageProps = {
   imgUrl?: string | null
   height?: number
   radius?: number
+  className?: string
   style?:  React.CSSProperties
   children?: React.ReactNode
 }
 
-export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children }: ProdImageProps) {
+export function ProdImage({ hue, imgUrl, height = 280, radius = 14, className, style, children }: ProdImageProps) {
   // El gradiente rayado es placeholder — solo tiene sentido SIN foto real.
   // Antes se pintaba siempre, así que un PNG con transparencia (fondo
   // recortado) dejaba ver las rayas de color por detrás/alrededor del
@@ -45,7 +46,7 @@ export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, child
   // que usan MercadoLibre/Amazon para catálogos con fotos de muchos
   // vendedores distintos.
   return (
-    <div style={{
+    <div className={className} style={{
       width: '100%', height, borderRadius: radius, position: 'relative', overflow: 'hidden',
       background: imgUrl ? 'var(--color-surface)' : thumbGradient(hue),
       ...style,

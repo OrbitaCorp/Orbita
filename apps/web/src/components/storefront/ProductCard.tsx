@@ -335,7 +335,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
     return (
       <>
       <div
-        className="orb-pcard-raiz"
+        className="orb-pcard-raiz orb-plist"
         onClick={irAlProducto} onAuxClick={abrirEnPestana} onMouseDown={frenarAutoscroll}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
@@ -350,11 +350,11 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
         }}
       >
         {enlace}
-        <ProdImage hue={producto.hue} imgUrl={imgMostrada} radius={9} style={{ width: 76, height: 76, flexShrink: 0 }} />
+        <ProdImage hue={producto.hue} imgUrl={imgMostrada} radius={9} className="orb-plist-img" style={{ width: 76, height: 76, flexShrink: 0 }} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="orb-plist-info" style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="orb-plist-nombre" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {producto.nombre}
             </div>
             {producto.badge && (() => {
@@ -390,7 +390,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
         </div>
 
         {mode !== 'SHOWCASE' && (
-        <div style={{ position: 'relative', display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div className="orb-plist-acciones" style={{ position: 'relative', display: 'flex', gap: 8, flexShrink: 0 }}>
           {sinMas && (
             <span style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, padding: '5px 8px', borderRadius: 6, background: 'var(--color-text)', color: 'var(--color-bg)', fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
               Ya tenés todo el stock en tu carrito
@@ -409,7 +409,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <button
             onClick={handleBuyNow}
             disabled={!!ocupado}
-            className="ds-hover"
+            className="ds-hover orb-plist-comprar"
             style={{ height: 38, padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap' }}
           >
             Comprar ahora

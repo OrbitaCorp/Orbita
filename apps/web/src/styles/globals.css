@@ -357,6 +357,23 @@ html.light body { background: #eef4ff; color: #0f172a; }
 .orb-pcard-link { position: absolute; inset: 0; z-index: 2; border-radius: inherit; -webkit-tap-highlight-color: transparent; }
 .orb-pcard-raiz button { position: relative; z-index: 3; }
 
+/* Tarjeta en modo lista (toggle grilla/lista del catálogo). En escritorio es una
+   fila: foto, datos y botones. En un celular no entra todo en una fila — el
+   nombre quedaba en "C…" y el precio se partía en dos líneas —, así que los
+   botones bajan a su propia fila a todo el ancho y el nombre puede ocupar
+   hasta dos líneas. */
+@media (max-width: 560px) {
+  .orb-plist { flex-wrap: wrap; align-items: flex-start !important; row-gap: 10px; }
+  .orb-plist-img { width: 84px !important; height: 84px !important; }
+  .orb-plist-info { flex: 1 1 0; }
+  .orb-plist-nombre {
+    white-space: normal !important; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .orb-plist-acciones { flex: 1 1 100%; }
+  .orb-plist-acciones .orb-plist-comprar { flex: 1; }
+}
+
 /* Zoom lento de la foto al pasar el mouse por la card de catálogo (la
    "por defecto", sin plantilla de Home — esa ya tenía su propio efecto vía
    .pl-card/.pl-media, ver panel/avanzado/plantillas/piezas.tsx). Sin esto,

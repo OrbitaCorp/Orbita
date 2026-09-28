@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Grid, List, Tag, TrendingUp, Search, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
+import { Grid, List, Tag, TrendingUp, Search, ChevronDown, ChevronLeft, ChevronRight, Check, SlidersHorizontal, X } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -616,19 +616,68 @@ export default function Catalogo() {
               </div>
             )}
 
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 40 }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                  <button key={n} className="ds-hover" onClick={() => setPage(n)} style={{ minWidth: 36, height: 36, padding: '0 12px', borderRadius: 8, background: n === page ? 'var(--color-text)' : 'var(--color-bg)', color: n === page ? 'var(--color-bg)' : 'var(--color-body)', border: `1px solid ${n === page ? 'var(--color-text)' : 'var(--color-border)'}`, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{n}</button>
-                ))}
-              </div>
-            )}
+            {totalPages > 1 && <Paginacion page={page} total={totalPages} onChange={setPage} />}
           </div>
         </div>
       </div>
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
+  )
+}
+
+// Paginación compacta: siempre la misma cantidad de botones, sin importar
+// cuántas páginas haya (antes uno por página: con 11+ se salía de la pantalla
+// en un celular). Primera y última fijas, la actual con sus vecinas, y "…" en
+// los saltos. En pantallas angostas se sacan las vecinas para que entre todo.
+function paginasVisibles(actual: number, total: number, vecinos: number): (number | '…')[] {
+  if (total <= vecinos * 2 + 5) return Array.from({ length: total }, (_, i) => i + 1)
+  const izq = Math.max(actual - vecinos, 1)
+  const der = Math.min(actual + vecinos, total)
+  const puntosIzq = izq > 2
+  const puntosDer = der < total - 1
+  const tramo = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
+  const bloque = 3 + vecinos * 2
+  if (!puntosIzq) return [...tramo(1, bloque), '…', total]
+  if (!puntosDer) return [1, '…', ...tramo(total - bloque + 1, total)]
+  return [1, '…', ...tramo(izq, der), '…', total]
+}
+
+function Paginacion({ page, total, onChange }: { page: number; total: number; onChange: (n: number) => void }) {
+  const [angosto, setAngosto] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 420px)')
+    const actualizar = () => setAngosto(mq.matches)
+    actualizar()
+    mq.addEventListener('change', actualizar)
+    return () => mq.removeEventListener('change', actualizar)
+  }, [])
+
+  const base: React.CSSProperties = { minWidth: 36, height: 36, padding: '0 6px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }
+  const flecha = (aria: string, destino: number, Icono: typeof ChevronLeft) => (
+    <button
+      className="ds-hover" aria-label={aria} disabled={destino < 1 || destino > total}
+      onClick={() => onChange(destino)}
+      style={{ ...base, background: 'var(--color-bg)', color: 'var(--color-body)', border: '1px solid var(--color-border)', opacity: destino < 1 || destino > total ? 0.4 : 1 }}
+    >
+      <Icono size={16} />
+    </button>
+  )
+
+  return (
+    <nav aria-label="Paginación" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 40 }}>
+      {flecha('Página anterior', page - 1, ChevronLeft)}
+      {paginasVisibles(page, total, angosto ? 0 : 1).map((n, i) => n === '…' ? (
+        <span key={`p${i}`} aria-hidden style={{ minWidth: 20, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>…</span>
+      ) : (
+        <button
+          key={n} className="ds-hover" onClick={() => onChange(n)}
+          aria-label={`Página ${n}`} aria-current={n === page ? 'page' : undefined}
+          style={{ ...base, background: n === page ? 'var(--color-text)' : 'var(--color-bg)', color: n === page ? 'var(--color-bg)' : 'var(--color-body)', border: `1px solid ${n === page ? 'var(--color-text)' : 'var(--color-border)'}` }}
+        >{n}</button>
+      ))}
+      {flecha('Página siguiente', page + 1, ChevronRight)}
+    </nav>
   )
 }
 
