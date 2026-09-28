@@ -1163,16 +1163,18 @@ export class StorefrontService {
       include: { _count: { select: { products: { where: { deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } } } } },
     });
 
-    return categories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      icon: c.icon,
-      color: c.color,
-      imageUrl: c.imageUrl,
-      parentId: c.parentId,
-      productCount: c._count.products,
-    }));
+    return categories
+      .filter((c) => (c._count?.products ?? 0) > 0)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        icon: c.icon,
+        color: c.color,
+        imageUrl: c.imageUrl,
+        parentId: c.parentId,
+        productCount: c._count.products,
+      }));
   }
 
   // ── Cupones públicos (RBT-615/616 — vista del cliente) ─────────────────────

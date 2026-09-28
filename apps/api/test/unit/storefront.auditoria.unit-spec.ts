@@ -53,6 +53,18 @@ describe('Catálogo de una tienda no publicada o pausada', () => {
     expect(prisma.category.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: 'biz-1', isActive: true } }));
   });
 
+  it('no devuelve categorías sin productos publicados (productCount === 0)', async () => {
+    const { svc, prisma } = tienda({ isActive: true, isPaused: false });
+    prisma.category.findMany.mockResolvedValue([
+      { id: 'cat-1', name: 'Con productos', slug: 'con-prod', icon: null, color: null, imageUrl: null, parentId: null, _count: { products: 3 } },
+      { id: 'cat-2', name: 'Sin productos', slug: 'sin-prod', icon: null, color: null, imageUrl: null, parentId: null, _count: { products: 0 } },
+    ]);
+    const res = await svc.listCategories('t');
+    expect(res).toHaveLength(1);
+    expect(res[0].id).toBe('cat-1');
+    expect(res[0].productCount).toBe(3);
+  });
+
   it('el resto de los negocios que resuelven por slug (seguimiento, arrepentimiento) no pasan por el filtro', async () => {
     const { svc } = tienda({ isActive: true, isPaused: true });
     await expect(svc.resolveBusinessId('t')).resolves.toBe('biz-1');
