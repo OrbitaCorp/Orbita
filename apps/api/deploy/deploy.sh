@@ -163,8 +163,15 @@ preflight() {
     echo "    AVISO: gh no está logueado (gh auth login); no se pueden verificar los check runs de CI. Se sigue igual."
   else
     local runs
+    # Un mismo nombre de check puede aparecer más de una vez (reintento o
+    # rerun del workflow) — GitHub conserva TODAS las corridas viejas
+    # (cancelled/failure incluidas), no solo la última. Sin este filtro, un
+    # commit con CI realmente verde podía cortar acá para siempre por una
+    # corrida vieja cancelada que ya no importa (bug real, encontrado
+    # 28/09/2026). `sort_by(started_at) | reverse | unique_by(.name)` se
+    # queda con la corrida MÁS RECIENTE de cada nombre.
     if ! runs="$(gh api "repos/OrbitaCorp/Orbita/commits/${sha_completo}/check-runs" \
-        --jq '.check_runs[] | "\(.name)|\(.status)|\(.conclusion)"' 2>&1)"; then
+        --jq '[.check_runs[]] | sort_by(.started_at) | reverse | unique_by(.name)[] | "\(.name)|\(.status)|\(.conclusion)"' 2>&1)"; then
       preflight_fallo \
         "(e) No se pudieron leer los check runs de CI de GitHub para ${sha_completo}:" \
         "$runs" \
