@@ -14,7 +14,15 @@
  *    de la prenda/producto, ignorando el aire o fondo sobrante.
  * 3. Si la foto es un producto con fondo uniforme o transparente, la centra en un
  *    lienzo cuadrado estándar (1200x1200px) donde el producto ocupa exactamente
- *    un 82% del espacio (TARGET_FILL), dejando un margen homogéneo y armónico.
+ *    un 90% del espacio (fillRatio), dejando un margen homogéneo y armónico —
+ *    ese margen es a propósito: la ficha de producto usa object-fit "cover"
+ *    para la foto principal y las miniaturas (ver ProdImage en Thumb.tsx), así
+ *    que si el margen queda muy justo, un contenedor no cuadrado (el común:
+ *    columna ancha, alto fijo) puede recortar dentro del producto. Vale para
+ *    TODOS los ingresos (subida manual, fotos IA, quitar fondo, fondo con
+ *    IA) — ninguno debería asumir que puede llenar el lienzo al 100% confiado
+ *    en que el fondo generado "ya viene con margen": el margen lo pone
+ *    siempre este estandarizador, un solo criterio para toda foto.
  * 4. Si la foto es de estilo de vida / exterior con fondo complejo no uniforme,
  *    la preserva sin recortar partes del sujeto.
  */
@@ -22,7 +30,7 @@
 export interface EstandarizarOpciones {
     /** Tamaño del lienzo cuadrado final en px (default: 1200). */
     targetSize?: number
-    /** Ocupación del producto respecto al lienzo (0.82 = 82% de ocupación, 9% margen a cada lado). */
+    /** Ocupación del producto respecto al lienzo (0.90 = 90% de ocupación, 5% margen a cada lado). */
     fillRatio?: number
     /** Calidad JPEG de salida (0.0 a 1.0, default 0.92). */
     calidad?: number
@@ -39,7 +47,7 @@ export async function estandarizarImagenProducto(
 
     const {
         targetSize = 1200,
-        fillRatio = 0.92,
+        fillRatio = 0.90,
         calidad = 0.92,
     } = opciones
 
