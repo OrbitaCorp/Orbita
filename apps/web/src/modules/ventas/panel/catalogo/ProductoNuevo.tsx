@@ -12,7 +12,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera, Loader2 } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera, Loader2 } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -1024,10 +1024,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }
     }
 
-    function marcarPrincipal(key: string) {
-        setImagenes(prev => prev.map(i => ({ ...i, principal: i.key === key })))
-        setGuardadas(prev => prev.map(g => ({ ...g, principal: false })))
-    }
 
     // Paquete "Avanzado" — "Quitar fondo" se aplica AL INSTANTE: corre el recorte
     // local en el backend (mismo que "Sin fondo" del modal de Fondo con IA) y
@@ -2583,7 +2579,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     onAgregar={files => agregarImagenes(files)}
                                     onQuitarPendiente={quitarPendiente}
                                     onQuitarGuardada={quitarGuardada}
-                                    onPrincipal={marcarPrincipal}
                                     onReorder={reordenarGeneral}
                                     orden={ordenGeneral}
                                     onQuitarFondo={alternarQuitarFondo}
@@ -3450,13 +3445,12 @@ function ControlOrdenFoto({
     )
 }
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
     onQuitarPendiente: (key: string) => void
     onQuitarGuardada: (id: string) => void
-    onPrincipal: (key: string) => void
     // Opcional: sin esto la galería se ve igual pero sin números ni drag —
     // hoy solo lo usa "Fotos principales" (permitePrincipal), no las de
     // por talle/color (raro que ahí importe el orden, casi siempre 1 foto).
@@ -3531,7 +3525,9 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         title={onReorder ? 'Arrastrá o usá las flechas para cambiar el orden' : undefined}
                         style={{
                             position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
-                            border: it.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                            // La principal es la PRIMERA del orden (no hay estrella): el borde lo lleva
+                            // la que está primera en las fotos generales.
+                            border: permitePrincipal && i === 0 ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                             cursor: onReorder ? 'grab' : 'default',
                             opacity: arrastrando === i ? (isTouchDragging ? 0.75 : 0.4) : 1,
                             transform: isTouchDragging && arrastrando === i ? 'scale(1.05)' : sobre === i && arrastrando !== null && arrastrando !== i ? 'scale(0.96)' : 'none',
@@ -3563,15 +3559,6 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                                 onMoverAntes={() => mover(i, i - 1)}
                                 onMoverDespues={() => mover(i, i + 1)}
                             />
-                        )}
-                        {/* El toggle de estrella solo aplica a las pendientes (mismo
-                            comportamiento de siempre) — una ya guardada solo se
-                            marca principal al subir una nueva, no hay endpoint
-                            acá para cambiarla en una ya existente. */}
-                        {permitePrincipal && it.tipo === 'pendiente' && (
-                            <button className="ds-hover" onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
-                                <Star size={12} fill={it.principal ? '#fff' : 'none'} />
-                            </button>
                         )}
                         {it.tipo === 'guardada'
                             ? <button className="ds-hover" onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
