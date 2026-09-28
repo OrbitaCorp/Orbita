@@ -8,7 +8,7 @@
 // los sub-ítems de módulos en Sidebar.tsx). Reemplaza el viejo popover por
 // hover que salía de un portal.
 
-import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
@@ -77,6 +77,10 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
     { id: 'ap-sec-pie',           label: 'Pie de página',            Icon: PanelBottom },
 ]
 
+// Cuánto por debajo del borde superior del panel tiene que haber pasado una
+// sección para considerarla "la actual" en el índice de Apariencia.
+const UMBRAL_SECCION_ACTIVA = 120
+
 export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onNavigate: (v: VistaConfig) => void }) {
     const { user } = useAuth()
     const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null
@@ -95,6 +99,61 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
 
     // Mobile: la tira es horizontal y con 13 ítems no entran todos.
     const { scrollerRef: navRef, hintRef } = useTiraScroll<HTMLElement>(activa, !isDesktop)
+
+    // Índice de Apariencia que sigue el scroll: la sección actual es la última
+    // cuyo borde superior ya pasó el umbral (se compara por posición en pantalla,
+    // no por el orden de SECCIONES_APARIENCIA: el orden en la página cambia según
+    // haya o no plantilla, y hay secciones que no siempre se dibujan). Al llegar
+    // al fondo gana la última, aunque sea corta y nunca alcance el umbral.
+    const [seccionActiva, setSeccionActiva] = useState<string | null>(null)
+    const subsRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (activa !== 'apariencia') { setSeccionActiva(null); return }
+        const main = document.querySelector('.admin-main') as HTMLElement | null
+        if (!main) return
+        const calcular = () => {
+            const tope = main.getBoundingClientRect().top
+            let elegida: string | null = null, mejorTop = -Infinity
+            let primera: string | null = null, primeraTop = Infinity
+            let ultima: string | null = null, ultimaTop = -Infinity
+            for (const sec of SECCIONES_APARIENCIA) {
+                const el = document.getElementById(sec.id)
+                if (!el) continue
+                const t = el.getBoundingClientRect().top - tope
+                if (t < primeraTop) { primeraTop = t; primera = sec.id }
+                if (t > ultimaTop) { ultimaTop = t; ultima = sec.id }
+                if (t <= UMBRAL_SECCION_ACTIVA && t > mejorTop) { mejorTop = t; elegida = sec.id }
+            }
+            const alFondo = main.scrollTop > 0 && main.scrollTop + main.clientHeight >= main.scrollHeight - 4
+            setSeccionActiva(alFondo ? ultima : (elegida ?? primera))
+        }
+        let raf = 0
+        const alScroll = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(calcular) }
+        main.addEventListener('scroll', alScroll, { passive: true })
+        window.addEventListener('resize', alScroll)
+        // Apariencia dibuja las secciones recién cuando carga (antes hay un
+        // esqueleto) y a veces cambian de altura al terminar de cargar imágenes:
+        // se recalcula unas veces al entrar además del scroll.
+        const timers = [0, 300, 900, 2000].map(ms => window.setTimeout(alScroll, ms))
+        return () => {
+            cancelAnimationFrame(raf)
+            main.removeEventListener('scroll', alScroll)
+            window.removeEventListener('resize', alScroll)
+            timers.forEach(clearTimeout)
+        }
+    }, [activa])
+
+    // Si el índice es más alto que la pantalla (scrollea solo), mantener visible
+    // el ítem activo — se mueve el scroll de la columna a mano, sin scrollIntoView,
+    // que también arrastraría el scroll del panel.
+    useEffect(() => {
+        const nav = navRef.current
+        const btn = seccionActiva ? subsRef.current?.querySelector<HTMLElement>(`[data-sec="${seccionActiva}"]`) : null
+        if (!nav || !btn || !isDesktop) return
+        const n = nav.getBoundingClientRect(), b = btn.getBoundingClientRect()
+        if (b.top < n.top + 8) nav.scrollTop -= n.top + 8 - b.top
+        else if (b.bottom > n.bottom - 8) nav.scrollTop += b.bottom - n.bottom + 8
+    }, [seccionActiva, isDesktop, navRef])
 
     return (
         <>
@@ -191,10 +250,14 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                     {/* Sub-ítems de Apariencia — aparecen cuando Apariencia está activa.
                                         Cada uno scrollea a su sección dentro de Apariencia.tsx. */}
                                     {item.vista === 'apariencia' && act && (
-                                        <div className="cfg-sidebar-ap-subs" style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 18, paddingTop: 4, paddingBottom: 4 }}>
-                                            {SECCIONES_APARIENCIA.map(sec => (
+                                        <div ref={subsRef} className="cfg-sidebar-ap-subs" style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 18, paddingTop: 4, paddingBottom: 4 }}>
+                                            {SECCIONES_APARIENCIA.map(sec => {
+                                                const actual = seccionActiva === sec.id
+                                                return (
                                                 <button
                                                     key={sec.id}
+                                                    data-sec={sec.id}
+                                                    aria-current={actual || undefined}
                                                     className="ds-hover"
                                                     onClick={() => {
                                                         document.getElementById(sec.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
@@ -202,16 +265,18 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                                     style={{
                                                         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                                                         padding: '6px 8px', borderRadius: 6, border: 'none',
-                                                        background: 'transparent', color: 'var(--color-muted)',
-                                                        fontSize: 12, fontWeight: 500, textAlign: 'left',
+                                                        background: actual ? 'var(--color-primary-bg)' : 'transparent',
+                                                        color: actual ? 'var(--color-primary)' : 'var(--color-muted)',
+                                                        fontSize: 12, fontWeight: actual ? 600 : 500, textAlign: 'left',
                                                         cursor: 'pointer', fontFamily: 'inherit',
-                                                        transition: 'color 120ms',
+                                                        transition: 'color 120ms, background 120ms',
                                                     }}
                                                 >
                                                     <sec.Icon size={13} strokeWidth={1.7} style={{ flexShrink: 0 }} />
                                                     {sec.label}
                                                 </button>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>
