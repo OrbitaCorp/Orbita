@@ -509,7 +509,6 @@ export default function Catalogo() {
                           <span style={{ fontSize: c.depth > 0 ? 12.5 : 13, fontWeight: activa ? 700 : 500, color: c.depth > 0 ? 'var(--color-muted)' : 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {c.name}
                           </span>
-                          <span style={{ color: 'var(--color-subtle)', fontSize: 10.5, fontFamily: '"Geist Mono", monospace' }}>{c.productCount}</span>
                         </div>
                       )
                     })}
