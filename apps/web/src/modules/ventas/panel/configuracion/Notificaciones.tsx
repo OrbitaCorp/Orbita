@@ -37,7 +37,7 @@ type Canal = 'panel' | 'email'
 // Los eventos que valida el backend (businesses.service.ts), agrupados por
 // tema: "qué pasó con una venta", "qué pasó con el stock", "los resúmenes".
 // Sin los grupos eran nueve filas indistinguibles una de otra.
-const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: string; desc: string; Icon: IconType }[] }[] = [
+export const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: string; desc: string; Icon: IconType }[] }[] = [
     {
         titulo: 'Ventas',
         desc: 'Lo que pasa con tus pedidos y tus cobros',

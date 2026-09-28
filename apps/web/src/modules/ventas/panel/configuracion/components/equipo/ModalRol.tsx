@@ -6,7 +6,8 @@ import { Search, Check, Package, Users, LayoutGrid, Tag, Settings, ShoppingBag, 
 import type { ComponentType } from 'react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
-import { Lbl, Inp, Toggle } from './FormBits'
+import { Lbl, Inp, Toggle, ToggleRow } from './FormBits'
+import { GRUPOS as GRUPOS_AVISOS } from '../../Notificaciones'
 import { ROL_COLORS } from '../../mock/equipo.mock'
 import type { Rol, Permiso, GrupoPermiso } from '../../types/equipo.types'
 
@@ -17,6 +18,13 @@ const MODULE_ICONS: Record<GrupoPermiso, ComponentType<{ size?: number; strokeWi
     'Descuentos': Tag, 'Configuración': Settings, 'Catálogo': ShoppingBag,
     'Mensajes': MessageSquare, 'Avanzado': Sparkles,
 }
+
+// Los avisos que le llegan al EQUIPO (todos los de Notificaciones menos el de la
+// invitación al cliente invitado, que va al comprador). Son los que se reparten por rol.
+const AVISOS_EQUIPO = GRUPOS_AVISOS
+    .map(g => ({ ...g, eventos: g.eventos.filter(e => e.key !== 'invitacion_cuenta_invitado') }))
+    .filter(g => g.eventos.length > 0)
+const CLAVES_AVISOS = AVISOS_EQUIPO.flatMap(g => g.eventos.map(e => e.key))
 
 interface ModalRolProps {
     rol?:     Rol
@@ -34,7 +42,12 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
     const [color, setColor] = useState(rol?.color ?? '#3B82F6')
     const [desc, setDesc] = useState(rol?.descripcion ?? '')
     const [perms, setPerms] = useState<string[]>(rol?.permisos ?? [])
+    // Avisos por email de este rol: sin lista guardada (null) recibe todos.
+    const [avisos, setAvisos] = useState<string[]>(rol?.avisosEmail ?? CLAVES_AVISOS)
     const [q, setQ] = useState('')
+    const toggleAviso = (key: string, on: boolean) => { if (view) return; setAvisos(a => on ? [...new Set([...a, key])] : a.filter(x => x !== key)) }
+    // El propietario recibe todo siempre y no se edita (se abre en modo vista).
+    const esPropietario = view && rol?.esDefault === true && (rol.nombre === 'Propietario' || rol.nombre === 'owner')
 
     const filtered = (g: GrupoPermiso) => catalogo.filter(p => p.grupo === g && (!q || p.label.toLowerCase().includes(q.toLowerCase())))
     const toggle = (id: string) => { if (view) return; setPerms(ps => ps.includes(id) ? ps.filter(x => x !== id) : [...ps, id]) }
@@ -45,7 +58,7 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
     }
     const submit = () => {
         if (!nombre.trim() || perms.length === 0) return
-        onSave({ id: rol?.id ?? 'rol' + Date.now(), nombre, color, descripcion: desc, esDefault: rol?.esDefault ?? false, permisos: perms, miembros: rol?.miembros ?? 0 }, mode === 'create')
+        onSave({ id: rol?.id ?? 'rol' + Date.now(), nombre, color, descripcion: desc, esDefault: rol?.esDefault ?? false, permisos: perms, avisosEmail: avisos.length === CLAVES_AVISOS.length ? null : avisos, miembros: rol?.miembros ?? 0 }, mode === 'create')
     }
 
     const title = mode === 'create' ? 'Crear nuevo rol' : view ? `Permisos: ${rol?.nombre}` : `Editar rol: ${rol?.nombre}`
@@ -129,6 +142,33 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
                         </div>
                     )
                 })}
+            </div>
+
+            {/* Avisos por email — qué le llega a quienes tengan este rol. */}
+            <div style={{ marginTop: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Avisos por email</span>
+                    <div style={{ flex: 1 }} />
+                    {!view && (
+                        <>
+                            <button onClick={() => setAvisos(CLAVES_AVISOS)} className="ds-link" style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Todos</button>
+                            <button onClick={() => setAvisos([])} className="ds-link" style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ninguno</button>
+                        </>
+                    )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 8 }}>
+                    {esPropietario
+                        ? 'El propietario recibe todos los avisos que estén activados por email en Configuración → Notificaciones.'
+                        : 'Elegí cuáles le llegan por email a quienes tengan este rol. Solo salen los que estén activados por email en Configuración → Notificaciones; la campanita del panel la ven todos.'}
+                </div>
+                {!esPropietario && AVISOS_EQUIPO.map(g => (
+                    <div key={g.titulo} style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.04em', textTransform: 'uppercase', padding: '0 4px' }}>{g.titulo}</div>
+                        {g.eventos.map(e => (
+                            <ToggleRow key={e.key} label={e.label} help={e.desc} on={avisos.includes(e.key)} onChange={on => toggleAviso(e.key, on)} />
+                        ))}
+                    </div>
+                ))}
             </div>
 
             {/* Resumen */}

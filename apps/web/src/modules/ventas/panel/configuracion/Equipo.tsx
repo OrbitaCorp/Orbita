@@ -88,6 +88,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
         color: COLORES_ROL[r.name] ?? r.color ?? '#3B82F6',
         esDefault: r.isDefault,
         permisos: r.permissions,
+        avisosEmail: r.notificationEvents,
         miembros: r.memberCount,
     })
 
@@ -421,7 +422,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                         }
                         setGuardandoRol(true)
                         try {
-                            const input = { name: r.nombre, description: r.descripcion || undefined, color: r.color, permissions: r.permisos }
+                            const input = { name: r.nombre, description: r.descripcion || undefined, color: r.color, permissions: r.permisos, notificationEvents: r.avisosEmail ?? null }
                             if (isNew) await createRole(input)
                             else await updateRole(r.id, input)
                             await cargarRoles()

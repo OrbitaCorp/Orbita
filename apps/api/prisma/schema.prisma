@@ -542,6 +542,12 @@ model Role {
   description String?
   color       String?
   isDefault   Boolean  @default(false) @map("is_default") // roles del sistema, no editables
+  // Qué avisos por EMAIL reciben los miembros con este rol (lista de claves de
+  // evento, ver notification-events.ts). null = todos: es lo que pasaba antes de
+  // que existiera esta columna, así que los roles que ya estaban no cambian. El
+  // rol de propietario recibe todo siempre, sin mirar esto. La campanita del
+  // panel es del negocio entero, no depende del rol.
+  notificationEvents Json?   @map("notification_events")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

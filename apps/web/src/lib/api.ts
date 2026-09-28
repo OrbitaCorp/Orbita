@@ -1294,8 +1294,10 @@ export type ApiPermission = { id: string; group: string; code: string; label: st
 export type ApiRole = {
   id: string; name: string; description: string | null; color: string | null
   isDefault: boolean; permissions: string[]; memberCount: number
+  // Avisos por email que recibe este rol (claves de evento). null = todos.
+  notificationEvents: string[] | null
 }
-export type UpsertRoleInput = { name: string; description?: string; color?: string; permissions: string[] }
+export type UpsertRoleInput = { name: string; description?: string; color?: string; permissions: string[]; notificationEvents?: string[] | null }
 
 export function getRoles() { return panelRequest<ApiRole[]>('/roles') }
 export function getPermissionsCatalog() { return panelRequest<ApiPermission[]>('/permissions') }
@@ -1951,11 +1953,17 @@ export type AiAssistInput = {
   existingDescription?: string
 }
 
+// Opción de variante que Orbi sugiere para ESTE producto (ej. Almacenamiento con
+// 128 GB / 256 GB…). `usual` son los valores más habituales entre `values`.
+export type AiVariantOption = { name: string; values: string[]; usual: string[] }
+
 export type AiAssistResult = {
   description: string
   suggestedCategoryId: string | null
   suggestedTags: string[]
   suggestedSpecs: { label: string; value: string }[]
+  // Opcional: un backend anterior a esta versión no lo manda.
+  suggestedVariants?: AiVariantOption[]
 }
 
 export function panelAiAssist(input: AiAssistInput) {
@@ -1968,6 +1976,7 @@ export type AiScanProductResult = {
   suggestedCategoryId: string | null
   suggestedTags: string[]
   suggestedSpecs: { label: string; value: string }[]
+  suggestedVariants?: AiVariantOption[]
   detectedBrand?: string
   detectedModel?: string
   detectedColor?: string

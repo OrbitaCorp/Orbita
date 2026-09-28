@@ -26,6 +26,7 @@ export interface Rol {
     color:       string
     esDefault:   boolean    // los roles default (Dueño) no se editan ni eliminan
     permisos:    string[]   // ids de Permiso
+    avisosEmail?: string[] | null  // avisos por email que recibe el rol (claves de evento); null/undefined = todos
     miembros:    number     // derivado — se recalcula al cambiar miembros
 }
 

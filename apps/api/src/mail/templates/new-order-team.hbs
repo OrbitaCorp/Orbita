@@ -1,0 +1,6 @@
+{{!-- Aviso al equipo de un pedido nuevo. Mismo diseño que order-received.hbs (el del comprador): tabla compartida (partial order-items-table) y mismo botón. --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Nuevo pedido #{{orderNumber}}</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;"><strong style="color:#1a1f36;">{{customerName}}</strong> hizo un pedido en <strong style="color:#1a1f36;">{{storeName}}</strong>. Este es el detalle:</p>
+{{> order-items-table this}}
+{{> cta-button this url=orderUrl label="Ver el pedido"}}
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Recibís este aviso porque tu rol tiene activados los avisos de pedidos nuevos. Podés cambiarlo en Equipo → Roles.</p>

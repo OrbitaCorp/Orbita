@@ -15,6 +15,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 import { buscarSucursalPrincipal } from '../common/utils/sucursal-principal';
+import { fmtPesos } from '../common/utils/pesos';
 
 // (Fase 2 — Alex) El corazón de los pedidos: acá viven las reglas de cómo nace
 // un pedido y cómo va cambiando de estado hasta entregarse o cancelarse.
@@ -66,12 +67,6 @@ const NOMBRE_ESTADO: Record<OrderStatus, string> = {
   COMPLETED: 'Completado',
   CANCELLED: 'Cancelado',
 };
-
-// Los templates de mail imprimen los montos tal cual llegan (no saben
-// formatear), así que se mandan ya escritos en pesos: $12.500 y no 12500.
-function fmtPesos(n: number): string {
-  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
 
 @Injectable()
 export class OrdersService {
@@ -574,7 +569,12 @@ export class OrdersService {
     // quién llama: solo StorefrontController.checkout() la manda.
     // `memberId`: quién cargó el pedido desde el panel — queda como
     // `created_by` en los movimientos de stock de una venta presencial.
-    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string },
+    // `pagoPendiente`: el pedido se paga afuera (Mercado Pago): nace PENDING y
+    // todavía no es una venta. Los avisos de "pedido nuevo" — mail al comprador,
+    // aviso al equipo del negocio, "primera venta" — NO salen acá: salen cuando el
+    // pago se aprueba (ver avisarPedidoPagado, lo llama el webhook de MP). Si el
+    // comprador abandona en Mercado Pago, no le llega nada a nadie.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string; pagoPendiente?: boolean },
   ) {
     const esPresencial = dto.channel === 'POS';
     if (esPresencial && opts?.publicCheckout) {
@@ -1029,26 +1029,19 @@ export class OrdersService {
         // (reportado con captura: había que entrar al panel a ciegas a
         // buscarlo). Mismo formato "Nombre · Variante" que ya arma el
         // detalle de abajo para los mails al comprador.
-        this.eventEmitter.emit('notification.nuevo_pedido', {
-          businessId,
-          orderNumber: creado.orderNumber,
-          customerName: buyerName,
-          total,
-          orderId: creado.id,
-          items: renglones.map((r) => ({
-            name: `${r.productName}${r.variantLabel ? ` · ${r.variantLabel}` : ''}`,
-            quantity: r.quantity,
-          })),
-        });
-        // Milestone "primera venta" (configurable, ver notifications.service.ts):
-        // no hay ningún OTRO pedido del negocio — mostrador u online, da igual
-        // el canal, cuenta la primera venta real sea cual sea.
-        const huboOtroPedido = await this.prisma.order.findFirst({
-          where: { businessId, id: { not: creado.id }, deletedAt: null },
-          select: { id: true },
-        });
-        if (!huboOtroPedido) {
-          this.eventEmitter.emit('notification.primera_venta', { businessId, orderId: creado.id });
+        if (!opts?.pagoPendiente) {
+          this.emitirPedidoNuevo(businessId, {
+            orderId: creado.id,
+            orderNumber: creado.orderNumber,
+            customerName: buyerName,
+            total,
+            items: renglones.map((r) => ({
+              name: `${r.productName}${r.variantLabel ? ` · ${r.variantLabel}` : ''}`,
+              quantity: r.quantity,
+              price: Number(r.unitPrice),
+            })),
+          });
+          await this.emitirPrimeraVentaSiCorresponde(businessId, creado.id);
         }
         if (esPresencial) {
           await this.avisarStockCritico(businessId, creado.branchId, renglones.map((r) => r.variantId));
@@ -1067,7 +1060,7 @@ export class OrdersService {
         // (reportado: "falta un correo al comprador... diciendo que fue
         // recibido y el detalle de lo que reservó"). Nunca rompe el alta: si
         // el mail falla queda en el log y el pedido ya está creado.
-        if ((opts?.publicCheckout || dto.notifyCustomer) && buyerEmail) {
+        if ((opts?.publicCheckout || dto.notifyCustomer) && buyerEmail && !opts?.pagoPendiente) {
           try {
             const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
             // "Ver mi pedido" SOLO si el comprador tiene cuenta (customer.id):
@@ -1109,25 +1102,8 @@ export class OrdersService {
         // sumar una dependencia de NotificationsModule en OrdersModule
         // (mismo criterio que notifications.service.ts evita depender de
         // ReportsModule: menos import circular, no más).
-        if (opts?.publicCheckout && !customer?.id && buyerEmail) {
-          try {
-            const config = await this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { matrix: true } });
-            const habilitado = (config?.matrix as Record<string, { email?: boolean }> | undefined)?.invitacion_cuenta_invitado?.email;
-            if (habilitado) {
-              const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
-              if (negocio?.subdomain) {
-                const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
-                const registerUrl = `${frontend}/tienda/${negocio.subdomain}/registro?email=${encodeURIComponent(buyerEmail)}`;
-                await this.mail.sendGuestAccountInvite(
-                  buyerEmail,
-                  { storeName: negocio.name, orderNumber: creado.orderNumber, registerUrl },
-                  { businessId },
-                );
-              }
-            }
-          } catch (e) {
-            this.logger.warn(`No se pudo mandar la invitación a crear cuenta del pedido #${creado.orderNumber}: ${e}`);
-          }
+        if (opts?.publicCheckout && !customer?.id && buyerEmail && !opts?.pagoPendiente) {
+          await this.invitarInvitadoACrearCuenta(businessId, creado.orderNumber, buyerEmail);
         }
         return this.findOne(businessId, creado.id);
       } catch (e) {
@@ -1138,6 +1114,96 @@ export class OrdersService {
       }
     }
     throw new UnprocessableEntityException('No se pudo generar el número de pedido.');
+  }
+
+  // Aviso al equipo de que entró un pedido (campanita y/o mail según la config
+  // de notificaciones y el rol de cada miembro, ver NotificationsService).
+  // `items` lleva qué producto/variante se compró y a qué precio por unidad: el
+  // aviso mostraba nombre y monto nomás, sin decir QUÉ se vendió. Mismo formato
+  // "Nombre · Variante" que los mails al comprador.
+  private emitirPedidoNuevo(
+    businessId: string,
+    p: { orderId: string; orderNumber: number; customerName: string; total: number; items: { name: string; quantity: number; price: number }[] },
+  ) {
+    this.eventEmitter.emit('notification.nuevo_pedido', { businessId, ...p });
+  }
+
+  // Milestone "primera venta" (configurable, ver notifications.service.ts): no
+  // hay ningún OTRO pedido del negocio — mostrador u online, da igual el canal,
+  // cuenta la primera venta real sea cual sea.
+  private async emitirPrimeraVentaSiCorresponde(businessId: string, orderId: string) {
+    const huboOtroPedido = await this.prisma.order.findFirst({
+      where: { businessId, id: { not: orderId }, deletedAt: null },
+      select: { id: true },
+    });
+    if (!huboOtroPedido) {
+      this.eventEmitter.emit('notification.primera_venta', { businessId, orderId });
+    }
+  }
+
+  // Invitación a crear cuenta — SOLO para un checkout real del storefront sin
+  // cuenta (invitado de verdad, no una venta cargada desde el panel). Gate propio
+  // con la matriz de notificaciones (invitacion_cuenta_invitado): a diferencia del
+  // resto de los eventos de esa matriz, el destinatario acá es el CLIENTE, no el
+  // equipo del negocio, así que esto NO pasa por dispatch()/sendEmailToMembers —
+  // se lee la config directo con Prisma para no sumar una dependencia de
+  // NotificationsModule en OrdersModule (mismo criterio que notifications.service.ts
+  // evita depender de ReportsModule: menos import circular, no más). Nunca rompe
+  // el alta ni la confirmación: si el mail falla queda en el log.
+  private async invitarInvitadoACrearCuenta(businessId: string, orderNumber: number, buyerEmail: string) {
+    try {
+      const config = await this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { matrix: true } });
+      const habilitado = (config?.matrix as Record<string, { email?: boolean }> | undefined)?.invitacion_cuenta_invitado?.email;
+      if (!habilitado) return;
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+      if (!negocio?.subdomain) return;
+      const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const registerUrl = `${frontend}/tienda/${negocio.subdomain}/registro?email=${encodeURIComponent(buyerEmail)}`;
+      await this.mail.sendGuestAccountInvite(
+        buyerEmail,
+        { storeName: negocio.name, orderNumber, registerUrl },
+        { businessId },
+      );
+    } catch (e) {
+      this.logger.warn(`No se pudo mandar la invitación a crear cuenta del pedido #${orderNumber}: ${e}`);
+    }
+  }
+
+  // Los avisos de "pedido nuevo" de un pedido que se pagó afuera (Mercado Pago):
+  // en create() se dejaron pendientes (opts.pagoPendiente) y salen recién cuando
+  // el pago se aprueba y el pedido queda confirmado. Al comprador no hace falta
+  // mandarle un "recibimos tu pedido" aparte: al confirmarse le llega el de
+  // "Pedido confirmado", con el detalle y los precios (ver updateStatus).
+  // Nunca rompe a quien lo llama (el webhook): cualquier error queda en el log.
+  async avisarPedidoPagado(businessId: string, orderId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findFirst({
+        where: { id: orderId, businessId, deletedAt: null },
+        select: {
+          id: true, orderNumber: true, total: true, customerId: true,
+          customer: { select: { firstName: true, lastName: true, email: true } },
+          onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
+          items: { select: { productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true } },
+        },
+      });
+      if (!order) return;
+      this.emitirPedidoNuevo(businessId, {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.onlineOrderDetails?.buyerName ?? ([order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ') || 'Un cliente'),
+        total: Number(order.total),
+        items: order.items.map((it) => ({
+          name: `${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`,
+          quantity: it.quantity,
+          price: Number(it.editedPrice ?? it.unitPrice),
+        })),
+      });
+      await this.emitirPrimeraVentaSiCorresponde(businessId, order.id);
+      const email = order.onlineOrderDetails?.buyerEmail ?? order.customer?.email ?? null;
+      if (!order.customerId && email) await this.invitarInvitadoACrearCuenta(businessId, order.orderNumber, email);
+    } catch (e) {
+      this.logger.warn(`No se pudieron mandar los avisos del pedido ${orderId} tras el pago: ${e}`);
+    }
   }
 
   // ── Cambio de estado ──────────────────────────────────────────────────────

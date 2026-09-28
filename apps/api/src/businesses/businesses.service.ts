@@ -24,6 +24,7 @@ import { UpdateBusinessConfigDto, CARRIERS, MAX_MONTO } from './dto/update-busin
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
 import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
+import { NOTIFICATION_EVENTS } from '../notifications/notification-events';
 import { TutorialStateDto, UpdateTutorialDto } from './dto/update-tutorial.dto';
 
 const BUSINESS_LOGOS_BUCKET = 'business-logos';
@@ -56,31 +57,7 @@ const postventaTocada = (config: Record<string, unknown>): boolean =>
 // Set cerrado de eventos y canales válidos para notification_config.matrix.
 // No están enumerados como tabla en MODELO_DATOS_DEFINITIVO.md (es un JSON libre),
 // así que este catálogo es una decisión tomada acá — ver resumen final.
-const NOTIFICATION_EVENTS = [
-  'nuevo_pedido',
-  'pedido_cancelado',
-  'stock_critico',
-  'devolucion',
-  'cancelacion_pedida', // el cliente PIDE cancelar (no la cancela sola) — ver CancellationsService
-  'pago_confirmado',
-  'resumen_diario',
-  'cliente_nuevo',
-  'reporte_semanal',
-  // Tanda del 25/09 (pedido explícito de Ale, "que sea configurable desde
-  // notificaciones"): dominio_comprado, cobro_suscripcion, primera_venta y
-  // resena_nueva pasan por el mismo dispatch() de siempre (panel + email a
-  // members, ver notifications.service.ts). invitacion_cuenta_invitado es
-  // distinto — el destinatario es el CLIENTE invitado, no el equipo del
-  // negocio — así que solo usa esta matriz como gate (channel "email" =
-  // "mandar o no este mail"), nunca pasa por dispatch()/sendEmailToMembers
-  // (ver orders.service.ts). Su "panel" queda sin efecto a propósito: no
-  // tiene sentido una campanita por cada invitado, ver comentario ahí.
-  'dominio_comprado',
-  'cobro_suscripcion',
-  'primera_venta',
-  'resena_nueva',
-  'invitacion_cuenta_invitado',
-] as const;
+// (La lista de eventos vive en notifications/notification-events.ts.)
 
 // Canales vivos. WhatsApp se sacó (19/08): los avisos nunca llegaban de
 // verdad — el despacho era un stub que solo logueaba — y tener el toggle

@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpsertRoleDto } from './dto/upsert-role.dto';
+import { EVENTOS_AL_EQUIPO } from '../notifications/notification-events';
 
 const roleInclude = {
   rolePermissions: { include: { permission: true } },
@@ -61,6 +62,7 @@ export class RolesService {
     const permissions = sinRepetidos(dto.permissions);
     await this.validatePermissionCodes(permissions);
     await this.assertNombreDisponible(businessId, dto.name);
+    const avisos = this.validarAvisos(dto.notificationEvents);
 
     const role = await this.prisma.role.create({
       data: {
@@ -69,6 +71,7 @@ export class RolesService {
         description: dto.description ?? null,
         color: dto.color ?? null,
         isDefault: false,
+        notificationEvents: avisos ?? Prisma.DbNull,
         rolePermissions: {
           create: permissions.map((code) => ({ permission: { connect: { code } } })),
         },
@@ -94,6 +97,7 @@ export class RolesService {
     }
     const permissions = sinRepetidos(dto.permissions);
     await this.validatePermissionCodes(permissions);
+    const avisos = this.validarAvisos(dto.notificationEvents);
     // Solo los roles personalizados cambian de nombre (los de fábrica lo conservan).
     if (!role.isDefault) await this.assertNombreDisponible(businessId, dto.name, id);
     // Foto de antes para el registro de auditoría (solo si hay dónde registrar).
@@ -116,8 +120,8 @@ export class RolesService {
       const { count } = await tx.role.updateMany({
         where: { id, businessId },
         data: role.isDefault
-          ? { name: role.name }
-          : { name: dto.name.trim(), description: dto.description ?? null, color: dto.color ?? null },
+          ? { name: role.name, notificationEvents: avisos ?? Prisma.DbNull }
+          : { name: dto.name.trim(), description: dto.description ?? null, color: dto.color ?? null, notificationEvents: avisos ?? Prisma.DbNull },
       });
       if (count === 0) throw new NotFoundException('Rol no encontrado');
 
@@ -140,9 +144,9 @@ export class RolesService {
     });
 
     const cambios = AuditService.diferencias(
-      { name: role.name, permissions: permisosAntes },
-      { name: updated.name, permissions: [...permissions].sort() },
-      ['name', 'permissions'],
+      { name: role.name, permissions: permisosAntes, notificationEvents: role.notificationEvents ?? null },
+      { name: updated.name, permissions: [...permissions].sort(), notificationEvents: avisos },
+      ['name', 'permissions', 'notificationEvents'],
     );
     if (cambios.length > 0) {
       await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'role', entityId: id, action: 'UPDATE', changes: cambios });
@@ -204,6 +208,20 @@ export class RolesService {
     if (repetido) throw new BadRequestException('Ya hay un rol con ese nombre en este negocio');
   }
 
+  // Avisos por email de un rol: null = todos. Una lista que ya cubre todos los
+  // eventos del equipo se guarda como null, así "todos" tiene una sola forma (y un
+  // evento nuevo que se agregue más adelante le llega también a estos roles).
+  private validarAvisos(eventos?: string[] | null): string[] | null {
+    if (!eventos) return null;
+    const unicos = [...new Set(eventos)];
+    const validos = new Set<string>(EVENTOS_AL_EQUIPO);
+    const invalidos = unicos.filter((e) => !validos.has(e));
+    if (invalidos.length > 0) {
+      throw new BadRequestException(`Avisos inválidos: ${invalidos.join(', ')}`);
+    }
+    return EVENTOS_AL_EQUIPO.every((e) => unicos.includes(e)) ? null : unicos;
+  }
+
   private async validatePermissionCodes(codes: string[]) {
     if (codes.length === 0) return;
     const found = await this.prisma.permission.findMany({ where: { code: { in: codes } } });
@@ -222,6 +240,8 @@ export class RolesService {
       color: role.color,
       isDefault: role.isDefault,
       permissions: role.rolePermissions.map((rp) => rp.permission.code),
+      // null = recibe todos los avisos por email.
+      notificationEvents: (role.notificationEvents as string[] | null) ?? null,
       memberCount: role._count.members,
     };
   }

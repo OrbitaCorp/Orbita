@@ -295,7 +295,13 @@ export class StorefrontController {
       // Con "coordinar el pago después" activado, no hay ningún método
       // elegido de verdad — pero tampoco hay que exigir que el total quede
       // cubierto por otra vía: es justamente el punto de este flujo.
-      { publicCheckout: true, paymentMethodChosen: coordinarDespues ? true : !!dto.paymentMethod },
+      {
+        publicCheckout: true,
+        paymentMethodChosen: coordinarDespues ? true : !!dto.paymentMethod,
+        // Mercado Pago: el pedido queda pendiente hasta que se paga; los avisos
+        // de pedido nuevo salen cuando se aprueba el pago, no al tocar "Continuar".
+        pagoPendiente: metodoEfectivo === 'MERCADOPAGO',
+      },
     );
   }
 

@@ -47,7 +47,7 @@ function mp(opts: { pago?: object; estadoPedido?: string; claim?: number; update
       create: jest.fn(),
     },
   };
-  const orders = { updateStatus: opts.updateStatus ?? jest.fn().mockResolvedValue({}) };
+  const orders = { updateStatus: opts.updateStatus ?? jest.fn().mockResolvedValue({}), avisarPedidoPagado: jest.fn().mockResolvedValue(undefined) };
   const emitter = { emit: jest.fn() };
   const svc = new MercadopagoService(prisma as any, config('secreto') as any, orders as any, emitter as any);
   jest.spyOn(svc as any, 'getValidAccessToken').mockResolvedValue('token');
@@ -88,6 +88,8 @@ describe('Qué pago se acepta para un pedido', () => {
     });
     expect(orders.updateStatus).toHaveBeenCalledWith(BIZ, null, PEDIDO, 'CONFIRMED');
     expect(emitter.emit).toHaveBeenCalledWith('notification.pago_confirmado', expect.anything());
+    // Los avisos de "pedido nuevo" se dejaron pendientes en el checkout: salen ahora.
+    expect(orders.avisarPedidoPagado).toHaveBeenCalledWith(BIZ, PEDIDO);
   });
 
   it('en proceso: sigue pendiente (solo se anota lo que dice MP)', async () => {

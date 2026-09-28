@@ -4,6 +4,8 @@ import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { escaparHtml } from '../common/utils/html';
+import { fmtPesos } from '../common/utils/pesos';
+import { ROLES_PROPIETARIO } from './notification-events';
 import { fechaArgentina, inicioDeDiaArgentina } from '../common/utils/hora-argentina';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
@@ -22,6 +24,17 @@ export type DispatchPayload = {
   // se reusa title/body como asunto y cuerpo del mail.
   emailSubject?: string;
   emailBody?: string;
+  // "Nuevo pedido": en vez del texto plano de emailBody, el email al equipo sale
+  // con la plantilla de marca (tabla de productos, precio por unidad, botón) —
+  // mismo diseño que el "Recibimos tu pedido" del comprador.
+  pedidoNuevo?: {
+    storeName: string;
+    customerName: string;
+    orderNumber: number;
+    total: string;
+    items: { name: string; quantity: number; price: string }[];
+    orderUrl: string;
+  };
 };
 
 // (RBT-645) El motor de notificaciones. `dispatch()` es el único punto de
@@ -71,17 +84,28 @@ export class NotificationsService {
     }
 
     if (prefs.email) {
-      await this.sendEmailToMembers(businessId, payload.emailSubject ?? payload.title, payload.emailBody ?? payload.body);
+      await this.sendEmailToMembers(businessId, event, payload);
     }
 
   }
 
-  // El email de notificación va a todos los members activos del negocio — no
-  // hay preferencia por miembro individual en esta fase (ver spec, §2.2).
-  private async sendEmailToMembers(businessId: string, subject: string, htmlBody: string): Promise<void> {
-    const members = await this.prisma.member.findMany({
+  // El email de notificación va a los members activos del negocio cuyo ROL
+  // tenga ese aviso activado (Role.notificationEvents, se edita en Equipo →
+  // Roles). Un rol sin lista guardada (null) recibe todo — es lo que pasaba antes
+  // de que existiera la opción — y el propietario recibe todo siempre. No hay
+  // preferencia por miembro individual, solo por rol.
+  private async sendEmailToMembers(businessId: string, event: string, payload: DispatchPayload): Promise<void> {
+    const subject = payload.emailSubject ?? payload.title;
+    const htmlBody = payload.emailBody ?? payload.body;
+    const miembros = await this.prisma.member.findMany({
       where: { businessId, status: 'ACTIVE' },
-      select: { email: true },
+      select: { email: true, role: { select: { name: true, notificationEvents: true } } },
+    });
+    const members = miembros.filter((m) => {
+      const rol = m.role;
+      if (!rol || ROLES_PROPIETARIO.includes(rol.name)) return true;
+      const lista = rol.notificationEvents as string[] | null | undefined;
+      return !Array.isArray(lista) || lista.includes(event);
     });
     // Los textos de los avisos llevan datos que escribe el cliente (su nombre
     // en "nuevo pedido" y "nuevo cliente") o el negocio (nombre de producto):
@@ -94,7 +118,8 @@ export class NotificationsService {
     const cuerpo = `<p>${escaparHtml(htmlBody).replace(/\n/g, '<br>')}</p>`;
     for (const m of members) {
       try {
-        await this.mail.sendCustomEmail(m.email, subject, cuerpo, { businessId });
+        if (payload.pedidoNuevo) await this.mail.sendNewOrderToTeam(m.email, payload.pedidoNuevo, { businessId });
+        else await this.mail.sendCustomEmail(m.email, subject, cuerpo, { businessId });
       } catch (e) {
         // Un email caído no puede voltear el despacho — mismo criterio que
         // el resto de MailService (best-effort, nunca rompe el flujo llamador).
@@ -148,7 +173,7 @@ export class NotificationsService {
   @OnEvent('notification.nuevo_pedido')
   async onNuevoPedido(p: {
     businessId: string; orderNumber: number; customerName: string; total: number; orderId: string
-    items: { name: string; quantity: number }[]
+    items: { name: string; quantity: number; price: number }[]
   }) {
     // La campanita del panel se queda corta a propósito (un renglón, sin
     // link — ahí al lado ya está la lista completa a un click). El email es
@@ -162,10 +187,19 @@ export class NotificationsService {
     const detalleItems = p.items.map((it) => `· ${it.name} × ${it.quantity}`).join('\n');
     const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
     const link = `${frontend}/admin/${p.businessId}/ventas/pedidos?vista=detalle&id=${p.orderId}`;
+    const negocio = await this.prisma.business.findUnique({ where: { id: p.businessId }, select: { name: true } });
     await this.dispatch('nuevo_pedido', p.businessId, {
       title: `Nuevo pedido #${p.orderNumber}`,
       body: `${p.customerName}: $${p.total.toFixed(2)}`,
       emailBody: `${p.customerName} hizo un pedido por $${p.total.toFixed(2)}:\n\n${detalleItems}\n\nVer el pedido: ${link}`,
+      pedidoNuevo: {
+        storeName: negocio?.name ?? 'tu tienda',
+        customerName: p.customerName,
+        orderNumber: p.orderNumber,
+        total: fmtPesos(p.total),
+        items: p.items.map((it) => ({ name: it.name, quantity: it.quantity, price: fmtPesos(it.price) })),
+        orderUrl: link,
+      },
       resourceType: 'order',
       resourceId: p.orderId,
     });

@@ -742,6 +742,9 @@ export class MercadopagoService {
         orderId: order.id,
         total: Number(order.total),
       });
+      // Recién ahora es una venta: los avisos de "pedido nuevo" (equipo del
+      // negocio, primera venta) se habían dejado pendientes en el checkout.
+      await this.orders.avisarPedidoPagado(order.businessId, order.id);
     } else if (order.status === 'CANCELLED') {
       // Cancelado mientras el comprador pagaba: la plata entró igual.
       this.avisarPagoSinConfirmar(order);

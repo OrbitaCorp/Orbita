@@ -187,6 +187,25 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     },
   },
   {
+    id: 'new-order-team',
+    label: 'Nuevo pedido (aviso al equipo)',
+    group: 'Pedidos',
+    template: 'new-order-team',
+    isPlatform: false,
+    subject: 'Nuevo pedido #1042',
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      customerName: 'Lucía Fernández',
+      orderNumber: 1042,
+      total: '$26.470',
+      items: [
+        { name: 'Medialunas x12', quantity: 2, price: '$4.500' },
+        { name: 'Torta de chocolate', quantity: 1, price: '$17.470' },
+      ],
+      orderUrl: 'https://orbita.site/admin/negocio-demo/ventas/pedidos?vista=detalle&id=1042',
+    },
+  },
+  {
     id: 'order-shipped-con-tracking',
     label: 'Pedido despachado (con seguimiento)',
     group: 'Pedidos',

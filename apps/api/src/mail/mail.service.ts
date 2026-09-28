@@ -90,6 +90,30 @@ const CTA_BUTTON_PARTIAL = `
   </td></tr>
 </table>`;
 
+// Tabla de detalle de un pedido (producto × cantidad, importe por unidad, total).
+// La comparten el mail al comprador (order-received / order-confirmation) y el
+// aviso al equipo del negocio (new-order-team): así los dos se ven igual y un
+// cambio de diseño se hace en un solo lugar. Se invoca como
+// `{{> order-items-table this}}` y espera `items` ({name, quantity, price}) y
+// `total` ya formateados.
+const ORDER_ITEMS_TABLE_PARTIAL = `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+  <tr>
+    <td style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; padding-bottom:8px;">Producto</td>
+    <td style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; padding-bottom:8px; text-align:right;">Importe</td>
+  </tr>
+  {{#each items}}
+  <tr>
+    <td style="padding:10px 0; border-top:1px solid #e3e8ee; font-size:13.5px; color:#1a1f36;">{{this.name}} <span style="color:#8792a2;">× {{this.quantity}}</span></td>
+    <td style="padding:10px 0; border-top:1px solid #e3e8ee; font-size:13.5px; color:#1a1f36; text-align:right; white-space:nowrap;">{{this.price}}</td>
+  </tr>
+  {{/each}}
+  <tr>
+    <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36;">Total</td>
+    <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36; text-align:right;">{{total}} <span style="font-weight:400; color:#8792a2; font-size:12px;">ARS</span></td>
+  </tr>
+</table>`;
+
 // Isotipo de Órbita (el mismo anillo+satélite del logo real de orbita.site)
 // — firma de plataforma en el footer de cada email. Colores fijos de marca
 // (no varían con el negocio): es la identidad de Órbita, no la del negocio.
@@ -247,6 +271,11 @@ export class MailService {
     'order-received': this.svgIcon(
       '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
     ),
+    // ClipboardList — mismo ícono que el "Recibimos tu pedido" del comprador: el
+    // aviso al equipo es el mismo mail visto del otro lado.
+    'new-order-team': this.svgIcon(
+      '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    ),
     // Package — pedido despachado.
     'order-shipped': this.svgIcon(
       '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
@@ -340,6 +369,7 @@ export class MailService {
     this.from = this.config.get<string>('MAIL_FROM') ?? '"Órbita" <no-reply@orbita-corp.com>';
     if (apiKey) this._resend = new Resend(apiKey);
     Handlebars.registerPartial('cta-button', CTA_BUTTON_PARTIAL);
+    Handlebars.registerPartial('order-items-table', ORDER_ITEMS_TABLE_PARTIAL);
     Handlebars.registerPartial('orbita-isotipo', ORBITA_ISOTIPO_PARTIAL);
     Handlebars.registerPartial('icon-instagram', ICON_INSTAGRAM_PARTIAL);
     Handlebars.registerPartial('icon-facebook', ICON_FACEBOOK_PARTIAL);
@@ -817,6 +847,26 @@ export class MailService {
     meta?: MailMeta,
   ): Promise<boolean> {
     return this.sendOrLog(to, `Recibimos tu pedido #${data.orderNumber}`, 'order-received', data, meta);
+  }
+
+  // Aviso al EQUIPO del negocio de que entró un pedido (lo dispara
+  // NotificationsService.onNuevoPedido). Mismo diseño que "Recibimos tu pedido"
+  // del comprador — misma tabla con el precio por unidad y el mismo botón —,
+  // con el texto pensado para quien atiende la tienda.
+  async sendNewOrderToTeam(
+    to: string,
+    data: {
+      storeName: string;
+      customerName: string;
+      orderNumber: number;
+      total: string;
+      items: Array<{ name: string; quantity: number; price: string }>;
+      // Link al pedido en el panel.
+      orderUrl: string;
+    },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `Nuevo pedido #${data.orderNumber}`, 'new-order-team', data, meta);
   }
 
   async sendOrderReadyForPickup(

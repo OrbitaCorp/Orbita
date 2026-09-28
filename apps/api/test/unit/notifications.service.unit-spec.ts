@@ -3,13 +3,13 @@ import { NotificationsService } from '../../src/notifications/notifications.serv
 // Unit test del motor de despacho (RBT-645): dispatch() es el único entry
 // point del módulo — mockea Prisma/Mail, no toca la base. Los endpoints HTTP
 // se prueban aparte en notifications.e2e-spec.ts.
-function svcCon(matrix: any, members: { email: string }[] = []) {
+function svcCon(matrix: any, members: { email: string; role?: { name: string; notificationEvents: string[] | null } }[] = []) {
   const prisma = {
     notificationConfig: { findUnique: jest.fn().mockResolvedValue({ matrix }) },
     notification: { create: jest.fn() },
     member: { findMany: jest.fn().mockResolvedValue(members) },
   };
-  const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+  const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true), sendNewOrderToTeam: jest.fn().mockResolvedValue(true) };
   return { svc: new NotificationsService(prisma as any, mail as any), prisma, mail };
 }
 
