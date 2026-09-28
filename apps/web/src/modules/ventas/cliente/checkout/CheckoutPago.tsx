@@ -363,32 +363,49 @@ export default function CheckoutPago() {
     || (cliente ? !!dirSel : (['street', 'provincia', 'city', 'zip'] as const).every(k => dirInvitado[k].trim()))
 
   async function confirmar() {
+    if (!draft || !draftCompleto || enviando) return
+    setError('')
+    // El botón de confirmar ya no se deshabilita cuando falta algo (quedaba
+    // sin ninguna pista de por qué no reaccionaba, sobre todo ahora que vive
+    // fijo al lado del resumen, lejos de la sección con el problema real) —
+    // clickeable siempre, y accá se le avisa al comprador qué falta
+    // completar en vez de no hacer nada. `error` se muestra pegado al botón.
+    if (!envio) {
+      setError('Elegí cómo querés recibir el pedido')
+      return
+    }
     // `metodo` solo hace falta si todavía queda algo por pagar después de
     // las notas de crédito Y el negocio no tiene "coordinar el pago después"
     // activado — con ese flujo no hay método que elegir en absoluto.
-    if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !coordinarDespuesActivo && !metodo) || enviando) return
+    if (!cubiertoPorCompleto && !coordinarDespuesActivo && !metodo) {
+      setError('Elegí un método de pago')
+      return
+    }
     if (envio === 'DELIVERY' && requiereTransportista && !carrierSel) {
       setErrorCarrier('Elegí con qué transportista coordinar el envío')
+      setError('Elegí con qué transportista coordinar el envío')
       return
     }
     if (envio === 'DELIVERY' && carrierSel && carrierSel !== 'DELIVERY_APP' && !carrierModeSel) {
       setErrorCarrierMode('Elegí si lo recibís a domicilio o en una sucursal')
+      setError('Elegí si lo recibís a domicilio o en una sucursal')
       return
     }
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
       const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement | HTMLSelectElement>][])
         .find(([campo]) => !dirInvitado[campo].trim())
       setErrorDirInvitado('Completá dirección, provincia, ciudad y CP')
+      setError('Completá tu dirección de envío')
       faltante?.[1].current?.focus()
       return
     }
     if (envio === 'DELIVERY' && cliente && !direccionCompleta) {
       setErrorDir('Agregá una dirección para poder confirmar la compra')
+      setError('Agregá una dirección para poder confirmar la compra')
       setShowNewDir(true)
       return
     }
     setEnviando(true)
-    setError('')
     try {
       const payload: CheckoutInput = {
         items: items.map(it => ({ variantId: it.id, quantity: it.qty })),
@@ -1105,44 +1122,6 @@ export default function CheckoutPago() {
               </div>
             )}
 
-            {error && (
-              <div style={{ padding: '12px 16px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13 }}>
-                {error}
-              </div>
-            )}
-
-            {(() => {
-              // Sin método hace falta, salvo que las notas de crédito ya
-              // cubran todo, o el negocio tenga "coordinar el pago después"
-              // activado — en los dos casos alcanza con haber elegido cómo
-              // se entrega.
-              const puedeConfirmar = !!envio
-                && (cubiertoPorCompleto || coordinarDespuesActivo || (!!metodo && metodosDisponibles.length > 0))
-                && direccionCompleta
-                && (envio !== 'DELIVERY' || !requiereTransportista || !!carrierSel)
-                && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !carrierSel || !!carrierModeSel)
-              return (
-                <button
-                  className="ds-hover"
-                  onClick={() => void confirmar()}
-                  disabled={!puedeConfirmar || enviando}
-                  style={{
-                    width: '100%', height: 56, borderRadius: 12,
-                    background: puedeConfirmar ? 'var(--color-primary)' : 'var(--color-surface-alt)',
-                    color: puedeConfirmar ? '#fff' : 'var(--color-muted)',
-                    fontSize: 15, fontWeight: 700, border: 'none', cursor: (!puedeConfirmar || enviando) ? 'default' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                    boxShadow: puedeConfirmar ? '0 12px 32px rgba(59,130,246,0.30)' : 'none',
-                    opacity: enviando ? 0.7 : 1,
-                  }}
-                >
-                  <Lock size={16} strokeWidth={1.5} />
-                  {enviando ? 'Confirmando…' : envio === 'PICKUP' ? 'Reservar y retirar en local' : 'Confirmar compra'} ·{' '}
-                  <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(totalAPagar)}</span>
-                </button>
-              )
-            })()}
-
             <button className="ds-link" onClick={() => router.push(`${base}/checkout/datos`)} style={{
               fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
               background: 'none', border: 'none', cursor: 'pointer',
@@ -1263,6 +1242,54 @@ export default function CheckoutPago() {
                 {config.shipping.shippingPolicy}
               </div>
             )}
+
+            {/* Botón de confirmar pegado al resumen (antes vivía al final de
+                la columna del formulario, después de envío + pago + cupón —
+                para verlo había que scrollear toda esa columna). Acá, con el
+                aside sticky, siempre está a la vista sin scrollear (pedido
+                explícito 28/09/2026).
+                Ya NO se deshabilita cuando falta algo: antes, si al
+                comprador le faltaba elegir transportista o cargar la
+                dirección, el botón quedaba gris SIN NINGÚN aviso de por qué
+                — encima ahora está lejos de esas secciones. Sigue clickeable
+                siempre (salvo mientras se envía) y `confirmar()` valida y
+                explica qué falta en `error`, que se muestra pegado acá
+                abajo — mucho más visible que un cartelito perdido en medio
+                del formulario. */}
+            {(() => {
+              const puedeConfirmar = !!envio
+                && (cubiertoPorCompleto || coordinarDespuesActivo || (!!metodo && metodosDisponibles.length > 0))
+                && direccionCompleta
+                && (envio !== 'DELIVERY' || !requiereTransportista || !!carrierSel)
+                && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !carrierSel || !!carrierModeSel)
+              return (
+                <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button
+                    className="ds-hover"
+                    onClick={() => void confirmar()}
+                    disabled={enviando}
+                    style={{
+                      width: '100%', height: 56, borderRadius: 12,
+                      background: puedeConfirmar ? 'var(--color-primary)' : 'var(--color-surface-alt)',
+                      color: puedeConfirmar ? '#fff' : 'var(--color-muted)',
+                      fontSize: 15, fontWeight: 700, border: 'none', cursor: enviando ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      boxShadow: puedeConfirmar ? '0 12px 32px rgba(59,130,246,0.30)' : 'none',
+                      opacity: enviando ? 0.7 : 1,
+                    }}
+                  >
+                    <Lock size={16} strokeWidth={1.5} />
+                    {enviando ? 'Confirmando…' : envio === 'PICKUP' ? 'Reservar y retirar en local' : 'Confirmar compra'} ·{' '}
+                    <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(totalAPagar)}</span>
+                  </button>
+                  {error && (
+                    <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 12.5 }}>
+                      {error}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </aside>
         </div>
       </div>
