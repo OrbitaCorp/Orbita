@@ -483,7 +483,13 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</span>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</div>
+                        {/* Costo cargado en el producto (solo lo ve el vendedor). Sin costo no se muestra nada. */}
+                        {p.cost != null && (
+                            <div title="Costo del producto (solo lo ves vos)" style={{ fontSize: 10.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 1 }}>Costo {fmtMoney(p.cost)}</div>
+                        )}
+                    </div>
                     <button
                         onClick={e => { e.stopPropagation(); onEditarStock() }}
                         title="Editar stock"
@@ -589,6 +595,9 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: Api
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Precio</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</div>
+                    {p.cost != null && (
+                        <div style={{ fontSize: 9.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 1 }}>Costo {fmtMoney(p.cost)}</div>
+                    )}
                 </div>
                 <button
                     onClick={e => { e.stopPropagation(); onEditarStock() }}

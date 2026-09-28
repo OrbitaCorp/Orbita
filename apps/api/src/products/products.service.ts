@@ -949,6 +949,24 @@ export class ProductsService {
           where: { id: dto.primaryId, productId },
           data: { isPrimary: true },
         });
+      } else {
+        // Sin una principal explícita, la principal es la PRIMERA foto general
+        // del orden nuevo: el panel dice "La primera es la principal", pero el
+        // listado (y la tienda) muestran la marcada isPrimary, que al reordenar
+        // se quedaba en la que se subió primero — la miniatura no respetaba el
+        // orden que armó el vendedor. Solo si el reordenamiento toca fotos
+        // generales (no las de color/talle) y la primera todavía no lo es.
+        const generales = await tx.productImage.findMany({
+          where: { productId, optionValueId: null },
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: { id: true, isPrimary: true },
+        });
+        const idsGenerales = new Set(generales.map((g) => g.id));
+        const primera = generales[0];
+        if (primera && !primera.isPrimary && dto.items.some((it) => idsGenerales.has(it.id))) {
+          await tx.productImage.updateMany({ where: { productId }, data: { isPrimary: false } });
+          await tx.productImage.updateMany({ where: { id: primera.id, productId }, data: { isPrimary: true } });
+        }
       }
     });
 
