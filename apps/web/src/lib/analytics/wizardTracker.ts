@@ -48,7 +48,7 @@ const vecesQueSeEdito = new Map<string, number>()
 // ─── Identidad anónima ────────────────────────────────────────────────────────
 
 function idAleatorio(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 

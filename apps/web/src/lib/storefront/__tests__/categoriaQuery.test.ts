@@ -47,3 +47,18 @@ describe('resolverIdsDeCategorias', () => {
     expect(resolverIdsDeCategorias('camisas-street,inexistente', categoriasMock)).toEqual(['cat-1'])
   })
 })
+
+describe('filtro de categorías con productos publicados', () => {
+  const todasLasCategorias = [
+    { id: 'c1', name: 'Zapatos', slug: 'zapatos', productCount: 5, parentId: null },
+    { id: 'c2', name: 'Mochilas', slug: 'mochilas', productCount: 0, parentId: null },
+    { id: 'c3', name: 'Gorras', slug: 'gorras', productCount: 1, parentId: null },
+    { id: 'c4', name: 'Accesorios vacíos', slug: 'acc-vacios', productCount: 0, parentId: null },
+  ]
+
+  it('excluye categorías con 0 productos publicados', () => {
+    const visibles = todasLasCategorias.filter(c => (c.productCount ?? 0) > 0)
+    expect(visibles).toHaveLength(2)
+    expect(visibles.map(c => c.id)).toEqual(['c1', 'c3'])
+  })
+})

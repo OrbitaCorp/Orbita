@@ -33,9 +33,10 @@ const LIMIT = 12
 type CategoriaNodo = StorefrontCategoryItem & { depth: number }
 
 function construirArbolCategorias(cats: StorefrontCategoryItem[]): CategoriaNodo[] {
+  const idsValidos = new Set(cats.map(c => c.id))
   const porPadre = new Map<string | null, StorefrontCategoryItem[]>()
   for (const c of cats) {
-    const key = c.parentId
+    const key = c.parentId && idsValidos.has(c.parentId) ? c.parentId : null
     if (!porPadre.has(key)) porPadre.set(key, [])
     porPadre.get(key)!.push(c)
   }
@@ -484,41 +485,43 @@ export default function Catalogo() {
               )}
             </div>
 
-            <FilterSection title="Categoría" open={seccionCategoria} onToggle={() => setSeccionCategoria(o => !o)}>
-              {catsCargando ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 4px' }}>
-                  {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${80 - i * 8}%`} height={11} delay={i * 60} />)}
-                </div>
-              ) : (
-                <div>
-                  <div className="sf-catrow" onClick={limpiarCategorias}>
-                    <span className={`sf-catchk${catsActivas.length === 0 ? ' on' : ''}`}>
-                      {catsActivas.length === 0 && <Check size={11} strokeWidth={3} color="#fff" />}
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: catsActivas.length === 0 ? 700 : 500, color: 'var(--color-text)' }}>Todas las categorías</span>
+            {(catsCargando || arbolCategorias.length > 0) && (
+              <FilterSection title="Categoría" open={seccionCategoria} onToggle={() => setSeccionCategoria(o => !o)}>
+                {catsCargando ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 4px' }}>
+                    {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${80 - i * 8}%`} height={11} delay={i * 60} />)}
                   </div>
-                  {arbolCategorias.map(c => {
-                    const activa = catsActivas.includes(c.id)
-                    return (
-                      <div
-                        key={c.id}
-                        className="sf-catrow"
-                        onClick={() => alternarCategoria(c.id)}
-                        style={{ paddingLeft: 4 + c.depth * 18, borderLeft: c.depth > 0 ? '1.5px solid var(--color-border)' : 'none', marginLeft: c.depth > 0 ? 8 : 0 }}
-                      >
-                        <span className={`sf-catchk${activa ? ' on' : ''}`}>
-                          {activa && <Check size={11} strokeWidth={3} color="#fff" />}
-                        </span>
-                        <span style={{ fontSize: c.depth > 0 ? 12.5 : 13, fontWeight: activa ? 700 : 500, color: c.depth > 0 ? 'var(--color-muted)' : 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.name}
-                        </span>
-                        <span style={{ color: 'var(--color-subtle)', fontSize: 10.5, fontFamily: '"Geist Mono", monospace' }}>{c.productCount}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </FilterSection>
+                ) : (
+                  <div>
+                    <div className="sf-catrow" onClick={limpiarCategorias}>
+                      <span className={`sf-catchk${catsActivas.length === 0 ? ' on' : ''}`}>
+                        {catsActivas.length === 0 && <Check size={11} strokeWidth={3} color="#fff" />}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: catsActivas.length === 0 ? 700 : 500, color: 'var(--color-text)' }}>Todas las categorías</span>
+                    </div>
+                    {arbolCategorias.map(c => {
+                      const activa = catsActivas.includes(c.id)
+                      return (
+                        <div
+                          key={c.id}
+                          className="sf-catrow"
+                          onClick={() => alternarCategoria(c.id)}
+                          style={{ paddingLeft: 4 + c.depth * 18, borderLeft: c.depth > 0 ? '1.5px solid var(--color-border)' : 'none', marginLeft: c.depth > 0 ? 8 : 0 }}
+                        >
+                          <span className={`sf-catchk${activa ? ' on' : ''}`}>
+                            {activa && <Check size={11} strokeWidth={3} color="#fff" />}
+                          </span>
+                          <span style={{ fontSize: c.depth > 0 ? 12.5 : 13, fontWeight: activa ? 700 : 500, color: c.depth > 0 ? 'var(--color-muted)' : 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.name}
+                          </span>
+                          <span style={{ color: 'var(--color-subtle)', fontSize: 10.5, fontFamily: '"Geist Mono", monospace' }}>{c.productCount}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </FilterSection>
+            )}
 
             <FilterSection title="Precio" open={seccionPrecio} onToggle={() => setSeccionPrecio(o => !o)}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>

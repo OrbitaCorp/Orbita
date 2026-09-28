@@ -485,8 +485,9 @@ export type StorefrontCategoryItem = {
   productCount: number
 }
 
-export function getStorefrontCategories(slug: string) {
-  return storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
+export async function getStorefrontCategories(slug: string) {
+  const cats = await storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
+  return (cats ?? []).filter(c => (c.productCount ?? 0) > 0)
 }
 
 // ─── Cupón por código ───────────────────────────────────────────────────────

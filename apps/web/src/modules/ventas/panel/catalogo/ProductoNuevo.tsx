@@ -12,13 +12,14 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera, Loader2 } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney, formatMiles } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { esArchivoDeImagen, normalizarImagen, optimizarImagenParaScan, MAX_IMAGEN_MB, MAX_IMAGEN_BYTES } from '@/lib/heic'
+import { estandarizarImagenProducto } from '@/lib/imageStandardizer'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -104,6 +105,8 @@ interface ImagenPendiente {
     // EstudioFondoModal/aplicarFondoIA) — se manda al subir para que el
     // storefront la muestre con object-fit:cover, ver ProductImage.hasAiBackground.
     fondoIA?: boolean
+    // true mientras el normalizador automático está encuadrando/centrando la foto
+    encuadrando?: boolean
 }
 
 interface ImagenGuardada {
@@ -794,19 +797,40 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
             const file = new File([u8arr], `sugerida-${Date.now()}.${ext}`, { type: mime })
 
+            const key = `sug-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
             setImagenes(prev => {
                 const tienePrincipal = prev.some(i => i.principal) || guardadas.some(g => g.principal)
                 const nuevaImg: ImagenPendiente = {
-                    key: `sug-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    key,
                     file,
                     preview: proxied.dataUrl,
                     principal: !tienePrincipal,
+                    encuadrando: true,
                 }
                 return [...prev, nuevaImg]
             })
 
             setSugeridasAgregadas(prev => new Set([...prev, sug.url]))
             onToast('Foto agregada a tu catálogo ✓')
+
+            // Estandarización automática en segundo plano:
+            void (async () => {
+                try {
+                    const estandarizada = await estandarizarImagenProducto(file, file.name)
+                    const previewEstandar = URL.createObjectURL(estandarizada)
+                    setImagenes(prev => prev.map(p => {
+                        if (p.key !== key) return p
+                        return {
+                            ...p,
+                            file: estandarizada,
+                            preview: previewEstandar,
+                            encuadrando: false,
+                        }
+                    }))
+                } catch {
+                    setImagenes(prev => prev.map(p => p.key === key ? { ...p, encuadrando: false } : p))
+                }
+            })()
         } catch (err) {
             onToast(err instanceof ApiError ? err.message : 'No se pudo descargar la foto sugerida')
         } finally {
@@ -891,9 +915,32 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 preview: URL.createObjectURL(file),
                 principal,
                 valorOpcion,
+                encuadrando: true,
             })
         }
         setImagenes(prev => [...prev, ...nuevas])
+
+        // Estandarización automática en segundo plano para cada foto:
+        for (const it of nuevas) {
+            void (async () => {
+                try {
+                    const estandarizada = await estandarizarImagenProducto(it.file, it.file.name)
+                    const nuevaPreview = URL.createObjectURL(estandarizada)
+                    setImagenes(prev => prev.map(p => {
+                        if (p.key !== it.key) return p
+                        URL.revokeObjectURL(p.preview)
+                        return {
+                            ...p,
+                            file: estandarizada,
+                            preview: nuevaPreview,
+                            encuadrando: false,
+                        }
+                    }))
+                } catch {
+                    setImagenes(prev => prev.map(p => p.key === it.key ? { ...p, encuadrando: false } : p))
+                }
+            })()
+        }
     }
 
     // ── Fotos por variante (Color/Talle…) — carga unificada estilo ML ────────
@@ -1010,11 +1057,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
             const nombre = img.file.name.replace(/\.[^.]+$/, '') + '.png'
             const recortada = new File([arr], nombre, { type: r.mimeType })
-            const previewNueva = URL.createObjectURL(recortada)
+
+            // Estandarizar automáticamente la silueta sin fondo (auto-trim de transparencia y centrado)
+            let finalFile = recortada
+            try {
+                finalFile = await estandarizarImagenProducto(recortada, nombre)
+            } catch (err) {
+                console.warn('Error al estandarizar sin fondo:', err)
+            }
+
+            const previewNueva = URL.createObjectURL(finalFile)
             const sigueEstando = imagenesRef.current.some(i => i.key === key)
             if (!sigueEstando) { URL.revokeObjectURL(previewNueva); return }
             setImagenes(prev => prev.map(i => i.key === key
-                ? { ...i, file: recortada, preview: previewNueva, quitarFondo: true, original: { file: i.file, preview: i.preview } }
+                ? { ...i, file: finalFile, preview: previewNueva, quitarFondo: true, original: { file: i.file, preview: i.preview } }
                 : i))
         } catch (e) {
             onToast(e instanceof ApiError ? e.message : 'No se pudo quitar el fondo. Probá de nuevo.')
@@ -1057,15 +1113,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // arriba); una GUARDADA no se toca — el resultado se agrega como una
     // foto pendiente nueva, general (sin valorOpcion), porque la guardada
     // original sigue siendo válida y el vendedor puede querer conservarla.
-    function aplicarFondoIA(origen: ImagenParaFondo, file: File, preview: string) {
+    async function aplicarFondoIA(origen: ImagenParaFondo, file: File, preview: string) {
+        let finalFile = file
+        let finalPreview = preview
+        try {
+            finalFile = await estandarizarImagenProducto(file, file.name)
+            finalPreview = URL.createObjectURL(finalFile)
+        } catch {}
+
         if (origen.tipo === 'pendiente') {
-            reemplazarImagenPendiente(origen.key, file, preview)
+            reemplazarImagenPendiente(origen.key, finalFile, finalPreview)
             return
         }
         setImagenes(prev => [...prev, {
-            key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
-            file,
-            preview,
+            key: `${Date.now()}-${finalFile.name}-${Math.random().toString(36).slice(2, 7)}`,
+            file: finalFile,
+            preview: finalPreview,
             principal: false,
             fondoIA: true,
         }])
@@ -1076,22 +1139,29 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // reemplaza en el lugar (conserva su etiqueta, valorOpcion); una GUARDADA no
     // se toca — el resultado se agrega como pendiente nueva con la MISMA
     // etiqueta que la original, así queda asociada al mismo valor.
-    function aplicarFondoIAVariante(origen: ImagenParaFondo, file: File, preview: string) {
+    async function aplicarFondoIAVariante(origen: ImagenParaFondo, file: File, preview: string) {
+        let finalFile = file
+        let finalPreview = preview
+        try {
+            finalFile = await estandarizarImagenProducto(file, file.name)
+            finalPreview = URL.createObjectURL(finalFile)
+        } catch {}
+
         if (origen.tipo === 'pendiente') {
-            reemplazarImagenPendiente(origen.key, file, preview)
+            reemplazarImagenPendiente(origen.key, finalFile, finalPreview)
             return
         }
         const guardada = guardadas.find(g => g.id === origen.key)
         const valor = valoresParaImagen.find(v => valorIds.get(v.valor) === guardada?.optionValueId)?.valor
         if (!valor) {
-            URL.revokeObjectURL(preview)
+            URL.revokeObjectURL(finalPreview)
             onToast('No se pudo asociar la foto a su variante. Probá con una foto nueva.')
             return
         }
         setImagenes(prev => [...prev, {
-            key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
-            file,
-            preview,
+            key: `${Date.now()}-${finalFile.name}-${Math.random().toString(36).slice(2, 7)}`,
+            file: finalFile,
+            preview: finalPreview,
             principal: false,
             valorOpcion: valor,
             fondoIA: true,
@@ -1289,7 +1359,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // (ver el comentario de más abajo), así que se pidió extenderle el
         // mismo comportamiento de segundo plano que ya tenía la creación.
         if (!editarId) {
-            const tempId = crypto.randomUUID()
+            const tempId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
             const imgsASubir = imagenes
             beginProductCreation(tempId, {
                 name: prod.nombre,
@@ -3082,8 +3154,8 @@ function PreviewProducto({
 // (guardadas siempre primero) sin ninguna forma de reordenar ni de saber,
 // de un vistazo, cuál se ve primero en el catálogo.
 type ItemGaleria =
-    | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean }
-    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false }
+    | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean; encuadrando?: boolean }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false; encuadrando?: boolean }
 
 // Tip de "quitar fondo con IA" — vive una sola vez junto al título de la
 // sección (no repetido por foto, es una recomendación de cómo sacar la
@@ -3405,7 +3477,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     const alto = compacta ? 72 : 96
     const natural: ItemGaleria[] = [
         ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo })),
+        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando })),
     ]
     const items: ItemGaleria[] = orden
         ? [...natural].sort((a, b) => {
@@ -3473,6 +3545,16 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        {it.encuadrando && (
+                            <div style={{
+                                position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
+                            }}>
+                                <Loader2 size={18} className="animate-spin" />
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>Encuadrando…</span>
+                            </div>
+                        )}
                         {/* Controles de orden: número de posición y flechas táctiles */}
                         {onReorder && (
                             <ControlOrdenFoto
@@ -3565,10 +3647,10 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     avanzadoDisponible?: boolean
 }) {
     const alto = 88
-    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean }
+    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean; encuadrando?: boolean }
     const items: ItemEtiquetado[] = [
         ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo })),
+        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando })),
     ]
 
     const mover = useCallback((origen: number, destino: number) => {
@@ -3635,6 +3717,16 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        {it.encuadrando && (
+                            <div style={{
+                                position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
+                            }}>
+                                <Loader2 size={18} className="animate-spin" />
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>Encuadrando…</span>
+                            </div>
+                        )}
                         <ControlOrdenFoto
                             posicion={i}
                             total={items.length}

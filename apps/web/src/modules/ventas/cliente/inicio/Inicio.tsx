@@ -1429,7 +1429,8 @@ function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryI
     // El filter sobre `cats` ya preserva el orden del catálogo (no el de
     // selección) — no hace falta reordenar aparte.
     const elegidas = categoryIds && categoryIds.length > 0 ? cats.filter(c => categoryIds.includes(c.id)) : cats
-    const base = estilo === 'indice' ? elegidas : elegidas.filter(c => !!c.imageUrl)
+    const candidatas = elegidas.length > 0 ? elegidas : cats
+    const base = estilo === 'indice' ? candidatas : candidatas.filter(c => !!c.imageUrl)
     const tope = CATEGORY_LAYOUT_MAX[estilo]
     return tope ? base.slice(0, tope) : base
 }
@@ -1439,6 +1440,8 @@ function SeccionCategorias({ cats, go, estilo, categoryIds }: { cats: CatVisual[
     const pedido = (estilo ?? 'pills') as CategoryLayout
     const elegido: CategoryLayout = (pedido === 'mosaico' || pedido === 'tarjetas') && !hayFotos ? 'pills' : pedido
     const catsAMostrar = resolverCategorias(cats, elegido, categoryIds)
+
+    if (catsAMostrar.length === 0) return null
 
     return (
         <div style={{ paddingTop: 24, paddingBottom: 28 }}>
