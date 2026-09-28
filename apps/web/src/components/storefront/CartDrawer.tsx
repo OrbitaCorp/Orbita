@@ -213,7 +213,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   boxShadow: hayNoDisponibles ? 'none' : '0 6px 20px rgba(37,99,235,0.28)',
                 }}
               >
-                {hayNoDisponibles ? 'Revisá tu carrito' : <>Ir al checkout <ArrowRight size={15} strokeWidth={2} /></>}
+                {hayNoDisponibles ? 'Revisá tu carrito' : <>Finalizar compra <ArrowRight size={15} strokeWidth={2} /></>}
               </button>
               <button
                 onClick={() => { onClose(); router.push(`${base}/carrito`) }}
