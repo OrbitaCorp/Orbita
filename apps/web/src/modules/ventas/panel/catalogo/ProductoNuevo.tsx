@@ -1,18 +1,24 @@
 // src/modules/ventas/panel/catalogo/ProductoNuevo.tsx — Vista P2
 // Alta y edición de producto (RBT-302 / RBT-303).
 //
-// Los pasos están ordenados así a propósito: las variantes se definen ANTES de
-// las imágenes porque cada foto se asocia a un valor de opción (el color), y no
-// se puede elegir a qué color pertenece si todavía no existe.
+// UNA sola pantalla, en el orden de un marketplace: fotos → nombre, precio,
+// stock y categoría → variantes → descripción → "Más detalles" (cerrado).
+// Antes eran cuatro pasos (Info, Variantes e imágenes, Precio y stock,
+// Revisión) y las fotos venían recién en el segundo. Sirve igual para editar:
+// cambiar un precio ya no obliga a recorrer cuatro pasos.
+//
+// Las fotos se pueden subir ANTES de definir las variantes: viven como `File`
+// pendientes y recién se asocian a un valor de opción (el color) al guardar,
+// así que el orden en pantalla no condiciona nada.
 //
 // Orden de guardado: primero se crea/actualiza el producto (POST/PUT) y recién
 // con la respuesta —que ya trae los ids de cada valor de opción— se suben las
 // imágenes pendientes. Antes de eso no existe el optionValueId al que apuntan.
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Video, Info, Camera, Loader2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2 } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -22,23 +28,22 @@ import { esArchivoDeImagen, normalizarImagen, optimizarImagenParaScan, MAX_IMAGE
 import { estandarizarImagenProducto } from '@/lib/imageStandardizer'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { VideoUploader, esVideoArchivo } from '../configuracion/components/apariencia/VideoUploader'
-import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
-import { EstudioFondoModal, type ImagenParaFondo } from './EstudioFondoModal'
+import { EstudioFondoModal, type ImagenParaFondo, type ResultadoFondo } from './EstudioFondoModal'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
     panelPresignProductVideo,
-    panelGetTags, panelCreateTag, panelAiAssist, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
+    panelGetTags, panelCreateTag, panelAiAssist, panelAiVariants, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
     panelGetBusiness, getRubrosCatalog,
     ApiError,
     panelGenerateProductBackground,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption,
 } from '@/lib/api'
 import { presetsDelNegocio, specsDelNegocio, type GrupoPresets, type PresetVariantes } from './presetsVariantes'
 import {
     beginProductCreation, markProductCreated, markImageUploaded,
-    markProductCreationFailed, finishProductUpload,
+    markProductCreationFailed, finishProductUpload, clearProductUpload, useProductUploads,
     beginProductEdit, finishProductEdit, markProductEditFailed,
 } from '@/lib/productUploadTracker'
 import { Volver } from '../_shared/Volver'
@@ -56,9 +61,12 @@ const TITULO_MANTENIMIENTO = 'En mantenimiento — vuelve pronto'
 // nunca se asume por default aunque haya una sola opción definida (ver
 // `opcionVisual` más abajo).
 // `sugeridos`: los valores que ofrece el modelo de rubro del que salió esta
-// opción (ver presetsVariantes.ts) — se muestran para agregar con un clic los
-// que no estén tildados. Solo vive en el formulario, nunca se guarda.
-interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean; sugeridos?: string[] }
+// opción (ver presetsVariantes.ts) — se muestran para agregar con un toque.
+// `habituales`: el subconjunto que "suele" usarse (los `pre` del modelo); se
+// aplica de una sola vez con "Usar los habituales". Ninguno arranca elegido:
+// sugerir es distinto de decidir por el vendedor. Solo viven en el
+// formulario, nunca se guardan.
+interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean; sugeridos?: string[]; habituales?: string[] }
 
 // Un modelo de rubro convertido a las opciones del formulario. Los ids llevan
 // el índice además del timestamp: las opciones de un mismo modelo se crean en
@@ -68,8 +76,9 @@ function desdePreset(preset: PresetVariantes): TipoVariante[] {
     return preset.opciones.map((o, i) => ({
         id: `v${t}-${i}`,
         nombre: o.nombre,
-        opciones: o.pre ?? o.valores,
+        opciones: [],
         sugeridos: o.valores,
+        habituales: o.pre ?? o.valores,
     }))
 }
 
@@ -107,6 +116,9 @@ interface ImagenPendiente {
     fondoIA?: boolean
     // true mientras el normalizador automático está encuadrando/centrando la foto
     encuadrando?: boolean
+    // true mientras "Fondo con IA" sigue generando el fondo de esta foto en
+    // segundo plano (el vendedor tocó "Aplicar y seguir" sin esperar el preview).
+    aplicandoFondo?: boolean
 }
 
 interface ImagenGuardada {
@@ -152,35 +164,29 @@ interface ProductoNuevoProps {
 // globals.css: mismo barrido de luz y corte por prefers-reduced-motion que el
 // resto del panel). ─────────────────────────────────────────────────────────
 
-// Reemplaza SOLO el contenido del paso 1 mientras se resuelve si el negocio
-// tiene categorías (ver `categoriasCargando`) — stepper, card y preview
-// siguen siendo los reales, así no hay salto de layout cuando resuelve.
+// Reemplaza SOLO el contenido del formulario mientras se resuelve si el negocio
+// tiene categorías (ver `categoriasCargando`) — card y preview siguen siendo
+// los reales, así no hay salto de layout cuando resuelve.
 function PasoInfoSkeleton() {
     return (
         <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <Skeleton width={40} height={40} radius={10} />
-                <div>
-                    <Skeleton width={180} height={16} radius={8} style={{ marginBottom: 6 }} />
-                    <Skeleton width={130} height={11} radius={8} />
-                </div>
+            <Skeleton width={60} height={14} radius={8} style={{ marginBottom: 12 }} />
+            <Skeleton width="100%" height={132} radius={10} style={{ marginBottom: 24 }} />
+            <Skeleton width="100%" height={46} radius={8} style={{ marginBottom: 16 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.4fr', gap: 12, marginBottom: 24 }}>
+                <Skeleton width="100%" height={40} radius={8} />
+                <Skeleton width="100%" height={40} radius={8} />
+                <Skeleton width="100%" height={40} radius={8} />
             </div>
-            <Skeleton width="100%" height={44} radius={8} style={{ marginBottom: 18 }} />
-            <Skeleton width="100%" height={110} radius={8} style={{ marginBottom: 18 }} />
-            <Skeleton width="100%" height={40} radius={8} style={{ marginBottom: 18 }} />
-            <Skeleton width="100%" height={36} radius={8} style={{ marginBottom: 18 }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Skeleton width="100%" height={44} radius={8} />
-                <Skeleton width="100%" height={44} radius={8} />
-            </div>
+            <Skeleton width="100%" height={64} radius={10} style={{ marginBottom: 24 }} />
+            <Skeleton width="100%" height={84} radius={8} />
         </div>
     )
 }
 
-// Reemplaza el wizard ENTERO mientras se carga un producto existente para
-// editar (`editarId`) — misma forma exacta del layout real (título, stepper
-// de 4 pasos, card + preview de 2 columnas) para que no haya salto cuando
-// llega la respuesta.
+// Reemplaza el formulario ENTERO mientras se carga un producto existente para
+// editar (`editarId`) — misma forma exacta del layout real (título, card +
+// preview de 2 columnas) para que no haya salto cuando llega la respuesta.
 function ProductoNuevoSkeleton() {
     return (
         <div className="pn-page" style={pageWrap}>
@@ -191,15 +197,6 @@ function ProductoNuevoSkeleton() {
                 @media (max-width: 768px)  { .pn-page { padding: 16px 14px 48px !important; } }
             `}</style>
             <Skeleton width={220} height={30} radius={8} style={{ marginBottom: 20 }} />
-            <div style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, gap: 8 }}>
-                {[0, 1, 2, 3].map(i => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none' }}>
-                        <Skeleton width={30} height={30} radius="50%" style={{ flexShrink: 0 }} />
-                        <Skeleton width={70} height={12} radius={8} style={{ marginLeft: 8 }} />
-                        {i < 3 && <div style={{ flex: 1, height: 2, background: 'var(--color-border)', margin: '0 12px' }} />}
-                    </div>
-                ))}
-            </div>
             <div className="pn-layout">
                 <Card>
                     <PasoInfoSkeleton />
@@ -234,7 +231,7 @@ const FORM_INICIAL: ProdForm = {
     stock: '0', stockMinimo: '5',
     photoType: 'flat',
     tieneVariantes: false,
-    tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
+    tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: [], sugeridos: ['S', 'M', 'L', 'XL'], habituales: ['S', 'M', 'L', 'XL'] }],
     specs: [],
     videoUrl: '',
 }
@@ -245,6 +242,11 @@ const FORM_INICIAL: ProdForm = {
 // que el usuario haya tocado y se usa como default de ahí en más, en vez del
 // "5" fijo de FORM_INICIAL.
 const STOCK_MINIMO_KEY = 'orbita:catalogo:stockMinimoDefault'
+// Mismo criterio con la categoría: quien carga varios productos seguidos casi
+// siempre los carga de la misma. Se guarda la del último producto publicado.
+const CATEGORIA_KEY = 'orbita:catalogo:categoriaDefault'
+// "Cargar otro después": quien sube un catálogo lo deja tildado y queda así.
+const CARGAR_OTRO_KEY = 'orbita:catalogo:cargarOtro'
 
 function formInicialConDefaults(): ProdForm {
     if (typeof window === 'undefined') return FORM_INICIAL
@@ -298,24 +300,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const router = useRouter()
     const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
-    const [step, setStep] = useState(1)
-    // En pantallas angostas el layout apila el formulario y el preview en una
-    // sola columna (.pn-layout de arriba baja a una columna debajo de
-    // 1080px) — sin esto, tocar "Siguiente" viendo el preview al fondo del
-    // paso anterior te dejaba en el mismo scroll, ahora mirando el preview
-    // del paso NUEVO en vez de su contenido (reportado: "arruina la UX").
-    // El que scrollea es .admin-main, NO la ventana — AdminLayout bloquea el
-    // scroll de html/body (.admin-locked, ver globals.css) para no duplicar
-    // el scroll vertical en celular; `window.scrollTo` quedaría pisando un
-    // scroll que ya está fijo en 0.
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-        if (!window.matchMedia('(max-width: 1080px)').matches) return
-        const contenedor = document.querySelector('.admin-main')
-        if (contenedor) contenedor.scrollTo({ top: 0, behavior: 'smooth' })
-        else window.scrollTo({ top: 0, behavior: 'smooth' })
-    }, [step])
-    const [done, setDone] = useState<number[]>([])
+    // Estado con el que se intentó guardar (null = todavía no se intentó). Recién
+    // ahí se marcan en rojo los campos que faltan: el botón nunca queda
+    // deshabilitado sin explicar por qué.
+    const [intento, setIntento] = useState<ProductStatus | null>(null)
+    const [masAbierto, setMasAbierto] = useState(false)
+    // "Solo stock" = grilla talle × color; "Precio y stock" = lista con precio,
+    // stock y ojo por fila. La grilla solo existe con exactamente dos opciones.
+    const [vista, setVista] = useState<'grilla' | 'lista'>('grilla')
+    // Tras publicar, quedarse en el formulario (vacío, con la misma categoría)
+    // en vez de volver a la lista. `enviados`: los productos mandados desde
+    // esta pantalla, para mostrar cómo van (el guardado sigue en segundo plano).
+    const [cargarOtro, setCargarOtro] = useState(() => {
+        if (typeof window === 'undefined') return false
+        try { return window.localStorage.getItem(CARGAR_OTRO_KEY) === '1' } catch { return false }
+    })
+    const [enviados, setEnviados] = useState<string[]>([])
+    // Cuántas fotos siguen esperando su fondo de "Fondo con IA" en segundo plano.
+    // Mientras haya alguna no se puede guardar: se subiría la foto sin el fondo.
+    const [fondosEnCurso, setFondosEnCurso] = useState(0)
+    const subidas = useProductUploads()
     const [orbiGen, setOrbiGen] = useState(false)
     const [orbiScanGen, setOrbiScanGen] = useState(false)
     const [orbiScanSuccess, setOrbiScanSuccess] = useState(false)
@@ -341,15 +345,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // separado de `filas` a propósito (ver bug de abajo). `undefined` = alta
     // nueva (todavía no hay ninguna variante que reconciliar).
     const [varianteUnicaId, setVarianteUnicaId] = useState<string | undefined>(undefined)
-    // Valor del input "aplicar a todas las variantes" del paso 3 — nunca se
-    // manda al backend, solo sirve para completar `filas[].precio` en lote.
-    const [precioMasivo, setPrecioMasivo] = useState('')
-    // Mismo patrón para stock y stock mínimo — con muchas combinaciones
-    // (ej. 3 talles x 3 colores = 9 filas) cargar el mismo número fila por
-    // fila es el paso más tedioso del wizard; el pedido fue justo "un botón
-    // que diga aplicar para todos".
+    // Valor de la fila "Todas" de la tabla de variantes — nunca se manda al
+    // backend, solo sirve para completar `filas[].stock` en lote. Con muchas
+    // combinaciones (3 talles x 3 colores = 9 filas) cargar el mismo número fila
+    // por fila era lo más tedioso. El precio no tiene fila propia: el "Precio"
+    // de arriba ya se copia a todas las filas (ver cambiarPrecio).
     const [stockMasivo, setStockMasivo] = useState('')
-    const [stockMinMasivo, setStockMinMasivo] = useState('')
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     // valor de opción (ej. "S") → id real de ese OptionValue — se arma una
@@ -377,7 +378,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             nombreInputRef.current.style.height = 'auto'
             nombreInputRef.current.style.height = `${Math.max(26, nombreInputRef.current.scrollHeight)}px`
         }
-    }, [prod.nombre, cargando, step])
+    }, [prod.nombre, cargando])
     // Paquete "Avanzado" — habilita el toggle de "quitar fondo con IA" en la
     // galería de fotos. false por default: mejor no mostrar el botón un
     // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
@@ -399,6 +400,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Ahí no se ofrecen modelos: aplicar uno reemplaza las opciones, y al
     // guardar se borrarían las variantes que hoy tienen stock cargado.
     const [opcionesGuardadas, setOpcionesGuardadas] = useState(false)
+    // Las opciones de variante que Orbi sugiere para ESTE producto (según su
+    // nombre o su foto), con la misma forma que un modelo de rubro para poder
+    // aplicarlas igual. Tiene prioridad sobre los modelos del rubro del negocio:
+    // una tienda de ropa que vende un celular necesita Almacenamiento y Color,
+    // no Talle. Nunca tilda valores: solo los ofrece.
+    const [presetOrbi, setPresetOrbi] = useState<PresetVariantes | null>(null)
+    const [orbiVarGen, setOrbiVarGen] = useState(false)
 
     // Fotos oficiales encontradas en la web en segundo plano al escanear con Orbi
     const [sugeridasWeb, setSugeridasWeb] = useState<SuggestedProductImage[]>([])
@@ -407,6 +415,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [sugeridasAgregadas, setSugeridasAgregadas] = useState<Set<string>>(new Set())
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
+    // Para leer el formulario vigente desde callbacks async (respuestas de Orbi).
+    const prodRef = useRef(prod)
+    useEffect(() => { prodRef.current = prod })
 
     // SKU automático: mientras el usuario no haya escrito el suyo, se
     // recalcula solo a partir del nombre — así llega al paso 3 ya completo
@@ -420,11 +431,29 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     useEffect(() => {
         panelGetCategoriesFlat()
-            .then(setCategorias)
+            .then(cats => {
+                setCategorias(cats)
+                if (editando) return
+                // Al crear: la categoría del último producto publicado, o la única
+                // que hay. Solo si sigue existiendo y el campo está vacío (Orbi
+                // puede haberlo completado antes de que llegue la lista).
+                let guardada: string | null = null
+                try { guardada = window.localStorage.getItem(CATEGORIA_KEY) } catch { /* sin storage, no hay default */ }
+                const elegida = guardada && cats.some(c => c.id === guardada) ? guardada : cats.length === 1 ? cats[0].id : ''
+                if (!elegida) return
+                const nombreCat = cats.find(c => c.id === elegida)?.name ?? ''
+                setProd(p => p.categoriaId ? p : {
+                    ...p,
+                    categoriaId: elegida,
+                    ...(photoTypeAutoRef.current ? { photoType: sugerirPhotoType(nombreCat) } : {}),
+                })
+            })
             .catch(() => setCategorias([]))
             .finally(() => setCategoriasCargando(false))
         panelGetTags().then(setTagsUsadas).catch(() => setTagsUsadas([]))
         panelGetAddons().then(r => setAvanzado(r.advanced)).catch(() => setAvanzado(false))
+        // Solo al montar: `editando` no cambia durante la vida de la pantalla.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Qué vende el negocio → qué modelos de variantes y qué especificaciones
@@ -466,6 +495,44 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const aplicarPreset = (preset: PresetVariantes) => {
         set('tiposVariante', desdePreset(preset))
         setPresetAplicado(preset.id)
+    }
+
+    // Orbi devolvió opciones de variante para este producto. Quedan como un modelo
+    // más ("Sugerido por Orbi") y, si el vendedor todavía no eligió ningún valor,
+    // pasan a ser las opciones del formulario — así no se pierde nada de lo que
+    // ya hizo. En un producto que ya tiene opciones guardadas no se toca nada.
+    const recibirVariantesOrbi = (sugeridas?: AiVariantOption[]): boolean => {
+        if (opcionesGuardadas || !sugeridas || sugeridas.length === 0) return false
+        const preset: PresetVariantes = {
+            id: 'orbi',
+            nombre: sugeridas.map(o => o.name).join(' y '),
+            opciones: sugeridas.map(o => ({ nombre: o.name, valores: o.values, pre: o.usual })),
+        }
+        setPresetOrbi(preset)
+        if (prodRef.current.tiposVariante.every(t => t.opciones.length === 0)) {
+            set('tiposVariante', desdePreset(preset))
+            setPresetAplicado(preset.id)
+        }
+        return true
+    }
+
+    // "Sugerir opciones con Orbi": lo mismo que arriba pero pedido a mano, para
+    // cuando no se escaneó la foto. Usa el pedido corto de variantes (no genera
+    // descripción, categoría ni ficha: no toca nada más del formulario).
+    const orbiSugerirVariantes = async () => {
+        if (!prod.nombre.trim()) { onToast('Poné el nombre del producto antes de pedirle sugerencias a Orbi'); return }
+        setOrbiVarGen(true)
+        try {
+            const { suggestedVariants } = await panelAiVariants({
+                name: prod.nombre.trim(),
+                description: prod.descripcion.trim() || undefined,
+            })
+            if (!recibirVariantesOrbi(suggestedVariants)) onToast('Orbi no encontró opciones para sugerir en este producto')
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo consultar a Orbi. Probá de nuevo.')
+        } finally {
+            setOrbiVarGen(false)
+        }
     }
 
     // Las especificaciones sugeridas que todavía no están en el producto. Se
@@ -578,7 +645,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 // variante desaparecían al editar (seguían ahí en la base,
                 // solo no se mostraban).
                 setValorIds(new Map(p.options.flatMap(opt => opt.values.map(v => [v.value, v.id] as const))))
-                setDone([1, 2, 3])
             })
             .catch(err => { if (vigente) setError(err instanceof ApiError ? err.message : 'No se pudo cargar el producto') })
             .finally(() => { if (vigente) setCargando(false) })
@@ -624,9 +690,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         if (!prod.tieneVariantes) { setFilas([]); return }
         setFilas(prev => {
             // Si las filas que ya existen comparten un mismo precio (lo más
-            // común: cargaste el precio con "Aplicar a todas" y después
-            // agregaste un talle/color más), la fila nueva lo hereda en vez de
-            // arrancar en 0 — menos tipeo repetido para el caso típico.
+            // común: cargaste el precio de arriba y después agregaste un
+            // talle/color más), la fila nueva lo hereda; si todavía no hay
+            // ninguna, copia el "Precio" del formulario — menos tipeo repetido.
             const preciosPrevios = prev.filter(f => f.activa).map(f => Number(f.precio) || 0).filter(p => p > 0)
             const precioHeredado = preciosPrevios.length > 0 && preciosPrevios.every(p => p === preciosPrevios[0])
                 ? String(preciosPrevios[0])
@@ -639,7 +705,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     clave: c.clave,
                     valores: c.valores,
                     sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
-                    precio: precioHeredado || '0',
+                    precio: precioHeredado || prod.precio || '0',
                     stock: '0',
                     stockMin: prod.stockMinimo || '0',
                     activa: true,
@@ -691,6 +757,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Escaneo inteligente con foto (Google Lens / Orbi): sube la imagen al backend,
     // Gemini Flash identifica marca, modelo/SKU comercial, título, descripción,
     // categoría y especificaciones técnicas.
+    // Se dispara con UN toque sobre la foto que el vendedor ya subió (ver
+    // "Completar con Orbi" en la sección de fotos): la foto ya está en la
+    // galería, así que no se vuelve a agregar, y solo se llenan los campos que
+    // todavía están vacíos — lo que el vendedor ya escribió no se pisa.
     const orbiEscanearFoto = async (file: File) => {
         if (!file) return
         if (!esArchivoDeImagen(file)) {
@@ -700,7 +770,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setOrbiScanGen(true)
         setOrbiScanSuccess(false)
         try {
-            const normalizado = await normalizarImagen(file)
             const paraScan = await optimizarImagenParaScan(file)
             const result = await panelAiScanProduct(paraScan, file.name)
 
@@ -709,42 +778,24 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 const nuevasTags = result.suggestedTags.filter(t => !yaEstanTags.has(t.trim().toLowerCase()))
                 return {
                     ...p,
-                    nombre: result.name.slice(0, 80),
-                    descripcion: result.description.slice(0, 2000),
-                    categoriaId: result.suggestedCategoryId || p.categoriaId,
+                    nombre: p.nombre.trim() ? p.nombre : result.name.slice(0, 80),
+                    descripcion: p.descripcion.trim() ? p.descripcion : result.description.slice(0, 2000),
+                    categoriaId: p.categoriaId || result.suggestedCategoryId || '',
                     tags: nuevasTags.length ? [...p.tags, ...nuevasTags] : p.tags,
-                    specs: result.suggestedSpecs && result.suggestedSpecs.length > 0 ? result.suggestedSpecs : p.specs,
+                    specs: p.specs.length === 0 && result.suggestedSpecs && result.suggestedSpecs.length > 0 ? result.suggestedSpecs : p.specs,
                 }
             })
 
             // Especificaciones técnicas: si la IA detectó especificaciones técnicas reales (ej. relojes, tecnología),
-            // encendemos el toggle automáticamente; si es indumentaria u objeto sin ficha, permanece apagado.
+            // encendemos la ficha automáticamente; si es indumentaria u objeto sin ficha, queda como estaba.
             if (result.suggestedSpecs && result.suggestedSpecs.length > 0) {
                 setMostrarSpecs(true)
-            } else {
-                setMostrarSpecs(false)
+                setMasAbierto(true)
             }
 
-            // Agregamos la foto escaneada a la galería de imágenes del producto
-            // para que el vendedor no tenga que volver a subirla en el Paso 2
-            const dataUrl = await new Promise<string>((resolve) => {
-                const reader = new FileReader()
-                reader.onload = () => resolve(reader.result as string)
-                reader.readAsDataURL(normalizado)
-            })
+            recibirVariantesOrbi(result.suggestedVariants)
 
-            setImagenes(prev => {
-                const tienePrincipal = prev.some(i => i.principal) || guardadas.some(g => g.principal)
-                const nuevaImg: ImagenPendiente = {
-                    key: `scan-${Date.now()}`,
-                    file: normalizado,
-                    preview: dataUrl,
-                    principal: !tienePrincipal,
-                }
-                return [...prev, nuevaImg]
-            })
-
-            // Búsqueda en segundo plano de imágenes oficiales de la web para el Paso 2
+            // Búsqueda en segundo plano de imágenes oficiales de la web
             const queryBusqueda = result.imageSearchQuery || result.name
             const modelDetectado = result.detectedModel || result.suggestedSpecs.find(s => /modelo|código|codigo|sku|referencia/i.test(s.label))?.value
             const brandDetectado = result.detectedBrand || result.suggestedSpecs.find(s => /marca|fabricante/i.test(s.label))?.value
@@ -771,7 +822,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             }
 
             setOrbiScanSuccess(true)
-            onToast('¡Listo! Revisá si está todo ok 👀')
         } catch (err) {
             onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
         } finally {
@@ -966,6 +1016,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setUltimoValorEtiqueta(valor)
     }
 
+    // Desde la miniatura de una foto general: pasa a ser la foto de ese valor
+    // (ej. "Negro"). Si era la principal, la principal pasa a la primera general
+    // que quede, para que el catálogo siga teniendo foto.
+    function asignarAValor(key: string, valor: string) {
+        setImagenes(prev => {
+            const era = prev.find(i => i.key === key)
+            const resto = prev.map(i => i.key === key ? { ...i, valorOpcion: valor, principal: false } : i)
+            if (!era?.principal) return resto
+            const heredera = resto.find(i => !i.valorOpcion)
+            return heredera ? resto.map(i => i.key === heredera.key ? { ...i, principal: true } : i) : resto
+        })
+        setUltimoValorEtiqueta(valor)
+    }
+
     function etiquetarPendiente(key: string, valor: string) {
         setImagenes(prev => prev.map(i => i.key === key ? { ...i, valorOpcion: valor } : i))
         setUltimoValorEtiqueta(valor)
@@ -1023,7 +1087,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             onToast(err instanceof ApiError ? err.message : 'No se pudo eliminar la imagen')
         }
     }
-
 
     // Paquete "Avanzado" — "Quitar fondo" se aplica AL INSTANTE: corre el recorte
     // local en el backend (mismo que "Sin fondo" del modal de Fondo con IA) y
@@ -1164,6 +1227,33 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }])
     }
 
+    // El vendedor tocó "Aplicar a N fotos" en EstudioFondoModal: el modal se cierra
+    // y el fondo de cada foto se genera en segundo plano. La foto queda marcada
+    // como "Aplicando fondo…" y se reemplaza sola cuando termina.
+    // Una foto ya guardada no tiene marca (su resultado entra como foto nueva);
+    // el contador de fondosEnCurso cubre a las dos.
+    function aplicarFondoEnSegundoPlano(origen: ImagenParaFondo, resultado: Promise<ResultadoFondo>, deVariante: boolean) {
+        const marcar = (valor: boolean) => {
+            if (origen.tipo !== 'pendiente') return
+            setImagenes(prev => prev.map(i => i.key === origen.key ? { ...i, aplicandoFondo: valor } : i))
+            setFondoEnProceso(prev => {
+                const n = new Set(prev)
+                if (valor) n.add(origen.key)
+                else n.delete(origen.key)
+                return n
+            })
+        }
+        marcar(true)
+        setFondosEnCurso(n => n + 1)
+        resultado
+            .then(r => (deVariante ? aplicarFondoIAVariante(origen, r.file, r.url) : aplicarFondoIA(origen, r.file, r.url)))
+            .catch(e => onToast(e instanceof ApiError ? e.message : 'No se pudo aplicar el fondo a una foto. Probá de nuevo.'))
+            .finally(() => {
+                marcar(false)
+                setFondosEnCurso(n => n - 1)
+            })
+    }
+
     // Reordena las fotos GENERALES del producto (las de "Fotos principales",
     // no las de por talle/color) — `nuevoOrden` llega de GaleriaImagenes ya
     // armado con el orden final que el vendedor arrastró, mezclando
@@ -1270,7 +1360,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const precioUnicoVariantes = preciosVariantesActivas.length > 0
         && preciosVariantesActivas.every(p => p === preciosVariantesActivas[0])
 
-    const armarPayload = useCallback((tagIds: string[]): UpsertProductInput => {
+    const armarPayload = useCallback((tagIds: string[], estado: ProductStatus): UpsertProductInput => {
         // Con variantes, `precio` (usado abajo solo como fallback de filas sin
         // completar y como basePrice) es el más bajo entre las activas — nunca
         // un valor tipeado aparte, ver precioMinVariantes más arriba.
@@ -1317,7 +1407,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             categoryId: prod.categoriaId || undefined,
             basePrice: precio,
             cost: prod.costo ? Number(prod.costo) : undefined,
-            status: prod.estado,
+            status: estado,
             photoType: prod.photoType,
             ...(tagIds.length > 0 ? { tagIds } : {}),
             specs,
@@ -1327,14 +1417,55 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }
     }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId, precioMinVariantes, mostrarSpecs])
 
-    async function guardar() {
+    // Deja el formulario listo para el siguiente producto: se conserva lo que casi
+    // siempre se repite (categoría, tipo de foto, stock mínimo y la estructura de
+    // variantes, sin sus valores) y se vacía el resto. El guardado que ya salió
+    // trabaja con lo capturado al tocar el botón, así que no se ve afectado.
+    function reiniciarFormulario() {
+        const venteOrbi = presetAplicado === 'orbi'
+        const baseVariantes = venteOrbi ? gruposPresets[0]?.variantes[0] : undefined
+        setPresetOrbi(null)
+        if (venteOrbi) setPresetAplicado(baseVariantes?.id ?? null)
+        setProd(p => ({
+            ...FORM_INICIAL,
+            tags: [],
+            specs: [],
+            stockMinimo: p.stockMinimo,
+            categoriaId: p.categoriaId,
+            photoType: p.photoType,
+            tieneVariantes: p.tieneVariantes,
+            tiposVariante: baseVariantes
+                ? desdePreset(baseVariantes)
+                : p.tiposVariante.map(tp => ({ ...tp, opciones: [], esVisual: false })),
+        }))
+        setFilas([])
+        setStockMasivo('')
+        setImagenes([])
+        setOrdenGeneral(undefined)
+        setValorIds(new Map())
+        setUltimoValorEtiqueta(undefined)
+        setSugeridasWeb([])
+        setSugeridasAgregadas(new Set())
+        setBuscandoSugeridas(false)
+        setOrbiScanSuccess(false)
+        setIntento(null)
+        setMasAbierto(false)
+        setMostrarSpecs(false)
+        setTagInput('')
+        skuAutoRef.current = true
+        const contenedor = document.querySelector('.admin-main')
+        if (contenedor) contenedor.scrollTo({ top: 0, behavior: 'smooth' })
+        else window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    async function guardar(estado: ProductStatus = prod.estado) {
         // Chequeo rápido antes de ir al backend (que igual lo valida — esto
         // solo evita el viaje de ida y vuelta): no se puede publicar un
         // producto sin stock, hay que cargarlo o guardarlo como borrador.
         // Toast, no banner fijo — es una validación disparada por la acción
         // de guardar (mismo criterio que el resto del sistema, ej. el chequeo
         // de envío en PedidoNuevo.tsx), no un error persistente de la pantalla.
-        if (prod.estado === 'PUBLISHED' && stockTotal <= 0) {
+        if (estado === 'PUBLISHED' && stockTotal <= 0) {
             onToast('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
@@ -1361,18 +1492,23 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             const imgsASubir = imagenes
             beginProductCreation(tempId, {
                 name: prod.nombre,
-                basePrice: Number(prod.precio) || 0,
+                basePrice: prod.tieneVariantes ? precioMinVariantes : Number(prod.precio) || 0,
                 totalStock: stockTotal,
                 categoryName: categorias.find(c => c.id === prod.categoriaId)?.name ?? null,
-                status: prod.estado as 'PUBLISHED' | 'DRAFT',
+                status: estado as 'PUBLISHED' | 'DRAFT',
             })
-            onToast(prod.estado === 'PUBLISHED' ? 'Creando producto…' : 'Guardando borrador…')
-            onVolver()
+            onToast(estado === 'PUBLISHED' ? 'Creando producto…' : 'Guardando borrador…')
+            if (cargarOtro) {
+                setEnviados(prev => [...prev, tempId])
+                reiniciarFormulario()
+            } else {
+                onVolver()
+            }
 
             void (async () => {
                 try {
                     const tagIds = await resolverTagIds(prod.tags)
-                    const payload = armarPayload(tagIds)
+                    const payload = armarPayload(tagIds, estado)
                     const guardado = await panelCreateProduct(payload)
                     markProductCreated(tempId, guardado.id, imgsASubir.length)
 
@@ -1455,7 +1591,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         void (async () => {
             try {
                 const tagIds = await resolverTagIds(prod.tags)
-                const payload = armarPayload(tagIds)
+                const payload = armarPayload(tagIds, estado)
                 const guardado = await panelUpdateProduct(idParaTracker, payload)
 
                 const idPorValor = new Map<string, string>()
@@ -1524,13 +1660,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         })()
     }
 
-    // ── Validación por paso ─────────────────────────────────────────────────
+    // ── Validación ──────────────────────────────────────────────────────────
     // La categoría es obligatoria (no se puede publicar un producto "suelto",
     // sin agrupar en ningún lado del catálogo del cliente) — mismo criterio
     // que ya rechaza el backend en create-product.dto.ts.
     const faltaNombre = prod.nombre.trim() === ''
     const faltaCategoria = prod.categoriaId === ''
-    const req1 = !faltaNombre && !faltaCategoria
     const req3 = prod.tieneVariantes
         ? filas.some(f => f.activa) && filas.filter(f => f.activa).every(f => Number(f.precio) > 0)
         : prod.precio !== '' && Number(prod.precio) > 0
@@ -1553,21 +1688,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }, [imagenes, guardadas, valoresParaImagen, valorIds])
     const valoresConFotoDuplicada = [...conteoPorValorVisual.entries()].filter(([, n]) => n > 1).map(([v]) => v)
 
-    const variantesOk = !prod.tieneVariantes || (combos.length > 0 && valoresConFotoDuplicada.length === 0)
-    const canNext = step === 1 ? req1 : step === 2 ? variantesOk : step === 3 ? req3 : true
-
-    const next = () => {
-        setDone(d => [...new Set([...d, step])])
-        if (step < 4) setStep(step + 1)
-        else void guardar()
-    }
-
-    const STEPS: [string, string, ComponentType<{ size?: number; strokeWidth?: number }>][] = [
-        ['1', 'Info', Package],
-        ['2', 'Variantes e imágenes', Layers],
-        ['3', 'Precio y stock', Banknote],
-        ['4', 'Revisión', Check],
-    ]
     // Con variantes no se muestra: el costo es un solo número pero cada
     // variante puede tener un precio distinto, así que un "margen" único
     // sería engañoso (¿margen contra cuál precio?). Sin variantes hay un
@@ -1578,6 +1698,48 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const stockTotal = prod.tieneVariantes
         ? filas.filter(f => f.activa).reduce((s, f) => s + (Number(f.stock) || 0), 0)
         : Number(prod.stock) || 0
+
+    // ── Qué falta para poder guardar ────────────────────────────────────────
+    // El botón nunca se deshabilita: al tocarlo, si falta algo, se marca en el
+    // campo y se lleva la vista hasta el primero (mismo criterio que el
+    // checkout). `id` es el del contenedor del campo en el JSX.
+    const faltantes = (estado: ProductStatus): { id: string; texto: string }[] => {
+        const f: { id: string; texto: string }[] = []
+        if (faltaNombre) f.push({ id: 'pn-nombre', texto: 'el nombre' })
+        if (faltaCategoria) f.push({ id: 'pn-categoria', texto: 'la categoría' })
+        if (prod.tieneVariantes && combos.length === 0) f.push({ id: 'pn-variantes', texto: 'al menos un valor de variante' })
+        else if (!req3) {
+            // Con variantes el precio se carga arriba; solo si eso está bien y
+            // alguna fila quedó en 0 se lleva a la tabla.
+            const enTabla = prod.tieneVariantes && Number(prod.precio) > 0
+            f.push({ id: enTabla ? 'pn-variantes-tabla' : 'pn-precio', texto: enTabla ? 'el precio de cada variante' : 'el precio' })
+        }
+        if (valoresConFotoDuplicada.length > 0) f.push({ id: 'pn-variantes', texto: 'una sola foto por valor' })
+        if (fondosEnCurso > 0) f.push({ id: 'pn-fotos', texto: 'que termine de aplicarse el fondo de las fotos' })
+        if (estado === 'PUBLISHED' && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
+        return f
+    }
+    const faltasVisibles = intento ? faltantes(intento) : []
+    const hayFalta = (id: string) => faltasVisibles.some(f => f.id === id)
+
+    const intentarGuardar = (estado: ProductStatus) => {
+        const f = faltantes(estado)
+        if (f.length > 0) {
+            setIntento(estado)
+            // El precio por fila solo se edita en "Precio y stock".
+            if (f[0].id === 'pn-variantes-tabla') setVista('lista')
+            document.getElementById(f[0].id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            return
+        }
+        if (!editando && prod.categoriaId) {
+            try { window.localStorage.setItem(CATEGORIA_KEY, prod.categoriaId) } catch { /* sin storage, no hay default */ }
+        }
+        void guardar(estado)
+    }
+
+    // Foto que se le pasa a Orbi: la principal si hay, si no la primera general.
+    // Solo una foto NUEVA (File): al editar, las ya guardadas no se pueden escanear.
+    const fotoParaOrbi = imagenes.find(i => i.principal && !i.valorOpcion) ?? imagenes.find(i => !i.valorOpcion)
 
     // ── Datos para la vista previa: fotos generales (mismo orden que la
     // galería — guardadas primero, pendientes después) + una foto
@@ -1613,50 +1775,85 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         return <ProductoNuevoSkeleton />
     }
 
+    // ── Helpers de la pantalla ───────────────────────────────────────────────
+    const actualizarTipo = (ti: number, cambio: Partial<TipoVariante>) =>
+        set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, ...cambio } : x))
+
+    // Los valores se agregan en el orden del modelo (S, M, L, no S, L, M); los
+    // que el vendedor escribe a mano van al final. Sin modelo (producto ya
+    // guardado) se respeta el orden que tenían.
+    const ordenarValores = (tp: TipoVariante, vals: string[]) => {
+        const orden = tp.sugeridos ?? []
+        const unicos = [...new Set(vals)]
+        return unicos.filter(v => orden.includes(v)).sort((a, b) => orden.indexOf(a) - orden.indexOf(b))
+            .concat(unicos.filter(v => !orden.includes(v)))
+    }
+    const agregarValores = (ti: number, vals: string[]) => {
+        const tp = prod.tiposVariante[ti]
+        actualizarTipo(ti, { opciones: ordenarValores(tp, [...tp.opciones, ...vals]) })
+    }
+
+    // Con variantes, el "Precio" de arriba se copia a las filas que todavía
+    // tienen el precio anterior (o ninguno): así cargar 9 combinaciones al mismo
+    // precio es escribirlo una vez, y las que se ajustaron a mano no se pisan.
+    const cambiarPrecio = (v: string) => {
+        const anterior = prod.precio
+        set('precio', v)
+        if (prod.tieneVariantes) {
+            setFilas(prev => prev.map(f => (f.precio === '' || f.precio === '0' || f.precio === anterior) ? { ...f, precio: v || '0' } : f))
+        }
+    }
+    const cambiarStockMasivo = (v: string) => {
+        const d = v.replace(/\D/g, '')
+        setStockMasivo(d)
+        // Vaciar el campo no borra lo cargado fila por fila.
+        if (d !== '') setFilas(prev => prev.map(f => ({ ...f, stock: d })))
+    }
+    const recordarStockMinimo = (limpio: string) => {
+        // Default para el próximo producto: casi siempre es el mismo número
+        // para todo el catálogo.
+        if (limpio) { try { window.localStorage.setItem(STOCK_MINIMO_KEY, limpio) } catch { /* sin storage, no hay default */ } }
+    }
+
+    // Opciones que casi siempre cambian cómo se ve el producto (color, tono,
+    // sabor…): se le SUGIERE al vendedor subir una foto por valor, con un botón a
+    // la vista. No se activa sola: un talle de ropa no cambia la foto.
+    const opcionSugeridaFoto = !opcionVisual
+        ? tiposValidos.find(tp => /color|tono|sabor|aroma|fragancia|estampa|dise[ñn]o/i.test(tp.nombre))
+        : undefined
+    const puedeGrilla = tiposValidos.length === 2
+    const vistaGrilla = puedeGrilla && vista === 'grilla'
+    const misEnvios = subidas.filter(u => enviados.includes(u.tempId))
+    const sinFotos = imagenes.length + guardadas.length === 0
+    const hayGenerales = imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)
+    const cantModelos = gruposPresets.reduce((n, g) => n + g.variantes.length, 0)
+    const inactivas = filas.filter(f => !f.activa).length
+    const errorPrecioFila = (f: FilaVariante) => hayFalta('pn-variantes-tabla') && f.activa && !(Number(f.precio) > 0)
+
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
+                .pn-3col    { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: start; }
+                .pn-vgrid   { display: grid; grid-template-columns: minmax(0,1.6fr) 108px 84px 30px; align-items: center; gap: 8px; }
+                .pn-vgrid-sku { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.6fr) 80px; align-items: center; gap: 8px; }
                 @media (max-width: 1080px) {
                     .pn-layout  { grid-template-columns: minmax(0,1fr) !important; }
                     .pn-preview { position: static !important; }
                 }
                 @media (max-width: 768px) {
                     .pn-page { padding: 16px 14px 48px !important; }
-                    /* Stepper: en 390px no entran cuatro labels en una fila.
-                       Dejar solo el del paso activo tampoco servía: el label
-                       empujaba los círculos y la fila quedaba descentrada y
-                       distinta en cada paso. Ahora los cuatro círculos van
-                       centrados y parejos, y el nombre del paso baja a un
-                       renglón propio abajo ("Paso 1 de 4 · Info"). */
-                    .pn-stepper { justify-content: center !important; gap: 0 !important; margin-bottom: 10px !important; }
-                    .pn-step-label { display: none !important; }
-                    .pn-step-conector { flex: 1 1 auto !important; max-width: 34px !important; margin: 0 5px !important; min-width: 14px !important; }
-                    .pn-step-caption { display: block !important; }
-                    /* Paso 3 sin variantes: SKU y "Stock disponible" uno al lado
-                       del otro dejaban ~139px por columna, y ahí no entra ni el
-                       enlace "Regenerar desde el nombre" ni el número de stock:
-                       la caja se estiraba y el stock quedaba fuera de pantalla. */
-                    .pn-2col { grid-template-columns: minmax(0,1fr) !important; }
-                    /* Paso 3 con variantes: la tabla tiene seis columnas y el
-                       contenedor recortaba (overflow hidden), así que "Mín." y
-                       el ojo de activar no se veían NI se podían tocar. Cada
-                       combinación pasa a ser una tarjeta (ds-tabla). */
-                    .pn-vartabla { overflow: visible !important; }
-                    /* "Aplicar a todas": el campo y el boton no entran en el
-                       mismo renglon en 390px y estiraban la caja 25px fuera de
-                       la pantalla. El boton baja debajo del campo, a lo ancho. */
-                    .pn-masivo > div > div { flex-wrap: wrap !important; }
-                    .pn-masivo > div > div > button { width: 100% !important; }
-                    /* Pie del wizard: en 390px el contador quedaba espichado
-                       entre los dos botones, casi tocandolos. Baja a su propio
-                       renglon y los botones se reparten el de arriba. */
-                    .pn-wizard-nav { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
-                    .pn-wizard-nav > span { grid-column: 1 / -1 !important; order: 3; margin-top: 2px; }
-                    .pn-wizard-nav > div > button { width: 100% !important; justify-content: center !important; }
-                    .pn-sugeridas-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+                    /* Precio y stock lado a lado; la categoría, a lo ancho. */
+                    .pn-3col { grid-template-columns: 1fr 1fr !important; }
+                    .pn-3col > :last-child { grid-column: 1 / -1; }
+                    .pn-vgrid { grid-template-columns: minmax(0,1fr) 92px 64px 28px !important; gap: 6px !important; }
+                    .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
+                    .pn-vgrid-sku > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+                    .pn-barra { padding: 10px 12px !important; }
+                    .pn-barra > span { flex-basis: 100%; }
+                    .pn-barra > div { width: 100%; justify-content: flex-end; }
                 }
             `}</style>
 
@@ -1666,904 +1863,55 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
 
-            {/* Stepper. Círculo y conector van como hermanos DIRECTOS de la fila
-                (no un <div> por paso envolviendo a los dos): antes cada paso
-                era su propio contenedor `flex: 1`, y como ESE contenedor tenía
-                más ancho asignado que lo que su botón + conector (con tope de
-                34px en celular) llegaban a ocupar, quedaba un tramo sin usar
-                al final de cada paso, antes de que empezara el siguiente
-                círculo — la línea se veía corta y "flotando" en vez de llegar
-                al círculo de al lado, más notorio justo antes del último paso
-                (el único que no crece). Con los conectores como flex:1 sueltos
-                en la fila, son ELLOS los que absorben todo el espacio libre
-                entre un círculo y el siguiente, sin sobrante en el medio. */}
-            <div className="pn-stepper" style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
-                {STEPS.map(([n, l], i) => {
-                    const a = step === Number(n), dn = done.includes(Number(n)) || step > Number(n)
-                    return (
-                        <Fragment key={n}>
-                            <button
-                                className="ds-hover"
-                                data-disabled={!(dn || a) || undefined}
-                                onClick={() => { if (dn || a) setStep(Number(n)) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit', flexShrink: 0 }}
-                            >
-                                <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
-                                    {dn ? <Check size={14} strokeWidth={2.6} /> : n}
-                                </span>
-                                <span className="pn-step-label" style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
-                            </button>
-                            {i < 3 && <div className="pn-step-conector" style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
-                        </Fragment>
-                    )
-                })}
-            </div>
-
-            {/* Solo celular: reemplaza a los labels de la fila de arriba. */}
-            <div className="pn-step-caption" style={{ display: 'none', maxWidth: 860, textAlign: 'center', marginBottom: 18, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                <span style={{ color: 'var(--color-muted)', fontWeight: 500 }}>Paso {step} de {STEPS.length} · </span>
-                {STEPS[step - 1]?.[1]}
-            </div>
-
             {error && (
                 <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, marginBottom: 16, maxWidth: 860 }}>
                     {error}
                 </div>
             )}
 
+            {misEnvios.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, maxWidth: 860 }} aria-live="polite">
+                    {misEnvios.slice(-3).map(u => (
+                        <div key={u.tempId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: u.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)' }}>
+                            {u.phase === 'done' ? <Check size={14} color="var(--color-success)" strokeWidth={2.5} />
+                                : u.phase === 'error' ? <AlertTriangle size={14} />
+                                    : <Loader2 size={14} className="animate-spin" />}
+                            <span>
+                                {u.phase === 'creating' && `Guardando "${u.name}"…`}
+                                {u.phase === 'uploading' && `Subiendo las fotos de "${u.name}" (${u.completed + u.failed}/${u.totalImages})…`}
+                                {u.phase === 'done' && `"${u.name}" ${u.status === 'PUBLISHED' ? 'quedó publicado' : 'se guardó como borrador'}.`}
+                                {u.phase === 'error' && `No se pudo crear "${u.name}": ${u.errorMessage ?? 'error desconocido'}`}
+                            </span>
+                            {u.phase === 'error' && (
+                                <button type="button" className="ds-link" onClick={() => { clearProductUpload(u.tempId); setEnviados(prev => prev.filter(id => id !== u.tempId)) }} style={{ ...enlace, color: 'var(--color-error)', textDecoration: 'underline' }}>
+                                    Cerrar
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="pn-layout">
-                <Card>
-                    {/* PASO 1 — Info */}
-                    {step === 1 && (
-                        categoriasCargando ? (
+                <div className="pn-main" style={{ minWidth: 0 }}>
+                    <Card>
+                        {categoriasCargando ? (
                             <PasoInfoSkeleton />
                         ) : categorias.length === 0 ? (
                             <SinCategoriasAviso negocioId={negocioId} />
                         ) : (
-                        <div>
-                            <StepHd icon={Package} title="¿Qué estás vendiendo?" sub="Lo básico de tu producto." />
-
-                            {/* Banner Escanear producto con foto (Orbi) */}
-                            <div style={{
-                                margin: '0 0 20px 0',
-                                padding: '16px 18px',
-                                borderRadius: 12,
-                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%)',
-                                border: '1px solid rgba(139, 92, 246, 0.28)',
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 14,
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: 1 }}>
-                                    <div style={{
-                                        width: 42,
-                                        height: 42,
-                                        borderRadius: 11,
-                                        background: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
-                                        color: '#fff',
-                                        display: 'grid',
-                                        placeItems: 'center',
-                                        flexShrink: 0,
-                                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
-                                    }}>
-                                        <Camera size={20} strokeWidth={2.2} />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            Rellená este paso solo con una foto de tu producto
-                                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 9999, background: 'rgba(139, 92, 246, 0.16)', color: '#8B5CF6', letterSpacing: '0.02em' }}>Orbi</span>
-                                        </div>
-                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.4 }}>
-                                            Sacá o subí una foto y Orbi detecta el producto, nombre, descripción, categoría y especificaciones técnicas.
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <input
-                                        ref={fileInputScanRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={e => {
-                                            const f = e.target.files?.[0]
-                                            if (f) orbiEscanearFoto(f)
-                                        }}
-                                        style={{ display: 'none' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        disabled={orbiScanGen}
-                                        onClick={() => fileInputScanRef.current?.click()}
-                                        className="ds-hover"
-                                        style={{
-                                            height: 40,
-                                            padding: '0 18px',
-                                            borderRadius: 9,
-                                            border: 'none',
-                                            background: '#8B5CF6',
-                                            color: '#fff',
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            cursor: orbiScanGen ? 'not-allowed' : 'pointer',
-                                            fontFamily: 'inherit',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: 8,
-                                            boxShadow: '0 3px 10px rgba(139, 92, 246, 0.3)',
-                                            opacity: orbiScanGen ? 0.75 : 1,
-                                            transition: 'all 0.15s ease',
-                                        }}
-                                    >
-                                        {orbiScanGen ? (
-                                            <>
-                                                <Sparkles size={15} className="animate-spin" />
-                                                Escaneando producto…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Camera size={15} />
-                                                Escanear producto con foto
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Banner de aviso tras escaneo exitoso */}
-                            {orbiScanSuccess && (
-                                <div style={{
-                                    margin: '-8px 0 20px 0',
-                                    padding: '11px 14px',
-                                    borderRadius: 9,
-                                    background: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
-                                    border: '1px solid color-mix(in srgb, var(--color-success) 35%, transparent)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: 10,
-                                    fontSize: 13,
-                                    color: 'var(--color-heading)',
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Check size={16} color="var(--color-success)" strokeWidth={2.5} />
-                                        <span><strong>¡Listo!</strong> Revisá si está todo ok y ajustá los detalles que quieras.</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setOrbiScanSuccess(false)}
-                                        style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'grid', placeItems: 'center' }}
-                                        title="Cerrar aviso"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            )}
-
-                            <div style={{ marginBottom: 18 }}>
-                                <label style={{ ...lbl, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                                    <span>
-                                        Nombre del producto <span style={{ color: 'var(--color-error)' }}>*</span>
-                                    </span>
-                                    {prod.nombre.trim().length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                set('nombre', '')
-                                                nombreInputRef.current?.focus()
-                                            }}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: 'var(--color-muted)',
-                                                fontSize: 11.5,
-                                                fontWeight: 500,
-                                                cursor: 'pointer',
-                                                padding: '2px 4px',
-                                                fontFamily: 'inherit',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: 4,
-                                                borderRadius: 4,
-                                            }}
-                                            className="ds-hover"
-                                            title="Borrar nombre"
-                                        >
-                                            <X size={12} strokeWidth={2.5} />
-                                            <span>Borrar todo</span>
-                                        </button>
-                                    )}
-                                </label>
-                                <div
-                                    className="ds-field"
-                                    onClick={() => nombreInputRef.current?.focus()}
-                                    style={{
-                                        position: 'relative',
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        minHeight: 46,
-                                        padding: '10px 12px',
-                                        background: 'var(--color-bg)',
-                                        border: '1px solid var(--color-border)',
-                                        borderRadius: 8,
-                                        gap: 8,
-                                        cursor: 'text',
-                                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                                    }}
-                                >
-                                    <textarea
-                                        ref={el => {
-                                            (nombreInputRef as any).current = el
-                                            if (el) {
-                                                el.style.height = 'auto'
-                                                el.style.height = `${Math.max(26, el.scrollHeight)}px`
-                                            }
-                                        }}
-                                        value={prod.nombre}
-                                        onChange={e => {
-                                            const clean = e.target.value.replace(/[\r\n]+/g, ' ').slice(0, 80)
-                                            set('nombre', clean)
-                                        }}
-                                        onInput={e => {
-                                            const t = e.currentTarget
-                                            t.style.height = 'auto'
-                                            t.style.height = `${Math.max(26, t.scrollHeight)}px`
-                                        }}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault()
-                                            }
-                                        }}
-                                        placeholder="Ej: Remera oversize negra"
-                                        rows={1}
-                                        style={{
-                                            flex: 1,
-                                            width: '100%',
-                                            minHeight: 24,
-                                            border: 'none',
-                                            outline: 'none',
-                                            background: 'transparent',
-                                            fontSize: 14.5,
-                                            fontWeight: 500,
-                                            color: 'var(--color-text)',
-                                            fontFamily: 'inherit',
-                                            resize: 'none',
-                                            lineHeight: 1.45,
-                                            padding: 0,
-                                            margin: 0,
-                                            whiteSpace: 'pre-wrap',
-                                            wordBreak: 'break-word',
-                                            overflowY: 'hidden',
-                                        }}
-                                    />
-                                    {prod.nombre.length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={e => {
-                                                e.stopPropagation()
-                                                set('nombre', '')
-                                                nombreInputRef.current?.focus()
-                                            }}
-                                            style={{
-                                                background: 'var(--color-surface)',
-                                                border: '1px solid var(--color-border)',
-                                                color: 'var(--color-muted)',
-                                                cursor: 'pointer',
-                                                width: 22,
-                                                height: 22,
-                                                borderRadius: '50%',
-                                                display: 'grid',
-                                                placeItems: 'center',
-                                                flexShrink: 0,
-                                                marginTop: 1,
-                                                padding: 0,
-                                                transition: 'all 0.15s ease',
-                                            }}
-                                            className="ds-hover"
-                                            title="Borrar nombre"
-                                        >
-                                            <X size={12} strokeWidth={2.5} />
-                                        </button>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                                    <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Usá palabras que tus clientes buscarían</span>
-                                    <span style={{
-                                        fontSize: 11,
-                                        color: prod.nombre.length >= 75 ? 'var(--color-warning, #f59e0b)' : 'var(--color-subtle)',
-                                        fontFamily: '"Geist Mono", monospace',
-                                        fontWeight: prod.nombre.length >= 75 ? 600 : 400,
-                                    }}>
-                                        {prod.nombre.length}/80
-                                    </span>
-                                </div>
-                            </div>
-                            <div style={{ marginBottom: 10 }}>
-                                <button
-                                    type="button"
-                                    onClick={orbiAsistir}
-                                    disabled={!prod.nombre.trim() || orbiGen}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        cursor: prod.nombre.trim() && !orbiGen ? 'pointer' : 'default',
-                                        padding: 0,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: 5,
-                                        fontSize: 12.5,
-                                        color: prod.nombre.trim() && !orbiGen ? 'var(--color-primary)' : 'var(--color-muted)',
-                                        fontFamily: 'inherit',
-                                        fontWeight: 500,
-                                        opacity: prod.nombre.trim() && !orbiGen ? 1 : 0.55,
-                                        transition: 'opacity 0.15s',
-                                    }}
-                                >
-                                    <Sparkles size={12} />
-                                    {orbiGen ? 'Generando…' : 'Generar descripción con Orbi'}
-                                </button>
-                            </div>
-                            <div style={{ marginBottom: 18 }}>
-                                <label style={lbl}>Descripción</label>
-                                <textarea className="ds-field" value={prod.descripcion} onChange={e => set('descripcion', e.target.value.slice(0, 2000))} rows={5} style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 110, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }} />
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.descripcion.length}/2000</span>
-                                </div>
-                            </div>
-                            <div style={{ marginBottom: 18 }}>
-                                <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
-                                <CategoriaSelect
-                                    categorias={categorias}
-                                    value={prod.categoriaId}
-                                    onChange={v => {
-                                        set('categoriaId', v)
-                                        if (photoTypeAutoRef.current) {
-                                            const nombreCat = categorias.find(c => c.id === v)?.name ?? ''
-                                            set('photoType', sugerirPhotoType(nombreCat))
-                                        }
-                                    }}
-                                />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
-                                    Obligatoria — así el producto aparece agrupado en el catálogo de tu tienda.
-                                </div>
-                            </div>
-                            <div style={{ marginBottom: 18 }}>
-                                <label style={lbl}>Etiquetas</label>
-                                <input
-                                    className="ds-field"
-                                    value={tagInput}
-                                    onChange={e => setTagInput(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); agregarTag(tagInput); setTagInput('') } }}
-                                    placeholder="Agregar etiqueta… presioná Enter"
-                                    style={{ ...inputBase, width: '100%', height: 36, padding: '0 12px', fontSize: 13 }}
-                                />
-                                {prod.tags.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                                        {prod.tags.map(tg => (
-                                            <span key={tg} style={chip}>{tg}
-                                                <button className="ds-hover" onClick={() => set('tags', prod.tags.filter(x => x !== tg))} style={chipX}><X size={11} strokeWidth={2} /></button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                                {sugerencias.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, alignItems: 'center' }}>
-                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Ya usaste:</span>
-                                        {sugerencias.map(t => (
-                                            <button
-                                                key={t.id}
-                                                className="ds-hover"
-                                                onClick={() => agregarTag(t.name)}
-                                                title={t.usageCount > 0 ? `En ${t.usageCount} producto${t.usageCount === 1 ? '' : 's'}` : 'Sin usar todavía'}
-                                                style={{ height: 24, padding: '0 9px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 11, fontFamily: 'inherit' }}
-                                            >
-                                                {t.name}{t.usageCount > 0 && <span style={{ opacity: 0.6 }}> · {t.usageCount}</span>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 8 }}>
-                                    Sirven para agrupar productos. Si escribís una nueva, se crea sola y te queda disponible para el próximo.
-                                </div>
-                            </div>
-                            <div style={{ marginBottom: 18 }}>
-                                <TogRow
-                                    label="Especificaciones técnicas"
-                                    help="Ideal para tecnología, electrodomésticos, herramientas: la ficha técnica que se ve en el detalle del producto de tu tienda."
-                                    on={mostrarSpecs}
-                                    onChange={v => { setMostrarSpecs(v); if (v && prod.specs.length === 0) agregarSpec() }}
-                                />
-                                {mostrarSpecs && (
-                                    <div style={{ marginTop: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
-                                        {prod.specs.map((s, i) => (
-                                            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                                                <input
-                                                    className="ds-field"
-                                                    value={s.label}
-                                                    onChange={e => actualizarSpec(i, 'label', e.target.value.slice(0, 60))}
-                                                    placeholder="Ej: RAM"
-                                                    style={{ ...inputBase, flex: 1, height: 36, padding: '0 10px', fontSize: 13 }}
-                                                />
-                                                <input
-                                                    className="ds-field"
-                                                    value={s.value}
-                                                    onChange={e => actualizarSpec(i, 'value', e.target.value.slice(0, 300))}
-                                                    placeholder="Ej: 16GB"
-                                                    style={{ ...inputBase, flex: 1.4, height: 36, padding: '0 10px', fontSize: 13 }}
-                                                />
-                                                <button className="ds-hover" onClick={() => quitarSpec(i)} title="Quitar" style={{ width: 32, height: 32, borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                                            <button className="ds-link" onClick={agregarSpec} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
-                                                <Plus size={13} /> Agregar especificación
-                                            </button>
-                                            <button className="ds-link" onClick={orbiAsistirSpecs} disabled={orbiSpecsGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
-                                                {orbiSpecsGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
-                                            </button>
-                                        </div>
-                                        {/* Lo que suele llevar la ficha en los rubros del
-                                            negocio (autor e ISBN en una librería, garantía
-                                            en electrónica). Suma el renglón con la etiqueta
-                                            puesta; un renglón sin valor no se guarda. */}
-                                        {specsPorSugerir.length > 0 && (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
-                                                <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Suelen llevar:</span>
-                                                {specsPorSugerir.map(l => (
-                                                    <button key={l} className="ds-hover" onClick={() => agregarSpecSugerida(l)} style={chipSugerido}>
-                                                        + {l}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <label style={lbl}>Estado</label>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                    {([['PUBLISHED', 'Publicado', Globe, 'var(--color-success)'], ['DRAFT', 'Borrador', Edit2, 'var(--color-muted)']] as [ProductStatus, string, ComponentType<{ size?: number; strokeWidth?: number }>, string][]).map(([id, l, Icon, col]) => {
-                                        const a = prod.estado === id
-                                        return (
-                                            <button key={id} className="ds-hover" onClick={() => set('estado', id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderRadius: 8, border: `${a ? 2 : 1}px solid ${a ? col : 'var(--color-border)'}`, background: a ? `color-mix(in srgb, ${col} 8%, transparent)` : 'var(--color-bg)', color: a ? col : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, fontFamily: 'inherit' }}>
-                                                <Icon size={16} strokeWidth={1.6} /> {l}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                        )
-                    )}
-
-                    {/* PASO 2 — Variantes e imágenes */}
-                    {step === 2 && (
-                        <div>
-                            <StepHd icon={Layers} title="Variantes e imágenes" sub="Definí las opciones y subí las fotos de cada una." />
-
-                            <TogRow
-                                label="Este producto tiene variantes (talles, colores, etc.)"
-                                help="Se genera una combinación por cada cruce. El precio y el stock de cada una se cargan en el paso siguiente."
-                                on={prod.tieneVariantes}
-                                onChange={v => set('tieneVariantes', v)}
-                            />
-
-                            {prod.tieneVariantes && (
-                                <div style={{ marginTop: 16 }}>
-                                    {/* Modelos según lo que el negocio vende. Con varios
-                                        rubros (ropa + calzado) se ofrecen separados:
-                                        un producto es UNA de esas cosas, así que se
-                                        elige desde cuál arrancar — nunca se mezclan. */}
-                                    {!opcionesGuardadas && gruposPresets.length > 0 && (
-                                        <div style={{ marginBottom: 16 }}>
-                                            <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-body)', marginBottom: 8 }}>
-                                                Empezá desde un modelo
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                {gruposPresets.map(g => (
-                                                    <div key={g.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                        {gruposPresets.length > 1 && (
-                                                            <span style={{ fontSize: 11.5, color: 'var(--color-muted)', minWidth: 96 }}>
-                                                                {nombresRubro[g.key] ?? g.key}
-                                                            </span>
-                                                        )}
-                                                        {g.variantes.map(pr => {
-                                                            const activo = presetAplicado === pr.id
-                                                            return (
-                                                                <button
-                                                                    key={pr.id}
-                                                                    className="ds-hover"
-                                                                    onClick={() => aplicarPreset(pr)}
-                                                                    aria-pressed={activo}
-                                                                    title={pr.opciones.map(o => o.nombre).join(' · ')}
-                                                                    style={{
-                                                                        height: 28, padding: '0 11px', borderRadius: 9999,
-                                                                        border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                        background: 'transparent',
-                                                                        color: activo ? 'var(--color-primary)' : 'var(--color-body)',
-                                                                        fontSize: 12, fontWeight: activo ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
-                                                                    }}
-                                                                >
-                                                                    {pr.nombre}
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {prod.tiposVariante.map((tp, ti) => (
-                                        <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                                <input
-                                                    className="ds-field"
-                                                    value={tp.nombre}
-                                                    onChange={e => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, nombre: e.target.value } : x))}
-                                                    placeholder="Nombre de la opción (Talle, Color…)"
-                                                    style={{ ...inputBase, height: 36, padding: '0 10px', fontSize: 14, fontWeight: 500, flex: 1 }}
-                                                />
-                                                {prod.tiposVariante.length > 1 && (
-                                                    <button className="ds-hover" onClick={() => set('tiposVariante', prod.tiposVariante.filter((_, j) => j !== ti))} style={iconBtn}><X size={15} strokeWidth={1.8} /></button>
-                                                )}
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                {tp.opciones.map(op => (
-                                                    <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
-                                                        <button className="ds-hover" onClick={() => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: x.opciones.filter(o => o !== op) } : x))} style={chipX}><X size={11} strokeWidth={2} /></button>
-                                                    </span>
-                                                ))}
-                                                <OpInput tipo={tp.nombre} onAdd={v => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: [...new Set([...x.opciones, v])] } : x))} />
-                                            </div>
-                                            {/* Los valores del modelo que no vinieron tildados
-                                                (o que se sacaron): a un clic, sin tipearlos. Se
-                                                agregan en el orden del modelo, no al final, así
-                                                la tabla de combinaciones queda S, M, L y no
-                                                S, L, M. */}
-                                            {(() => {
-                                                const restantes = (tp.sugeridos ?? []).filter(v => !tp.opciones.includes(v))
-                                                if (restantes.length === 0) return null
-                                                const conOrden = (nuevas: string[]) => (tp.sugeridos ?? []).filter(v => nuevas.includes(v))
-                                                    .concat(nuevas.filter(v => !(tp.sugeridos ?? []).includes(v)))
-                                                const agregar = (vals: string[]) => set('tiposVariante', prod.tiposVariante.map((x, j) =>
-                                                    j === ti ? { ...x, opciones: conOrden([...x.opciones, ...vals]) } : x))
-                                                return (
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 10 }}>
-                                                        {restantes.map(v => (
-                                                            <button key={v} className="ds-hover" onClick={() => agregar([v])} style={chipSugerido}>
-                                                                + {v}
-                                                            </button>
-                                                        ))}
-                                                        {restantes.length > 1 && (
-                                                            <button className="ds-link" onClick={() => agregar(restantes)} style={{ background: 'none', border: 'none', padding: '0 4px', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                                                                Agregar todos
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })()}
-                                        </div>
-                                    ))}
-                                    {prod.tiposVariante.length < 3 && (
-                                        <Button variant="outline" size="sm" icon={<Plus size={15} />} onClick={() => set('tiposVariante', [...prod.tiposVariante, { id: 'v' + Date.now(), nombre: '', opciones: [] }])} style={{ width: '100%', justifyContent: 'center' }}>
-                                            Agregar otra opción
-                                        </Button>
-                                    )}
-                                    {combos.length > 0 && (
-                                        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
-                                            Se van a crear <strong style={{ color: 'var(--color-text)' }}>{combos.length}</strong> combinaciones.
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Fotos por valor de opción — opt-in, nunca asumido. Este flujo lo usan
-                                rubros muy distintos (indumentaria, gastronomía, plantas, tecnología…):
-                                en la mayoría de los casos NINGUNA opción tiene una foto distinta por
-                                valor (un talle de ropa no se ve diferente en foto), así que las
-                                opciones para elegir están siempre a la vista al lado de la etiqueta
-                                (nada escondido detrás de un "cambiar") — se ve de entrada que por
-                                default está en "Ninguna". */}
-                            {/* prod.tieneVariantes acá a propósito: tiposValidos no depende del
-                                toggle (ver su comentario, arriba) — apagar "Tiene variantes" no
-                                borra prod.tiposVariante (por si el vendedor lo vuelve a prender),
-                                así que sin este chequeo "Fotos por" seguía mostrando talles/colores
-                                ya definidos aunque el producto ya no tuviera variantes activas. */}
-                            {prod.tieneVariantes && tiposValidos.length > 0 && (
-                                <div style={{ marginTop: 24 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                                        <label style={{ ...lbl, marginBottom: 0 }}>Fotos por</label>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                            <button
-                                                type="button"
-                                                className="ds-hover"
-                                                onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: false })))}
-                                                style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: !opcionVisual ? 600 : 500, fontFamily: 'inherit' }}
-                                            >
-                                                Ninguna
-                                            </button>
-                                            {tiposValidos.map(tp => {
-                                                const activo = tp.id === opcionVisual?.id
-                                                return (
-                                                    <button
-                                                        key={tp.id}
-                                                        type="button"
-                                                        className="ds-hover"
-                                                        onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id })))}
-                                                        style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: activo ? 600 : 500, fontFamily: 'inherit' }}
-                                                    >
-                                                        {tp.nombre}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                    {!opcionVisual && (
-                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
-                                            Solo si alguna opción tiene una foto distinta por valor (ej. Color). No hace falta si tus opciones no cambian la foto (ej. Talle solo).
-                                        </div>
-                                    )}
-                                    {valoresParaImagen.length > 0 && (
-                                        <>
-                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '10px 0' }}>
-                                                Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde, como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
-                                            </div>
-                                            {avanzado && (imagenes.some(i => !!i.valorOpcion) || guardadas.some(g => g.optionValueId != null)) && (
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                                                    <Button
-                                                        variant="outline" size="sm"
-                                                        icon={<Sparkles size={13} strokeWidth={2.2} />}
-                                                        onClick={() => setModalFondoIAVariantes(true)}
-                                                        disabled={FONDO_IA_MANTENIMIENTO}
-                                                        title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
-                                                    >
-                                                        Fondo con IA
-                                                    </Button>
-                                                </div>
-                                            )}
-                                            <GaleriaImagenesEtiquetada
-                                                pendientes={imagenes.filter(i => !!i.valorOpcion)}
-                                                guardadas={guardadas.filter(g => g.optionValueId != null)}
-                                                opciones={opcionVisual?.opciones ?? []}
-                                                valorDeGuardada={optionValueId => valoresParaImagen.find(v => valorIds.get(v.valor) === optionValueId)?.valor}
-                                                onAgregar={agregarImagenesVariante}
-                                                onQuitarPendiente={quitarPendiente}
-                                                onQuitarGuardada={quitarGuardada}
-                                                onEtiquetar={etiquetarPendiente}
-                                                onReorder={reordenarVariante}
-                                                onQuitarFondo={alternarQuitarFondo}
-                                                onQuitarFondoGuardada={alternarQuitarFondoGuardada}
-                                                fondoEnProceso={fondoEnProceso}
-                                                avanzadoDisponible={avanzado}
-                                            />
-                                            <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                                Arrastrá las fotos o usá las flechas ◀ ▶ para cambiar el orden. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
-                                            </div>
-                                            {valoresConFotoDuplicada.length > 0 && (
-                                                <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
-                                                    Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Apartado nuevo: Fotos oficiales sugeridas en la web */}
-                            {(sugeridasWeb.length > 0 || buscandoSugeridas) && (
-                                <div style={{
-                                    marginTop: 22,
-                                    marginBottom: 18,
-                                    padding: '16px 18px',
-                                    borderRadius: 14,
-                                    border: '1px solid var(--color-border)',
-                                    background: 'var(--color-bg)',
-                                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <div style={{
-                                                width: 34,
-                                                height: 34,
-                                                borderRadius: 10,
-                                                background: 'rgba(139, 92, 246, 0.12)',
-                                                border: '1px solid rgba(139, 92, 246, 0.22)',
-                                                display: 'grid',
-                                                placeItems: 'center',
-                                                color: '#8B5CF6',
-                                                flexShrink: 0,
-                                            }}>
-                                                <Camera size={17} strokeWidth={2.2} />
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                                                    Fotos oficiales sugeridas en la web
-                                                    <span style={{
-                                                        fontSize: 10,
-                                                        fontWeight: 700,
-                                                        padding: '1px 6px',
-                                                        borderRadius: 9999,
-                                                        background: 'rgba(139, 92, 246, 0.14)',
-                                                        color: '#8B5CF6',
-                                                        letterSpacing: '0.02em',
-                                                    }}>
-                                                        Orbi
-                                                    </span>
-                                                </div>
-                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.35 }}>
-                                                    {buscandoSugeridas
-                                                        ? 'Buscando fotos oficiales del producto en segundo plano...'
-                                                        : 'Encontradas para este modelo. Sumalas a tu galería con un clic.'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {buscandoSugeridas ? (
-                                            <span style={{ fontSize: 11.5, color: '#8B5CF6', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
-                                                <Sparkles size={12} className="animate-spin" /> Buscando...
-                                            </span>
-                                        ) : sugeridasWeb.length > 0 ? (
-                                            <span style={{
-                                                fontSize: 11,
-                                                fontWeight: 600,
-                                                color: 'var(--color-muted)',
-                                                background: 'var(--color-surface)',
-                                                padding: '3px 9px',
-                                                borderRadius: 9999,
-                                                border: '1px solid var(--color-border)',
-                                            }}>
-                                                {sugeridasWeb.length} fotos
-                                            </span>
-                                        ) : null}
-                                    </div>
-
-                                    {sugeridasWeb.length > 0 && (
-                                        <div
-                                            className="pn-sugeridas-grid"
-                                            style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: `repeat(${Math.max(1, Math.min(sugeridasWeb.length, 3))}, minmax(0, 1fr))`,
-                                                gap: 14,
-                                                width: '100%',
-                                            }}
-                                        >
-                                            {sugeridasWeb.map((sug, idx) => {
-                                                const yaAgregada = sugeridasAgregadas.has(sug.url)
-                                                const descargando = agregandoSugeridaUrl === sug.url
-                                                return (
-                                                    <div
-                                                        key={idx}
-                                                        style={{
-                                                            border: '1px solid var(--color-border)',
-                                                            borderRadius: 12,
-                                                            overflow: 'hidden',
-                                                            background: 'var(--color-surface)',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                                                            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                                                        }}
-                                                    >
-                                                        <div style={{
-                                                            position: 'relative',
-                                                            width: '100%',
-                                                            height: 160,
-                                                            background: '#ffffff',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            overflow: 'hidden',
-                                                            padding: 10,
-                                                        }}>
-                                                            <img
-                                                                src={sug.url}
-                                                                alt={sug.title || 'Foto sugerida'}
-                                                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                                                                loading="lazy"
-                                                            />
-                                                            {sug.domain && (
-                                                                <div style={{
-                                                                    position: 'absolute',
-                                                                    bottom: 8,
-                                                                    left: 8,
-                                                                    background: 'rgba(15, 23, 42, 0.78)',
-                                                                    backdropFilter: 'blur(6px)',
-                                                                    color: '#ffffff',
-                                                                    padding: '2.5px 7.5px',
-                                                                    borderRadius: 6,
-                                                                    fontSize: 10.5,
-                                                                    fontWeight: 600,
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 4.5,
-                                                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
-                                                                }}>
-                                                                    <Globe size={11} strokeWidth={2.2} />
-                                                                    <span>{sug.domain}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, justifyContent: 'space-between', borderTop: '1px solid var(--color-border)' }}>
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 11.5,
-                                                                    fontWeight: 500,
-                                                                    color: 'var(--color-text)',
-                                                                    lineHeight: 1.35,
-                                                                    height: 32,
-                                                                    display: '-webkit-box',
-                                                                    WebkitLineClamp: 2,
-                                                                    WebkitBoxOrient: 'vertical',
-                                                                    overflow: 'hidden',
-                                                                    textOverflow: 'ellipsis',
-                                                                }}
-                                                                title={sug.title}
-                                                            >
-                                                                {sug.title || 'Foto de producto'}
-                                                            </div>
-                                                            <Button
-                                                                variant={yaAgregada ? 'outline' : 'primary'}
-                                                                size="sm"
-                                                                disabled={yaAgregada || descargando}
-                                                                onClick={() => agregarFotoSugerida(sug)}
-                                                                style={{
-                                                                    width: '100%',
-                                                                    fontSize: 11.5,
-                                                                    fontWeight: 600,
-                                                                    height: 30,
-                                                                    padding: '0 10px',
-                                                                    borderRadius: 8,
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: 5,
-                                                                }}
-                                                            >
-                                                                {descargando ? (
-                                                                    <>
-                                                                        <Sparkles size={12} className="animate-spin" />
-                                                                        <span>Descargando...</span>
-                                                                    </>
-                                                                ) : yaAgregada ? (
-                                                                    <>
-                                                                        <Check size={13} strokeWidth={2.5} color="var(--color-success)" />
-                                                                        <span>Agregada</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Plus size={13} strokeWidth={2.5} />
-                                                                        <span>Agregar a mi producto</span>
-                                                                    </>
-                                                                )}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Imagen principal + galería general */}
-                            <div style={{ marginTop: 24 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                                    <label style={{ ...lbl, display: 'flex', alignItems: 'center' }}>
-                                        Fotos principales
-                                        {avanzado && <TipQuitarFondo />}
-                                    </label>
-                                    {/* Paquete "Avanzado", mismo gate que "Quitar fondo" — necesita
-                                        al menos una foto general (pendiente o ya guardada, no tiene
-                                        sentido elegir un estilo sin nada para probarlo). */}
-                                    {avanzado && (imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)) && (
+                            <>
+                                {/* ── FOTOS: primero, como en un marketplace ── */}
+                                <Seccion
+                                    primera
+                                    id="pn-fotos"
+                                    titulo={<>Fotos {avanzado && <TipQuitarFondo />}</>}
+                                    derecha={avanzado && hayGenerales ? (
                                         // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
                                         // pipeline de "Fondo con IA" (ver background-removal.service.ts).
                                         // Deshabilitado en vez de ocultado para que quede claro que vuelve.
                                         <Button
-                                            variant="outline" size="sm"
+                                            variant="ghost" size="sm"
                                             icon={<Sparkles size={13} strokeWidth={2.2} />}
                                             onClick={() => setModalFondoIA(true)}
                                             disabled={FONDO_IA_MANTENIMIENTO}
@@ -2571,330 +1919,785 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         >
                                             Fondo con IA
                                         </Button>
+                                    ) : undefined}
+                                >
+                                    {fondosEnCurso > 0 && (
+                                        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            Aplicando el fondo a {fondosEnCurso} {fondosEnCurso === 1 ? 'foto' : 'fotos'}… podés seguir cargando el producto.
+                                        </div>
                                     )}
-                                </div>
-                                <GaleriaImagenes
-                                    pendientes={imagenes.filter(i => !i.valorOpcion)}
-                                    guardadas={guardadas.filter(g => !g.optionValueId)}
-                                    onAgregar={files => agregarImagenes(files)}
-                                    onQuitarPendiente={quitarPendiente}
-                                    onQuitarGuardada={quitarGuardada}
-                                    onReorder={reordenarGeneral}
-                                    orden={ordenGeneral}
-                                    onQuitarFondo={alternarQuitarFondo}
-                                    onQuitarFondoGuardada={alternarQuitarFondoGuardada}
-                                    fondoEnProceso={fondoEnProceso}
-                                    avanzadoDisponible={avanzado}
-                                    permitePrincipal
-                                />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos o usá las flechas ◀ ▶ para cambiar el orden en que se ven — el número de cada una es su posición. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.
-                                </div>
-                            </div>
+                                    {sinFotos ? (
+                                        <ZonaSubida onArchivos={files => agregarImagenes(files)} />
+                                    ) : (
+                                        <>
+                                            <GaleriaImagenes
+                                                pendientes={imagenes.filter(i => !i.valorOpcion)}
+                                                guardadas={guardadas.filter(g => !g.optionValueId)}
+                                                onAgregar={files => agregarImagenes(files)}
+                                                onQuitarPendiente={quitarPendiente}
+                                                onQuitarGuardada={quitarGuardada}
+                                                onReorder={reordenarGeneral}
+                                                orden={ordenGeneral}
+                                                onQuitarFondo={alternarQuitarFondo}
+                                                onQuitarFondoGuardada={alternarQuitarFondoGuardada}
+                                                fondoEnProceso={fondoEnProceso}
+                                                avanzadoDisponible={avanzado}
+                                                permitePrincipal
+                                                opcionesAsignar={valoresParaImagen.map(v => v.valor)}
+                                                nombreAsignar={opcionVisual?.nombre}
+                                                onAsignar={asignarAValor}
+                                            />
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8 }}>
+                                                La foto con la estrella es la que se ve en el catálogo. Arrastrá las fotos o usá las flechas para cambiar el orden. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.{valoresParaImagen.length > 0 && ` Si una foto es de un {opcionVisual?.nombre.toLowerCase()} en particular, elegilo debajo de la miniatura.`}
+                                            </div>
+                                        </>
+                                    )}
 
-                            {/* Video del producto — opcional, un solo video por producto (no por
-                                variante). Mismo mecanismo que la sección de video de Apariencia:
-                                pegar un link (YouTube/Vimeo/archivo) o subir el archivo directo,
-                                los dos escriben el mismo campo `videoUrl`. Se muestra en la ficha
-                                del storefront como una pieza más de la galería (ver
-                                ProductoDetalle.tsx). */}
-                            <div style={{ marginTop: 24 }}>
-                                <label style={lbl}><Video size={13} strokeWidth={2} style={{ verticalAlign: -2, marginRight: 5 }} />Video del producto (opcional)</label>
-                                {/* El input de link solo tiene sentido si NO hay ya un
-                                    archivo subido — con un archivo, ese link es el
-                                    de R2 (armado por el uploader, no algo que el
-                                    usuario deba tocar); se vuelve a mostrar si
-                                    quita el video con la papelera de abajo. */}
-                                {!esVideoArchivo(prod.videoUrl) && (
-                                    <>
-                                        <input
+                                    {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                        <button
+                                            type="button"
+                                            onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file)}
+                                            disabled={orbiScanGen}
+                                            className="ds-link"
+                                            style={{ ...enlace, marginTop: 12, fontSize: 13, opacity: orbiScanGen ? 0.7 : 1, cursor: orbiScanGen ? 'default' : 'pointer' }}
+                                        >
+                                            {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                            {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
+                                        </button>
+                                    )}
+                                    {orbiScanSuccess && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                            <Check size={14} color="var(--color-success)" strokeWidth={2.5} />
+                                            Orbi completó lo que estaba vacío. Revisalo y ajustá lo que quieras.
+                                        </div>
+                                    )}
+
+                                    {/* Fotos oficiales que Orbi encontró en la web para este modelo. */}
+                                    {(sugeridasWeb.length > 0 || buscandoSugeridas) && (
+                                        <div style={{ marginTop: 14 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>
+                                                {buscandoSugeridas
+                                                    ? <><Loader2 size={13} className="animate-spin" /> Buscando fotos oficiales de este producto…</>
+                                                    : <>Fotos oficiales encontradas para este modelo</>}
+                                            </div>
+                                            {sugeridasWeb.length > 0 && (
+                                                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                                                    {sugeridasWeb.map((sug, idx) => {
+                                                        const yaAgregada = sugeridasAgregadas.has(sug.url)
+                                                        const descargando = agregandoSugeridaUrl === sug.url
+                                                        return (
+                                                            <div key={idx} style={{ flex: '0 0 132px', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg)' }}>
+                                                                <div style={{ height: 112, background: '#fff', display: 'grid', placeItems: 'center', padding: 6 }} title={sug.title}>
+                                                                    <img src={sug.url} alt={sug.title || 'Foto sugerida'} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    className="ds-hover"
+                                                                    disabled={yaAgregada || descargando}
+                                                                    onClick={() => void agregarFotoSugerida(sug)}
+                                                                    style={{ width: '100%', height: 32, border: 'none', borderTop: '1px solid var(--color-border)', background: 'transparent', color: yaAgregada ? 'var(--color-muted)' : 'var(--color-primary)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', cursor: yaAgregada || descargando ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                                                                >
+                                                                    {descargando ? <><Loader2 size={12} className="animate-spin" /> Descargando…</>
+                                                                        : yaAgregada ? <><Check size={13} strokeWidth={2.5} /> Agregada</>
+                                                                            : <><Plus size={13} strokeWidth={2.5} /> Agregar</>}
+                                                                </button>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </Seccion>
+
+                                {/* ── LO ESENCIAL: nombre, precio, stock, categoría ── */}
+                                <Seccion>
+                                    <div id="pn-nombre">
+                                        <label style={lbl}>Nombre <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                                        <div
                                             className="ds-field"
-                                            value={prod.videoUrl}
-                                            onChange={e => set('videoUrl', e.target.value)}
-                                            placeholder="https://www.youtube.com/watch?v=..."
-                                            style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
-                                        />
-                                        {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
-                                            <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
-                                                No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                            onClick={() => nombreInputRef.current?.focus()}
+                                            style={{
+                                                display: 'flex', alignItems: 'flex-start', minHeight: 46, padding: '10px 12px',
+                                                background: 'var(--color-bg)', borderRadius: 8, cursor: 'text',
+                                                border: `1px solid ${hayFalta('pn-nombre') ? 'var(--color-error)' : 'var(--color-border)'}`,
+                                                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                                            }}
+                                        >
+                                            <textarea
+                                                ref={el => {
+                                                    (nombreInputRef as any).current = el
+                                                    if (el) {
+                                                        el.style.height = 'auto'
+                                                        el.style.height = `${Math.max(26, el.scrollHeight)}px`
+                                                    }
+                                                }}
+                                                value={prod.nombre}
+                                                onChange={e => set('nombre', e.target.value.replace(/[\r\n]+/g, ' ').slice(0, 80))}
+                                                onKeyDown={e => { if (e.key === 'Enter') e.preventDefault() }}
+                                                placeholder="Ej: Remera oversize negra"
+                                                rows={1}
+                                                aria-label="Nombre del producto"
+                                                style={{
+                                                    flex: 1, width: '100%', minHeight: 24, border: 'none', outline: 'none', background: 'transparent',
+                                                    fontSize: 14.5, fontWeight: 500, color: 'var(--color-text)', fontFamily: 'inherit', resize: 'none',
+                                                    lineHeight: 1.45, padding: 0, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowY: 'hidden',
+                                                }}
+                                            />
+                                        </div>
+                                        {(hayFalta('pn-nombre') || prod.nombre.length >= 60) && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 11.5 }}>
+                                                <span style={{ color: 'var(--color-error)' }}>{hayFalta('pn-nombre') ? 'Poné el nombre del producto' : ''}</span>
+                                                <span style={{ color: prod.nombre.length >= 75 ? 'var(--color-warning, #f59e0b)' : 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.nombre.length}/80</span>
                                             </div>
                                         )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
-                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-                                            <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
-                                            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                    </div>
+
+                                    <div className="pn-3col" style={{ marginTop: 16 }}>
+                                        <div id="pn-precio">
+                                            <PField
+                                                label={<>Precio <span style={{ color: 'var(--color-error)' }}>*</span></>}
+                                                value={prod.precio} onChange={cambiarPrecio}
+                                                prefix="$" mono placeholder="0" miles error={hayFalta('pn-precio')}
+                                            />
+                                            {hayFalta('pn-precio') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Poné el precio</div>}
                                         </div>
-                                    </>
-                                )}
-                                <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    Se muestra junto a las fotos en la ficha del producto — el cliente lo elige desde las miniaturas, como una foto más.
-                                </div>
-                            </div>
-
-                        </div>
-                    )}
-
-                    {/* PASO 3 — Precio y stock */}
-                    {step === 3 && (
-                        <div>
-                            <StepHd icon={Banknote} title="¿Cuánto cuesta?" sub="Precio, costo y disponibilidad." />
-                            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20, marginBottom: 14 }}>
-                                {prod.tieneVariantes ? (
-                                    <div style={{ marginBottom: 14 }}>
-                                        <label style={lbl}>Aplicar un precio a todas las variantes</label>
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <div className="ds-field" style={{ flex: 1, display: 'flex', alignItems: 'center', height: 40, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6, boxSizing: 'border-box' }}>
-                                                <span style={{ color: 'var(--color-muted)', fontSize: 14, fontFamily: '"Geist Mono", monospace' }}>$</span>
-                                                <InputPrecio
-                                                    value={precioMasivo}
-                                                    onChange={setPrecioMasivo}
-                                                    placeholder="0"
-                                                    mono
-                                                    style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--color-text)' }}
-                                                />
+                                        <div id="pn-costo">
+                                            <PField
+                                                label={<>Costo <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span></>}
+                                                value={prod.costo} onChange={v => set('costo', v)}
+                                                prefix="$" mono placeholder="0" miles
+                                            />
+                                            {/* Solo lo ve el vendedor; con un costo cargado se calcula el margen. */}
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                                {margen != null
+                                                    ? <>Margen estimado <strong style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>{margen}%</strong></>
+                                                    : 'Solo vos lo ves'}
                                             </div>
-                                            <Button
-                                                variant="outline"
-                                                disabled={!precioMasivo || Number(precioMasivo) <= 0}
-                                                onClick={() => {
-                                                    setFilas(prev => prev.map(f => ({ ...f, precio: precioMasivo })))
-                                                    setPrecioMasivo('')
+                                        </div>
+                                        <div id="pn-stock">
+                                            {prod.tieneVariantes ? (
+                                                <div>
+                                                    <label style={lbl}>Stock</label>
+                                                    <div style={{ height: 40, display: 'flex', alignItems: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
+                                                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, marginRight: 6 }}>{stockTotal}</span> en total, por variante
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <PField label="Stock" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} />
+                                            )}
+                                            {hayFalta('pn-stock') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Para publicar necesitás stock</div>}
+                                        </div>
+                                        <div id="pn-categoria" style={{ gridColumn: '1 / -1' }}>
+                                            <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
+                                            <CategoriaSelect
+                                                categorias={categorias}
+                                                value={prod.categoriaId}
+                                                error={hayFalta('pn-categoria')}
+                                                onChange={v => {
+                                                    set('categoriaId', v)
+                                                    if (photoTypeAutoRef.current) {
+                                                        const nombreCat = categorias.find(c => c.id === v)?.name ?? ''
+                                                        set('photoType', sugerirPhotoType(nombreCat))
+                                                    }
                                                 }}
-                                            >
-                                                Aplicar a todas
-                                            </Button>
-                                        </div>
-                                        <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                            Cada variante tiene su propio precio — ajustalos abajo si alguna cuesta distinto. En el catálogo se muestra &quot;Desde&quot; el más bajo entre las activas.
+                                            />
+                                            {hayFalta('pn-categoria') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Elegí una categoría</div>}
                                         </div>
                                     </div>
-                                ) : (
-                                    <div style={{ marginBottom: 14 }}>
-                                        <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v)} prefix="$" mono big h={44} placeholder="0" miles />
-                                    </div>
-                                )}
-                                <PField label="Costo del producto (opcional)" value={prod.costo} onChange={v => set('costo', v)} prefix="$" mono h={40} placeholder="0" miles />
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
-                                    Solo vos podés verlo. Si lo cargás, sirve para el margen y para calcular el valor de tu inventario — no hace falta para publicar.
-                                </div>
-                                {margen != null && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 8, marginTop: 12 }}>
-                                        <span style={{ fontSize: 12, color: 'var(--color-body)' }}>Margen estimado</span>
-                                        <div style={{ flex: 1 }} />
-                                        <span style={{ height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-success-bg)', color: 'var(--color-success)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace', display: 'inline-flex', alignItems: 'center' }}>{margen}%</span>
-                                    </div>
-                                )}
-                            </div>
+                                </Seccion>
 
-                            {!prod.tieneVariantes ? (
-                                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20 }}>
-                                    <div className="pn-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                                        <div>
-                                            <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
-                                            <button className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Regenerar desde el nombre</button>
-                                        </div>
-                                        <PField label="Stock disponible" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono />
-                                    </div>
-                                    <div style={{ marginTop: 14 }}>
-                                        <PField label="Stock mínimo de alerta" value={prod.stockMinimo} onChange={v => {
-                                            const limpio = v.replace(/\D/g, '')
-                                            set('stockMinimo', limpio)
-                                            // Se guarda como default para el próximo producto que se cree —
-                                            // casi siempre es el mismo número para todo el catálogo.
-                                            if (limpio) window.localStorage.setItem(STOCK_MINIMO_KEY, limpio)
-                                        }} mono />
-                                        <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>Te avisamos cuando el stock baje a este nivel.</div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                {filas.length > 1 && (
-                                    // Con varias combinaciones (ej. 3 talles x 3 colores = 9 filas), cargar
-                                    // el mismo stock/mínimo fila por fila es lo más tedioso del wizard —
-                                    // mismo patrón que "Aplicar a todas" del precio, pero acá SÍ se permite
-                                    // 0 (una combinación puede arrancar sin stock a propósito).
-                                    <div className="pn-masivo" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                                        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                                            <label style={lbl}>Stock para todas</label>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <input
-                                                    className="ds-field"
-                                                    value={stockMasivo}
-                                                    onChange={e => setStockMasivo(e.target.value.replace(/\D/g, ''))}
-                                                    placeholder="0"
-                                                    style={{ flex: 1, minWidth: 0, height: 36, padding: '0 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
-                                                />
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={stockMasivo === ''}
-                                                    onClick={() => {
-                                                        setFilas(prev => prev.map(f => ({ ...f, stock: stockMasivo })))
-                                                        setStockMasivo('')
-                                                    }}
+                                {/* ── VARIANTES: el interruptor siempre a la vista; los valores, sugeridos ── */}
+                                <Seccion id="pn-variantes">
+                                    <InterruptorVariantes on={prod.tieneVariantes} onChange={v => set('tieneVariantes', v)} />
+                                    {/* Orbi ya miró el producto: se lo dice al vendedor sin activar nada solo. */}
+                                    {!prod.tieneVariantes && presetOrbi && (
+                                        <button
+                                            type="button"
+                                            className="ds-link"
+                                            onClick={() => {
+                                                set('tieneVariantes', true)
+                                                if (presetAplicado !== 'orbi' && prod.tiposVariante.every(t => t.opciones.length === 0)) aplicarPreset(presetOrbi)
+                                            }}
+                                            style={{ ...enlace, marginTop: 10, fontSize: 12.5 }}
+                                        >
+                                            <Sparkles size={13} /> Orbi sugiere para este producto: {presetOrbi.nombre}. Usarlas
+                                        </button>
+                                    )}
+
+                                    {prod.tieneVariantes && (
+                                        <div style={{ marginTop: 16 }}>
+                                            {/* Modelos según lo que el negocio vende. Con varios rubros
+                                                (ropa + calzado) se ofrecen separados: un producto es UNA
+                                                de esas cosas, así que se elige desde cuál arrancar. */}
+                                            {/* Sin sugerencia de Orbi todavía: se puede pedir con un toque. */}
+                                            {!opcionesGuardadas && !presetOrbi && (
+                                                <button
+                                                    type="button"
+                                                    className="ds-link"
+                                                    onClick={() => void orbiSugerirVariantes()}
+                                                    disabled={orbiVarGen || !prod.nombre.trim()}
+                                                    title={!prod.nombre.trim() ? 'Poné el nombre del producto primero' : undefined}
+                                                    style={{ ...enlace, marginBottom: 14, fontSize: 12.5, opacity: orbiVarGen || !prod.nombre.trim() ? 0.55 : 1, cursor: orbiVarGen || !prod.nombre.trim() ? 'default' : 'pointer' }}
                                                 >
-                                                    Aplicar a todas
-                                                </Button>
+                                                    {orbiVarGen ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                                    {orbiVarGen ? 'Orbi está pensando las opciones…' : 'Sugerir opciones con Orbi según el nombre'}
+                                                </button>
+                                            )}
+                                            {!opcionesGuardadas && (cantModelos + (presetOrbi ? 1 : 0)) > 1 && (
+                                                <div style={{ marginBottom: 14 }}>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>¿Qué tipo de producto es?</div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        {presetOrbi && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="ds-hover"
+                                                                    onClick={() => aplicarPreset(presetOrbi)}
+                                                                    aria-pressed={presetAplicado === 'orbi'}
+                                                                    title={presetOrbi.opciones.map(o => o.nombre).join(' · ')}
+                                                                    style={{
+                                                                        height: 30, padding: '0 12px', borderRadius: 9999, display: 'inline-flex', alignItems: 'center', gap: 6,
+                                                                        border: `1px solid ${presetAplicado === 'orbi' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                        background: presetAplicado === 'orbi' ? 'var(--color-primary-bg)' : 'transparent',
+                                                                        color: presetAplicado === 'orbi' ? 'var(--color-primary)' : 'var(--color-body)',
+                                                                        fontSize: 12.5, fontWeight: presetAplicado === 'orbi' ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    <Sparkles size={12} /> Sugerido por Orbi: {presetOrbi.nombre}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {gruposPresets.map(g => (
+                                                            <div key={g.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                                {gruposPresets.length > 1 && (
+                                                                    <span style={{ fontSize: 11.5, color: 'var(--color-muted)', minWidth: 96 }}>{nombresRubro[g.key] ?? g.key}</span>
+                                                                )}
+                                                                {g.variantes.map(pr => {
+                                                                    const activo = presetAplicado === pr.id
+                                                                    return (
+                                                                        <button
+                                                                            key={pr.id}
+                                                                            type="button"
+                                                                            className="ds-hover"
+                                                                            onClick={() => aplicarPreset(pr)}
+                                                                            aria-pressed={activo}
+                                                                            title={pr.opciones.map(o => o.nombre).join(' · ')}
+                                                                            style={{
+                                                                                height: 30, padding: '0 12px', borderRadius: 9999,
+                                                                                border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                                                background: activo ? 'var(--color-primary-bg)' : 'transparent',
+                                                                                color: activo ? 'var(--color-primary)' : 'var(--color-body)',
+                                                                                fontSize: 12.5, fontWeight: activo ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            {pr.nombre}
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {prod.tiposVariante.map((tp, ti) => {
+                                                const restantes = (tp.sugeridos ?? []).filter(v => !tp.opciones.includes(v))
+                                                const habituales = (tp.habituales ?? []).filter(v => !tp.opciones.includes(v))
+                                                return (
+                                                    <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                                            <input
+                                                                className="ds-field"
+                                                                value={tp.nombre}
+                                                                onChange={e => actualizarTipo(ti, { nombre: e.target.value })}
+                                                                placeholder="Nombre de la opción (Talle, Color…)"
+                                                                aria-label="Nombre de la opción"
+                                                                style={{ ...inputBase, height: 34, padding: '0 10px', fontSize: 14, fontWeight: 600, flex: 1 }}
+                                                            />
+                                                            {prod.tiposVariante.length > 1 && (
+                                                                <button type="button" className="ds-hover" aria-label="Quitar esta opción" title="Quitar esta opción" onClick={() => set('tiposVariante', prod.tiposVariante.filter((_, j) => j !== ti))} style={iconBtn}><X size={15} strokeWidth={1.8} /></button>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                            {tp.opciones.map(op => (
+                                                                <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
+                                                                    <button type="button" className="ds-hover" aria-label={`Quitar ${op}`} onClick={() => actualizarTipo(ti, { opciones: tp.opciones.filter(o => o !== op) })} style={chipX}><X size={11} strokeWidth={2} /></button>
+                                                                </span>
+                                                            ))}
+                                                            {/* Sugeridos: un toque los suma. Ninguno viene elegido de antemano. */}
+                                                            {restantes.map(v => (
+                                                                <button key={v} type="button" className="ds-hover" onClick={() => agregarValores(ti, [v])} style={chipSugerido}>+ {v}</button>
+                                                            ))}
+                                                            <OpInput tipo={tp.nombre} onAdd={vals => agregarValores(ti, vals)} />
+                                                        </div>
+                                                        {tp.opciones.length === 0 && habituales.length > 0 ? (
+                                                            <button type="button" className="ds-link" onClick={() => agregarValores(ti, habituales)} style={{ ...enlace, marginTop: 10, fontSize: 12 }}>
+                                                                Usar los habituales ({habituales.join(', ')})
+                                                            </button>
+                                                        ) : restantes.length > 1 ? (
+                                                            <button type="button" className="ds-link" onClick={() => agregarValores(ti, restantes)} style={{ ...enlace, marginTop: 10, fontSize: 12 }}>
+                                                                Agregar todos
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                )
+                                            })}
+
+                                            {prod.tiposVariante.length < 3 && (
+                                                <button type="button" className="ds-link" onClick={() => set('tiposVariante', [...prod.tiposVariante, { id: 'v' + Date.now(), nombre: '', opciones: [] }])} style={{ ...enlace, marginBottom: 4 }}>
+                                                    <Plus size={14} /> Agregar otra opción
+                                                </button>
+                                            )}
+
+                                            {/* Fotos distintas por valor (ej. Color) — opt-in, nunca asumido:
+                                                un talle de ropa no se ve distinto en la foto. */}
+                                            {tiposValidos.length > 0 && (
+                                                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed var(--color-border)' }}>
+                                                    {opcionSugeridaFoto ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                icon={<ImagePlus size={15} />}
+                                                                onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === opcionSugeridaFoto.id })))}
+                                                            >
+                                                                Subir una foto por cada {opcionSugeridaFoto.nombre.toLowerCase()}
+                                                            </Button>
+                                                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                                Cuando el cliente elige el {opcionSugeridaFoto.nombre.toLowerCase()}, ve su foto.
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                                                        <span style={{ fontSize: 12.5, color: 'var(--color-body)' }}>¿Alguna opción cambia la foto?</span>
+                                                        {[{ id: '', nombre: 'No' }, ...tiposValidos].map(tp => {
+                                                            const activo = tp.id === (opcionVisual?.id ?? '')
+                                                            return (
+                                                                <button
+                                                                    key={tp.id || 'ninguna'}
+                                                                    type="button"
+                                                                    className="ds-hover"
+                                                                    aria-pressed={activo}
+                                                                    onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: !!tp.id && x.id === tp.id })))}
+                                                                    style={{ height: 28, padding: '0 11px', borderRadius: 9999, border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: activo ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer' }}
+                                                                >
+                                                                    {tp.nombre}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                    )}
+                                                    {valoresParaImagen.length > 0 && (
+                                                        <div style={{ marginTop: 12 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                                                                <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                                    Subí las fotos juntas y etiquetá cada una con su {opcionVisual?.nombre.toLowerCase() || 'valor'}. Cuando el cliente lo elija en tu tienda, va a ver esas fotos.
+                                                                </div>
+                                                                {avanzado && (imagenes.some(i => !!i.valorOpcion) || guardadas.some(g => g.optionValueId != null)) && (
+                                                                    <Button
+                                                                        variant="ghost" size="sm"
+                                                                        icon={<Sparkles size={13} strokeWidth={2.2} />}
+                                                                        onClick={() => setModalFondoIAVariantes(true)}
+                                                                        disabled={FONDO_IA_MANTENIMIENTO}
+                                                                        title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
+                                                                    >
+                                                                        Fondo con IA
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                            <GaleriaImagenesEtiquetada
+                                                                pendientes={imagenes.filter(i => !!i.valorOpcion)}
+                                                                guardadas={guardadas.filter(g => g.optionValueId != null)}
+                                                                opciones={opcionVisual?.opciones ?? []}
+                                                                valorDeGuardada={optionValueId => valoresParaImagen.find(v => valorIds.get(v.valor) === optionValueId)?.valor}
+                                                                onAgregar={agregarImagenesVariante}
+                                                                onQuitarPendiente={quitarPendiente}
+                                                                onQuitarGuardada={quitarGuardada}
+                                                                onEtiquetar={etiquetarPendiente}
+                                                                onReorder={reordenarVariante}
+                                                                onQuitarFondo={alternarQuitarFondo}
+                                                                onQuitarFondoGuardada={alternarQuitarFondoGuardada}
+                                                                fondoEnProceso={fondoEnProceso}
+                                                                avanzadoDisponible={avanzado}
+                                                            />
+                                                            {valoresConFotoDuplicada.length > 0 && (
+                                                                <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
+                                                                    Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'}.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Combinaciones: precio y stock. El precio arranca en el de arriba. */}
+                                            <div id="pn-variantes-tabla" style={{ marginTop: 16 }}>
+                                                {combos.length === 0 ? (
+                                                    <div style={{ padding: '14px 16px', borderRadius: 10, border: `1px dashed ${hayFalta('pn-variantes') ? 'var(--color-error)' : 'var(--color-border)'}`, fontSize: 12.5, color: hayFalta('pn-variantes') ? 'var(--color-error)' : 'var(--color-muted)' }}>
+                                                        Tocá los valores que vendés (por ejemplo S, M, L) y acá aparecen las combinaciones para cargar el stock.
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{combos.length} {combos.length === 1 ? 'combinación' : 'combinaciones'}</span>
+                                                            {puedeGrilla ? (
+                                                                <span role="group" aria-label="Qué cargar en las combinaciones" style={{ display: 'inline-flex', gap: 4 }}>
+                                                                    {([['grilla', 'Solo stock'], ['lista', 'Precio y stock']] as const).map(([id, l]) => {
+                                                                        const a = vista === id
+                                                                        return (
+                                                                            <button key={id} type="button" className="ds-hover" aria-pressed={a} onClick={() => setVista(id)} style={{ height: 26, padding: '0 11px', borderRadius: 9999, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: a ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer' }}>
+                                                                                {l}
+                                                                            </button>
+                                                                        )
+                                                                    })}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Todas usan el precio de arriba; cambialo en la que cueste distinto.</span>
+                                                            )}
+                                                        </div>
+                                                        {vistaGrilla ? (
+                                                            <>
+                                                                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 20, rowGap: 8, marginBottom: 8 }}>
+                                                                    {/* El precio que va a tener cada combinación, a la vista: en
+                                                                        esta vista solo se carga stock. */}
+                                                                    <span style={{ fontSize: 12.5, color: hayFalta('pn-precio') ? 'var(--color-error)' : 'var(--color-body)' }}>
+                                                                        {precioMinVariantes <= 0
+                                                                            ? 'Precio: definilo arriba'
+                                                                            : precioUnicoVariantes
+                                                                                ? <>Precio: <strong style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)' }}>{fmtMoney(precioMinVariantes)}</strong> en todas</>
+                                                                                : <>Precios distintos, desde <strong style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)' }}>{fmtMoney(precioMinVariantes)}</strong></>}
+                                                                    </span>
+                                                                    {filas.length > 1 && (
+                                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                                                            <label htmlFor="pn-stock-todas" style={{ fontSize: 12.5, color: 'var(--color-body)' }}>Mismo stock en todas</label>
+                                                                            <input id="pn-stock-todas" className="ds-field" inputMode="numeric" value={stockMasivo} onChange={e => cambiarStockMasivo(e.target.value)} onFocus={e => e.target.select()} placeholder="0" style={{ ...celdaGrande, width: 84 }} />
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <GrillaStock
+                                                                    tipos={tiposValidos}
+                                                                    filas={filas}
+                                                                    onStock={(clave, valor) => setFilas(prev => prev.map(f => f.clave === clave ? { ...f, stock: valor.replace(/\D/g, '') } : f))}
+                                                                />
+                                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
+                                                                    Escribí cuántas unidades tenés de cada combinación. Para cambiar el precio de una o dejar de ofrecerla, elegí &quot;Precio y stock&quot;.
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                        <>
+                                                        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                                                            <div className="pn-vgrid" style={{ padding: '0 12px', height: 34, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600, color: 'var(--color-muted)' }}>
+                                                                <span>Variante</span><span>Precio</span><span>Stock</span><span />
+                                                            </div>
+                                                            {filas.length > 1 && (
+                                                                <div className="pn-vgrid" style={{ padding: '6px 12px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+                                                                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Todas</span>
+                                                                    <span />
+                                                                    <input
+                                                                        className="ds-field"
+                                                                        inputMode="numeric"
+                                                                        value={stockMasivo}
+                                                                        onChange={e => cambiarStockMasivo(e.target.value)}
+                                                                        placeholder="0"
+                                                                        aria-label="Stock para todas las variantes"
+                                                                        style={celdaGrande}
+                                                                    />
+                                                                    <span />
+                                                                </div>
+                                                            )}
+                                                            {filas.map((f, i) => (
+                                                                <div key={f.clave} className="pn-vgrid" style={{ padding: '6px 12px', borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
+                                                                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', overflowWrap: 'anywhere' }}>{f.clave}</span>
+                                                                    <InputPrecio
+                                                                        className="ds-field"
+                                                                        value={f.precio}
+                                                                        disabled={!f.activa}
+                                                                        onChange={v => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: v } : x))}
+                                                                        style={{ ...celdaGrande, ...(errorPrecioFila(f) ? { borderColor: 'var(--color-error)' } : {}) }}
+                                                                        placeholder="0"
+                                                                        mono
+                                                                    />
+                                                                    <input
+                                                                        className="ds-field"
+                                                                        inputMode="numeric"
+                                                                        value={f.stock}
+                                                                        disabled={!f.activa}
+                                                                        onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))}
+                                                                        aria-label={`Stock de ${f.clave}`}
+                                                                        style={celdaGrande}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        className="ds-hover"
+                                                                        aria-label={f.activa ? 'Dejar de ofrecer esta combinación' : 'Volver a ofrecer esta combinación'}
+                                                                        title={f.activa ? 'Dejar de ofrecer esta combinación' : 'Volver a ofrecer esta combinación'}
+                                                                        onClick={() => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: !x.activa } : x))}
+                                                                        style={{ ...iconBtn, width: 30, color: f.activa ? 'var(--color-muted)' : 'var(--color-subtle)' }}
+                                                                    >
+                                                                        {f.activa ? <Eye size={16} strokeWidth={1.6} /> : <EyeOff size={16} strokeWidth={1.6} />}
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {inactivas > 0 && (
+                                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
+                                                                {inactivas} {inactivas === 1 ? 'combinación no se ofrece' : 'combinaciones no se ofrecen'}. Tocá el ojo para volver a ofrecerla.
+                                                            </div>
+                                                        )}
+                                                        </>
+                                                        )}
+                                                    </>
+                                                )}
                                             </div>
-                                        </div>
-                                        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                                            <label style={lbl}>Mínimo para todas</label>
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <input
-                                                    className="ds-field"
-                                                    value={stockMinMasivo}
-                                                    onChange={e => setStockMinMasivo(e.target.value.replace(/\D/g, ''))}
-                                                    placeholder="0"
-                                                    style={{ flex: 1, minWidth: 0, height: 36, padding: '0 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
-                                                />
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={stockMinMasivo === ''}
-                                                    onClick={() => {
-                                                        setFilas(prev => prev.map(f => ({ ...f, stockMin: stockMinMasivo })))
-                                                        setStockMinMasivo('')
-                                                    }}
-                                                >
-                                                    Aplicar a todas
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="ds-tabla pn-vartabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                                    <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span style={{ textAlign: 'center' }}>Activa</span>
-                                    </div>
-                                    {filas.map((f, i) => (
-                                        <div key={f.clave} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
-                                            <span data-col="Variante" data-principal style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{f.clave}</span>
-                                            <div data-col="SKU" style={{ minWidth: 0 }}>
-                                                <input className="ds-field" value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
-                                            </div>
-                                            <div data-col="Precio" style={{ minWidth: 0 }}>
-                                                <InputPrecio className="ds-field" value={f.precio} disabled={!f.activa} onChange={v => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: v } : x))} style={celda} placeholder="0" mono />
-                                            </div>
-                                            <div data-col="Stock" style={{ minWidth: 0 }}>
-                                                <input className="ds-field" value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            </div>
-                                            <div data-col="Mín." style={{ minWidth: 0 }}>
-                                                <input className="ds-field" value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            </div>
-                                            <div data-col="" style={{ justifySelf: 'center' }}>
-                                            <button
-                                                type="button"
-                                                className="ds-hover"
-                                                title={f.activa ? 'Dejar de ofrecer esta combinación' : 'Volver a ofrecer esta combinación'}
-                                                onClick={() => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: !x.activa } : x))}
-                                                style={{ ...iconBtn, color: f.activa ? 'var(--color-success)' : 'var(--color-subtle)', justifySelf: 'center' }}
-                                            >
-                                                {f.activa ? <Eye size={16} strokeWidth={1.6} /> : <EyeOff size={16} strokeWidth={1.6} />}
-                                            </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {filas.length === 0 && (
-                                        <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
-                                            Volvé al paso anterior y cargá al menos una opción con valores.
                                         </div>
                                     )}
-                                </div>
-                                </>
-                            )}
-                        </div>
-                    )}
+                                </Seccion>
 
-                    {/* PASO 4 — Revisión */}
-                    {step === 4 && (
-                        <div>
-                            <StepHd icon={Check} title={editando ? 'Revisá los cambios' : '¡Listo para publicar!'} sub="Verificá que esté todo bien antes de guardar." />
-                            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
-                                <Resumen etiqueta="Nombre" valor={prod.nombre || '-'} />
-                                <Resumen etiqueta="Categoría" valor={categorias.find(c => c.id === prod.categoriaId)?.name ?? 'Sin categoría'} />
-                                <Resumen
-                                    etiqueta="Precio"
-                                    valor={
-                                        prod.tieneVariantes
-                                            ? (precioMinVariantes > 0
-                                                ? `${precioUnicoVariantes ? '' : 'Desde '}${fmtMoney(precioMinVariantes)}`
-                                                : '-')
-                                            : (prod.precio ? fmtMoney(Number(prod.precio)) : '-')
-                                    }
-                                    mono
-                                />
-                                <Resumen etiqueta="Stock total" valor={String(stockTotal)} mono />
-                                <Resumen
-                                    etiqueta="Variantes"
-                                    valor={
-                                        prod.tieneVariantes
-                                            ? (() => {
-                                                const desactivadas = filas.filter(f => !f.activa).length
-                                                return `${filas.length} combinaciones${desactivadas > 0 ? ` (${desactivadas} desactivada${desactivadas === 1 ? '' : 's'})` : ''}`
-                                            })()
-                                            : 'Sin variantes'
-                                    }
-                                />
-                                <Resumen etiqueta="Fotos" valor={`${imagenes.length + guardadas.length}`} mono />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Estado</span>
-                                    <ProductoEstadoBadge estado={prod.estado === 'PUBLISHED' ? 'publicado' : 'borrador'} />
-                                </div>
+                                {/* ── DESCRIPCIÓN: opcional, con la foto y el nombre ya puestos es más fácil ── */}
+                                <Seccion>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                                        <label style={{ ...lbl, marginBottom: 0 }}>Descripción <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span></label>
+                                        <button
+                                            type="button"
+                                            onClick={orbiAsistir}
+                                            disabled={!prod.nombre.trim() || orbiGen}
+                                            className="ds-link"
+                                            style={{ ...enlace, fontSize: 12.5, opacity: prod.nombre.trim() && !orbiGen ? 1 : 0.55, cursor: prod.nombre.trim() && !orbiGen ? 'pointer' : 'default' }}
+                                        >
+                                            {orbiGen ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                            {orbiGen ? 'Redactando…' : 'Redactar con Orbi'}
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        className="ds-field"
+                                        value={prod.descripcion}
+                                        onChange={e => set('descripcion', e.target.value.slice(0, 2000))}
+                                        rows={3}
+                                        aria-label="Descripción"
+                                        style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 84, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }}
+                                    />
+                                </Seccion>
+
+                                {/* ── MÁS DETALLES: todo lo opcional, cerrado por defecto ── */}
+                                <Desplegable
+                                    abierto={masAbierto}
+                                    onToggle={() => setMasAbierto(o => !o)}
+                                    titulo="Más detalles"
+                                    resumen="Etiquetas, especificaciones, video y SKU"
+                                >
+                                    <Bloque titulo="Etiquetas" ayuda="Sirven para agrupar productos.">
+                                        <input
+                                            className="ds-field"
+                                            value={tagInput}
+                                            onChange={e => setTagInput(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); agregarTag(tagInput); setTagInput('') } }}
+                                            placeholder="Escribí una etiqueta y presioná Enter"
+                                            aria-label="Etiquetas"
+                                            style={{ ...inputBase, width: '100%', height: 38, padding: '0 12px', fontSize: 13 }}
+                                        />
+                                        {prod.tags.length > 0 && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                                                {prod.tags.map(tg => (
+                                                    <span key={tg} style={chip}>{tg}
+                                                        <button type="button" className="ds-hover" aria-label={`Quitar ${tg}`} onClick={() => set('tags', prod.tags.filter(x => x !== tg))} style={chipX}><X size={11} strokeWidth={2} /></button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {sugerencias.length > 0 && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, alignItems: 'center' }}>
+                                                <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Ya usaste:</span>
+                                                {sugerencias.map(t => (
+                                                    <button
+                                                        key={t.id}
+                                                        type="button"
+                                                        className="ds-hover"
+                                                        onClick={() => agregarTag(t.name)}
+                                                        title={t.usageCount > 0 ? `En ${t.usageCount} producto${t.usageCount === 1 ? '' : 's'}` : 'Sin usar todavía'}
+                                                        style={chipSugerido}
+                                                    >
+                                                        {t.name}{t.usageCount > 0 && <span style={{ opacity: 0.6 }}> · {t.usageCount}</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </Bloque>
+
+                                    <Bloque
+                                        titulo="Especificaciones técnicas"
+                                        ayuda="Ideal para tecnología, electrodomésticos, herramientas."
+                                        derecha={!mostrarSpecs ? (
+                                            <button type="button" className="ds-link" onClick={() => { setMostrarSpecs(true); if (prod.specs.length === 0) agregarSpec() }} style={enlace}>
+                                                <Plus size={13} /> Agregar
+                                            </button>
+                                        ) : (
+                                            <button type="button" className="ds-link" onClick={() => setMostrarSpecs(false)} style={{ ...enlace, color: 'var(--color-muted)' }}>
+                                                Quitar especificaciones
+                                            </button>
+                                        )}
+                                    >
+                                        {mostrarSpecs && (
+                                            <div>
+                                                {prod.specs.map((sp, i) => (
+                                                    <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                                                        <input className="ds-field" value={sp.label} onChange={e => actualizarSpec(i, 'label', e.target.value.slice(0, 60))} placeholder="Ej: RAM" aria-label="Característica" style={{ ...inputBase, flex: 1, height: 36, padding: '0 10px', fontSize: 13 }} />
+                                                        <input className="ds-field" value={sp.value} onChange={e => actualizarSpec(i, 'value', e.target.value.slice(0, 300))} placeholder="Ej: 16GB" aria-label="Valor" style={{ ...inputBase, flex: 1.4, height: 36, padding: '0 10px', fontSize: 13 }} />
+                                                        <button type="button" className="ds-hover" onClick={() => quitarSpec(i)} aria-label="Quitar" title="Quitar" style={{ width: 32, height: 32, borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
+                                                    <button type="button" className="ds-link" onClick={agregarSpec} style={enlace}><Plus size={13} /> Agregar especificación</button>
+                                                    <button type="button" className="ds-link" onClick={orbiAsistirSpecs} disabled={orbiSpecsGen} style={enlace}>
+                                                        {orbiSpecsGen ? <><Loader2 size={12} className="animate-spin" /> Generando…</> : <><Sparkles size={12} /> Completar con Orbi</>}
+                                                    </button>
+                                                </div>
+                                                {/* Lo que suele llevar la ficha en los rubros del negocio. */}
+                                                {specsPorSugerir.length > 0 && (
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 12 }}>
+                                                        <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Suelen llevar:</span>
+                                                        {specsPorSugerir.map(l => (
+                                                            <button key={l} type="button" className="ds-hover" onClick={() => agregarSpecSugerida(l)} style={chipSugerido}>+ {l}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </Bloque>
+
+                                    <Bloque titulo="Video" ayuda="Se ve junto a las fotos en la ficha del producto.">
+                                        {/* Un solo video por producto. Pegar un link (YouTube/Vimeo/archivo) o
+                                            subir el archivo directo: los dos escriben el mismo campo videoUrl. */}
+                                        {!esVideoArchivo(prod.videoUrl) && (
+                                            <>
+                                                <input
+                                                    className="ds-field"
+                                                    value={prod.videoUrl}
+                                                    onChange={e => set('videoUrl', e.target.value)}
+                                                    placeholder="https://www.youtube.com/watch?v=..."
+                                                    aria-label="Link del video"
+                                                    style={{ ...inputBase, height: 38, padding: '0 12px', fontSize: 13.5, width: '100%', marginBottom: 8 }}
+                                                />
+                                                {prod.videoUrl.trim() !== '' && !parseVideoEmbed(prod.videoUrl) && (
+                                                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginBottom: 8 }}>
+                                                        No reconocemos este link. Probá con uno de YouTube, de Vimeo, o que termine en .mp4
+                                                    </div>
+                                                )}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px' }}>
+                                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                                    <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontWeight: 600 }}>O</span>
+                                                    <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+                                                </div>
+                                            </>
+                                        )}
+                                        <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
+                                    </Bloque>
+
+                                    {!prod.tieneVariantes ? (
+                                        <Bloque titulo="Inventario" ayuda="El código se arma solo a partir del nombre.">
+                                            <div className="pn-3col" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                                <div>
+                                                    <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
+                                                    <button type="button" className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ ...enlace, fontSize: 11.5, marginTop: 4 }}>Regenerar desde el nombre</button>
+                                                </div>
+                                                <div>
+                                                    <PField label="Stock mínimo de alerta" value={prod.stockMinimo} onChange={v => { const limpio = v.replace(/\D/g, ''); set('stockMinimo', limpio); recordarStockMinimo(limpio) }} mono />
+                                                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>Te avisamos cuando el stock baje a este nivel.</div>
+                                                </div>
+                                            </div>
+                                        </Bloque>
+                                    ) : filas.length > 0 && (
+                                        <Bloque titulo="SKU y stock mínimo por variante" ayuda="Los códigos se arman solos. Te avisamos cuando el stock baje del mínimo.">
+                                            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '6px 12px' }}>
+                                                {filas.map((f, i) => (
+                                                    <div key={f.clave} className="pn-vgrid-sku" style={{ padding: '6px 0', borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
+                                                        <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', overflowWrap: 'anywhere' }}>{f.clave}</span>
+                                                        <input className="ds-field" value={f.sku} disabled={!f.activa} aria-label={`SKU de ${f.clave}`} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celdaGrande} />
+                                                        <input className="ds-field" inputMode="numeric" value={f.stockMin} disabled={!f.activa} aria-label={`Stock mínimo de ${f.clave}`} onChange={e => { const limpio = e.target.value.replace(/\D/g, ''); recordarStockMinimo(limpio); setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: limpio } : x)) }} style={celdaGrande} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Bloque>
+                                    )}
+
+                                    {/* Al crear, el estado lo decide el botón (Publicar / Guardar borrador).
+                                        Al editar, se elige acá y "Guardar cambios" lo respeta. */}
+                                    {editando && (
+                                        <Bloque titulo="Estado">
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                {([['PUBLISHED', 'Publicado'], ['DRAFT', 'Borrador']] as [ProductStatus, string][]).map(([id, l]) => {
+                                                    const a = prod.estado === id
+                                                    return (
+                                                        <button key={id} type="button" className="ds-hover" aria-pressed={a} onClick={() => set('estado', id)} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer' }}>
+                                                            {l}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                            {/* Contenido de la ficha (videos con texto): mismo editor que
+                                                Productos → ⋮ → "Contenido de la ficha"; guarda solo. */}
+                                            {editarId && (
+                                                <button type="button" className="ds-link" onClick={() => setContenidoAbierto(true)} style={{ ...enlace, marginTop: 12 }}>
+                                                    Contenido de la ficha <ChevronRight size={13} />
+                                                </button>
+                                            )}
+                                        </Bloque>
+                                    )}
+                                </Desplegable>
+                            </>
+                        )}
+                    </Card>
+
+                    {/* Barra de guardado fija: siempre a mano, sin pasos. */}
+                    {!categoriasCargando && categorias.length > 0 && (
+                        <div
+                            className="pn-barra"
+                            style={{
+                                position: 'sticky', bottom: 0, zIndex: 5, marginTop: 12, padding: '12px 16px',
+                                background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12,
+                                boxShadow: 'var(--shadow-card)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                            }}
+                        >
+                            {!editando && (
+                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-muted)', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={cargarOtro}
+                                        onChange={e => {
+                                            setCargarOtro(e.target.checked)
+                                            try { window.localStorage.setItem(CARGAR_OTRO_KEY, e.target.checked ? '1' : '0') } catch { /* sin storage, no se recuerda */ }
+                                        }}
+                                        style={{ accentColor: 'var(--color-primary)', width: 16, height: 16, margin: 0 }}
+                                    />
+                                    Cargar otro después
+                                </label>
+                            )}
+                            {faltasVisibles.length > 0 && (
+                                <span style={{ fontSize: 12.5, color: 'var(--color-error)', flex: 1, minWidth: 0 }} role="alert">
+                                    Falta {faltasVisibles.map(f => f.texto).join(', ')}.
+                                </span>
+                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                                {editando ? (
+                                    <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                ) : (
+                                    <>
+                                        <Button variant="ghost" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>
+                                        <Button variant="primary" size="lg" onClick={() => intentarGuardar('PUBLISHED')}>Publicar</Button>
+                                    </>
+                                )}
                             </div>
-                            <button
-                                className="ds-hover"
-                                onClick={() => void guardar()}
-                                disabled={!req1 || !req3}
-                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                            >
-                                {editando
-                                    ? <>Guardar cambios</>
-                                    : prod.estado === 'PUBLISHED'
-                                        ? <><Globe size={18} strokeWidth={1.8} /> Crear producto</>
-                                        : <><FileText size={18} strokeWidth={1.8} /> Guardar como borrador</>}
-                            </button>
-                            {(!req1 || !req3) && (
-                                <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 8 }}>
-                                    Falta {faltaNombre ? 'el nombre del producto' : faltaCategoria ? 'seleccionar una categoría' : prod.tieneVariantes ? 'el precio de alguna variante activa' : 'el precio de venta'}.
-                                </div>
-                            )}
-                            {/* Acceso opcional al contenido de la ficha (videos
-                                con texto) — solo editando: es un paso aparte a
-                                propósito, no un paso más del alta. Mismo
-                                editor que Productos → ⋮ → "Contenido de la
-                                ficha"; guarda solo, sin tocar este formulario. */}
-                            {editando && editarId && (
-                                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', textAlign: 'center', margin: '14px 0 0' }}>
-                                    ¿Querés sumar videos con texto a la ficha?{' '}
-                                    <button type="button" onClick={() => setContenidoAbierto(true)} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--color-primary)', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
-                                        Contenido de la ficha →
-                                    </button>
-                                </p>
-                            )}
-                            {contenidoAbierto && editarId && (
-                                <ContenidoFichaModal productId={editarId} onClose={() => setContenidoAbierto(false)} onGuardado={() => onToast?.('Contenido de la ficha guardado')} />
-                            )}
                         </div>
                     )}
 
-                    {/* Footer — grid de 3 columnas (no space-between): con "space-between" el
-                        texto del medio quedaba corrido hacia la izquierda en el paso 4, donde
-                        el lado derecho es un <div/> vacío en vez de un botón del mismo ancho
-                        que el de la izquierda. Con columnas fijas queda centrado siempre. */}
-                    <div className="pn-wizard-nav" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
-                        <div>
-                            {step > 1
-                                ? <Button variant="outline" icon={<ChevronLeft size={14} />} onClick={() => setStep(step - 1)}>Volver</Button>
-                                : <Button variant="outline" onClick={onVolver}>Cancelar</Button>}
-                        </div>
-                        <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'center' }}>Paso {step} de 4</span>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            {step < 4 &&
-                                <Button variant="primary" onClick={next} disabled={!canNext}>Continuar <ChevronRight size={16} strokeWidth={2} /></Button>}
-                        </div>
-                    </div>
-                </Card>
+                    {contenidoAbierto && editarId && (
+                        <ContenidoFichaModal productId={editarId} onClose={() => setContenidoAbierto(false)} onGuardado={() => onToast?.('Contenido de la ficha guardado')} />
+                    )}
+                </div>
 
                 {/* ── Preview en vivo ── */}
                 <div className="pn-preview">
@@ -2936,10 +2739,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 isOpen={modalFondoIA}
                 onClose={() => setModalFondoIA(false)}
                 imagenes={[
-                    ...imagenes.filter(i => !i.valorOpcion).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
+                    ...imagenes.filter(i => !i.valorOpcion && !i.aplicandoFondo).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
                     ...guardadas.filter(g => !g.optionValueId).map((g): ImagenParaFondo => ({ key: g.id, tipo: 'guardada', url: g.url, preview: g.url })),
                 ]}
-                onAplicar={aplicarFondoIA}
+                onAplicarEnSegundoPlano={(origen, resultado) => aplicarFondoEnSegundoPlano(origen, resultado, false)}
                 onToast={onToast}
                 photoType={prod.photoType}
             />
@@ -2948,10 +2751,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 isOpen={modalFondoIAVariantes}
                 onClose={() => setModalFondoIAVariantes(false)}
                 imagenes={[
-                    ...imagenes.filter(i => !!i.valorOpcion).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
+                    ...imagenes.filter(i => !!i.valorOpcion && !i.aplicandoFondo).map((i): ImagenParaFondo => ({ key: i.key, tipo: 'pendiente', file: i.file, preview: i.preview })),
                     ...guardadas.filter(g => g.optionValueId != null).map((g): ImagenParaFondo => ({ key: g.id, tipo: 'guardada', url: g.url, preview: g.url })),
                 ]}
-                onAplicar={aplicarFondoIAVariante}
+                onAplicarEnSegundoPlano={(origen, resultado) => aplicarFondoEnSegundoPlano(origen, resultado, true)}
                 onToast={onToast}
                 photoType={prod.photoType}
             />
@@ -3149,8 +2952,8 @@ function PreviewProducto({
 // (guardadas siempre primero) sin ninguna forma de reordenar ni de saber,
 // de un vistazo, cuál se ve primero en el catálogo.
 type ItemGaleria =
-    | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean; encuadrando?: boolean }
-    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false; encuadrando?: boolean }
+    | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean; encuadrando?: boolean; textoProceso?: string }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false; encuadrando?: boolean; textoProceso?: string }
 
 // Tip de "quitar fondo con IA" — vive una sola vez junto al título de la
 // sección (no repetido por foto, es una recomendación de cómo sacar la
@@ -3445,7 +3248,7 @@ function ControlOrdenFoto({
     )
 }
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta }: {
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onReorder, orden, onQuitarFondo, onQuitarFondoGuardada, fondoEnProceso, avanzadoDisponible, permitePrincipal, compacta, opcionesAsignar, nombreAsignar, onAsignar }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
@@ -3467,11 +3270,16 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     avanzadoDisponible?: boolean
     permitePrincipal?: boolean
     compacta?: boolean
+    /** Valores de la opción con fotos por valor (ej. los colores); vacío = no se ofrece asignar. */
+    opcionesAsignar?: string[]
+    nombreAsignar?: string
+    /** Pasa una foto NUEVA de "general" a la de ese valor. */
+    onAsignar?: (key: string, valor: string) => void
 }) {
     const alto = compacta ? 72 : 96
     const natural: ItemGaleria[] = [
         ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando })),
+        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
     ]
     const items: ItemGaleria[] = orden
         ? [...natural].sort((a, b) => {
@@ -3548,7 +3356,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>Encuadrando…</span>
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
                             </div>
                         )}
                         {/* Controles de orden: número de posición y flechas táctiles */}
@@ -3593,6 +3401,19 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                             {fondoEnProceso?.has(it.id) ? 'Quitando…' : it.quitarFondo ? 'Sin fondo' : 'Quitar fondo'}
                         </button>
                     )}
+                    {onAsignar && opcionesAsignar && opcionesAsignar.length > 0 && it.tipo === 'pendiente' && (
+                        <select
+                            className="ds-field"
+                            value=""
+                            aria-label={`Asignar esta foto a un ${(nombreAsignar || 'valor').toLowerCase()}`}
+                            onChange={e => { if (e.target.value) onAsignar(it.id, e.target.value) }}
+                            onMouseDown={e => e.stopPropagation()}
+                            style={{ width: '100%', height: 24, padding: '0 4px', borderRadius: 5, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-muted)', fontSize: 10.5, fontFamily: 'inherit' }}
+                        >
+                            <option value="">{nombreAsignar || 'Valor'}…</option>
+                            {opcionesAsignar.map(op => <option key={op} value={op}>{op}</option>)}
+                        </select>
+                    )}
                 </div>
             ))}
             <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
@@ -3634,10 +3455,10 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     avanzadoDisponible?: boolean
 }) {
     const alto = 88
-    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean; encuadrando?: boolean }
+    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean; encuadrando?: boolean; textoProceso?: string }
     const items: ItemEtiquetado[] = [
         ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando })),
+        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
     ]
 
     const mover = useCallback((origen: number, destino: number) => {
@@ -3711,7 +3532,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>Encuadrando…</span>
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
                             </div>
                         )}
                         <ControlOrdenFoto
@@ -3779,11 +3600,200 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
-function StepHd({ icon: Icon, title, sub }: { icon: ComponentType<{ size?: number; strokeWidth?: number }>; title: string; sub: string }) {
+// Una sección de la pantalla única: separadas por una línea fina, sin tarjetas
+// anidadas. El título es opcional (el nombre y el precio no lo necesitan).
+function Seccion({ titulo, derecha, primera, id, children }: {
+    titulo?: ReactNode; derecha?: ReactNode; primera?: boolean; id?: string; children: ReactNode
+}) {
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Icon size={20} strokeWidth={1.6} /></div>
-            <div><h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>{title}</h2><div style={{ fontSize: 13, color: 'var(--color-muted)' }}>{sub}</div></div>
+        <section id={id} style={{ padding: primera ? '0 0 22px' : '22px 0', borderTop: primera ? 'none' : '1px solid var(--color-border)' }}>
+            {(titulo || derecha) && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12, minHeight: 32 }}>
+                    <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: 0, display: 'flex', alignItems: 'center', gap: 4 }}>{titulo}</h2>
+                    {derecha}
+                </div>
+            )}
+            {children}
+        </section>
+    )
+}
+
+// Zona grande de subida (arrastrar o tocar) — es lo primero que se ve, así
+// arrancar el producto es soltar la foto. El input queda oculto pero
+// enfocable, así se puede usar con teclado.
+function ZonaSubida({ onArchivos }: { onArchivos: (files: FileList | null) => void }) {
+    const [sobre, setSobre] = useState(false)
+    return (
+        <label
+            className="ds-hover"
+            onDragOver={e => { e.preventDefault(); setSobre(true) }}
+            onDragLeave={() => setSobre(false)}
+            onDrop={e => { e.preventDefault(); setSobre(false); onArchivos(e.dataTransfer.files) }}
+            style={{
+                position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                minHeight: 132, padding: 16, textAlign: 'center', borderRadius: 12, cursor: 'pointer', color: 'var(--color-muted)',
+                border: `1.5px dashed ${sobre ? 'var(--color-primary)' : 'var(--color-border-strong, var(--color-border))'}`,
+                background: sobre ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+            }}
+        >
+            <input
+                type="file" accept="image/*,.heic,.heif" multiple
+                onChange={e => { onArchivos(e.target.files); e.target.value = '' }}
+                aria-label="Subir fotos del producto"
+                style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            />
+            <ImagePlus size={26} strokeWidth={1.5} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Arrastrá tus fotos o tocá para subirlas</span>
+            <span style={{ fontSize: 12 }}>La primera es la principal · PNG, JPG o HEIC · hasta {MAX_IMAGEN_MB}MB</span>
+        </label>
+    )
+}
+
+// El interruptor de variantes tiene que verse desde lejos: es la fila entera
+// (tarjeta con borde y un switch grande), no una línea de texto chica.
+function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={on}
+            className="ds-hover"
+            onClick={() => onChange(!on)}
+            style={{
+                display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '14px 16px', textAlign: 'left',
+                borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                background: on ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                border: `1px solid ${on ? 'var(--color-primary)' : 'var(--color-border)'}`,
+            }}
+        >
+            <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Este producto viene en varias opciones</span>
+                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>Talle, color, tamaño… cada combinación lleva su propio stock.</span>
+            </span>
+            <span aria-hidden style={{ width: 44, height: 24, borderRadius: 12, flexShrink: 0, position: 'relative', transition: 'background 150ms', background: on ? 'var(--color-primary)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border-strong, var(--color-border))' }}>
+                <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 23 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.2)', transition: 'left 150ms' }} />
+            </span>
+        </button>
+    )
+}
+
+// Grilla de stock para productos con DOS opciones (talle × color): una celda por
+// combinación, como una planilla. La opción con más valores va en filas y la de
+// menos en columnas. Enter/flecha abajo pasa a la celda de abajo (y, al final de
+// la columna, a la siguiente); Tab recorre la fila. Al enfocar una celda se
+// selecciona su contenido, así escribir reemplaza el 0.
+function GrillaStock({ tipos, filas, onStock }: {
+    tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void
+}) {
+    const ref = useRef<HTMLDivElement>(null)
+    const [ri, ci] = tipos[0].opciones.length >= tipos[1].opciones.length ? [0, 1] : [1, 0]
+    const opFilas = tipos[ri]
+    const opCols = tipos[ci]
+    const porClave = new Map(filas.map(f => [f.clave, f]))
+    const claveDe = (r: string, c: string) => {
+        const v: string[] = []
+        v[ri] = r
+        v[ci] = c
+        return v.join(' / ')
+    }
+    const ir = (r: number, c: number) => ref.current?.querySelector<HTMLInputElement>(`[data-celda="${r}-${c}"]`)?.focus()
+    const teclas = (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => {
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            if (r + 1 < opFilas.opciones.length) ir(r + 1, c)
+            else if (c + 1 < opCols.opciones.length) ir(0, c + 1)
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            if (r > 0) ir(r - 1, c)
+        }
+    }
+    const celdaHead: React.CSSProperties = { padding: '8px 6px', fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textAlign: 'center', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap' }
+    return (
+        <div ref={ref} style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 10, background: 'var(--color-bg)' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                    {/* Fila 1: a qué opción pertenecen las columnas ("Color"). */}
+                    <tr>
+                        <th style={{ ...celdaHead, borderBottom: 'none', position: 'sticky', left: 0 }} />
+                        <th colSpan={opCols.opciones.length} scope="colgroup" style={{ ...celdaHead, borderBottom: 'none', color: 'var(--color-text)' }}>{opCols.nombre}</th>
+                    </tr>
+                    {/* Fila 2: la opción de las filas ("Talle") y los valores de las columnas. */}
+                    <tr>
+                        <th style={{ ...celdaHead, textAlign: 'left', paddingLeft: 12, color: 'var(--color-text)', position: 'sticky', left: 0 }} scope="col">{opFilas.nombre}</th>
+                        {opCols.opciones.map(c => <th key={c} scope="col" style={{ ...celdaHead, minWidth: 72, fontWeight: 500 }}>{c}</th>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {opFilas.opciones.map((r, i) => (
+                        <tr key={r}>
+                            <th scope="row" style={{ padding: '4px 12px', fontSize: 12.5, fontWeight: 500, textAlign: 'left', color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', background: 'var(--color-bg)', borderBottom: i < opFilas.opciones.length - 1 ? '1px solid var(--color-border)' : 'none', position: 'sticky', left: 0, whiteSpace: 'nowrap' }}>{r}</th>
+                            {opCols.opciones.map((c, j) => {
+                                const f = porClave.get(claveDe(r, c))
+                                return (
+                                    <td key={c} style={{ padding: 4, borderBottom: i < opFilas.opciones.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                        {f ? (
+                                            <input
+                                                className="ds-field"
+                                                data-celda={`${i}-${j}`}
+                                                inputMode="numeric"
+                                                value={f.stock}
+                                                disabled={!f.activa}
+                                                title={f.activa ? undefined : 'No se ofrece — activala en "Precio y stock"'}
+                                                aria-label={`Stock de ${f.clave}`}
+                                                onChange={e => onStock(f.clave, e.target.value)}
+                                                onFocus={e => e.target.select()}
+                                                onKeyDown={e => teclas(e, i, j)}
+                                                style={{ ...celdaGrande, textAlign: 'center', padding: '0 4px', opacity: f.activa ? 1 : 0.4, color: f.stock === '' || f.stock === '0' ? 'var(--color-subtle)' : 'var(--color-text)', fontWeight: f.stock === '' || f.stock === '0' ? 400 : 600 }}
+                                            />
+                                        ) : null}
+                                    </td>
+                                )
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
+// Lo opcional, cerrado por defecto: la pantalla arranca corta y quien necesita
+// etiquetas, ficha técnica, video o costo lo abre con un toque.
+function Desplegable({ abierto, onToggle, titulo, resumen, children }: {
+    abierto: boolean; onToggle: () => void; titulo: string; resumen?: string; children: ReactNode
+}) {
+    return (
+        <section style={{ borderTop: '1px solid var(--color-border)' }}>
+            <button
+                type="button"
+                className="ds-hover"
+                onClick={onToggle}
+                aria-expanded={abierto}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%', padding: '16px 0', background: 'none', border: 'none', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+            >
+                <span style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</span>
+                    {resumen && <span style={{ fontSize: 12.5, color: 'var(--color-muted)', marginLeft: 8 }}>{resumen}</span>}
+                </span>
+                <ChevronDown size={16} style={{ color: 'var(--color-muted)', flexShrink: 0, transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+            </button>
+            {abierto && <div style={{ paddingTop: 4 }}>{children}</div>}
+        </section>
+    )
+}
+
+// Un grupo dentro de "Más detalles": título chico + ayuda en la misma línea.
+function Bloque({ titulo, ayuda, derecha, children }: { titulo: string; ayuda?: string; derecha?: ReactNode; children?: ReactNode }) {
+    return (
+        <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</span>
+                    {ayuda && <span style={{ fontSize: 12, color: 'var(--color-muted)', marginLeft: 8 }}>{ayuda}</span>}
+                </span>
+                {derecha}
+            </div>
+            {children}
         </div>
     )
 }
@@ -3813,15 +3823,6 @@ function SinCategoriasAviso({ negocioId }: { negocioId: string }) {
             >
                 Crear categoría
             </Button>
-        </div>
-    )
-}
-
-function Resumen({ etiqueta, valor, mono }: { etiqueta: string; valor: string; mono?: boolean }) {
-    return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
-            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{etiqueta}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }}>{valor}</span>
         </div>
     )
 }
@@ -3944,14 +3945,14 @@ function InputPrecio({
     )
 }
 
-function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles }: {
-    label: string; value: string; onChange: (v: string) => void; placeholder?: string
-    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean
+function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles, error }: {
+    label: ReactNode; value: string; onChange: (v: string) => void; placeholder?: string
+    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean; error?: boolean
 }) {
     return (
         <div>
             <label style={lbl}>{label}</label>
-            <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: h, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6 }}>
+            <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: h, padding: '0 12px', background: 'var(--color-bg)', border: `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`, borderRadius: 8, gap: 6 }}>
                 {prefix && <span style={{ color: 'var(--color-muted)', fontSize: big ? 18 : 14, fontFamily: '"Geist Mono", monospace' }}>{prefix}</span>}
                 {miles ? (
                     <InputPrecio
@@ -3969,26 +3970,12 @@ function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big
     )
 }
 
-function TogRow({ label, help, on, onChange }: { label: string; help?: string; on: boolean; onChange: (v: boolean) => void }) {
-    return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, cursor: 'pointer' }}>
-            <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{label}</div>
-                {help && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{help}</div>}
-            </div>
-            <span className="ds-hover" onClick={e => { e.preventDefault(); onChange(!on) }} style={{ width: 40, height: 22, borderRadius: 11, background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border)', position: 'relative', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.15)', transition: 'left 200ms' }} />
-            </span>
-        </label>
-    )
-}
-
 // Combobox con búsqueda para elegir categoría — reemplaza al <select> nativo,
 // que con muchas categorías/subcategorías se vuelve tedioso de recorrer
 // (listado plano larguísimo sin forma de filtrar). Mantiene la jerarquía
 // (padre en negrita, hijas indentadas) pero permite escribir para filtrar.
-function CategoriaSelect({ categorias, value, onChange }: {
-    categorias: ApiCategory[]; value: string; onChange: (id: string) => void
+function CategoriaSelect({ categorias, value, onChange, error }: {
+    categorias: ApiCategory[]; value: string; onChange: (id: string) => void; error?: boolean
 }) {
     const [open, setOpen] = useState(false)
     const [q, setQ] = useState('')
@@ -4031,7 +4018,7 @@ function CategoriaSelect({ categorias, value, onChange }: {
                 type="button"
                 className="ds-field"
                 onClick={() => setOpen(o => !o)}
-                style={{ ...inputBase, width: '100%', height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}
+                style={{ ...inputBase, width: '100%', height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', ...(error ? { borderColor: 'var(--color-error)' } : {}) }}
             >
                 <span style={{ fontSize: 14, color: seleccionada ? 'var(--color-text)' : 'var(--color-subtle)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {seleccionada ? seleccionada.name : 'Elegí una categoría'}
@@ -4089,20 +4076,26 @@ function CategoriaSelect({ categorias, value, onChange }: {
     )
 }
 
-function OpInput({ tipo, onAdd }: { tipo: string; onAdd: (v: string) => void }) {
+function OpInput({ tipo, onAdd }: { tipo: string; onAdd: (vals: string[]) => void }) {
     const [v, setV] = useState('')
     const t = tipo.toLowerCase()
-    const ph = t.includes('talle') ? 'Ej: XL' : t.includes('color') ? 'Ej: Negro' : 'Nueva opción'
-    const commit = () => { if (v.trim()) { onAdd(v.trim()); setV('') } }
+    const ph = t.includes('talle') ? 'Otro, o pegá S, M, L' : t.includes('color') ? 'Otro color…' : 'Agregar otro…'
+    // Acepta varios valores juntos, separados por coma, punto y coma o renglón
+    // (una lista pegada de una planilla o de un mensaje).
+    const commit = (texto: string) => {
+        const vals = texto.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean)
+        if (vals.length > 0) { onAdd(vals); setV('') }
+    }
     return (
         <input
             className="ds-field"
             value={v}
-            onChange={e => setV(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit() } }}
-            onBlur={commit}
+            onChange={e => { const nuevo = e.target.value; if (/[,;\n]/.test(nuevo)) commit(nuevo); else setV(nuevo) }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(v) } }}
+            onBlur={() => commit(v)}
             placeholder={ph}
-            style={{ ...inputBase, height: 30, width: 120, padding: '0 10px', fontSize: 12 }}
+            aria-label={`Agregar valor de ${tipo || 'la opción'}`}
+            style={{ ...inputBase, height: 28, width: 150, padding: '0 10px', fontSize: 12 }}
         />
     )
 }
@@ -4113,6 +4106,9 @@ const inputBase: React.CSSProperties = { boxSizing: 'border-box', background: 'v
 const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const celda: React.CSSProperties = { ...inputBase, height: 28, padding: '0 8px', fontSize: 11, fontFamily: '"Geist Mono", monospace', width: '100%' }
 const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500 }
+const celdaGrande: React.CSSProperties = { ...celda, height: 34, fontSize: 13 }
+// Acción de texto (sin caja): el color solo donde se clickea.
+const enlace: React.CSSProperties = { background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 5 }
 const chipX: React.CSSProperties = { background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-primary)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }
 // Algo sugerido que todavía no está puesto — mismo borde punteado que las
 // etiquetas "Ya usaste" del paso 1, así se lee igual en todo el formulario.

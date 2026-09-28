@@ -608,6 +608,23 @@ export interface CostBusinessRow {
   pctOfTotal: number
 }
 
+export interface CostAiUsageRow {
+  /** ai-assist, ai-variants, ai-scan, orbi-chat… */
+  feature: string
+  provider: string
+  model: string | null
+  requests: number
+  promptTokens: number
+  completionTokens: number
+  costUsd: number
+}
+
+export interface CostAiUsageResponse {
+  month: string
+  rows: CostAiUsageRow[]
+  totalUsd: number
+}
+
 export interface CostByBusinessResponse {
   month: string
   businesses: CostBusinessRow[]
@@ -745,6 +762,7 @@ export const platformApi = {
   costsHistory: (months = 6) => getJSON<CostHistoryResponse>(`/platform/costs/history?months=${months}`),
   costsProvider: (slug: string, month?: string) => getJSON<CostProviderDetail>(`/platform/costs/provider/${slug}${month ? `?month=${month}` : ''}`),
   costsByBusiness: (month?: string) => getJSON<CostByBusinessResponse>(`/platform/costs/by-business${month ? `?month=${month}` : ''}`),
+  costsAiUsage: (month?: string) => getJSON<CostAiUsageResponse>(`/platform/costs/ai-usage${month ? `?month=${month}` : ''}`),
   costsLimits: () => getJSON<CostLimitRow[]>('/platform/costs/limits'),
   costsCreateLimit: (body: CreateCostLimitInput) => sendJSON<CostLimitRow>('/platform/costs/limits', 'POST', body),
   costsDeleteLimit: (id: string) => sendJSON<{ ok: true }>(`/platform/costs/limits/${id}`, 'DELETE'),

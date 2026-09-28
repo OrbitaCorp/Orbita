@@ -43,6 +43,12 @@ export class CostsController {
     return this.costs.getByBusiness(month);
   }
 
+  @Get('ai-usage')
+  aiUsage(@Query() query: MonthQueryDto) {
+    const month = query.month ?? new Date().toISOString().slice(0, 7);
+    return this.costs.getAiUsageByFeature(month);
+  }
+
   @Get('usage')
   usage() {
     return this.costs.getUsage();

@@ -35,6 +35,7 @@ import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
+import { AiVariantsDto } from './dto/ai-variants.dto';
 import { SuggestedImagesDto } from './dto/suggested-images.dto';
 import { ProxyImageDto } from './dto/proxy-image.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
@@ -91,6 +92,19 @@ export class ProductsController {
       throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.productAiService.assist(member.businessId, dto);
+  }
+
+  // Opciones de variante para ESTE producto (Almacenamiento y Color para un
+  // celular, Talle para una remera). Pedido corto y aparte del asistente de texto.
+  @Post('ai-variants')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  aiVariants(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiVariantsDto) {
+    const member = assertMemberContext(ctx);
+    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+      throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    return this.productAiService.suggestVariants(member.businessId, dto);
   }
 
   @Post('ai-scan')

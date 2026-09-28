@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLimitDto } from './dto/create-limit.dto';
 import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 import { CostAdapter } from './adapters/adapter.interface';
-import { InternalCostAdapter } from './adapters/internal.adapter';
+import { InternalCostAdapter, PRICING } from './adapters/internal.adapter';
 import { COST_ADAPTERS } from './costs.constants';
 
 const DEFAULT_PROVIDERS = [
@@ -182,6 +182,57 @@ export class CostsService {
       breakdown: (snapshot?.breakdown as Record<string, number>) ?? {},
       source: snapshot?.source ?? 'MANUAL',
     };
+  }
+
+  // Consumo de IA (Gemini y Groq) del mes agrupado por función, proveedor y modelo:
+  // `metadata.feature` lo pone cada ayuda al registrar el uso (ai-assist, ai-variants,
+  // ai-scan…); los eventos del chat de Orbi no traen feature y se agrupan como
+  // 'orbi-chat'. El costo sale del estimatedCostUsd del evento si lo trae y, si no, de
+  // tokens × precio de PRICING (la misma tabla del adapter interno).
+  async getAiUsageByFeature(month: string) {
+    const start = new Date(`${month}-01`);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+
+    const events = await this.prisma.usageEvent.findMany({
+      where: {
+        timestamp: { gte: start, lt: end },
+        category: { in: ['prompt_tokens', 'completion_tokens'] },
+        provider: { slug: { in: ['gemini', 'groq'] } },
+      },
+      select: {
+        category: true,
+        quantity: true,
+        estimatedCostUsd: true,
+        metadata: true,
+        provider: { select: { slug: true } },
+      },
+    });
+
+    type Fila = { feature: string; provider: string; model: string | null; requests: number; promptTokens: number; completionTokens: number; costUsd: number };
+    const filas = new Map<string, Fila>();
+    for (const e of events) {
+      const meta = (e.metadata && typeof e.metadata === 'object' && !Array.isArray(e.metadata) ? e.metadata : {}) as Record<string, unknown>;
+      const feature = typeof meta.feature === 'string' ? meta.feature : 'orbi-chat';
+      const model = typeof meta.model === 'string' ? meta.model : null;
+      const provider = e.provider.slug;
+      const clave = `${feature}|${provider}|${model ?? ''}`;
+      const fila = filas.get(clave) ?? { feature, provider, model, requests: 0, promptTokens: 0, completionTokens: 0, costUsd: 0 };
+      const cantidad = Number(e.quantity);
+      if (e.category === 'prompt_tokens') {
+        // Una llamada registra un evento de entrada y uno de salida: se cuenta por las de entrada.
+        fila.requests += 1;
+        fila.promptTokens += cantidad;
+      } else {
+        fila.completionTokens += cantidad;
+      }
+      fila.costUsd += e.estimatedCostUsd != null ? Number(e.estimatedCostUsd) : cantidad * (PRICING[provider]?.[e.category] ?? 0);
+      filas.set(clave, fila);
+    }
+
+    const rows = [...filas.values()]
+      .map((f) => ({ ...f, costUsd: Math.round(f.costUsd * 1_000_000) / 1_000_000 }))
+      .sort((a, b) => b.costUsd - a.costUsd);
+    return { month, rows, totalUsd: Math.round(rows.reduce((s, r) => s + r.costUsd, 0) * 1_000_000) / 1_000_000 };
   }
 
   async getByBusiness(month: string) {

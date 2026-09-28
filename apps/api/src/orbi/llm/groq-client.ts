@@ -12,6 +12,13 @@ import Groq from 'groq-sdk';
 export const GROQ_DEFAULT_MODEL = 'openai/gpt-oss-120b';
 // product-ai y las tools del wizard: llamadas chicas, JSON acotado.
 export const GROQ_AUX_MODEL = 'openai/gpt-oss-20b';
+// Escaneo de producto por foto: único modelo de Groq que acepta imágenes (los
+// gpt-oss son solo texto). Último recurso si TODOS los modelos Gemini están
+// caídos. Límite de la cuenta on_demand al 2026-09-28: 1000 tokens de salida por
+// minuto, o sea 1-2 escaneos por minuto: alcanza de emergencia, no de carga normal.
+export const GROQ_VISION_MODEL = 'qwen/qwen3.8-27b';
+// Groq rechaza imágenes en base64 de más de 4 MB.
+export const GROQ_MAX_IMAGE_BASE64 = 4 * 1024 * 1024;
 
 export function createGroqClient(config: ConfigService): Groq {
   const apiKey = config.get<string>('GROQ_API_KEY');

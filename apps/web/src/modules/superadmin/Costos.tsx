@@ -683,6 +683,7 @@ export function TabCostos() {
   const { data: limits, loading: loadingLimits } = useFetch(() => platformApi.costsLimits(), [tick])
   const { data: alerts, loading: loadingAlerts } = useFetch(() => platformApi.costsAlerts(), [tick])
   const { data: byBiz, loading: loadingByBiz } = useFetch(() => platformApi.costsByBusiness(), [tick])
+  const { data: aiUsage, loading: loadingAiUsage } = useFetch(() => platformApi.costsAiUsage(), [tick])
 
   const [syncing, setSyncing] = useState(false)
   const [showManual, setShowManual] = useState(false)
@@ -834,6 +835,38 @@ export function TabCostos() {
         </Card>
       </div>
 
+      {/* Consumo de IA por función: qué ayuda gasta cuánto y con qué modelo. */}
+      <Card title="IA por función (mes actual)">
+        {loadingAiUsage && !aiUsage ? (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {Array.from({ length: 3 }, (_, i) => <BusinessRowSkeleton key={i} />)}
+          </div>
+        ) : aiUsage && aiUsage.rows.length > 0 ? (
+          <>
+            <Table
+              head={['Función', 'Modelo', 'Llamadas', 'Tokens entrada', 'Tokens salida', 'Costo est.']}
+              alignRight={[2, 3, 4, 5]}
+              rows={aiUsage.rows.map((r) => ({
+                key: `${r.feature}|${r.provider}|${r.model ?? ''}`,
+                cells: [
+                  <span key="f" style={{ fontWeight: 500 }}>{AI_FEATURE_LABELS[r.feature] ?? r.feature}</span>,
+                  <span key="m" style={{ fontSize: 12, color: 'var(--color-muted)' }}>{r.provider}{r.model ? ` · ${r.model}` : ''}</span>,
+                  <span key="q" style={{ fontFamily: '"Geist Mono", monospace' }}>{r.requests.toLocaleString('es-AR')}</span>,
+                  <span key="p" style={{ fontFamily: '"Geist Mono", monospace' }}>{r.promptTokens.toLocaleString('es-AR')}</span>,
+                  <span key="c" style={{ fontFamily: '"Geist Mono", monospace' }}>{r.completionTokens.toLocaleString('es-AR')}</span>,
+                  <span key="u" style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600 }}>{fmtUsd(r.costUsd)}</span>,
+                ],
+              }))}
+            />
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-muted)' }}>
+              Total estimado: <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtUsd(aiUsage.totalUsd)}</strong>. Los tokens de razonamiento cuentan como salida.
+            </div>
+          </>
+        ) : (
+          <Empty text="Todavía no hay consumo de IA registrado este mes." />
+        )}
+      </Card>
+
       {/* Alertas recientes */}
       <Card title="Alertas recientes">
         {loadingAlerts && !alerts ? (
@@ -863,6 +896,14 @@ export function TabCostos() {
       {showLimit && <LimitModal providers={providers} onClose={() => setShowLimit(false)} onSaved={() => { setShowLimit(false); reload() }} />}
     </div>
   )
+}
+
+// Nombre legible de cada función que registra consumo de IA (metadata.feature).
+const AI_FEATURE_LABELS: Record<string, string> = {
+  'ai-assist': 'Redactar y especificaciones (Orbi)',
+  'ai-variants': 'Sugerir variantes (Orbi)',
+  'ai-scan': 'Escaneo de producto por foto',
+  'orbi-chat': 'Chat de Orbi',
 }
 
 // ─── Alert row ───────────────────────────────────────────────────────────────

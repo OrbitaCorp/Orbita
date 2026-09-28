@@ -1,21 +1,27 @@
-// EstudioFondoModal.tsx — "Fondo con IA" (paquete Avanzado), paso 2 del
-// wizard de producto ("Variantes e imágenes").
+// EstudioFondoModal.tsx — "Fondo con IA" (paquete Avanzado), en la pantalla de
+// alta/edición de producto (ProductoNuevo.tsx).
 //
-// Flujo: el vendedor elige un estilo del catálogo (GET /image-studio/
-// background-styles, con thumbnail real de R2 — incluye "Sin fondo" como
-// primera opción, con tratamiento visual propio, ver checkerboard abajo) →
-// se genera un preview de CADA foto tildada (POST /image-studio/background,
-// de a dos en paralelo) → si confirma, "Aplicar" usa esos mismos resultados
-// (no vuelve a pedirlos) y solo reintenta las que hayan fallado.
+// Flujo: el vendedor tilda las fotos, elige un estilo del catálogo (GET
+// /image-studio/background-styles, con thumbnail real de R2 — incluye "Sin
+// fondo" como primera opción, con tratamiento visual propio, ver checkerboard
+// abajo) y toca "Aplicar a N fotos". El modal se cierra AL INSTANTE: no hay
+// vista previa acá (el formulario ya muestra cómo queda el producto) ni se
+// espera nada — generar un fondo tarda, así que cada foto se pide en segundo
+// plano (POST /image-studio/background, de a dos en paralelo) y el que llama
+// (ver `onAplicarEnSegundoPlano`) la marca como "Aplicando fondo…" en su
+// miniatura y la reemplaza sola cuando llega el resultado.
+//
+// Los estilos se muestran como un slider de dos filas con flechas (no una
+// grilla larga con scroll): con el modal abierto se ve todo sin bajar.
 //
 // Acepta tanto fotos PENDIENTES (recién elegidas en esta sesión, en memoria
 // como File) como YA GUARDADAS (un producto en edición) — para estas
 // últimas se manda `imageUrl` en vez de `file`, el backend la baja server-
 // side (ver ImageStudioService.resolverImagenPorUrl, con chequeo de que sea
 // de nuestro propio storage). Una guardada NUNCA se reemplaza in-place: el
-// resultado se agrega como una foto pendiente NUEVA (ver `onAplicar` — el
-// caller decide qué hacer según `origen.tipo`), porque la original ya
-// guardada sigue siendo válida y el vendedor puede querer conservarla.
+// resultado se agrega como una foto pendiente NUEVA (el caller decide qué
+// hacer según `origen.tipo`), porque la original ya guardada sigue siendo
+// válida y el vendedor puede querer conservarla.
 //
 // "Sin fondo" (SIN_FONDO_KEY en el catálogo) no depende de Cloudflare en
 // absoluto — corre el mismo recorte local (ONNX) que el toggle "Quitar
@@ -28,9 +34,8 @@
 // cualquier estilo, primero intenta Workers AI (timeout de 7s) y si falla
 // (error, NSFW, cuota o timeout) cae al modelo local — sin Gemini, sin
 // distinción de "modo" gratis/premium. "Sin fondo" es siempre ONNX directo.
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Sparkles, Check, AlertCircle, Scissors, Maximize2, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Sparkles, Check, AlertCircle, Scissors, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -43,22 +48,26 @@ const SIN_FONDO_KEY = 'sin_fondo'
 const BLANCO_LISO_KEY = 'blanco_liso'
 const NEGRO_LISO_KEY = 'negro_liso'
 
+// Slider de estilos: siempre dos filas por página.
+const FILAS_ESTILOS = 2
+const ANCHO_MIN_ESTILO = 84
+const GAP_ESTILOS = 8
+
 export type ImagenParaFondo =
     | { key: string; tipo: 'pendiente'; file: File; preview: string }
     | { key: string; tipo: 'guardada'; url: string; preview: string }
 
-type EstadoPreview =
-    | { estado: 'cargando' }
-    | { estado: 'listo'; file: File; url: string }
-    | { estado: 'error'; mensaje: string }
+export interface ResultadoFondo { file: File; url: string }
 
 interface Props {
     isOpen: boolean
     onClose: () => void
     imagenes: ImagenParaFondo[]
-    /** El caller decide qué hacer según `origen.tipo`: reemplazar en el lugar
-     *  (pendiente) o agregar como una foto pendiente nueva (guardada). */
-    onAplicar: (origen: ImagenParaFondo, file: File, preview: string) => void
+    /** Se llama una vez por foto elegida, con la promesa de su resultado, y el
+     *  modal se cierra sin esperarla. El que llama marca la foto como "en
+     *  proceso", la reemplaza (o la agrega, si era una guardada) cuando la
+     *  promesa resuelve y avisa si falla. */
+    onAplicarEnSegundoPlano: (origen: ImagenParaFondo, resultado: Promise<ResultadoFondo>) => void
     onToast: (m: string) => void
     /** Plano o con volumen (Product.photoType) — se manda al backend pero
      *  generateBackground() no lo usa hoy (queda como dato, sin efecto). */
@@ -81,33 +90,44 @@ function nombreDeImagen(img: ImagenParaFondo): string {
     return img.url.split('/').pop()?.split('?')[0] || 'foto.jpg'
 }
 
-export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToast, photoType }: Props) {
+// Cuántas columnas entran en el ancho disponible (mínimo 84px por estilo): el
+// slider las usa para saber cuántos estilos caben en una página de dos filas.
+function useColumnas() {
+    const [ancho, setAncho] = useState(0)
+    const observador = useRef<ResizeObserver | null>(null)
+    const ref = useCallback((el: HTMLDivElement | null) => {
+        observador.current?.disconnect()
+        observador.current = null
+        if (!el) return
+        setAncho(el.clientWidth)
+        const ro = new ResizeObserver(() => setAncho(el.clientWidth))
+        ro.observe(el)
+        observador.current = ro
+    }, [])
+    const columnas = ancho > 0
+        ? Math.max(3, Math.min(8, Math.floor((ancho + GAP_ESTILOS) / (ANCHO_MIN_ESTILO + GAP_ESTILOS))))
+        : 7
+    return { ref, columnas }
+}
+
+export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicarEnSegundoPlano, onToast, photoType }: Props) {
     const [estilos, setEstilos] = useState<ApiBackgroundStyle[] | null>(null)
     const [errorEstilos, setErrorEstilos] = useState<string | null>(null)
     const [estiloElegido, setEstiloElegido] = useState<string | null>(null)
 
-    // Previews: una por cada foto tildada, apenas se elige un estilo — así el
-    // vendedor ve el resultado de TODAS antes de aplicarlo. Cada una tiene su
-    // propio estado (cargando / lista / error) porque pueden fallar por separado
-    // (red, filtro de contenido). `corridaRef` invalida las respuestas de una
-    // corrida vieja cuando se cambia de estilo a mitad de camino.
-    const [previews, setPreviews] = useState<Record<string, EstadoPreview>>({})
-    const corridaRef = useRef(0)
+    // Página del slider de estilos.
+    const [pagina, setPagina] = useState(0)
+    const { ref: gridRef, columnas } = useColumnas()
+    const tamPagina = columnas * FILAS_ESTILOS
+    const totalPaginas = estilos ? Math.max(1, Math.ceil(estilos.length / tamPagina)) : 1
+    const paginaActual = Math.min(pagina, totalPaginas - 1)
+    const estilosDePagina = estilos ? estilos.slice(paginaActual * tamPagina, (paginaActual + 1) * tamPagina) : []
+    const irAPagina = (p: number) => setPagina(Math.max(0, Math.min(totalPaginas - 1, p)))
+    const toqueX = useRef<number | null>(null)
 
-    const [aplicando, setAplicando] = useState(false)
-    const [progreso, setProgreso] = useState({ hecho: 0, total: 0 })
-
-    // El thumbnail del preview es chico (120px) y recortado (object-fit:
-    // cover) — no alcanza para juzgar si el fondo generado realmente queda
-    // bien antes de aplicarlo a las demás fotos. Pedido real: poder verlo
-    // completo. Un lightbox propio (sin librería nueva) que muestra la
-    // imagen entera, sin recortar (contain).
-    const [zoomKey, setZoomKey] = useState<string | null>(null)
-
-    // Qué fotos de la tira de arriba se van a transformar — pedido real: no
-    // forzar "todas o ninguna", poder elegir una sola o un subconjunto. Por
-    // default entran todas (mismo comportamiento que antes, para quien no
-    // toque nada), y cada miniatura funciona como un checkbox.
+    // Qué fotos de la tira de arriba se van a transformar — no forzar "todas o
+    // ninguna", poder elegir una sola o un subconjunto. Por default entran
+    // todas, y cada miniatura funciona como un checkbox.
     const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
     useEffect(() => {
         if (isOpen) setSeleccionadas(new Set(imagenes.map(i => i.key)))
@@ -115,32 +135,15 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
     }, [isOpen])
 
     function toggleSeleccion(key: string) {
-        const agregando = !seleccionadas.has(key)
         setSeleccionadas(prev => {
             const next = new Set(prev)
             if (next.has(key)) next.delete(key)
             else next.add(key)
             return next
         })
-        // Con un estilo ya elegido, una foto que se suma recién ahora se prueba
-        // sola (las demás ya tienen su preview).
-        if (agregando && estiloElegido && !previews[key]) {
-            const img = imagenes.find(i => i.key === key)
-            if (img) void generarUna(img, estiloElegido, corridaRef.current)
-        }
     }
 
     const imagenesElegidas = imagenes.filter(i => seleccionadas.has(i.key))
-    const hayCargando = imagenesElegidas.some(i => previews[i.key]?.estado === 'cargando')
-    const listasCount = imagenesElegidas.filter(i => previews[i.key]?.estado === 'listo').length
-    const previewZoom = zoomKey ? previews[zoomKey] : undefined
-
-    useEffect(() => {
-        if (!zoomKey) return
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoomKey(null) }
-        window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
-    }, [zoomKey])
 
     // Carga el catálogo curado unificado:
     useEffect(() => {
@@ -152,130 +155,73 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
             .then(r => {
                 if (cancelado) return
                 setEstilos(r)
-                if (estiloElegido && !r.some(e => e.key === estiloElegido)) {
-                    setEstiloElegido(null)
-                    limpiarPreviews()
-                }
+                setEstiloElegido(actual => (actual && r.some(e => e.key === actual) ? actual : null))
             })
             .catch(e => { if (!cancelado) setErrorEstilos(e instanceof ApiError ? e.message : 'No se pudieron cargar los estilos') })
         return () => { cancelado = true }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, photoType])
 
     // Al cerrar, se resetea todo — cada apertura arranca de cero (no tiene
-    // sentido recordar el estilo elegido la sesión pasada: el objetivo de
-    // "Fondo con IA" es probar varios hasta encontrar el que gusta).
+    // sentido recordar el estilo elegido la sesión pasada).
     useEffect(() => {
         if (!isOpen) {
             setEstiloElegido(null)
-            limpiarPreviews()
-            setAplicando(false)
-            setProgreso({ hecho: 0, total: 0 })
-            setZoomKey(null)
+            setPagina(0)
         }
     }, [isOpen])
 
-    function limpiarPreviews() {
-        corridaRef.current++
-        setPreviews({})
-    }
-
-    // Genera la preview de UNA foto. Si mientras esperaba se cambió de estilo
-    // (`corrida` ya no es la vigente), el resultado se descarta.
-    async function generarUna(img: ImagenParaFondo, estilo: string, corrida: number) {
-        setPreviews(p => ({ ...p, [img.key]: { estado: 'cargando' } }))
-        try {
-            const r = await panelGenerateProductBackground(origenParaApi(img), { estilo, photoType })
-            if (corrida !== corridaRef.current) return
+    // Pide el fondo de UNA foto y lo deja como archivo listo para usar.
+    function pedirFondo(img: ImagenParaFondo, estilo: string): Promise<ResultadoFondo> {
+        return panelGenerateProductBackground(origenParaApi(img), { estilo, photoType }).then(r => {
             const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
-            setPreviews(p => ({ ...p, [img.key]: { estado: 'listo', file, url: URL.createObjectURL(file) } }))
-        } catch (e) {
-            if (corrida !== corridaRef.current) return
-            setPreviews(p => ({ ...p, [img.key]: { estado: 'error', mensaje: e instanceof ApiError ? e.message : 'No se pudo generar el preview. Probá de nuevo.' } }))
-        }
+            return { file, url: URL.createObjectURL(file) }
+        })
     }
 
-    // Todas las tildadas, de a dos en paralelo (una por una era lento; todas
-    // juntas pisaría el cupo diario y la cola del servidor).
-    async function generarTodas(estilo: string) {
-        const corrida = ++corridaRef.current
-        const lista = imagenesElegidas
-        setPreviews(Object.fromEntries(lista.map(i => [i.key, { estado: 'cargando' } as EstadoPreview])))
-        const cola = [...lista]
-        await Promise.all(Array.from({ length: Math.min(2, cola.length) }, async () => {
-            while (cola.length > 0) {
-                const img = cola.shift()!
-                await generarUna(img, estilo, corrida)
-            }
-        }))
-    }
-
-    function elegirEstilo(key: string) {
-        setEstiloElegido(key)
-        void generarTodas(key)
-    }
-
-    async function aplicarASeleccionadas() {
+    // Cierra el modal y deja los pedidos corriendo: de a dos en paralelo (una
+    // por una era lento; todas juntas pisaría el cupo diario y la cola del
+    // servidor). Si un pedido falla, los siguientes de su carril siguen.
+    function aplicar() {
         if (!estiloElegido || imagenesElegidas.length === 0) return
-        setAplicando(true)
-        setProgreso({ hecho: 0, total: imagenesElegidas.length })
-        try {
-            for (const img of imagenesElegidas) {
-                const p = previews[img.key]
-                if (p?.estado === 'listo') {
-                    // Ya está resuelta (es su preview) — no se vuelve a pedir.
-                    onAplicar(img, p.file, p.url)
-                } else {
-                    // Falló al probarla: se reintenta una vez acá.
-                    try {
-                        const r = await panelGenerateProductBackground(origenParaApi(img), { estilo: estiloElegido, photoType })
-                        const file = base64AFile(r.base64, r.mimeType, nombreDeImagen(img))
-                        onAplicar(img, file, URL.createObjectURL(file))
-                    } catch {
-                        // Una foto puntual puede fallar (red, filtro de contenido) sin
-                        // frenar el resto — mejor aplicar 3 de 4 que ninguna.
-                        onToast(`No se pudo generar el fondo para "${nombreDeImagen(img)}"`)
-                    }
-                }
-                setProgreso(pr => ({ ...pr, hecho: pr.hecho + 1 }))
-            }
-            onToast(imagenesElegidas.length === 1 ? 'Fondo aplicado a la foto' : 'Fondo aplicado a las fotos elegidas')
-            onClose()
-        } finally {
-            setAplicando(false)
-        }
+        const carriles: Promise<unknown>[] = [Promise.resolve(), Promise.resolve()]
+        imagenesElegidas.forEach((img, i) => {
+            const c = i % carriles.length
+            const pedido = carriles[c].then(() => pedirFondo(img, estiloElegido))
+            carriles[c] = pedido.catch(() => undefined)
+            onAplicarEnSegundoPlano(img, pedido)
+        })
+        onToast('Aplicando el fondo… podés seguir cargando el producto, la foto se actualiza sola.')
+        onClose()
     }
+
+    const puedeAplicar = !!estiloElegido && imagenesElegidas.length > 0
 
     return (
-        <Fragment>
         <Modal
             isOpen={isOpen}
-            onClose={aplicando ? () => {} : onClose}
-            dismissable={!aplicando}
+            onClose={onClose}
             title="Fondo con IA"
             maxWidth={760}
             footer={
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', width: '100%' }}>
-                    <Button variant="secondary" size="sm" onClick={onClose} disabled={aplicando}>Cancelar</Button>
-                    <Button
-                        variant="primary" size="sm"
-                        icon={<Check size={14} strokeWidth={2.2} />}
-                        onClick={aplicarASeleccionadas}
-                        disabled={!estiloElegido || hayCargando || listasCount === 0 || imagenesElegidas.length === 0}
-                        loading={aplicando}
-                    >
-                        {aplicando
-                            ? `Aplicando ${progreso.hecho}/${progreso.total}...`
-                            : imagenesElegidas.length === 1 ? 'Aplicar a esta foto' : `Aplicar a ${imagenesElegidas.length} fotos`}
-                    </Button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between', width: '100%', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-muted)', flex: '1 1 220px', minWidth: 0, lineHeight: 1.4 }}>
+                        Se aplica en segundo plano: podés seguir cargando el producto.
+                    </span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+                        <Button
+                            variant="primary" size="sm"
+                            icon={<Check size={14} strokeWidth={2.2} />}
+                            onClick={aplicar}
+                            disabled={!puedeAplicar}
+                        >
+                            {imagenesElegidas.length === 1 ? 'Aplicar a esta foto' : `Aplicar a ${imagenesElegidas.length} fotos`}
+                        </Button>
+                    </div>
                 </div>
             }
         >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.55 }}>
-                    Elegí un estilo de fondo — se prueba en las fotos que tildaste arriba (una sola, algunas, o todas) y ves cómo queda cada una antes de aplicarlo. Podés elegir fondos de estudio, maderas, mármol o los nuevos podios 3D para calzado y accesorios.
-                </div>
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Tira de fotos: cada una es un checkbox — tocarla la
                     suma/saca de lo que se va a aplicar. Por default entran
                     todas. */}
@@ -287,8 +233,7 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                         <button
                             type="button"
                             onClick={() => setSeleccionadas(seleccionadas.size === imagenes.length ? new Set() : new Set(imagenes.map(i => i.key)))}
-                            disabled={aplicando}
-                            style={{ fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', padding: 0, cursor: aplicando ? 'default' : 'pointer', fontWeight: 600 }}
+                            style={{ fontSize: 11, color: 'var(--color-primary)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 600 }}
                         >
                             {seleccionadas.size === imagenes.length ? 'Ninguna' : 'Todas'}
                         </button>
@@ -301,11 +246,10 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                     key={img.key}
                                     type="button"
                                     onClick={() => toggleSeleccion(img.key)}
-                                    disabled={aplicando}
                                     title={elegida ? 'Sacar de la selección' : 'Sumar a la selección'}
                                     style={{
                                         position: 'relative', width: 44, height: 44, padding: 0, flexShrink: 0,
-                                        borderRadius: 6, overflow: 'hidden', cursor: aplicando ? 'default' : 'pointer',
+                                        borderRadius: 6, overflow: 'hidden', cursor: 'pointer',
                                         border: elegida ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                                     }}
                                 >
@@ -322,213 +266,159 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                             )
                         })}
                     </div>
+                    {imagenesElegidas.length === 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--color-error)' }}>
+                            <AlertCircle size={14} strokeWidth={2} />
+                            Elegí al menos una foto para aplicar el fondo.
+                        </div>
+                    )}
                 </div>
 
-                {/* Selector de estilo */}
-                {errorEstilos && <div style={{ fontSize: 12.5, color: 'var(--color-error)' }}>{errorEstilos}</div>}
-                {!estilos && !errorEstilos && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
-                        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} width="100%" height={84} radius={8} delay={i * 40} />)}
+                {/* Selector de estilo: slider de dos filas con flechas. */}
+                <div>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-body)', marginBottom: 8 }}>
+                        Elegí un fondo y aplicalo: lo ves en la vista previa del producto.
                     </div>
-                )}
-                {estilos && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: 8 }}>
-                        {estilos.map(e => {
-                            const elegido = e.key === estiloElegido
-                            return (
-                                <button
-                                    key={e.key}
-                                    type="button"
-                                    onClick={() => elegirEstilo(e.key)}
-                                    disabled={aplicando}
-                                    title={e.label}
-                                    style={{
-                                        position: 'relative', display: 'flex', flexDirection: 'column', gap: 4,
-                                        padding: 0, border: 'none', background: 'none', cursor: aplicando ? 'default' : 'pointer',
-                                        fontFamily: 'inherit', textAlign: 'left',
-                                    }}
-                                >
-                                    <div style={{
-                                        width: '100%', aspectRatio: '1', borderRadius: 8, overflow: 'hidden',
-                                        border: elegido ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                                        outline: elegido ? '2px solid var(--color-primary-bg)' : 'none', outlineOffset: 1,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        // "Sin fondo" (no compone nada, ver ImageStudioController):
-                                        // checkerboard estándar para indicar transparencia. Los
-                                        // estilos premium (Fase 2: texturas + "podio") también
-                                        // llegan sin previewUrl pero no son transparentes — se
-                                        // distinguen por key, ver comentario del import de arriba.
-                                        ...(e.key === SIN_FONDO_KEY ? {
-                                            backgroundImage:
-                                                'linear-gradient(45deg, var(--color-border) 25%, transparent 25%), ' +
-                                                'linear-gradient(-45deg, var(--color-border) 25%, transparent 25%), ' +
-                                                'linear-gradient(45deg, transparent 75%, var(--color-border) 75%), ' +
-                                                'linear-gradient(-45deg, transparent 75%, var(--color-border) 75%)',
-                                            backgroundSize: '12px 12px',
-                                            backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
-                                        } : e.key === BLANCO_LISO_KEY ? {
-                                            background: '#ffffff',
-                                        } : e.key === NEGRO_LISO_KEY ? {
-                                            background: '#000000',
-                                        } : !e.previewUrl ? { background: 'var(--color-primary-bg)' } : {}),
-                                    }}>
-                                        {e.previewUrl
-                                            ? <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                            : e.key === SIN_FONDO_KEY
-                                                ? <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />
-                                                : e.key === BLANCO_LISO_KEY
-                                                    ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.08)' }} />
-                                                    : e.key === NEGRO_LISO_KEY
-                                                        ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#000000', border: '1.5px solid #475569', boxShadow: '0 2px 5px rgba(0,0,0,0.25)' }} />
-                                                        : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
-                                    </div>
-                                    <span style={{
-                                        fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',
-                                        fontWeight: elegido ? 600 : 500, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                                    }}>
-                                        {e.label}
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                )}
-
-                {/* Previews del resultado: una por cada foto tildada */}
-                {estiloElegido && (
-                    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {imagenesElegidas.length === 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-error)' }}>
-                                <AlertCircle size={15} strokeWidth={2} />
-                                Elegí al menos una foto arriba para probar este estilo.
-                            </div>
-                        )}
-                        {imagenesElegidas.length > 0 && (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Sparkles size={14} fill="var(--color-primary)" color="var(--color-primary)" />
-                                Así queda — tocá una foto para verla completa. Si te gusta, aplicalo.
-                            </div>
-                        )}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-                            {imagenesElegidas.map(img => {
-                                const p = previews[img.key]
-                                return (
-                                    <div key={img.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                        <div style={{ position: 'relative', width: '100%', aspectRatio: '1 / 1', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
-                                            {(!p || p.estado === 'cargando') && (
-                                                <div style={{ position: 'absolute', inset: 0 }}>
-                                                    <Skeleton width="100%" height="100%" radius={0} />
-                                                </div>
-                                            )}
-                                            {p?.estado === 'listo' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setZoomKey(img.key)}
-                                                    title="Ver completo"
-                                                    style={{ position: 'absolute', inset: 0, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
-                                                >
-                                                    <img src={p.url} alt="Preview con el nuevo fondo" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                                    <span style={{
-                                                        position: 'absolute', bottom: 6, right: 6, width: 28, height: 28, borderRadius: 8,
-                                                        background: 'rgba(15,23,42,0.65)', color: '#fff', display: 'grid', placeItems: 'center',
-                                                    }}>
-                                                        <Maximize2 size={14} strokeWidth={2.2} />
-                                                    </span>
-                                                </button>
-                                            )}
-                                            {p?.estado === 'error' && (
-                                                <div style={{ position: 'absolute', inset: 0, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center' }}>
-                                                    <AlertCircle size={18} strokeWidth={2} color="var(--color-error)" />
-                                                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', lineHeight: 1.4 }}>{p.mensaje}</div>
-                                                    <Button variant="secondary" size="sm" onClick={() => void generarUna(img, estiloElegido, corridaRef.current)} disabled={aplicando}>
-                                                        Reintentar
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )
-                            })}
+                    {errorEstilos && <div style={{ fontSize: 12.5, color: 'var(--color-error)' }}>{errorEstilos}</div>}
+                    {!estilos && !errorEstilos && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: GAP_ESTILOS }}>
+                            {Array.from({ length: 7 * FILAS_ESTILOS }).map((_, i) => <Skeleton key={i} width="100%" height={84} radius={8} delay={i * 30} />)}
                         </div>
-                        {estiloElegido === SIN_FONDO_KEY && (
-                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <span>💡 <strong>Consejo para recortes limpios:</strong> usá fondos lisos que contrasten con el color de la prenda (evitá alfombras de pelo o fondos del mismo tono).</span>
-                                <span>Si fotografiás un conjunto de 2 piezas, dejalas con unos centímetros de separación.</span>
+                    )}
+                    {estilos && (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <FlechaSlider dir="izq" disabled={paginaActual === 0} onClick={() => irAPagina(paginaActual - 1)} />
+                                <div
+                                    ref={gridRef}
+                                    onTouchStart={e => { toqueX.current = e.touches[0].clientX }}
+                                    onTouchEnd={e => {
+                                        if (toqueX.current == null) return
+                                        const dx = e.changedTouches[0].clientX - toqueX.current
+                                        toqueX.current = null
+                                        if (Math.abs(dx) > 40) irAPagina(paginaActual + (dx < 0 ? 1 : -1))
+                                    }}
+                                    style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${columnas}, minmax(0, 1fr))`, gap: GAP_ESTILOS, alignContent: 'start' }}
+                                >
+                                    {estilosDePagina.map(e => {
+                                        const elegido = e.key === estiloElegido
+                                        return (
+                                            <button
+                                                key={e.key}
+                                                type="button"
+                                                onClick={() => setEstiloElegido(e.key)}
+                                                title={e.label}
+                                                aria-pressed={elegido}
+                                                style={{
+                                                    position: 'relative', display: 'flex', flexDirection: 'column', gap: 4,
+                                                    padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+                                                    fontFamily: 'inherit', textAlign: 'left', minWidth: 0,
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '100%', aspectRatio: '1', borderRadius: 8, overflow: 'hidden',
+                                                    border: elegido ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                                    outline: elegido ? '2px solid var(--color-primary-bg)' : 'none', outlineOffset: 1,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    // "Sin fondo" (no compone nada, ver ImageStudioController):
+                                                    // checkerboard estándar para indicar transparencia. Los
+                                                    // estilos premium (Fase 2: texturas + "podio") también
+                                                    // llegan sin previewUrl pero no son transparentes — se
+                                                    // distinguen por key, ver comentario del import de arriba.
+                                                    ...(e.key === SIN_FONDO_KEY ? {
+                                                        backgroundImage:
+                                                            'linear-gradient(45deg, var(--color-border) 25%, transparent 25%), ' +
+                                                            'linear-gradient(-45deg, var(--color-border) 25%, transparent 25%), ' +
+                                                            'linear-gradient(45deg, transparent 75%, var(--color-border) 75%), ' +
+                                                            'linear-gradient(-45deg, transparent 75%, var(--color-border) 75%)',
+                                                        backgroundSize: '12px 12px',
+                                                        backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                                                    } : e.key === BLANCO_LISO_KEY ? {
+                                                        background: '#ffffff',
+                                                    } : e.key === NEGRO_LISO_KEY ? {
+                                                        background: '#000000',
+                                                    } : !e.previewUrl ? { background: 'var(--color-primary-bg)' } : {}),
+                                                }}>
+                                                    {e.previewUrl
+                                                        ? <img src={e.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                                        : e.key === SIN_FONDO_KEY
+                                                            ? <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />
+                                                            : e.key === BLANCO_LISO_KEY
+                                                                ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.08)' }} />
+                                                                : e.key === NEGRO_LISO_KEY
+                                                                    ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#000000', border: '1.5px solid #475569', boxShadow: '0 2px 5px rgba(0,0,0,0.25)' }} />
+                                                                    : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
+                                                </div>
+                                                <span style={{
+                                                    fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',
+                                                    fontWeight: elegido ? 600 : 500, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                                                }}>
+                                                    {e.label}
+                                                </span>
+                                            </button>
+                                        )
+                                    })}
+                                    {/* Relleno invisible: la última página (con menos estilos) queda de la
+                                        misma altura que las demás y el modal no se mueve al pasar de página. */}
+                                    {Array.from({ length: Math.max(0, tamPagina - estilosDePagina.length) }).map((_, i) => (
+                                        <div key={`relleno-${i}`} aria-hidden style={{ visibility: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            <div style={{ width: '100%', aspectRatio: '1' }} />
+                                            <span style={{ fontSize: 10.5, lineHeight: 1.3 }}>&nbsp;<br />&nbsp;</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <FlechaSlider dir="der" disabled={paginaActual >= totalPaginas - 1} onClick={() => irAPagina(paginaActual + 1)} />
                             </div>
-                        )}
-                    </div>
-                )}
+                            {totalPaginas > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 8 }} role="group" aria-label="Páginas de fondos">
+                                    {Array.from({ length: totalPaginas }).map((_, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => irAPagina(i)}
+                                            aria-label={`Página ${i + 1} de ${totalPaginas}`}
+                                            aria-current={i === paginaActual}
+                                            style={{
+                                                width: i === paginaActual ? 18 : 7, height: 7, borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
+                                                background: i === paginaActual ? 'var(--color-primary)' : 'var(--color-border-strong, var(--color-border))',
+                                                transition: 'width 150ms ease, background 150ms ease',
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {estiloElegido === SIN_FONDO_KEY && (
+                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
+                            <span><strong>Consejo para recortes limpios:</strong> usá fondos lisos que contrasten con el color de la prenda (evitá alfombras de pelo o fondos del mismo tono).</span>
+                            <span>Si fotografiás un conjunto de 2 piezas, dejalas con unos centímetros de separación.</span>
+                        </div>
+                    )}
+                </div>
             </div>
         </Modal>
+    )
+}
 
-        {/* Lightbox: imagen entera, SIN recortar (contain) — renderizado via createPortal en document.body para superar el z-index del Modal. */}
-        {previewZoom?.estado === 'listo' && typeof document !== 'undefined' && createPortal(
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-label="Preview del fondo, tamaño completo"
-                onClick={() => setZoomKey(null)}
-                style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 9999,
-                    background: 'rgba(15,23,42,0.75)',
-                    backdropFilter: 'blur(3px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 24,
-                }}
-            >
-                {/* Modal mediano (no pantalla completa): la imagen se ve entera (contain) */}
-                <div
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                        position: 'relative',
-                        width: 'min(580px, 100%)',
-                        maxHeight: '85vh',
-                        background: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 14,
-                        padding: 16,
-                        boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <img
-                        src={previewZoom.url}
-                        alt="Preview con el nuevo fondo, tamaño completo"
-                        style={{ maxWidth: '100%', maxHeight: 'calc(85vh - 32px)', objectFit: 'contain', borderRadius: 8, display: 'block' }}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setZoomKey(null)}
-                        aria-label="Cerrar"
-                        className="ds-hover"
-                        style={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            width: 32,
-                            height: 32,
-                            borderRadius: '50%',
-                            border: '1px solid var(--color-border)',
-                            background: 'var(--color-surface)',
-                            color: 'var(--color-text)',
-                            display: 'grid',
-                            placeItems: 'center',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                        }}
-                    >
-                        <X size={16} strokeWidth={2.2} />
-                    </button>
-                </div>
-            </div>,
-            document.body
-        )}
-        </Fragment>
+// Flecha del slider de estilos: círculo de 32px, apagada en el primer/último tramo.
+function FlechaSlider({ dir, disabled, onClick }: { dir: 'izq' | 'der'; disabled: boolean; onClick: () => void }) {
+    const Icono = dir === 'izq' ? ChevronLeft : ChevronRight
+    return (
+        <button
+            type="button"
+            className="ds-hover"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={dir === 'izq' ? 'Fondos anteriores' : 'Más fondos'}
+            style={{
+                width: 32, height: 32, flexShrink: 0, borderRadius: '50%', display: 'grid', placeItems: 'center', padding: 0,
+                border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text)',
+                cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.35 : 1, alignSelf: 'center',
+            }}
+        >
+            <Icono size={16} strokeWidth={2} />
+        </button>
     )
 }

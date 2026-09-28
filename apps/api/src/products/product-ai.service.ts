@@ -3,9 +3,23 @@ import { ConfigService } from '@nestjs/config';
 import { ApiError, ThinkingLevel } from '@google/genai';
 import { DEFAULT_MODEL, createGeminiClient, THINKING_MINIMO } from '../orbi/llm/gemini-client';
 import { generarTexto } from '../orbi/llm/text-generation';
+import { createGroqClient, GROQ_MAX_IMAGE_BASE64, GROQ_VISION_MODEL } from '../orbi/llm/groq-client';
+import { esErrorDeDisponibilidad } from '../orbi/llm/llm-errors';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
+import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { AiAssistDto } from './dto/ai-assist.dto';
+import { AiVariantsDto } from './dto/ai-variants.dto';
+
+// Una opción de variante sugerida para ESTE producto (ej. Almacenamiento con
+// 128 GB / 256 GB / 512 GB). `values` son las que se ofrecen; `usual` las más
+// habituales entre ellas. El panel las muestra como sugerencias, nunca las
+// tilda solas.
+export interface SuggestedVariantOption {
+  name: string;
+  values: string[];
+  usual: string[];
+}
 
 export interface AiScanProductResult {
   name: string;
@@ -13,6 +27,7 @@ export interface AiScanProductResult {
   suggestedCategoryId: string | null;
   suggestedTags: string[];
   suggestedSpecs: { label: string; value: string }[];
+  suggestedVariants: SuggestedVariantOption[];
   detectedBrand?: string;
   detectedModel?: string;
   detectedColor?: string;
@@ -30,6 +45,63 @@ export interface AiAssistResult {
   // wizard del panel decide qué campos aplicar según desde qué botón se
   // llamó ("Generar con Orbi" de la info general, o el de especificaciones).
   suggestedSpecs: { label: string; value: string }[];
+}
+
+// Vocabulario común a los dos prompts (asistente por nombre y escaneo por foto):
+// qué es una opción de variante y cómo se devuelve. El modelo del rubro que
+// eligió el negocio NO entra acá a propósito — una tienda de ropa que vende un
+// celular tiene que recibir Almacenamiento/Color, no Talle.
+const VARIANTES_PROMPT =
+  'Opciones de variante sugeridas ("suggestedVariants"): las opciones en las que ESTE producto realmente se vende ' +
+  'en distintas versiones, pensando en el producto en sí y no en el rubro del negocio (celular: Almacenamiento y ' +
+  'Color; zapatilla: Número y Color; remera: Talle y Color; perfume: Tamaño; sillón: Color). Máximo 3 opciones, ' +
+  'cada una {"name": "...", "values": [...], "usual": [...]}: "values" con entre 2 y 12 valores típicos del ' +
+  'mercado argentino, del más común al menos común, cortos y como se escriben ahí (ej. "128 GB", "S", "42", ' +
+  '"Negro"); "usual" con los 2 a 5 más comunes de esa lista. Para colores, si conocés el modelo listá solo los ' +
+  'que existen de verdad (ej. iPhone 16 Pro: Titanio negro, Titanio blanco, Titanio natural, Titanio desierto); si ' +
+  'no los conocés, no inventes: dejá esa opción afuera. Si el producto no suele venir en versiones (un libro, ' +
+  'una pieza única, un servicio), devolvé un array vacío.';
+
+// Pedido propio de variantes (POST /products/ai-variants): corto y sin el resto
+// de la ficha, para que se pueda mandar a un modelo más barato (ver
+// generarTexto) sin arrastrar descripción, categorías ni etiquetas.
+const VARIANTES_SYSTEM_PROMPT =
+  'Asistís a un vendedor que está cargando un producto en la tienda online de un comercio en Argentina. ' +
+  'Con el nombre del producto (y opcionalmente su descripción) sugerís las opciones de variante.\n' +
+  VARIANTES_PROMPT + '\n' +
+  'Devolvé SOLO un JSON con esta forma exacta, sin texto adicional ni markdown: ' +
+  '{"suggestedVariants": [{"name": "...", "values": ["..."], "usual": ["..."]}]}';
+
+// Un modelo que devuelve algo con otra forma no tira abajo el resto de la
+// respuesta: esta parte queda vacía. Tope de 3 opciones y de 12 valores por
+// opción; `usual` solo puede contener valores que estén en `values`.
+export function sanitizarVariantesSugeridas(raw: unknown): SuggestedVariantOption[] {
+  if (!Array.isArray(raw)) return [];
+  const limpiar = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? Array.from(
+          new Set(
+            v
+              .filter((x): x is string => typeof x === 'string')
+              .map((x) => x.trim().slice(0, 30))
+              .filter((x) => x.length > 0),
+          ),
+        )
+      : [];
+
+  const out: SuggestedVariantOption[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    const name = typeof rec.name === 'string' ? rec.name.trim().slice(0, 30) : '';
+    const values = limpiar(rec.values).slice(0, 12);
+    if (!name || values.length < 2) continue;
+    if (out.some((o) => o.name.toLowerCase() === name.toLowerCase())) continue;
+    const usual = limpiar(rec.usual).filter((x) => values.includes(x)).slice(0, 6);
+    out.push({ name, values, usual });
+    if (out.length === 3) break;
+  }
+  return out;
 }
 
 const SYSTEM_PROMPT =
@@ -64,6 +136,7 @@ export class ProductAiService {
     private readonly config: ConfigService,
     private readonly categoriesService: CategoriesService,
     private readonly tagsService: TagsService,
+    private readonly usageMetering: UsageMeteringService,
   ) {}
 
   private get modelo(): string {
@@ -93,64 +166,19 @@ export class ProductAiService {
       contexto.push(`Etiquetas ya usadas por el negocio (preferí reusarlas si aplican): ${tagsUsados.map((t) => t.name).join(', ')}`);
     }
 
-    let raw: string | undefined;
-    let finishReason: string | undefined;
-    try {
-      // El prompt apunta a 10-15 pares label/value + descripción: 800 tokens de
-      // salida no alcanzan y el JSON queda cortado a la mitad (ya no parsea).
-      // 3000 deja margen. Si Gemini no está disponible, generarTexto cae a Groq.
-      const r = await generarTexto(this.config, {
-        system: SYSTEM_PROMPT,
-        user: contexto.join('\n'),
-        maxTokens: 3000,
-        json: true,
-        geminiModel: this.modelo,
-      });
-      raw = r.text;
-      finishReason = r.finishReason; // 'MAX_TOKENS' = cortó por tope de tokens
-    } catch (error) {
-      // "GEMINI_API_KEY / GROQ_API_KEY no configurada" ya viene como 503 con
-      // mensaje claro — se propaga tal cual.
-      if (error instanceof ServiceUnavailableException) throw error;
-      const status = error instanceof ApiError ? error.status : undefined;
-      this.logger.error(`La generación con IA rechazó la descripción (status ${status ?? 'desconocido'}): ${error}`);
-      if (status === 401 || status === 403) {
-        throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
-      }
-      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
-    }
-
-    if (!raw) {
-      this.logger.error(`Gemini no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
-      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
-    }
-
-    // Defensa: algunos modelos envuelven el JSON en fences de markdown pese a
-    // la instrucción de no hacerlo (```json ... ```).
-    const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(limpio);
-    } catch (error) {
-      // finishReason 'MAX_TOKENS' = Gemini cortó la respuesta por tocar el techo
-      // de maxOutputTokens, no porque el JSON esté mal armado — el log lo
-      // distingue así la próxima vez se sabe de entrada que hay que subir el
-      // presupuesto de tokens, sin tener que adivinar mirando el contenido.
-      if (finishReason === 'MAX_TOKENS') {
-        this.logger.error(`Orbi devolvió una respuesta cortada por maxOutputTokens — contenido: ${raw.slice(0, 500)}`);
-      } else {
-        this.logger.error(
-          `Gemini devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
-        );
-      }
-      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
-    }
+    // El prompt apunta a 10-15 pares label/value + descripción: 800 tokens de
+    // salida no alcanzan y el JSON queda cortado a la mitad (ya no parsea).
+    // 3000 deja margen. Si Gemini no está disponible, generarTexto cae a Groq.
+    const parsed = await this.pedirJson(businessId, 'ai-assist', {
+      system: SYSTEM_PROMPT,
+      user: contexto.join('\n'),
+      maxTokens: 3000,
+    });
 
     const result = parsed as Partial<AiAssistResult>;
     const description = typeof result.description === 'string' ? result.description.trim() : '';
     if (!description) {
-      this.logger.error(`La respuesta JSON de Gemini no trae "description" válida: ${raw.slice(0, 500)}`);
+      this.logger.error(`La respuesta JSON de Gemini no trae "description" válida: ${JSON.stringify(parsed).slice(0, 500)}`);
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
@@ -190,6 +218,142 @@ export class ProductAiService {
     return { description, suggestedCategoryId, suggestedTags, suggestedSpecs };
   }
 
+  // Opciones de variante para ESTE producto, pedidas por separado (botón
+  // "Sugerir opciones con Orbi"). Corto a propósito: no genera descripción,
+  // categoría ni ficha.
+  async suggestVariants(businessId: string, dto: AiVariantsDto): Promise<{ suggestedVariants: SuggestedVariantOption[] }> {
+    const contexto: string[] = [`Nombre del producto: ${dto.name}`];
+    if (dto.description) contexto.push(`Descripción: ${dto.description}`);
+
+    // 1500 y no 300: si cae a Groq (razonamiento "low") los tokens de razonamiento
+    // cuentan contra el tope y un margen justo deja el JSON cortado.
+    const parsed = await this.pedirJson(businessId, 'ai-variants', {
+      system: VARIANTES_SYSTEM_PROMPT,
+      user: contexto.join('\n'),
+      maxTokens: 1500,
+    });
+    const bruto = typeof parsed === 'object' && parsed !== null ? (parsed as { suggestedVariants?: unknown }).suggestedVariants : undefined;
+    return { suggestedVariants: sanitizarVariantesSugeridas(bruto) };
+  }
+
+  // Llama al modelo y devuelve el JSON ya parseado. Centraliza lo que toda ayuda de
+  // IA de producto necesita: el mapeo de errores (503 si la IA no está bien
+  // configurada, 500 el resto), el log según el motivo del corte y el registro del
+  // consumo por función (ver registrarUso).
+  private async pedirJson(
+    businessId: string,
+    feature: string,
+    opts: { system: string; user: string; maxTokens: number },
+  ): Promise<unknown> {
+    let raw: string | undefined;
+    let finishReason: string | undefined;
+    try {
+      const r = await generarTexto(this.config, { ...opts, json: true, geminiModel: this.modelo });
+      raw = r.text;
+      finishReason = r.finishReason; // 'MAX_TOKENS' = cortó por tope de tokens
+      this.registrarUso(businessId, feature, r);
+    } catch (error) {
+      // "GEMINI_API_KEY / GROQ_API_KEY no configurada" ya viene como 503 con
+      // mensaje claro — se propaga tal cual.
+      if (error instanceof ServiceUnavailableException) throw error;
+      const status = error instanceof ApiError ? error.status : undefined;
+      this.logger.error(`La generación con IA rechazó el pedido "${feature}" (status ${status ?? 'desconocido'}): ${error}`);
+      if (status === 401 || status === 403) {
+        throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
+      }
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
+    }
+
+    if (!raw) {
+      this.logger.error(`Gemini no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
+    }
+
+    // Defensa: algunos modelos envuelven el JSON en fences de markdown pese a
+    // la instrucción de no hacerlo (```json ... ```).
+    const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    try {
+      return JSON.parse(limpio);
+    } catch (error) {
+      // finishReason 'MAX_TOKENS' = el modelo cortó la respuesta por tocar el techo
+      // de tokens, no porque el JSON esté mal armado — el log lo distingue así la
+      // próxima vez se sabe de entrada que hay que subir el presupuesto.
+      if (finishReason === 'MAX_TOKENS') {
+        this.logger.error(`Orbi devolvió una respuesta cortada por maxOutputTokens — contenido: ${raw.slice(0, 500)}`);
+      } else {
+        this.logger.error(
+          `Gemini devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
+        );
+      }
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
+    }
+  }
+
+  // Registra el consumo de IA de esta llamada en usage_events (el panel de costos
+  // del superadmin lo agrega por proveedor). `metadata.feature` dice QUÉ ayuda lo
+  // gastó (ai-assist, ai-variants, ai-scan) y `metadata.model` con qué modelo
+  // respondió de verdad — la categoría queda en prompt/completion_tokens para que
+  // el cálculo de costo por token de InternalCostAdapter lo tome igual que el
+  // chat de Orbi. Sin await: no demora la respuesta, y track() ya atrapa sus
+  // propios errores.
+  private registrarUso(
+    businessId: string,
+    feature: string,
+    uso: { provider?: 'gemini' | 'groq'; model?: string; promptTokens?: number; completionTokens?: number; viaFallback?: boolean },
+  ): void {
+    // Sin consumo informado no se inventa un 0: se promediaría como llamada gratis.
+    if (!uso.provider || !uso.promptTokens) return;
+    const metadata = { feature, model: uso.model, ...(uso.viaFallback ? { viaFallback: true } : {}) };
+    void this.usageMetering.track({
+      providerSlug: uso.provider, businessId, category: 'prompt_tokens', quantity: uso.promptTokens, unit: 'tokens', metadata,
+    });
+    void this.usageMetering.track({
+      providerSlug: uso.provider, businessId, category: 'completion_tokens', quantity: uso.completionTokens ?? 0, unit: 'tokens', metadata,
+    });
+  }
+
+  // Escaneo de respaldo con el modelo de visión de Groq. Devuelve el JSON ya
+  // parseado o null si no pudo (el llamador sigue con su manejo de error normal:
+  // este camino nunca agrega un error nuevo).
+  private async escanearConGroq(businessId: string, contexto: string, imageBase64: string, mimeType: string): Promise<unknown> {
+    if (imageBase64.length > GROQ_MAX_IMAGE_BASE64) {
+      this.logger.warn('El escaneo no puede caer a Groq: la imagen supera el máximo de 4 MB en base64');
+      return null;
+    }
+    this.logger.warn('Todos los modelos Gemini del escaneo están no disponibles; escaneando con Groq');
+    try {
+      const response = await createGroqClient(this.config).chat.completions.create({
+        model: GROQ_VISION_MODEL,
+        // Groq rechaza el pedido entero (429 "request too large") si la salida esperada
+        // supera los 1000 tokens/min de la cuenta; una ficha típica usa 300-600.
+        max_completion_tokens: 900,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SCAN_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: contexto },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+      });
+      this.registrarUso(businessId, 'ai-scan', {
+        provider: 'groq',
+        model: GROQ_VISION_MODEL,
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        viaFallback: true,
+      });
+      const candidato = intentarParsearJsonScan(response.choices[0]?.message?.content?.trim() ?? '');
+      return candidato && typeof candidato === 'object' && ('name' in candidato || 'description' in candidato) ? candidato : null;
+    } catch (error) {
+      this.logger.error(`El escaneo con Groq (${GROQ_VISION_MODEL}) también falló: ${error}`);
+      return null;
+    }
+  }
+
   async scanProductImage(businessId: string, file: Express.Multer.File): Promise<AiScanProductResult> {
     if (!file || !file.buffer || file.buffer.length === 0) {
       throw new BadRequestException('Falta la imagen a escanear');
@@ -223,6 +387,9 @@ export class ProductAiService {
     let raw: string | undefined;
     let finishReason: string | undefined;
     let parsed: unknown = null;
+    // Cuántos modelos Gemini fallaron por indisponibilidad (429/5xx/red): si fueron
+    // todos, se prueba con Groq (ver abajo).
+    let fallosDeDisponibilidad = 0;
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const model = modelsToTry[i];
@@ -253,6 +420,13 @@ export class ProductAiService {
             responseMimeType: 'application/json',
           },
         });
+        const uso = response.usageMetadata;
+        this.registrarUso(businessId, 'ai-scan', {
+          provider: 'gemini',
+          model,
+          promptTokens: uso?.promptTokenCount ?? undefined,
+          completionTokens: uso ? (uso.candidatesTokenCount ?? 0) + (uso.thoughtsTokenCount ?? 0) : undefined,
+        });
         raw = response.text?.trim();
         finishReason = response.candidates?.[0]?.finishReason;
         if (raw) {
@@ -269,11 +443,18 @@ export class ProductAiService {
         if (status === 401 || status === 403) {
           throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
         }
+        if (esErrorDeDisponibilidad(error)) fallosDeDisponibilidad++;
         // Si falló por límite de cuota o rate limit (429/503), esperar 600ms antes del siguiente modelo
         if (status === 429 || status === 503) {
           await new Promise((r) => setTimeout(r, 600));
         }
       }
+    }
+
+    // Último recurso: Gemini está caído en TODOS sus modelos (no si contestó algo
+    // que no se pudo leer: eso no es indisponibilidad). Solo con GROQ_API_KEY.
+    if (!parsed && fallosDeDisponibilidad === modelsToTry.length && this.config.get<string>('GROQ_API_KEY')) {
+      parsed = await this.escanearConGroq(businessId, contexto.join('\n'), imageBase64, mimeType);
     }
 
     if (!parsed) {
@@ -352,6 +533,7 @@ export class ProductAiService {
       suggestedCategoryId,
       suggestedTags,
       suggestedSpecs,
+      suggestedVariants: sanitizarVariantesSugeridas(result.suggestedVariants),
       ...(detectedBrand ? { detectedBrand } : {}),
       ...(detectedModel ? { detectedModel } : {}),
       ...(detectedColor ? { detectedColor } : {}),
@@ -386,8 +568,9 @@ const SCAN_SYSTEM_PROMPT =
   'extraé entre 6 y 14 especificaciones técnicas reales (Marca, Modelo con SKU específico, Material de caja, Malla, Color del dial, Pantalla, Resistencia al agua, etc.). ' +
   'Si el producto es indumentaria / ropa común (remera, buzo, pollera, short básico, pantalón, campera básica) o artículos simples sin ficha técnica, ' +
   'devolvé un array vacío [] porque la ropa no suele llevar tabla de especificaciones técnicas.\n' +
+  '10) ' + VARIANTES_PROMPT + '\n' +
   'Devolvé ÚNICAMENTE un JSON válido con la siguiente estructura: ' +
-  '{"name": "...", "description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["..."], "detectedBrand": "...", "detectedModel": "...", "detectedColor": "...", "imageSearchQuery": "...", "suggestedSpecs": [{"label": "...", "value": "..."}]}';
+  '{"name": "...", "description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["..."], "detectedBrand": "...", "detectedModel": "...", "detectedColor": "...", "imageSearchQuery": "...", "suggestedSpecs": [{"label": "...", "value": "..."}], "suggestedVariants": [{"name": "...", "values": ["..."], "usual": ["..."]}]}';
 
 function intentarParsearJsonScan(raw: string): unknown {
   const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();

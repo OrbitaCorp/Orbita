@@ -21,6 +21,14 @@ export interface GenerarTextoResult {
   /** Normalizado: 'MAX_TOKENS' cuando el modelo cortó por tope de tokens. */
   finishReason?: string;
   viaFallback: boolean;
+  /** Quién respondió de verdad (si Gemini falló y contestó Groq, es 'groq'). */
+  provider?: 'gemini' | 'groq';
+  model?: string;
+  /** Consumo informado por el proveedor; undefined si no lo informó (un 0
+   *  inventado se promediaría como si la llamada hubiera sido gratis). */
+  promptTokens?: number;
+  /** Incluye los tokens de razonamiento: se cobran como salida. */
+  completionTokens?: number;
 }
 
 /**
@@ -54,10 +62,15 @@ async function conGemini(config: ConfigService, opts: GenerarTextoOpts): Promise
       ...(opts.json ? { responseMimeType: 'application/json' } : {}),
     },
   });
+  const uso = response.usageMetadata;
   return {
     text: response.text?.trim() ?? '',
     finishReason: response.candidates?.[0]?.finishReason,
     viaFallback: false,
+    provider: 'gemini',
+    model: opts.geminiModel,
+    promptTokens: uso?.promptTokenCount ?? undefined,
+    completionTokens: uso ? (uso.candidatesTokenCount ?? 0) + (uso.thoughtsTokenCount ?? 0) : undefined,
   };
 }
 
@@ -78,5 +91,9 @@ async function conGroq(config: ConfigService, opts: GenerarTextoOpts): Promise<G
     text: response.choices[0]?.message?.content?.trim() ?? '',
     finishReason: finish === 'length' ? 'MAX_TOKENS' : finish ?? undefined,
     viaFallback: true,
+    provider: 'groq',
+    model: GROQ_AUX_MODEL,
+    promptTokens: response.usage?.prompt_tokens,
+    completionTokens: response.usage?.completion_tokens,
   };
 }

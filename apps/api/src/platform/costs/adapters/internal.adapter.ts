@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CostAdapter, CostBreakdown } from './adapter.interface';
 
-const PRICING: Record<string, Record<string, number>> = {
+export const PRICING: Record<string, Record<string, number>> = {
   gemini: {
     // gemini-3.6-flash: $0.10/1M input, $0.40/1M output (blended ~$0.25/1M)
     'prompt_tokens': 0.10 / 1_000_000,

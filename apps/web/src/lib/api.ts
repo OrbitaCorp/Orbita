@@ -1964,12 +1964,16 @@ export type AiAssistResult = {
   suggestedCategoryId: string | null
   suggestedTags: string[]
   suggestedSpecs: { label: string; value: string }[]
-  // Opcional: un backend anterior a esta versión no lo manda.
-  suggestedVariants?: AiVariantOption[]
 }
 
 export function panelAiAssist(input: AiAssistInput) {
   return panelRequest<AiAssistResult>('/products/ai-assist', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// Opciones de variante para ESTE producto, en un pedido corto aparte del asistente
+// de texto (no genera descripción, categoría ni ficha).
+export function panelAiVariants(input: { name: string; description?: string }) {
+  return panelRequest<{ suggestedVariants: AiVariantOption[] }>('/products/ai-variants', { method: 'POST', body: JSON.stringify(input) })
 }
 
 export type AiScanProductResult = {

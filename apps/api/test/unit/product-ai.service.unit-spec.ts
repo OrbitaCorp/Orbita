@@ -1,9 +1,10 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ApiError } from '@google/genai';
-import { ProductAiService } from '../../src/products/product-ai.service';
+import { ProductAiService, sanitizarVariantesSugeridas } from '../../src/products/product-ai.service';
 import type { CategoryListItem } from '../../src/categories/categories.service';
 import { generarTexto } from '../../src/orbi/llm/text-generation';
 import { createGeminiClient } from '../../src/orbi/llm/gemini-client';
+import { createGroqClient } from '../../src/orbi/llm/groq-client';
 
 // Unit test de ProductAiService (RBT-684 — Orbi asiste descripción + categoría +
 // etiquetas y escaneo con imagen). No pega a ninguna API: mockea generarTexto/createGeminiClient
@@ -16,10 +17,21 @@ jest.mock('../../src/orbi/llm/gemini-client', () => {
     createGeminiClient: jest.fn(),
   };
 });
+jest.mock('../../src/orbi/llm/groq-client', () => {
+  const actual = jest.requireActual('../../src/orbi/llm/groq-client');
+  return { ...actual, createGroqClient: jest.fn() };
+});
+const createGroqClientMock = createGroqClient as jest.MockedFunction<typeof createGroqClient>;
 const generarTextoMock = generarTexto as jest.MockedFunction<typeof generarTexto>;
 const createGeminiClientMock = createGeminiClient as jest.MockedFunction<typeof createGeminiClient>;
 
 type TagUsado = { id: string; name: string; createdAt: string; usageCount: number };
+
+// Medidor de consumo (UsageMeteringService) simulado: cada test puede mirar los
+// eventos que se habrían guardado en usage_events.
+const trackMock = jest.fn();
+const usageMetering = { track: trackMock } as any;
+beforeEach(() => trackMock.mockReset());
 
 function makeService(
   apiKey: string | undefined,
@@ -29,7 +41,7 @@ function makeService(
   const config = { get: () => apiKey } as any;
   const categoriesService = { findAll: async () => categorias } as any;
   const tagsService = { findAll: async () => tagsUsados } as any;
-  return new ProductAiService(config, categoriesService, tagsService);
+  return new ProductAiService(config, categoriesService, tagsService, usageMetering);
 }
 
 // `impl` recibe los opts de generarTexto y devuelve el texto que "responde" el
@@ -73,6 +85,16 @@ describe('ProductAiService.assist (unit)', () => {
       suggestedTags: ['verano', 'algodón'],
       suggestedSpecs: [],
     });
+  });
+
+  it('assist ya no pide ni devuelve variantes: eso es un pedido aparte', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [], suggestedVariants: [{ name: 'Talle', values: ['S', 'M'] }] }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result).not.toHaveProperty('suggestedVariants');
+    expect((generarTextoMock.mock.calls[0][1] as { system: string }).system).not.toContain('suggestedVariants');
   });
 
   it('devuelve suggestedSpecs cuando el modelo las manda para un producto técnico', async () => {
@@ -224,7 +246,7 @@ describe('ProductAiService.assist (unit)', () => {
     const config = { get: () => 'gsk-test' } as any;
     const categoriesService = { findAll: async () => { throw new Error('db down'); } } as any;
     const tagsService = { findAll: async () => [] } as any;
-    const svc = new ProductAiService(config, categoriesService, tagsService);
+    const svc = new ProductAiService(config, categoriesService, tagsService, usageMetering);
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
 
     await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
@@ -305,6 +327,32 @@ describe('ProductAiService.scanProductImage (unit)', () => {
 
     expect(result.name).toBe('Remera básica lisa');
     expect(result.suggestedSpecs).toEqual([]);
+    expect(result.suggestedVariants).toEqual([]);
+  });
+
+  it('devuelve las variantes sugeridas al escanear un celular, sin tocar las specs', async () => {
+    const svc = makeService('test-key');
+    createGeminiClientMock.mockReturnValue({
+      models: {
+        generateContent: jest.fn().mockResolvedValue({
+          text: JSON.stringify({
+            name: 'Apple iPhone 16 Pro Titanio Desierto',
+            description: 'Smartphone premium.',
+            suggestedCategoryId: null,
+            suggestedTags: ['iphone'],
+            suggestedSpecs: [{ label: 'Marca', value: 'Apple' }],
+            suggestedVariants: [{ name: 'Almacenamiento', values: ['128 GB', '256 GB', '512 GB'], usual: ['128 GB', '256 GB'] }],
+          }),
+        }),
+      },
+    } as any);
+
+    const result = await svc.scanProductImage('biz-1', fakeFile);
+
+    expect(result.suggestedVariants).toEqual([
+      { name: 'Almacenamiento', values: ['128 GB', '256 GB', '512 GB'], usual: ['128 GB', '256 GB'] },
+    ]);
+    expect(result.suggestedSpecs).toEqual([{ label: 'Marca', value: 'Apple' }]);
   });
 
   it('rechaza con 503 si createGeminiClient tira ServiceUnavailableException', async () => {
@@ -317,3 +365,252 @@ describe('ProductAiService.scanProductImage (unit)', () => {
   });
 });
 
+
+describe('ProductAiService.suggestVariants (unit)', () => {
+  it('devuelve las opciones de variante de ESTE producto (no las del rubro del negocio)', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => JSON.stringify({
+      suggestedVariants: [
+        { name: 'Almacenamiento', values: ['128 GB', '256 GB', '512 GB', '1 TB'], usual: ['128 GB', '256 GB'] },
+        { name: 'Color', values: ['Titanio negro', 'Titanio blanco', 'Titanio natural', 'Titanio desierto'], usual: [] },
+      ],
+    }));
+
+    const result = await svc.suggestVariants('biz-1', { name: 'iPhone 16 Pro' });
+
+    expect(result.suggestedVariants).toEqual([
+      { name: 'Almacenamiento', values: ['128 GB', '256 GB', '512 GB', '1 TB'], usual: ['128 GB', '256 GB'] },
+      { name: 'Color', values: ['Titanio negro', 'Titanio blanco', 'Titanio natural', 'Titanio desierto'], usual: [] },
+    ]);
+  });
+
+  it('usa un prompt corto propio (sin descripción, categorías ni ficha) y pasa el nombre y la descripción', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => JSON.stringify({ suggestedVariants: [] }));
+
+    await svc.suggestVariants('biz-1', { name: 'Zapatillas Nike', description: 'Urbanas' });
+
+    const opts = generarTextoMock.mock.calls[0][1] as { system: string; user: string; maxTokens: number; json?: boolean };
+    expect(opts.system).toContain('no en el rubro del negocio');
+    expect(opts.system).not.toContain('suggestedSpecs');
+    expect(opts.user).toContain('Zapatillas Nike');
+    expect(opts.user).toContain('Urbanas');
+    expect(opts.json).toBe(true);
+    expect(opts.maxTokens).toBeLessThan(3000);
+  });
+
+  it('devuelve [] si el modelo responde algo con otra forma o no manda variantes', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => JSON.stringify({ suggestedVariants: 'no es un array' }));
+    expect((await svc.suggestVariants('biz-1', dto)).suggestedVariants).toEqual([]);
+
+    mockGen(async () => JSON.stringify(['algo', 'raro']));
+    expect((await svc.suggestVariants('biz-1', dto)).suggestedVariants).toEqual([]);
+  });
+
+  it('mapea los errores igual que el asistente: 503 si la API key es inválida, 500 si no hay JSON', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => { throw new ApiError({ message: 'Invalid API Key', status: 401 }); });
+    await expect(svc.suggestVariants('biz-1', dto)).rejects.toMatchObject({ status: 503 });
+
+    mockGen(async () => 'esto no es json');
+    await expect(svc.suggestVariants('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+describe('Registro de consumo de IA de producto (unit)', () => {
+  const eventos = () => trackMock.mock.calls.map((c) => c[0]);
+
+  it('assist registra tokens de entrada y salida con proveedor, modelo y función', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => ({
+      text: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }),
+      provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 900, completionTokens: 420,
+    }));
+
+    await svc.assist('biz-1', dto);
+
+    expect(eventos()).toEqual([
+      expect.objectContaining({ providerSlug: 'gemini', businessId: 'biz-1', category: 'prompt_tokens', quantity: 900, unit: 'tokens', metadata: { feature: 'ai-assist', model: 'gemini-3.6-flash' } }),
+      expect.objectContaining({ providerSlug: 'gemini', businessId: 'biz-1', category: 'completion_tokens', quantity: 420, unit: 'tokens', metadata: { feature: 'ai-assist', model: 'gemini-3.6-flash' } }),
+    ]);
+  });
+
+  it('suggestVariants registra su propia función y, si respondió Groq de respaldo, lo marca', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => ({
+      text: JSON.stringify({ suggestedVariants: [] }),
+      provider: 'groq', model: 'openai/gpt-oss-20b', promptTokens: 300, completionTokens: 80, viaFallback: true,
+    }));
+
+    await svc.suggestVariants('biz-1', dto);
+
+    expect(eventos()).toEqual([
+      expect.objectContaining({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 300, metadata: { feature: 'ai-variants', model: 'openai/gpt-oss-20b', viaFallback: true } }),
+      expect.objectContaining({ providerSlug: 'groq', category: 'completion_tokens', quantity: 80 }),
+    ]);
+  });
+
+  it('no registra nada si el proveedor no informó consumo (no inventa un 0)', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }));
+
+    await svc.assist('biz-1', dto);
+
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it('registra el consumo aunque después la respuesta no sea JSON válido (ya se cobró)', async () => {
+    const svc = makeService('gsk-test');
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    mockGen(async () => ({ text: 'esto no es json', provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 500, completionTokens: 50 }));
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+    expect(trackMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('el escaneo con foto registra el consumo de Gemini como ai-scan', async () => {
+    const svc = makeService('test-key');
+    createGeminiClientMock.mockReturnValue({
+      models: {
+        generateContent: jest.fn().mockResolvedValue({
+          text: JSON.stringify({ name: 'Reloj', description: 'Un reloj.', suggestedCategoryId: null, suggestedTags: [], suggestedSpecs: [] }),
+          usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 200, thoughtsTokenCount: 50 },
+        }),
+      },
+    } as any);
+
+    await svc.scanProductImage('biz-1', { buffer: Buffer.from('x'), mimetype: 'image/jpeg', originalname: 't.jpg' } as any);
+
+    expect(eventos()).toEqual([
+      expect.objectContaining({ providerSlug: 'gemini', category: 'prompt_tokens', quantity: 1200, metadata: expect.objectContaining({ feature: 'ai-scan' }) }),
+      // La salida incluye los tokens de razonamiento: se cobran como salida.
+      expect.objectContaining({ providerSlug: 'gemini', category: 'completion_tokens', quantity: 250 }),
+    ]);
+  });
+});
+
+describe('ProductAiService.scanProductImage — respaldo con Groq (unit)', () => {
+  const fakeFile = { buffer: Buffer.from('fake-image-bytes'), mimetype: 'image/jpeg', originalname: 't.jpg' } as any;
+  const eventos = () => trackMock.mock.calls.map((c) => c[0]);
+  const jsonScan = JSON.stringify({ name: 'iPhone 16 Pro', description: 'Smartphone.', suggestedCategoryId: null, suggestedTags: ['iphone'], suggestedSpecs: [] });
+
+  const gemini503 = () => Object.assign(new Error('high demand'), { status: 503 });
+  const geminiCaido = () => createGeminiClientMock.mockReturnValue({ models: { generateContent: jest.fn().mockRejectedValue(gemini503()) } } as any);
+  const groqResponde = (content: string) => {
+    const create = jest.fn().mockResolvedValue({ choices: [{ message: { content } }], usage: { prompt_tokens: 2500, completion_tokens: 400 } });
+    createGroqClientMock.mockReturnValue({ chat: { completions: { create } } } as any);
+    return create;
+  };
+
+  beforeEach(() => {
+    createGeminiClientMock.mockReset();
+    createGroqClientMock.mockReset();
+  });
+
+  it('si TODOS los modelos Gemini están no disponibles, escanea con Groq y registra el consumo como respaldo', async () => {
+    const svc = makeService('test-key');
+    geminiCaido();
+    const create = groqResponde(jsonScan);
+
+    const result = await svc.scanProductImage('biz-1', fakeFile);
+
+    expect(result.name).toBe('iPhone 16 Pro');
+    const args = create.mock.calls[0][0];
+    expect(args.model).toBe('qwen/qwen3.8-27b');
+    expect(args.messages[1].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
+    expect(eventos()).toEqual([
+      expect.objectContaining({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 2500, metadata: { feature: 'ai-scan', model: 'qwen/qwen3.8-27b', viaFallback: true } }),
+      expect.objectContaining({ providerSlug: 'groq', category: 'completion_tokens', quantity: 400 }),
+    ]);
+  });
+
+  it('no usa Groq si Gemini respondió pero con algo ilegible: eso no es indisponibilidad', async () => {
+    const svc = makeService('test-key');
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    createGeminiClientMock.mockReturnValue({ models: { generateContent: jest.fn().mockResolvedValue({ text: 'no es json' }) } } as any);
+
+    await expect(svc.scanProductImage('biz-1', fakeFile)).rejects.toMatchObject({ status: 500 });
+    expect(createGroqClientMock).not.toHaveBeenCalled();
+  });
+
+  it('no usa Groq si un modelo Gemini falló por indisponibilidad pero otro contestó ilegible (no fueron todos)', async () => {
+    const svc = makeService('test-key');
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    const generateContent = jest.fn().mockRejectedValueOnce(gemini503()).mockResolvedValue({ text: 'no es json' });
+    createGeminiClientMock.mockReturnValue({ models: { generateContent } } as any);
+
+    await expect(svc.scanProductImage('biz-1', fakeFile)).rejects.toMatchObject({ status: 500 });
+    expect(createGroqClientMock).not.toHaveBeenCalled();
+  });
+
+  it('sin GROQ_API_KEY no hay respaldo: falla como antes', async () => {
+    const svc = makeService('test-key');
+    (svc as any).config = { get: (k: string) => (k === 'GEMINI_API_KEY' ? 'test-key' : undefined) };
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    geminiCaido();
+
+    await expect(svc.scanProductImage('biz-1', fakeFile)).rejects.toMatchObject({ status: 500 });
+    expect(createGroqClientMock).not.toHaveBeenCalled();
+  });
+
+  it('si Groq también falla (ej. límite de tokens por minuto), devuelve el mismo error de siempre', async () => {
+    const svc = makeService('test-key');
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    geminiCaido();
+    createGroqClientMock.mockReturnValue({ chat: { completions: { create: jest.fn().mockRejectedValue(Object.assign(new Error('rate limit'), { status: 429 })) } } } as any);
+
+    await expect(svc.scanProductImage('biz-1', fakeFile)).rejects.toMatchObject({ status: 500 });
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it('no manda a Groq una imagen que supera su máximo de 4 MB en base64', async () => {
+    const svc = makeService('test-key');
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    geminiCaido();
+
+    await expect(svc.scanProductImage('biz-1', { ...fakeFile, buffer: Buffer.alloc(3.2 * 1024 * 1024) })).rejects.toMatchObject({ status: 500 });
+    expect(createGroqClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('sanitizarVariantesSugeridas (unit)', () => {
+  it('devuelve [] si no es un array', () => {
+    expect(sanitizarVariantesSugeridas(undefined)).toEqual([]);
+    expect(sanitizarVariantesSugeridas({ name: 'Talle' })).toEqual([]);
+    expect(sanitizarVariantesSugeridas('Talle')).toEqual([]);
+  });
+
+  it('descarta opciones sin nombre o con menos de 2 valores, y elementos que no son objetos', () => {
+    expect(sanitizarVariantesSugeridas([
+      { name: '', values: ['S', 'M'] },
+      { name: 'Talle', values: ['S'] },
+      { name: 'Color', values: 'Negro' },
+      null,
+      'Talle',
+      { name: 'Número', values: ['40', '41'], usual: ['40'] },
+    ])).toEqual([{ name: 'Número', values: ['40', '41'], usual: ['40'] }]);
+  });
+
+  it('dedupea valores y nombres, recorta a 12 valores y a 3 opciones', () => {
+    const muchos = Array.from({ length: 20 }, (_, i) => `V${i}`);
+    const r = sanitizarVariantesSugeridas([
+      { name: 'Color', values: ['Negro', ' Negro ', 'Blanco'], usual: [] },
+      { name: 'color', values: ['Rojo', 'Azul'] },
+      { name: 'Talle', values: muchos, usual: muchos },
+      { name: 'Tamaño', values: ['Chico', 'Grande'] },
+      { name: 'Extra', values: ['a', 'b'] },
+    ]);
+    expect(r.map((o) => o.name)).toEqual(['Color', 'Talle', 'Tamaño']);
+    expect(r[0].values).toEqual(['Negro', 'Blanco']);
+    expect(r[1].values).toHaveLength(12);
+    expect(r[1].usual).toHaveLength(6);
+  });
+
+  it('"usual" solo puede tener valores que estén en "values"', () => {
+    const [op] = sanitizarVariantesSugeridas([
+      { name: 'Almacenamiento', values: ['128 GB', '256 GB'], usual: ['256 GB', '2 TB'] },
+    ]);
+    expect(op.usual).toEqual(['256 GB']);
+  });
+});
