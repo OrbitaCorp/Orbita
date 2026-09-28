@@ -9,6 +9,7 @@ import { PageLoader } from '@/components/PageLoader'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
+import { cssPrimarioTienda } from '@/lib/storefront/primarioTema'
 import { getStorefrontConfig, recordStorefrontVisit } from '@/lib/storefront/api'
 import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
 // Solo el tipo: el módulo de plantillas pesa 78 KB y este archivo lo carga
@@ -245,12 +246,9 @@ export default function App({ Component, pageProps }: AppProps) {
                  Next.js termine inyectando cada <style>/<link>, que no está
                  garantizado. Es la única forma de que esto ande siempre,
                  pase lo que pase con el orden real de las hojas de estilo. */
-              :root, .dark {
-                --color-primary: ${ssrColorPrimary} !important;
-                --color-primary-bg: color-mix(in srgb, ${ssrColorPrimary} 15%, transparent) !important;
-              }
-              :root { --color-primary-h: color-mix(in srgb, ${ssrColorPrimary} 82%, black) !important; }
-              .dark { --color-primary-h: color-mix(in srgb, ${ssrColorPrimary} 75%, white) !important; }
+              /* En oscuro un primario oscuro se aclara para que se vea (texto,
+                 hovers, botones): ver primarioTema.ts. */
+              ${cssPrimarioTienda(ssrColorPrimary)}
               ` : ''}
               ${ssrColorBackground ? `
               /* Solo en claro: si el visitante eligió oscuro (toggle más abajo

@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
+import { cssPrimarioTienda } from './primarioTema'
 import type { StorefrontConfigResponse } from './api'
 
 type Appearance = NonNullable<StorefrontConfigResponse['appearance']>
@@ -99,9 +100,7 @@ function aplicarTema(ov: AppearanceOverrides): void {
 
   // Mismas reglas que _app.tsx (ahí desde lo guardado, acá desde el borrador).
   const css = [
-    primario ? `:root, .dark { --color-primary: ${primario} !important; --color-primary-bg: color-mix(in srgb, ${primario} 15%, transparent) !important; }
-      :root { --color-primary-h: color-mix(in srgb, ${primario} 82%, black) !important; }
-      .dark { --color-primary-h: color-mix(in srgb, ${primario} 75%, white) !important; }` : '',
+    primario ? cssPrimarioTienda(primario) : '',
     fondo ? `:root:not(.dark) { --color-bg: ${fondo} !important; }` : '',
     texto ? `:root:not(.dark) { --color-text: ${texto} !important; }` : '',
     acento ? `:root, .dark { --color-accent: ${acento} !important; }` : '',
