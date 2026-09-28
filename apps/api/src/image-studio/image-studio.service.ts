@@ -14,6 +14,7 @@ import {
   DEFAULT_BACKGROUND_STYLE,
   SIN_FONDO_KEY,
   BLANCO_LISO_KEY,
+  NEGRO_LISO_KEY,
   type BackgroundStyle,
 } from './background-styles';
 
@@ -203,7 +204,7 @@ export class ImageStudioService {
 
     const key = estilo ?? DEFAULT_BACKGROUND_STYLE;
     const style: BackgroundStyle | undefined = BACKGROUND_STYLES[key];
-    if (!style && key !== BLANCO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
+    if (!style && key !== BLANCO_LISO_KEY && key !== NEGRO_LISO_KEY) throw new BadRequestException('Estilo de fondo inválido');
 
     // Flujo unificado:
     // 1. Intenta Workers AI (1 solo intento rápido con timeout estricto de 7s).
@@ -211,7 +212,9 @@ export class ImageStudioService {
     //    aplica inmediatamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
     const prompt = key === BLANCO_LISO_KEY
       ? this.promptFondoBlancoLiso(descripcion)
-      : this.promptPremium(style!, descripcion);
+      : key === NEGRO_LISO_KEY
+        ? this.promptFondoNegroLiso(descripcion)
+        : this.promptPremium(style!, descripcion);
     let workersResult: { buffer: Buffer; mimeType: string } | null = null;
     let ultimoError: any = null;
 
@@ -243,6 +246,9 @@ export class ImageStudioService {
     );
     if (key === BLANCO_LISO_KEY) {
       return await this.componerFondoBlanco(origen.buffer, businessId);
+    }
+    if (key === NEGRO_LISO_KEY) {
+      return await this.componerFondoNegro(origen.buffer, businessId);
     }
     return await this.componerConModeloLocal(businessId, origen.buffer, style!, descripcion);
   }
@@ -461,6 +467,122 @@ export class ImageStudioService {
     return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
   }
 
+  // Mismo tratamiento que componerFondoBlanco() pero sobre lienzo negro puro
+  // — con una diferencia real: esa sombra de contacto oscurece, así que sobre
+  // negro no se ve nada (quedaría el producto "flotando" sin ningún anclaje
+  // visual). Acá se usa un aro de luz clara sutil en su lugar (mismo cálculo
+  // de alfil doble capa, pero aclarando en vez de oscureciendo) para dar la
+  // misma sensación de apoyo/profundidad que el contact shadow le da al fondo
+  // blanco.
+  private async componerFondoNegro(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
+    const cutout = await this.backgroundRemoval.removeBackground(origenBuffer, businessId);
+    const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
+    const cutoutWidth = meta.width ?? 1024;
+    const cutoutHeight = meta.height ?? 1024;
+
+    const MARGEN_FONDO = 1.35;
+    const anchoConMargen = Math.round(cutoutWidth * MARGEN_FONDO);
+    const altoConMargen = Math.round(cutoutHeight * MARGEN_FONDO);
+
+    const ASPECT_OBJETIVO = 3 / 4;
+    const productoEsMasAnchoQueElObjetivo = anchoConMargen / altoConMargen > ASPECT_OBJETIVO;
+    const width = productoEsMasAnchoQueElObjetivo ? anchoConMargen : Math.round(altoConMargen * ASPECT_OBJETIVO);
+    const height = productoEsMasAnchoQueElObjetivo ? Math.round(anchoConMargen / ASPECT_OBJETIVO) : altoConMargen;
+    const left = Math.round((width - cutoutWidth) / 2);
+    const top = Math.round((height - cutoutHeight) / 2);
+
+    let composedBuffer: Buffer;
+    try {
+      const prodFull = await sharp({
+        create: {
+          width,
+          height,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .composite([{ input: cutout, left, top }])
+        .png()
+        .toBuffer();
+
+      const alphaFull = await sharp(prodFull).extractChannel(3).raw().toBuffer();
+
+      const alphaContacto = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(4)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      const alphaAmbiente = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
+        .toColourspace('b-w')
+        .blur(22)
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+
+      // Mismas dos capas que componerFondoBlanco(), pero con RGB claro
+      // (aclara) en vez de oscuro — sobre fondo negro, oscurecer no se nota.
+      const contactoRgba = Buffer.alloc(width * height * 4);
+      const ambienteRgba = Buffer.alloc(width * height * 4);
+      for (let i = 0; i < width * height; i++) {
+        contactoRgba[i * 4] = 235;
+        contactoRgba[i * 4 + 1] = 235;
+        contactoRgba[i * 4 + 2] = 235;
+        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.18);
+
+        ambienteRgba[i * 4] = 245;
+        ambienteRgba[i * 4 + 1] = 245;
+        ambienteRgba[i * 4 + 2] = 245;
+        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.08);
+      }
+
+      const rimContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+      const rimAmbiente = await sharp(ambienteRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
+
+      const fondoNegro = await sharp({
+        create: {
+          width,
+          height,
+          channels: 3,
+          background: { r: 0, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      composedBuffer = await sharp(fondoNegro)
+        .composite([
+          { input: rimAmbiente, top: 0, left: 0 },
+          { input: rimContacto, top: 0, left: 0 },
+          { input: prodFull, top: 0, left: 0 },
+        ])
+        .png()
+        .toBuffer();
+    } catch (error) {
+      this.logger.warn(`Error en aro de luz para fondo negro, aplicando composición directa: ${error}`);
+      try {
+        const fondoNegro = await sharp({
+          create: {
+            width,
+            height,
+            channels: 3,
+            background: { r: 0, g: 0, b: 0 },
+          },
+        })
+          .composite([{ input: cutout, left, top }])
+          .png()
+          .toBuffer();
+        composedBuffer = fondoNegro;
+      } catch (fallbackErr) {
+        this.logger.error(`Error crítico en composición fondo negro: ${fallbackErr}`);
+        return { base64: cutout.toString('base64'), mimeType: 'image/png' };
+      }
+    }
+
+    return { base64: composedBuffer.toString('base64'), mimeType: 'image/png' };
+  }
+
   // Instrucción de edición para Workers AI (generateBackground(), 1er intento
   // del flujo unificado): un solo call de edición sobre la foto COMPLETA,
   // reusando style.prompt tal cual (pensado para el catálogo gratis, con
@@ -494,6 +616,21 @@ export class ImageStudioService {
       'Keep the EXACT original color of the product (same hue, saturation and brightness as the source photo) — do not shift white balance, ' +
       'do not recolor, do not apply any color grading or tint to the product. ' +
       'Add only a subtle, clean, soft realistic contact shadow directly underneath the product so it rests naturally on the pure white floor.' +
+      extra
+    );
+  }
+
+  private promptFondoNegroLiso(descripcion?: string): string {
+    const extra = descripcion ? ` Additional style note: ${descripcion}.` : '';
+    return (
+      'This is a product photo. Replace ONLY the background with a seamless, solid, perfectly flat, uniform, pure black (#000000) ' +
+      'studio background, with no texture, no patterns, no props, and no scene details. ' +
+      'Keep the product itself pixel-perfect: same shape, same angle, same text, same numbers, same logos, same stitching, same zippers ' +
+      '— do not redraw, restyle, recolor or reinterpret the product in any way. ' +
+      'Keep the EXACT original color of the product (same hue, saturation and brightness as the source photo) — do not shift white balance, ' +
+      'do not recolor, do not apply any color grading or tint to the product. ' +
+      'Add only a subtle, soft rim light along the product edges so it stands out clearly against the black background, ' +
+      'without adding any visible ground shadow (a dark shadow would not be visible on pure black anyway).' +
       extra
     );
   }

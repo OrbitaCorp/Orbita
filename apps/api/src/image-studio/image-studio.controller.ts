@@ -11,7 +11,7 @@ import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { ListBackgroundStylesDto } from './dto/list-background-styles.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
-import { BACKGROUND_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY } from './background-styles';
+import { BACKGROUND_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY, NEGRO_LISO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
@@ -48,12 +48,13 @@ export class ImageStudioController {
     // frontend le da un tratamiento visual propio con checkerboard.
     const sinFondo = { key: SIN_FONDO_KEY, label: 'Sin fondo (transparente)', previewUrl: null };
     const blancoLiso = { key: BLANCO_LISO_KEY, label: 'Blanco liso', previewUrl: null };
+    const negroLiso = { key: NEGRO_LISO_KEY, label: 'Negro liso', previewUrl: null };
 
     // Catálogo unificado (25/09/2026): sin distinción entre gratis y premium.
     // Incluye los nuevos fondos 3D/podios/alfombra con sus thumbnails locales,
     // y los fondos curados de R2.
     const estilos = Object.entries(BACKGROUND_STYLES)
-      .filter(([key, style]) => key !== BLANCO_LISO_KEY && (!!style.localAsset || !!style.previewUrl || (style.backgroundKeys && style.backgroundKeys.length > 0)))
+      .filter(([key, style]) => key !== BLANCO_LISO_KEY && key !== NEGRO_LISO_KEY && (!!style.localAsset || !!style.previewUrl || (style.backgroundKeys && style.backgroundKeys.length > 0)))
       .map(([key, style]) => {
         let previewUrl: string | null = style.previewUrl ?? null;
         if (!previewUrl && style.backgroundKeys && style.backgroundKeys.length > 0) {
@@ -66,7 +67,7 @@ export class ImageStudioController {
         };
       });
 
-    return [sinFondo, blancoLiso, ...estilos];
+    return [sinFondo, blancoLiso, negroLiso, ...estilos];
   }
 
   @Post('background')

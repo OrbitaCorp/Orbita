@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
-import { BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY } from '../background-styles';
+import { BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY, NEGRO_LISO_KEY } from '../background-styles';
 
 export class GenerateBackgroundDto {
   // Sin efecto en el flujo actual (ImageStudioService.generateBackground()
@@ -15,10 +15,10 @@ export class GenerateBackgroundDto {
   // Key del catálogo curado (ver background-styles.ts) — "madera",
   // "marmol_plantas", "lino_flores", etc. — o SIN_FONDO_KEY para no
   // componer nada (mismo resultado que el toggle "Quitar fondo" de
-  // siempre), o BLANCO_LISO_KEY para fondo blanco puro de estudio. Si
-  // viene vacío, se usa DEFAULT_BACKGROUND_STYLE.
+  // siempre), o BLANCO_LISO_KEY/NEGRO_LISO_KEY para fondo blanco o negro
+  // puro de estudio. Si viene vacío, se usa DEFAULT_BACKGROUND_STYLE.
   @IsOptional()
-  @IsIn([...BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY])
+  @IsIn([...BACKGROUND_STYLE_KEYS, SIN_FONDO_KEY, BLANCO_LISO_KEY, NEGRO_LISO_KEY])
   estilo?: string;
 
   // Ajuste libre ADEMÁS del estilo elegido (ej. "con tonos más fríos", "sin

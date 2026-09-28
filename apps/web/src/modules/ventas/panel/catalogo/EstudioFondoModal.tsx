@@ -41,6 +41,7 @@ import { ApiError, panelListBackgroundStyles, panelGenerateProductBackground, ty
 // transparencia.
 const SIN_FONDO_KEY = 'sin_fondo'
 const BLANCO_LISO_KEY = 'blanco_liso'
+const NEGRO_LISO_KEY = 'negro_liso'
 
 export type ImagenParaFondo =
     | { key: string; tipo: 'pendiente'; file: File; preview: string }
@@ -367,6 +368,8 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                             backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
                                         } : e.key === BLANCO_LISO_KEY ? {
                                             background: '#ffffff',
+                                        } : e.key === NEGRO_LISO_KEY ? {
+                                            background: '#000000',
                                         } : !e.previewUrl ? { background: 'var(--color-primary-bg)' } : {}),
                                     }}>
                                         {e.previewUrl
@@ -375,7 +378,9 @@ export function EstudioFondoModal({ isOpen, onClose, imagenes, onAplicar, onToas
                                                 ? <Scissors size={22} strokeWidth={1.6} color="var(--color-muted)" />
                                                 : e.key === BLANCO_LISO_KEY
                                                     ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#ffffff', border: '1.5px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.08)' }} />
-                                                    : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
+                                                    : e.key === NEGRO_LISO_KEY
+                                                        ? <div style={{ width: 28, height: 28, borderRadius: 6, background: '#000000', border: '1.5px solid #475569', boxShadow: '0 2px 5px rgba(0,0,0,0.25)' }} />
+                                                        : <Sparkles size={20} strokeWidth={1.8} color="var(--color-primary)" />}
                                     </div>
                                     <span style={{
                                         fontSize: 10.5, lineHeight: 1.3, color: elegido ? 'var(--color-primary)' : 'var(--color-muted)',

@@ -57,6 +57,11 @@ export const BACKGROUND_STYLES: Record<string, BackgroundStyle> = {
     prompt:
       'a seamless, solid, perfectly flat, uniform, pure white (#FFFFFF) studio background, with no texture, no patterns, no props, and no scene details, clean studio lighting with a subtle soft contact shadow under the product',
   },
+  negro_liso: {
+    label: 'Negro liso',
+    prompt:
+      'a seamless, solid, perfectly flat, uniform, pure black (#000000) studio background, with no texture, no patterns, no props, and no scene details, clean studio lighting with a subtle soft rim light on the product edges',
+  },
   podio_lujo_flores: {
     label: 'Podio de lujo con flores (cosmética, joyas, tech)',
     prompt:
@@ -231,3 +236,10 @@ export const SIN_FONDO_KEY = 'sin_fondo';
 // "Blanco liso": recorte local montado sobre un lienzo blanco puro (#ffffff)
 // con sombra orgánica de contacto sutil. Sin texturas ni elementos distractores.
 export const BLANCO_LISO_KEY = 'blanco_liso';
+
+// "Negro liso": mismo tratamiento que blanco_liso pero sobre lienzo negro
+// puro (#000000) — pedido explícito (28/09/2026). La sombra de contacto de
+// componerFondoBlanco() (oscurece) no se ve sobre negro, así que
+// componerFondoNegro() usa un aro de luz clara sutil alrededor del producto
+// en su lugar, para que no quede "flotando" sin ningún anclaje visual.
+export const NEGRO_LISO_KEY = 'negro_liso';
