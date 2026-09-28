@@ -474,7 +474,50 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
     const secTextos = (
         <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft} ayuda={AYUDA_SECCIONES.textos}>
-            <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+            {/* Varios ítems en el mismo campo (textoEnvio), uno por línea:
+                ver mensajesAnuncio() en AnnouncementBar.tsx. El tope de 200
+                caracteres es el del backend (shippingText), contando los
+                saltos de línea. */}
+            <div style={{ marginBottom: 6 }}>
+                <FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'. Podés cargar varios ítems: con la cartelera se deslizan uno tras otro, y fijo van rotando.">Mensajes del banner debajo del header</FieldLabel>
+                {(() => {
+                    const items = ap.textoEnvio.split('\n')
+                    const guardar = (n: string[]) => set('textoEnvio', n.join('\n'))
+                    return (
+                        <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                                {items.map((t, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <Inp value={t} onChange={v => guardar(items.map((x, j) => j === i ? v : x))} maxLength={Math.max(t.length, 200 - (ap.textoEnvio.length - t.length))} />
+                                        </div>
+                                        {items.length > 1 && (
+                                            <button
+                                                onClick={() => guardar(items.filter((_, j) => j !== i))}
+                                                title="Quitar"
+                                                style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
+                                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            {items.length < 5 && ap.textoEnvio.length < 200 && (
+                                <button
+                                    onClick={() => guardar([...items, ''])}
+                                    className="ds-hover"
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                                >
+                                    <Plus size={14} strokeWidth={2} /> Agregar ítem
+                                </button>
+                            )}
+                        </>
+                    )
+                })()}
+            </div>
             {/* Pedido explícito del dueño: que el banner se pueda
                 mostrar como cartelera (se desliza en loop) en vez
                 de quedarse fijo centrado — mandó de referencia

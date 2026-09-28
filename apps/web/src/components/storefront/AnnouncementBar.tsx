@@ -1,7 +1,20 @@
 // Banner angosto debajo del header. `text`/`visible` vienen de Apariencia
 // (StorefrontConfig.shippingText/showAnnouncementBar) — los defaults acá
 // abajo son solo para páginas que todavía no pasan esos props.
+import { useEffect, useState } from 'react'
+
 const DEFAULT_TEXT = 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'
+
+// El banner puede tener varios ítems (ej. "Showroom" y "Envíos" por separado).
+// Se guardan en el MISMO campo de siempre (shippingText) uno por línea, así no
+// hizo falta tocar la API ni la base: un texto de un solo renglón, como los que
+// ya cargaron los negocios, sigue siendo un banner de un solo ítem.
+export function mensajesAnuncio(text?: string | null): string[] {
+  return (text ?? '').split('\n').map(t => t.trim()).filter(Boolean)
+}
+
+// Cada cuánto cambia de ítem el banner fijo cuando tiene más de uno.
+const ROTACION_MS = 4000
 
 // Cuántas veces se repite el mensaje en el modo cartelera — tiene que
 // alcanzar para llenar la pantalla más ancha realista (~2560px) sin que se
@@ -14,7 +27,21 @@ const DEFAULT_TEXT = 'Envíos gratis en compras mayores a $30.000 · Cambios en 
 const REPETICIONES = 6
 
 export function AnnouncementBar({ text, visible = true, scroll = false, dark = false }: { text?: string | null; visible?: boolean; scroll?: boolean; dark?: boolean }) {
-  const contenido = text?.trim() || DEFAULT_TEXT
+  const parsed = mensajesAnuncio(text)
+  const mensajes = parsed.length > 0 ? parsed : [DEFAULT_TEXT]
+  const multiple = mensajes.length > 1
+
+  // Modo fijo con varios ítems: se muestran de a uno, rotando. Todos juntos en
+  // una línea no entran en un celular (el banner mide 40px y no envuelve).
+  // Con "menos movimiento" activado no rota: queda el primero, fijo.
+  const [activo, setActivo] = useState(0)
+  useEffect(() => {
+    if (scroll || !multiple) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const id = window.setInterval(() => setActivo(a => (a + 1) % mensajes.length), ROTACION_MS)
+    return () => window.clearInterval(id)
+  }, [scroll, multiple, mensajes.length])
+
   if (!visible) return null
 
   // padding solo en el modo cartelera — es el "aire" ENTRE una repetición y
@@ -24,7 +51,7 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
   // sueltos como texto) para poder esconderlos por CSS en un celular angosto
   // — ver el media query de abajo: es lo primero que sobra cuando no entra
   // el mensaje entero, antes de tocar la letra del mensaje en sí.
-  const item = (key: number, conAire: boolean) => (
+  const item = (key: number | string, contenido: string, conAire: boolean) => (
     <span key={key} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, whiteSpace: 'nowrap', padding: conAire ? '0 28px' : 0 }}>
       <span className="orb-anuncio-deco">✦&nbsp;&nbsp;</span>{contenido}<span className="orb-anuncio-deco">&nbsp;&nbsp;✦</span>
     </span>
@@ -83,7 +110,7 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
         <>
           <style>{`
             @keyframes orbAnuncioCartelera { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-            .orb-anuncio-cartelera { animation: orbAnuncioCartelera 22s linear infinite; }
+            .orb-anuncio-cartelera { animation: orbAnuncioCartelera ${22 * mensajes.length}s linear infinite; }
             /* Respeta "menos movimiento" del sistema operativo — se
                congela en vez de animar; el mensaje se sigue leyendo (solo
                deja de correr), no desaparece. */
@@ -92,11 +119,21 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
             }
           `}</style>
           <div className="orb-anuncio-cartelera" style={{ display: 'flex', width: 'max-content' }}>
-            {Array.from({ length: REPETICIONES * 2 }).map((_, i) => item(i, true))}
+            {Array.from({ length: REPETICIONES * 2 }).map((_, tanda) => mensajes.map((m, i) => item(`${tanda}-${i}`, m, true)))}
           </div>
         </>
+      ) : multiple ? (
+        // key = activo: re-monta el ítem en cada cambio y dispara el fade de entrada.
+        <>
+          <style>{`
+            @keyframes orbAnuncioEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+            .orb-anuncio-rota { animation: orbAnuncioEntra 350ms ease-out; }
+            @media (prefers-reduced-motion: reduce) { .orb-anuncio-rota { animation: none; } }
+          `}</style>
+          <span key={activo} className="orb-anuncio-rota">{item(activo, mensajes[activo], false)}</span>
+        </>
       ) : (
-        item(0, false)
+        item(0, mensajes[0], false)
       )}
     </div>
   )
