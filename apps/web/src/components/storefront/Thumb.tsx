@@ -24,34 +24,26 @@ type ProdImageProps = {
   radius?: number
   style?:  React.CSSProperties
   children?: React.ReactNode
-  // true solo para imágenes compuestas por "Fondo con IA" (ver comentario de
-  // ProductImage.hasAiBackground en el schema) — esas SÍ se pueden llenar de
-  // borde a borde sin riesgo: el fondo se generó a propósito con margen para
-  // recortarse, nunca toca al producto. Una foto común del vendedor sigue en
-  // `contain` (ver el comentario largo de acá abajo, sigue aplicando).
-  cover?: boolean
 }
 
-export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children, cover = false }: ProdImageProps) {
+export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children }: ProdImageProps) {
   // El gradiente rayado es placeholder — solo tiene sentido SIN foto real.
   // Antes se pintaba siempre, así que un PNG con transparencia (fondo
   // recortado) dejaba ver las rayas de color por detrás/alrededor del
   // producto en vez de quedar limpio.
   //
-  // `object-fit: contain` (antes `cover`) + fondo neutro (antes
-  // transparente) — cada negocio sube sus fotos con su propio recorte y
-  // proporción, sin ningún estándar entre productos: una puede venir
-  // recortada al pixel, otra con un margen enorme alrededor. Con `cover` esa
-  // diferencia se notaba MUCHO — el producto con margen quedaba minúsculo y
-  // "flotando" en el medio de la card mientras el otro llenaba el cuadro
-  // entero, dos tamaños de card que en los hechos parecían distintos aunque
-  // el contenedor mida exactamente lo mismo (ver Catalogo.tsx/ProductCard.tsx,
-  // siempre un height fijo). `contain` nunca recorta la foto (se ve completa
-  // siempre, sea cual sea su proporción) y el fondo parejo + un margen
-  // interno chico (`inset`, no pegado al borde) hacen que todas las cards
-  // lean con el mismo "aire" alrededor del producto — mismo criterio que
-  // usan MercadoLibre/Amazon para catálogos con fotos de muchos vendedores
-  // distintos, exactamente este problema.
+  // Siempre `object-fit: contain` — nunca recorta la foto (se ve completa,
+  // sea cual sea su proporción o la del contenedor). Se probó `cover` para
+  // la foto principal y miniaturas de la ficha (ProductoDetalle.tsx) creyendo
+  // que las fotos con fondo generado por IA tenían margen de sobra para
+  // bancarse el recorte sin riesgo — en la práctica igual comía mangas y
+  // bordes de la prenda en contenedores no cuadrados (alto fijo, ancho
+  // variable), así que se sacó `cover` del todo: ninguna foto de producto
+  // (con o sin fondo IA) debería recortarse nunca. El fondo parejo + un
+  // margen interno chico (`inset`, no pegado al borde) hacen que todas las
+  // cards lean con el mismo "aire" alrededor del producto — mismo criterio
+  // que usan MercadoLibre/Amazon para catálogos con fotos de muchos
+  // vendedores distintos.
   return (
     <div style={{
       width: '100%', height, borderRadius: radius, position: 'relative', overflow: 'hidden',
@@ -64,9 +56,7 @@ export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, child
           alt=""
           loading="lazy"
           decoding="async"
-          style={cover
-            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
-            : { position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }}
+          style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }}
         />
       )}
       {children}
