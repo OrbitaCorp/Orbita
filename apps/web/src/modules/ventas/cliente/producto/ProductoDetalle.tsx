@@ -624,9 +624,10 @@ export default function ProductoDetalle() {
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
                 {esSlideVideo && videoEmbed ? (
-                  // Mismo contenedor 620/14 que ProdImage, para que el salto
-                  // entre foto y video no mueva el layout de alrededor.
-                  <div style={{ width: '100%', height: 620, borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                  // Mismo contenedor cuadrado (aspectRatio 1/1) que ProdImage
+                  // acá abajo, para que el salto entre foto y video no mueva
+                  // el layout de alrededor.
+                  <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
                     {videoEmbed.tipo === 'file' ? (
                       <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
                         <source src={videoEmbed.src} />
@@ -662,7 +663,18 @@ export default function ProductoDetalle() {
                     )}
                   </div>
                 ) : (
-                  <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={620} radius={14}>
+                  <ProdImage
+                    hue={hue}
+                    imgUrl={imagenes?.[idxMostrado]?.url}
+                    radius={14}
+                    // Cuadrado (1/1), igual que el lienzo del estandarizador
+                    // (imageStandardizer.ts): así el contenedor SIEMPRE tiene
+                    // la misma proporción que la foto ya viene, sea cual sea
+                    // el ancho de esta columna en cualquier pantalla — la
+                    // imagen llena el 100% sin recortar ni dejar aire, sin
+                    // depender de un alto fijo en px ni de breakpoints.
+                    style={{ height: 'auto', aspectRatio: '1 / 1' }}
+                  >
                     {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
                         específico, mismo criterio de prioridad que el badge
                         del catálogo (toProducto()). */}
