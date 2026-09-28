@@ -1871,6 +1871,14 @@ export type ApiProductStats = {
   sinCostoCargado?: number
 }
 
+// Opciones de variante (Color, Talle…) y valores (Crudo, XL…) que el negocio ya
+// usó en sus productos, del más al menos usado — para ofrecerlos al cargar uno nuevo.
+export type ApiVariantHistory = { name: string; isVisual: boolean; values: string[] }
+
+export function panelGetVariantHistory() {
+  return panelRequest<ApiVariantHistory[]>('/products/variant-history')
+}
+
 export function panelGetProductStats() {
   return panelRequest<ApiProductStats>('/products/stats')
 }

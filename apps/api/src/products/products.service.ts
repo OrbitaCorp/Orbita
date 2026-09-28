@@ -564,6 +564,58 @@ export class ProductsService {
     };
   }
 
+  // ── Historial de variantes ───────────────────────────────────────────────
+
+  // Las opciones de variante y los valores que el negocio ya usó en sus productos
+  // (no borrados), del más al menos usado. No es una tabla aparte: sale de lo que
+  // ya está guardado en los productos, así "queda guardado" solo con crear el
+  // producto y no hay nada que mantener sincronizado. Opciones y valores se
+  // juntan sin distinguir mayúsculas ("color" y "Color" son la misma); queda la
+  // grafía más usada.
+  async variantHistory(businessId: string) {
+    const opciones = await this.prisma.productOption.findMany({
+      where: { product: { businessId, deletedAt: null } },
+      select: { name: true, isVisual: true, values: { select: { value: true } } },
+    });
+
+    type Cuenta = { texto: Map<string, number>; n: number };
+    const masUsado = (c: Cuenta) => [...c.texto.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const sumar = (c: Cuenta, texto: string) => {
+      c.texto.set(texto, (c.texto.get(texto) ?? 0) + 1);
+      c.n += 1;
+    };
+
+    const porNombre = new Map<string, { nombre: Cuenta; visual: boolean; valores: Map<string, Cuenta> }>();
+    for (const o of opciones) {
+      const nombre = o.name.trim();
+      if (!nombre) continue;
+      const clave = nombre.toLowerCase();
+      const e = porNombre.get(clave) ?? { nombre: { texto: new Map(), n: 0 }, visual: false, valores: new Map() };
+      sumar(e.nombre, nombre);
+      e.visual = e.visual || o.isVisual;
+      for (const v of o.values) {
+        const valor = v.value.trim();
+        if (!valor) continue;
+        const cv = e.valores.get(valor.toLowerCase()) ?? { texto: new Map(), n: 0 };
+        sumar(cv, valor);
+        e.valores.set(valor.toLowerCase(), cv);
+      }
+      porNombre.set(clave, e);
+    }
+
+    return [...porNombre.values()]
+      .sort((a, b) => b.nombre.n - a.nombre.n)
+      .slice(0, 30)
+      .map((e) => ({
+        name: masUsado(e.nombre),
+        isVisual: e.visual,
+        values: [...e.valores.values()]
+          .sort((a, b) => b.n - a.n)
+          .slice(0, 60)
+          .map(masUsado),
+      }));
+  }
+
   // ── Duplicar (RBT-302) ───────────────────────────────────────────────────
 
   // Clona el producto entero (opciones, valores, variantes, imágenes y tags).

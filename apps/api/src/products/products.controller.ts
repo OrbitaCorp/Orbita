@@ -168,6 +168,16 @@ export class ProductsController {
     return this.productsService.stats(member.businessId);
   }
 
+  // Opciones de variante (Color, Talle…) y valores (Crudo, XL…) que el negocio ya
+  // usó en sus productos, para ofrecerlos al cargar uno nuevo. Antes de ':id' por
+  // la misma razón que 'stats'.
+  @Get('variant-history')
+  @RequirePermission('catalog.view')
+  variantHistory(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.variantHistory(member.businessId);
+  }
+
   @Get(':id')
   @RequirePermission('catalog.view')
   findOne(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {

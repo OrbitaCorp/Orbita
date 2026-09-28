@@ -35,12 +35,12 @@ import {
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
     panelPresignProductVideo,
     panelGetTags, panelCreateTag, panelAiAssist, panelAiVariants, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
-    panelGetBusiness, getRubrosCatalog,
+    panelGetBusiness, panelGetVariantHistory,
     ApiError,
     panelGenerateProductBackground,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption, type ApiVariantHistory,
 } from '@/lib/api'
-import { presetsDelNegocio, specsDelNegocio, type GrupoPresets, type PresetVariantes } from './presetsVariantes'
+import { specsDelNegocio, type PresetVariantes } from './presetsVariantes'
 import {
     beginProductCreation, markProductCreated, markImageUploaded,
     markProductCreationFailed, finishProductUpload, clearProductUpload, useProductUploads,
@@ -387,14 +387,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // EstudioFondoModal.tsx.
     const [modalFondoIA, setModalFondoIA] = useState(false)
     const [modalFondoIAVariantes, setModalFondoIAVariantes] = useState(false)
-    // Modelos de variantes y especificaciones sugeridas según lo que el negocio
-    // eligió que vende en el wizard (ver presetsVariantes.ts). Vacíos hasta
-    // que resuelve el negocio — y si falla, el formulario queda como siempre.
-    const [gruposPresets, setGruposPresets] = useState<GrupoPresets[]>([])
+    // Especificaciones sugeridas según lo que el negocio eligió que vende en el
+    // wizard (ver presetsVariantes.ts). Vacías hasta que resuelve el negocio — y
+    // si falla, el formulario queda como siempre. Ya no se ofrecen modelos de
+    // variantes por rubro ("Ropa (talle en letras)"…): lo que sugiere el formulario
+    // son las opciones y valores que el negocio YA usó (historialVariantes).
     const [specsSugeridas, setSpecsSugeridas] = useState<string[]>([])
-    // Nombre visible de cada subrubro ("Calzado"), para titular los grupos de
-    // modelos. Sale del mismo catálogo que el wizard, no de una lista aparte.
-    const [nombresRubro, setNombresRubro] = useState<Record<string, string>>({})
+    // Opciones (Color, Talle…) y valores (Crudo, XL…) que el negocio ya usó en sus
+    // productos, del más al menos usado. Vive en los propios productos (ver
+    // ProductsService.variantHistory): crear un producto los "guarda".
+    const [historialVariantes, setHistorialVariantes] = useState<ApiVariantHistory[]>([])
     const [presetAplicado, setPresetAplicado] = useState<string | null>(null)
     // true = el producto que se está editando ya tiene opciones guardadas.
     // Ahí no se ofrecen modelos: aplicar uno reemplaza las opciones, y al
@@ -456,36 +458,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // Qué vende el negocio → qué modelos de variantes y qué especificaciones
-    // ofrecer. Las dos llamadas son independientes: sin el catálogo los grupos
-    // igual se arman, solo pierden el título.
+    // Qué vende el negocio → qué especificaciones ofrecer; y el historial de
+    // variantes que ya usó. Las dos llamadas son independientes: si una falla, el
+    // formulario queda como siempre.
     useEffect(() => {
         let vigente = true
         panelGetBusiness()
-            .then(b => {
-                if (!vigente) return
-                const grupos = presetsDelNegocio(b.subrubros)
-                setGruposPresets(grupos)
-                setSpecsSugeridas(specsDelNegocio(b.subrubros))
-                // Un producto nuevo arranca con el primer modelo del primer
-                // rubro del negocio, en vez del "Talle S/M/L" fijo de antes —
-                // que para una ferretería o una librería no tenía sentido.
-                // Solo si nadie tocó las opciones todavía: la comparación es
-                // por referencia, y cualquier edición crea un array nuevo.
-                const primero = grupos[0]?.variantes[0]
-                if (!editando && primero) {
-                    setProd(p => p.tiposVariante === FORM_INICIAL.tiposVariante ? { ...p, tiposVariante: desdePreset(primero) } : p)
-                    setPresetAplicado(actual => actual ?? primero.id)
-                }
-            })
+            .then(b => { if (vigente) setSpecsSugeridas(specsDelNegocio(b.subrubros)) })
             .catch(() => { /* sin negocio, el formulario queda como siempre */ })
-        getRubrosCatalog()
-            .then(({ rubros }) => {
-                if (!vigente) return
-                const tienda = rubros.find(r => r.key === 'tienda')
-                setNombresRubro(Object.fromEntries((tienda?.subrubros ?? []).map(s => [s.key, s.label])))
-            })
-            .catch(() => { /* los grupos se muestran sin título */ })
+        panelGetVariantHistory()
+            .then(h => { if (vigente) setHistorialVariantes(h) })
+            .catch(() => { /* sin historial, solo no se ofrecen "usados antes" */ })
         return () => { vigente = false }
     }, [editando])
 
@@ -1453,9 +1436,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // trabaja con lo capturado al tocar el botón, así que no se ve afectado.
     function reiniciarFormulario() {
         const venteOrbi = presetAplicado === 'orbi'
-        const baseVariantes = venteOrbi ? gruposPresets[0]?.variantes[0] : undefined
         setPresetOrbi(null)
-        if (venteOrbi) setPresetAplicado(baseVariantes?.id ?? null)
+        if (venteOrbi) setPresetAplicado(null)
+        recordarVariantes(prod.tiposVariante)
         setProd(p => ({
             ...FORM_INICIAL,
             tags: [],
@@ -1464,9 +1447,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             categoriaId: p.categoriaId,
             photoType: p.photoType,
             tieneVariantes: p.tieneVariantes,
-            tiposVariante: baseVariantes
-                ? desdePreset(baseVariantes)
-                : p.tiposVariante.map(tp => ({ ...tp, opciones: [], esVisual: false })),
+            tiposVariante: p.tiposVariante.map(tp => ({ ...tp, opciones: [], esVisual: false })),
         }))
         setFilas([])
         setStockMasivo('')
@@ -1827,6 +1808,24 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         return unicos.filter(v => orden.includes(v)).sort((a, b) => orden.indexOf(a) - orden.indexOf(b))
             .concat(unicos.filter(v => !orden.includes(v)))
     }
+    // Suma al historial local lo que se acaba de usar en este producto, para que
+    // "Cargar otro después" ya lo ofrezca sin esperar a que el guardado en segundo
+    // plano termine (el servidor lo va a devolver igual la próxima vez).
+    const recordarVariantes = (tipos: TipoVariante[]) => {
+        setHistorialVariantes(prev => {
+            const sig = (t: string) => t.trim().toLowerCase()
+            let lista = prev.map(h => ({ ...h, values: [...h.values] }))
+            for (const tp of tipos) {
+                const nombre = tp.nombre.trim()
+                if (!nombre || tp.opciones.length === 0) continue
+                let h = lista.find(x => sig(x.name) === sig(nombre))
+                if (!h) { h = { name: nombre, isVisual: !!tp.esVisual, values: [] }; lista = [h, ...lista] }
+                for (const v of tp.opciones) if (!h.values.some(x => sig(x) === sig(v))) h.values.push(v)
+            }
+            return lista
+        })
+    }
+
     const agregarValores = (ti: number, vals: string[]) => {
         const tp = prod.tiposVariante[ti]
         actualizarTipo(ti, { opciones: ordenarValores(tp, [...tp.opciones, ...vals]) })
@@ -1865,7 +1864,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const misEnvios = subidas.filter(u => enviados.includes(u.tempId))
     const sinFotos = imagenes.length + guardadas.length === 0
     const hayGenerales = imagenes.some(i => !i.valorOpcion) || guardadas.some(g => !g.optionValueId)
-    const cantModelos = gruposPresets.reduce((n, g) => n + g.variantes.length, 0)
     const inactivas = filas.filter(f => !f.activa).length
     const errorPrecioFila = (f: FilaVariante) => hayFalta('pn-variantes-tabla') && f.activa && !(Number(f.precio) > 0)
 
@@ -2185,66 +2183,35 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     {orbiVarGen ? 'Orbi está pensando las opciones…' : 'Sugerir opciones con Orbi según el nombre'}
                                                 </button>
                                             )}
-                                            {!opcionesGuardadas && (cantModelos + (presetOrbi ? 1 : 0)) > 1 && (
-                                                <div style={{ marginBottom: 14 }}>
-                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>¿Qué tipo de producto es?</div>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                        {presetOrbi && (
-                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                                <button
-                                                                    type="button"
-                                                                    className="ds-hover"
-                                                                    onClick={() => aplicarPreset(presetOrbi)}
-                                                                    aria-pressed={presetAplicado === 'orbi'}
-                                                                    title={presetOrbi.opciones.map(o => o.nombre).join(' · ')}
-                                                                    style={{
-                                                                        height: 30, padding: '0 12px', borderRadius: 9999, display: 'inline-flex', alignItems: 'center', gap: 6,
-                                                                        border: `1px solid ${presetAplicado === 'orbi' ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                        background: presetAplicado === 'orbi' ? 'var(--color-primary-bg)' : 'transparent',
-                                                                        color: presetAplicado === 'orbi' ? 'var(--color-primary)' : 'var(--color-body)',
-                                                                        fontSize: 12.5, fontWeight: presetAplicado === 'orbi' ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
-                                                                    }}
-                                                                >
-                                                                    <Sparkles size={12} /> Sugerido por Orbi: {presetOrbi.nombre}
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        {gruposPresets.map(g => (
-                                                            <div key={g.key} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                                {gruposPresets.length > 1 && (
-                                                                    <span style={{ fontSize: 11.5, color: 'var(--color-muted)', minWidth: 96 }}>{nombresRubro[g.key] ?? g.key}</span>
-                                                                )}
-                                                                {g.variantes.map(pr => {
-                                                                    const activo = presetAplicado === pr.id
-                                                                    return (
-                                                                        <button
-                                                                            key={pr.id}
-                                                                            type="button"
-                                                                            className="ds-hover"
-                                                                            onClick={() => aplicarPreset(pr)}
-                                                                            aria-pressed={activo}
-                                                                            title={pr.opciones.map(o => o.nombre).join(' · ')}
-                                                                            style={{
-                                                                                height: 30, padding: '0 12px', borderRadius: 9999,
-                                                                                border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                                                background: activo ? 'var(--color-primary-bg)' : 'transparent',
-                                                                                color: activo ? 'var(--color-primary)' : 'var(--color-body)',
-                                                                                fontSize: 12.5, fontWeight: activo ? 600 : 500, fontFamily: 'inherit', cursor: 'pointer',
-                                                                            }}
-                                                                        >
-                                                                            {pr.nombre}
-                                                                        </button>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                            {/* Sugerencia de Orbi para ESTE producto, mientras no se haya aplicado. */}
+                                            {!opcionesGuardadas && presetOrbi && presetAplicado !== 'orbi' && (
+                                                <div style={{ marginBottom: 14, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="ds-hover"
+                                                        onClick={() => aplicarPreset(presetOrbi)}
+                                                        title={presetOrbi.opciones.map(o => o.nombre).join(' · ')}
+                                                        style={{
+                                                            height: 30, padding: '0 12px', borderRadius: 9999, display: 'inline-flex', alignItems: 'center', gap: 6,
+                                                            border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)',
+                                                            fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        <Sparkles size={12} /> Sugerido por Orbi: {presetOrbi.nombre}
+                                                    </button>
                                                 </div>
                                             )}
 
                                             {prod.tiposVariante.map((tp, ti) => {
                                                 const restantes = (tp.sugeridos ?? []).filter(v => !tp.opciones.includes(v))
                                                 const habituales = (tp.habituales ?? []).filter(v => !tp.opciones.includes(v))
+                                                // Lo que el negocio ya usó: nombres de opción (mientras esta no tiene nombre)
+                                                // y valores de la opción que se llama igual. Sin repetir lo que ya está.
+                                                const sig = (t: string) => t.trim().toLowerCase()
+                                                const nombresUsados = new Set(prod.tiposVariante.map(x => sig(x.nombre)))
+                                                const nombresHistorial = tp.nombre.trim() === '' ? historialVariantes.filter(h => !nombresUsados.has(sig(h.name))).slice(0, 8) : []
+                                                const enHistorial = historialVariantes.find(h => sig(h.name) === sig(tp.nombre))
+                                                const valoresHistorial = (enHistorial?.values ?? []).filter(v => !tp.opciones.some(o => sig(o) === sig(v)) && !restantes.some(r => sig(r) === sig(v))).slice(0, 24)
                                                 return (
                                                     <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -2260,6 +2227,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                 <button type="button" className="ds-hover" aria-label="Quitar esta opción" title="Quitar esta opción" onClick={() => set('tiposVariante', prod.tiposVariante.filter((_, j) => j !== ti))} style={iconBtn}><X size={15} strokeWidth={1.8} /></button>
                                                             )}
                                                         </div>
+                                                        {nombresHistorial.length > 0 && (
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 10 }}>
+                                                                <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Usadas antes:</span>
+                                                                {nombresHistorial.map(h => (
+                                                                    <button key={h.name} type="button" className="ds-hover" onClick={() => actualizarTipo(ti, { nombre: h.name })} style={chipSugerido}>{h.name}</button>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                                                             {tp.opciones.map(op => (
                                                                 <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
@@ -2268,6 +2243,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                             ))}
                                                             {/* Sugeridos: un toque los suma. Ninguno viene elegido de antemano. */}
                                                             {restantes.map(v => (
+                                                                <button key={v} type="button" className="ds-hover" onClick={() => agregarValores(ti, [v])} style={chipSugerido}>+ {v}</button>
+                                                            ))}
+                                                            {valoresHistorial.length > 0 && <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Usados antes:</span>}
+                                                            {valoresHistorial.map(v => (
                                                                 <button key={v} type="button" className="ds-hover" onClick={() => agregarValores(ti, [v])} style={chipSugerido}>+ {v}</button>
                                                             ))}
                                                             <OpInput tipo={tp.nombre} onAdd={vals => agregarValores(ti, vals)} />
