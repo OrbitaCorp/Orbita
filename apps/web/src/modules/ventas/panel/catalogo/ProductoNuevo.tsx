@@ -1168,10 +1168,38 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }))
     }
 
+    // Fotos ya guardadas que un "Fondo con IA" reemplazó. Desaparecen de la
+    // galería al toque (el resultado ocupa su lugar), pero recién se borran del
+    // servidor al guardar el producto: si el vendedor cancela la edición, la
+    // original sigue intacta y no se pierde nada.
+    const [guardadasReemplazadas, setGuardadasReemplazadas] = useState<{ id: string; porKey: string }[]>([])
+    // Los handlers del modal corren cuando termina el fondo en segundo plano, con
+    // el estado de cuando se tocó "Aplicar": estas refs dan el estado de AHORA.
+    const guardadasRef = useRef(guardadas)
+    guardadasRef.current = guardadas
+    // (imagenesRef, más abajo, ya existe y se mantiene al día.)
+
+    // Cambia una foto guardada por su versión con fondo nuevo: la guardada sale de
+    // la galería (y queda anotada para borrarse al guardar) y la pendiente entra en
+    // el MISMO lugar del orden.
+    function reemplazarGuardadaPorPendiente(idGuardada: string, nueva: ImagenPendiente) {
+        const general = nueva.valorOpcion == null
+        if (general) {
+            const base = ordenGeneralRef.current ?? [
+                ...guardadasRef.current.filter(g => g.optionValueId == null).map(g => `guardada:${g.id}`),
+                ...imagenesRef.current.filter(i => !i.valorOpcion).map(i => `pendiente:${i.key}`),
+            ]
+            setOrdenGeneral(base.map(e => (e === `guardada:${idGuardada}` ? `pendiente:${nueva.key}` : e)))
+        }
+        setGuardadasReemplazadas(prev => [...prev, { id: idGuardada, porKey: nueva.key }])
+        setGuardadas(prev => prev.filter(g => g.id !== idGuardada))
+        setImagenes(prev => [...prev, nueva])
+    }
+
     // Handler que pasa el modal: una pendiente se reemplaza en el lugar (de
-    // arriba); una GUARDADA no se toca — el resultado se agrega como una
-    // foto pendiente nueva, general (sin valorOpcion), porque la guardada
-    // original sigue siendo válida y el vendedor puede querer conservarla.
+    // arriba); una GUARDADA también se reemplaza (ver reemplazarGuardadaPorPendiente):
+    // el resultado entra como foto nueva general (sin valorOpcion) en su mismo lugar
+    // y la original se borra al guardar el producto.
     async function aplicarFondoIA(origen: ImagenParaFondo, file: File, preview: string) {
         let finalFile = file
         let finalPreview = preview
@@ -1184,20 +1212,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             reemplazarImagenPendiente(origen.key, finalFile, finalPreview)
             return
         }
-        setImagenes(prev => [...prev, {
+        reemplazarGuardadaPorPendiente(origen.key, {
             key: `${Date.now()}-${finalFile.name}-${Math.random().toString(36).slice(2, 7)}`,
             file: finalFile,
             preview: finalPreview,
             principal: false,
             fondoIA: true,
-        }])
+        })
     }
 
     // "Fondo con IA" para las fotos POR VARIANTE (Color/Talle): mismo modal que
     // para las principales, pero con las fotos etiquetadas. Una pendiente se
-    // reemplaza en el lugar (conserva su etiqueta, valorOpcion); una GUARDADA no
-    // se toca — el resultado se agrega como pendiente nueva con la MISMA
-    // etiqueta que la original, así queda asociada al mismo valor.
+    // reemplaza en el lugar (conserva su etiqueta, valorOpcion); una GUARDADA se
+    // reemplaza por una pendiente nueva con la MISMA etiqueta que la original, así
+    // queda asociada al mismo valor (y la original se borra al guardar).
     async function aplicarFondoIAVariante(origen: ImagenParaFondo, file: File, preview: string) {
         let finalFile = file
         let finalPreview = preview
@@ -1217,14 +1245,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             onToast('No se pudo asociar la foto a su variante. Probá con una foto nueva.')
             return
         }
-        setImagenes(prev => [...prev, {
+        reemplazarGuardadaPorPendiente(origen.key, {
             key: `${Date.now()}-${finalFile.name}-${Math.random().toString(36).slice(2, 7)}`,
             file: finalFile,
             preview: finalPreview,
             principal: false,
             valorOpcion: valor,
             fondoIA: true,
-        }])
+        })
     }
 
     // El vendedor tocó "Aplicar a N fotos" en EstudioFondoModal: el modal se cierra
@@ -1266,6 +1294,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // las dibuja siempre guardadas primero, así que sin esto arrastrar una
     // pendiente ANTES de una guardada no tenía efecto. Undefined = orden natural.
     const [ordenGeneral, setOrdenGeneral] = useState<string[] | undefined>(undefined)
+    const ordenGeneralRef = useRef(ordenGeneral)
+    ordenGeneralRef.current = ordenGeneral
 
     function reordenarGeneral(nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) {
         setOrdenGeneral(nuevoOrden.map(o => `${o.tipo}:${o.id}`))
@@ -1583,6 +1613,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // ProductoNuevo ya se desmontó (se volvió a la lista).
         const idParaTracker = editarId
         const imgsASubir = imagenes
+        const reemplazadas = guardadasReemplazadas
         const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
         beginProductEdit(idParaTracker)
         onToast('Guardando cambios…')
@@ -1629,6 +1660,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 )
                 // Si el vendedor arrastró fotos (ordenGeneral), se respeta el orden
                 // mezclado completo: guardadas y recién subidas juntas, desde 0.
+                // Las fotos guardadas que "Fondo con IA" reemplazó se borran RECIÉN acá, con el
+                // producto ya guardado y SOLO si su reemplazo se subió bien (si algo falla, la
+                // original queda). Antes del reorden de abajo, para que la principal se
+                // recalcule sobre lo que queda.
+                const aBorrar = reemplazadas.filter(r => idPorKey.has(r.porKey)).map(r => r.id)
+                if (aBorrar.length > 0) {
+                    await Promise.allSettled(aBorrar.map(id => panelDeleteProductImage(idParaTracker, id)))
+                }
                 let itemsOrden: { id: string; position: number }[]
                 if (ordenGeneral) {
                     const guardadasVivas = new Set(guardadas.map(g => g.id))
@@ -1949,7 +1988,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 onAsignar={asignarAValor}
                                             />
                                             <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8 }}>
-                                                La foto con la estrella es la que se ve en el catálogo. Arrastrá las fotos o usá las flechas para cambiar el orden. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.{valoresParaImagen.length > 0 && ` Si una foto es de un {opcionVisual?.nombre.toLowerCase()} en particular, elegilo debajo de la miniatura.`}
+                                                La primera foto es la que se ve en el catálogo. Arrastrá las fotos o usá las flechas para cambiar el orden. PNG, JPG o HEIC, hasta {MAX_IMAGEN_MB}MB.{valoresParaImagen.length > 0 && ` Si una foto es de un {opcionVisual?.nombre.toLowerCase()} en particular, elegilo debajo de la miniatura.`}
                                             </div>
                                         </>
                                     )}
@@ -2953,7 +2992,7 @@ function PreviewProducto({
 // de un vistazo, cuál se ve primero en el catálogo.
 type ItemGaleria =
     | { tipo: 'guardada'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA: boolean; encuadrando?: boolean; textoProceso?: string }
-    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: false; encuadrando?: boolean; textoProceso?: string }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean; conFondoIA?: boolean; encuadrando?: boolean; textoProceso?: string }
 
 // Tip de "quitar fondo con IA" — vive una sola vez junto al título de la
 // sección (no repetido por foto, es una recomendación de cómo sacar la
@@ -3279,7 +3318,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     const alto = compacta ? 72 : 96
     const natural: ItemGaleria[] = [
         ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
+        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo, conFondoIA: !!p.fondoIA, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
     ]
     const items: ItemGaleria[] = orden
         ? [...natural].sort((a, b) => {
@@ -3379,7 +3418,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         sobre la miniatura (bajo contraste, difícil de ver con
                         ciertas fotos) — ahora es un botón explícito debajo. */}
                     {/* Deshabilitado (no oculto) mientras FONDO_IA_MANTENIMIENTO. */}
-                    {avanzadoDisponible && onQuitarFondo && (it.tipo === 'pendiente' || (onQuitarFondoGuardada && !it.conFondoIA)) && (
+                    {avanzadoDisponible && onQuitarFondo && !it.conFondoIA && (it.tipo === 'pendiente' || onQuitarFondoGuardada) && (
                         <button
                             type="button"
                             className="ds-hover"
@@ -3458,7 +3497,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
     type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean; quitarFondo?: boolean; conFondoIA?: boolean; encuadrando?: boolean; textoProceso?: string }
     const items: ItemEtiquetado[] = [
         ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false, quitarFondo: g.backgroundRemoved, conFondoIA: g.hasAiBackground })),
-        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
+        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true, quitarFondo: !!p.quitarFondo, conFondoIA: !!p.fondoIA, encuadrando: p.encuadrando || p.aplicandoFondo, textoProceso: p.aplicandoFondo ? 'Aplicando fondo…' : undefined })),
     ]
 
     const mover = useCallback((origen: number, destino: number) => {
@@ -3567,7 +3606,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                             {it.etiqueta ?? '-'}
                         </span>
                     )}
-                    {avanzadoDisponible && onQuitarFondo && (it.tipo === 'pendiente' || (onQuitarFondoGuardada && !it.conFondoIA)) && (
+                    {avanzadoDisponible && onQuitarFondo && !it.conFondoIA && (it.tipo === 'pendiente' || onQuitarFondoGuardada) && (
                         <button
                             type="button"
                             className="ds-hover"
