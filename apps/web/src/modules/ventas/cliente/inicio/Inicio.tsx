@@ -455,7 +455,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-marcas-volanta { font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-muted); text-align:center; margin-bottom:22px; }
                 .sf-marca { display:flex; align-items:center; justify-content:center; height:46px; padding:0 10px; flex-shrink:0; }
                 .sf-marca-img { max-height:46px; max-width:150px; width:auto; object-fit:contain; display:block; transition:filter 260ms ease, opacity 260ms ease; }
-                .sf-marca-txt { font-family:var(--font-heading, inherit); font-size:23px; font-weight:600; letter-spacing:0.02em; white-space:nowrap; color:var(--color-muted); transition:color 260ms ease; }
+                .sf-marca-txt { font-family:var(--font-heading, inherit); font-size:23px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; white-space:nowrap; color:var(--color-muted); transition:color 260ms ease; }
                 @media (hover:hover) {
                     .sf-marca-img { filter:grayscale(1); opacity:0.55; }
                     .sf-marca:hover .sf-marca-img { filter:grayscale(0); opacity:1; }
@@ -495,7 +495,6 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-cat-tile-texto { position:absolute; left:16px; right:16px; bottom:14px; display:flex; flex-direction:column; gap:2px; text-align:left; }
                 .sf-cat-tile-nombre { color:#fff; font-weight:700; font-size:16px; letter-spacing:-0.01em; }
                 .sf-cat-tile--grande .sf-cat-tile-nombre { font-size:22px; }
-                .sf-cat-tile-count { color:rgba(255,255,255,0.78); font-size:11.5px; font-family:"Geist Mono",monospace; }
                 @media(max-width:1024px){ .sf-cat-mosaico { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:132px } .sf-cat-tile--grande { grid-row:span 1 } }
 
                 /* Tarjetas: grilla pareja, nombre debajo de la foto. */
@@ -1562,9 +1561,10 @@ function CatMosaico({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }
                             así que una sola clave cubre los dos casos. */}
                         <span className="sf-cat-tile-foto" style={{ backgroundImage: c.imageUrl ? `url(${c.imageUrl})` : `linear-gradient(135deg, oklch(0.80 0.07 ${c.hue}), oklch(0.66 0.09 ${c.hue}))` }} />
                         <span className="sf-cat-tile-velo" />
+                        {/* Sin "N productos" (pedido 29/09): en el mosaico la
+                            foto y el nombre alcanzan, el contador era ruido. */}
                         <span className="sf-cat-tile-texto">
                             <span className="sf-cat-tile-nombre">{c.nombre}</span>
-                            <span className="sf-cat-tile-count">{c.count} productos</span>
                         </span>
                     </button>
                 ))}
