@@ -401,6 +401,209 @@
      "estudio": false
     }
    ]
+  },
+  "Tocadiscos Bluetooth Nébula Vinyl": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/tocadiscos-bluetooth-nebula-vinyl-1.webp",
+     "pexels": "https://www.pexels.com/photo/18289430/",
+     "autor": "V Marin",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/tocadiscos-bluetooth-nebula-vinyl-2.webp",
+     "pexels": "https://www.pexels.com/photo/6521626/",
+     "autor": "Сергей Жаров",
+     "estudio": false
+    }
+   ]
+  },
+  "Auriculares de estudio Nébula Studio": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/auriculares-de-estudio-nebula-studio-1.webp",
+     "pexels": "https://www.pexels.com/photo/20385204/",
+     "autor": "Paul Seling",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/auriculares-de-estudio-nebula-studio-2.webp",
+     "pexels": "https://www.pexels.com/photo/12266869/",
+     "autor": "Paul Seling",
+     "estudio": false
+    }
+   ]
+  },
+  "Cargador inalámbrico 15 W": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/cargador-inalambrico-15-w-1.webp",
+     "pexels": "https://www.pexels.com/photo/5961044/",
+     "autor": "Oscar Helgstrand",
+     "estudio": true
+    }
+   ]
+  },
+  "Funda de silicona": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/funda-de-silicona-1.webp",
+     "pexels": "https://www.pexels.com/photo/34171437/",
+     "autor": "Rohit Sharma",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/funda-de-silicona-2.webp",
+     "pexels": "https://www.pexels.com/photo/11128855/",
+     "autor": "Yaroslava Borz",
+     "estudio": false
+    }
+   ]
+  },
+  "Tablet Nébula Tab 11\"": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/tablet-nebula-tab-11-1.webp",
+     "pexels": "https://www.pexels.com/photo/6337/",
+     "autor": "Karolina Grabowska www.kaboompics.com",
+     "estudio": true
+    }
+   ]
+  },
+  "Disco SSD externo 1 TB": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/disco-ssd-externo-1-tb-1.webp",
+     "pexels": "https://www.pexels.com/photo/4675007/",
+     "autor": "Nothing Ahead",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/disco-ssd-externo-1-tb-2.webp",
+     "pexels": "https://www.pexels.com/photo/17924342/",
+     "autor": "Uwukuri Emery",
+     "estudio": false
+    }
+   ]
+  },
+  "Soporte de aluminio para notebook": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/soporte-de-aluminio-para-notebook-1.webp",
+     "pexels": "https://www.pexels.com/photo/4792717/",
+     "autor": "Anete Lusina",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/soporte-de-aluminio-para-notebook-2.webp",
+     "pexels": "https://www.pexels.com/photo/34502055/",
+     "autor": "Karina Finger",
+     "estudio": false
+    }
+   ]
+  },
+  "Silla gamer Nébula Throne": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/silla-gamer-nebula-throne-1.webp",
+     "pexels": "https://www.pexels.com/photo/7862645/",
+     "autor": "Alena Darmel",
+     "estudio": true
+    }
+   ]
+  },
+  "Monitor curvo 34\" gamer": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/monitor-curvo-34-gamer-1.webp",
+     "pexels": "https://www.pexels.com/photo/27559482/",
+     "autor": "minhphuc .workspace",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/monitor-curvo-34-gamer-2.webp",
+     "pexels": "https://www.pexels.com/photo/20648391/",
+     "autor": "minhphuc .workspace",
+     "estudio": false
+    }
+   ]
+  },
+  "Robot aspiradora Nébula Clean": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/robot-aspiradora-nebula-clean-1.webp",
+     "pexels": "https://www.pexels.com/photo/35147280/",
+     "autor": "Andrey Matveev",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/robot-aspiradora-nebula-clean-2.webp",
+     "pexels": "https://www.pexels.com/photo/10567507/",
+     "autor": "Ron Lach",
+     "estudio": false
+    }
+   ]
+  },
+  "Tira LED RGB 5 m": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/tira-led-rgb-5-m-1.webp",
+     "pexels": "https://www.pexels.com/photo/34195903/",
+     "autor": "fish socks",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/tira-led-rgb-5-m-2.webp",
+     "pexels": "https://www.pexels.com/photo/17840843/",
+     "autor": "Pramod  Tiwari",
+     "estudio": false
+    }
+   ]
+  },
+  "Smartwatch deportivo con GPS": {
+   "grupo": "Wearables",
+   "fotos": [
+    {
+     "archivo": "productos/smartwatch-deportivo-con-gps-1.webp",
+     "pexels": "https://www.pexels.com/photo/31775355/",
+     "autor": "Tiago L BR",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/smartwatch-deportivo-con-gps-2.webp",
+     "pexels": "https://www.pexels.com/photo/8637970/",
+     "autor": "Kampus Production",
+     "estudio": false
+    }
+   ]
+  },
+  "Visor de realidad virtual": {
+   "grupo": "Wearables",
+   "fotos": [
+    {
+     "archivo": "productos/visor-de-realidad-virtual-1.webp",
+     "pexels": "https://www.pexels.com/photo/4523065/",
+     "autor": "Polina Tankilevitch",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/visor-de-realidad-virtual-2.webp",
+     "pexels": "https://www.pexels.com/photo/7561900/",
+     "autor": "SHVETS production",
+     "estudio": false
+    }
+   ]
   }
  },
  "categorias": {
