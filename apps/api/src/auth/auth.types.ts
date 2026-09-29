@@ -27,6 +27,10 @@ export interface PlatformAdminAuthResponse {
   // Sin `business`: un super admin no pertenece a ningún negocio.
 }
 
+// Sesión anónima de la demo pública (AuthService.demoSession): sin refresh
+// token, a propósito.
+export type DemoSessionResponse = Omit<MemberAuthResponse, 'refreshToken'> & { demo: true };
+
 export type LoginResponse =
   | MemberAuthResponse
   | CustomerAuthResponse

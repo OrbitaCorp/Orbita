@@ -17,6 +17,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "prisma db seed",
+    "seed:demo": "ts-node prisma/seed-demo.ts",
     "test": "jest --config ./test/jest-unit.json && jest --config ./test/jest-src.json",
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:src": "jest --config ./test/jest-src.json",

@@ -37,6 +37,12 @@ model Business {
   cancellationWarningEmailSentAt DateTime? @map("cancellation_warning_email_sent_at")
   deletedAt                      DateTime? @map("deleted_at")
 
+  // Tienda de la demo pública de Órbita (demo.orbita.site). Los visitantes
+  // entran al panel con un miembro `readOnly` y lo que "crean" vive solo en
+  // su localStorage; el servidor rechaza cualquier escritura pública sobre
+  // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
+  isDemo Boolean @default(false) @map("is_demo")
+
   // Datos del wizard de onboarding (RBT-293) — se completan progresivamente
   // mientras isActive: false, vía PUT /onboarding/business.
   subrubros        String[] @default([]) @map("subrubros") // ej: ["indumentaria","calzado"]
@@ -503,6 +509,10 @@ model Member {
   failedLoginAttempts      Int             @default(0) @map("failed_login_attempts")
   lockedUntil              DateTime?       @map("locked_until")
   lastAccessAt             DateTime?       @map("last_access_at")
+  // Miembro de solo lectura: el visitante anónimo de la demo pública (ver
+  // Business.isDemo). Puede leer todo lo que su rol permite, pero DemoGuard
+  // le rechaza cualquier método que no sea GET/HEAD/OPTIONS.
+  readOnly                 Boolean         @default(false) @map("read_only")
   // Preferencia de tema del panel (RBT-646) — por usuario, no por navegador
   // (antes vivía solo en localStorage, se perdía al cambiar de dispositivo).
   themePreference          ThemePreference @default(SYSTEM) @map("theme_preference")

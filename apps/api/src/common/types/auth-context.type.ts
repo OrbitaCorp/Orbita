@@ -8,6 +8,8 @@ export interface MemberContext {
   roleId: string;
   roleName: string;
   permissions: string[];
+  // Visitante anónimo del panel de la demo (ver DemoGuard): solo lectura.
+  readOnly?: boolean;
 }
 
 export interface CustomerContext {

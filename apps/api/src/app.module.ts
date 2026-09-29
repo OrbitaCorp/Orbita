@@ -11,6 +11,7 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { R2Module } from './r2/r2.module';
 
 import { AuthGuard } from './common/guards/auth.guard';
+import { DemoGuard } from './common/guards/demo.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { BusinessModeGuard } from './common/guards/business-mode.guard';
@@ -118,8 +119,9 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
   ],
   controllers: [AppController],
   providers: [
-    // Orden de guards: AuthGuard primero (valida token y puebla req.user), luego
-    // RolesGuard/PermissionsGuard (leen req.user ya poblado), BusinessModeGuard,
+    // Orden de guards: AuthGuard primero (valida token y puebla req.user),
+    // DemoGuard (corta escrituras sobre la demo pública — ver demo.guard.ts),
+    // luego RolesGuard/PermissionsGuard (leen req.user ya poblado), BusinessModeGuard,
     // AddonGuard (paquete "Avanzado" — ver requires-addon.decorator.ts) y por
     // último SubscriptionActiveGuard (modo solo-lectura si la suscripción está
     // SUSPENDED — ver allow-when-paused.decorator.ts).
@@ -129,6 +131,7 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     // pedido pasa por el BFF de Vercel (hallazgo rate-limit-ip-proxy).
     { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: DemoGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: BusinessModeGuard },

@@ -8,6 +8,7 @@
 // directo — así se evita CORS bajo subdominios y el refresh token queda httpOnly.
 
 import { currentSlug, authChannel } from '@/lib/tenant'
+import { esTiendaDemo, marcarVisitanteDemo } from '@/lib/demo/modo'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -89,6 +90,15 @@ export function tryRefresh(): Promise<boolean> {
 }
 
 async function hacerRefresh(): Promise<boolean> {
+  // Panel de la demo pública: si no hay una sesión REAL de panel para este
+  // negocio (el dueño que cura la demo), se entra con la sesión anónima de
+  // solo lectura en vez de refrescar. Se pregunta con el peek (no rota ni
+  // borra nada): refrescar a ciegas podía tocar la cookie de un dueño de
+  // OTRA tienda que entra a mirar la demo. Ver lib/demo/modo.ts.
+  if (esTiendaDemo() && authChannel() === 'panel' && !(await haySesionRealDePanel())) {
+    return pedirSesionDemo()
+  }
+
   const body = JSON.stringify({ channel: authChannel() })
   const headers = { 'Content-Type': 'application/json' }
   let res = await fetch('/api/auth/refresh', { method: 'POST', headers, body })
@@ -128,4 +138,18 @@ export async function authedFetch(path: string, init: RequestInit = {}): Promise
     if (refreshed) res = await bffFetch(path, init)
   }
   return res
+}
+
+async function haySesionRealDePanel(): Promise<boolean> {
+  const res = await fetch('/api/auth/has-session?channel=panel').catch(() => null)
+  const data = res?.ok ? ((await res.json().catch(() => null)) as { exists?: boolean } | null) : null
+  return !!data?.exists
+}
+
+async function pedirSesionDemo(): Promise<boolean> {
+  const res = await fetch('/api/auth/demo-session', { method: 'POST' }).catch(() => null)
+  const data = res?.ok ? ((await res.json().catch(() => null)) as { token?: string } | null) : null
+  accessToken = data?.token ?? null
+  marcarVisitanteDemo(!!accessToken)
+  return !!accessToken
 }

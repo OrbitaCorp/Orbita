@@ -99,6 +99,7 @@ export class AuthGuard implements CanActivate {
         roleId: member.roleId,
         roleName: member.role.name,
         permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
+        readOnly: member.readOnly,
       };
     }
 

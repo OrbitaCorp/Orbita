@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { currentSlug, authChannel } from '@/lib/tenant'
 import { AuthError, bffFetch, tokenStore, tryRefresh } from './authClient'
+import { esVisitanteDemo, marcarVisitanteDemo } from '@/lib/demo/modo'
 
 // ─── Tipos del usuario autenticado ──────────────────────────────────────────
 // El shape lo define el backend (login / GET /auth/me). Ver CONTRATO_API.md.
@@ -203,6 +204,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async (): Promise<void> => {
+    // Visitante de la demo: su sesión no tiene cookie propia, y el logout del
+    // BFF borraría la cookie de panel de un dueño real que esté mirando la
+    // demo (ver lib/demo/modo.ts). Alcanza con olvidar el token.
+    if (esVisitanteDemo()) {
+      marcarVisitanteDemo(false)
+      tokenStore.set(null)
+      setUser(null)
+      setStatus('anonymous')
+      return
+    }
     await fetch('/api/auth/logout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

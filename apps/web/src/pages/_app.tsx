@@ -19,8 +19,10 @@ import type { Tema as TemaPlantilla } from '@/modules/ventas/panel/avanzado/plan
 import { TiendaPausada } from '@/components/storefront/TiendaPausada'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
 import { TEMA_SCRIPT } from '@/lib/csp'
+import { iniciarDemo } from '@/lib/demo'
 
 const queryClient = new QueryClient()
+iniciarDemo(queryClient)
 
 // El backend ya valida colorPrimary/colorBackground como hex al guardar (ver
 // update-storefront-config.dto.ts), pero acá se vuelve a chequear: son

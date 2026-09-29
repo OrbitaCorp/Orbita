@@ -45,6 +45,16 @@ export class AuthController {
     return this.authService.login(dto, businessSlug, deviceInfoFrom(req));
   }
 
+  // Sesión anónima del panel de la demo pública (ver AuthService.demoSession).
+  // Throttle generoso: cada visitante pide uno cada 15 minutos de uso.
+  @Post('demo-session')
+  @Public()
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  demoSession() {
+    return this.authService.demoSession();
+  }
+
   @Post('refresh')
   @Public()
   refresh(

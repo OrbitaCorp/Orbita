@@ -17,7 +17,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
+import { DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
+import { errorDemo } from '../common/guards/demo.guard';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -170,6 +171,8 @@ export class AuthService implements OnModuleInit {
       include: { storefrontConfig: { select: { storeName: true } } },
     });
     if (!business) throw new NotFoundException('Negocio no encontrado');
+    // La demo pública no acumula clientes de visitantes (ver DemoGuard).
+    if (business.isDemo) throw errorDemo();
 
     const existingCustomer = await this.prisma.customer.findFirst({
       where: { businessId: business.id, email: dto.email, deletedAt: null },
@@ -912,6 +915,7 @@ export class AuthService implements OnModuleInit {
   async googleLoginStorefront(identity: GoogleIdentity, businessSlug: string): Promise<LoginResponse> {
     const business = await this.prisma.business.findUnique({ where: { subdomain: businessSlug } });
     if (!business) throw new NotFoundException('Negocio no encontrado');
+    if (business.isDemo) throw errorDemo();
 
     let customer = await this.prisma.customer.findFirst({
       where: { businessId: business.id, googleId: identity.googleId, deletedAt: null },
@@ -1019,6 +1023,33 @@ export class AuthService implements OnModuleInit {
         subdomain: member.business.subdomain,
         mode: member.business.mode,
       },
+    };
+  }
+
+  // ── Demo pública (demo.orbita.site) ──────────────────────────────────────
+  // Sesión anónima del panel de la demo: un access token del miembro
+  // `readOnly` del negocio demo, SIN refresh token. No pasa por la cookie de
+  // refresh del panel (vive en todo .orbita.site): si un dueño real prueba la
+  // demo, su propia sesión queda intacta. Cuando el token vence, el frontend
+  // vuelve a pedir uno acá. Todo lo que no sea lectura lo corta DemoGuard.
+  async demoSession(): Promise<DemoSessionResponse> {
+    const member = await this.prisma.member.findFirst({
+      where: { readOnly: true, business: { isDemo: true, deletedAt: null } },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        business: { select: { id: true, name: true, subdomain: true, mode: true } },
+      },
+    });
+    if (!member) throw new NotFoundException('La demo no está disponible');
+
+    return {
+      type: 'member',
+      demo: true,
+      token: this.signToken({ sub: member.id, type: 'member', businessId: member.businessId }),
+      member: { id: member.id, name: member.name, email: member.email, status: member.status, hasTempPassword: false },
+      role: member.role.name,
+      permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
+      business: member.business,
     };
   }
 
