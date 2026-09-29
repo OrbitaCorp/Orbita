@@ -566,6 +566,28 @@ export class MailService {
     return env.NODE_ENV === 'production' ? `claves: ${Object.keys(context).join(', ')}` : JSON.stringify(context);
   }
 
+  // La demo pública (Business.isDemo, demo.orbita.site) no manda ningún mail:
+  // ni avisos al dueño, ni resúmenes, ni nada a sus clientes sembrados. Se
+  // corta acá, en el envío, en vez de en cada llamador. Tampoco sale nada a
+  // un dominio .invalid (RFC 2606): son las cuentas inventadas de la demo.
+  // Se responde "enviado" para que ningún flujo lo trate como un error.
+  private readonly demoCache = new Map<string, { esDemo: boolean; hasta: number }>();
+
+  private async esDeLaDemo(to: string, meta?: MailMeta): Promise<boolean> {
+    if (/\.invalid$/i.test(to.trim())) return true;
+    const businessId = meta?.businessId;
+    if (!businessId) return false;
+    const ahora = Date.now();
+    const cacheado = this.demoCache.get(businessId);
+    if (cacheado && cacheado.hasta > ahora) return cacheado.esDemo;
+    const negocio = await this.prisma.business
+      .findUnique({ where: { id: businessId }, select: { isDemo: true } })
+      .catch(() => null);
+    const esDemo = negocio?.isDemo ?? false;
+    this.demoCache.set(businessId, { esDemo, hasta: ahora + 5 * 60 * 1000 });
+    return esDemo;
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,
@@ -580,6 +602,7 @@ export class MailService {
   ): Promise<boolean> {
     subject = limpiarAsunto(subject);
     if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, template, meta);
+    if (await this.esDeLaDemo(to, meta)) return true;
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${MailService.datosDelStub(context)}`);
       await this.registrar(to, subject, template, EmailSendStatus.SIMULATED, meta);
@@ -645,6 +668,7 @@ export class MailService {
   async sendCustomEmail(to: string, subject: string, htmlBody: string, meta?: MailMeta): Promise<boolean> {
     subject = limpiarAsunto(subject);
     if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, null, meta);
+    if (await this.esDeLaDemo(to, meta)) return true;
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Body: ${htmlBody.substring(0, 200)}`);
       await this.registrar(to, subject, null, EmailSendStatus.SIMULATED, meta);
