@@ -585,7 +585,7 @@ export default function Header({ onMenuClick }: Props) {
 // directo. El backend ya filtra los grupos según los permisos del miembro.
 
 const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: string[] }[] = [
-    { label: 'Dashboard',            seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
+    { label: 'Inicio',               seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
     { label: 'Pedidos',              seccion: 'pedidos',       alias: ['pedidos', 'ventas', 'ordenes', 'órdenes'] },
     { label: 'Historial de pedidos', seccion: 'pedidos',       vista: 'historial', alias: ['historial'] },
     { label: 'Cancelaciones y devoluciones', seccion: 'pedidos', vista: 'devoluciones', alias: ['postventa', 'cancelaciones', 'devoluciones', 'notas de credito', 'notas de crédito'] },

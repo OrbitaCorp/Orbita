@@ -33,7 +33,7 @@ export interface SeccionCopy {
 
 export const SECCIONES: SeccionCopy[] = [
     {
-        id: 'dashboard', sidebarTexto: 'Dashboard', titulo: 'Inicio',
+        id: 'dashboard', sidebarTexto: 'Inicio', titulo: 'Inicio',
         queEs: 'El resumen del negocio: cómo venís hoy, esta semana o este mes.',
         paraQue: 'Es la primera pantalla del día: ves ventas, pedidos y alertas de un vistazo, y desde cada alerta saltás directo a resolverla.',
         claves: [
@@ -524,8 +524,8 @@ export const MISIONES_ASISTENTE: MisionAsistente[] = [
         explicacion: 'El paquete de extras pago: juegos con premio, modales de anuncios, plantillas de Home (veinte portadas para tu tienda) y countdown. Se contrata aparte de la suscripción.',
     },
     {
-        id: 'cierre', esperaSeccion: 'dashboard', resaltaSidebar: 'Dashboard',
-        pedido: 'Última: volvé al **Dashboard**.',
+        id: 'cierre', esperaSeccion: 'dashboard', resaltaSidebar: 'Inicio',
+        pedido: 'Última: volvé al **Inicio**.',
         explicacion: 'Listo, ya recorriste todo el panel. El Inicio es tu resumen diario: números, alertas y el botón "Publicar tienda" para salir a vender. Por acá se empieza cada mañana.',
     },
 ]

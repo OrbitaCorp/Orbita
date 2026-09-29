@@ -31,7 +31,7 @@ interface Sub { label: string; seccion: string; vista?: string; permisos?: strin
 interface Modulo { id: string; label: string; Icon: IconType; seccion: string; badge?: number; alert?: boolean; subs?: Sub[] }
 
 const MODULOS: Modulo[] = [
-    { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, seccion: 'dashboard' },
+    { id: 'dashboard', label: 'Inicio', Icon: LayoutDashboard, seccion: 'dashboard' },
     {
         id: 'pedidos', label: 'Pedidos', Icon: ShoppingBag, seccion: 'pedidos',
         subs: [

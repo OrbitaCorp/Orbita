@@ -178,7 +178,7 @@ function Callout({ n, x, y }: { n: number; x: number; y: number }) {
 type ModuloId = 'dashboard' | 'pedidos' | 'clientes' | 'productos' | 'mensajes' | 'descuentos' | 'config' | 'avanzado' | 'manual'
 
 const MODULOS: { id: ModuloId; label: string; subs?: string[] }[] = [
-    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'dashboard', label: 'Inicio' },
     { id: 'pedidos', label: 'Pedidos', subs: ['Lista', 'Historial', 'Canc. y devol.', 'Nuevo +'] },
     // Los rótulos largos van abreviados para entrar en los 60px del menú.
     { id: 'clientes', label: 'Clientes', subs: ['Lista', 'Rep. clientes'] },

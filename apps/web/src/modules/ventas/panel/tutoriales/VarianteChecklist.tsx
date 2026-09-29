@@ -34,7 +34,7 @@ const SIDEBAR_DE: Record<string, string> = {
     configuracion: 'Configuración',
     categorias: 'Productos',
     catalogo: 'Productos',
-    dashboard: 'Dashboard',
+    dashboard: 'Inicio',
     // Segunda etapa.
     pedidos: 'Pedidos',
     clientes: 'Clientes',
