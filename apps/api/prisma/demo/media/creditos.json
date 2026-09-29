@@ -604,6 +604,282 @@
      "estudio": false
     }
    ]
+  },
+  "smart-tv": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/smart-tv-1.webp",
+     "pexels": "https://www.pexels.com/photo/37834298/",
+     "autor": "Margo Evardson",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/smart-tv-2.webp",
+     "pexels": "https://www.pexels.com/photo/28549934/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/smart-tv-3.webp",
+     "pexels": "https://www.pexels.com/photo/28850990/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/smart-tv-4.webp",
+     "pexels": "https://www.pexels.com/photo/6980724/",
+     "autor": "Max Vakhtbovych",
+     "estudio": false
+    }
+   ]
+  },
+  "parlante-redondo": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/parlante-redondo-1.webp",
+     "pexels": "https://www.pexels.com/photo/9842750/",
+     "autor": "Kaye RD",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/parlante-redondo-2.webp",
+     "pexels": "https://www.pexels.com/photo/28469377/",
+     "autor": "Mahmoud Yahyaoui",
+     "estudio": true
+    }
+   ]
+  },
+  "mochila": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/mochila-1.webp",
+     "pexels": "https://www.pexels.com/photo/16359299/",
+     "autor": "Erik Mclean",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/mochila-2.webp",
+     "pexels": "https://www.pexels.com/photo/17491913/",
+     "autor": "Erik Mclean",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/mochila-3.webp",
+     "pexels": "https://www.pexels.com/photo/15059375/",
+     "autor": "Collab Media",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/mochila-4.webp",
+     "pexels": "https://www.pexels.com/photo/5827880/",
+     "autor": "Polina ⠀",
+     "estudio": false
+    }
+   ]
+  },
+  "cable-usb": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/cable-usb-1.webp",
+     "pexels": "https://www.pexels.com/photo/914915/",
+     "autor": "Matthias Zomer",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/cable-usb-2.webp",
+     "pexels": "https://www.pexels.com/photo/12997239/",
+     "autor": "Srattha Nualsate",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/cable-usb-3.webp",
+     "pexels": "https://www.pexels.com/photo/4219863/",
+     "autor": "https://kaboompics.com/",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/cable-usb-4.webp",
+     "pexels": "https://www.pexels.com/photo/4219867/",
+     "autor": "https://kaboompics.com/",
+     "estudio": false
+    }
+   ]
+  },
+  "disco-externo": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/disco-externo-1.webp",
+     "pexels": "https://www.pexels.com/photo/4675007/",
+     "autor": "Nothing Ahead",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/disco-externo-2.webp",
+     "pexels": "https://www.pexels.com/photo/4675013/",
+     "autor": "Nothing Ahead",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/disco-externo-3.webp",
+     "pexels": "https://www.pexels.com/photo/3915760/",
+     "autor": "Andrea Piacquadio",
+     "estudio": true
+    }
+   ]
+  },
+  "pendrive": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/pendrive-1.webp",
+     "pexels": "https://www.pexels.com/photo/10336136/",
+     "autor": "Get Lost Mike",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/pendrive-2.webp",
+     "pexels": "https://www.pexels.com/photo/5474289/",
+     "autor": "cottonbro studio",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/pendrive-3.webp",
+     "pexels": "https://www.pexels.com/photo/4792747/",
+     "autor": "Anete Lusina",
+     "estudio": false
+    }
+   ]
+  },
+  "proyector": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/proyector-1.webp",
+     "pexels": "https://www.pexels.com/photo/31726725/",
+     "autor": "Alpha En",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/proyector-2.webp",
+     "pexels": "https://www.pexels.com/photo/31726737/",
+     "autor": "Alpha En",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/proyector-3.webp",
+     "pexels": "https://www.pexels.com/photo/31726722/",
+     "autor": "Alpha En",
+     "estudio": false
+    }
+   ]
+  },
+  "ring-light": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/ring-light-1.webp",
+     "pexels": "https://www.pexels.com/photo/24206110/",
+     "autor": "Markus Winkler",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/ring-light-2.webp",
+     "pexels": "https://www.pexels.com/photo/4793156/",
+     "autor": "Anete Lusina",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/ring-light-3.webp",
+     "pexels": "https://www.pexels.com/photo/4793157/",
+     "autor": "Anete Lusina",
+     "estudio": false
+    }
+   ]
+  },
+  "auris-cable": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/auris-cable-1.webp",
+     "pexels": "https://www.pexels.com/photo/1540237/",
+     "autor": "Emma Pollard",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/auris-cable-2.webp",
+     "pexels": "https://www.pexels.com/photo/8704040/",
+     "autor": "Smika",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/auris-cable-3.webp",
+     "pexels": "https://www.pexels.com/photo/6251/",
+     "autor": "Karolina Grabowska www.kaboompics.com",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/auris-cable-4.webp",
+     "pexels": "https://www.pexels.com/photo/8704380/",
+     "autor": "Khan Nirob",
+     "estudio": false
+    }
+   ]
+  },
+  "funda-notebook": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/funda-notebook-1.webp",
+     "pexels": "https://www.pexels.com/photo/28028270/",
+     "autor": "Gül Işık",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/funda-notebook-2.webp",
+     "pexels": "https://www.pexels.com/photo/7742558/",
+     "autor": "Rann Vijay",
+     "estudio": false
+    }
+   ]
+  },
+  "teclado-compacto": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/teclado-compacto-1.webp",
+     "pexels": "https://www.pexels.com/photo/19686530/",
+     "autor": "minhphuc .workspace",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/teclado-compacto-2.webp",
+     "pexels": "https://www.pexels.com/photo/34030131/",
+     "autor": "Hilal Cavus",
+     "estudio": true
+    }
+   ]
+  },
+  "router-mesh": {
+   "grupo": "Tanda 4",
+   "fotos": [
+    {
+     "archivo": "productos/router-mesh-1.webp",
+     "pexels": "https://www.pexels.com/photo/4218546/",
+     "autor": "Aditya Singh",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/router-mesh-2.webp",
+     "pexels": "https://www.pexels.com/photo/18071864/",
+     "autor": "Jaycee300s",
+     "estudio": false
+    }
+   ]
   }
  },
  "categorias": {
@@ -733,12 +1009,6 @@
    "pexels": "https://www.pexels.com/video/8566516/",
    "autor": "Kindel Media"
   },
-  "Bloque robot bordes": {
-   "archivo": "videos/bloque-robot-bordes.mp4",
-   "poster": "videos/bloque-robot-bordes.webp",
-   "pexels": "https://www.pexels.com/video/8566377/",
-   "autor": "Kindel Media"
-  },
   "Bloque robot casa": {
    "archivo": "videos/bloque-robot-casa.mp4",
    "poster": "videos/bloque-robot-casa.webp",
@@ -757,23 +1027,71 @@
    "pexels": "https://www.pexels.com/video/6496235/",
    "autor": "Gustavo Fring"
   },
-  "Bloque auriculares plegables": {
-   "archivo": "videos/bloque-auriculares-plegables.mp4",
-   "poster": "videos/bloque-auriculares-plegables.webp",
-   "pexels": "https://www.pexels.com/video/4523128/",
-   "autor": "Polina Tankilevitch"
-  },
   "Bloque drone cielo": {
    "archivo": "videos/bloque-drone-cielo.mp4",
    "poster": "videos/bloque-drone-cielo.webp",
    "pexels": "https://www.pexels.com/video/39549847/",
    "autor": "Sergei Starostin"
   },
-  "Bloque drone estable": {
-   "archivo": "videos/bloque-drone-estable.mp4",
-   "poster": "videos/bloque-drone-estable.webp",
-   "pexels": "https://www.pexels.com/video/39549850/",
-   "autor": "Sergei Starostin"
+  "bloque-celular-mensajes": {
+   "archivo": "videos/bloque-celular-mensajes.mp4",
+   "poster": "videos/bloque-celular-mensajes.webp",
+   "pexels": "https://www.pexels.com/video/6186015/",
+   "autor": "K"
+  },
+  "bloque-celular-sillon": {
+   "archivo": "videos/bloque-celular-sillon.mp4",
+   "poster": "videos/bloque-celular-sillon.webp",
+   "pexels": "https://www.pexels.com/video/10374917/",
+   "autor": "RDNE Stock project"
+  },
+  "bloque-notebook-escritorio": {
+   "archivo": "videos/bloque-notebook-escritorio.mp4",
+   "poster": "videos/bloque-notebook-escritorio.webp",
+   "pexels": "https://www.pexels.com/video/4841394/",
+   "autor": "Tima Miroshnichenko"
+  },
+  "bloque-notebook-planta": {
+   "archivo": "videos/bloque-notebook-planta.mp4",
+   "poster": "videos/bloque-notebook-planta.webp",
+   "pexels": "https://www.pexels.com/video/31031473/",
+   "autor": "Jakub Zerdzicki"
+  },
+  "bloque-reloj-muneca": {
+   "archivo": "videos/bloque-reloj-muneca.mp4",
+   "poster": "videos/bloque-reloj-muneca.webp",
+   "pexels": "https://www.pexels.com/video/34509926/",
+   "autor": "Airam Dato-on"
+  },
+  "bloque-reloj-escritorio": {
+   "archivo": "videos/bloque-reloj-escritorio.mp4",
+   "poster": "videos/bloque-reloj-escritorio.webp",
+   "pexels": "https://www.pexels.com/video/9130468/",
+   "autor": "Dario Fernandez Ruz"
+  },
+  "bloque-parlante-playa": {
+   "archivo": "videos/bloque-parlante-playa.mp4",
+   "poster": "videos/bloque-parlante-playa.webp",
+   "pexels": "https://www.pexels.com/video/12918543/",
+   "autor": "Engin Akyurt"
+  },
+  "bloque-parlante-piso": {
+   "archivo": "videos/bloque-parlante-piso.mp4",
+   "poster": "videos/bloque-parlante-piso.webp",
+   "pexels": "https://www.pexels.com/video/6322747/",
+   "autor": "cottonbro studio"
+  },
+  "bloque-vr-rosa": {
+   "archivo": "videos/bloque-vr-rosa.mp4",
+   "poster": "videos/bloque-vr-rosa.webp",
+   "pexels": "https://www.pexels.com/video/7774296/",
+   "autor": "Artem Podrez"
+  },
+  "bloque-vr-amarillo": {
+   "archivo": "videos/bloque-vr-amarillo.mp4",
+   "poster": "videos/bloque-vr-amarillo.webp",
+   "pexels": "https://www.pexels.com/video/3761536/",
+   "autor": "Sound On"
   }
  }
 }
