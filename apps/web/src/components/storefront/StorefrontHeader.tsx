@@ -430,6 +430,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // sería un botón a ningún lado. Mismo criterio que cartBlock.
   const accountBlock = !esVidriera && (
     <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+      {/* Demo: saltar al panel sin volver a la página de elegir rol. */}
+      {enDemo && (
+        <a href="/panel" className="ds-hover"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', marginLeft: 6, borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          <Store size={14} strokeWidth={2} /> Ver panel admin
+        </a>
+      )}
       <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
       {status === 'loading' ? (
@@ -742,6 +749,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             ))}
             {/* Vidriera digital: mismo criterio que accountBlock (sin cuenta
                 de cliente, sin carrito) — no tiene sentido ofrecer login. */}
+            {enDemo && (
+              <a href="/panel" className="sf-drawer-link" style={{ color: 'var(--color-primary)', fontWeight: 600 }} onClick={() => setMenuOpen(false)}>
+                <Store size={16} strokeWidth={1.5} /> Ver panel admin
+              </a>
+            )}
             {!esVidriera && status !== 'loading' && (cliente ? (
               <>
                 {accountLinks.map(l => (

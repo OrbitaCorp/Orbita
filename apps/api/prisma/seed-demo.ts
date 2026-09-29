@@ -134,8 +134,9 @@ async function negocioBase() {
   const owner = await prisma.role.findFirstOrThrow({ where: { businessId: negocio.id, name: 'owner' } });
   await prisma.member.upsert({
     where: { businessId_email: { businessId: negocio.id, email: EMAIL_VISITANTE } },
-    update: { readOnly: true, roleId: owner.id, status: 'ACTIVE' },
-    create: { businessId: negocio.id, name: 'Visitante de la demo', email: EMAIL_VISITANTE, roleId: owner.id, status: 'ACTIVE', readOnly: true, emailVerified: true },
+    // Tema claro: el panel de la demo arranca en blanco, sea cual sea el del sistema.
+    update: { readOnly: true, roleId: owner.id, status: 'ACTIVE', themePreference: 'LIGHT' },
+    create: { businessId: negocio.id, name: 'Visitante de la demo', email: EMAIL_VISITANTE, roleId: owner.id, status: 'ACTIVE', readOnly: true, emailVerified: true, themePreference: 'LIGHT' },
   });
 
   // Cortesía sin vencimiento práctico + paquete Avanzado: la demo muestra
