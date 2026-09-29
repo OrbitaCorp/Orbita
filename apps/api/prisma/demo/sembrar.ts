@@ -303,7 +303,8 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   // la fila de countdown_configs, igual que la escribe
   // DiscountCountdownService#aplicar desde Descuentos. Productos que no están
   // en ningún otro descuento, para que el precio de la sección sea el que
-  // cobra el carrito.
+  // cobra el carrito. productLevel 'padre' (lo que guarda el panel): sin eso
+  // el motor compara contra la variante y no descuenta ningún producto.
   //
   // Nunca termina: DemoFechasService corre end_date (del descuento Y de la
   // copia en countdown_configs) cada vez que pone al día las fechas —la tarea
@@ -312,9 +313,9 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   // mucho más que el día entre corridas nocturnas: si una falla, no vence.
   const relampago = idDemo('descuento:relampago');
   const finRelampago = new Date(ahora.getTime() + 2 * DIA + 20 * HORA);
-  const nombreRelampago = 'Oferta relámpago: 25 % off';
+  const nombreRelampago = 'Favoritos de Nébula';
   await prisma.discount.create({
-    data: { id: relampago, businessId, name: nombreRelampago, type: 'PERCENT_PRODUCT', value: dec(25), scope: 'PRODUCT', application: 'AUTOMATIC', startDate: hace(DIA), endDate: finRelampago, activeDays: [], priority: 2, createdBy: dueno.id, createdAt: hace(DIA) },
+    data: { id: relampago, businessId, name: nombreRelampago, type: 'PERCENT_PRODUCT', value: dec(25), scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(DIA), endDate: finRelampago, activeDays: [], priority: 2, createdBy: dueno.id, createdAt: hace(DIA) },
   });
   await prisma.discountProduct.createMany({
     data: ['auriculares-anc', 'smartwatch-gps', 'parlante-redondo', 'tablet', 'drone', 'robot-aspiradora'].map((c) => ({ discountId: relampago, productId: idDemo(`producto:${c}`) })),
