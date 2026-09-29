@@ -298,6 +298,34 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
     ],
   });
 
+  // Oferta relámpago (paquete Avanzado): un % en productos elegidos, con
+  // reloj y sección propia en la portada. Es un descuento PERCENT_PRODUCT más
+  // la fila de countdown_configs, igual que la escribe
+  // DiscountCountdownService#aplicar desde Descuentos. Productos que no están
+  // en ningún otro descuento, para que el precio de la sección sea el que
+  // cobra el carrito.
+  //
+  // Nunca termina: DemoFechasService corre end_date (del descuento Y de la
+  // copia en countdown_configs) cada vez que pone al día las fechas —la tarea
+  // nocturna y cada vez que alguien abre el panel—, así que el reloj baja
+  // durante el día y vuelve a "2 días y 20 h" en cada corrida. El margen es
+  // mucho más que el día entre corridas nocturnas: si una falla, no vence.
+  const relampago = idDemo('descuento:relampago');
+  const finRelampago = new Date(ahora.getTime() + 2 * DIA + 20 * HORA);
+  const nombreRelampago = 'Oferta relámpago: 25 % off';
+  await prisma.discount.create({
+    data: { id: relampago, businessId, name: nombreRelampago, type: 'PERCENT_PRODUCT', value: dec(25), scope: 'PRODUCT', application: 'AUTOMATIC', startDate: hace(DIA), endDate: finRelampago, activeDays: [], priority: 2, createdBy: dueno.id, createdAt: hace(DIA) },
+  });
+  await prisma.discountProduct.createMany({
+    data: ['auriculares-anc', 'smartwatch-gps', 'parlante-redondo', 'tablet', 'drone', 'robot-aspiradora'].map((c) => ({ discountId: relampago, productId: idDemo(`producto:${c}`) })),
+  });
+  const cuentaRegresiva = {
+    title: nombreRelampago, subtitle: null, endDate: finRelampago, finishedMessage: null, ctaText: null, ctaLink: null,
+    placement: 'HOME' as const, showProductsOnHome: true, isActive: true, discountId: relampago,
+  };
+  await prisma.countdownConfig.upsert({ where: { businessId }, create: { businessId, ...cuentaRegresiva }, update: cuentaRegresiva });
+  await prisma.business.update({ where: { id: businessId }, data: { flashSaleEnabled: true } });
+
   // ── Clientes ──────────────────────────────────────────────────────────────
   console.log('Clientes…');
   const clientes: { id: string; nombre: string; apellido: string; email: string; telefono: string; ciudad: (typeof CIUDADES)[number]; direccionId: string; calle: string; alta: Date }[] = [];

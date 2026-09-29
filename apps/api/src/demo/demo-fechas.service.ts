@@ -35,6 +35,10 @@ export const TABLAS_DEMO: Tabla[] = [
   { tabla: 'payments', columnas: ['paid_at', 'verified_at', 'created_at', 'updated_at'], negocio: DIRECTO },
   { tabla: 'discounts', columnas: ['start_date', 'end_date', 'created_at', 'updated_at', 'deleted_at'], negocio: DIRECTO },
   { tabla: 'discount_redemptions', columnas: ['created_at'], negocio: DIRECTO },
+  // La oferta relámpago guarda una COPIA de la fecha de fin de su descuento
+  // (el reloj de la portada lee esta): si no se corre junto con discounts, el
+  // reloj da "terminada" con el descuento todavía vigente.
+  { tabla: 'countdown_configs', columnas: ['end_date', 'created_at', 'updated_at'], negocio: DIRECTO },
   { tabla: 'stock_movements', columnas: ['created_at'], negocio: DIRECTO },
   { tabla: 'reviews', columnas: ['created_at', 'updated_at'], negocio: DIRECTO },
   { tabla: 'conversations', columnas: ['created_at', 'updated_at'], negocio: DIRECTO },

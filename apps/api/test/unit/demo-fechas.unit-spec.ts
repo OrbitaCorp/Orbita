@@ -50,6 +50,12 @@ describe('DemoFechasService', () => {
     expect(clientes.columnas).not.toContain('locked_until');
   });
 
+  it('el reloj de la oferta relámpago se corre junto con su descuento (si no, vence solo)', () => {
+    const fin = (tabla: string) => TABLAS_DEMO.find((t) => t.tabla === tabla)?.columnas.includes('end_date');
+    expect(fin('discounts')).toBe(true);
+    expect(fin('countdown_configs')).toBe(true);
+  });
+
   it('las columnas existen en el schema (si una se renombra, esto avisa)', () => {
     const porTabla = new Map(Prisma.dmmf.datamodel.models.map((m) => [m.dbName ?? m.name, new Set(m.fields.filter((f) => f.type === 'DateTime').map((f) => f.dbName ?? f.name))]));
     for (const t of TABLAS_DEMO) {
