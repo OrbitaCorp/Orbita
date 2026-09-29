@@ -50,6 +50,13 @@ const CSS_FICHA = `
     .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
     .sf-pd-img-main > div { height: 300px !important; }
     .sf-pd-belowimg { margin-left: 0 !important; }
+    /* En una sola columna, las características (y la caja de envíos cuando
+       va abajo de la foto) quedaban entre la foto y el título: el cliente
+       tenía que pasar toda la ficha técnica para ver el precio y comprar.
+       La columna de la foto se "disuelve" en la grilla y lo de abajo de la
+       foto pasa después del panel de compra. */
+    .sf-pd-col-izq  { display: contents !important; }
+    .sf-pd-belowimg { order: 2; }
     .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
     .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
     /* La silueta de la foto sigue los MISMOS altos que la foto real de
@@ -573,7 +580,7 @@ export default function ProductoDetalle() {
         <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60, marginBottom: 72 }}>
 
           {/* ── Galería + Características ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="sf-pd-col-izq" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
             <div className="sf-pd-gallery" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
 
