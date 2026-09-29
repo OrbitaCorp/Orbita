@@ -69,7 +69,6 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
     // Sin nada elegido ni el mouse encima, el fondo alterna solo entre las
     // dos perspectivas: anticipa qué hay detrás de cada tarjeta.
     const [alterna, setAlterna] = useState<Rol>('tienda');
-    const [montado, setMontado] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [progreso, setProgreso] = useState(0);
     const [urls, setUrls] = useState<Record<Rol, string>>({ tienda: urlInicial('/'), panel: urlInicial('/panel') });
@@ -77,8 +76,6 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
 
     useEffect(() => {
         setUrls({ tienda: tenantUrl(DEMO_SLUG, '/'), panel: tenantUrl(DEMO_SLUG, '/panel') });
-        const t = requestAnimationFrame(() => setMontado(true));
-        return () => cancelAnimationFrame(t);
     }, []);
 
     useEffect(() => {
@@ -141,7 +138,7 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
     const pasoActual = Math.min(pasos.length - 1, Math.floor(progreso * pasos.length));
 
     return (
-        <div className={`de-raiz${montado ? ' de-montado' : ''}${cargando ? ' de-cargando' : ''}`}>
+        <div className={`de-raiz${cargando ? ' de-cargando' : ''}`}>
             <style>{CSS}</style>
 
             {/* ── Fondo: las dos perspectivas, borrosas, superpuestas ── */}
@@ -265,18 +262,18 @@ const CSS = `
 .de-capa { position: absolute; inset: 0; opacity: 0; transition: opacity 900ms ease; }
 .de-capa img {
     width: 100%; height: 100%; object-fit: cover; object-position: top center;
-    filter: blur(26px) saturate(1.15) brightness(.8);
-    transform: scale(1.14);
+    filter: blur(18px) saturate(1.2) brightness(.8);
+    transform: scale(1.1);
     transition: filter 1100ms cubic-bezier(.2,.7,.2,1), transform 1400ms cubic-bezier(.2,.7,.2,1);
 }
-.de-capa[data-activa] { opacity: .42; }
-.de-capa[data-enfocada] { opacity: .78; }
-.de-capa[data-enfocada] img { filter: blur(16px) saturate(1.15) brightness(.85); transform: scale(1.08); }
+.de-capa[data-activa] { opacity: .55; }
+.de-capa[data-enfocada] { opacity: 1; }
+.de-capa[data-enfocada] img { filter: blur(9px) saturate(1.2) brightness(.78); transform: scale(1.05); }
 .de-velo {
     position: absolute; inset: 0;
     background:
-        radial-gradient(ellipse 80% 70% at 50% 45%, rgba(0,0,0,.35) 0%, rgba(0,0,0,.72) 70%, rgba(0,0,0,.9) 100%),
-        linear-gradient(180deg, rgba(2,6,23,.55) 0%, rgba(2,6,23,.15) 40%, rgba(2,6,23,.75) 100%);
+        radial-gradient(ellipse 75% 65% at 50% 48%, rgba(2,6,23,.62) 0%, rgba(2,6,23,.5) 55%, rgba(0,0,0,.82) 100%),
+        linear-gradient(180deg, rgba(2,6,23,.45) 0%, rgba(2,6,23,0) 30%, rgba(2,6,23,.55) 100%);
     transition: opacity 1200ms ease;
 }
 
@@ -303,8 +300,11 @@ const CSS = `
     width: 100%; max-width: 960px; margin: 0 auto; padding: 24px 24px 56px; text-align: center;
     transition: opacity 600ms ease, transform 700ms cubic-bezier(.2,.7,.2,1), filter 600ms ease;
 }
-.de-in { opacity: 0; transform: translateY(14px); transition: opacity 700ms ease var(--d, 0ms), transform 800ms cubic-bezier(.2,.7,.2,1) var(--d, 0ms), border-color 250ms ease, background 250ms ease, box-shadow 300ms ease; }
-.de-montado .de-in { opacity: 1; transform: none; }
+/* Entrada escalonada con animación CSS, no con un estado "montado" puesto
+   desde requestAnimationFrame: en una pestaña en segundo plano ese rAF no
+   corre y el contenido quedaba invisible. */
+.de-in { animation: de-entra 800ms cubic-bezier(.2,.7,.2,1) var(--d, 0ms) both; transition: border-color 250ms ease, background 250ms ease, box-shadow 300ms ease; }
+@keyframes de-entra { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 .de-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(203,213,225,.85); margin: 0; }
 .de-punto { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 0 rgba(74,222,128,.6); animation: de-latido 2s ease-out infinite; }
@@ -337,7 +337,8 @@ const CSS = `
 .de-radio {
     position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%;
     display: grid; place-items: center; color: transparent;
-    border: 1.5px solid rgba(255,255,255,.55); background: rgba(2,6,23,.55); backdrop-filter: blur(6px);
+    border: 1.5px solid rgba(255,255,255,.75); background: rgba(2,6,23,.35); backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.35);
     transition: background 220ms ease, border-color 220ms ease, color 220ms ease, transform 300ms cubic-bezier(.3,1.6,.5,1);
 }
 .de-op[aria-checked="true"] .de-radio { background: #3b82f6; border-color: #3b82f6; color: #fff; transform: scale(1.08); }
@@ -360,7 +361,7 @@ const CSS = `
 .de-cargando .de-main { opacity: 0; transform: scale(.97); filter: blur(6px); pointer-events: none; }
 .de-cargando .de-top { opacity: 0; pointer-events: none; }
 .de-cargando .de-capa[data-activa] { opacity: 1; }
-.de-cargando .de-capa[data-activa] img { filter: blur(3px) saturate(1.1) brightness(.72); transform: scale(1.01); transition-duration: 2400ms; }
+.de-cargando .de-capa[data-activa] img { filter: blur(2px) saturate(1.1) brightness(.7); transform: scale(1.01); transition-duration: 2400ms; }
 .de-cargando .de-velo { opacity: .75; }
 
 .de-carga {
@@ -409,7 +410,7 @@ const CSS = `
 
 @media (prefers-reduced-motion: reduce) {
     .de-in, .de-capa, .de-capa img, .de-main, .de-mini img, .de-carga { transition: none !important; }
-    .de-in { opacity: 1; transform: none; }
+    .de-in,
     .de-punto, .de-planeta, .de-satelite-eje, .de-carga-paso { animation: none; }
 }
 `;
