@@ -25,6 +25,7 @@ process.loadEnvFile?.();
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { sembrarContenido } from './demo/sembrar';
+import { sembrarApariencia } from './demo/apariencia';
 
 const prisma = new PrismaClient();
 
@@ -185,9 +186,12 @@ async function negocioBase() {
 async function main() {
   const negocio = await negocioBase();
   // --solo-base: arma el negocio (dueño, visitante, suscripción) sin tocar
-  // el contenido. Sin la bandera, además borra y vuelve a sembrar catálogo,
-  // ventas y todo el panel (ver prisma/demo/sembrar.ts).
-  if (!process.argv.includes('--solo-base')) await sembrarContenido(prisma, negocio.id);
+  // el contenido. --solo-apariencia: además, logo y diseño del home (rápido,
+  // para iterar el diseño). Sin banderas, borra y vuelve a sembrar catálogo,
+  // ventas y todo el panel (ver prisma/demo/sembrar.ts) y la apariencia.
+  const soloApariencia = process.argv.includes('--solo-apariencia');
+  if (!process.argv.includes('--solo-base') && !soloApariencia) await sembrarContenido(prisma, negocio.id);
+  if (!process.argv.includes('--solo-base')) await sembrarApariencia(prisma, negocio.id);
   console.log(`Demo lista: ${negocio.subdomain} (${negocio.id})`);
 }
 

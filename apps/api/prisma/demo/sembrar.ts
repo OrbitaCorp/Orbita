@@ -66,7 +66,7 @@ const dec = (n: number) => new Prisma.Decimal(n.toFixed(2));
 
 // ── Subidas: Supabase Storage (fotos) y R2 (videos), como la app ────────────
 
-function almacenamiento(businessId: string) {
+export function almacenamiento(businessId: string) {
   const supabase = createClient(process.env.SUPABASE_URL ?? '', process.env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
     auth: { autoRefreshToken: false, persistSession: false },
     // Igual que SupabaseService: en Node 20 no hay WebSocket nativo.
@@ -88,7 +88,7 @@ function almacenamiento(businessId: string) {
       if (cache.has(clave)) return cache.get(clave)!;
       const ruta = `${businessId}/demo/${archivo.replace(/\//g, '-')}`;
       const { error } = await supabase.storage.from(bucket).upload(ruta, readFileSync(join(MEDIA, archivo)), {
-        contentType: 'image/webp',
+        contentType: archivo.endsWith('.png') ? 'image/png' : 'image/webp',
         upsert: true,
       });
       if (error) throw new Error(`No se pudo subir ${archivo} a ${bucket}: ${error.message}`);
