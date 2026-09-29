@@ -55,12 +55,17 @@ export class ConversationsService {
   // Abrir una conversación desde el panel la marca leída — mismo criterio que
   // cualquier bandeja de entrada (Gmail, WhatsApp Web). Si ya estaba leída,
   // no se toca nada.
-  async getMessages(businessId: string, conversationId: string) {
+  //
+  // `marcarLeida: false` (el visitante de solo lectura de la demo pública):
+  // abrir el hilo no puede tocar la conversación, que es de todos — el "sin
+  // leer" sembrado se le apagaba a los demás con la primera apertura. El
+  // visitante lleva lo leído en su navegador (lib/demo/recursos/mensajes.ts).
+  async getMessages(businessId: string, conversationId: string, marcarLeida = true) {
     const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
 
     const messages = await this.ultimosMensajes(conversationId);
-    if (conv.isUnread) {
+    if (conv.isUnread && marcarLeida) {
       // Raw UPDATE a propósito: prisma.update() dispara @updatedAt y la bandeja
       // (findAllForBusiness) ordena por updatedAt, así que abrir una
       // conversación para leerla la subía al tope de la lista. updatedAt tiene
