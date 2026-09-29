@@ -1047,6 +1047,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                    celular la dejaba con el hover "pegado" hasta tocar otro
                    lado — mismo criterio que .ds-hover en globals.css. */
                 .prod-grid-card, .prod-table-row { transition: border-color 160ms ease, background 160ms ease; }
+                /* La card entera abre el producto: el cursor lo dice (menos las que están subiendo o guardándose). */
+                .prod-grid-card:not([data-disabled]), .prod-mobile-card:not([data-disabled]) { cursor: pointer; }
                 @media (hover: hover) and (min-width: 769px) {
                     .prod-grid-card:hover { border-color: var(--color-border-strong) !important; }
                     .prod-table-row:hover { background: var(--color-surface) !important; }
