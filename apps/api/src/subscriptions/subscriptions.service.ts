@@ -25,6 +25,7 @@ import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
 import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
+import { describeError } from '../common/utils/describe-error.util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
@@ -80,6 +81,14 @@ const FREE_SIGNUP_PREFIX = 'FREE-';
 // no hay businessId para usar como referencia (a diferencia de los cobros
 // recurrentes de un plan ya activo, que sí usan el businessId).
 const PENDING_REF_PREFIX = 'PEND-';
+
+// Una alta pagada que el barrido nocturno rescató o no pudo resolver (ver
+// rescatarAltasPagadas): lo mínimo para identificarla en el aviso interno.
+interface AltaAvisada {
+  ref: string;
+  email: string;
+  detalle: string;
+}
 
 // Exportados (no solo de uso interno): subscriptions.controller.ts los
 // necesita para validar el `?plan=` de GET /discount/:code sin duplicar la
@@ -227,6 +236,17 @@ export class SubscriptionsService {
   // entornos sin MP (dev sin credenciales).
   private get mpConfigured(): boolean {
     return !!this.config.get<string>('MP_ACCESS_TOKEN');
+  }
+
+  // URL pública del webhook que confirma altas pagadas (handleWebhook). Se
+  // deriva de MERCADOPAGO_REDIRECT_URI igual que mercadopago.service.ts arma la
+  // de pedidos, así no hay una variable más que mantener. undefined si no es
+  // https (dev local): MP no puede llegar a localhost y rechazaría la
+  // Preference entera por un notification_url inválido.
+  private get urlWebhookAltas(): string | undefined {
+    const redirect = this.config.get<string>('MERCADOPAGO_REDIRECT_URI') ?? '';
+    const url = redirect.replace('/mercadopago/oauth/callback', '/webhooks/mercadopago/preapproval');
+    return url.startsWith('https://') && url !== redirect ? url : undefined;
   }
 
   private mpConfig(): MercadoPagoConfig {
@@ -461,6 +481,12 @@ export class SubscriptionsService {
           ],
           payer: { email: dto.account.email },
           external_reference: ref,
+          // Sin esto el único camino para crear la cuenta era que el navegador
+          // volviera a /onboarding/pago-retorno. Si la persona pagaba desde la
+          // app de Mercado Pago (o cerraba la pestaña) el pago quedaba
+          // aprobado y la cuenta sin crear — caso real del 24/09 (pago
+          // 180757333764). Con el aviso, MP le pega a la API por su cuenta.
+          ...(this.urlWebhookAltas ? { notification_url: this.urlWebhookAltas } : {}),
           back_urls: {
             success: `${frontendUrl}/onboarding/pago-retorno`,
             pending: `${frontendUrl}/onboarding/pago-retorno`,
@@ -1499,6 +1525,13 @@ export class SubscriptionsService {
 
     // El tipo distingue un cambio de la suscripción de un cobro concreto.
     const type = (body?.type ?? body?.action ?? '') as string;
+    // Con notification_url en la Preference, MP manda además un aviso de
+    // merchant_order por cada pago. No aporta nada (el pago llega aparte) y
+    // caía en la rama de preapproval, que lo buscaba como si fuera una y
+    // dejaba un error falso en el log.
+    if (type.includes('merchant_order') || String(body?.topic ?? query['topic'] ?? '').includes('merchant_order')) {
+      return { received: true };
+    }
     const data = body?.data as { id?: string } | undefined;
     const id = data?.id ?? (body?.id as string | undefined);
     if (!id) {
@@ -1974,15 +2007,105 @@ export class SubscriptionsService {
   // negocios draft, esto es de bajo riesgo: la tabla no tiene ninguna relación
   // ni cascada, borrar una fila vieja no afecta nada más.
   // Ya NO es @Cron — mismo motivo que reconcileOverdueSubscriptions() arriba.
+  //
+  // ANTES de borrar, rescata las que SÍ se pagaron: el 24/09 una clienta pagó
+  // ($5.500, aprobado) y no volvió a la pantalla de retorno; el webhook tampoco
+  // llegó, y este barrido le borró el alta a las 48 h sin mirar si MP había
+  // cobrado. Quedó con la plata cobrada, sin cuenta y sin los datos del wizard.
+  // Ahora: toda alta con más de 15 min se reintenta confirmar (si MP tiene un
+  // pago aprobado se crea la cuenta; si no, no pasa nada) y solo se borran las
+  // vencidas que MP no cobró. Lo que no se pudo verificar o confirmar se
+  // CONSERVA y se avisa, para que un cobro nunca se pierda en silencio.
   async cleanupExpiredPendingSignups() {
     const hours = Number(this.config.get<string>('PENDING_SIGNUP_TTL_HOURS') ?? 48);
     const cutoff = new Date();
     cutoff.setHours(cutoff.getHours() - hours);
 
+    const conservar = await this.rescatarAltasPagadas();
+
     const { count } = await this.prisma.pendingSignup.deleteMany({
-      where: { createdAt: { lt: cutoff } },
+      where: {
+        createdAt: { lt: cutoff },
+        ...(conservar.length > 0 ? { preapprovalId: { notIn: conservar } } : {}),
+      },
     });
     if (count > 0) this.logger.log(`Altas pendientes vencidas borradas: ${count}`);
+  }
+
+  // Devuelve las refs que NO hay que borrar todavía (no se pudo verificar el
+  // pago o no se pudo crear la cuenta). Las gratis (FREE-) no se tocan: no hay
+  // pago que rescatar y las sigue limpiando el TTL.
+  private async rescatarAltasPagadas(): Promise<string[]> {
+    if (!this.mpConfigured) return [];
+
+    const hace15min = new Date(Date.now() - 15 * 60 * 1000);
+    const pendientes = await this.prisma.pendingSignup.findMany({
+      where: { createdAt: { lt: hace15min }, preapprovalId: { startsWith: PENDING_REF_PREFIX } },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+
+    const conservar: string[] = [];
+    const rescatadas: AltaAvisada[] = [];
+    const problemas: AltaAvisada[] = [];
+
+    for (const p of pendientes) {
+      const email = (p.payload as { account?: { email?: string } } | null)?.account?.email ?? '(sin mail)';
+      try {
+        const r = await this.confirmAndCreate(p.preapprovalId);
+        if (r.activated) {
+          rescatadas.push({ ref: p.preapprovalId, email, detalle: `cuenta creada (${'subdomain' in r ? r.subdomain : '?'})` });
+        } else if (r.status === 'search_failed') {
+          // MP no respondió: no sabemos si pagó. Se conserva y se reintenta mañana.
+          conservar.push(p.preapprovalId);
+        } else if (r.status === 'monto_no_coincide') {
+          conservar.push(p.preapprovalId);
+          problemas.push({ ref: p.preapprovalId, email, detalle: 'hay un pago aprobado pero el monto no coincide: revisar a mano' });
+        }
+        // Cualquier otro estado (rejected, pending, unknown...) = no pagó: sigue el TTL.
+      } catch (err) {
+        conservar.push(p.preapprovalId);
+        problemas.push({ ref: p.preapprovalId, email, detalle: `falló al crear la cuenta: ${describeError(err)}` });
+      }
+    }
+
+    if (rescatadas.length > 0 || problemas.length > 0) {
+      await this.avisarAltasPagadasSinCuenta(rescatadas, problemas);
+    }
+    return conservar;
+  }
+
+  // Aviso interno (no al cliente): un pago aprobado que quedó sin cuenta es
+  // plata cobrada, y hasta ahora nos enterábamos solo si la persona escribía.
+  // Va por log en nivel error (para poder alertar desde Cloud Logging) y por
+  // mail a ALERTAS_PLATAFORMA_EMAIL. El mail es best-effort: si falla, el log
+  // ya quedó.
+  private async avisarAltasPagadasSinCuenta(rescatadas: AltaAvisada[], problemas: AltaAvisada[]) {
+    const linea = (a: AltaAvisada) => `${a.email} — ${a.ref} — ${a.detalle}`;
+    if (rescatadas.length > 0) {
+      this.logger.error(`Altas pagadas que no se habían confirmado (se creó la cuenta ahora): ${rescatadas.map(linea).join(' | ')}`);
+    }
+    if (problemas.length > 0) {
+      this.logger.error(`ALTAS PAGADAS SIN CUENTA que no se pudieron resolver solas: ${problemas.map(linea).join(' | ')}`);
+    }
+
+    const to = this.config.get<string>('ALERTAS_PLATAFORMA_EMAIL') ?? 'contacto@orbita-corp.com';
+    const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const bloque = (titulo: string, items: AltaAvisada[]) =>
+      items.length === 0
+        ? ''
+        : `<p><strong>${titulo}</strong></p><ul>${items.map((a) => `<li>${escapar(linea(a))}</li>`).join('')}</ul>`;
+    try {
+      await this.mail.sendCustomEmail(
+        to,
+        problemas.length > 0 ? 'Alta pagada sin cuenta: requiere revisión' : 'Alta pagada recuperada por el barrido nocturno',
+        bloque('Requieren revisión a mano (el pago está aprobado y la cuenta no se pudo crear)', problemas) +
+          bloque('Recuperadas solas (el pago estaba aprobado y no se había confirmado)', rescatadas) +
+          '<p>Si se repite seguido, revisar que el webhook de Mercado Pago esté llegando.</p>',
+      );
+    } catch (err) {
+      this.logger.warn(`No se pudo mandar el aviso interno de altas pagadas: ${describeError(err)}`);
+    }
   }
 
   // ── Lectura ──────────────────────────────────────────────────────────────
