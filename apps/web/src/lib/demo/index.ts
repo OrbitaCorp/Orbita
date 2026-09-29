@@ -6,6 +6,8 @@ import { esTiendaDemo } from './modo'
 import { instalarInterceptorDemo } from './interceptor'
 import { alCambiar } from './almacen'
 import './recursos/tienda'
+import './recursos/checkout'
+import './recursos/pedidos'
 
 export function iniciarDemo(queryClient: QueryClient): void {
   if (typeof window === 'undefined' || !esTiendaDemo()) return

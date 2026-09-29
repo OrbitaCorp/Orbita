@@ -152,6 +152,33 @@ async function negocioBase() {
     create: { businessId: negocio.id, type: 'ADVANCED', isActive: true },
   });
 
+  // Sin tutorial de primeros pasos: la demo ya está armada. Fase 'terminado'
+  // en la etapa 2 = no se muestra nunca (ver tutoriales/estado.ts en apps/web).
+  await prisma.business.update({
+    where: { id: negocio.id },
+    data: { tutorial: { variante: 'checklist', fase: 'terminado', etapa: 2, paso: 0, hechas: [], minimizado: false } },
+  });
+
+  // Pagos y envíos: que el checkout muestre lo que Órbita permite (descuento
+  // por transferencia y por efectivo, costos por transportista, envío gratis
+  // desde un monto). Se pisa en cada corrida, así un cambio acá se aplica
+  // re-sembrando. Sin WhatsApp ni redes: un número o usuario inventado podría
+  // ser de alguien real.
+  await prisma.businessConfig.update({
+    where: { businessId: negocio.id },
+    data: {
+      acceptsMercadopago: true, acceptsCash: true, acceptsTransfer: true, acceptsPickup: true,
+      transferDiscountPercent: 10,
+      cashDiscountPercent: 5,
+      pickupPaymentMethods: ['CASH', 'DEBIT', 'CREDIT', 'MERCADOPAGO'],
+      freeShippingFrom: 250000,
+      enabledCarriers: ['CORREO_ARGENTINO', 'ANDREANI', 'OCA', 'DELIVERY_APP'],
+      carrierShippingCosts: { CORREO_ARGENTINO: 8900, ANDREANI: 11500, OCA: 9800, DELIVERY_APP: 4500 },
+      shippingEstimateText: 'Llega en 24 a 72 h',
+      scheduleText: 'Lunes a viernes de 9 a 18 h',
+    },
+  });
+
   return negocio;
 }
 

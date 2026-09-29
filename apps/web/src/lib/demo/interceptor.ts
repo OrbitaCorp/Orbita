@@ -28,6 +28,8 @@ export type Pedido = {
   body: unknown
   /** La llamada original a la API, para las lecturas que ajustan lo real. */
   real: () => Promise<Response>
+  /** Headers de la llamada original (token del visitante incluido), para pedir otros datos reales. */
+  headers: HeadersInit | undefined
 }
 
 type Manejador = {
@@ -67,33 +69,40 @@ function parsearBody(body: BodyInit | null | undefined): unknown {
   return body
 }
 
-let instalado = false
+let fetchOriginal: typeof fetch | null = null
+
+/** Llamada directa a la API, sin pasar por los manejadores (para armar respuestas con datos reales). */
+export function apiReal(ruta: string, init?: RequestInit): Promise<Response> {
+  return (fetchOriginal ?? fetch)(API_BASE + ruta, init)
+}
 
 export function instalarInterceptorDemo(): void {
-  if (instalado || typeof window === 'undefined') return
-  instalado = true
-  const fetchOriginal = window.fetch.bind(window)
+  if (fetchOriginal || typeof window === 'undefined') return
+  const original = window.fetch.bind(window)
+  fetchOriginal = original
 
   window.fetch = async (entrada: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof entrada === 'string' ? entrada : entrada instanceof URL ? entrada.href : entrada.url
-    if (!esTiendaDemo() || !url.startsWith(API_BASE)) return fetchOriginal(entrada, init)
+    if (!esTiendaDemo() || !url.startsWith(API_BASE)) return original(entrada, init)
 
     const metodo = (init?.method ?? (entrada instanceof Request ? entrada.method : 'GET')).toUpperCase()
     const u = new URL(url)
     const ruta = u.pathname.slice(new URL(API_BASE).pathname.length) || '/'
-    const lado: Manejador['lado'] | null = esVisitanteDemo() ? 'panel' : ruta.startsWith('/storefront/') ? 'tienda' : null
-    if (!lado) return fetchOriginal(entrada, init)
+    // Los de la tienda valen para cualquiera en la demo (también el visitante
+    // del panel que abre "Ver tienda"); los del panel, solo con la sesión
+    // anónima: el dueño que cura la demo escribe de verdad.
+    const visitante = esVisitanteDemo()
 
     for (const m of manejadores) {
-      if (m.metodo !== metodo || m.lado !== lado) continue
+      if (m.metodo !== metodo || (m.lado === 'panel' && !visitante)) continue
       const match = ruta.match(m.ruta)
       if (!match) continue
       const resultado = await m.responder(
-        { metodo, ruta, query: u.searchParams, body: parsearBody(init?.body), real: () => fetchOriginal(entrada, init) },
+        { metodo, ruta, query: u.searchParams, body: parsearBody(init?.body), real: () => original(entrada, init), headers: init?.headers },
         match,
       )
       return resultado instanceof Response ? resultado : json(resultado)
     }
-    return fetchOriginal(entrada, init)
+    return original(entrada, init)
   }
 }

@@ -25,6 +25,7 @@ import { LineChart, BarChart, DonutChart } from '@/design-system/components/Char
 import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
 import { adminPath, currentSlug, tenantUrl } from '@/lib/tenant'
 import { useAuth } from '@/hooks/useAuth'
+import { esTiendaDemo } from '@/lib/demo/modo'
 import {
     ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness, pauseBusiness,
     type ApiDashboardReport, type ApiOrderStatus,
@@ -67,7 +68,10 @@ export default function Dashboard() {
     const { user } = useAuth()
     const nombreUsuario = user?.type === 'member' ? user.member.name.split(' ')[0] : ''
 
-    const [periodo, setPeriodo] = useState(0)
+    // En la demo pública arranca en "7 días": "Hoy" depende de la hora a la
+    // que se entre (a las 00:30 no hay casi nada) y el visitante lo leería
+    // como un panel vacío.
+    const [periodo, setPeriodo] = useState(() => (esTiendaDemo() ? 1 : 0))
     const [topView, setTopView] = useState<'productos' | 'categorias' | 'canal'>('productos')
     const [descartadas, setDescartadas] = useState<string[]>([])
     const [publicada, setPublicada] = useState(false)

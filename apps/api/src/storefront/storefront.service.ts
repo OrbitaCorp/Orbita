@@ -447,7 +447,12 @@ export class StorefrontService {
       payment: contact
         ? {
             acceptsMercadopago: contact.acceptsMercadopago,
-            mercadopagoAvailable: await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
+            // La demo pública no tiene cuenta de MP conectada: el botón se
+            // muestra igual y el pago lo simula el navegador (apps/web,
+            // lib/demo/recursos/checkout.ts). El checkout real lo corta DemoGuard.
+            mercadopagoAvailable: business.isDemo
+              ? contact.acceptsMercadopago
+              : await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
             acceptsCash: contact.acceptsCash,
             acceptsTransfer: contact.acceptsTransfer,
             acceptsPickup: contact.acceptsPickup,
