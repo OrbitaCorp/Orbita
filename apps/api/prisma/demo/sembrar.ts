@@ -479,7 +479,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   };
   await prisma.customer.create({
     data: {
-      id: invitado.id, businessId, firstName: invitado.nombre, lastName: invitado.apellido, email: invitado.email, phone: invitado.telefono,
+      id: invitado.id, businessId, firstName: invitado.nombre, lastName: invitado.apellido, email: invitado.email, phone: invitado.telefono, dni: '12345678',
       emailVerified: true, createdAt: invitado.alta, updatedAt: invitado.alta,
       addresses: { create: { id: invitado.direccionId, alias: 'Casa', street: invitado.calle, city: ciudadInv, provincia: provinciaInv, zip: cpInv, isDefault: true, createdAt: invitado.alta } },
     },

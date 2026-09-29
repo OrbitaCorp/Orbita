@@ -22,6 +22,7 @@ import {
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 import { PromoChip } from '../../_shared/components'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER' | 'DEBIT_CARD' | 'CREDIT_CARD'
 type Entrega = 'DELIVERY' | 'PICKUP'
@@ -152,6 +153,14 @@ export default function CheckoutPago() {
   // comprador a una sucursal del correo.
   const [carrierModeSel, setCarrierModeSel] = useState<'DOMICILIO' | 'SUCURSAL' | null>(null)
   const [errorCarrierMode, setErrorCarrierMode] = useState('')
+  // Tienda demo: transportista y modalidad ya elegidos, para que el visitante
+  // llegue al pago sin detenerse a decidir (los puede cambiar igual). En una
+  // tienda real no se preselecciona: es una decisión del comprador.
+  useEffect(() => {
+    if (slug !== DEMO_SLUG) return
+    if (!carrierSel && carriersDisponibles.length > 0) setCarrierSel(carriersDisponibles[0])
+    if (!carrierModeSel) setCarrierModeSel('DOMICILIO')
+  }, [slug, carriersDisponibles, carrierSel, carrierModeSel])
 
   // ── Dirección de envío — dos caminos: cliente con sesión elige entre sus
   // direcciones guardadas (mismo mecanismo que antes vivía en
