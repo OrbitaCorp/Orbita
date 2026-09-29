@@ -415,6 +415,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [buscandoSugeridas, setBuscandoSugeridas] = useState(false)
     const [agregandoSugeridaUrl, setAgregandoSugeridaUrl] = useState<string | null>(null)
     const [sugeridasAgregadas, setSugeridasAgregadas] = useState<Set<string>>(new Set())
+    // Fotos de la búsqueda web que el navegador no pudo cargar (la tienda de origen
+    // bloquea el uso desde otras webs, el link murió…) o que son miniaturas: no se
+    // ofrecen, en vez de mostrar el ícono de imagen rota con el texto alternativo.
+    const [sugeridasDescartadas, setSugeridasDescartadas] = useState<Set<string>>(new Set())
+    const descartarSugerida = (url: string) => setSugeridasDescartadas(prev => (prev.has(url) ? prev : new Set(prev).add(url)))
+    const sugeridasVisibles = sugeridasWeb.filter(s => !sugeridasDescartadas.has(s.url))
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
     // Para leer el formulario vigente desde callbacks async (respuestas de Orbi).
@@ -1874,6 +1880,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
                 .pn-3col    { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: start; }
+                .pn-fondoia { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: none; border-radius: 9999px; cursor: pointer;
+                              background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+                              box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 14px -4px var(--color-primary); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; }
+                .pn-fondoia:hover:not(:disabled)  { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 8px 20px -4px var(--color-primary); }
+                .pn-fondoia:active:not(:disabled) { transform: translateY(0); }
+                .pn-fondoia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .pn-fondoia:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
                 .pn-vgrid   { display: grid; grid-template-columns: minmax(0,1.6fr) 108px 84px 30px; align-items: center; gap: 8px; }
                 .pn-vgrid-sku { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1.6fr) 80px; align-items: center; gap: 8px; }
                 @media (max-width: 1080px) {
@@ -1958,15 +1971,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         // EN MANTENIMIENTO (24/09/2026): se está reconstruyendo todo el
                                         // pipeline de "Fondo con IA" (ver background-removal.service.ts).
                                         // Deshabilitado en vez de ocultado para que quede claro que vuelve.
-                                        <Button
-                                            variant="ghost" size="sm"
-                                            icon={<Sparkles size={13} strokeWidth={2.2} />}
-                                            onClick={() => setModalFondoIA(true)}
-                                            disabled={FONDO_IA_MANTENIMIENTO}
-                                            title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
-                                        >
-                                            Fondo con IA
-                                        </Button>
+                                        <BotonFondoIA onClick={() => setModalFondoIA(true)} />
                                     ) : undefined}
                                 >
                                     {fondosEnCurso > 0 && (
@@ -2023,22 +2028,29 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Fotos oficiales que Orbi encontró en la web para este modelo. */}
-                                    {(sugeridasWeb.length > 0 || buscandoSugeridas) && (
+                                    {(sugeridasVisibles.length > 0 || buscandoSugeridas) && (
                                         <div style={{ marginTop: 14 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>
                                                 {buscandoSugeridas
                                                     ? <><Loader2 size={13} className="animate-spin" /> Buscando fotos oficiales de este producto…</>
                                                     : <>Fotos oficiales encontradas para este modelo</>}
                                             </div>
-                                            {sugeridasWeb.length > 0 && (
+                                            {sugeridasVisibles.length > 0 && (
                                                 <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
-                                                    {sugeridasWeb.map((sug, idx) => {
+                                                    {sugeridasVisibles.map((sug, idx) => {
                                                         const yaAgregada = sugeridasAgregadas.has(sug.url)
                                                         const descargando = agregandoSugeridaUrl === sug.url
                                                         return (
                                                             <div key={idx} style={{ flex: '0 0 132px', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg)' }}>
                                                                 <div style={{ height: 112, background: '#fff', display: 'grid', placeItems: 'center', padding: 6 }} title={sug.title}>
-                                                                    <img src={sug.url} alt={sug.title || 'Foto sugerida'} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                                                    <img
+                                                                        src={sug.url}
+                                                                        alt=""
+                                                                        loading="lazy"
+                                                                        referrerPolicy="no-referrer"
+                                                                        onError={() => descartarSugerida(sug.url)}
+                                                                        onLoad={e => { if (Math.min(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight) < 250) descartarSugerida(sug.url) }}
+                                                                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                                                                 </div>
                                                                 <button
                                                                     type="button"
@@ -2326,15 +2338,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     Subí las fotos juntas y etiquetá cada una con su {opcionVisual?.nombre.toLowerCase() || 'valor'}. Cuando el cliente lo elija en tu tienda, va a ver esas fotos.
                                                                 </div>
                                                                 {avanzado && (imagenes.some(i => !!i.valorOpcion) || guardadas.some(g => g.optionValueId != null)) && (
-                                                                    <Button
-                                                                        variant="ghost" size="sm"
-                                                                        icon={<Sparkles size={13} strokeWidth={2.2} />}
-                                                                        onClick={() => setModalFondoIAVariantes(true)}
-                                                                        disabled={FONDO_IA_MANTENIMIENTO}
-                                                                        title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : undefined}
-                                                                    >
-                                                                        Fondo con IA
-                                                                    </Button>
+                                                                    <BotonFondoIA onClick={() => setModalFondoIAVariantes(true)} />
                                                                 )}
                                                             </div>
                                                             <GaleriaImagenesEtiquetada
@@ -3631,6 +3635,22 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
 
 // Una sección de la pantalla única: separadas por una línea fina, sin tarjetas
 // anidadas. El título es opcional (el nombre y el precio no lo necesitan).
+// "Fondo con IA": es la función que más diferencia una foto de otra, así que va
+// resaltada (relleno del color principal + brillo suave) y no como un botón más.
+function BotonFondoIA({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            className="pn-fondoia"
+            onClick={onClick}
+            disabled={FONDO_IA_MANTENIMIENTO}
+            title={FONDO_IA_MANTENIMIENTO ? TITULO_MANTENIMIENTO : 'Reemplaza el fondo de tus fotos por uno de estudio'}
+        >
+            <Sparkles size={14} strokeWidth={2.2} /> Fondo con IA
+        </button>
+    )
+}
+
 function Seccion({ titulo, derecha, primera, id, children }: {
     titulo?: ReactNode; derecha?: ReactNode; primera?: boolean; id?: string; children: ReactNode
 }) {
