@@ -34,8 +34,9 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { tenantUrl } from '@/lib/tenant';
 
 const LINKS: { label: string; href: string }[] = [
+    // "Cómo funciona" salió del menú (pedido 29/09): la sección sigue en la
+    // página, pero el menú quedó más corto y centrado.
     { label: 'Qué incluye',   href: '#modulos'       },
-    { label: 'Cómo funciona', href: '#como-funciona' },
     { label: 'Comparativa',   href: '#comparativa'   },
     { label: 'Qué vendés',    href: '#rubros'        },
     { label: 'Avanzado',      href: '#avanzado'      },
@@ -108,7 +109,7 @@ export function NavbarV2() {
                 backdropFilter: scrolleado ? 'blur(14px)' : undefined,
             }}
         >
-            <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-4 px-6 xl:max-w-7xl" aria-label="Principal">
+            <nav className="relative mx-auto flex h-[68px] max-w-6xl items-center gap-4 px-6 xl:max-w-7xl" aria-label="Principal">
                 {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
                     de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
                 <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Órbita — Ir al inicio">
@@ -116,12 +117,15 @@ export function NavbarV2() {
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
 
-                {/* Los 8 links + los dos botones de la derecha no entran en una fila por
+                {/* Los links + los dos botones de la derecha no entran en una fila por
                     debajo de ~1280px (y por eso la barra se ensancha a `max-w-7xl` en `xl`): antes, a 1024–1200px el texto de "Qué incluye" /
-                    "Cómo funciona" / "Qué vendés" se partía en dos líneas. Ahora el
+                    "Qué vendés" se partía en dos líneas. Ahora el
                     menú de escritorio arranca en `xl`, los links no se parten
-                    (`whitespace-nowrap`) y por debajo va el menú hamburguesa. */}
-                <ul className="ml-2 hidden flex-1 items-center gap-0.5 xl:flex">
+                    (`whitespace-nowrap`) y por debajo va el menú hamburguesa.
+                    Centrados respecto del header entero (absolute + translate),
+                    no del hueco entre logo y botones: ese hueco es asimétrico
+                    (logo angosto, dos botones anchos) y con flex quedaban corridos. */}
+                <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
                         return (
@@ -178,8 +182,8 @@ export function NavbarV2() {
                                 tenía ningún otro lugar visible sin abrir el menú
                                 hamburguesa. Pedido explícito: priorizar login en el navbar
                                 mobile por sobre duplicar el CTA que ya está en el hero.
-                                Con borde (`oc-ghost`, la misma clase que "Ver cómo
-                                funciona" del hero) en vez de texto suelto: como texto
+                                Con borde (`oc-ghost`, la misma clase que "Probá la
+                                demo" del hero) en vez de texto suelto: como texto
                                 plano quedaba perdido contra el fondo oscuro — sin forma
                                 de botón, costaba notar que se podía tocar.
                                 Solo se llega hasta acá mientras `pasadoHero` es false —
