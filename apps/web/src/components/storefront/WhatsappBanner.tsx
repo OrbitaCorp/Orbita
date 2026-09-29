@@ -19,6 +19,28 @@ import { ArrowRight } from 'lucide-react'
 import { openWpp } from '@/lib/storefront/utils'
 import type { WhatsappLayout } from '@/lib/storefront/api'
 
+// Textos del diseño Clásico. Por default, los de siempre; la demo pública
+// de Órbita los cambia por una invitación a tener la tienda propia (ver
+// lib/demo/whatsapp.ts).
+export type TextosWpp = {
+  badge: string
+  titulo: string
+  texto: string
+  boton: string
+  stats: [string, string][]
+  /** Conversación animada: cliente, respuesta, cliente. */
+  chat: [string, string, string]
+}
+
+const TEXTOS_CLASICO: TextosWpp = {
+  badge: 'Atención por WhatsApp',
+  titulo: 'Respondemos en menos\nde una hora',
+  texto: 'Consultá talles, disponibilidad o coordiná un envío. Te atendemos de lunes a sábado, sin bots.',
+  boton: 'Escribirnos ahora',
+  stats: [['< 1hs', 'respuesta'], ['+1.200', 'consultas']],
+  chat: ['Hola! ¿Tienen la campera en talle M?', '¡Sí! Tenemos en M y L. Te coordinamos el envío hoy mismo 🎉', '¡Perfecto, muchas gracias! 🙌'],
+}
+
 type Props = {
   layout: WhatsappLayout | null | undefined
   wpp: string
@@ -26,11 +48,13 @@ type Props = {
   message?: string | null
   /** Horario real del negocio (Configuración → Contacto) — solo lo usa `bento`. */
   scheduleText?: string | null
+  /** Solo diseño Clásico. */
+  textos?: TextosWpp
 }
 
 const MENSAJE_DEFAULT = 'Hola! Quería hacer una consulta.'
 
-export function WhatsappBanner({ layout, wpp, message, scheduleText }: Props) {
+export function WhatsappBanner({ layout, wpp, message, scheduleText, textos }: Props) {
   if (!wpp) return null
   const msg = message?.trim() || MENSAJE_DEFAULT
   const diseno = layout ?? 'clasico'
@@ -41,7 +65,7 @@ export function WhatsappBanner({ layout, wpp, message, scheduleText }: Props) {
       {diseno === 'minimal' ? <Minimal wpp={wpp} msg={msg} />
         : diseno === 'franja' ? <Franja wpp={wpp} msg={msg} />
         : diseno === 'bento' ? <Bento wpp={wpp} msg={msg} scheduleText={scheduleText} />
-        : <Clasico wpp={wpp} msg={msg} />}
+        : <Clasico wpp={wpp} msg={msg} textos={textos} />}
     </section>
   )
 }
@@ -63,7 +87,7 @@ type VariantProps = { wpp: string; msg: string }
 
 // Clásico: tarjeta grande en degradé, badge, título, stats y un chat
 // animado — el diseño de siempre, sin cambios.
-function Clasico({ wpp, msg }: VariantProps) {
+function Clasico({ wpp, msg, textos = TEXTOS_CLASICO }: VariantProps & { textos?: TextosWpp }) {
   return (
     <div className="sf-wpp-clasico">
       <div className="sf-wpp-clasico-glow1" />
@@ -72,17 +96,17 @@ function Clasico({ wpp, msg }: VariantProps) {
         <div>
           <div className="sf-wpp-clasico-badge">
             <WppIcon size={13} color="#34D399" />
-            <span>Atención por WhatsApp</span>
+            <span>{textos.badge}</span>
           </div>
-          <h2 className="sf-wpp-clasico-h2">Respondemos en menos<br />de una hora</h2>
-          <p className="sf-wpp-clasico-p">Consultá talles, disponibilidad o coordiná un envío. Te atendemos de lunes a sábado, sin bots.</p>
+          <h2 className="sf-wpp-clasico-h2" style={{ whiteSpace: 'pre-line' }}>{textos.titulo}</h2>
+          <p className="sf-wpp-clasico-p">{textos.texto}</p>
           <div className="sf-wpp-clasico-fila">
             <button className="sf-wpp-clasico-btn" onClick={() => openWpp(wpp, msg)}>
               <WppIcon size={16} />
-              Escribirnos ahora
+              {textos.boton}
             </button>
             <div className="sf-wpp-clasico-stats">
-              {([['< 1hs', 'respuesta'], ['+1.200', 'consultas']] as [string, string][]).map(([n, l]) => (
+              {textos.stats.map(([n, l]) => (
                 <div key={l} className="sf-wpp-clasico-stat">
                   <span className="sf-wpp-clasico-stat-n">{n}</span>
                   <span className="sf-wpp-clasico-stat-l">{l}</span>
@@ -91,7 +115,7 @@ function Clasico({ wpp, msg }: VariantProps) {
             </div>
           </div>
         </div>
-        <div className="sf-wpp-clasico-chat"><WppChat /></div>
+        <div className="sf-wpp-clasico-chat"><WppChat chat={textos.chat} /></div>
       </div>
     </div>
   )
@@ -168,7 +192,7 @@ const WPP_DOUBLE_CHECK = (
   </svg>
 )
 
-function WppChat() {
+function WppChat({ chat }: { chat: TextosWpp['chat'] }) {
   const [phase, setPhase] = useState(0)
 
   useEffect(() => {
@@ -191,7 +215,7 @@ function WppChat() {
       `}</style>
       {show1 && (
         <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.13)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '14px 14px 14px 3px', padding: '9px 13px', maxWidth: '85%', animation: 'wppBubble 280ms ease both' }}>
-          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>Hola! ¿Tienen la campera en talle M?</p>
+          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>{chat[0]}</p>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 3, display: 'block', textAlign: 'right' }}>09:41</span>
         </div>
       )}
@@ -204,7 +228,7 @@ function WppChat() {
       )}
       {show2 && (
         <div style={{ alignSelf: 'flex-end', background: '#25D366', borderRadius: '14px 14px 3px 14px', padding: '9px 13px', maxWidth: '92%', animation: 'wppBubble 280ms ease both' }}>
-          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>¡Sí! Tenemos en M y L. Te coordinamos el envío hoy mismo 🎉</p>
+          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>{chat[1]}</p>
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 3 }}>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>09:42</span>
             {WPP_DOUBLE_CHECK}
@@ -213,7 +237,7 @@ function WppChat() {
       )}
       {show3 && (
         <div style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.13)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '14px 14px 14px 3px', padding: '9px 13px', maxWidth: '70%', animation: 'wppBubble 280ms ease both' }}>
-          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>¡Perfecto, muchas gracias! 🙌</p>
+          <p style={{ fontSize: 12.5, color: '#fff', margin: 0, lineHeight: 1.45 }}>{chat[2]}</p>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 3, display: 'block', textAlign: 'right' }}>09:43</span>
         </div>
       )}

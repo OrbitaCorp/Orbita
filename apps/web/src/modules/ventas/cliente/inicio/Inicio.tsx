@@ -12,6 +12,8 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
+import { DEMO_SLUG } from '@/lib/demo/modo'
+import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -891,7 +893,17 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 WhatsappBanner.tsx y WHATSAPP_LAYOUTS en apariencia.mock.ts).
                 El gate (toggle + número real cargado) sigue acá, como en
                 cualquier otra sección; el componente decide el resto. */}
-            {config?.appearance?.showWhatsapp !== false && tienda.wpp && (
+            {/* Tienda demo: el banner invita a tener la tienda propia y le
+                escribe a Órbita (ver lib/demo/whatsapp.ts). Por slug y no por
+                window, así sale igual en el render del servidor. */}
+            {config?.business?.subdomain === DEMO_SLUG ? (DEMO_WHATSAPP && (
+                <WhatsappBanner
+                    layout="clasico"
+                    wpp={DEMO_WHATSAPP}
+                    message={MENSAJE_WHATSAPP_DEMO}
+                    textos={TEXTOS_WHATSAPP_DEMO}
+                />
+            )) : config?.appearance?.showWhatsapp !== false && tienda.wpp && (
                 <WhatsappBanner
                     layout={config?.appearance?.whatsappLayout}
                     wpp={tienda.wpp}

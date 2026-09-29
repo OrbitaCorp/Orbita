@@ -76,7 +76,16 @@ export async function sembrarApariencia(prisma: PrismaClient, businessId: string
         { id: 'masVendidos', label: 'Más vendidos', on: true },
       ],
       showAnnouncementBar: true, announcementScroll: true,
-      shippingText: 'Envío gratis desde $250.000   ·   10 % off pagando con transferencia   ·   Cambios dentro de los 30 días',
+      // Un ítem por renglón (ver AnnouncementBar.tsx): la cartelera los pasa
+      // en fila. Todo lo que promete existe de verdad en la demo.
+      shippingText: [
+        'Envío gratis desde $250.000',
+        '10 % off pagando con transferencia',
+        'Semana Gamer: 15 % off en toda la categoría',
+        'Cupón BIENVENIDA10: 10 % en tu primera compra',
+        'Cambios dentro de los 30 días',
+        '12 meses de garantía en todos los productos',
+      ].join('\n'),
       heroSlides,
       showStatsBar: true,
       statsBar: [
@@ -110,8 +119,12 @@ export async function sembrarApariencia(prisma: PrismaClient, businessId: string
           ctaText: 'Ver gaming', ctaLink: '/catalogo/gaming',
         },
       ],
-      // Sin marcas: una tira de marcas inventadas o reales sería mentir.
-      showBrands: false,
+      // Marcas inventadas, solo con el nombre (la tira dibuja el texto si no
+      // hay logo): nombres de astronomía, en línea con Nébula, que no son
+      // marcas de tecnología conocidas.
+      showBrands: true,
+      brandsTitle: 'Las marcas que elegimos',
+      brands: ['Cuásar', 'Púlsar Labs', 'Andrómeda', 'Magnetar', 'Cometa Audio', 'Vórtice', 'Hélix', 'Perihelio'].map((name, i) => ({ id: `marca-${i + 1}`, name })),
       // Sin número de WhatsApp (ver seed-demo.ts): el banner no se dibuja igual.
       showWhatsapp: false,
       showFooter: true, showSocialFooter: false,
