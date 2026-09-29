@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search, MessageCircle } from 'lucide-react'
 import type { Conversacion, FiltroBandeja } from '../mock/mensajes.mock'
 import { ConversacionItem } from './ConversacionItem'
+import { WhatsappBoton } from './WhatsappConexion'
 
 interface Props {
   conversaciones: Conversacion[]
@@ -45,6 +46,7 @@ export function BandejaLista({ conversaciones, activaId, onSelect, onArchivar }:
               {sinLeerCount} sin leer
             </span>
           )}
+          <span style={{ marginLeft: 'auto' }}><WhatsappBoton /></span>
         </div>
 
         {/* Buscador */}

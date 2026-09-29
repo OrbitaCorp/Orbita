@@ -3145,7 +3145,9 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // ── Mensajes: chat cliente↔tienda ────────────────────────────────────────────
 // Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo
 // usan el cliente (storefront) y el panel (dueño/staff).
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; createdAt: string }
+// `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
+export type ChatChannel = 'STOREFRONT' | 'WHATSAPP'
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3157,7 +3159,7 @@ export function meSendConversationMessage(text: string) {
 // Panel (dueño/staff) — bandeja de todas las conversaciones del negocio
 export type ConversationRow = {
   id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
-  isUnread: boolean; isArchived: boolean; lastMessage: ChatMessage | null; updatedAt: string
+  isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
 export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
@@ -3172,6 +3174,14 @@ export function updateConversation(id: string, input: { isUnread?: boolean; isAr
 export function getUnreadConversationsCount() {
   return panelRequest<{ count: number }>('/conversations/unread-count')
 }
+
+// WhatsApp Business — conexión del negocio (solo propietario/admin)
+export type WhatsappEstado = { connected: false } | { connected: true; displayPhone: string | null; phoneNumberId: string; connectedAt: string }
+export function getWhatsappConnection() { return panelRequest<WhatsappEstado>('/whatsapp/connection') }
+export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; accessToken: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
+}
+export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)
 export type MessageTemplateRow = { id: string; name: string; text: string; category: string; createdAt: string; updatedAt: string }

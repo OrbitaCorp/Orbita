@@ -103,7 +103,21 @@ async function bootstrap(): Promise<void> {
   // reales (confirmado en producción: "PayloadTooLargeError" al subir una
   // imagen de producto vía multipart). También cubre el logoDataUrl en
   // base64 que manda el onboarding en JSON — mismo riesgo, mismo fix.
-  app.use(json({ limit: '10mb' }));
+  //
+  // `verify` conserva el body crudo del webhook de WhatsApp: la firma de Meta
+  // (X-Hub-Signature-256) se calcula sobre esos bytes exactos, no sobre el
+  // JSON ya parseado. Solo para esa ruta, para no retener en memoria una copia
+  // de cada subida de fotos.
+  app.use(
+    json({
+      limit: '10mb',
+      verify: (req, _res, buf) => {
+        if ((req as { url?: string }).url?.includes('/webhooks/whatsapp')) {
+          (req as { rawBody?: Buffer }).rawBody = buf;
+        }
+      },
+    }),
+  );
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   app.setGlobalPrefix('api/v1');

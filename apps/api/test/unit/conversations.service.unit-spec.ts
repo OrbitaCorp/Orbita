@@ -31,6 +31,7 @@ function build(overrides: Partial<PrismaMock> = {}) {
     },
     message: {
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null), // último mensaje del cliente: sin WhatsApp de por medio
       create: jest.fn().mockResolvedValue(MSG_STORE),
       ...(overrides.message ?? {}),
     },
@@ -40,7 +41,7 @@ function build(overrides: Partial<PrismaMock> = {}) {
     },
     $executeRaw: overrides.$executeRaw ?? jest.fn().mockResolvedValue(1),
   };
-  return { svc: new ConversationsService(prisma as any), prisma };
+  return { svc: new ConversationsService(prisma as any, { enviarTexto: jest.fn() } as any), prisma };
 }
 
 describe('ConversationsService (unit)', () => {

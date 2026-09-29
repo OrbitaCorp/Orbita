@@ -76,6 +76,7 @@ model Business {
   orders               Order[]
   payments             Payment[]
   mpCredentials        MpCredentials?
+  whatsappConnection   WhatsappConnection?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -592,6 +593,7 @@ model Customer {
   dni                 String? // facturación
   birthDate           DateTime? @map("birth_date")
   avatarUrl           String?   @map("avatar_url")
+  whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -612,6 +614,7 @@ model Customer {
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
+  @@unique([businessId, whatsappId])
   @@index([businessId])
   @@index([phone])
   @@map("customers")
@@ -1557,6 +1560,9 @@ model Message {
   sender         MessageSender // enum unificado (antes 'cli'/'me' vs 'cliente'/'tienda')
   text           String
   orderId        String?       @map("order_id") // mención opcional a un pedido
+  channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
+  externalId     String?       @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
+  deliveryStatus String?       @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
   createdAt      DateTime      @default(now()) @map("created_at") // timestamp real (antes string display)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -1568,6 +1574,35 @@ model Message {
 enum MessageSender {
   CUSTOMER
   STORE
+}
+
+enum MessageChannel {
+  STOREFRONT
+  WHATSAPP
+}
+
+// Conexión de un negocio con WhatsApp Business (Cloud API de Meta). Una por
+// negocio. `accessToken` va CIFRADO con pgp_sym_encrypt (mismo criterio que
+// MpCredentials): el texto plano solo existe dentro de la query.
+model WhatsappConnection {
+  id            String                   @id @default(uuid())
+  businessId    String                   @unique @map("business_id")
+  wabaId        String                   @map("waba_id") // WhatsApp Business Account
+  phoneNumberId String                   @unique @map("phone_number_id") // con esto el webhook único resuelve a qué negocio pertenece el mensaje
+  displayPhone  String?                  @map("display_phone") // número legible, solo para mostrar en el panel
+  accessToken   String                   @map("access_token") // CIFRADO (pgp_sym_encrypt)
+  status        WhatsappConnectionStatus @default(ACTIVE)
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("whatsapp_connections")
+}
+
+enum WhatsappConnectionStatus {
+  ACTIVE
+  DISCONNECTED
 }
 
 model MessageTemplate {

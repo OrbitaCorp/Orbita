@@ -17,12 +17,13 @@ function conversaciones(conv: object | null = { id: 'c-1', businessId: BIZ, cust
         { id: 'm2', sender: 'STORE', text: 'segundo', orderId: null, createdAt: new Date(2) },
         { id: 'm1', sender: 'CUSTOMER', text: 'primero', orderId: null, createdAt: new Date(1) },
       ]),
+      findFirst: jest.fn().mockResolvedValue(null), // último mensaje del cliente: sin WhatsApp de por medio
       create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'm-n', createdAt: new Date(), orderId: null, ...data })),
     },
     order: { findFirst: jest.fn().mockResolvedValue(null) },
     $executeRaw: jest.fn(),
   };
-  return { svc: new ConversationsService(prisma as any), prisma };
+  return { svc: new ConversationsService(prisma as any, { enviarTexto: jest.fn() } as any), prisma };
 }
 
 describe('Hilos de mensajes', () => {

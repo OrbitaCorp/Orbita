@@ -3,7 +3,7 @@ import { MessageSquare, Package } from 'lucide-react'
 import type { Conversacion, Plantilla, PedidoResumen } from '../mock/mensajes.mock'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
-import { getConversationMessages, sendConversationMessage, getCustomer, type ChatMessage } from '@/lib/api'
+import { getConversationMessages, sendConversationMessage, getCustomer, ApiError, type ChatMessage } from '@/lib/api'
 
 interface Props {
   cv:              Conversacion | null
@@ -16,6 +16,9 @@ interface Props {
 }
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
+
+// Estado de entrega de un mensaje saliente por WhatsApp.
+const ENTREGA: Record<string, string> = { sent: 'Enviado', delivered: 'Entregado', read: 'Leído', failed: 'No entregado' }
 
 // Mismo mapeo de estado→etiqueta que el resto del panel (Seguimiento del
 // storefront, Perfil del cliente) — acá solo hace falta la etiqueta, el
@@ -129,8 +132,10 @@ export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantil
       setMsgs(prev => [...prev, nuevo])
       onToast('Mensaje enviado')
       return true
-    } catch {
-      onToast('No se pudo enviar el mensaje')
+    } catch (e) {
+      // Los rechazos de WhatsApp (ventana de 24 h vencida, número inválido) traen
+      // el motivo en el mensaje: el dueño tiene que poder leerlo.
+      onToast(e instanceof ApiError && e.status < 500 ? e.message : 'No se pudo enviar el mensaje')
       return false
     }
   }
@@ -186,6 +191,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantil
               </div>
               <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>
                 {hora}
+                {m.channel === 'WHATSAPP' && ` · WhatsApp${me && m.deliveryStatus ? ` · ${ENTREGA[m.deliveryStatus] ?? m.deliveryStatus}` : ''}`}
               </div>
             </div>
           )
