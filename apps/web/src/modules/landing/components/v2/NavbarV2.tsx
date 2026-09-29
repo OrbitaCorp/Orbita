@@ -109,7 +109,7 @@ export function NavbarV2() {
                 backdropFilter: scrolleado ? 'blur(14px)' : undefined,
             }}
         >
-            <nav className="relative mx-auto flex h-[68px] max-w-6xl items-center gap-4 px-6 xl:max-w-7xl" aria-label="Principal">
+            <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-4 px-6 xl:max-w-7xl" aria-label="Principal">
                 {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
                     de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
                 <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Órbita — Ir al inicio">
@@ -122,10 +122,12 @@ export function NavbarV2() {
                     "Qué vendés" se partía en dos líneas. Ahora el
                     menú de escritorio arranca en `xl`, los links no se parten
                     (`whitespace-nowrap`) y por debajo va el menú hamburguesa.
-                    Centrados respecto del header entero (absolute + translate),
-                    no del hueco entre logo y botones: ese hueco es asimétrico
-                    (logo angosto, dos botones anchos) y con flex quedaban corridos. */}
-                <ul className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-0.5 xl:flex">
+                    Centrados en el hueco entre el logo y los botones (flex-1 +
+                    justify-center): queda la misma separación a los dos lados.
+                    Centrarlos contra el header entero dejaba un hueco grande
+                    junto al logo y el menú pegado a los botones, que son más
+                    anchos que el logo (se probó el 29/09 y se descartó). */}
+                <ul className="hidden flex-1 items-center justify-center gap-0.5 xl:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
                         return (
