@@ -1892,7 +1892,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
-                .pn-3col    { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: start; }
+                .pn-3col    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+                .pn-3col > * { min-width: 0; }
+                /* Un <input> trae un ancho mínimo propio (~170px): sin esto, dentro de una columna
+                   angosta empuja todo el formulario más allá del borde de la pantalla. */
+                .pn-page input, .pn-page select, .pn-page textarea { min-width: 0; max-width: 100%; }
                 .pn-fondoia { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: none; border-radius: 9999px; cursor: pointer;
                               background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
                               box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 14px -4px var(--color-primary); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; }
@@ -1909,7 +1913,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 @media (max-width: 768px) {
                     .pn-page { padding: 16px 14px 48px !important; }
                     /* Precio y stock lado a lado; la categoría, a lo ancho. */
-                    .pn-3col { grid-template-columns: 1fr 1fr !important; }
+                    .pn-3col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
                     .pn-3col > :last-child { grid-column: 1 / -1; }
                     .pn-vgrid { grid-template-columns: minmax(0,1fr) 92px 64px 28px !important; gap: 6px !important; }
                     .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
@@ -2645,7 +2649,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                                     {!prod.tieneVariantes ? (
                                         <Bloque titulo="Inventario" ayuda="El código se arma solo a partir del nombre.">
-                                            <div className="pn-3col" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="pn-3col" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                                                 <div>
                                                     <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
                                                     <button type="button" className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ ...enlace, fontSize: 11.5, marginTop: 4 }}>Regenerar desde el nombre</button>
