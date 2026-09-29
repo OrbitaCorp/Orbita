@@ -108,7 +108,7 @@ export function NavbarV2() {
                 backdropFilter: scrolleado ? 'blur(14px)' : undefined,
             }}
         >
-            <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-6 px-6" aria-label="Principal">
+            <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-4 px-6 xl:max-w-7xl" aria-label="Principal">
                 {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
                     de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
                 <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Órbita — Ir al inicio">
@@ -116,7 +116,12 @@ export function NavbarV2() {
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
 
-                <ul className="ml-4 hidden flex-1 items-center gap-0.5 lg:flex">
+                {/* Los 8 links + los dos botones de la derecha no entran en una fila por
+                    debajo de ~1280px (y por eso la barra se ensancha a `max-w-7xl` en `xl`): antes, a 1024–1200px el texto de "Qué incluye" /
+                    "Cómo funciona" / "Qué vendés" se partía en dos líneas. Ahora el
+                    menú de escritorio arranca en `xl`, los links no se parten
+                    (`whitespace-nowrap`) y por debajo va el menú hamburguesa. */}
+                <ul className="ml-2 hidden flex-1 items-center gap-0.5 xl:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
                         return (
@@ -125,7 +130,7 @@ export function NavbarV2() {
                                     href={hrefReal(l.href)}
                                     onMouseEnter={() => setHoverLink(l.href)}
                                     onMouseLeave={() => setHoverLink(h => (h === l.href ? null : h))}
-                                    className={`inline-flex cursor-pointer items-center rounded-lg px-2.5 py-2 text-[13.5px] font-semibold transition-colors duration-200 ${act ? '' : 'hover:bg-white/[0.06]'}`}
+                                    className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-lg px-2 py-2 text-[13.5px] font-semibold transition-colors duration-200 ${act ? '' : 'hover:bg-white/[0.06]'}`}
                                     style={{
                                         color: act || hoverLink === l.href ? 'var(--oc-text)' : 'var(--oc-text-3)',
                                         background: act ? 'var(--oc-accent-soft)' : undefined,
@@ -142,7 +147,7 @@ export function NavbarV2() {
                     {hrefPanel ? (
                         <a
                             href={hrefPanel}
-                            className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
+                            className="oc-cta inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
                             style={{ minHeight: 40 }}
                         >
                             Ir a mi panel
@@ -156,7 +161,7 @@ export function NavbarV2() {
                            mientras estás en el hero ya está repetido ahí mismo). */
                         <a
                             href="/onboarding/rubro"
-                            className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
+                            className="oc-cta inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
                             style={{ minHeight: 40 }}
                         >
                             Crear tu espacio
@@ -182,14 +187,14 @@ export function NavbarV2() {
                                 donde `pasadoHero` ya arranca en true y nunca se ve esto). */}
                             <a
                                 href="/login"
-                                className="oc-ghost inline-flex cursor-pointer items-center rounded-xl px-3.5 text-[13.5px] font-semibold transition-colors duration-200 hover:bg-white/10"
+                                className="oc-ghost inline-flex cursor-pointer items-center whitespace-nowrap rounded-xl px-3.5 text-[13.5px] font-semibold transition-colors duration-200 hover:bg-white/10"
                                 style={{ minHeight: 40, border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
                             >
                                 Iniciar sesión
                             </a>
                             <a
                                 href="/onboarding/rubro"
-                                className="oc-cta hidden cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200 sm:inline-flex"
+                                className="oc-cta hidden cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200 sm:inline-flex"
                                 style={{ minHeight: 40 }}
                             >
                                 Crear tu espacio
@@ -202,7 +207,7 @@ export function NavbarV2() {
 
                     <button
                         onClick={() => setAbierto(a => !a)}
-                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl text-slate-300 transition-colors duration-200 hover:bg-white/10 lg:hidden"
+                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl text-slate-300 transition-colors duration-200 hover:bg-white/10 xl:hidden"
                         aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
                         aria-expanded={abierto}
                     >
@@ -213,7 +218,7 @@ export function NavbarV2() {
 
             {abierto && (
                 <div
-                    className="lg:hidden"
+                    className="xl:hidden"
                     style={{ background: 'var(--oc-panel)', borderTop: '1px solid var(--oc-card-bd)' }}
                 >
                     <ul className="mx-auto max-w-6xl px-6 py-3">

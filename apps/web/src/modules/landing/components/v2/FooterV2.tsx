@@ -21,7 +21,8 @@ import { EMAIL_SOPORTE, useContacto } from './Contacto';
 import { LegalModal } from '@/modules/landing/components/ui/LegalModal';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 
-type LegalKey = 'terminos' | 'privacidad' | 'cookies';
+// Cookies sigue abriendo el modal; Términos, Privacidad y Eliminación de datos
+// son páginas con URL propia (Meta las pide públicas para la app de WhatsApp).
 
 const COLUMNAS = [
     {
@@ -51,14 +52,14 @@ const COL_AYUDA_LINKS = [
     { label: EMAIL_SOPORTE,     href: `mailto:${EMAIL_SOPORTE}` },
 ];
 
-const LEGALES: { label: string; key: LegalKey }[] = [
-    { label: 'Términos de uso', key: 'terminos'   },
-    { label: 'Privacidad',      key: 'privacidad' },
-    { label: 'Cookies',         key: 'cookies'    },
+const LEGALES_LINKS = [
+    { label: 'Términos de uso',       href: '/terminos'              },
+    { label: 'Privacidad',            href: '/privacidad'            },
+    { label: 'Eliminación de datos',  href: '/eliminacion-de-datos'  },
 ];
 
 export function FooterV2() {
-    const [legal, setLegal] = useState<LegalKey | null>(null);
+    const [legal, setLegal] = useState<'cookies' | null>(null);
     const { abrir } = useContacto();
     const enHome = useRouter().pathname === '/';
     const hrefReal = (href: string) => (href.startsWith('#') && !enHome ? `/${href}` : href);
@@ -147,16 +148,24 @@ export function FooterV2() {
                     <div className="mt-6 flex flex-col items-center justify-between gap-3 sm:flex-row">
                         <span className="text-[12.5px] text-slate-500">© 2026 Órbita. Todos los derechos reservados.</span>
                         <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                            {LEGALES.map(l => (
-                                <li key={l.key}>
-                                    <button
-                                        onClick={() => setLegal(l.key)}
+                            {LEGALES_LINKS.map(l => (
+                                <li key={l.href}>
+                                    <a
+                                        href={l.href}
                                         className="cursor-pointer text-[12.5px] text-slate-500 transition-colors duration-200 hover:text-slate-300"
                                     >
                                         {l.label}
-                                    </button>
+                                    </a>
                                 </li>
                             ))}
+                            <li>
+                                <button
+                                    onClick={() => setLegal('cookies')}
+                                    className="cursor-pointer text-[12.5px] text-slate-500 transition-colors duration-200 hover:text-slate-300"
+                                >
+                                    Cookies
+                                </button>
+                            </li>
                         </ul>
                     </div>
                 </div>
