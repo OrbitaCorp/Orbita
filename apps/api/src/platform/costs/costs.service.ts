@@ -520,7 +520,7 @@ export class CostsService {
       this.logger.warn(`Error obteniendo usage de proveedores internos: ${err}`);
     }
 
-    return { providers: result };
+    return { providers: result, updatedAt: new Date().toISOString() };
   }
 
   async reportQuotaExceeded(providerSlug: string, reason: string): Promise<void> {

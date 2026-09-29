@@ -460,14 +460,24 @@ function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
   if (slugs.length === 0) return null
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      gap: 16,
-    }}>
-      {slugs.map((slug) => (
-        <UsageProviderBlock key={slug} slug={slug} items={usage.providers[slug].items} />
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {usage.updatedAt && (
+        <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+          Última actualización:{' '}
+          {new Date(usage.updatedAt).toLocaleString('es-AR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          })}
+        </div>
+      )}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: 16,
+      }}>
+        {slugs.map((slug) => (
+          <UsageProviderBlock key={slug} slug={slug} items={usage.providers[slug].items} />
+        ))}
+      </div>
     </div>
   )
 }
