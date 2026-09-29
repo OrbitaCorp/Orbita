@@ -13,9 +13,11 @@
 // Uso (desde apps/api):
 //   DEMO_OWNER_PASSWORD='...' pnpm seed:demo
 //
-// DEMO_OWNER_PASSWORD solo hace falta la primera vez: es la contraseña del
-// dueño de la demo, la cuenta con la que se cura la tienda desde el panel
-// real. Nunca se imprime ni se guarda en el repo.
+// DEMO_OWNER_PASSWORD es la contraseña del dueño de la demo: la cuenta con la
+// que se cura la tienda desde el panel real (login con EMAIL_DUENO). Hace
+// falta la primera vez; después, pasarla de nuevo la cambia — es la forma de
+// "recuperarla", porque el email del dueño no es una casilla real. Nunca se
+// imprime ni se guarda en el repo.
 
 process.loadEnvFile?.();
 
@@ -26,9 +28,10 @@ const prisma = new PrismaClient();
 
 const SLUG = 'demo';
 const NOMBRE = 'Nébula Tech';
-// El email de un member es único en TODA la plataforma (ver
-// OnboardingService.registerBusiness): por eso uno propio de la demo.
-const EMAIL_DUENO = process.env.DEMO_OWNER_EMAIL ?? 'demo@orbita.site';
+// Solo sirve para loguearse: no es una casilla real (dominio .invalid, RFC
+// 2606 — ningún mail sale). Tiene que ser propio de la demo porque el email
+// de un member es único en TODA la plataforma (ver registerBusiness).
+const EMAIL_DUENO = 'dueno@demo.invalid';
 // El visitante no tiene contraseña: nunca loguea, solo recibe tokens de
 // AuthService.demoSession. Dominio .invalid (RFC 2606): ningún mail sale.
 const EMAIL_VISITANTE = 'visitante@demo.invalid';
@@ -72,6 +75,7 @@ async function negocioBase() {
   const permisos = new Map((await prisma.permission.findMany()).map((p) => [p.code, p.id]));
 
   let negocio = await prisma.business.findUnique({ where: { subdomain: SLUG } });
+  const creadoAhora = !negocio;
   if (!negocio) {
     const password = process.env.DEMO_OWNER_PASSWORD;
     if (!password || password.length < 10) {
@@ -112,6 +116,14 @@ async function negocioBase() {
     console.log(`Negocio demo creado: ${negocio.id}`);
   } else if (!negocio.isDemo) {
     negocio = await prisma.business.update({ where: { id: negocio.id }, data: { isDemo: true } });
+  }
+  if (process.env.DEMO_OWNER_PASSWORD && !creadoAhora) {
+    const passwordHash = await argon2.hash(process.env.DEMO_OWNER_PASSWORD, { type: argon2.argon2id });
+    const { count } = await prisma.member.updateMany({
+      where: { businessId: negocio.id, email: EMAIL_DUENO },
+      data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
+    });
+    if (count) console.log('Contraseña del dueño de la demo actualizada.');
   }
 
   // Visitante anónimo: dueño en permisos (ve todo), readOnly (DemoGuard le
