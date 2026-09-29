@@ -418,14 +418,14 @@ export class CostsService {
       }
     }
 
-    // Groq, Serper y Tavily: se arman con los usage_events propios.
+    // Gemini, Groq, Serper y Tavily: se arman con los usage_events propios.
     try {
       const start = new Date();
       start.setUTCDate(1);
       start.setUTCHours(0, 0, 0, 0);
 
       const targetProviders = await this.prisma.costProvider.findMany({
-        where: { slug: { in: ['groq', 'serper', 'tavily'] } },
+        where: { slug: { in: ['gemini', 'groq', 'serper', 'tavily'] } },
         select: { id: true, slug: true },
       });
 
@@ -439,6 +439,24 @@ export class CostsService {
           _sum: { quantity: true },
           _count: { _all: true },
         });
+
+        // Gemini
+        const geminiId = targetProviders.find((p) => p.slug === 'gemini')?.id;
+        if (geminiId) {
+          const geminiRows = rows.filter((r) => r.providerId === geminiId);
+          if (geminiRows.length > 0) {
+            const prompt = geminiRows.find((r) => r.category === 'prompt_tokens');
+            const completion = geminiRows.find((r) => r.category === 'completion_tokens');
+            result['gemini'] = {
+              slug: 'gemini',
+              items: [
+                { category: 'Requests (mes)', value: prompt?._count._all ?? 0, unit: 'requests' },
+                { category: 'Tokens de entrada (mes)', value: Number(prompt?._sum.quantity ?? 0), unit: 'tokens' },
+                { category: 'Tokens de salida (mes)', value: Number(completion?._sum.quantity ?? 0), unit: 'tokens' },
+              ],
+            };
+          }
+        }
 
         // Groq
         const groqId = targetProviders.find((p) => p.slug === 'groq')?.id;
@@ -502,7 +520,7 @@ export class CostsService {
       this.logger.warn(`Error obteniendo usage de proveedores internos: ${err}`);
     }
 
-    return { providers: result };
+    return { providers: result, updatedAt: new Date().toISOString() };
   }
 
   async reportQuotaExceeded(providerSlug: string, reason: string): Promise<void> {
