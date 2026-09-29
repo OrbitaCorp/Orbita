@@ -172,7 +172,6 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
             {/* ── Elección ── */}
             <main className="de-main" aria-hidden={cargando || undefined}>
                 <p className="de-eyebrow de-in" style={{ ['--d' as string]: '60ms' }}>
-                    <span className="de-punto" aria-hidden="true" />
                     Demo en vivo · sin cuenta y sin tarjeta
                 </p>
                 <h1 className="de-titulo de-in" style={{ ['--d' as string]: '140ms' }}>
@@ -199,17 +198,26 @@ export function DemoEntrada({ rolInicial }: { rolInicial?: Rol | null }) {
                                 onClick={() => setElegido(r)}
                                 onMouseEnter={() => setHover(r)}
                                 onMouseLeave={() => setHover(null)}
+                                onMouseMove={e => {
+                                    // Posición del cursor para el brillo que lo
+                                    // sigue (.de-op::before/::after).
+                                    const b = e.currentTarget.getBoundingClientRect();
+                                    e.currentTarget.style.setProperty('--mx', `${e.clientX - b.left}px`);
+                                    e.currentTarget.style.setProperty('--my', `${e.clientY - b.top}px`);
+                                }}
                             >
                                 <span className="de-mini" aria-hidden="true">
                                     <img src={d.fondo.desk} alt="" loading="lazy" decoding="async" />
                                 </span>
                                 <span className="de-op-texto">
-                                    <span className="de-op-rol">{d.rol}</span>
+                                    <span className="de-op-cabeza">
+                                        <span className="de-op-rol">{d.rol}</span>
+                                        <span className="de-radio" aria-hidden="true">
+                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                                        </span>
+                                    </span>
                                     <span className="de-op-titulo">{d.titulo}</span>
                                     <span className="de-op-desc">{d.texto}</span>
-                                </span>
-                                <span className="de-radio" aria-hidden="true">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                                 </span>
                             </button>
                         );
@@ -307,8 +315,6 @@ const CSS = `
 @keyframes de-entra { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 .de-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(203,213,225,.85); margin: 0; }
-.de-punto { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 0 rgba(74,222,128,.6); animation: de-latido 2s ease-out infinite; }
-@keyframes de-latido { 0% { box-shadow: 0 0 0 0 rgba(74,222,128,.55); } 70% { box-shadow: 0 0 0 9px rgba(74,222,128,0); } 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); } }
 
 .de-titulo { margin: 18px 0 0; font-weight: 900; letter-spacing: -.04em; line-height: .98; font-size: clamp(38px, 6.4vw, 76px); }
 .de-titulo span { color: #3b82f6; }
@@ -320,28 +326,57 @@ const CSS = `
     border-radius: 18px; border: 1px solid rgba(255,255,255,.1);
     background: rgba(2,6,23,.55); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2);
     color: #fff; cursor: pointer; text-align: left; font: inherit;
+    --mx: 50%; --my: 0px;
+    /* translate y no transform: transform lo fija la animación de entrada
+       (.de-in, fill both) y le ganaría al hover. */
+    translate: 0 0;
+    transition: translate 420ms cubic-bezier(.2,.7,.2,1), border-color 250ms ease, background 250ms ease, box-shadow 350ms ease;
 }
-.de-op:hover { border-color: rgba(147,197,253,.34); background: rgba(15,23,42,.62); }
+/* Brillo que sigue al cursor: una luz suave adentro (::before) y el borde
+   encendido cerca del puntero (::after, recortado a 1px con máscara). */
+.de-op::before, .de-op::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    opacity: 0; transition: opacity 350ms ease; z-index: 1;
+}
+.de-op::before { background: radial-gradient(420px circle at var(--mx) var(--my), rgba(147,197,253,.10), transparent 55%); }
+.de-op::after {
+    padding: 1px;
+    background: radial-gradient(240px circle at var(--mx) var(--my), rgba(191,219,254,.9), rgba(147,197,253,.15) 55%, transparent 75%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+@media (hover: hover) {
+    .de-op:hover { translate: 0 -4px; border-color: rgba(147,197,253,.22); background: rgba(15,23,42,.66); box-shadow: 0 30px 70px -28px rgba(0,0,0,.9), 0 18px 50px -24px rgba(59,130,246,.45); }
+    .de-op:hover::before, .de-op:hover::after { opacity: 1; }
+}
 .de-op[aria-checked="true"] {
     border-color: #93c5fd; background: rgba(30,58,138,.32);
     box-shadow: 0 0 0 1px #93c5fd, 0 24px 60px -18px rgba(59,130,246,.55);
 }
 .de-op:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
-.de-mini { display: block; height: 150px; overflow: hidden; border-bottom: 1px solid rgba(255,255,255,.08); background: #0b1224; }
-.de-mini img { width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: .88; transform-origin: top left; transition: transform 700ms cubic-bezier(.2,.7,.2,1), opacity 300ms ease; }
-.de-op:hover .de-mini img, .de-op[aria-checked="true"] .de-mini img { transform: scale(1.04); opacity: 1; }
-.de-op-texto { display: flex; flex-direction: column; padding: 18px 20px 22px; }
+.de-mini { position: relative; display: block; height: 150px; overflow: hidden; border-bottom: 1px solid rgba(255,255,255,.08); background: #0b1224; }
+.de-mini::after { content: ''; position: absolute; inset: auto 0 0 0; height: 40px; background: linear-gradient(180deg, transparent, rgba(2,6,23,.45)); pointer-events: none; }
+.de-mini img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: .9; transition: transform 2600ms cubic-bezier(.45,.05,.3,1), opacity 300ms ease; }
+.de-op:hover .de-mini img, .de-op[aria-checked="true"] .de-mini img { opacity: 1; }
+/* En escritorio la miniatura va con su alto natural y al pasar el mouse se
+   desplaza hasta abajo, como si se recorriera la pantalla. */
+@media (min-width: 641px) and (hover: hover) {
+    .de-mini img { height: auto; object-fit: initial; }
+    .de-op:hover .de-mini img { transform: translateY(calc(-100% + 150px)); }
+}
+.de-op-texto { position: relative; z-index: 2; display: flex; flex-direction: column; padding: 18px 20px 22px; }
+.de-op-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .de-op-rol { font-size: 12.5px; font-weight: 600; color: #93c5fd; }
 .de-op-titulo { margin-top: 4px; font-size: 22px; font-weight: 900; letter-spacing: -.02em; }
 .de-op-desc { margin-top: 6px; font-size: 14px; line-height: 1.55; color: rgba(203,213,225,.78); }
 .de-radio {
-    position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%;
+    flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
     display: grid; place-items: center; color: transparent;
-    border: 1.5px solid rgba(255,255,255,.75); background: rgba(2,6,23,.35); backdrop-filter: blur(6px);
-    box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    border: 1.5px solid rgba(255,255,255,.3); background: transparent;
     transition: background 220ms ease, border-color 220ms ease, color 220ms ease, transform 300ms cubic-bezier(.3,1.6,.5,1);
 }
-.de-op[aria-checked="true"] .de-radio { background: #3b82f6; border-color: #3b82f6; color: #fff; transform: scale(1.08); }
+.de-op:hover .de-radio { border-color: rgba(191,219,254,.7); }
+.de-op[aria-checked="true"] .de-radio { background: #3b82f6; border-color: #3b82f6; color: #fff; transform: scale(1.1); }
 
 .de-accion { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .de-cta {
@@ -400,17 +435,18 @@ const CSS = `
     .de-opciones { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 28px; }
     .de-op { flex-direction: row; align-items: stretch; }
     .de-mini { width: 96px; height: auto; min-height: 128px; flex-shrink: 0; border-bottom: 0; border-right: 1px solid rgba(255,255,255,.08); }
-    .de-op-texto { padding: 14px 44px 16px 14px; }
+    .de-op-texto { flex: 1; min-width: 0; padding: 14px 14px 16px; }
     .de-op-titulo { font-size: 19px; }
     .de-op-desc { font-size: 13px; }
-    .de-radio { top: 12px; right: 12px; }
     .de-accion { width: 100%; }
     .de-cta { width: 100%; min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .de-in, .de-capa, .de-capa img, .de-main, .de-mini img, .de-carga { transition: none !important; }
+    .de-in, .de-op, .de-capa, .de-capa img, .de-main, .de-mini img, .de-carga { transition: none !important; }
+    .de-op:hover { translate: none; }
+    .de-op:hover .de-mini img { transform: none; }
     .de-in,
-    .de-punto, .de-planeta, .de-satelite-eje, .de-carga-paso { animation: none; }
+    .de-planeta, .de-satelite-eje, .de-carga-paso { animation: none; }
 }
 `;
