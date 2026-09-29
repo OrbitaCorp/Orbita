@@ -2,7 +2,7 @@
 // páginas públicas de marketing para que Google las encuentre sin tener que
 // descubrirlas solo por links.
 //
-// Solo las 3 páginas estáticas de marketing (home, /nosotros, /planes). Las
+// Solo las páginas estáticas públicas (home, /nosotros, /planes y las legales). Las
 // quedan afuera a propósito:
 //   - /plantillas/[id]: son ~16 slugs que viven mezclados con ids internos
 //     de piezas dentro de PLANTILLAS (datos.tsx) — listarlas bien requiere
@@ -12,7 +12,7 @@
 import type { GetServerSideProps } from 'next'
 import { SEO_CANONICAL_HOST } from '@/lib/tenant'
 
-const STATIC_PATHS = ['/', '/nosotros', '/planes']
+const STATIC_PATHS = ['/', '/nosotros', '/planes', '/terminos', '/privacidad', '/eliminacion-de-datos']
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     const urlEntries = STATIC_PATHS.map(
