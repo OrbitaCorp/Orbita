@@ -12,7 +12,7 @@
 import type { GetServerSideProps } from 'next'
 import { SEO_CANONICAL_HOST } from '@/lib/tenant'
 
-const STATIC_PATHS = ['/', '/nosotros', '/planes', '/terminos', '/privacidad', '/eliminacion-de-datos']
+const STATIC_PATHS = ['/', '/demo', '/nosotros', '/planes', '/terminos', '/privacidad', '/eliminacion-de-datos']
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     const urlEntries = STATIC_PATHS.map(
