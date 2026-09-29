@@ -581,7 +581,7 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
     const inicio = hace(c.haceHoras * HORA);
     await prisma.conversation.create({
       data: {
-        id: idDemo(`conversacion:${i}`), businessId, customerId: clientes[c.cliente].id, isUnread: c.sinLeer,
+        id: idDemo(`conversacion:${i}`), businessId, customerId: clientes[c.cliente < 0 ? idxInvitado : c.cliente].id, isUnread: c.sinLeer,
         createdAt: inicio, updatedAt: new Date(inicio.getTime() + (c.mensajes.length - 1) * 7 * 60000),
         messages: { create: c.mensajes.map(([sender, text], j) => ({ id: idDemo(`mensaje:${i}:${j}`), sender, text, createdAt: new Date(inicio.getTime() + j * 7 * 60000) })) },
       },

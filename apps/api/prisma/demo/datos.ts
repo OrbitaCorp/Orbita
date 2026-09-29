@@ -81,7 +81,8 @@ export const RESENAS: Record<string, string[]> = {
 };
 
 // Conversaciones de la bandeja de Mensajes. `cliente` = índice en la lista de
-// clientes sembrados; `haceHoras` del primer mensaje; cada mensaje suma minutos.
+// clientes sembrados (-1 = el Invitado, con el que entra el visitante a la tienda);
+// `haceHoras` del primer mensaje; cada mensaje suma minutos.
 export const CONVERSACIONES: { cliente: number; haceHoras: number; sinLeer: boolean; mensajes: [('CUSTOMER' | 'STORE'), string][] }[] = [
   {
     cliente: 3, haceHoras: 2, sinLeer: true,
@@ -127,6 +128,17 @@ export const CONVERSACIONES: { cliente: number; haceHoras: number; sinLeer: bool
     mensajes: [
       ['CUSTOMER', 'Puedo pagar con transferencia?'],
       ['STORE', '¡Sí! Elegí "Transferencia" al finalizar la compra y te aparecen los datos. Apenas acreditamos el pago, preparamos el envío.'],
+    ],
+  },
+  // El hilo del Invitado: lo que ve en la tienda (Mi cuenta → Mensajes) y, del
+  // otro lado, en la bandeja del panel. En la demo los dos chats son el mismo
+  // (ver apps/web/src/lib/demo/recursos/mensajes.ts), así que el primer mensaje
+  // explica cómo probarlo.
+  {
+    cliente: -1, haceHoras: 3, sinLeer: false,
+    mensajes: [
+      ['STORE', '¡Hola! Gracias por elegir Nébula Tech. Si tenés alguna duda con tus pedidos, escribinos por acá.'],
+      ['STORE', 'Tip de la demo: lo que escribas en este chat le llega al panel (Mensajes), y lo que contestes desde el panel aparece acá.'],
     ],
   },
 ];
