@@ -11,7 +11,8 @@
 // OnboardingService.registerBusiness.
 //
 // Uso (desde apps/api):
-//   DEMO_OWNER_PASSWORD='...' pnpm seed:demo
+//   DEMO_OWNER_PASSWORD='...' pnpm seed:demo            (negocio + contenido)
+//   pnpm seed:demo -- --solo-base                       (solo el negocio)
 //
 // DEMO_OWNER_PASSWORD es la contraseña del dueño de la demo: la cuenta con la
 // que se cura la tienda desde el panel real (login con EMAIL_DUENO). Hace
@@ -23,6 +24,7 @@ process.loadEnvFile?.();
 
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { sembrarContenido } from './demo/sembrar';
 
 const prisma = new PrismaClient();
 
@@ -155,6 +157,10 @@ async function negocioBase() {
 
 async function main() {
   const negocio = await negocioBase();
+  // --solo-base: arma el negocio (dueño, visitante, suscripción) sin tocar
+  // el contenido. Sin la bandera, además borra y vuelve a sembrar catálogo,
+  // ventas y todo el panel (ver prisma/demo/sembrar.ts).
+  if (!process.argv.includes('--solo-base')) await sembrarContenido(prisma, negocio.id);
   console.log(`Demo lista: ${negocio.subdomain} (${negocio.id})`);
 }
 

@@ -19,6 +19,7 @@ import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
 import { errorDemo } from '../common/guards/demo.guard';
+import { DemoFechasService } from '../demo/demo-fechas.service';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -81,6 +82,9 @@ export class AuthService implements OnModuleInit {
     // argumentos; en runtime lo provee PlatformAdminLogModule. Sus métodos
     // nunca tiran: un insert fallido no deja a nadie afuera del panel.
     private readonly adminLog?: PlatformAdminLogService,
+    // Fechas de la demo pública al día al abrir su panel (ver demoSession).
+    // Opcional por la misma razón que adminLog.
+    private readonly demoFechas?: DemoFechasService,
   ) {
     this.jwtSecret = this.config.getOrThrow<string>('JWT_SECRET');
     // Falla rápido ante un deploy mal configurado (ej. el placeholder de
@@ -1041,6 +1045,11 @@ export class AuthService implements OnModuleInit {
       },
     });
     if (!member) throw new NotFoundException('La demo no está disponible');
+
+    // Respaldo de la tarea nocturna: si las fechas quedaron atrasadas (más de
+    // media hora), se ponen al día antes de que el visitante vea el dashboard.
+    // Un fallo acá no puede dejar a nadie afuera de la demo.
+    await this.demoFechas?.ponerAlDia().catch((e) => this.logger.warn(`No se pudieron poner al día las fechas de la demo: ${e}`));
 
     return {
       type: 'member',

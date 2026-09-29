@@ -1,0 +1,492 @@
+{
+ "productos": {
+  "Auriculares over-ear con cancelación de ruido": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/auriculares-over-ear-con-cancelacion-de-ruido-1.webp",
+     "pexels": "https://www.pexels.com/photo/3394650/",
+     "autor": "Sound On",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/auriculares-over-ear-con-cancelacion-de-ruido-2.webp",
+     "pexels": "https://www.pexels.com/photo/3394665/",
+     "autor": "Sound On",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/auriculares-over-ear-con-cancelacion-de-ruido-3.webp",
+     "pexels": "https://www.pexels.com/photo/3394666/",
+     "autor": "Sound On",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/auriculares-over-ear-con-cancelacion-de-ruido-4.webp",
+     "pexels": "https://www.pexels.com/photo/9371408/",
+     "autor": "Adrian Regeci",
+     "estudio": false
+    }
+   ]
+  },
+  "Auriculares in-ear inalámbricos": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/auriculares-in-ear-inalambricos-1.webp",
+     "pexels": "https://www.pexels.com/photo/8380417/",
+     "autor": "Saif71.com",
+     "estudio": true
+    }
+   ]
+  },
+  "Parlante bluetooth portátil": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/parlante-bluetooth-portatil-1.webp",
+     "pexels": "https://www.pexels.com/photo/7772558/",
+     "autor": "Caleb Oquendo",
+     "estudio": true
+    }
+   ]
+  },
+  "Micrófono USB para streaming": {
+   "grupo": "Audio",
+   "fotos": [
+    {
+     "archivo": "productos/microfono-usb-para-streaming-1.webp",
+     "pexels": "https://www.pexels.com/photo/12541646/",
+     "autor": "Dušan Cvetanović",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/microfono-usb-para-streaming-2.webp",
+     "pexels": "https://www.pexels.com/photo/12953470/",
+     "autor": "Dušan Cvetanović",
+     "estudio": false
+    }
+   ]
+  },
+  "Smartphone Nébula X1": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/smartphone-nebula-x1-1.webp",
+     "pexels": "https://www.pexels.com/photo/11934173/",
+     "autor": "Zaidan Falaah",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/smartphone-nebula-x1-2.webp",
+     "pexels": "https://www.pexels.com/photo/12039537/",
+     "autor": "Mger Akopyan",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/smartphone-nebula-x1-3.webp",
+     "pexels": "https://www.pexels.com/photo/6373210/",
+     "autor": "KATRIN  BOLOVTSOVA",
+     "estudio": false
+    }
+   ]
+  },
+  "Cargador rápido 65 W": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/cargador-rapido-65-w-1.webp",
+     "pexels": "https://www.pexels.com/photo/4526406/",
+     "autor": "I'm Zion",
+     "estudio": true
+    }
+   ]
+  },
+  "Batería portátil 20.000 mAh": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/bateria-portatil-20-000-mah-1.webp",
+     "pexels": "https://www.pexels.com/photo/29356607/",
+     "autor": "Pedro Paiva",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/bateria-portatil-20-000-mah-2.webp",
+     "pexels": "https://www.pexels.com/photo/8137313/",
+     "autor": "Lensmagicians",
+     "estudio": false
+    }
+   ]
+  },
+  "Soporte magnético para auto": {
+   "grupo": "Celulares y accesorios",
+   "fotos": [
+    {
+     "archivo": "productos/soporte-magnetico-para-auto-1.webp",
+     "pexels": "https://www.pexels.com/photo/13536013/",
+     "autor": "Abdulvahap Demir",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/soporte-magnetico-para-auto-2.webp",
+     "pexels": "https://www.pexels.com/photo/30954662/",
+     "autor": "William Hadley",
+     "estudio": false
+    }
+   ]
+  },
+  "Notebook 14\"": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/notebook-14-1.webp",
+     "pexels": "https://www.pexels.com/photo/5798001/",
+     "autor": "Ann poan",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/notebook-14-2.webp",
+     "pexels": "https://www.pexels.com/photo/5474290/",
+     "autor": "cottonbro studio",
+     "estudio": false
+    }
+   ]
+  },
+  "Monitor 27\" 4K": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/monitor-27-4k-1.webp",
+     "pexels": "https://www.pexels.com/photo/11163174/",
+     "autor": "Yusuf P",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/monitor-27-4k-2.webp",
+     "pexels": "https://www.pexels.com/photo/21325138/",
+     "autor": "Alpha En",
+     "estudio": false
+    }
+   ]
+  },
+  "Teclado mecánico": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/teclado-mecanico-1.webp",
+     "pexels": "https://www.pexels.com/photo/34877295/",
+     "autor": "FOX ^.ᆽ.^= ∫",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/teclado-mecanico-2.webp",
+     "pexels": "https://www.pexels.com/photo/5152261/",
+     "autor": "FOX ^.ᆽ.^= ∫",
+     "estudio": false
+    }
+   ]
+  },
+  "Mouse ergonómico inalámbrico": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/mouse-ergonomico-inalambrico-1.webp",
+     "pexels": "https://www.pexels.com/photo/7151698/",
+     "autor": "Helena Lopes",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/mouse-ergonomico-inalambrico-2.webp",
+     "pexels": "https://www.pexels.com/photo/5861326/",
+     "autor": "Athena Sandrini",
+     "estudio": false
+    }
+   ]
+  },
+  "Hub USB-C 8 en 1": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/hub-usb-c-8-en-1-1.webp",
+     "pexels": "https://www.pexels.com/photo/20076002/",
+     "autor": "Aleksander Dumała",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/hub-usb-c-8-en-1-2.webp",
+     "pexels": "https://www.pexels.com/photo/20076003/",
+     "autor": "Aleksander Dumała",
+     "estudio": false
+    }
+   ]
+  },
+  "Drone plegable con cámara 4K": {
+   "grupo": "Computación",
+   "fotos": [
+    {
+     "archivo": "productos/drone-plegable-con-camara-4k-1.webp",
+     "pexels": "https://www.pexels.com/photo/19247750/",
+     "autor": "Bedirhan Akyüz",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/drone-plegable-con-camara-4k-2.webp",
+     "pexels": "https://www.pexels.com/photo/3945674/",
+     "autor": "cottonbro studio",
+     "estudio": false
+    }
+   ]
+  },
+  "Joystick inalámbrico": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/joystick-inalambrico-1.webp",
+     "pexels": "https://www.pexels.com/photo/27271924/",
+     "autor": "FOX ^.ᆽ.^= ∫",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/joystick-inalambrico-2.webp",
+     "pexels": "https://www.pexels.com/photo/15592023/",
+     "autor": "Roberto",
+     "estudio": false
+    }
+   ]
+  },
+  "Auriculares gamer": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/auriculares-gamer-1.webp",
+     "pexels": "https://www.pexels.com/photo/9742608/",
+     "autor": "Reimond Mar Depra",
+     "estudio": true
+    }
+   ]
+  },
+  "Mousepad XL con luces": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/mousepad-xl-con-luces-1.webp",
+     "pexels": "https://www.pexels.com/photo/28842077/",
+     "autor": "Atahan Demir",
+     "estudio": true
+    }
+   ]
+  },
+  "Consola retro portátil": {
+   "grupo": "Gaming",
+   "fotos": [
+    {
+     "archivo": "productos/consola-retro-portatil-1.webp",
+     "pexels": "https://www.pexels.com/photo/35026559/",
+     "autor": "Lisa Fotios",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/consola-retro-portatil-2.webp",
+     "pexels": "https://www.pexels.com/photo/4978057/",
+     "autor": "Caleb Oquendo",
+     "estudio": false
+    }
+   ]
+  },
+  "Lámpara LED inteligente": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/lampara-led-inteligente-1.webp",
+     "pexels": "https://www.pexels.com/photo/20943579/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/lampara-led-inteligente-2.webp",
+     "pexels": "https://www.pexels.com/photo/28940484/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    }
+   ]
+  },
+  "Cámara de seguridad Wi-Fi": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/camara-de-seguridad-wi-fi-1.webp",
+     "pexels": "https://www.pexels.com/photo/24347621/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/camara-de-seguridad-wi-fi-2.webp",
+     "pexels": "https://www.pexels.com/photo/28940577/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    }
+   ]
+  },
+  "Enchufe inteligente ×2": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/enchufe-inteligente-2-1.webp",
+     "pexels": "https://www.pexels.com/photo/28117696/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/enchufe-inteligente-2-2.webp",
+     "pexels": "https://www.pexels.com/photo/27934787/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    }
+   ]
+  },
+  "Parlante con asistente de voz": {
+   "grupo": "Hogar inteligente",
+   "fotos": [
+    {
+     "archivo": "productos/parlante-con-asistente-de-voz-1.webp",
+     "pexels": "https://www.pexels.com/photo/19652337/",
+     "autor": "Jeff Valvekens",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/parlante-con-asistente-de-voz-2.webp",
+     "pexels": "https://www.pexels.com/photo/13941387/",
+     "autor": "Martín Rivera",
+     "estudio": false
+    }
+   ]
+  },
+  "Smartwatch": {
+   "grupo": "Wearables",
+   "fotos": [
+    {
+     "archivo": "productos/smartwatch-1.webp",
+     "pexels": "https://www.pexels.com/photo/14691506/",
+     "autor": "Douglas Mendes",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/smartwatch-2.webp",
+     "pexels": "https://www.pexels.com/photo/30909359/",
+     "autor": "Jakub Zerdzicki",
+     "estudio": false
+    },
+    {
+     "archivo": "productos/smartwatch-3.webp",
+     "pexels": "https://www.pexels.com/photo/8217438/",
+     "autor": "MART  PRODUCTION",
+     "estudio": false
+    }
+   ]
+  },
+  "Pulsera fitness": {
+   "grupo": "Wearables",
+   "fotos": [
+    {
+     "archivo": "productos/pulsera-fitness-1.webp",
+     "pexels": "https://www.pexels.com/photo/39076654/",
+     "autor": "NEW VISION PRODUCTION",
+     "estudio": true
+    },
+    {
+     "archivo": "productos/pulsera-fitness-2.webp",
+     "pexels": "https://www.pexels.com/photo/39076649/",
+     "autor": "NEW VISION PRODUCTION",
+     "estudio": false
+    }
+   ]
+  }
+ },
+ "categorias": {
+  "Audio": {
+   "archivo": "categorias/audio.webp",
+   "pexels": "https://www.pexels.com/photo/3756747/",
+   "autor": "Sound On"
+  },
+  "Celulares y accesorios": {
+   "archivo": "categorias/celulares-y-accesorios.webp",
+   "pexels": "https://www.pexels.com/photo/6373218/",
+   "autor": "KATRIN  BOLOVTSOVA"
+  },
+  "Computación": {
+   "archivo": "categorias/computacion.webp",
+   "pexels": "https://www.pexels.com/photo/8534457/",
+   "autor": "Hanna Pad"
+  },
+  "Gaming": {
+   "archivo": "categorias/gaming.webp",
+   "pexels": "https://www.pexels.com/photo/9794458/",
+   "autor": "Lynde"
+  },
+  "Hogar inteligente": {
+   "archivo": "categorias/hogar-inteligente.webp",
+   "pexels": "https://www.pexels.com/photo/29091470/",
+   "autor": "Jakub Zerdzicki"
+  },
+  "Wearables": {
+   "archivo": "categorias/wearables.webp",
+   "pexels": "https://www.pexels.com/photo/8217295/",
+   "autor": "MART  PRODUCTION"
+  }
+ },
+ "home": {
+  "Slide 1": {
+   "archivo": "home/slide-1.webp",
+   "pexels": "https://www.pexels.com/photo/9128853/",
+   "autor": "Matheus Bertelli"
+  },
+  "Slide 2": {
+   "archivo": "home/slide-2.webp",
+   "pexels": "https://www.pexels.com/photo/3756940/",
+   "autor": "Sound On"
+  },
+  "Slide 3": {
+   "archivo": "home/slide-3.webp",
+   "pexels": "https://www.pexels.com/photo/9072216/",
+   "autor": "Yan Krukau"
+  },
+  "Fondo con efecto parallax": {
+   "archivo": "home/fondo-con-efecto-parallax.webp",
+   "pexels": "https://www.pexels.com/photo/36169774/",
+   "autor": "Jakub Pabis"
+  }
+ },
+ "videos": {
+  "Home: video principal": {
+   "archivo": "videos/home-video-principal.mp4",
+   "poster": "videos/home-video-principal.webp",
+   "pexels": "https://www.pexels.com/video/10240606/",
+   "autor": "max laurell"
+  },
+  "Home: gaming": {
+   "archivo": "videos/home-gaming.mp4",
+   "poster": "videos/home-gaming.webp",
+   "pexels": "https://www.pexels.com/video/9396143/",
+   "autor": "Stan \"Kenzo\" K"
+  },
+  "Ficha de los auriculares": {
+   "archivo": "videos/ficha-de-los-auriculares.mp4",
+   "poster": "videos/ficha-de-los-auriculares.webp",
+   "pexels": "https://www.pexels.com/video/9130365/",
+   "autor": "Dario Fernandez Ruz"
+  },
+  "Ficha del smartwatch": {
+   "archivo": "videos/ficha-del-smartwatch.mp4",
+   "poster": "videos/ficha-del-smartwatch.webp",
+   "pexels": "https://www.pexels.com/video/4211107/",
+   "autor": "https://kaboompics.com/"
+  },
+  "Vertical (formato reels)": {
+   "archivo": "videos/vertical-formato-reels.mp4",
+   "poster": "videos/vertical-formato-reels.webp",
+   "pexels": "https://www.pexels.com/video/8027978/",
+   "autor": "MART  PRODUCTION"
+  }
+ }
+}

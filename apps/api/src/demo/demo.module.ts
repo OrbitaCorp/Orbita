@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { DemoController } from './demo.controller';
 import { DemoIaService } from './demo-ia.service';
 import { DemoIaInterceptor } from './demo-ia.interceptor';
+import { DemoFechasService } from './demo-fechas.service';
 
 // Demo pública de Órbita (demo.orbita.site). Global: DemoIaInterceptor se usa
 // con @UseInterceptors en rutas de varios módulos (productos, image-studio,
@@ -9,7 +10,7 @@ import { DemoIaInterceptor } from './demo-ia.interceptor';
 @Global()
 @Module({
   controllers: [DemoController],
-  providers: [DemoIaService, DemoIaInterceptor],
-  exports: [DemoIaService, DemoIaInterceptor],
+  providers: [DemoIaService, DemoIaInterceptor, DemoFechasService],
+  exports: [DemoIaService, DemoIaInterceptor, DemoFechasService],
 })
 export class DemoModule {}

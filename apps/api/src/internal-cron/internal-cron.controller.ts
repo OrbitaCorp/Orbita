@@ -1,4 +1,5 @@
 import { Controller, Logger, Post, UseGuards } from '@nestjs/common';
+import { DemoFechasService } from '../demo/demo-fechas.service';
 import { Public } from '../common/decorators/public.decorator';
 import { InternalCronSecretGuard } from './internal-cron-secret.guard';
 import { CronRunsService } from './cron-runs.service';
@@ -64,6 +65,9 @@ export class InternalCronController {
     // Recordatorios de verificación de correo (a los 7, 3 y 1 días restantes).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly emailVerification?: EmailVerificationService,
+    // Fechas de la demo pública al día (ver demo/demo-fechas.service.ts).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly demoFechas?: DemoFechasService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -113,6 +117,13 @@ export class InternalCronController {
           await this.emailVerification?.avisarRecordatorios();
         } catch (e) {
           this.logger.error(`Recordatorios de verificación de email: no se pudo correr — ${describeError(e)}`);
+        }
+        // Demo pública: las fechas de sus datos avanzan con el calendario, así
+        // sus reportes nunca se vacían. Mismo criterio: si falla, se anota.
+        try {
+          await this.demoFechas?.ponerAlDia();
+        } catch (e) {
+          this.logger.error(`Fechas de la demo: no se pudieron poner al día — ${describeError(e)}`);
         }
       },
     );
