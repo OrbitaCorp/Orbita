@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { DemoIaService } from '../demo/demo-ia.service';
 import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
@@ -45,6 +46,8 @@ describe('OrbiController', () => {
       controllers: [OrbiController],
       providers: [
         { provide: LLM_ADAPTER, useValue: mockLlm },
+        // Cuota de la demo pública: el interceptor de la ruta /chat la pide.
+        { provide: DemoIaService, useValue: { consumir: jest.fn(), devolver: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
         {
           provide: ConversationService,
@@ -252,7 +255,7 @@ describe('OrbiController', () => {
       soloLectura as any,
     );
 
-    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined);
+    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined, { soloLectura: false });
   });
 
   // Orbi existe en el panel y en el wizard. En el storefront no, y este

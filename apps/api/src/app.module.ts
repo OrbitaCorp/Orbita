@@ -6,6 +6,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
+import { DemoModule } from './demo/demo.module';
 import { MailModule } from './mail/mail.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { R2Module } from './r2/r2.module';
@@ -68,6 +69,7 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     PrismaModule,
+    DemoModule,
     MailModule,
     SupabaseModule,
     R2Module,

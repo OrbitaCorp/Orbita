@@ -13,9 +13,12 @@ export class ToolRegistryService {
     this.logger.log(`Registered tool: ${tool.name}`);
   }
 
-  getTools(surface: OrbiSurface, permissions: string[], stepName?: string): LlmToolDefinition[] {
+  // `soloLectura`: el visitante de la demo pública — no ve las tools que
+  // escriben (tampoco podría confirmarlas: DemoGuard corta /orbi/confirm).
+  getTools(surface: OrbiSurface, permissions: string[], stepName?: string, opciones?: { soloLectura?: boolean }): LlmToolDefinition[] {
     return Array.from(this.tools.values())
       .filter(t => t.surfaces.includes(surface))
+      .filter(t => !(opciones?.soloLectura && t.requiresConfirmation))
       .filter(t => !t.steps || (stepName !== undefined && t.steps.includes(stepName)))
       .filter(t =>
         t.requiredPermissions.length === 0 ||

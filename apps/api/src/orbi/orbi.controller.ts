@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
@@ -16,6 +16,8 @@ import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.ser
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaDiaria } from './cuota-diaria';
+import { DemoIa } from '../demo/demo-ia';
+import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
 // Topes de costo (auditoría interna 10/09, ítem api.orbi; hallazgo MEDIO del
 // 04/09 "sin tope de gasto de IA"). Cada mensaje son una o varias llamadas
@@ -26,6 +28,18 @@ const HISTORIAL_PANEL = 30; // mensajes previos que se le mandan al modelo
 const MAX_VUELTAS_TOOLS = 6; // llamadas al modelo por mensaje (cada tool es otra vuelta)
 const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.';
 const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
+
+// Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
+// (miembro readOnly, ver demo/demo-ia.ts). Va al final del prompt de
+// sistema, así pisa cualquier invitación del prompt normal a hacer cambios.
+export const PROMPT_DEMO = [
+  'IMPORTANTE — DEMO PÚBLICA DE ÓRBITA.',
+  'Estás hablando con un visitante que prueba la tienda DEMO de Órbita (Nébula Tech). No es el dueño: los datos de esta tienda son ficticios, cargados para mostrar cómo funciona Órbita.',
+  'Dejá claro que es una demo cuando venga al caso (por ejemplo, la primera vez que respondas o si pregunta por "su" tienda).',
+  'Respondé breve y concreto. Podés contar lo que muestran los datos de esta tienda demo y explicar cómo se usa Órbita.',
+  'En la demo no podés crear, editar ni borrar nada. Si te piden un cambio, explicá en pocos pasos cómo se hace desde el panel y aclarales que en la demo no se aplica.',
+  'No inventes precios, planes, límites ni detalles internos de la plataforma. Si no sabés algo, decí que lo pueden consultar con el equipo de Órbita.',
+].join('\n');
 
 @Controller('orbi')
 export class OrbiController {
@@ -57,6 +71,8 @@ export class OrbiController {
   @Post('chat')
   @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @DemoIa('orbi-chat') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(DemoIaInterceptor)
   async chat(
     @Body() dto: OrbiChatDto,
     @Res() res: Response,
@@ -103,11 +119,17 @@ export class OrbiController {
     let promptTokens = 0;
     let completionTokens = 0;
 
+    // Visitante de la demo: todos comparten el mismo miembro readOnly, así que
+    // su conversación NO se guarda (si no, cada visitante vería el chat de
+    // los anteriores), no ve las herramientas que modifican datos y el
+    // prompt le dice que es una demo.
+    const esDemo = user.readOnly === true;
+
     try {
       let conversationId = dto.conversationId;
       let history: LlmMessage[] = [];
 
-      if (dto.context.surface === OrbiSurface.PANEL) {
+      if (dto.context.surface === OrbiSurface.PANEL && !esDemo) {
         // El id de la conversación viene del cliente: se verifica que sea de
         // ESTE negocio y de ESTA persona antes de leerla o escribirle nada
         // (ver ConversationService#propia). Antes se usaba tal cual.
@@ -132,7 +154,7 @@ export class OrbiController {
 
       const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
       const messages: LlmMessage[] = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: esDemo ? `${systemPrompt}\n\n${PROMPT_DEMO}` : systemPrompt },
         ...history,
         { role: 'user', content: dto.message },
       ];
@@ -152,7 +174,7 @@ export class OrbiController {
       // por parámetro (ver el test del catálogo): el modelo no tiene forma de
       // nombrar otro negocio ni siquiera si se lo piden. El aislamiento no
       // depende de que Orbi se porte bien.
-      const tools = this.toolRegistry.getTools(dto.context.surface, user.permissions, dto.context.stepName);
+      const tools = this.toolRegistry.getTools(dto.context.surface, user.permissions, dto.context.stepName, { soloLectura: esDemo });
       const modelo = this.modeloPara(dto.context.surface);
       const toolCtx: ToolExecutionContext = {
         businessId: user.businessId,
@@ -282,7 +304,7 @@ export class OrbiController {
         }
       }
 
-      if (dto.context.surface === OrbiSurface.PANEL && conversationId) {
+      if (dto.context.surface === OrbiSurface.PANEL && conversationId && !esDemo) {
         await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'assistant',
           content: fullResponse,

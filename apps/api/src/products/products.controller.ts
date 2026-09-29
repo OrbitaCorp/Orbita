@@ -39,6 +39,8 @@ import { AiVariantsDto } from './dto/ai-variants.dto';
 import { SuggestedImagesDto } from './dto/suggested-images.dto';
 import { ProxyImageDto } from './dto/proxy-image.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
+import { DemoIa } from '../demo/demo-ia';
+import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
 
 // Cada ayuda de IA es una llamada paga al modelo, y solo tenía el throttle de
@@ -86,6 +88,8 @@ export class ProductsController {
   @Post('ai-assist')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(DemoIaInterceptor)
   aiAssist(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiAssistDto) {
     const member = assertMemberContext(ctx);
     if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
@@ -99,6 +103,8 @@ export class ProductsController {
   @Post('ai-variants')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(DemoIaInterceptor)
   aiVariants(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiVariantsDto) {
     const member = assertMemberContext(ctx);
     if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
@@ -110,7 +116,8 @@ export class ProductsController {
   @Post('ai-scan')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 15, ttl: 60000 } })
-  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN), DemoIaInterceptor)
   aiScan(
     @CurrentBusiness() ctx: AuthContext,
     @UploadedFile() file?: Express.Multer.File,

@@ -13,6 +13,8 @@ import { GenerateModelDto } from './dto/generate-model.dto';
 import { CuotaDiaria } from '../orbi/cuota-diaria';
 import { BACKGROUND_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY, NEGRO_LISO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
+import { DemoIa } from '../demo/demo-ia';
+import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
 // Workers AI, pero eso puede cambiar) — mismo criterio que
@@ -73,7 +75,11 @@ export class ImageStudioController {
   @Post('background')
   @RequirePermission('advanced.manage')
   @RequiresAddon('ADVANCED')
-  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  // Prueba de la demo pública (ver demo/demo-ia.ts): "sin fondo" es Quitar
+  // fondo, cualquier otro estilo es Fondo con IA — cada una con su cupo. El
+  // interceptor va DESPUÉS del de multer: necesita el body ya parseado.
+  @DemoIa((req) => (req.body?.estilo === SIN_FONDO_KEY ? 'quitar-fondo' : 'fondo-ia'))
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN), DemoIaInterceptor)
   async generateBackground(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: GenerateBackgroundDto,

@@ -1,12 +1,20 @@
 // DemoGuard: la demo pública (Business.isDemo) nunca acepta escrituras de un
 // visitante — ni del panel (miembro readOnly) ni de la tienda pública.
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { DemoGuard, DEMO_SOLO_LECTURA } from '../../src/common/guards/demo.guard';
 import { AuthService } from '../../src/auth/auth.service';
+import { DemoIa } from '../../src/demo/demo-ia';
 
-function contexto(req: Record<string, unknown>): ExecutionContext {
-  return { switchToHttp: () => ({ getRequest: () => req }) } as unknown as ExecutionContext;
+function rutaComun() {}
+const rutaConIa = () => undefined;
+DemoIa('orbi-producto')(rutaConIa, 'x', { value: rutaConIa });
+
+function contexto(req: Record<string, unknown>, handler: () => void = rutaComun): ExecutionContext {
+  return { switchToHttp: () => ({ getRequest: () => req }), getHandler: () => handler } as unknown as ExecutionContext;
 }
+
+const nuevoGuard = (prisma: unknown) => new DemoGuard(prisma as never, new Reflector());
 
 function prismaCon(negocios: Record<string, boolean>) {
   const findUnique = jest.fn(async ({ where }: { where: { subdomain: string } }) =>
@@ -28,40 +36,45 @@ async function rechazo(p: Promise<boolean>) {
 
 describe('DemoGuard', () => {
   it('deja pasar cualquier lectura, incluso del miembro readOnly', async () => {
-    const guard = new DemoGuard(prismaCon({ demo: true }) as never);
+    const guard = nuevoGuard(prismaCon({ demo: true }));
     for (const method of ['GET', 'HEAD', 'OPTIONS']) {
       await expect(guard.canActivate(contexto({ method, user: miembro(true), path: '/api/v1/products' }))).resolves.toBe(true);
     }
   });
 
   it('rechaza toda escritura del miembro readOnly, sin importar la ruta', async () => {
-    const guard = new DemoGuard(prismaCon({}) as never);
+    const guard = nuevoGuard(prismaCon({}));
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       await rechazo(guard.canActivate(contexto({ method, user: miembro(true), path: '/api/v1/products' })));
     }
   });
 
+  it('al miembro readOnly solo le abre las rutas marcadas con @DemoIa', async () => {
+    const guard = nuevoGuard(prismaCon({}));
+    await expect(guard.canActivate(contexto({ method: 'POST', user: miembro(true), path: '/api/v1/products/ai-scan' }, rutaConIa))).resolves.toBe(true);
+  });
+
   it('el dueño real del negocio demo (sin readOnly) escribe normal', async () => {
-    const guard = new DemoGuard(prismaCon({ demo: true }) as never);
+    const guard = nuevoGuard(prismaCon({ demo: true }));
     await expect(guard.canActivate(contexto({ method: 'POST', user: miembro(false), path: '/api/v1/products' }))).resolves.toBe(true);
   });
 
   it('corta checkout, visitas y juegos públicos sobre la tienda demo', async () => {
-    const guard = new DemoGuard(prismaCon({ demo: true }) as never);
+    const guard = nuevoGuard(prismaCon({ demo: true }));
     for (const path of ['/api/v1/storefront/demo/checkout', '/api/v1/storefront/demo/visit', '/api/v1/storefront/demo/games/start', '/api/v1/storefront/demo/return-requests']) {
       await rechazo(guard.canActivate(contexto({ method: 'POST', params: { slug: 'demo' }, path })));
     }
   });
 
   it('permite validar el carrito de la tienda demo (lectura por POST)', async () => {
-    const guard = new DemoGuard(prismaCon({ demo: true }) as never);
+    const guard = nuevoGuard(prismaCon({ demo: true }));
     await expect(
       guard.canActivate(contexto({ method: 'POST', params: { slug: 'demo' }, path: '/api/v1/storefront/demo/cart/validate' })),
     ).resolves.toBe(true);
   });
 
   it('no afecta a las tiendas reales', async () => {
-    const guard = new DemoGuard(prismaCon({ tienda1: false }) as never);
+    const guard = nuevoGuard(prismaCon({ tienda1: false }));
     await expect(
       guard.canActivate(contexto({ method: 'POST', params: { slug: 'tienda1' }, path: '/api/v1/storefront/tienda1/checkout' })),
     ).resolves.toBe(true);
@@ -69,7 +82,7 @@ describe('DemoGuard', () => {
 
   it('cachea si el slug es demo (una sola consulta por slug)', async () => {
     const prisma = prismaCon({ tienda1: false });
-    const guard = new DemoGuard(prisma as never);
+    const guard = nuevoGuard(prisma);
     const req = { method: 'POST', params: { slug: 'tienda1' }, path: '/api/v1/storefront/tienda1/visit' };
     await guard.canActivate(contexto(req));
     await guard.canActivate(contexto(req));

@@ -2836,3 +2836,20 @@ model StoreVisit {
   @@map("store_visits")
 }
 
+
+// Pruebas de IA de la demo pública (demo.orbita.site): cuántas veces usó cada
+// función un mismo visitante en la semana. El visitante es anónimo y todos
+// comparten el mismo miembro readOnly, así que se cuenta por IP — guardada
+// como hash con sal (ip_hash), nunca en texto plano. Ver DemoIaService.
+model DemoAiUsage {
+  id        String   @id @default(uuid())
+  ipHash    String   @map("ip_hash")
+  feature   String // orbi-producto | fondo-ia | quitar-fondo | orbi-chat
+  week      String // semana ISO en hora argentina: "2026-W40"
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ipHash, feature, week])
+  @@index([week])
+  @@map("demo_ai_usage")
+}

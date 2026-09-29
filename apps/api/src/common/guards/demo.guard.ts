@@ -1,6 +1,8 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthContext } from '../types/auth-context.type';
+import { DEMO_IA_KEY } from '../../demo/demo-ia';
 
 // ─── Demo pública de Órbita (demo.orbita.site) ──────────────────────────────
 //
@@ -11,7 +13,9 @@ import { AuthContext } from '../types/auth-context.type';
 // aunque le pegue a la API directo salteando el frontend:
 //
 //   1. Un miembro `readOnly` (la sesión anónima del panel de la demo, ver
-//      AuthService.demoSession) no puede usar ningún método que escriba.
+//      AuthService.demoSession) no puede usar ningún método que escriba,
+//      salvo las pruebas de IA marcadas con @DemoIa (con cuota semanal por
+//      IP — ver src/demo/demo-ia.ts).
 //   2. Las rutas públicas de la tienda (`/storefront/:slug/...`) no aceptan
 //      escrituras sobre un negocio demo: checkout, visitas, juegos,
 //      devoluciones. Excepción: validar el carrito, que es una lectura que
@@ -48,13 +52,19 @@ export class DemoGuard implements CanActivate {
   // no sumar una consulta a cada escritura pública de cualquier tienda.
   private readonly cache = new Map<string, { esDemo: boolean; hasta: number }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<RequestDemo>();
     if (METODOS_SEGUROS.has(req.method.toUpperCase())) return true;
 
-    if (req.user?.type === 'member' && req.user.readOnly) throw errorDemo();
+    if (req.user?.type === 'member' && req.user.readOnly) {
+      if (this.reflector.get(DEMO_IA_KEY, context.getHandler())) return true;
+      throw errorDemo();
+    }
 
     const slug = req.params?.slug;
     if (!slug) return true;
