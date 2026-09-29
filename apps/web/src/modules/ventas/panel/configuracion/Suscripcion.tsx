@@ -25,7 +25,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import {
-    ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan,
+    ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan, panelPreviewActivationDiscount,
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
 
@@ -130,6 +130,91 @@ function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey; onElegir:
     )
 }
 
+// Código ya validado por el backend. `amountFinal` es lo que se paga en el
+// PRIMER cobro; desde el segundo la suscripción vuelve al precio de lista.
+type DescuentoActivacion = { code: string; percentOff: number; amountBase: number; amountFinal: number }
+
+// Campo opcional de código de descuento para activar el plan. Mismo patrón que
+// el del alta (pages/onboarding/plan.tsx), pero contra el precio de lista del
+// plan: el descuento vale solo para el primer cobro y eso se dice explícito
+// para que nadie crea que queda rebajado para siempre.
+function CodigoDescuento({ descuento, onAplicado, onQuitar, disabled }: {
+    descuento: DescuentoActivacion | null
+    onAplicado: (d: DescuentoActivacion) => void
+    onQuitar: () => void
+    disabled?: boolean
+}) {
+    const [code, setCode] = useState('')
+    const [error, setError] = useState<string | null>(null)
+    const [validando, setValidando] = useState(false)
+
+    async function aplicar() {
+        const limpio = code.trim()
+        if (!limpio) return
+        setValidando(true)
+        setError(null)
+        try {
+            onAplicado(await panelPreviewActivationDiscount(limpio))
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : 'No pudimos validar el código.')
+        } finally {
+            setValidando(false)
+        }
+    }
+
+    if (descuento) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 12px' }}>
+                <Check size={15} strokeWidth={2.4} color="var(--color-success)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <p style={{ flex: 1, margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'var(--color-body)' }}>
+                    Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado:{' '}
+                    pagás <strong style={{ color: 'var(--color-text)' }}>{fmtPesos(descuento.amountFinal)}</strong> el primer cobro
+                    y desde el segundo vuelve a {fmtPesos(descuento.amountBase)}.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => { onQuitar(); setCode('') }}
+                    disabled={disabled}
+                    className="ds-link"
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-muted)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                >
+                    Quitar
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ margin: '0 0 12px' }}>
+            <label htmlFor="codigo-descuento-activacion" style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 6 }}>
+                ¿Tenés un código de descuento? <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>(vale para el primer cobro)</span>
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                    id="codigo-descuento-activacion"
+                    value={code}
+                    onChange={e => { setCode(e.target.value.toUpperCase()); setError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void aplicar() } }}
+                    placeholder="Tu código"
+                    disabled={disabled || validando}
+                    autoComplete="off"
+                    className="ds-field"
+                    style={{
+                        flex: 1, minWidth: 0, height: 40, padding: '0 12px', borderRadius: 10,
+                        border: `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`, background: 'var(--color-bg)',
+                        color: 'var(--color-text)', fontSize: 13.5, fontFamily: '"Geist Mono", monospace',
+                        letterSpacing: '0.05em', outline: 'none',
+                    }}
+                />
+                <Button variant="outline" size="sm" onClick={() => void aplicar()} disabled={disabled || validando || !code.trim()}>
+                    {validando ? 'Validando…' : 'Aplicar'}
+                </Button>
+            </div>
+            {error && <p role="alert" style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
+        </div>
+    )
+}
+
 export default function Suscripcion() {
     const [sub, setSub] = useState<ApiSubscription | null>(null)
     const [advanced, setAdvanced] = useState(false)
@@ -139,6 +224,8 @@ export default function Suscripcion() {
 
     const [activando, setActivando] = useState(false)
     const [errorActivar, setErrorActivar] = useState<string | null>(null)
+    // Código de descuento ya validado contra el backend (vale para el primer cobro).
+    const [descuento, setDescuento] = useState<DescuentoActivacion | null>(null)
 
     const [editandoPlan, setEditandoPlan] = useState(false)
     const [guardandoPlan, setGuardandoPlan] = useState(false)
@@ -161,7 +248,7 @@ export default function Suscripcion() {
     function activarPlan() {
         setActivando(true)
         setErrorActivar(null)
-        panelActivatePlan()
+        panelActivatePlan(descuento?.code)
             .then(({ initPoint }) => { window.location.href = initPoint })
             .catch(e => {
                 setErrorActivar(e instanceof ApiError ? e.message : 'No se pudo iniciar la activación')
@@ -266,6 +353,12 @@ export default function Suscripcion() {
                                         <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                                     )}
                                 </p>
+                                <CodigoDescuento
+                                    descuento={descuento}
+                                    onAplicado={setDescuento}
+                                    onQuitar={() => setDescuento(null)}
+                                    disabled={activando}
+                                />
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
                                 <Button variant="primary" size="sm" onClick={activarPlan} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
                                     {activando ? 'Abriendo Mercado Pago…' : `Activar mi plan${planMostrado ? ` ${PLANES[planMostrado].nombre}` : ''}`}

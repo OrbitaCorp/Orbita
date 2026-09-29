@@ -801,8 +801,23 @@ export function panelGetSubscriptionPayments(limit = 1) {
 // Arma el link de MP para activar el plan elegido — solo funciona una vez que
 // `currentPeriodEnd` ya pasó (backend lo vuelve a validar igual). Redirigir a
 // `initPoint` para que el dueño autorice.
-export function panelActivatePlan() {
-  return panelRequest<{ initPoint: string; plan: PlanKey }>('/subscription/activate-plan', { method: 'POST' })
+//
+// `discountCode` (opcional): un código de descuento de plataforma. Vale SOLO para
+// el primer cobro; desde el segundo la suscripción vuelve al precio de lista.
+export function panelActivatePlan(discountCode?: string) {
+  return panelRequest<{ initPoint: string; plan: PlanKey }>('/subscription/activate-plan', {
+    method: 'POST',
+    ...(discountCode ? { body: JSON.stringify({ discountCode }) } : {}),
+  })
+}
+
+// Previsualiza un código contra el precio de lista del plan que le toca activar
+// a este negocio, para mostrar cuánto va a pagar ANTES de mandarlo a Mercado
+// Pago. Mismo cálculo que hace el backend al activar.
+export function panelPreviewActivationDiscount(code: string) {
+  return panelRequest<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string }>(
+    `/subscription/activation-discount/${encodeURIComponent(code)}`,
+  )
 }
 
 // Cambia el plan elegido. Si todavía se está cursando el beneficio de

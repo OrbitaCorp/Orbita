@@ -83,6 +83,14 @@ export class InternalCronController {
         await this.subscriptions.processLifecycleNotices();
         await this.subscriptions.processCancellationWindow();
         await this.subscriptions.cleanupExpiredPendingSignups();
+        // Descuentos de activación a medias: devolver el precio de lista tras el
+        // primer cobro, o cerrar los que ya no tienen sentido. Con su propio
+        // try/catch: un fallo acá no puede voltear el resto del mantenimiento.
+        try {
+          await this.subscriptions.reconciliarDescuentosDeActivacion();
+        } catch (e) {
+          this.logger.error(`Descuentos de activación: no se pudo correr — ${describeError(e)}`);
+        }
         // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
         // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar
         // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira

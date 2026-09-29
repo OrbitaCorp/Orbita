@@ -29,6 +29,8 @@ function suscripciones(opts: { sub?: Record<string, unknown>; preapproval?: Reco
     platformAdminLog: { findFirst: jest.fn().mockResolvedValue(opts.suspendidaPorAdmin ? { action: 'suspend_business' } : null) },
     pendingSignup: { findUnique: jest.fn(), create: jest.fn().mockResolvedValue({}) },
     platformDiscountCode: { findUnique: jest.fn() },
+    // Descuento de activación: estos tests activan un plan SIN código.
+    subscriptionActivationDiscount: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   const config = { get: (k: string) => (k === 'MP_WEBHOOK_SECRET' ? opts.secret : undefined) };
   const onboarding = { checkEmail: jest.fn().mockResolvedValue({ available: true }), registerBusiness: jest.fn() };

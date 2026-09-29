@@ -2858,3 +2858,40 @@ model DemoAiUsage {
   @@index([week])
   @@map("demo_ai_usage")
 }
+
+// ─── Descuento en la activación del plan (después del beneficio de bienvenida) ─
+// Un código de descuento de plataforma aplicado al activar el plan desde
+// Configuración → Suscripción vale SOLO para el primer cobro: la preapproval de
+// MP se crea con el monto rebajado y, recién registrado ese primer cobro, se
+// le devuelve el precio de lista (ver SubscriptionsService, "restaurar
+// precio"). Esta tabla recuerda ese estado entre el link de pago, la
+// autorización y el primer cobro — que llegan por caminos y en órdenes
+// distintos (vuelta del navegador, webhook del pago, barrido nocturno).
+//
+// Sin FK a propósito, y NO entra en la purga de datos personales de la baja de
+// un negocio: no guarda ningún dato de personas (solo ids y montos), igual que
+// el historial de cobros (subscription_payments). El barrido nocturno cierra
+// las filas de una suscripción cancelada.
+//
+// status: PENDING (link creado, todavía sin autorizar) → ACTIVE (autorizada,
+// cursa el ciclo con descuento) → PAID (primer cobro registrado, falta
+// devolver el precio de lista) → RESTORED (precio de lista de vuelta). CLOSED
+// = se abandonó (plan cambiado, cancelada o nunca autorizada).
+model SubscriptionActivationDiscount {
+  id            String    @id @default(uuid())
+  businessId    String    @map("business_id")
+  preapprovalId String    @unique @map("preapproval_id")
+  codeId        String    @map("code_id")
+  plan          String
+  amountList    Decimal   @map("amount_list") @db.Decimal(12, 2)
+  amountFinal   Decimal   @map("amount_final") @db.Decimal(12, 2)
+  status        String    @default("PENDING")
+  activatedAt   DateTime? @map("activated_at")
+  restoredAt    DateTime? @map("restored_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([businessId])
+  @@index([status])
+  @@map("subscription_activation_discounts")
+}
