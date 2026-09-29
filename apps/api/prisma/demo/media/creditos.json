@@ -658,6 +658,12 @@
    "archivo": "home/fondo-con-efecto-parallax.webp",
    "pexels": "https://www.pexels.com/photo/36169774/",
    "autor": "Jakub Pabis"
+  },
+  "Slide 2 (auriculares sin fondo)": {
+   "archivo": "home/slide-2-auriculares.webp",
+   "pexels": "https://www.pexels.com/photo/3394650/",
+   "autor": "Sound On",
+   "estudio": "sin_fondo"
   }
  },
  "videos": {
@@ -690,6 +696,84 @@
    "poster": "videos/vertical-formato-reels.webp",
    "pexels": "https://www.pexels.com/video/8027978/",
    "autor": "MART  PRODUCTION"
+  },
+  "Ficha tocadiscos": {
+   "archivo": "videos/ficha-tocadiscos.mp4",
+   "poster": "videos/ficha-tocadiscos.webp",
+   "pexels": "https://www.pexels.com/video/7202468/",
+   "autor": "emirkhan bal"
+  },
+  "Ficha teclado": {
+   "archivo": "videos/ficha-teclado.mp4",
+   "poster": "videos/ficha-teclado.webp",
+   "pexels": "https://www.pexels.com/video/11916849/",
+   "autor": "Andreas"
+  },
+  "Ficha visor VR": {
+   "archivo": "videos/ficha-visor-vr.mp4",
+   "poster": "videos/ficha-visor-vr.webp",
+   "pexels": "https://www.pexels.com/video/8762946/",
+   "autor": "Michelangelo Buonarroti"
+  },
+  "Ficha joystick": {
+   "archivo": "videos/ficha-joystick.mp4",
+   "poster": "videos/ficha-joystick.webp",
+   "pexels": "https://www.pexels.com/video/4247321/",
+   "autor": "Nino Souza"
+  },
+  "Ficha robot aspiradora": {
+   "archivo": "videos/ficha-robot-aspiradora.mp4",
+   "poster": "videos/ficha-robot-aspiradora.webp",
+   "pexels": "https://www.pexels.com/video/8566384/",
+   "autor": "Kindel Media"
+  },
+  "Bloque robot alfombras": {
+   "archivo": "videos/bloque-robot-alfombras.mp4",
+   "poster": "videos/bloque-robot-alfombras.webp",
+   "pexels": "https://www.pexels.com/video/8566516/",
+   "autor": "Kindel Media"
+  },
+  "Bloque robot bordes": {
+   "archivo": "videos/bloque-robot-bordes.mp4",
+   "poster": "videos/bloque-robot-bordes.webp",
+   "pexels": "https://www.pexels.com/video/8566377/",
+   "autor": "Kindel Media"
+  },
+  "Bloque robot casa": {
+   "archivo": "videos/bloque-robot-casa.mp4",
+   "poster": "videos/bloque-robot-casa.webp",
+   "pexels": "https://www.pexels.com/video/8566382/",
+   "autor": "Kindel Media"
+  },
+  "Bloque auriculares ciudad": {
+   "archivo": "videos/bloque-auriculares-ciudad.mp4",
+   "poster": "videos/bloque-auriculares-ciudad.webp",
+   "pexels": "https://www.pexels.com/video/10781896/",
+   "autor": "Can Köksal"
+  },
+  "Bloque auriculares musica": {
+   "archivo": "videos/bloque-auriculares-musica.mp4",
+   "poster": "videos/bloque-auriculares-musica.webp",
+   "pexels": "https://www.pexels.com/video/6496235/",
+   "autor": "Gustavo Fring"
+  },
+  "Bloque auriculares plegables": {
+   "archivo": "videos/bloque-auriculares-plegables.mp4",
+   "poster": "videos/bloque-auriculares-plegables.webp",
+   "pexels": "https://www.pexels.com/video/4523128/",
+   "autor": "Polina Tankilevitch"
+  },
+  "Bloque drone cielo": {
+   "archivo": "videos/bloque-drone-cielo.mp4",
+   "poster": "videos/bloque-drone-cielo.webp",
+   "pexels": "https://www.pexels.com/video/39549847/",
+   "autor": "Sergei Starostin"
+  },
+  "Bloque drone estable": {
+   "archivo": "videos/bloque-drone-estable.mp4",
+   "poster": "videos/bloque-drone-estable.webp",
+   "pexels": "https://www.pexels.com/video/39549850/",
+   "autor": "Sergei Starostin"
   }
  }
 }

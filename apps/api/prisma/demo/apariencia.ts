@@ -26,7 +26,7 @@ export async function sembrarApariencia(prisma: PrismaClient, businessId: string
   console.log('Apariencia: logo, slider, parallax y videos…');
   const [logoUrl, faviconUrl, slide1, slide2, slide3, parallax] = await Promise.all([
     img('marca/logo-512.png'), img('marca/favicon-64.png'),
-    img('home/slide-1.webp'), img('home/slide-2.webp'), img('home/slide-3.webp'),
+    img('home/slide-1.webp'), img('home/slide-2-auriculares.webp'), img('home/slide-3.webp'),
     img('home/fondo-con-efecto-parallax.webp'),
   ]);
   const [videoDrone, posterDrone, videoGaming, posterGaming] = await Promise.all([

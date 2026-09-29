@@ -76,6 +76,11 @@ export const PRODUCTOS: ProductoDemo[] = [
       { valores: ['Negro'], precio: 189999, stock: 21, sku: 'NB-PULSE-BLK' },
     ],
     video: 'videos/ficha-de-los-auriculares.mp4',
+    bloques: [
+      { video: 'videos/bloque-auriculares-ciudad.mp4', eyebrow: 'Cancelación activa de ruido', titulo: 'La ciudad, en silencio', texto: 'Tráfico, colectivo u oficina: la cancelación activa baja el ruido de afuera y te deja solo con lo que querés escuchar.' },
+      { video: 'videos/bloque-auriculares-musica.mp4', eyebrow: 'Sonido Hi-Res', titulo: 'Escuchá cada detalle', texto: 'Drivers de 40 mm afinados para graves con cuerpo y voces claras, a cualquier volumen.' },
+      { video: 'videos/bloque-auriculares-plegables.mp4', eyebrow: 'Diseño plegable', titulo: 'De la mesa a la mochila', texto: 'Se pliegan en segundos y entran en su estuche rígido. 250 gramos que ni vas a notar.' },
+    ],
   },
   {
     clave: 'earbuds', nombre: 'Auriculares in-ear Nébula Buds', categoria: 'audio', popularidad: 9,
@@ -222,6 +227,7 @@ export const PRODUCTOS: ProductoDemo[] = [
       { valores: ['Rojo (lineal)'], precio: 139999, stock: 18, sku: 'NB-KEYS75-RED' },
       { valores: ['Marrón (táctil)'], precio: 139999, stock: 13, sku: 'NB-KEYS75-BRN' },
     ],
+    video: 'videos/ficha-teclado.mp4',
   },
   {
     clave: 'mouse', nombre: 'Mouse ergonómico inalámbrico', categoria: 'computacion', popularidad: 7,
@@ -260,7 +266,8 @@ export const PRODUCTOS: ProductoDemo[] = [
     fotos: [P('drone-plegable-con-camara-4k-1.webp'), P('drone-plegable-con-camara-4k-2.webp')], stock: 2, stockMinimo: 3,
     bloques: [
       { video: 'videos/home-video-principal.mp4', eyebrow: 'Estabilización de 3 ejes', titulo: 'Tomas limpias, aunque sople viento', texto: 'El gimbal compensa cada movimiento y la cámara graba en 4K sin temblores.' },
-      { video: 'videos/vertical-formato-reels.mp4', eyebrow: 'Listo para redes', titulo: 'Grabá en vertical', texto: 'Cambiá a formato vertical con un toque y subí tus videos directo a reels.' },
+      { video: 'videos/bloque-drone-cielo.mp4', eyebrow: '34 minutos de vuelo', titulo: 'Más tiempo en el aire', texto: 'Una batería alcanza para recorrer, encuadrar y volver con margen. Con las tres que vienen en la caja, tenés la tarde entera.' },
+      { video: 'videos/bloque-drone-estable.mp4', eyebrow: 'Vuelo en el lugar', titulo: 'Quieto como en un trípode', texto: 'Los sensores lo mantienen fijo en el aire para fotos nítidas y timelapses sin mover el encuadre.' },
     ],
   },
 
@@ -283,6 +290,7 @@ export const PRODUCTOS: ProductoDemo[] = [
       { valores: ['Lavanda'], precio: 74999, stock: 15, sku: 'NB-PAD-LAV' },
       { valores: ['Blanco'], precio: 74999, stock: 22, sku: 'NB-PAD-WHT' },
     ],
+    video: 'videos/ficha-joystick.mp4',
   },
   {
     clave: 'auris-gamer', nombre: 'Auriculares gamer Nébula Arena', categoria: 'gaming', popularidad: 5,
@@ -427,6 +435,7 @@ export const PRODUCTOS: ProductoDemo[] = [
       { valores: ['Blanco'], precio: 159999, stock: 9, sku: 'NB-VINYL-WHT' },
       { valores: ['Negro'], precio: 159999, stock: 6, sku: 'NB-VINYL-BLK' },
     ],
+    video: 'videos/ficha-tocadiscos.mp4',
   },
   {
     clave: 'auris-estudio', nombre: 'Auriculares de estudio Nébula Studio', categoria: 'audio', popularidad: 4,
@@ -544,6 +553,12 @@ export const PRODUCTOS: ProductoDemo[] = [
       { label: 'Garantía', value: '12 meses' },
     ],
     fotos: [P('robot-aspiradora-nebula-clean-1.webp'), P('robot-aspiradora-nebula-clean-2.webp')], stock: 9,
+    video: 'videos/ficha-robot-aspiradora.mp4',
+    bloques: [
+      { video: 'videos/bloque-robot-alfombras.mp4', eyebrow: 'Detecta alfombras', titulo: 'Sube la potencia donde hace falta', texto: 'Reconoce las alfombras y aspira más fuerte, sin mojarlas cuando está trapeando.' },
+      { video: 'videos/bloque-robot-bordes.mp4', eyebrow: 'Bordes y rincones', titulo: 'Llega hasta el zócalo', texto: 'El cepillo lateral barre contra las paredes y el perfil bajo lo deja pasar por debajo de los muebles.' },
+      { video: 'videos/bloque-robot-casa.mp4', eyebrow: 'Mapeo láser', titulo: 'Conoce toda tu casa', texto: 'Arma el mapa en la primera pasada: después elegís qué ambientes limpia y a qué hora, desde la app.' },
+    ],
   },
   {
     clave: 'tira-led', nombre: 'Tira LED RGB 5 m', categoria: 'hogar', popularidad: 7,
@@ -581,5 +596,6 @@ export const PRODUCTOS: ProductoDemo[] = [
       { label: 'Garantía', value: '12 meses' },
     ],
     fotos: [P('visor-de-realidad-virtual-1.webp'), P('visor-de-realidad-virtual-2.webp')], stock: 6,
+    video: 'videos/ficha-visor-vr.mp4',
   },
 ];
