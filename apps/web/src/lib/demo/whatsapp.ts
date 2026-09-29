@@ -1,13 +1,14 @@
 // Banner de WhatsApp de la tienda demo: en vez de "consultanos por un
 // producto" (la demo no tiene a quién consultar), invita a tener la tienda
-// propia y escribe al WhatsApp de Órbita. El número viene de
-// NEXT_PUBLIC_DEMO_WHATSAPP (formato wa.me: 549 + característica + número);
-// sin número, el banner no aparece. Solo cambia este banner: el resto de la
+// propia y escribe al WhatsApp de Órbita (formato wa.me: 549 + característica
+// + número). NEXT_PUBLIC_DEMO_WHATSAPP lo cambia sin tocar código; el default
+// es el número público de contacto de Órbita (igual queda a la vista en la
+// página, no es un secreto). Solo cambia este banner: el resto de la
 // tienda demo sigue sin WhatsApp, así las consultas de productos o de
 // pedidos simulados no le llegan a Órbita.
 import type { TextosWpp } from '@/components/storefront/WhatsappBanner'
 
-export const DEMO_WHATSAPP = (process.env.NEXT_PUBLIC_DEMO_WHATSAPP ?? '').replace(/\D/g, '')
+export const DEMO_WHATSAPP = (process.env.NEXT_PUBLIC_DEMO_WHATSAPP || '5493757673226').replace(/\D/g, '')
 
 export const MENSAJE_WHATSAPP_DEMO = 'Hola! Vi la demo de Órbita y quiero tener mi propia tienda.'
 
