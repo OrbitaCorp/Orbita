@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { DomainExpiryService } from '../domains/domain-expiry.service';
 import { EmailVerificationService } from '../member-profile/email-verification.service';
+import { CostsService } from '../platform/costs/costs.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -68,6 +69,9 @@ export class InternalCronController {
     // Fechas de la demo pública al día (ver demo/demo-fechas.service.ts).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly demoFechas?: DemoFechasService,
+    // Sincronización diaria de costos de proveedores (pantalla Costos del super admin).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly costs?: CostsService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -132,6 +136,14 @@ export class InternalCronController {
           await this.demoFechas?.ponerAlDia();
         } catch (e) {
           this.logger.error(`Fechas de la demo: no se pudieron poner al día — ${describeError(e)}`);
+        }
+        // Costos de proveedores (Cloudflare, Gemini, Groq, Resend…): deja el snapshot del
+        // mes al día sin depender de que alguien apriete "Sincronizar". Mismo criterio:
+        // si falla, se anota sin marcar la corrida como fallida.
+        try {
+          await this.costs?.syncAll();
+        } catch (e) {
+          this.logger.error(`Sincronización de costos: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

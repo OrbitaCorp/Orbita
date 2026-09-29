@@ -248,48 +248,48 @@ export class CloudflareCostAdapter implements CostAdapter {
     }
   }
 
+  // Workers AI cobra por neuronas: las primeras 10.000 de cada día (UTC) son gratis y el
+  // resto cuesta $0,011 cada 1.000. Se suma día por día, no sobre el total del mes.
   private async fetchWorkersAiUsage(accountId: string, token: string, month: string): Promise<number | null> {
-    // Workers AI doesn't have a billing endpoint — we use GraphQL analytics
     const [y, m] = month.split('-').map(Number);
-    const start = `${month}-01`;
-    const endDate = new Date(Date.UTC(y, m, 1));
-    const end = endDate.toISOString().slice(0, 10);
+    const from = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    const to = new Date(Date.UTC(y, m, 1)).toISOString();
 
-    try {
-      const query = `{
-        viewer {
-          accounts(filter: {accountTag: "${accountId}"}) {
-            aiGatewayGeneral(
-              filter: { datetimeHour_geq: "${start}T00:00:00Z", datetimeHour_lt: "${end}T00:00:00Z" }
-              limit: 1000
-            ) {
-              sum { totalTokens totalRequests }
-            }
+    const query = `{
+      viewer {
+        accounts(filter: {accountTag: "${accountId}"}) {
+          aiInferenceAdaptiveGroups(
+            limit: 1000
+            filter: { datetime_geq: "${from}", datetime_lt: "${to}" }
+          ) {
+            sum { totalNeurons }
+            dimensions { date }
           }
         }
-      }`;
+      }
+    }`;
 
+    try {
       const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
-
       if (!res.ok) return null;
-      const data = await res.json() as any;
-      const entries = data?.data?.viewer?.accounts?.[0]?.aiGatewayGeneral ?? [];
+      const data = (await res.json()) as any;
+      const groups = data?.data?.viewer?.accounts?.[0]?.aiInferenceAdaptiveGroups;
+      if (!Array.isArray(groups)) return null;
 
-      let totalTokens = 0;
-      for (const e of entries) {
-        totalTokens += e.sum?.totalTokens ?? 0;
+      const porDia = new Map<string, number>();
+      for (const g of groups) {
+        const dia = g.dimensions?.date as string;
+        porDia.set(dia, (porDia.get(dia) ?? 0) + (g.sum?.totalNeurons ?? 0));
       }
-
-      // Workers AI pricing varies by model; rough average ~$0.01/1K tokens
-      // for text models. This is an estimate.
-      return Math.round((totalTokens / 1000) * 0.01 * 10000) / 10000;
+      let costo = 0;
+      for (const neuronas of porDia.values()) {
+        costo += (Math.max(0, neuronas - 10_000) / 1000) * 0.011;
+      }
+      return Math.round(costo * 10000) / 10000;
     } catch (err) {
       this.logger.warn(`Error fetching Workers AI usage: ${err}`);
       return null;
