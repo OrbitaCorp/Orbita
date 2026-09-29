@@ -21,6 +21,7 @@ import {
   type MeProfile, type MeOrderRow, type MeSession,
 } from '@/lib/api'
 import { SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Tab = 'pedidos' | 'mensajes' | 'direcciones' | 'datos' | 'seguridad'
 
@@ -115,7 +116,11 @@ export default function Perfil() {
   // bloquea, ver FullModeOnly en conversations.controller.ts) — se saca la
   // pestaña entera en vez de dejarla y que tire error al abrirla.
   const esVidriera = config?.business?.mode === 'SHOWCASE'
-  const tabsVisibles = esVidriera ? TABS.filter(t => t.id !== 'mensajes') : TABS
+  // Tienda demo: el Invitado no tiene contraseña ni sesiones propias, y no
+  // "sale" de ningún lado (ver lib/auth/authClient.ts): sin Seguridad ni
+  // Cerrar sesión.
+  const enDemo = slug === DEMO_SLUG
+  const tabsVisibles = TABS.filter(t => !(esVidriera && t.id === 'mensajes') && !(enDemo && t.id === 'seguridad'))
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
   // de cuenta del header. `pedidos` es el default seguro mientras el query se
@@ -384,7 +389,7 @@ export default function Perfil() {
                 </button>
               </div>
             )}
-            <div style={{ borderTop: '1px solid var(--color-border)' }}>
+            {!enDemo && <div style={{ borderTop: '1px solid var(--color-border)' }}>
               <button
                 className="ds-hover"
                 onClick={handleCerrarSesion}
@@ -399,7 +404,7 @@ export default function Perfil() {
                 <LogOut size={15} strokeWidth={1.5} />
                 Cerrar sesión
               </button>
-            </div>
+            </div>}
           </div>
 
           {/* Contenido */}

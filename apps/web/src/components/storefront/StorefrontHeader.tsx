@@ -11,6 +11,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { PromoChip } from '@/modules/ventas/_shared/components'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { MarcaVista, type Marca } from './marca'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Props = {
   tienda:  TiendaConfig
@@ -198,6 +199,10 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     await logout()
     router.push(`${base}/`)
   }
+
+  // Tienda demo: el visitante ya entra como el cliente Invitado (ver
+  // lib/auth/authClient.ts) — no hay login ni "Cerrar sesión".
+  const enDemo = tienda.slug === DEMO_SLUG
 
   // Items del menú de cuenta (dropdown desktop + drawer mobile).
   const accountLinks = [
@@ -463,11 +468,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   <Store size={15} strokeWidth={1.5} /> Panel de administrador
                 </button>
               )}
-              <button onClick={handleLogout}
-                className="ds-hover"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
-                <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
-              </button>
+              {!enDemo && (
+                <button onClick={handleLogout}
+                  className="ds-hover"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
+                  <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -747,9 +754,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     <Store size={16} strokeWidth={1.5} /> Panel de administrador
                   </a>
                 )}
-                <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
-                  <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
-                </button>
+                {!enDemo && (
+                  <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
+                    <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
+                  </button>
+                )}
               </>
             ) : (
               <a href={`${base}/login`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>

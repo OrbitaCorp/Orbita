@@ -30,6 +30,7 @@ export interface PlatformAdminAuthResponse {
 // Sesión anónima de la demo pública (AuthService.demoSession): sin refresh
 // token, a propósito.
 export type DemoSessionResponse = Omit<MemberAuthResponse, 'refreshToken'> & { demo: true };
+export type DemoCustomerSessionResponse = Omit<CustomerAuthResponse, 'refreshToken'> & { demo: true };
 
 export type LoginResponse =
   | MemberAuthResponse

@@ -54,6 +54,22 @@ describe('DemoGuard', () => {
     await expect(guard.canActivate(contexto({ method: 'POST', user: miembro(true), path: '/api/v1/products/ai-scan' }, rutaConIa))).resolves.toBe(true);
   });
 
+  it('el cliente Invitado de la tienda demo (readOnly) no escribe nada, salvo validar el carrito', async () => {
+    const guard = nuevoGuard(prismaCon({}));
+    const invitado = { type: 'customer', customerId: 'c1', businessId: 'b1', businessMode: 'FULL', readOnly: true };
+    for (const path of ['/api/v1/me/profile', '/api/v1/me/addresses', '/api/v1/reviews', '/api/v1/storefront/demo/checkout']) {
+      await rechazo(guard.canActivate(contexto({ method: 'POST', user: invitado, path })));
+    }
+    await expect(guard.canActivate(contexto({ method: 'POST', user: invitado, path: '/api/v1/storefront/demo/cart/validate' }))).resolves.toBe(true);
+    await expect(guard.canActivate(contexto({ method: 'GET', user: invitado, path: '/api/v1/me/orders' }))).resolves.toBe(true);
+  });
+
+  it('un cliente de una tienda real escribe normal', async () => {
+    const guard = nuevoGuard(prismaCon({ otra: false }));
+    const cliente = { type: 'customer', customerId: 'c1', businessId: 'b1', businessMode: 'FULL', readOnly: false };
+    await expect(guard.canActivate(contexto({ method: 'PATCH', user: cliente, path: '/api/v1/me/profile' }))).resolves.toBe(true);
+  });
+
   it('el dueño real del negocio demo (sin readOnly) escribe normal', async () => {
     const guard = nuevoGuard(prismaCon({ demo: true }));
     await expect(guard.canActivate(contexto({ method: 'POST', user: miembro(false), path: '/api/v1/products' }))).resolves.toBe(true);

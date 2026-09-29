@@ -92,11 +92,13 @@ export function tryRefresh(): Promise<boolean> {
 async function hacerRefresh(): Promise<boolean> {
   // Panel de la demo pública: si no hay una sesión REAL de panel para este
   // negocio (el dueño que cura la demo), se entra con la sesión anónima de
-  // solo lectura en vez de refrescar. Se pregunta con el peek (no rota ni
+  // solo lectura en vez de refrescar. En la tienda demo, siempre el Invitado. Se pregunta con el peek (no rota ni
   // borra nada): refrescar a ciegas podía tocar la cookie de un dueño de
   // OTRA tienda que entra a mirar la demo. Ver lib/demo/modo.ts.
-  if (esTiendaDemo() && authChannel() === 'panel' && !(await haySesionRealDePanel())) {
-    return pedirSesionDemo()
+  if (esTiendaDemo()) {
+    // Tienda demo: todo visitante entra como el cliente Invitado, sin login.
+    if (authChannel() === 'customer') return pedirSesionDemo('customer')
+    if (!(await haySesionRealDePanel())) return pedirSesionDemo('panel')
   }
 
   const body = JSON.stringify({ channel: authChannel() })
@@ -146,10 +148,14 @@ async function haySesionRealDePanel(): Promise<boolean> {
   return !!data?.exists
 }
 
-async function pedirSesionDemo(): Promise<boolean> {
-  const res = await fetch('/api/auth/demo-session', { method: 'POST' }).catch(() => null)
+async function pedirSesionDemo(canal: 'panel' | 'customer'): Promise<boolean> {
+  const res = await fetch('/api/auth/demo-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel: canal }),
+  }).catch(() => null)
   const data = res?.ok ? ((await res.json().catch(() => null)) as { token?: string } | null) : null
   accessToken = data?.token ?? null
-  marcarVisitanteDemo(!!accessToken)
+  if (canal === 'panel') marcarVisitanteDemo(!!accessToken)
   return !!accessToken
 }

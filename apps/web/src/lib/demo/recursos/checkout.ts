@@ -9,7 +9,7 @@
 // Mercado Pago: el botón está (la API marca mercadopagoAvailable en la demo),
 // pero en vez de ir a MP se abre /checkout/pago-simulado, que aprueba el pago
 // localmente y vuelve a la confirmación como lo haría la vuelta de MP.
-import type { CheckoutInput, CheckoutOrder, MeOrderDetail } from '@/lib/api'
+import type { CheckoutInput, CheckoutOrder, MeAddress, MeOrderDetail, MeOrdersResponse } from '@/lib/api'
 import type { CartValidationResponse, StorefrontConfigResponse } from '@/lib/storefront/api'
 import { apiReal, json, leerJson, registrar } from '../interceptor'
 import { crear, esIdLocal, leerCapa, aplicarARegistro, nuevoId } from '../almacen'
@@ -73,7 +73,14 @@ registrar({
     const total = redondear(Math.max(0, lista - discountTotal + (envio ?? 0)))
     const ahora = new Date().toISOString()
     const previos = leerCapa(PEDIDOS_TIENDA).creados.length
-    const dir = input.shippingAddress
+    // El Invitado elige una de sus direcciones guardadas: se copia al pedido,
+    // como hace el backend.
+    const guardada = input.shippingAddressId
+      ? (await apiJson<MeAddress[]>('/me/addresses', { headers: p.headers }))?.find((a) => a.id === input.shippingAddressId) ?? null
+      : null
+    const dir = input.shippingAddress ?? (guardada
+      ? { street: guardada.street, floor: guardada.floor ?? undefined, depto: guardada.depto ?? undefined, referencia: guardada.referencia ?? undefined, provincia: guardada.provincia ?? '', city: guardada.city, zip: guardada.zip ?? '' }
+      : undefined)
     const esMp = input.paymentMethod === 'MERCADOPAGO'
 
     const pedido: PedidoTiendaDemo = {
@@ -102,8 +109,8 @@ registrar({
         carrier: input.carrier ?? null,
         carrierDeliveryMode: input.carrierDeliveryMode ?? null,
         tracking: null,
-        shippingAddressId: null,
-        shippingAddress: null,
+        shippingAddressId: guardada?.id ?? null,
+        shippingAddress: guardada,
         shippingMethod: input.shippingMethod,
         shippingStreet: dir?.street ?? null,
         shippingFloor: dir?.floor ?? null,
@@ -162,5 +169,44 @@ registrar({
     if (!esIdLocal(id)) return p.real()
     const pedido = aplicarARegistro<PedidoTiendaDemo>(PEDIDOS_TIENDA, id, null)
     return pedido ?? json({ message: 'Pedido no encontrado' }, 404)
+  },
+})
+
+// "Mis pedidos" del Invitado: los que compró en la demo (en este navegador)
+// arriba de los sembrados.
+registrar({
+  metodo: 'GET',
+  ruta: /^\/me\/orders$/,
+  lado: 'tienda',
+  responder: async (p) => {
+    const res = await p.real()
+    const real = await leerJson<MeOrdersResponse>(res.clone())
+    if (!real) return res
+    const locales = leerCapa<PedidoTiendaDemo>(PEDIDOS_TIENDA).creados
+    if (locales.length === 0) return real
+    const filas = locales.map((o) => ({
+      id: o.id, orderNumber: o.orderNumber, status: o.status,
+      subtotal: o.subtotal, discountTotal: o.discountTotal, total: o.total,
+      itemCount: o.items.reduce((a, i) => a + i.quantity, 0), createdAt: o.createdAt,
+      devolucionAprobada: false, notaCreditoMonto: 0,
+    }))
+    return {
+      data: [...filas, ...real.data],
+      resumen: {
+        cantidadPedidos: real.resumen.cantidadPedidos + filas.length,
+        totalGastado: redondear(real.resumen.totalGastado + filas.reduce((a, f) => a + f.total, 0)),
+      },
+    }
+  },
+})
+
+registrar({
+  metodo: 'GET',
+  ruta: /^\/me\/orders\/([^/]+)$/,
+  lado: 'tienda',
+  responder: async (p, m) => {
+    const id = decodeURIComponent(m[1])
+    if (!esIdLocal(id)) return p.real()
+    return aplicarARegistro<PedidoTiendaDemo>(PEDIDOS_TIENDA, id, null) ?? json({ message: 'Pedido no encontrado' }, 404)
   },
 })

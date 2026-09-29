@@ -27,6 +27,9 @@ const MEDIA = join(__dirname, 'media');
 const DIAS_DE_HISTORIA = 90;
 const HORA = 3600 * 1000;
 const DIA = 24 * HORA;
+// Cliente con el que entra el visitante de la tienda demo (sin login). Mismo
+// valor en la API: src/demo/demo.constants.ts. Dominio .invalid: no recibe mails.
+export const EMAIL_INVITADO = 'invitado@demo.invalid';
 
 // ── Utilidades determinísticas ─────────────────────────────────────────────
 
@@ -464,6 +467,50 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
   }
   const usosGamer = await prisma.discountRedemption.count({ where: { discountId: semanaGamer } });
   await prisma.discount.update({ where: { id: semanaGamer }, data: { usesConsumed: usosGamer } });
+
+  // ── Cliente "Invitado" ────────────────────────────────────────────────────
+  // Con quien entra cualquier visitante a la tienda demo, sin login (ver
+  // AuthService.demoSession). Se queda con pedidos ya sembrados de estados
+  // distintos: "Mis pedidos" arranca con historia en vez de vacío.
+  const [ciudadInv, provinciaInv, cpInv] = CIUDADES[0];
+  const invitado = {
+    id: idDemo('cliente:invitado'), nombre: 'Invitado', apellido: 'Demo', email: EMAIL_INVITADO, telefono: '1100000000',
+    ciudad: CIUDADES[0], direccionId: idDemo('direccion:invitado'), calle: 'Av. Corrientes 1234', alta: hace(150 * DIA),
+  };
+  await prisma.customer.create({
+    data: {
+      id: invitado.id, businessId, firstName: invitado.nombre, lastName: invitado.apellido, email: invitado.email, phone: invitado.telefono,
+      emailVerified: true, createdAt: invitado.alta, updatedAt: invitado.alta,
+      addresses: { create: { id: invitado.direccionId, alias: 'Casa', street: invitado.calle, city: ciudadInv, provincia: provinciaInv, zip: cpInv, isDefault: true, createdAt: invitado.alta } },
+    },
+  });
+  const idxInvitado = clientes.push(invitado) - 1;
+  const tomados = new Set<string>();
+  for (const estado of ['PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'COMPLETED', 'CANCELLED'] as const) {
+    const o = await prisma.order.findFirst({
+      where: { businessId, channel: 'ONLINE', status: estado, id: { notIn: [...tomados] } },
+      orderBy: { createdAt: 'desc' },
+      include: { onlineOrderDetails: { select: { shippingMethod: true } } },
+    });
+    if (!o) continue;
+    tomados.add(o.id);
+    const conEnvio = o.onlineOrderDetails?.shippingMethod === 'DELIVERY';
+    await prisma.order.update({
+      where: { id: o.id },
+      data: {
+        customerId: invitado.id,
+        onlineOrderDetails: {
+          update: {
+            buyerName: `${invitado.nombre} ${invitado.apellido}`, buyerEmail: invitado.email, buyerPhone: invitado.telefono,
+            ...(conEnvio ? { shippingAddressId: invitado.direccionId, shippingStreet: invitado.calle, shippingCity: ciudadInv, shippingProvincia: provinciaInv, shippingZip: cpInv } : {}),
+          },
+        },
+      },
+    });
+    await prisma.discountRedemption.updateMany({ where: { orderId: o.id }, data: { customerId: invitado.id } });
+    const p = pedidos.find((x) => x.id === o.id);
+    if (p) p.clienteIdx = idxInvitado;
+  }
 
   // ── Reseñas ──────────────────────────────────────────────────────────────
   console.log('Reseñas, mensajes, devoluciones…');

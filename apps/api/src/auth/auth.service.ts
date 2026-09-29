@@ -17,9 +17,10 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
+import { DemoCustomerSessionResponse, DemoSessionResponse, LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
 import { errorDemo } from '../common/guards/demo.guard';
 import { DemoFechasService } from '../demo/demo-fechas.service';
+import { EMAIL_INVITADO_DEMO } from '../demo/demo.constants';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -1036,7 +1037,8 @@ export class AuthService implements OnModuleInit {
   // refresh del panel (vive en todo .orbita.site): si un dueño real prueba la
   // demo, su propia sesión queda intacta. Cuando el token vence, el frontend
   // vuelve a pedir uno acá. Todo lo que no sea lectura lo corta DemoGuard.
-  async demoSession(): Promise<DemoSessionResponse> {
+  async demoSession(canal: 'panel' | 'customer' = 'panel'): Promise<DemoSessionResponse | DemoCustomerSessionResponse> {
+    if (canal === 'customer') return this.demoSessionCliente();
     const member = await this.prisma.member.findFirst({
       where: { readOnly: true, business: { isDemo: true, deletedAt: null } },
       include: {
@@ -1059,6 +1061,25 @@ export class AuthService implements OnModuleInit {
       role: member.role.name,
       permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
       business: member.business,
+    };
+  }
+
+  // Tienda demo: el visitante entra ya "logueado" como el cliente Invitado
+  // (sembrado, con pedidos), sin contraseña ni refresh token. Solo lectura:
+  // AuthGuard marca readOnly a todo cliente de un negocio demo y DemoGuard le
+  // corta las escrituras; lo que "compra" vive en su navegador.
+  private async demoSessionCliente(): Promise<DemoCustomerSessionResponse> {
+    const customer = await this.prisma.customer.findFirst({
+      where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null } },
+      include: { business: { select: { id: true, name: true, subdomain: true, mode: true } } },
+    });
+    if (!customer) throw new NotFoundException('La demo no está disponible');
+    return {
+      type: 'customer',
+      demo: true,
+      token: this.signToken({ sub: customer.id, type: 'customer', businessId: customer.businessId }),
+      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl ?? null },
+      business: customer.business,
     };
   }
 

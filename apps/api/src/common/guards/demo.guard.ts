@@ -16,7 +16,10 @@ import { DEMO_IA_KEY } from '../../demo/demo-ia';
 //      AuthService.demoSession) no puede usar ningún método que escriba,
 //      salvo las pruebas de IA marcadas con @DemoIa (con cuota semanal por
 //      IP — ver src/demo/demo-ia.ts).
-//   2. Las rutas públicas de la tienda (`/storefront/:slug/...`) no aceptan
+//   2. El cliente Invitado de la tienda demo (sesión sin login, ver
+//      AuthService.demoSession) tampoco escribe nada: pedidos, perfil,
+//      direcciones y reseñas los simula el frontend.
+//   3. Las rutas públicas de la tienda (`/storefront/:slug/...`) no aceptan
 //      escrituras sobre un negocio demo: checkout, visitas, juegos,
 //      devoluciones. Excepción: validar el carrito, que es una lectura que
 //      viaja por POST.
@@ -66,9 +69,15 @@ export class DemoGuard implements CanActivate {
       throw errorDemo();
     }
 
+    const ruta = req.path ?? req.url ?? '';
+    // El cliente Invitado de la tienda demo: solo validar el carrito.
+    if (req.user?.type === 'customer' && req.user.readOnly) {
+      if (PERMITIDAS_EN_TIENDA_DEMO.some((re) => re.test(ruta))) return true;
+      throw errorDemo();
+    }
+
     const slug = req.params?.slug;
     if (!slug) return true;
-    const ruta = req.path ?? req.url ?? '';
     if (!ruta.includes('/storefront/')) return true;
     if (PERMITIDAS_EN_TIENDA_DEMO.some((re) => re.test(ruta))) return true;
 

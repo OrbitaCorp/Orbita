@@ -12,6 +12,7 @@ import {
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -554,6 +555,8 @@ export default function Header({ onMenuClick }: Props) {
                                         <Store size={16} strokeWidth={1.5} /> Ir a la tienda
                                     </button>
                                 </div>
+                                {/* El visitante de la demo no tiene una cuenta de la que salir. */}
+                                {!esVisitanteDemo() && (
                                 <div className="p-1" style={{ borderTop: '1px solid var(--color-border)' }}>
                                     {/* El velo de .ds-hover usa currentColor: acá el texto es
                                         --color-error, así que el hover tinta rojo suave solo,
@@ -564,6 +567,7 @@ export default function Header({ onMenuClick }: Props) {
                                         <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
                                     </button>
                                 </div>
+                                )}
                             </div>
                         )}
                     </div>
