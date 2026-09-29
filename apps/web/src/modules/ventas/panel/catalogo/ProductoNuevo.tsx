@@ -1888,15 +1888,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-vgrid { grid-template-columns: minmax(0,1fr) 92px 64px 28px !important; gap: 6px !important; }
                     .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
                     .pn-vgrid-sku > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
-                    .pn-barra { padding: 10px 12px !important; }
+                    /* Celular: la vista previa iba al final de todo, después del botón de guardar —
+                       una pantalla entera de scroll que no aporta mientras se carga. Se oculta. */
+                    .pn-preview { display: none !important; }
+                    .pn-titulo { font-size: 22px !important; margin-bottom: 14px !important; }
+                    /* iOS hace zoom al enfocar un campo de menos de 16px y deja la pantalla movida. */
+                    .pn-page input:not([type='checkbox']):not([type='radio']):not([type='file']), .pn-page textarea, .pn-page select { font-size: 16px !important; }
+                    /* Barra de guardado: los botones se reparten el ancho (más fáciles de tocar) y
+                       respeta la barra inferior del iPhone. */
+                    .pn-barra { padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important; border-radius: 12px 12px 0 0 !important; }
                     .pn-barra > span { flex-basis: 100%; }
-                    .pn-barra > div { width: 100%; justify-content: flex-end; }
+                    .pn-barra > label { flex-basis: 100%; }
+                    .pn-barra > div { width: 100%; justify-content: stretch; margin-left: 0 !important; }
+                    .pn-barra > div > button { flex: 1; }
+                    .pn-opcion { padding: 12px !important; }
                 }
             `}</style>
 
             <Volver a="Productos" onClick={onVolver} />
 
-            <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
+            <h1 className="pn-titulo" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
 
@@ -2213,7 +2224,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 const enHistorial = historialVariantes.find(h => sig(h.name) === sig(tp.nombre))
                                                 const valoresHistorial = (enHistorial?.values ?? []).filter(v => !tp.opciones.some(o => sig(o) === sig(v)) && !restantes.some(r => sig(r) === sig(v))).slice(0, 24)
                                                 return (
-                                                    <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                                                    <div key={tp.id} className="pn-opcion" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                                                             <input
                                                                 className="ds-field"
@@ -3626,7 +3637,7 @@ function Seccion({ titulo, derecha, primera, id, children }: {
     return (
         <section id={id} style={{ padding: primera ? '0 0 22px' : '22px 0', borderTop: primera ? 'none' : '1px solid var(--color-border)' }}>
             {(titulo || derecha) && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12, minHeight: 32 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12, minHeight: 32 }}>
                     <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: 0, display: 'flex', alignItems: 'center', gap: 4 }}>{titulo}</h2>
                     {derecha}
                 </div>
