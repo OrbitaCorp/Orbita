@@ -18,6 +18,7 @@ import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
 import { ComoFunciona } from '@/modules/landing/components/v2/ComoFunciona';
+import { Demo } from '@/modules/landing/components/v2/Demo';
 
 const PlanetaInteractivo = dynamic(() => import('@/modules/landing/components/v2/PlanetaInteractivo').then(m => m.PlanetaInteractivo), { ssr: false });
 const Comparativa = dynamic(() => import('@/modules/landing/components/v2/Comparativa').then(m => m.Comparativa));
@@ -57,6 +58,7 @@ export default function HomePage() {
             <HeroCinematic />
             <Modulos />
             <ComoFunciona />
+            <Demo />
             <PlanetaInteractivo />
             <Comparativa />
             <Rubros />

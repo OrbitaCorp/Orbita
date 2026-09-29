@@ -29,6 +29,7 @@ const COLUMNAS = [
         links: [
             { label: 'Qué incluye',   href: '#modulos'       },
             { label: 'Cómo funciona', href: '#como-funciona' },
+            { label: 'Probá la demo', href: '#demo'          },
             { label: 'Qué vendés',    href: '#rubros'        },
             { label: 'Paquete avanzado', href: '#avanzado'   },
             { label: 'Sobre nosotros', href: '/nosotros'    },
