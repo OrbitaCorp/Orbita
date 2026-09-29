@@ -2849,7 +2849,7 @@ model StoreVisit {
 model DemoAiUsage {
   id        String   @id @default(uuid())
   ipHash    String   @map("ip_hash")
-  feature   String // orbi-producto | fondo-ia | quitar-fondo | orbi-chat
+  feature   String // orbi-producto | fondo-ia | quitar-fondo | orbi-chat | fotos-web | foto-web
   week      String // semana ISO en hora argentina: "2026-W40"
   count     Int      @default(0)
   updatedAt DateTime @updatedAt @map("updated_at")

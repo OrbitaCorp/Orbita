@@ -322,7 +322,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const subidas = useProductUploads()
     const [orbiGen, setOrbiGen] = useState(false)
     const [orbiScanGen, setOrbiScanGen] = useState(false)
-    const [orbiScanSuccess, setOrbiScanSuccess] = useState(false)
+    // Key de la foto que Orbi ya escaneó. Antes era un booleano suelto: si el
+    // vendedor borraba esa foto y subía otra, seguía en true y "Completar con
+    // esta foto" no volvía a aparecer para la nueva.
+    const [orbiScanKey, setOrbiScanKey] = useState<string | null>(null)
     const fileInputScanRef = useRef<HTMLInputElement>(null)
     const nombreInputRef = useRef<HTMLTextAreaElement>(null)
     // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
@@ -750,14 +753,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // "Completar con Orbi" en la sección de fotos): la foto ya está en la
     // galería, así que no se vuelve a agregar, y solo se llenan los campos que
     // todavía están vacíos — lo que el vendedor ya escribió no se pisa.
-    const orbiEscanearFoto = async (file: File) => {
+    const orbiEscanearFoto = async (file: File, key: string) => {
         if (!file) return
         if (!esArchivoDeImagen(file)) {
             onToast('El archivo seleccionado no es una imagen soportada')
             return
         }
         setOrbiScanGen(true)
-        setOrbiScanSuccess(false)
+        setOrbiScanKey(null)
         try {
             const paraScan = await optimizarImagenParaScan(file)
             const result = await panelAiScanProduct(paraScan, file.name)
@@ -810,7 +813,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     })
             }
 
-            setOrbiScanSuccess(true)
+            setOrbiScanKey(key)
         } catch (err) {
             onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
         } finally {
@@ -1464,7 +1467,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setSugeridasWeb([])
         setSugeridasAgregadas(new Set())
         setBuscandoSugeridas(false)
-        setOrbiScanSuccess(false)
+        setOrbiScanKey(null)
         setIntento(null)
         setMasAbierto(false)
         setMostrarSpecs(false)
@@ -1766,6 +1769,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Foto que se le pasa a Orbi: la principal si hay, si no la primera general.
     // Solo una foto NUEVA (File): al editar, las ya guardadas no se pueden escanear.
     const fotoParaOrbi = imagenes.find(i => i.principal && !i.valorOpcion) ?? imagenes.find(i => !i.valorOpcion)
+    const orbiScanSuccess = !!fotoParaOrbi && orbiScanKey === fotoParaOrbi.key
+    // Si se borra la foto escaneada, las fotos web que se encontraron para ella
+    // ya no corresponden (la nueva puede ser de otro producto).
+    const fotoEscaneadaSigue = !orbiScanKey || imagenes.some(i => i.key === orbiScanKey)
+    useEffect(() => {
+        if (fotoEscaneadaSigue) return
+        setOrbiScanKey(null)
+        setSugeridasWeb([])
+        setBuscandoSugeridas(false)
+    }, [fotoEscaneadaSigue])
 
     // ── Datos para la vista previa: fotos generales (mismo orden que la
     // galería — guardadas primero, pendientes después) + una foto
@@ -2011,7 +2024,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     {fotoParaOrbi && !orbiScanSuccess && (
                                         <button
                                             type="button"
-                                            onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file)}
+                                            onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
                                             disabled={orbiScanGen}
                                             className="ds-link"
                                             style={{ ...enlace, marginTop: 12, fontSize: 13, opacity: orbiScanGen ? 0.7 : 1, cursor: orbiScanGen ? 'default' : 'pointer' }}

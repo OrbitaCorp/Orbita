@@ -20,6 +20,9 @@ describe('rutas abiertas a la demo', () => {
     expect(marca(ProductsController.prototype, 'aiAssist')).toBe('orbi-producto');
     expect(marca(ProductsController.prototype, 'aiVariants')).toBe('orbi-producto');
     expect(marca(OrbiController.prototype, 'chat')).toBe('orbi-chat');
+    // Las fotos web que siguen al escaneo: buscarlas y bajar la elegida.
+    expect(marca(ProductsController.prototype, 'suggestedImages')).toBe('fotos-web');
+    expect(marca(ProductsController.prototype, 'proxyImage')).toBe('foto-web');
     // "Modelo con ropa puesta" queda cerrado: no aplica a tecnología y es la más cara.
     expect(marca(ImageStudioController.prototype, 'generateModel')).toBeUndefined();
     // Y nada que guarde: subir fotos al producto, confirmar acciones de Orbi.

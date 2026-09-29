@@ -133,6 +133,8 @@ export class ProductsController {
   @Post('suggested-images')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 25, ttl: 60000 } })
+  @DemoIa('fotos-web') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(DemoIaInterceptor)
   suggestedImages(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: SuggestedImagesDto,
@@ -151,6 +153,8 @@ export class ProductsController {
   @Post('proxy-image')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 40, ttl: 60000 } })
+  @DemoIa('foto-web') // prueba de la demo pública, ver demo/demo-ia.ts
+  @UseInterceptors(DemoIaInterceptor)
   proxyImage(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: ProxyImageDto,

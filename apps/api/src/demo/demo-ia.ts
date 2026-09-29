@@ -13,13 +13,20 @@ import { SetMetadata } from '@nestjs/common';
 // (DemoIaInterceptor la consume). Una ruta de IA nueva sin el decorador
 // queda cerrada para la demo por defecto.
 
-export type FuncionDemoIa = 'orbi-producto' | 'fondo-ia' | 'quitar-fondo' | 'orbi-chat';
+export type FuncionDemoIa = 'orbi-producto' | 'fondo-ia' | 'quitar-fondo' | 'orbi-chat' | 'fotos-web' | 'foto-web';
 
+// 'fotos-web' y 'foto-web' no son IA, pero cuestan igual: la búsqueda paga
+// Serper/Tavily y la descarga baja una URL cualquiera desde el servidor. En la
+// app solo se llaman después de un escaneo con Orbi (que ya tiene tope de 3),
+// así que sus topes son holgados: están para cortar a quien le pegue directo
+// a la API con el token de la demo.
 export const FUNCIONES_DEMO_IA: Record<FuncionDemoIa, { nombre: string; limiteSemanal: number; unidad: string }> = {
   'orbi-producto': { nombre: 'Generar con Orbi', limiteSemanal: 3, unidad: 'pruebas' },
   'fondo-ia': { nombre: 'Fondo con IA', limiteSemanal: 2, unidad: 'pruebas' },
   'quitar-fondo': { nombre: 'Quitar fondo', limiteSemanal: 3, unidad: 'pruebas' },
   'orbi-chat': { nombre: 'el chat con Orbi', limiteSemanal: 10, unidad: 'mensajes' },
+  'fotos-web': { nombre: 'la búsqueda de fotos en la web', limiteSemanal: 10, unidad: 'búsquedas' },
+  'foto-web': { nombre: 'agregar fotos de la web', limiteSemanal: 20, unidad: 'fotos' },
 };
 
 export const DEMO_LIMITE_IA = 'DEMO_LIMITE_IA';
