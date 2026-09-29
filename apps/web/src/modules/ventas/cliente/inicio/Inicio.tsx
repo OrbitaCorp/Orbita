@@ -654,9 +654,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                        inline desde arrowStyle() (Inicio.tsx), más
                        específico que esta clase. */
                     .sf-hero-arrow-left, .sf-hero-arrow-right { top:auto !important; bottom:14px !important; transform:none !important; }
-                    .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
+                    /* Grilla de 2×2 en vez de renglones sueltos alineados a
+                       la izquierda (pedido 29/09): valor arriba, leyenda
+                       abajo, centrados y con filetes — mismo criterio que
+                       las plantillas avanzadas en celular. Si hay una
+                       cantidad impar, el último ocupa el ancho entero. */
+                    .sf-stats-wrap { padding:0 !important }
+                    .sf-stats-row  { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); width:100% }
+                    .sf-stats-cell { display:block !important }
+                    .sf-stats-cell:nth-child(even) { border-left:1px solid var(--color-border) }
+                    .sf-stats-cell:nth-child(n+3)  { border-top:1px solid var(--color-border) }
+                    .sf-stats-cell:last-child:nth-child(odd) { grid-column:1 / -1 }
                     .sf-stats-div  { display:none !important }
-                    .sf-stats-item { padding:4px 16px !important }
+                    .sf-stats-item { flex-direction:column; align-items:center !important; text-align:center; gap:2px !important; padding:12px 8px !important }
                     .sf-parallax   { min-height:320px; margin-bottom:32px; }
                     .sf-parallax-title { font-size:26px; }
                     .sf-parallax-sub   { font-size:14px; }
@@ -770,11 +780,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                    <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                    <div className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
                         <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
                             <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
                                 {stats.map((s, i, arr) => (
-                                    <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <span key={s.id} className="sf-stats-cell" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                         <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
                                             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
                                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>

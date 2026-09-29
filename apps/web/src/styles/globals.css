@@ -398,10 +398,16 @@ html.light body { background: #eef4ff; color: #0f172a; }
    "sueltos" flotando sobre la foto — y el de agregar al carrito se reubica
    como ícono chico al lado de "Comprar ahora", abajo (ver ProductCard.tsx,
    .orb-pcard-cart-inline). Nada de esto toca desktop, donde los flotantes
-   siguen exactamente igual. */
-@media (max-width: 640px) {
+   siguen exactamente igual.
+   En su lugar arriba queda una flecha de 40px (.orb-pcard-flecha) que indica
+   que la tarjeta lleva a la ficha — pedido 29/09, también para las tarjetas
+   de las plantillas avanzadas. El segundo query agarra celulares que
+   informan un ancho mayor (modo "versión de escritorio", apaisado): táctiles
+   sin hover, donde los flotantes quedaban fijos sobre la foto. */
+@media (max-width: 640px), (hover: none) and (pointer: coarse) and (max-width: 1023px) {
   .orb-pcard-floating { display: none !important; }
   .orb-pcard-cart-inline { display: inline-flex !important; }
+  .orb-pcard-flecha { display: grid !important; }
 }
 
 .ds-hover { position: relative; isolation: isolate; }

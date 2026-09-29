@@ -701,8 +701,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), padding: movil ? '12px 10px' : '14px 40px' }}>
             {confianza.map(([a, b], i) => (
-              <div key={a} style={{ textAlign: 'center', fontSize: movil ? 11.5 : 13, borderLeft: i && !movil ? `1px solid ${t.border}` : 'none' }}>
-                <strong style={{ fontWeight: 700 }}>{a}</strong> <span style={{ color: t.muted }}>{b}</span>
+              <div key={a} style={{ textAlign: 'center', fontSize: movil ? 11.5 : 13, borderLeft: i && !movil ? `1px solid ${t.border}` : 'none', padding: movil ? '6px 4px' : undefined }}>
+                {/* En celular, valor arriba y leyenda abajo: en línea, cada
+                    celda cortaba en un lugar distinto y la grilla quedaba
+                    despareja. */}
+                <strong style={{ fontWeight: 700, display: movil ? 'block' : undefined }}>{a}</strong>{movil ? null : ' '}<span style={{ color: t.muted }}>{b}</span>
               </div>
             ))}
           </div>

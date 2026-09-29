@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, Check, ShoppingCart, Timer } from 'lucide-react'
+import { ArrowUpRight, Eye, Check, ShoppingCart, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
@@ -182,6 +182,27 @@ export function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchS
         </button>
       ))}
     </div>
+  )
+}
+
+// Flecha "ir a la ficha" — SOLO celular/táctil (.orb-pcard-flecha, ver
+// globals.css), en el lugar de los íconos flotantes de carrito/ojo, que ahí
+// no tienen hover que los muestre. Mismo tamaño que esos (40px) para que la
+// tarjeta se lea igual que en escritorio (pedido 29/09). Es decorativa:
+// pointer-events none, el toque cae en el enlace que cubre la tarjeta.
+function FlechaFicha({ fondo = '#fff', color = '#0F172A' }: { fondo?: string; color?: string }) {
+  return (
+    <span
+      aria-hidden
+      className="orb-pcard-flecha"
+      style={{
+        display: 'none', position: 'absolute', top: '4%', right: '4%', zIndex: 3,
+        width: 40, height: 40, borderRadius: '50%', background: fondo, color,
+        placeItems: 'center', pointerEvents: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.16)',
+      }}
+    >
+      <ArrowUpRight size={18} strokeWidth={2} />
+    </span>
   )
 }
 
@@ -529,6 +550,8 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             </span>
           )}
 
+          <FlechaFicha fondo={tema.bg} color={tema.text} />
+
           {/* Lo que la maqueta NO tiene y Órbita sí: agregar al carrito sin
               entrar al producto. Mismos íconos flotantes que la tarjeta por
               defecto (misma clase, mismo deslizado al hover). */}
@@ -818,6 +841,8 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             celular (mucho más alta). De paso, un poco más grandes (34→40px)
             — el pedido del dueño, "capaz que sea la solución": ayuda solas,
             se sienten menos como puntitos perdidos en la esquina. */}
+        <FlechaFicha />
+
         {mode !== 'SHOWCASE' && (
           <div className="orb-pcard-floating" style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <button
