@@ -70,6 +70,12 @@ function fechaResenia(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// YouTube y Vimeo arrancan solos con autoplay=1 en el link del embed (el
+// iframe ya declara allow="autoplay"). parseVideoEmbed arma links sin query.
+function conAutoplay(src: string): string {
+  return `${src}${src.includes('?') ? '&' : '?'}autoplay=1`
+}
+
 function hueFromId(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
@@ -578,6 +584,10 @@ export default function ProductoDetalle() {
                       key={img.url + i}
                       className="ds-hover"
                       onClick={() => setImgIdx(i)}
+                      // Como Mercado Libre: con el mouse encima ya se ve
+                      // grande, sin clic, y queda esa foto al salir. La del
+                      // video no: sin clic el navegador no deja que suene.
+                      onMouseEnter={() => setImgIdx(i)}
                       style={{
                         width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
                         border: `2px solid ${i === idxMostrado ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -632,13 +642,31 @@ export default function ProductoDetalle() {
                   // acá abajo, para que el salto entre foto y video no mueva
                   // el layout de alrededor.
                   <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                    {/* Arranca solo apenas carga: se llega acá con un clic
+                        (miniatura o flechas). Si el navegador no deja que
+                        arranque con sonido, arranca en silencio y el cliente
+                        lo activa desde los controles. */}
                     {videoEmbed.tipo === 'file' ? (
-                      <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                      <video
+                        controls
+                        autoPlay
+                        playsInline
+                        onCanPlay={e => {
+                          // Solo la primera vez: canplay vuelve a dispararse
+                          // al adelantar, y ahí no hay que pisar una pausa.
+                          const v = e.currentTarget
+                          if (v.dataset.arranco) return
+                          v.dataset.arranco = '1'
+                          if (!v.paused) return
+                          v.play().catch(() => { v.muted = true; void v.play().catch(() => {}) })
+                        }}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                      >
                         <source src={videoEmbed.src} />
                       </video>
                     ) : (
                       <iframe
-                        src={videoEmbed.src}
+                        src={conAutoplay(videoEmbed.src)}
                         title={producto.name}
                         loading="lazy"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

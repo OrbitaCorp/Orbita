@@ -10,8 +10,9 @@
 // pero en vez de ir a MP se abre /checkout/pago-simulado, que aprueba el pago
 // localmente y vuelve a la confirmación como lo haría la vuelta de MP.
 import type { CheckoutInput, CheckoutOrder, MeAddress, MeOrderDetail, MeOrdersResponse } from '@/lib/api'
-import type { CartValidationResponse, StorefrontConfigResponse } from '@/lib/storefront/api'
+import type { StorefrontConfigResponse } from '@/lib/storefront/api'
 import { apiReal, json, leerJson, registrar } from '../interceptor'
+import { validarCarritoDemo } from './juegos'
 import { crear, esIdLocal, leerCapa, aplicarARegistro, nuevoId } from '../almacen'
 import { DEMO_SLUG } from '../modo'
 
@@ -39,11 +40,8 @@ registrar({
     const slug = m[1]
     const input = p.body as CheckoutInput
     const [validacion, config] = await Promise.all([
-      apiJson<CartValidationResponse>(`/storefront/${slug}/cart/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: input.items, couponCode: input.couponCode }),
-      }),
+      // Acepta también los cupones de premio de los juegos (ver juegos.ts).
+      validarCarritoDemo(slug, { items: input.items, couponCode: input.couponCode }),
       apiJson<StorefrontConfigResponse>(`/storefront/${slug}`),
     ])
     if (!validacion || !config) return json({ message: 'No se pudo confirmar el pedido. Probá de nuevo.' }, 503)

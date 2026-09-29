@@ -26,6 +26,7 @@ import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { sembrarContenido } from './demo/sembrar';
 import { sembrarApariencia } from './demo/apariencia';
+import { sembrarAvanzado } from './demo/avanzado';
 
 const prisma = new PrismaClient();
 
@@ -192,7 +193,10 @@ async function main() {
   // ventas y todo el panel (ver prisma/demo/sembrar.ts) y la apariencia.
   const soloApariencia = process.argv.includes('--solo-apariencia');
   if (!process.argv.includes('--solo-base') && !soloApariencia) await sembrarContenido(prisma, negocio.id);
-  if (!process.argv.includes('--solo-base')) await sembrarApariencia(prisma, negocio.id);
+  if (!process.argv.includes('--solo-base')) {
+    await sembrarApariencia(prisma, negocio.id);
+    await sembrarAvanzado(prisma, negocio.id);
+  }
   console.log(`Demo lista: ${negocio.subdomain} (${negocio.id})`);
 }
 

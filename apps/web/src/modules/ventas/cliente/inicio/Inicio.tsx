@@ -14,6 +14,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
 import { DEMO_SLUG } from '@/lib/demo/modo'
 import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
+import { MenuDemoTienda } from '@/modules/demo/MenuDemoTienda'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -117,6 +118,22 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     const [promoActivo, setPromoActivo] = useState<ActivePromoModal | null>(null)
     const [modalPromo, setModalPromo] = useState(false)
 
+    // Tienda demo: los juegos y anuncios NO se abren solos al entrar; se
+    // abren a mano desde el menú flotante (MenuDemoTienda), siempre como si
+    // fuera la primera visita. `vez` remonta el juego en cada apertura.
+    const enDemo = slug === DEMO_SLUG
+    const [juegoDemo, setJuegoDemo] = useState<{ juego: ActiveGame; vez: number } | null>(null)
+    const [anuncioDemo, setAnuncioDemo] = useState<ActivePromoModal | null>(null)
+    function abrirJuegoDemo(juego: ActiveGame) {
+        try {
+            for (const estado of ['ganado', 'perdido', 'declinado']) {
+                localStorage.removeItem(`orbita-juego-${estado}:${slug}:${juego.type}:${juego.campaignVersion}`)
+            }
+        } catch { /* sin localStorage: el juego abre igual */ }
+        setAnuncioDemo(null)
+        setJuegoDemo(prev => ({ juego, vez: (prev?.vez ?? 0) + 1 }))
+    }
+
     useEffect(() => {
         if (!slug) return
         let cancelado = false
@@ -211,7 +228,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // distinto y vuelve a mostrarse, aunque ya se haya visto/declinado/
     // jugado la combinación anterior.
     useEffect(() => {
-        if (!slug || reclamo || elegibles.length === 0) return
+        if (!slug || enDemo || reclamo || elegibles.length === 0) return
         const key = `orbita-juego-modal:${slug}:${estadoJuegos(elegibles)}`
         try {
             if (localStorage.getItem(key)) return
@@ -219,7 +236,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             setModalJuego(true)
         } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slug, reclamo, estadoJuegos(elegibles)])
+    }, [slug, enDemo, reclamo, estadoJuegos(elegibles)])
 
     // Al cerrar con la X se declina lo que el modal esté ofreciendo en ese
     // momento — el picker completo si todavía no se eligió uno (varios
@@ -246,14 +263,14 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // ofrece — se va a mostrar en una visita futura en la que el juego ya
     // no sea elegible. Sin cola ni orden configurable por ahora (ver plan).
     useEffect(() => {
-        if (!slug || !promoActivo || reclamo || modalJuego || elegibles.length > 0) return
+        if (!slug || enDemo || !promoActivo || reclamo || modalJuego || elegibles.length > 0) return
         const key = `orbita-promo-modal:${slug}:${promoActivo.campaignVersion}`
         try {
             if (localStorage.getItem(key)) return
             localStorage.setItem(key, '1')
             setModalPromo(true)
         } catch { /* sin localStorage — simplemente no se muestra */ }
-    }, [slug, promoActivo, reclamo, modalJuego, elegibles.length])
+    }, [slug, enDemo, promoActivo, reclamo, modalJuego, elegibles.length])
 
     function cerrarModalPromo() {
         setModalPromo(false)
@@ -956,6 +973,23 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {modalPromo && promoActivo && !modalJuego && !reclamo && (
                 <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
                     <PromoModalContenido promo={promoActivo} go={go} />
+                </ModalJuego>
+            )}
+
+            {enDemo && (
+                <MenuDemoTienda juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
+            )}
+            {juegoDemo && (
+                <ModalJuego
+                    titulo={juegoDemo.juego.name || TEMAS[juegoDemo.juego.type]?.titulo || 'Juego con premio'}
+                    onCerrar={() => setJuegoDemo(null)}
+                >
+                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} />
+                </ModalJuego>
+            )}
+            {anuncioDemo && (
+                <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
+                    <PromoModalContenido promo={anuncioDemo} go={go} />
                 </ModalJuego>
             )}
         </StorefrontChrome>

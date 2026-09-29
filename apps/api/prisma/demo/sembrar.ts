@@ -269,17 +269,34 @@ export async function sembrarContenido(prisma: PrismaClient, businessId: string)
     vip: idDemo('cupon:VIP-LUCIA'),
   };
   const lamparas3x2 = idDemo('descuento:lamparas-3x2');
+  const accesorios2x1 = idDemo('descuento:accesorios-2x1');
+  // Los 2x1/3x2 van como los arma el panel (TwoForOneService.create):
+  // nombre "LxP", productLevel 'padre' y su fila en two_for_one_promos. Sin
+  // productLevel el motor compara contra la variante y la promo no se aplica
+  // nunca, ni el cartel "3x2" en el catálogo.
   await prisma.discount.createMany({
     data: [
       { id: semanaGamer, businessId, name: 'Semana Gamer: 15 % en Gaming', type: 'PERCENT_PRODUCT', value: dec(15), scope: 'CATEGORY', application: 'AUTOMATIC', startDate: hace(10 * DIA), endDate: new Date(ahora.getTime() + 11 * DIA), activeDays: [], priority: 1, createdBy: dueno.id, createdAt: hace(11 * DIA) },
-      { id: lamparas3x2, businessId, name: 'Lámparas: llevá 3, pagá 2', type: 'BUY_X_PAY_Y', value: dec(2), minQuantity: 3, scope: 'PRODUCT', application: 'AUTOMATIC', startDate: hace(40 * DIA), endDate: null, activeDays: [], createdBy: dueno.id, createdAt: hace(40 * DIA) },
+      { id: lamparas3x2, businessId, name: '3x2', type: 'BUY_X_PAY_Y', value: dec(2), minQuantity: 3, scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(40 * DIA), endDate: null, activeDays: [], createdBy: dueno.id, createdAt: hace(40 * DIA) },
+      { id: accesorios2x1, businessId, name: '2x1', type: 'BUY_X_PAY_Y', value: dec(1), minQuantity: 2, scope: 'PRODUCT', productLevel: 'padre', application: 'AUTOMATIC', startDate: hace(6 * DIA), endDate: null, activeDays: [], createdBy: dueno.id, createdAt: hace(6 * DIA) },
       { id: cupones.bienvenida, businessId, name: 'Bienvenida: 10 % en tu primera compra', code: 'BIENVENIDA10', type: 'PERCENT_TICKET', value: dec(10), scope: 'TICKET', application: 'MANUAL', startDate: hace(95 * DIA), activeDays: [], maxUsesPerCustomer: 1, createdBy: dueno.id, createdAt: hace(95 * DIA) },
       { id: cupones.nebula15, businessId, name: '15 % en compras desde $150.000', code: 'NEBULA15', type: 'PERCENT_TICKET', value: dec(15), minAmount: dec(150000), scope: 'TICKET', application: 'MANUAL', startDate: hace(20 * DIA), endDate: new Date(ahora.getTime() + 25 * DIA), activeDays: [], maxUsesTotal: 200, linkActive: true, createdBy: dueno.id, createdAt: hace(20 * DIA) },
       { id: cupones.hotsale, businessId, name: 'Hot Sale: $20.000 de descuento', code: 'HOTSALE', type: 'AMOUNT_TICKET', value: dec(20000), minAmount: dec(100000), scope: 'TICKET', application: 'MANUAL', startDate: hace(70 * DIA), endDate: hace(63 * DIA), activeDays: [], createdBy: dueno.id, createdAt: hace(72 * DIA) },
     ],
   });
   await prisma.discountCategory.create({ data: { discountId: semanaGamer, categoryId: categoriaId.gaming } });
-  await prisma.discountProduct.create({ data: { discountId: lamparas3x2, productId: idDemo('producto:lampara') } });
+  await prisma.discountProduct.createMany({
+    data: [
+      ...['lampara', 'tira-led', 'enchufe'].map((c) => ({ discountId: lamparas3x2, productId: idDemo(`producto:${c}`) })),
+      ...['funda', 'cargador', 'soporte-auto'].map((c) => ({ discountId: accesorios2x1, productId: idDemo(`producto:${c}`) })),
+    ],
+  });
+  await prisma.twoForOnePromo.createMany({
+    data: [
+      { id: idDemo('2x1:lamparas'), businessId, discountId: lamparas3x2, isActive: true, createdAt: hace(40 * DIA) },
+      { id: idDemo('2x1:accesorios'), businessId, discountId: accesorios2x1, isActive: true, createdAt: hace(6 * DIA) },
+    ],
+  });
 
   // ── Clientes ──────────────────────────────────────────────────────────────
   console.log('Clientes…');

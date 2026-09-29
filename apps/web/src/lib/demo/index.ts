@@ -6,6 +6,7 @@ import { esTiendaDemo } from './modo'
 import { instalarInterceptorDemo } from './interceptor'
 import { alCambiar } from './almacen'
 import './recursos/tienda'
+import './recursos/juegos'
 import './recursos/checkout'
 import './recursos/pedidos'
 
