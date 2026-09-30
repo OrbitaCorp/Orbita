@@ -16,10 +16,11 @@ export const MAX_MONTO = 1_000_000_000;
 // el resto del checkout. DEBIT/CREDIT son la única excepción: no tienen
 // toggle global (posnet físico, solo existe en retiro), así que esos dos
 // SIEMPRE necesitan estar marcados acá para aparecer — ver
-// StorefrontController.checkout(). TRANSFER (Coordinar por WhatsApp) queda
-// deliberadamente fuera de esta lista: a pedido, siempre sigue el toggle
-// general (acceptsTransfer), nunca se restringe puntual para retiro.
-export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT', 'MERCADOPAGO'] as const;
+// StorefrontController.checkout(). TRANSFER ("Transferencia" al retirar) se
+// comporta como DEBIT/CREDIT: es una opción informativa que solo aparece si
+// está marcada acá, sin toggle global. Coordinar por WhatsApp, en cambio,
+// sigue el toggle general (acceptsTransfer) y no se restringe por esta lista.
+export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT', 'TRANSFER', 'MERCADOPAGO'] as const;
 
 // Mismo enum cerrado que `carrier` en checkout.dto.ts/update-order-shipping.dto.ts.
 export const CARRIERS = ['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO'] as const;

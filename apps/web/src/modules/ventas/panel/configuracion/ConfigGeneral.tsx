@@ -80,11 +80,13 @@ const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
 // MERCADOPAGO se filtra más abajo (solo tiene sentido ofrecer restringirlo
 // en retiro si el negocio lo acepta en general). Coordinar por WhatsApp NO
 // entra en esta lista a pedido: siempre sigue el toggle general
-// (acceptsTransfer), sin restricción puntual para retiro.
+// (acceptsTransfer), sin restricción puntual para retiro. "Transferencia" sí:
+// es informativa (se paga por transferencia en el local), como Débito/Crédito.
 const PICKUP_PAGO_META: { key: string; label: string }[] = [
     { key: 'CASH',         label: 'Efectivo' },
     { key: 'DEBIT',        label: 'Débito' },
     { key: 'CREDIT',       label: 'Crédito' },
+    { key: 'TRANSFER',     label: 'Transferencia' },
     { key: 'MERCADOPAGO',  label: 'Mercado Pago' },
 ]
 
@@ -1076,7 +1078,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     </div>
                                     <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 8 }}>
                                         {pagos.pickupPaymentMethods.length === 0
-                                            ? 'Sin nada marcado, se aceptan todos los que tenés habilitados arriba (Mercado Pago, Efectivo) más Débito/Crédito con posnet. Marcá acá solo si querés restringir el retiro a medios puntuales. Coordinar por WhatsApp no se restringe acá: sigue siempre el toggle de arriba.'
+                                            ? 'Sin nada marcado, se aceptan todos los que tenés habilitados arriba (Mercado Pago, Efectivo) más Débito/Crédito con posnet (Transferencia solo aparece si la marcás). Marcá acá solo si querés restringir el retiro a medios puntuales. Coordinar por WhatsApp no se restringe acá: sigue siempre el toggle de arriba.'
                                             : 'El retiro queda limitado a lo marcado acá: el resto (aunque esté habilitado arriba) no se ofrece al retirar. Coordinar por WhatsApp es la excepción: sigue siempre el toggle de arriba.'}
                                     </div>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
