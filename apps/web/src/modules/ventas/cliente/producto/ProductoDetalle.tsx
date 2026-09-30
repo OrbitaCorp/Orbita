@@ -744,7 +744,7 @@ export default function ProductoDetalle() {
                     {producto.promo.scope === 'CATEGORY' ? (
                       <> combinando cualquier producto de la categoría <strong>{producto.promo.categoryName}</strong>.</>
                     ) : producto.promo.otherProducts.length > 0 ? (
-                      <> combinando este producto con {producto.promo.otherProducts.length === 1 ? 'el siguiente' : 'los siguientes'}:</>
+                      <> entre este producto y {producto.promo.otherProducts.length === 1 ? 'el siguiente' : 'los siguientes'} (la unidad más barata sale gratis):</>
                     ) : (
                       <> de este mismo producto — entre las unidades que elijas, la más barata sale gratis.</>
                     )}
@@ -775,7 +775,7 @@ export default function ProductoDetalle() {
                     ambigüedad, distinta según haga falta OTRO producto o no. */}
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                   {producto.promo.scope === 'PRODUCT' && producto.promo.otherProducts.length > 0
-                    ? `Agregá los ${producto.promo.otherProducts.length + 1} productos al carrito (en total, ${producto.promo.llevaCantidad} unidades) para que el descuento se aplique.`
+                    ? `Agregá ${producto.promo.llevaCantidad} unidades al carrito, del mismo producto o combinando los de arriba en cualquier orden, para que el descuento se aplique.`
                     : producto.promo.scope === 'CATEGORY'
                     ? `Agregá ${producto.promo.llevaCantidad} unidades de la categoría "${producto.promo.categoryName}" al carrito (pueden ser de distintos productos) para que el descuento se aplique.`
                     : `Agregá ${producto.promo.llevaCantidad} unidades de este producto al carrito para que el descuento se aplique.`}
