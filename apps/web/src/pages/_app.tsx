@@ -20,9 +20,16 @@ import { TiendaPausada } from '@/components/storefront/TiendaPausada'
 import { fontStack, googleFontsHref } from '@/lib/fonts'
 import { TEMA_SCRIPT } from '@/lib/csp'
 import { iniciarDemo } from '@/lib/demo'
+import { BannerCookies } from '@/components/shared/BannerCookies'
+import { EVENTO_CAMBIO, estadisticasPermitidas } from '@/lib/cookies/consentimiento'
 
 const queryClient = new QueryClient()
 iniciarDemo(queryClient)
+
+// Páginas públicas de orbita.site donde se muestra el aviso de cookies. Las
+// demás (login, alta de negocio, panel, superadmin) son de quien ya usa la
+// plataforma y no llevan más que las cookies necesarias.
+const PAGINAS_PUBLICAS_ORBITA = new Set(['/', '/nosotros', '/planes', '/terminos', '/privacidad', '/cookies', '/eliminacion-de-datos'])
 
 // El backend ya valida colorPrimary/colorBackground como hex al guardar (ver
 // update-storefront-config.dto.ts), pero acá se vuelve a chequear: son
@@ -123,18 +130,40 @@ export default function App({ Component, pageProps }: AppProps) {
     const slug = (router.query.slug as string) || currentSlug()
     if (!slug || typeof window === 'undefined') return
 
-    const sessionKey = `orbita_v_${slug}`
-    try {
-      if (sessionStorage.getItem(sessionKey)) return
-      sessionStorage.setItem(sessionKey, '1')
-    } catch {
-      // Si el navegador bloquea sessionStorage (ej. modo incógnito estricto), continúa
+    const registrar = () => {
+      const sessionKey = `orbita_v_${slug}`
+      try {
+        if (sessionStorage.getItem(sessionKey)) return
+        sessionStorage.setItem(sessionKey, '1')
+      } catch {
+        // Si el navegador bloquea sessionStorage (ej. modo incógnito estricto), continúa
+      }
+
+      const hostname = window.location.hostname
+      const path = window.location.pathname
+      recordStorefrontVisit(slug, { domain: hostname, path }).catch(() => {})
     }
 
-    const hostname = window.location.hostname
-    const path = window.location.pathname
-    recordStorefrontVisit(slug, { domain: hostname, path }).catch(() => {})
+    // "Solo necesarias" en el aviso de cookies: la visita no se cuenta. Si más
+    // tarde cambia de idea (Preferencias de cookies, en el pie), se cuenta desde ahí.
+    if (!estadisticasPermitidas()) {
+      const alCambiar = () => {
+        if (!estadisticasPermitidas()) return
+        window.removeEventListener(EVENTO_CAMBIO, alCambiar)
+        registrar()
+      }
+      window.addEventListener(EVENTO_CAMBIO, alCambiar)
+      return () => window.removeEventListener(EVENTO_CAMBIO, alCambiar)
+    }
+    registrar()
   }, [isStorefront, router.query.slug])
+
+  // Aviso de cookies: en toda tienda en funcionamiento y en las páginas públicas
+  // de orbita.site (ver PAGINAS_PUBLICAS_ORBITA).
+  const slugCookies = isStorefront ? (typeof router.query.slug === 'string' ? router.query.slug : currentSlug()) : null
+  const avisoCookies = isStorefront
+    ? (slugCookies ? { variante: 'tienda' as const, href: `/tienda/${slugCookies}/legales/cookies` } : null)
+    : PAGINAS_PUBLICAS_ORBITA.has(router.pathname) ? { variante: 'orbita' as const, href: '/cookies' } : null
 
   // Nombre/logo reales de la tienda — hoy solo para `TiendaPausada` (se
   // muestra cuando el negocio está pausado/suspendido). Ya no gatea el
@@ -343,6 +372,7 @@ export default function App({ Component, pageProps }: AppProps) {
                   equivocada. */}
               <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} tema={temaPlantilla} />
               <Component {...pageProps} />
+              {avisoCookies && <BannerCookies variante={avisoCookies.variante} hrefPolitica={avisoCookies.href} />}
             </>
           )}
         </CartProvider>

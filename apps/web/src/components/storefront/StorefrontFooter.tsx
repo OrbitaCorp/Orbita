@@ -6,6 +6,7 @@ import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
 import { ReturnRequestModal } from './ReturnRequestModal'
 import { SocialProofToast } from './SocialProofToast'
 import { CreditoOrbita } from './CreditoOrbita'
+import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento'
 
 type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
 type Props = {
@@ -182,6 +183,17 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
             <a href={`${base}/legales/privacidad`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
               Política de privacidad
             </a>
+            <a href={`${base}/legales/cookies`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
+              Política de cookies
+            </a>
+            <button
+              type="button"
+              className="ds-link"
+              onClick={abrirPreferenciasDeCookies}
+              style={{ padding: 0, border: 'none', background: 'none', fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Preferencias de cookies
+            </button>
             {/* Derecho de arrepentimiento y garantía legal, sin login (RBT-683). Como un
                 enlace más de los legales, no como botón destacado. Se muestra SIEMPRE:
                 no depende del interruptor de devoluciones de Configuración. */}

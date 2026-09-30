@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
 import { User, ShoppingBag } from 'lucide-react'
 import { CreditoOrbita } from '@/components/storefront/CreditoOrbita'
+import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento'
 import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -640,6 +641,13 @@ export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales
           {(legales ?? []).map((l) => (
             <a key={l.label} href={l.href} style={{ color: t.muted, textDecoration: 'none' }}>{l.label}</a>
           ))}
+          {/* Solo en una tienda real (con `legales`): en la maqueta del panel no hay aviso que reabrir. */}
+          {legales && (
+            <button
+              type="button" onClick={abrirPreferenciasDeCookies}
+              style={{ padding: 0, border: 'none', background: 'none', color: t.muted, fontSize: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
+            >Preferencias de cookies</button>
+          )}
           {onDevolucion && (
             <button
               type="button" onClick={onDevolucion}
