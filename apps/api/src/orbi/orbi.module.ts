@@ -34,6 +34,7 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
+import { CuotaService } from '../common/cuota/cuota.service';
 
 @Module({
   imports: [
@@ -71,6 +72,8 @@ export class OrbiModule {
     private readonly businessesService: BusinessesService,
     private readonly reportsService: ReportsService,
     private readonly onboardingService: OnboardingService,
+    // CuotaModule es global: la cuota diaria de la IA de productos.
+    private readonly cuotaService: CuotaService,
   ) {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
@@ -78,7 +81,7 @@ export class OrbiModule {
 
     this.toolRegistry.register(new ListProductsTool(this.productsService));
     this.toolRegistry.register(new CreateProductTool(this.productsService));
-    this.toolRegistry.register(new GenerateDescriptionTool(this.productAiService));
+    this.toolRegistry.register(new GenerateDescriptionTool(this.productAiService, this.cuotaService));
 
     this.toolRegistry.register(new ListDiscountsTool(this.discountsService));
     this.toolRegistry.register(new CreateDiscountTool(this.discountsService));

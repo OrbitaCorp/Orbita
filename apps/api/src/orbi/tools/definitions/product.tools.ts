@@ -3,12 +3,14 @@ import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interfa
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { ProductsService } from '../../../products/products.service';
 import type { ProductAiService } from '../../../products/product-ai.service';
+import type { CuotaService } from '../../../common/cuota/cuota.service';
+import { AI_ASSIST_DIA_NEGOCIO } from '../../../products/products.controller';
 
 export class ListProductsTool implements OrbiTool {
   name = 'listProducts';
   description = 'Listar productos del negocio. Úsalo para mostrar al usuario qué productos tiene cargados, buscar uno específico, o dar contexto antes de crear uno nuevo.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['catalog.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -56,7 +58,7 @@ export class CreateProductTool implements OrbiTool {
   name = 'createProduct';
   description = 'Crear un nuevo producto en el catálogo del negocio. Necesitás al menos nombre, precio y categoría. El producto se crea como borrador por defecto.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['products:write'];
+  requiredPermissions = ['catalog.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
@@ -111,7 +113,9 @@ export class GenerateDescriptionTool implements OrbiTool {
   name = 'generateDescription';
   description = 'Generar una descripción con IA para un producto, además de sugerir categoría, etiquetas y especificaciones técnicas. Útil cuando el usuario necesita ayuda redactando.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  // catalog.manage y no catalog.view: es el permiso que POST /products/ai-assist exige.
+  // Con view (el Empleado) tendría por Orbi una IA paga que por HTTP se le niega.
+  requiredPermissions = ['catalog.manage'];
   parameters = {
     type: 'object',
     properties: {
@@ -121,7 +125,10 @@ export class GenerateDescriptionTool implements OrbiTool {
     required: ['productName'],
   };
 
-  constructor(private readonly productAiService: ProductAiService) {}
+  constructor(
+    private readonly productAiService: ProductAiService,
+    private readonly cuotaService: CuotaService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -129,6 +136,16 @@ export class GenerateDescriptionTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
+      // Misma cuota que POST /products/ai-assist: la IA de productos gasta plata
+      // y las dos vías (el botón del panel y Orbi) suman al mismo contador
+      // diario del negocio, con la misma clave y el mismo tope.
+      if (!(await this.cuotaService.consumir(`ai-assist:${ctx.businessId}`, AI_ASSIST_DIA_NEGOCIO))) {
+        return {
+          success: false,
+          error: 'Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.',
+          label: 'Llegaste al máximo de ayudas de IA por hoy',
+        };
+      }
       const result = await this.productAiService.assist(ctx.businessId, {
         name: args.productName as string,
         existingDescription: args.existingDescription as string | undefined,

@@ -8,7 +8,7 @@ export class ListDiscountsTool implements OrbiTool {
   name = 'listDiscounts';
   description = 'Listar los descuentos automáticos del negocio (sin código). Úsalo para mostrar qué descuentos existen o dar contexto antes de crear uno nuevo.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['discounts.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -59,7 +59,7 @@ export class CreateDiscountTool implements OrbiTool {
   name = 'createDiscount';
   description = 'Crear un descuento automático (sin código) para productos, categorías o el ticket total. Se aplica solo, sin que el cliente escriba nada.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['discounts:write'];
+  requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
@@ -116,7 +116,7 @@ export class CreateCouponTool implements OrbiTool {
   name = 'createCoupon';
   description = 'Crear un cupón con código que el cliente ingresa manualmente en el checkout.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['discounts:write'];
+  requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {

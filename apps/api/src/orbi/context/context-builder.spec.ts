@@ -246,7 +246,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
-    } as any);
+    } as any, ['reports.dashboard']);
 
     expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', 'dashboard');
   });
@@ -313,7 +313,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
-    } as any);
+    } as any, ['reports.dashboard']);
 
     expect(prompt).toContain('$150.000');
     expect(prompt).toContain('25 pedidos');
@@ -360,7 +360,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
-    } as any);
+    } as any, ['orders.view']);
 
     expect(prompt).toContain('PENDING: 5');
     expect(prompt).toContain('36h sin confirmar');
@@ -405,7 +405,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'clientes', businessId: 'biz-1' },
-    } as any);
+    } as any, ['customers.view']);
 
     expect(prompt).toContain('120 clientes');
     expect(prompt).toContain('Nuevos este mes: 15');
@@ -453,7 +453,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'catalogo', businessId: 'biz-1' },
-    } as any);
+    } as any, ['catalog.view']);
 
     expect(prompt).toContain('30 productos');
     expect(prompt).toContain('20 publicados');
@@ -496,7 +496,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'mensajes', businessId: 'biz-1' },
-    } as any);
+    } as any, ['messages.view']);
 
     expect(prompt).toContain('Conversaciones totales: 30');
     expect(prompt).toContain('Sin leer: 5');
@@ -514,5 +514,57 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('Lo que sabés sobre mensajería');
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
+  });
+
+  // El snapshot del prompt son números del negocio (facturación, clientes,
+  // mensajes). Sin chequear permisos, un empleado con solo orders.view veía la
+  // caja del mes en cuanto abría el dashboard. Ahora cada módulo pide el permiso
+  // que la pantalla equivalente exige por HTTP, y sin permisos no hay nada.
+  describe('snapshot del módulo según los permisos', () => {
+    const casos: Array<[string, string]> = [
+      ['dashboard', 'reports.dashboard'],
+      ['pedidos', 'orders.view'],
+      ['clientes', 'customers.view'],
+      ['catalogo', 'catalog.view'],
+      ['mensajes', 'messages.view'],
+    ];
+    const dtoDe = (module: string) => ({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module, businessId: 'biz-1' },
+    }) as any;
+
+    it('sin permisos no hay snapshot de ningún módulo (nunca "todo")', async () => {
+      for (const [module] of casos) {
+        await service.buildSystemPrompt(dtoDe(module));
+        await service.buildSystemPrompt(dtoDe(module), []);
+      }
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it.each(casos)('el módulo %s trae el snapshot con el permiso %s', async (module, permiso) => {
+      await service.buildSystemPrompt(dtoDe(module), [permiso]);
+      expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', module);
+    });
+
+    it.each(casos)('el módulo %s NO trae el snapshot con un permiso ajeno', async (module) => {
+      // discounts.view no le da a nadie ningún snapshot; y los de los otros
+      // módulos tampoco se filtran entre sí.
+      const ajenos = ['discounts.view', ...casos.filter(([m]) => m !== module).map(([, p]) => p)];
+      await service.buildSystemPrompt(dtoDe(module), ajenos);
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('sin permiso el prompt del módulo sigue armándose (solo faltan los números)', async () => {
+      const prompt = await service.buildSystemPrompt(dtoDe('dashboard'), []);
+      expect(prompt).toContain('Lo que sabés sobre métricas');
+    });
+
+    it('el wizard sigue sin snapshot aunque le pasen permisos', async () => {
+      await service.buildSystemPrompt(
+        { message: 'hola', context: { surface: OrbiSurface.WIZARD, stepName: 'elegir-rubro' } } as any,
+        ['reports.dashboard'],
+      );
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
   });
 });

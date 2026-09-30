@@ -7,7 +7,7 @@ export class UpdateBusinessInfoTool implements OrbiTool {
   name = 'updateBusinessInfo';
   description = 'Actualizar el nombre, rubro o descripción del negocio. NO permite cambiar el subdominio, el plan ni las credenciales — eso está fuera de mi alcance.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['config:write'];
+  requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
@@ -50,7 +50,7 @@ export class UpdatePaymentMethodsTool implements OrbiTool {
   name = 'updatePaymentMethods';
   description = 'Actualizar qué métodos de pago acepta el negocio (efectivo, transferencia, tarjeta, MercadoPago, coordinar por WhatsApp) y sus datos asociados.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['config:write'];
+  requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
@@ -109,7 +109,7 @@ export class UpdateShippingTool implements OrbiTool {
   name = 'updateShipping';
   description = 'Actualizar la configuración de envíos: transportistas habilitados, costo de envío gratis a partir de cierto monto, y política de envíos.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['config:write'];
+  requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {

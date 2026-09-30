@@ -63,7 +63,7 @@ describe('OrbiChatDto', () => {
         module: 'catalogo',
         section: 'productos',
         businessId: '3f1e6c9a-1b2d-4e5f-8a90-1234567890ab',
-        permissions: ['products:write'],
+        permissions: ['catalog.manage'],
       },
     });
 

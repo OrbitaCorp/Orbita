@@ -7,7 +7,7 @@ export class ListOrdersTool implements OrbiTool {
   name = 'listOrders';
   description = 'Listar pedidos del negocio. Úsalo para mostrar pedidos recientes, buscar uno por cliente o número, o filtrar por estado.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['orders.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -58,7 +58,7 @@ export class GetOrderDetailTool implements OrbiTool {
   name = 'getOrderDetail';
   description = 'Obtener el detalle completo de un pedido específico por su ID: items, cliente, pagos y estado.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['orders.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -129,7 +129,7 @@ export class UpdateOrderStatusTool implements OrbiTool {
   name = 'updateOrderStatus';
   description = 'Cambiar el estado de un pedido (ej. confirmar, marcar como enviado o entregado). Solo se permiten las transiciones válidas para el canal del pedido.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['orders:write'];
+  requiredPermissions = ['orders.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {

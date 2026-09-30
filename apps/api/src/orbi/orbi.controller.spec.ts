@@ -12,6 +12,7 @@ import { PendingActionStore } from './tools/pending-action.store';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
+import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
 
 function createMockResponse() {
   const chunks: string[] = [];
@@ -28,6 +29,7 @@ describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
   let registry: { getTools: jest.Mock; execute: jest.Mock };
+  let contextBuilder: { buildSystemPrompt: jest.Mock };
 
   // El wizard hashea la IP con JWT_SECRET para la clave de la cuota diaria.
   beforeAll(() => {
@@ -91,6 +93,7 @@ describe('OrbiController', () => {
     }).compile();
 
     controller = module.get(OrbiController);
+    contextBuilder = module.get(ContextBuilderService);
   });
 
   it('el texto que el modelo dice ANTES de llamar una tool NUNCA llega al cliente', async () => {
@@ -256,7 +259,7 @@ describe('OrbiController', () => {
         message: 'Hola',
         context: {
           surface: OrbiSurface.PANEL,
-          permissions: ['products:write', 'discounts:write', 'orders:write', 'config:write'],
+          permissions: ['catalog.manage', 'discounts.manage', 'orders.manage', 'config.edit'],
         },
       } as any,
       res as any,
@@ -265,6 +268,41 @@ describe('OrbiController', () => {
 
     expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined, { soloLectura: false });
   });
+
+  // El dueño no depende de filas de permisos (igual que PermissionsGuard): Orbi
+  // le tiene que dar el catálogo completo aunque su lista venga vacía, tanto en
+  // el chat como al confirmar. Si no, un permiso nuevo lo dejaría sin tools.
+  it('el dueño recibe todos los permisos del catálogo en las tools, y un rol común solo los suyos', async () => {
+    const usuario = (roleName: string, permissions: string[]) => ({
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName, permissions,
+    });
+
+    await controller.chat(
+      { message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any,
+      createMockResponse() as any,
+      usuario('owner', []) as any,
+    );
+    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO, undefined, { soloLectura: false });
+
+    await controller.chat(
+      { message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any,
+      createMockResponse() as any,
+      usuario('empleado', ['orders.view']) as any,
+    );
+    expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, ['orders.view'], undefined, { soloLectura: false });
+  });
+
+  it('el prompt del sistema se arma con los permisos efectivos del usuario', async () => {
+    const usuario = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'empleado', permissions: ['orders.view'],
+    };
+    const dto = { message: 'Hola', context: { surface: OrbiSurface.PANEL, module: 'pedidos' } } as any;
+    await controller.chat(dto, createMockResponse() as any, usuario as any);
+    expect(contextBuilder.buildSystemPrompt).toHaveBeenLastCalledWith(expect.anything(), ['orders.view']);
+  });
+
 
   // Orbi existe en el panel y en el wizard. En el storefront no, y este
   // endpoint es la única puerta al panel. Un cliente de una tienda tiene JWT

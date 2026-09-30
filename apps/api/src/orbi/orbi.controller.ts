@@ -17,6 +17,7 @@ import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
+import { permisosDeOrbi } from './permisos-orbi';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -107,6 +108,11 @@ export class OrbiController {
     // funcionando contra el negocio correcto.
     dto.context.businessId = user.businessId;
 
+    // Los permisos EFECTIVOS: el dueño pasa siempre (como PermissionsGuard) y un
+    // rol común tiene los suyos del JWT. Alimentan las tools, la ejecución y el
+    // snapshot del prompt: los tres tienen que ver lo mismo.
+    const permisos = permisosDeOrbi(user);
+
     // Antes de abrir el stream, para que llegue como un 429 normal.
     if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
@@ -153,7 +159,7 @@ export class OrbiController {
         });
       }
 
-      const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
+      const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto, permisos);
       const messages: LlmMessage[] = [
         { role: 'system', content: esDemo ? `${systemPrompt}\n\n${PROMPT_DEMO}` : systemPrompt },
         ...history,
@@ -175,13 +181,13 @@ export class OrbiController {
       // por parámetro (ver el test del catálogo): el modelo no tiene forma de
       // nombrar otro negocio ni siquiera si se lo piden. El aislamiento no
       // depende de que Orbi se porte bien.
-      const tools = this.toolRegistry.getTools(dto.context.surface, user.permissions, dto.context.stepName, { soloLectura: esDemo });
+      const tools = this.toolRegistry.getTools(dto.context.surface, permisos, dto.context.stepName, { soloLectura: esDemo });
       const modelo = this.modeloPara(dto.context.surface);
       const toolCtx: ToolExecutionContext = {
         businessId: user.businessId,
         userId: user.memberId,
         surface: dto.context.surface,
-        permissions: user.permissions,
+        permissions: permisos,
       };
 
       let fullResponse = '';
@@ -380,7 +386,7 @@ export class OrbiController {
       businessId: user.businessId,
       userId: user.memberId,
       surface: OrbiSurface.PANEL,
-      permissions: user.permissions,
+      permissions: permisosDeOrbi(user),
     });
   }
 
