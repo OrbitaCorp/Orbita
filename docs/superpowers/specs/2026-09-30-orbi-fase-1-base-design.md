@@ -557,11 +557,11 @@ stream viejo se descartan); tratamiento de las respuestas de confirmar (200, 404
 
 **Las bases:** producción corre contra `dgergykdihtvsglfumsb` ("Orbita Produccion") desde
 el 2026-09-21. El `.env` local de `apps/api` apunta a la base vieja
-(`hhaqlzrcskmwnvhgydon`), que hoy es **desarrollo**. El paso 2 del `CLAUDE.md` raíz ("la
-base local ES la de producción") y `DEPLOYMENT.md` quedaron desactualizados, y el control
-de migraciones del preflight de `deploy.sh` mira la base del `.env` local: puede dar verde
-sin que producción tenga las tablas nuevas. La API nueva saldría con 500 en la cuota y en
-las propuestas.
+(`hhaqlzrcskmwnvhgydon`), que hoy es **desarrollo**. Esto ya está corregido (2026-09-30,
+rama `chore/deploy-docs-y-hooks`): `CLAUDE.md`, `apps/api/CLAUDE.md` y `DEPLOYMENT.md`
+explican las dos bases, y `apps/api/deploy/prisma-prod.sh` corre prisma contra producción con
+las URLs de Secret Manager. El preflight (d) de `deploy.sh` usa ese script, así que ya no da
+verde si a producción le faltan las tablas nuevas.
 
 **Orden:**
 
@@ -570,10 +570,9 @@ las propuestas.
    verde.
 3. Migración en **desarrollo** con `pnpm exec prisma migrate deploy` (el `.env` local) y
    e2e de 6 contra esa base.
-4. Migración en **producción**, aparte: `prisma migrate deploy` con las URLs de producción
-   de `apps/api/.env.new` (leídas con parser literal: la contraseña tiene `$$`), y
-   `prisma migrate status` contra producción para verificar. No confiar en el preflight
-   para esto.
+4. Migración en **producción**, con `main` en verde y antes del deploy:
+   `./deploy/prisma-prod.sh migrate deploy` y `./deploy/prisma-prod.sh migrate status` para
+   verificar (el preflight de `deploy.sh` lo vuelve a chequear).
 5. `deploy/deploy.sh`.
 6. Consulta de permisos de los roles (3.12) y prueba manual del corte (3.7).
 
@@ -582,8 +581,7 @@ recibe `conversation` (queda como hoy) y `reject` da 404. La API nueva con el fr
 crea una conversación por mensaje durante unos minutos. Nada se rompe.
 
 Al terminar, comentar en Jira (RBT-695 u el ticket que corresponda) las decisiones de este
-spec, según `apps/api/CLAUDE.md`. Corregir `CLAUDE.md` y `DEPLOYMENT.md` sobre las bases es
-una tarea aparte.
+spec, según `apps/api/CLAUDE.md`.
 
 ## 8. Decisiones tomadas en este spec
 
