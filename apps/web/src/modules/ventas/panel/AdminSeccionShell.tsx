@@ -18,9 +18,13 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import AdminLayout from '@/layouts/AdminLayout'
 import type { ComponentType } from 'react'
+import type { SeccionDelPanel } from '@/modules/ventas/panel/secciones'
 
 // componentMap: tabla de lookup moduloPadre → seccion → componente.
-const componentMap: Record<string, Record<string, ComponentType>> = {
+// Las claves de `ventas` son exactamente SECCIONES_DEL_PANEL (secciones.ts): el
+// tipo hace que agregar o sacar una sección sin tocar esa lista no compile, y
+// esa lista es la que copia la API para que Orbi arme links que existen.
+const componentMap: Record<string, Record<SeccionDelPanel, ComponentType>> = {
     ventas: {
         dashboard: dynamic(() => import('@/modules/ventas/panel/reportes/Dashboard'), { ssr: false }),
         pedidos:        dynamic(() => import('@/modules/ventas/panel/pedidos/PedidoLista'), { ssr: false }),
@@ -45,7 +49,7 @@ export default function AdminSeccionShell() {
   // (subdominio), moduloPadre/seccion quedan en la misma posición relativa.
   const seccion = partes[partes.length - 1]
   const moduloPadre = partes[partes.length - 2]
-  const Componente = componentMap[moduloPadre as string]?.[seccion as string]
+  const Componente = componentMap[moduloPadre as string]?.[seccion as SeccionDelPanel]
 
   if (!Componente) return <div>Página no encontrada</div>
 

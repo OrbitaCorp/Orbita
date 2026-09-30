@@ -53,7 +53,7 @@ describe('ToolRegistryService', () => {
   });
 
   it('NavigationTool returns correct path', async () => {
-    const result = await registry.execute('navigateTo', { module: 'productos', section: 'listado' }, {
+    const result = await registry.execute('navigateTo', { seccion: 'configuracion', vista: 'envios' }, {
       businessId: 'biz-1',
       userId: 'user-1',
       surface: OrbiSurface.PANEL,
@@ -61,7 +61,7 @@ describe('ToolRegistryService', () => {
     });
 
     expect(result.success).toBe(true);
-    expect((result.data as any).path).toBe('/admin/ventas/productos/listado');
+    expect((result.data as any).path).toBe('/admin/ventas/configuracion?vista=envios');
   });
 
   describe('proponer (escrituras seguras, spec §3.2)', () => {
@@ -169,7 +169,7 @@ describe('ToolRegistryService', () => {
   });
 
   it('NavigationTool returns path without section', async () => {
-    const result = await registry.execute('navigateTo', { module: 'dashboard' }, {
+    const result = await registry.execute('navigateTo', { seccion: 'dashboard' }, {
       businessId: 'biz-1',
       userId: 'user-1',
       surface: OrbiSurface.PANEL,
