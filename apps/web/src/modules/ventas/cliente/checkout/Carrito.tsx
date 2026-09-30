@@ -107,7 +107,7 @@ export default function Carrito() {
             Ir al catálogo <ArrowRight size={16} strokeWidth={2} />
           </button>
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} returnsEnabled={config?.payment?.returnsEnabled} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       </StorefrontChrome>
     )
   }
@@ -406,7 +406,7 @@ export default function Carrito() {
         </div>
       </div>
 
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} returnsEnabled={config?.payment?.returnsEnabled} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
     </StorefrontChrome>
   )
 }

@@ -635,8 +635,7 @@ export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales
         </div>
         {/* Términos, Privacidad y Arrepentimiento: no son decoración, son lo
             que el footer normal muestra por obligación legal. Si la plantilla
-            dibuja SU pie, tiene que llevarlos igual. Sin `onDevolucion` (la
-            tienda apagó la postventa) no hay botón. */}
+            dibuja SU pie, tiene que llevarlos igual. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           {(legales ?? []).map((l) => (
             <a key={l.label} href={l.href} style={{ color: t.muted, textDecoration: 'none' }}>{l.label}</a>

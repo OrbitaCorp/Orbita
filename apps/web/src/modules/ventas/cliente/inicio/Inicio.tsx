@@ -744,10 +744,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
-                        // la plantilla tiene que poder abrirlo igual — salvo
-                        // que la tienda haya apagado la postventa: sin
-                        // función, la plantilla no dibuja el botón.
-                        abrirDevolucion: config?.payment?.returnsEnabled === false ? undefined : () => setDevolucionAbierta(true),
+                        // la plantilla tiene que poder abrirlo igual, sin
+                        // depender del interruptor de devoluciones.
+                        abrirDevolucion: () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
                         // La maqueta pone la forma y el tema; esto, el
@@ -967,7 +966,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 PlantillaHome (es parte de su diseño: columnas, tipografía y
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
-                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} returnsEnabled={config?.payment?.returnsEnabled} />
+                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
             )}
             {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
                 monta esta pagina: dentro de PlantillaHome no hay a donde. */}

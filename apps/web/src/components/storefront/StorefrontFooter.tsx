@@ -16,18 +16,12 @@ type Props = {
   // Toggle de Apariencia — gatea solo la fila de íconos sociales, el resto del
   // footer (horario, email) se muestra automáticamente según haya o no dato real.
   showSocial?: boolean
-  // Postventa activada en Configuración (BusinessConfig.returnsEnabled). Apagada, la
-  // tienda no ofrece ni el botón de Arrepentimiento / Devolución ni "Iniciar
-  // cambio". Sin dato todavía (la config no llegó) se muestra: mismo criterio que
-  // Devolucion.tsx, que solo corta con `=== false`.
-  returnsEnabled?: boolean
 }
 
 // El pie NO se puede apagar desde Apariencia: lleva Términos y condiciones, la Política de
 // privacidad y el acceso a devoluciones, que son obligación de cualquier tienda online.
-export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, returnsEnabled }: Props) {
+export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true }: Props) {
   const [devolucionAbierta, setDevolucionAbierta] = useState(false)
-  const conDevoluciones = returnsEnabled !== false
   const socialLinks = [
     // El dueño puede haber cargado el usuario solo ("mi_negocio") o el link
     // completo — urlRedSocial() arma la URL de verdad en cualquiera de los
@@ -139,7 +133,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                 ['Ingresar', `${base}/login`],
                 ['Crear cuenta', `${base}/registro`],
                 ['Mis pedidos', `${base}/pedido`],
-                ...(conDevoluciones ? [['Iniciar cambio', `${base}/pedido`]] : []),
+                ['Iniciar cambio', `${base}/pedido`],
               ].map(([label, href]) => (
                 <a key={label} href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none' }}>
                   {label}
@@ -189,17 +183,16 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
               Política de privacidad
             </a>
             {/* Derecho de arrepentimiento y garantía legal, sin login (RBT-683). Como un
-                enlace más de los legales, no como botón destacado. */}
-            {conDevoluciones && (
-              <button
-                type="button"
-                className="ds-link"
-                onClick={() => setDevolucionAbierta(true)}
-                style={{ padding: 0, border: 'none', background: 'none', fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                Arrepentimiento / Devolución
-              </button>
-            )}
+                enlace más de los legales, no como botón destacado. Se muestra SIEMPRE:
+                no depende del interruptor de devoluciones de Configuración. */}
+            <button
+              type="button"
+              className="ds-link"
+              onClick={() => setDevolucionAbierta(true)}
+              style={{ padding: 0, border: 'none', background: 'none', fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Arrepentimiento / Devolución
+            </button>
             <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
               © 2026 {tienda.nombre} · Todos los derechos reservados
             </div>
@@ -207,7 +200,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
         </div>
       </div>
 
-      {conDevoluciones && <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />}
+      <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
       <SocialProofToast slug={slug} />
     </footer>
   )
