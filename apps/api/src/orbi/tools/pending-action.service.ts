@@ -132,7 +132,9 @@ export class PendingActionService {
         return { tipo: 'resuelta', result: fila.result as unknown as ToolResult };
       case 'executing': {
         const desde = fila.startedAt?.getTime() ?? 0;
-        return Date.now() - desde < APLICANDO_MAX_MS ? { tipo: 'aplicando' } : { tipo: 'desconocido', tool: fila.tool };
+        return Date.now() - desde < APLICANDO_MAX_MS
+          ? { tipo: 'aplicando' }
+          : { tipo: 'desconocido', tool: fila.tool };
       }
       default:
         // rejected, o pending pero vencida.

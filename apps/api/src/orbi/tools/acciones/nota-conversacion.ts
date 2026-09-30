@@ -65,18 +65,18 @@ function sujeto(tool: string, ctx: { pedido?: number; codigo?: string }): string
   return etiqueta;
 }
 
-/**
- * El error de un ToolResult, reducido a una categoría fija. Se reconocen los
- * mensajes que arma el propio servidor (ToolRegistryService y el confirm); un
- * error que viene de adentro de la tool (el service tiró) no se puede
- * clasificar sin leer su texto, así que cuenta como interno.
- */
 // La forma exacta de ToolRegistryService#execute: `"<tool>" no disponible en
 // <surface>` o `en este paso`. Un "no disponible" cualquiera ("Producto no
 // disponible", que puede tirar el service de adentro de la tool) no es un
 // permiso.
 const TOOL_NO_DISPONIBLE = /^"[^"]+" no disponible en /;
 
+/**
+ * El error de un ToolResult, reducido a una categoría fija. Se reconocen los
+ * mensajes que arma el propio servidor (ToolRegistryService y el confirm); un
+ * error que viene de adentro de la tool (el service tiró) no se puede
+ * clasificar sin leer su texto, así que cuenta como interno.
+ */
 function categoria(error: string | undefined): Categoria {
   if (!error) return 'interno';
   if (error === ERROR_DESACTUALIZADA) return 'conflicto';

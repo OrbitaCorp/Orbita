@@ -88,11 +88,6 @@ function sumarConsumo(consumo: ConsumoPorProveedor, u: LlmUsage): void {
 }
 
 /**
- * Engancha el corte de la respuesta al cierre de la conexión (spec §3.7).
- * Node emite 'close' también después de un res.end() normal: solo es un corte
- * si la respuesta todavía no terminó.
- */
-/**
  * Los 409 de /orbi/confirm y /orbi/reject. Llevan su contrato (`estado`, y
  * `mensaje` o `result`, spec §3.4) y además `error` y `message`, que es lo que
  * lee el filtro global: sin ellos el 409 salía con `error: 'ConflictException'`
@@ -105,6 +100,11 @@ function conflicto(
   return new ConflictException({ error: 'Conflict', message, ...cuerpo });
 }
 
+/**
+ * Engancha el corte de la respuesta al cierre de la conexión (spec §3.7).
+ * Node emite 'close' también después de un res.end() normal: solo es un corte
+ * si la respuesta todavía no terminó.
+ */
 function corteAlCerrar(res: Response): AbortController {
   const corte = new AbortController();
   res.on('close', () => {
