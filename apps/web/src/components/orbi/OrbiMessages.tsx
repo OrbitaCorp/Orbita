@@ -174,7 +174,7 @@ function EstadoDeLaTarjeta({ accion }: { accion: OrbiAction }) {
     case 'complete':
       return <>{fila(<Check size={14} strokeWidth={2.5} aria-hidden />, 'Listo', 'var(--chip-success-fg)')}{detalle}</>
     case 'error':
-      return <>{fila(<CircleAlert size={14} strokeWidth={2} aria-hidden />, 'No se pudo', 'var(--chip-error-fg)')}{detalle}</>
+      return <>{fila(<CircleAlert size={14} strokeWidth={2} aria-hidden />, accion.titulo ?? 'No se pudo', 'var(--chip-error-fg)')}{detalle}</>
     case 'rejected':
       return fila(<X size={14} strokeWidth={2} aria-hidden />, 'Cancelado', 'var(--color-muted)')
     case 'unknown':

@@ -2,6 +2,9 @@ import type { EstadoTarjeta } from './confirmarAccion'
 
 export type OrbiSurface = 'wizard' | 'panel'
 
+/** Id del panel de Orbi en escritorio/celular: lo apunta el `aria-controls` del botón de la barra. */
+export const ID_PANEL_ORBI = 'orbi-panel'
+
 export interface OrbiContext {
   surface: OrbiSurface
   module?: string
@@ -49,6 +52,11 @@ export interface OrbiAction {
   resumen?: string
   /** Aviso chico de la tarjeta ("Ya se aplicó", "No pude cancelarla…"). */
   nota?: string
+  /**
+   * Encabezado propio de la tarjeta para cuando el de su estado ("No se
+   * pudo") es ambiguo: "No se pudo cancelar", "No se aplicó".
+   */
+  titulo?: string
 }
 
 export interface OrbiMessage {

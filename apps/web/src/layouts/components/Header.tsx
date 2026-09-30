@@ -15,6 +15,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { esVisitanteDemo } from '@/lib/demo/modo'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -380,6 +381,9 @@ export default function Header({ onMenuClick }: Props) {
                         onClick={alternarOrbi}
                         aria-label="Abrir Orbi"
                         aria-expanded={orbiAbierto}
+                        // Solo con el panel abierto: cerrado no está en el DOM y
+                        // un aria-controls a un id inexistente es inválido.
+                        aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
                         className="admin-orbi-btn ds-hover place-items-center rounded-lg"
                         style={{ width: 44, height: 44, background: 'transparent', border: '1px solid var(--color-border)', flexShrink: 0 }}
                     >

@@ -50,6 +50,23 @@ describe('siguienteEstado (respuesta de confirmar)', () => {
     expect(paso.mensaje).toBe('Esa acción ya no está disponible. Pedísela a Orbi de nuevo.')
   })
 
+  it('403: error "No se aplicó" sin Reintentar (el guard rechaza antes de ejecutar nada)', () => {
+    const paso = siguienteEstado({ http: 403 }, 'createCoupon')
+    expect(paso.estado).toBe('error')
+    expect(paso.reintentar).toBe(false)
+    expect(paso.titulo).toBe('No se aplicó')
+    expect(paso.mensaje).toBe('No tenés permiso para hacer esto.')
+    expect(paso.mensaje).not.toMatch(PEDISELA)
+  })
+
+  it('400: error "No se aplicó" sin Reintentar (la validación corta antes de ejecutar)', () => {
+    const paso = siguienteEstado({ http: 400 })
+    expect(paso.estado).toBe('error')
+    expect(paso.reintentar).toBe(false)
+    expect(paso.titulo).toBe('No se aplicó')
+    expect(paso.mensaje).toBeTruthy()
+  })
+
   it('409 aplicando: sigue en active y pide reintentar', () => {
     const paso = siguienteEstado({ http: 409, body: { estado: 'aplicando' } })
     expect(paso.estado).toBe('active')
@@ -60,8 +77,11 @@ describe('siguienteEstado (respuesta de confirmar)', () => {
     const paso = siguienteEstado({ http: 409, body: { estado: 'desconocido' } }, 'createCoupon')
     expect(paso.estado).toBe('unknown')
     expect(paso.reintentar).toBe(false)
-    expect(paso.mensaje).toMatch(/No sé si se aplicó/)
-    expect(paso.mensaje).toMatch(/Cupones/)
+    // El "No sé si se aplicó" ya es el encabezado de la tarjeta: el mensaje
+    // no lo repite, solo dice dónde revisar.
+    expect(paso.mensaje).not.toMatch(/No sé si se aplicó/)
+    expect(paso.mensaje).toMatch(/Revisalo en Cupones/)
+    expect(paso.mensaje).toMatch(/no se duplica/)
   })
 
   it('red caída: unknown', () => {
@@ -109,9 +129,14 @@ describe('interpretarRespuestaConfirmar (HTTP crudo → respuesta tipada)', () =
     expect(interpretarRespuestaConfirmar(404, { message: 'x' })).toEqual({ http: 404 })
   })
 
-  it('cualquier otra cosa (5xx, 403, 429, cuerpo raro) cae en "no sé": nunca afirma algo que no sabe', () => {
+  it('403 y 400 son rechazos previos a la ejecución: tienen su propio estado', () => {
+    expect(interpretarRespuestaConfirmar(403, { message: 'no' })).toEqual({ http: 403 })
+    expect(interpretarRespuestaConfirmar(400, { message: ['actionId must be a UUID'] })).toEqual({ http: 400 })
+  })
+
+  it('cualquier otra cosa (5xx, 429, cuerpo raro) cae en "no sé": nunca afirma algo que no sabe', () => {
     expect(interpretarRespuestaConfirmar(502, null)).toEqual({ http: 500 })
-    expect(interpretarRespuestaConfirmar(403, { message: 'no' })).toEqual({ http: 500 })
+    expect(interpretarRespuestaConfirmar(429, { message: 'slow down' })).toEqual({ http: 500 })
     expect(interpretarRespuestaConfirmar(200, null)).toEqual({ http: 500 })
     expect(interpretarRespuestaConfirmar(409, { estado: 'otro' })).toEqual({ http: 500 })
   })
@@ -181,6 +206,44 @@ describe('confirmarConReintentos', () => {
   })
 })
 
+describe('confirmarConReintentos: la sesión cambió en el medio (logout, otro usuario, reset)', () => {
+  it('por defecto siempre es vigente: no cambia nada para quien no pasa `vigente`', async () => {
+    const final = await confirmarConReintentos('acc-5', async () => ({ http: 200, body: { success: true, label: 'Listo' } }), async () => {})
+    expect(final.cortado).toBeUndefined()
+    expect(final.estado).toBe('complete')
+  })
+
+  it('corta el lazo apenas deja de ser vigente: no vuelve a POSTear', async () => {
+    const pedidos: string[] = []
+    const esperas: number[] = []
+    let vigente = true
+    const final = await confirmarConReintentos(
+      'acc-6',
+      async (id) => { pedidos.push(id); return { http: 409, body: { estado: 'aplicando' } } },
+      async (ms) => { esperas.push(ms); vigente = false }, // logout durante la espera
+      'createCoupon',
+      () => vigente,
+    )
+    expect(pedidos).toEqual(['acc-6'])
+    expect(esperas).toEqual([500])
+    expect(final.cortado).toBe(true)
+  })
+
+  it('un 200 que llega con la sesión ya cambiada queda cortado: no es un complete para el que llama', async () => {
+    let vigente = true
+    const final = await confirmarConReintentos(
+      'acc-7',
+      async () => { vigente = false; return { http: 200, body: { success: true, label: 'Listo', data: { productId: 'p1' } } } },
+      async () => {},
+      'createProduct',
+      () => vigente,
+    )
+    expect(final.cortado).toBe(true)
+    expect(final.estado).not.toBe('complete')
+    expect(final.data).toBeUndefined()
+  })
+})
+
 describe('cancelar (POST /orbi/reject)', () => {
   it('interpreta las respuestas', () => {
     expect(interpretarRespuestaCancelar(200, { ok: true })).toEqual({ http: 200 })
@@ -210,6 +273,9 @@ describe('cancelar (POST /orbi/reject)', () => {
   it('404: no afirma que no se hizo nada (pudo estar aplicándose) y no dice "pedísela"', () => {
     const paso = siguienteEstadoAlCancelar({ http: 404 }, 'createCoupon')
     expect(paso.estado).toBe('error')
+    // "No se pudo" solo sería ambiguo (¿no se pudo aplicar o cancelar?): el
+    // encabezado dice qué fue lo que no se pudo.
+    expect(paso.titulo).toBe('No se pudo cancelar')
     expect(paso.mensaje).toMatch(/Cupones/)
     expect(paso.mensaje).not.toMatch(PEDISELA)
   })

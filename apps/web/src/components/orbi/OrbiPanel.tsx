@@ -9,6 +9,7 @@ import { OrbiInput } from './OrbiInput'
 import { OrbiBottomSheet } from './OrbiBottomSheet'
 import { useMediaQuery } from './useMediaQuery'
 import { track } from '@/lib/analytics/wizardTracker'
+import { ID_PANEL_ORBI } from './types'
 
 export function OrbiPanel() {
   const isOpen = useOrbiStore(s => s.isOpen)
@@ -52,6 +53,7 @@ export function OrbiPanel() {
       />
 
       <div
+        id={ID_PANEL_ORBI}
         className="orbi-panel-root"
         style={{
           position: 'fixed',

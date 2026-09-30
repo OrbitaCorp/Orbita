@@ -22,6 +22,9 @@ export interface ResultadoTool {
 export type RespuestaConfirmar =
   | { http: 200; body: ResultadoTool }
   | { http: 404 }
+  // 403 y 400 los corta la API ANTES de tocar la acción (el guard de miembro, la
+  // validación del body): seguro que no se aplicó nada.
+  | { http: 400 | 403 }
   | { http: 409; body: { estado: 'aplicando' | 'desconocido'; mensaje?: string } }
   | { http: 'red' | 500 }
 
@@ -36,7 +39,17 @@ export interface PasoTarjeta {
   /** Solo con 409 `aplicando`: volver a preguntar solo, con el mismo actionId. */
   reintentar: boolean
   mensaje?: string
+  /**
+   * Encabezado de la tarjeta cuando el estado genérico ("No se pudo") no
+   * alcanza para decir qué pasó. Sin esto, la tarjeta usa el de su estado.
+   */
+  titulo?: string
 }
+
+// Los dos encabezados que se pisan en estado `error`: rechazo previo a la
+// ejecución (no se aplicó nada) y cancelación que no se pudo confirmar.
+export const TITULO_NO_SE_APLICO = 'No se aplicó'
+export const TITULO_NO_SE_PUDO_CANCELAR = 'No se pudo cancelar'
 
 // Los dos únicos textos que dicen "pedísela de nuevo": la acción seguro NO se
 // aplicó (no existe más, o el servidor se negó porque la tarjeta quedó vieja).
@@ -48,6 +61,8 @@ export const MENSAJE_DESACTUALIZADA = 'La acción cambió mientras tanto. Pedís
 // nada a nadie.
 const MENSAJE_INTERNO = 'Falló de nuestro lado y no se aplicó.'
 const MENSAJE_SIN_MOTIVO = 'No se pudo completar.'
+const MENSAJE_SIN_PERMISO = 'No tenés permiso para hacer esto.'
+const MENSAJE_CONFIRMACION_INVALIDA = 'La confirmación no era válida, así que no se aplicó nada.'
 
 // Los códigos de error fijos que manda la API (ver nota-conversacion.ts en
 // apps/api): el resto son frases de las herramientas, que ya están en castellano.
@@ -81,7 +96,8 @@ export function dondeRevisar(tool?: string): string {
 }
 
 function mensajeDesconocido(tool?: string): string {
-  return `No sé si se aplicó. Revisalo en ${dondeRevisar(tool)}; si reintentás, no se duplica.`
+  // Sin "No sé si se aplicó": ya es el encabezado de la tarjeta en `unknown`.
+  return `Revisalo en ${dondeRevisar(tool)}; si reintentás, no se duplica.`
 }
 
 function mensajeSigueAplicando(tool?: string): string {
@@ -104,6 +120,11 @@ export function siguienteEstado(r: RespuestaConfirmar, tool?: string): PasoTarje
         : { estado: 'error', reintentar: false, mensaje: motivoDelError(r.body.error) }
     case 404:
       return { estado: 'error', reintentar: false, mensaje: MENSAJE_NO_DISPONIBLE }
+    case 403:
+      // Sin Reintentar: volver a mandar lo mismo recibe el mismo rechazo.
+      return { estado: 'error', reintentar: false, titulo: TITULO_NO_SE_APLICO, mensaje: MENSAJE_SIN_PERMISO }
+    case 400:
+      return { estado: 'error', reintentar: false, titulo: TITULO_NO_SE_APLICO, mensaje: MENSAJE_CONFIRMACION_INVALIDA }
     case 409:
       return r.body.estado === 'aplicando'
         ? { estado: 'active', reintentar: true }
@@ -131,7 +152,7 @@ function comoResultado(v: unknown): ResultadoTool | null {
 /**
  * Pasa el status y el cuerpo crudos de POST /orbi/confirm a la respuesta
  * tipada. El 409 de Nest trae `{ estado, mensaje, error, statusCode }`: se lee
- * `estado`. Todo lo que no es una respuesta conocida (5xx, 403, 429, un
+ * `estado`. Todo lo que no es una respuesta conocida (5xx, 429, un
  * cuerpo que no se entiende) cae en "no sé": nunca se afirma algo que no se
  * sabe, y reintentar el mismo actionId no duplica.
  */
@@ -141,6 +162,8 @@ export function interpretarRespuestaConfirmar(status: number, cuerpo: unknown): 
     return body ? { http: 200, body } : { http: 500 }
   }
   if (status === 404) return { http: 404 }
+  if (status === 403) return { http: 403 }
+  if (status === 400) return { http: 400 }
   if (status === 409 && esObjeto(cuerpo) && (cuerpo.estado === 'aplicando' || cuerpo.estado === 'desconocido')) {
     return {
       http: 409,
@@ -153,6 +176,12 @@ export function interpretarRespuestaConfirmar(status: number, cuerpo: unknown): 
 export interface ResultadoConfirmar extends PasoTarjeta {
   /** `data` del ToolResult, solo en un 200. */
   data?: unknown
+  /**
+   * La sesión cambió mientras se confirmaba (logout, otro usuario, reset): no
+   * hay tarjeta a la que mostrarle nada y quien llama no tiene que aplicar
+   * efectos (refrescar pantallas, marcar productos) sobre la sesión nueva.
+   */
+  cortado?: boolean
 }
 
 /**
@@ -160,13 +189,21 @@ export interface ResultadoConfirmar extends PasoTarjeta {
  * MISMO actionId esperando cada vez más. `pedir` hace el POST; si tira (red
  * caída) cuenta como "no sé". `esperar` se inyecta para poder probarlo sin
  * relojes.
+ *
+ * `vigente` se consulta después de cada espera y de cada respuesta: el lazo
+ * puede durar ~15 s y en ese tiempo la persona puede cerrar sesión o entrar
+ * otro usuario. Sin cortarlo, seguiría POSTeando /orbi/confirm con un token
+ * nuevo y aplicaría los efectos de la acción sobre la sesión equivocada. La
+ * acción en sí no se pierde: el servidor la termina igual.
  */
 export async function confirmarConReintentos(
   actionId: string,
   pedir: (actionId: string) => Promise<RespuestaConfirmar>,
   esperar: (ms: number) => Promise<void>,
   tool?: string,
+  vigente: () => boolean = () => true,
 ): Promise<ResultadoConfirmar> {
+  const cortado: ResultadoConfirmar = { estado: 'unknown', reintentar: false, cortado: true }
   for (let reintentos = 0; ; reintentos++) {
     let r: RespuestaConfirmar
     try {
@@ -174,6 +211,7 @@ export async function confirmarConReintentos(
     } catch {
       r = { http: 'red' }
     }
+    if (!vigente()) return cortado
     const paso = siguienteEstado(r, tool)
     if (!paso.reintentar) {
       return r.http === 200 && r.body.data !== undefined ? { ...paso, data: r.body.data } : paso
@@ -182,6 +220,7 @@ export async function confirmarConReintentos(
       return { estado: 'unknown', reintentar: false, mensaje: mensajeSigueAplicando(tool) }
     }
     await esperar(ESPERAS_REINTENTO_MS[reintentos])
+    if (!vigente()) return cortado
   }
 }
 
@@ -201,6 +240,8 @@ export interface PasoCancelar {
   mensaje?: string
   /** Aviso chico arriba del resultado ("Ya se aplicó", "No pude cancelarla"). */
   nota?: string
+  /** Encabezado propio de la tarjeta (ver PasoTarjeta). */
+  titulo?: string
   data?: unknown
 }
 
@@ -221,7 +262,11 @@ export function siguienteEstadoAlCancelar(r: RespuestaCancelar, tool?: string): 
     case 404:
       // 404 también es "se está aplicando en este momento" (ver
       // PendingActionService#rechazar): no se puede afirmar que no pasó nada.
-      return { estado: 'error', mensaje: `Ya no se puede cancelar. Revisá en ${dondeRevisar(tool)} si se aplicó.` }
+      return {
+        estado: 'error',
+        titulo: TITULO_NO_SE_PUDO_CANCELAR,
+        mensaje: `Ya no se puede cancelar. Revisá en ${dondeRevisar(tool)} si se aplicó.`,
+      }
     default:
       // Cancelar no escribe nada: la propuesta sigue ahí y se puede volver a
       // cancelar (o confirmar).

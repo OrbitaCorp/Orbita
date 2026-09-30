@@ -278,19 +278,26 @@ export function useOrbiChat() {
    * que quisiera.
    */
   const confirmarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string, tool: string) => {
-    useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active', result: undefined, nota: undefined })
+    const sesionAlConfirmar = useOrbiStore.getState().sesion
+    useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active', result: undefined, nota: undefined, titulo: undefined })
 
     // Mientras la API diga "se está aplicando" se vuelve a preguntar con el
     // MISMO actionId; red caída o 5xx quedan en "no sé" con Reintentar (ver
     // confirmarAccion.ts: confirmar es idempotente, reintentar no duplica).
-    const final = await confirmarConReintentos(actionId, pedirConfirmacion, esperar, tool)
+    // El lazo de reintentos dura hasta ~15 s: si en ese tiempo hubo un reset
+    // (logout, otro usuario, Nueva conversación) se corta. La acción no se
+    // pierde, el servidor la termina igual; lo que no se hace es seguir
+    // POSTeando ni aplicar efectos (refrescar pantallas, marcar el producto
+    // como creado) sobre la sesión nueva.
+    const vigente = () => !debeDescartar(sesionAlConfirmar, useOrbiStore.getState().sesion)
+    const final = await confirmarConReintentos(actionId, pedirConfirmacion, esperar, tool, vigente)
+    if (final.cortado || !vigente()) return
     const data = esRegistro(final.data) ? final.data : undefined
 
-    // Si hubo un reset en el medio la burbuja ya no existe y esto no toca
-    // nada; el refresco de abajo igual corre, porque la acción sí se aplicó.
     useOrbiStore.getState().updateAction(mensajeId, accionId, {
       status: final.estado,
       result: final.mensaje,
+      titulo: final.titulo,
       data,
     })
     if (final.estado === 'complete') alAplicarse(tool, data)
@@ -320,6 +327,7 @@ export function useOrbiChat() {
       status: paso.estado,
       result: paso.mensaje,
       nota: paso.nota,
+      titulo: paso.titulo,
       ...(data ? { data } : {}),
     })
     if (paso.estado === 'complete') alAplicarse(tool, data)
