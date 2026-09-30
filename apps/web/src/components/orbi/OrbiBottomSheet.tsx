@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useOrbiChat } from './useOrbiChat'
+import { useOrbiStore } from './useOrbiStore'
 import { useOrbiContext } from './useOrbiContext'
 import { useOrbiViewport } from './useOrbiViewport'
 import { OrbiWizardCtx } from './OrbiWizardCtx'
@@ -169,6 +170,8 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         <OrbiInput
           onSend={(m) => send(m, context)}
           disabled={isStreaming}
+          streaming={isStreaming}
+          onStop={() => useOrbiStore.getState().abortar()}
           quickChips={context.quickChips}
         />
       </div>

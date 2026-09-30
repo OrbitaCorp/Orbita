@@ -5,6 +5,13 @@ import { authedFetch } from '@/lib/auth/authClient'
 import { track, wizardIds } from '@/lib/analytics/wizardTracker'
 import { getWizardFormState } from './useOrbiContext'
 import { leerStreamSse } from './sseParser'
+import {
+  conversationIdParaEnviar,
+  debeDescartar,
+  esAborto,
+  filtrarPorSesion,
+  idDeConversacionDelEvento,
+} from './sesionOrbi'
 
 // Forma de los datos de los eventos del stream. Es permisiva a propósito: el
 // parser devuelve `unknown` (JSON ya decodificado) y cada evento usa solo
@@ -71,12 +78,21 @@ export function useOrbiChat() {
     store.addMessage(assistantMsg)
     store.setStreaming(true)
 
+    // Se leen del estado vivo (no del `store` de este render): la sesión y el
+    // id tienen que ser los de este instante. Un AbortController por envío,
+    // guardado en el store para que Detener, cerrar, reset y logout lo corten.
+    const sesionAlEnviar = useOrbiStore.getState().sesion
+    const corte = new AbortController()
+    store.setAbort(corte)
+    const sigueVigente = () => !debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)
+
     try {
       const endpoint = context.surface === 'wizard' ? '/orbi/chat/wizard' : '/orbi/chat'
       const fetchFn = context.surface === 'wizard' ? fetch : authedFetch
 
       const res = await fetchFn(`${API}${endpoint}`, {
         method: 'POST',
+        signal: corte.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
@@ -88,7 +104,9 @@ export function useOrbiChat() {
           context: context.surface === 'wizard'
             ? { ...context, ...wizardIds(), formState: getWizardFormState() }
             : context,
-          conversationId: store.conversationId,
+          // Solo el panel sigue un hilo guardado en el servidor; sin id (o
+          // en el wizard) el campo no viaja y el servidor arranca uno nuevo.
+          conversationId: conversationIdParaEnviar(context.surface, useOrbiStore.getState().conversationId),
           history: priorHistory,
         }),
       })
@@ -98,6 +116,12 @@ export function useOrbiChat() {
       // vacía y la persona no veía por qué (auditoría interna 10/09).
       if (!res.ok) {
         const cuerpo = await res.json().catch(() => null)
+        if (!sigueVigente()) return
+        // Cortado mientras se leía el error: no se inventa un mensaje.
+        if (corte.signal.aborted) {
+          store.marcarDetenido(assistantMsg.id)
+          return
+        }
         store.appendToLastAssistant(
           typeof cuerpo?.message === 'string' ? cuerpo.message : 'No pude responder ahora. Probá de nuevo en un rato.',
         )
@@ -106,15 +130,17 @@ export function useOrbiChat() {
       if (!res.body) throw new Error('No response body')
       // Se lee hasta que el servidor cierra el stream, sin cortar en `done`:
       // el wizard manda `turn` después (ver leerStreamSse).
-      await leerStreamSse(res.body.getReader(), ({ event: eventType, data: crudo }) => {
+      // Cada evento pasa por el filtro de sesión: si hubo un reset desde que
+      // se mandó este mensaje, se tira todo lo que falte, `conversation`
+      // incluido (sería el hilo de otra persona o de la conversación vieja).
+      await leerStreamSse(res.body.getReader(), filtrarPorSesion(sesionAlEnviar, () => useOrbiStore.getState().sesion, ({ event: eventType, data: crudo }) => {
         const data = (crudo ?? {}) as DatosSse
         if (eventType === 'conversation') {
           // El servidor emite primero el id de la conversación del panel
           // (la crea si hace falta). Se guarda para mandarlo en el próximo
-          // mensaje y que Orbi siga el mismo hilo. En el wizard no viene.
-          // TODO(T11): el store todavía no descarta ids de un stream viejo
-          // ni aborta al reset; eso se agrega en la tarea del store.
-          if (typeof data.id === 'string') store.setConversationId(data.id)
+          // mensaje y que Orbi siga el mismo hilo. En el wizard no se usa.
+          const id = idDeConversacionDelEvento(context.surface, crudo)
+          if (id) store.setConversationId(id)
         } else if (eventType === 'text') {
           store.appendToLastAssistant(data.chunk ?? '')
         } else if (eventType === 'text_reset') {
@@ -158,11 +184,23 @@ export function useOrbiChat() {
           // estado de "escribiendo" lo baja el `finally` al cerrarse el
           // stream, y todavía puede llegar `turn` (wizard).
         }
-      })
-    } catch {
-      store.appendToLastAssistant('Error de conexión. Intentá de nuevo.')
+      }))
+    } catch (err) {
+      // Con la sesión cambiada (reset) la burbuja ya no existe: no se toca
+      // nada. Un corte pedido (Detener, cerrar el panel) no es un error de
+      // conexión: queda lo que llegó con la marca "Detenido".
+      if (!sigueVigente()) return
+      if (esAborto(err) || corte.signal.aborted) {
+        store.marcarDetenido(assistantMsg.id)
+      } else {
+        store.appendToLastAssistant('Error de conexión. Intentá de nuevo.')
+      }
     } finally {
-      store.setStreaming(false)
+      // Solo se suelta el controller si sigue siendo el de este envío, y solo
+      // se baja el "escribiendo" si nadie reinició el chat mientras tanto (el
+      // reset ya lo bajó, y puede haber otro envío en curso).
+      if (useOrbiStore.getState().abortEnCurso === corte) store.setAbort(null)
+      if (sigueVigente()) store.setStreaming(false)
     }
   }, [store])
 

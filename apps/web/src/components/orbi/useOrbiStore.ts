@@ -21,6 +21,14 @@ interface OrbiState {
   // con X"). Evita re-saludar al reabrir el panel en el mismo paso. Se
   // reinicia con reset().
   welcomeGreetedStep: string | null
+  // Contador de "sesión" del chat. Cada reset() lo sube; el lector del stream
+  // anota el valor al enviar y, si cambió cuando llega un evento, lo descarta
+  // (ver sesionOrbi.ts). Así un stream viejo nunca escribe en el chat nuevo.
+  sesion: number
+  // El AbortController del envío en curso (uno por envío, lo pone
+  // useOrbiChat). Sin cortarlo, cerrar Orbi o navegar no cierra la conexión y
+  // la API sigue gastando modelo para una respuesta que nadie va a leer.
+  abortEnCurso: AbortController | null
 
   toggle: () => void
   open: () => void
@@ -36,13 +44,16 @@ interface OrbiState {
   setTurnIdOnLastAssistant: (turnId: string) => void
   setRating: (msgId: string, rating: 1 | -1) => void
   setStreaming: (v: boolean) => void
-  setConversationId: (id: string) => void
+  setConversationId: (id: string | null) => void
   addStepDivider: (stepName: string) => void
   setWelcomeGreetedStep: (stepKey: string | null) => void
+  marcarDetenido: (msgId: string) => void
+  setAbort: (c: AbortController | null) => void
+  abortar: () => void
   reset: () => void
 }
 
-export const useOrbiStore = create<OrbiState>((set) => ({
+export const useOrbiStore = create<OrbiState>((set, get) => ({
   isOpen: false,
   messages: [],
   conversationId: null,
@@ -50,10 +61,20 @@ export const useOrbiStore = create<OrbiState>((set) => ({
   createdProductIds: new Set(),
   bubble: null,
   welcomeGreetedStep: null,
+  sesion: 0,
+  abortEnCurso: null,
 
-  toggle: () => set(s => ({ isOpen: !s.isOpen })),
+  // Cerrar Orbi corta la respuesta en curso: la vista se desmonta y nadie la
+  // va a leer. Abrir no toca nada.
+  toggle: () => {
+    if (get().isOpen) get().abortar()
+    set(s => ({ isOpen: !s.isOpen }))
+  },
   open: () => set({ isOpen: true, bubble: null }),
-  close: () => set({ isOpen: false }),
+  close: () => {
+    get().abortar()
+    set({ isOpen: false })
+  },
   showBubble: (data) => set({ bubble: data }),
   hideBubble: () => set({ bubble: null }),
 
@@ -129,5 +150,33 @@ export const useOrbiStore = create<OrbiState>((set) => ({
 
   setWelcomeGreetedStep: (stepKey) => set({ welcomeGreetedStep: stepKey }),
 
-  reset: () => set({ messages: [], conversationId: null, isStreaming: false, welcomeGreetedStep: null }),
+  marcarDetenido: (msgId) => set(s => ({
+    messages: s.messages.map(m => m.id === msgId ? { ...m, detenido: true } : m),
+  })),
+
+  setAbort: (c) => set({ abortEnCurso: c }),
+
+  // Corta la respuesta, no la conversación: los mensajes y el id quedan (es
+  // lo que usa el botón Detener y cerrar el panel).
+  abortar: () => {
+    const c = get().abortEnCurso
+    if (!c) return
+    set({ abortEnCurso: null })
+    c.abort()
+  },
+
+  // Conversación nueva (botón Nueva conversación, logout, login de otra
+  // persona): corta lo que esté en curso y sube la sesión para que ningún
+  // evento del stream viejo llegue a escribir acá. Limpiar welcomeGreetedStep
+  // hace que el saludo vuelva a aparecer.
+  reset: () => {
+    get().abortar()
+    set(s => ({
+      messages: [],
+      conversationId: null,
+      isStreaming: false,
+      welcomeGreetedStep: null,
+      sesion: s.sesion + 1,
+    }))
+  },
 }))

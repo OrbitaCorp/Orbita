@@ -209,9 +209,20 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
           if (contenido) return msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido
           // Sin texto todavía: mientras Orbi trabaja (último mensaje + streaming)
           // se muestra qué está haciendo. Un mensaje viejo sin texto no muestra nada.
-          return msg.role === 'assistant' && isLastMessage && isStreaming ? <OrbiThinking msg={msg} /> : null
+          if (msg.role === 'assistant' && isLastMessage && isStreaming) return <OrbiThinking msg={msg} />
+          // Cortada antes de que llegara texto: se dice en la burbuja en vez
+          // de dejarla vacía.
+          return msg.detenido ? <span style={{ color: 'var(--color-muted)' }}>No llegué a responder.</span> : null
         })()}
       </div>
+
+      {/* Respuesta cortada (Detener o cerrar el panel): lo que llegó queda y
+          se aclara que no está completa. No es un error de conexión. */}
+      {!isUser && msg.detenido && (
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', marginTop: 2 }}>
+          Detenido
+        </span>
+      )}
 
       {!hideActionsUntilDone && pendingActions.map(a => (
         <OrbiConfirmButton key={a.id} accion={a} mensajeId={msg.id} />

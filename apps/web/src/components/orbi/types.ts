@@ -55,4 +55,10 @@ export interface OrbiMessage {
   turnId?: string
   /** Voto del usuario sobre esta respuesta: 1 pulgar arriba, -1 abajo. */
   rating?: 1 | -1
+  /**
+   * La respuesta se cortó a mitad de camino (Detener o cerrar el panel): la
+   * burbuja conserva lo que llegó y muestra la marca "Detenido" en vez de un
+   * error de conexión.
+   */
+  detenido?: boolean
 }
