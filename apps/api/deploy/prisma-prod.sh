@@ -38,7 +38,12 @@ fi
 
 leer_secret() {
   local nombre="$1" valor
-  if ! valor="$(gcloud secrets versions access latest --secret="$nombre" --project="$PROJECT_ID" 2>&1)"; then
+  # Solo stdout es el valor del secret. Antes era `2>&1`: un aviso de gcloud
+  # por stderr en una lectura EXITOSA (versión nueva disponible, credenciales
+  # por vencer) quedaba pegado a la URL y prisma recibía basura. stderr va a
+  # /dev/null también cuando falla: el motivo probable ya está en el mensaje
+  # de abajo, y así este script nunca reimprime nada de lo que devolvió gcloud.
+  if ! valor="$(gcloud secrets versions access latest --secret="$nombre" --project="$PROJECT_ID" 2>/dev/null)"; then
     {
       echo "No se pudo leer el secret ${nombre} de Secret Manager (proyecto ${PROJECT_ID})."
       echo "¿gcloud está logueado con la cuenta @orbita-corp.com (gcloud auth login)?"
