@@ -42,6 +42,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let error = 'INTERNAL_ERROR';
     let message: string | undefined;
+    // Contrato propio de los 409 de POST /orbi/confirm y /orbi/reject (spec
+    // §3.4 de Orbi fase 1): `estado` dice si la acción se está aplicando, si
+    // no se sabe o si ya se aplicó, y `result` trae lo que se guardó. Sin
+    // copiarlos, el front solo vería un 409 genérico.
+    const extra: Record<string, unknown> = {};
 
     if (exception instanceof HttpException) {
       const res = exception.getResponse();
@@ -51,6 +56,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const body = res as Record<string, unknown>;
         message = (body.message as string) ?? undefined;
         error = (body.error as string) ?? exception.name;
+        if (typeof body.estado === 'string') {
+          extra.estado = body.estado;
+          if (body.mensaje !== undefined) extra.mensaje = body.mensaje;
+          if (body.result !== undefined) extra.result = body.result;
+        }
       }
       // El 413 que llega acá es el de multer al pasarse del tope configurado
       // (SUBIDA_IMAGEN o SUBIDA_VIDEO, según la ruta), con su texto en inglés
@@ -77,6 +87,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
-    response.status(status).json({ error, statusCode: status, message });
+    response.status(status).json({ error, statusCode: status, message, ...extra });
   }
 }

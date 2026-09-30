@@ -126,6 +126,46 @@ describe('ToolRegistryService', () => {
       expect(r.success).toBe(false);
       expect(tool.execute).not.toHaveBeenCalled();
     });
+
+    it('requiereConfirmacion distingue escrituras de lecturas (y una tool que no existe no escribe)', () => {
+      registry.register(escritura());
+      expect(registry.requiereConfirmacion('escribirAlgo')).toBe(true);
+      expect(registry.requiereConfirmacion('navigateTo')).toBe(false);
+      expect(registry.requiereConfirmacion('noExiste')).toBe(false);
+    });
+
+    // La tarjeta se arma al proponer, con el estado de la base de ESE momento
+    // (el pedido estaba pendiente, así que "se descuenta el stock"). Si al
+    // confirmar ya no dice lo mismo, lo que la persona aprobó no es lo que va a
+    // pasar.
+    describe('sigueVigente (tarjeta desactualizada al confirmar)', () => {
+      it('true si el resumen recalculado es el mismo', async () => {
+        const tool = escritura();
+        registry.register(tool);
+        expect(await registry.sigueVigente('escribirAlgo', { nombre: 'A' }, ctx, 'Escribir A')).toBe(true);
+        expect(tool.describirAccion).toHaveBeenCalledWith({ nombre: 'A' }, ctx);
+      });
+
+      it('false si cambió', async () => {
+        registry.register(escritura());
+        expect(await registry.sigueVigente('escribirAlgo', { nombre: 'A' }, ctx, 'Escribir B')).toBe(false);
+      });
+
+      it('false si el dato ya no existe (AccionInvalida)', async () => {
+        registry.register(escritura({ describirAccion: async () => { throw new AccionInvalida('Pedido no encontrado'); } }));
+        expect(await registry.sigueVigente('escribirAlgo', { nombre: 'A' }, ctx, 'Escribir A')).toBe(false);
+      });
+
+      it('un error inesperado se propaga (lo resuelve el confirm como interno)', async () => {
+        registry.register(escritura({ describirAccion: async () => { throw new Error('la base no respondió'); } }));
+        await expect(registry.sigueVigente('escribirAlgo', { nombre: 'A' }, ctx, 'Escribir A')).rejects.toThrow('la base no respondió');
+      });
+
+      it('sin describirAccion no hay nada que comparar', async () => {
+        registry.register(escritura({ describirAccion: undefined }));
+        expect(await registry.sigueVigente('escribirAlgo', { nombre: 'A' }, ctx, 'Ejecutar: escribirAlgo')).toBe(true);
+      });
+    });
   });
 
   it('NavigationTool returns path without section', async () => {

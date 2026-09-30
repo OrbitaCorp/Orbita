@@ -143,8 +143,15 @@ export class OrbiContextDto {
   anonId?: string;
 }
 
-/** Confirmación de una acción que Orbi propuso. Solo el id: ver PendingActionStore. */
+/** Confirmación de una acción que Orbi propuso. Solo el id: ver PendingActionService. */
 export class ConfirmActionDto {
+  @IsString()
+  @MaxLength(64)
+  actionId!: string;
+}
+
+/** Cancelación de una acción que Orbi propuso (botón "Cancelar" de la tarjeta). Solo el id. */
+export class RejectActionDto {
   @IsString()
   @MaxLength(64)
   actionId!: string;

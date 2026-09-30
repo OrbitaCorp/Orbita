@@ -42,7 +42,7 @@ export interface OrbiTool {
   steps?: string[];
   /**
    * La tool ESCRIBE en la base, así que no se ejecuta sola: se propone y la
-   * persona confirma con un clic (ver PendingActionStore y POST /orbi/confirm).
+   * persona confirma con un clic (ver PendingActionService y POST /orbi/confirm).
    *
    * Es la defensa contra la inyección indirecta de RBT-695. Un texto malicioso
    * guardado en el nombre de un cliente puede convencer al modelo de pedir un

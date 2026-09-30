@@ -32,9 +32,10 @@ export class ToolRegistryService {
    * ¿Esta llamada hay que proponerla en vez de ejecutarla?
    *
    * - `null`: no se propone. Lecturas (se corren directo), o una escritura que
-   *   no pasa las puertas (surface, paso, permisos, demo) — en ese caso
-   *   execute() la va a rechazar igual, con su mensaje de error, y no tiene
-   *   sentido pedirle a nadie que confirme algo que va a fallar.
+   *   no pasa las puertas (surface, paso, permisos, demo): no tiene sentido
+   *   pedirle a nadie que confirme algo que va a fallar. El chat distingue los
+   *   dos casos con requiereConfirmacion() y a la escritura NO la ejecuta: le
+   *   devuelve el fallo al modelo.
    * - `{ error }`: los argumentos no pasan el DTO del endpoint, o un dato de
    *   la base no existe (el pedido, la categoría). No hay tarjeta: el
    *   controller le devuelve el motivo al modelo como resultado de la tool.
@@ -90,6 +91,40 @@ export class ToolRegistryService {
     }
   }
 
+  /**
+   * ¿La tool escribe? El chat lo pregunta cuando proponer() devuelve null:
+   * una escritura que no pasó las puertas (demo, permiso, surface) NO se
+   * ejecuta directo, el modelo recibe el fallo. Así la garantía de que nada se
+   * escribe sin clic no depende de que execute() repita cada puerta.
+   */
+  requiereConfirmacion(name: string): boolean {
+    return this.tools.get(name)?.requiresConfirmation === true;
+  }
+
+  /**
+   * ¿La tarjeta que la persona aprobó sigue describiendo lo que va a pasar?
+   *
+   * El resumen se arma al proponer, con la base de ESE momento: la tarjeta del
+   * pedido dice "se descuenta el stock" o "le llega un mail" según el estado
+   * que tenía. Si entre la propuesta y el clic el pedido cambió, confirmar
+   * haría algo distinto de lo que se vio. Se recalcula con los mismos
+   * argumentos y el mismo negocio (ctx.businessId) y se compara.
+   *
+   * - Sin describirAccion no hay nada que recalcular: true.
+   * - AccionInvalida (el pedido ya no existe): false.
+   * - Cualquier otro error se propaga: el confirm lo resuelve como interno.
+   */
+  async sigueVigente(name: string, args: Record<string, unknown>, ctx: ToolExecutionContext, resumenGuardado: string): Promise<boolean> {
+    const tool = this.tools.get(name);
+    if (!tool?.describirAccion) return true;
+    try {
+      return (await tool.describirAccion(args, ctx)) === resumenGuardado;
+    } catch (e) {
+      if (e instanceof AccionInvalida) return false;
+      throw e;
+    }
+  }
+
   async execute(
     name: string,
     args: Record<string, unknown>,
@@ -100,10 +135,11 @@ export class ToolRegistryService {
     const tool = this.tools.get(name);
     if (!tool) return { success: false, error: `Tool "${name}" no existe`, label: name };
 
-    // proponer() devuelve null en la demo, y el chat ejecuta directo lo que no
-    // se propone: sin este corte, una escritura pedida en la demo se
-    // ESCRIBIRÍA sin tarjeta (DemoGuard solo frena rutas HTTP, y las tools
-    // llaman a los services directo).
+    // Segunda barrera para la demo: el chat ya no ejecuta directo una
+    // escritura que no se propuso (ver requiereConfirmacion), pero si eso se
+    // rompiera, una escritura pedida en la demo se ESCRIBIRÍA sin tarjeta
+    // (DemoGuard solo frena rutas HTTP, y las tools llaman a los services
+    // directo).
     if (opciones?.soloLectura && tool.requiresConfirmation) {
       return { success: false, error: 'En la demo no se pueden hacer cambios', label: name };
     }

@@ -1,15 +1,16 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
-import { ConfirmActionDto, OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
+import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
 import type { ToolExecutionContext, ToolResult } from './tools/tool.interface';
-import { PendingActionStore } from './tools/pending-action.store';
+import { PendingActionService, type FilaPendiente } from './tools/pending-action.service';
+import { notaDeCancelacion, notaDeConfirmacion, pantallaDe, ERROR_DESACTUALIZADA, ERROR_INTERNO } from './tools/acciones/nota-conversacion';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -30,6 +31,12 @@ const HISTORIAL_PANEL = 30; // mensajes previos que se le mandan al modelo
 const MAX_VUELTAS_TOOLS = 6; // llamadas al modelo por mensaje (cada tool es otra vuelta)
 const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.';
 const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
+const MENSAJE_NO_DISPONIBLE = 'Esa acción ya no está disponible. Pedísela a Orbi de nuevo.';
+const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos.';
+// Lo que recibe el modelo cuando pide una escritura que no puede proponerse
+// (demo, sin permiso, fuera del panel). Fijo y sin detalles.
+const ESCRITURA_NO_DISPONIBLE = 'No podés hacer esa acción desde acá: no tenés permiso o no está disponible.';
+const ESCRITURA_EN_DEMO = 'En la demo no se pueden hacer cambios';
 
 // Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
 // (miembro readOnly, ver demo/demo-ia.ts). Va al final del prompt de
@@ -65,7 +72,7 @@ export class OrbiController {
     private readonly contextBuilder: ContextBuilderService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly wizardAnalytics: WizardAnalyticsService,
-    private readonly pendingActions: PendingActionStore,
+    private readonly pendingActions: PendingActionService,
     private readonly usageMetering: UsageMeteringService,
     private readonly cuota: CuotaService,
   ) {}
@@ -134,6 +141,10 @@ export class OrbiController {
 
     try {
       let conversationId = dto.conversationId;
+      // La única conversación que puede quedar guardada en una acción pendiente
+      // (ahí va la nota de confirmar o cancelar): la que se verificó como
+      // propia en ESTE turno. El id del body, sin verificar, nunca.
+      let conversacionVerificada: string | null = null;
       let history: LlmMessage[] = [];
 
       if (dto.context.surface === OrbiSurface.PANEL && !esDemo) {
@@ -151,6 +162,7 @@ export class OrbiController {
           const conv = await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
           conversationId = conv.id;
         }
+        conversacionVerificada = conversationId;
 
         await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'user',
@@ -261,12 +273,31 @@ export class OrbiController {
               continue;
             }
 
+            // Una escritura que no se pudo proponer (demo, sin permiso, otra
+            // surface) NO se ejecuta directo: solo /orbi/confirm escribe. El
+            // modelo recibe el fallo, igual que con un { error }.
+            if (!propuesta && this.toolRegistry.requiereConfirmacion(event.call.name)) {
+              messages.push({
+                role: 'assistant',
+                content: '',
+                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
+              });
+              messages.push({
+                role: 'tool',
+                content: JSON.stringify({ success: false, error: esDemo ? ESCRITURA_EN_DEMO : ESCRITURA_NO_DISPONIBLE }),
+                toolCallId: event.call.id,
+              });
+              continueLoop = true;
+              continue;
+            }
+
             if (propuesta) {
-              const actionId = this.pendingActions.crear({
+              const actionId = await this.pendingActions.crear({
                 tool: event.call.name,
                 args: event.call.arguments,
                 businessId: user.businessId,
                 memberId: user.memberId,
+                conversationId: conversacionVerificada,
                 resumen: propuesta.resumen,
               });
 
@@ -302,8 +333,8 @@ export class OrbiController {
 
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
-            // soloLectura también acá: proponer() devuelve null en la demo, y
-            // sin esto una escritura pedida por el modelo se ejecutaría directo.
+            // Acá solo llegan lecturas. soloLectura igual, como segunda barrera
+            // de la demo (ver ToolRegistryService#execute).
             const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName, { soloLectura: esDemo });
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
@@ -368,14 +399,6 @@ export class OrbiController {
     }
   }
 
-  /**
-   * Ejecuta de verdad una acción que Orbi propuso y la persona confirmó.
-   *
-   * Recibe SOLO el id de la propuesta. La herramienta y los argumentos viven
-   * en el servidor (PendingActionStore) — si vinieran del cliente, esto sería
-   * el mismo agujero de antes con un paso más: cualquiera podría saltearse a
-   * Orbi y postear la escritura que quisiera.
-   */
   // Cuando una respuesta encadena más vueltas de herramientas que el tope: se
   // corta con un mensaje en vez de seguir llamando al modelo.
   private cortarPorVueltas(res: Response): string {
@@ -385,6 +408,18 @@ export class OrbiController {
     return MENSAJE_VUELTAS;
   }
 
+  /**
+   * Ejecuta de verdad una acción que Orbi propuso y la persona confirmó
+   * (spec §3.4).
+   *
+   * Recibe SOLO el id de la propuesta. La herramienta y los argumentos viven
+   * en el servidor (PendingActionService): si vinieran del cliente, cualquiera
+   * podría saltearse a Orbi y postear la escritura que quisiera.
+   *
+   * Respuestas: 200 con el ToolResult (también el guardado, si ya se había
+   * confirmado: es idempotente), 409 `{ estado: 'aplicando' | 'desconocido',
+   * mensaje }`, 404 si ya no está disponible.
+   */
   @Post('confirm')
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: 60000 } })
@@ -396,23 +431,124 @@ export class OrbiController {
       throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
     }
 
-    // consumir() valida que la propuesta exista, no haya vencido, y sea de
-    // ESTE negocio y ESTA persona. Y la borra: un botón no se aprieta dos
-    // veces para crear dos cupones.
-    const accion = this.pendingActions.consumir(dto.actionId, user.businessId, user.memberId);
-    if (!accion) {
-      throw new NotFoundException('Esa acción ya no está disponible. Pedísela a Orbi de nuevo.');
+    const consumo = await this.pendingActions.consumir(dto.actionId, user.businessId, user.memberId);
+    switch (consumo.tipo) {
+      case 'resuelta':
+        return consumo.result;
+      case 'aplicando':
+        throw new ConflictException({ estado: 'aplicando', mensaje: MENSAJE_APLICANDO });
+      case 'desconocido':
+        // No se vuelve a ejecutar sola: si la escritura llegó a la base,
+        // repetirla crearía dos cupones o cambiaría dos veces el pedido.
+        throw new ConflictException({ estado: 'desconocido', mensaje: `No sé si se aplicó; revisalo en ${pantallaDe(consumo.tool)}.` });
+      case 'no_disponible':
+        throw new NotFoundException(MENSAJE_NO_DISPONIBLE);
     }
 
-    // Los permisos se vuelven a chequear acá dentro contra el JWT de AHORA, no
-    // contra los de cuando se propuso: entre una cosa y la otra le pueden haber
-    // sacado el permiso a la persona.
-    return this.toolRegistry.execute(accion.tool, accion.args, {
-      businessId: user.businessId,
-      userId: user.memberId,
-      surface: OrbiSurface.PANEL,
-      permissions: permisosDeOrbi(user),
-    });
+    const accion = consumo.accion;
+    const result = await this.ejecutarConfirmada(accion, user);
+
+    // La nota va DESPUÉS de guardar el estado y nunca cambia la respuesta: la
+    // acción ya se resolvió, y una conversación borrada o la base lenta no
+    // pueden hacer que la persona crea que no pasó.
+    await this.anotar(accion, user, (ids) => notaDeConfirmacion(accion.tool, result, ids));
+    return result;
+  }
+
+  /**
+   * Cancelar desde la tarjeta. Sin chequeo de permisos: cancelar una
+   * propuesta propia nunca puede estar prohibido.
+   *
+   * Respuestas: 200 `{ ok: true }` (también si ya estaba cancelada), 409
+   * `{ estado: 'ya_aplicada', result }` si ya se confirmó, 404 si no existe,
+   * venció o es de otra persona u otro negocio.
+   */
+  @Post('reject')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async reject(
+    @Body() dto: RejectActionDto,
+    @CurrentUser() user: AuthContext,
+  ): Promise<{ ok: true }> {
+    // Con un JWT de customer o platform_admin, memberId sería undefined y
+    // Prisma lo sacaría del filtro: cualquiera cancelaría acciones ajenas.
+    if (user.type !== 'member') {
+      throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
+    }
+
+    const rechazo = await this.pendingActions.rechazar(dto.actionId, user.businessId, user.memberId);
+    switch (rechazo.tipo) {
+      case 'ok': {
+        const accion = rechazo.accion;
+        await this.anotar(accion, user, (ids) => notaDeCancelacion(accion.tool, ids));
+        return { ok: true };
+      }
+      case 'ya_rechazada':
+        return { ok: true };
+      case 'ya_aplicada':
+        throw new ConflictException({ estado: 'ya_aplicada', result: rechazo.result });
+      case 'no_disponible':
+        throw new NotFoundException(MENSAJE_NO_DISPONIBLE);
+    }
+  }
+
+  /**
+   * Corre la acción tomada y SIEMPRE la deja resuelta (executed o failed, con
+   * result y resolvedAt), también si la tool tira. El result arranca como
+   * fallo interno: si algo falla antes de asignarlo, o dentro del catch, el
+   * finally igual tiene qué guardar. Si la fila quedara en executing, el
+   * próximo clic recibiría "no sé si se aplicó" para siempre.
+   */
+  private async ejecutarConfirmada(accion: FilaPendiente, user: Extract<AuthContext, { type: 'member' }>): Promise<ToolResult> {
+    let result: ToolResult = { success: false, error: ERROR_INTERNO, label: accion.tool };
+    try {
+      const args = (accion.args ?? {}) as Record<string, unknown>;
+      // Los permisos del JWT de AHORA, no los de cuando se propuso: entre una
+      // cosa y la otra le pueden haber sacado el permiso a la persona.
+      const ctx: ToolExecutionContext = {
+        businessId: user.businessId,
+        userId: user.memberId,
+        surface: OrbiSurface.PANEL,
+        permissions: permisosDeOrbi(user),
+      };
+      // Si la tarjeta ya no describe lo que pasaría (el pedido cambió de
+      // estado desde la propuesta), no se ejecuta: la persona aprobó otra cosa.
+      if (!(await this.toolRegistry.sigueVigente(accion.tool, args, ctx, accion.summary))) {
+        result = { success: false, error: ERROR_DESACTUALIZADA, label: accion.tool };
+      } else {
+        result = await this.toolRegistry.execute(accion.tool, args, ctx);
+      }
+    } catch (e) {
+      // Sin el mensaje: puede traer valores e internos de Prisma.
+      this.logger.warn(`Falló la acción confirmada ${accion.tool}: ${(e as Error)?.name ?? 'error'}`);
+      result = { success: false, error: ERROR_INTERNO, label: accion.tool };
+    } finally {
+      await this.pendingActions.resolver(accion.id, accion.businessId, result.success ? 'executed' : 'failed', result);
+    }
+    return result;
+  }
+
+  /**
+   * La nota de confirmar o cancelar en la conversación del turno en que se
+   * propuso, best-effort: si falla se loguea y la respuesta no cambia. El
+   * texto sale solo de datos del servidor (ver acciones/nota-conversacion.ts).
+   */
+  private async anotar(
+    accion: FilaPendiente,
+    user: Extract<AuthContext, { type: 'member' }>,
+    armar: (ids: { pedido?: number; codigo?: string }) => string,
+  ): Promise<void> {
+    if (!accion.conversationId) return;
+    try {
+      const ids = await this.pendingActions.idsParaNota(accion);
+      await this.conversationService.appendMessage(accion.conversationId, user.businessId, user.memberId, {
+        role: 'assistant',
+        content: armar(ids),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo anotar la acción ${accion.tool} en la conversación: ${(e as Error)?.name ?? 'error'}`);
+    }
   }
 
   @Post('chat/wizard')
