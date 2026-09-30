@@ -83,6 +83,16 @@ describe('UpdateOrderStatusTool — la tarjeta', () => {
     expect(Array.from(citado).length).toBeLessThanOrEqual(80);
   });
 
+  it('un RLO o un carácter de ancho cero en el nombre del cliente no llegan a la tarjeta', async () => {
+    const rlo = String.fromCharCode(0x202e);
+    const ancho0 = String.fromCharCode(0x200b);
+    const { tool } = armar(pedido({ onlineOrderDetails: { buyerName: `Ana${rlo} ffo %001 ed${ancho0}`, buyerEmail: 'a@example.com' } }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx);
+    expect(r).not.toContain(rlo);
+    expect(r).not.toContain(ancho0);
+    expect(r).toContain('"Ana ffo %001 ed"');
+  });
+
   it('una venta sin cliente lo dice', async () => {
     const { tool } = armar(pedido({ customer: null, onlineOrderDetails: null, channel: 'POS' }));
     const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CANCELLED' }, ctx);

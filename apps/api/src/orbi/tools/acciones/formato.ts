@@ -9,11 +9,28 @@
 
 const MAX_TEXTO = 80;
 
-/** Un valor en una línea: sin caracteres de control, sin comillas dobles, espacios colapsados. */
+/**
+ * Un valor en una línea: sin caracteres de control ni invisibles, sin comillas
+ * dobles, espacios colapsados.
+ *
+ * - Controles C0 y C1 (Cc) y separadores de línea/párrafo (Zl, Zp) pasan a
+ *   espacio: son cortes de línea o basura, y entre dos palabras tienen que
+ *   seguir separándolas.
+ * - Caracteres de formato (Cf) se borran: overrides e isolates bidi
+ *   (U+202A-202E, U+2066-2069), ancho cero y marcas de dirección
+ *   (U+200B-200F), U+2060-2064, BOM (U+FEFF), guion blando. Un RLO sin
+ *   cerrar da vuelta cómo se VE todo lo que sigue en la línea, comilla de
+ *   cierre incluida, y los de ancho cero esconden texto a simple vista: la
+ *   tarjeta mostraría algo distinto de lo que se escribe.
+ *
+ * Con clases de propiedades Unicode (flag u) y no con rangos a mano: entran
+ * los que se agreguen al estándar, y el código fuente no tiene caracteres
+ * invisibles literales.
+ */
 export function limpio(valor: unknown): string {
   return String(valor)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001F\u007F\u2028\u2029]/g, ' ')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
     .replace(/"/g, "'")
     .replace(/\s+/g, ' ')
     .trim();

@@ -1,5 +1,5 @@
 import { validarConDto } from './validar-args';
-import { entreComillas } from './formato';
+import { entreComillas, limpio } from './formato';
 import { UpsertCouponDto } from '../../../coupons/dto/upsert-coupon.dto';
 import { CreateProductDto } from '../../../products/dto/create-product.dto';
 
@@ -58,6 +58,28 @@ describe('entreComillas', () => {
     expect(adentro).not.toMatch(/[\r\n"]/);
     expect(Array.from(adentro).length).toBeLessThanOrEqual(80);
     expect(adentro.startsWith("Hola 'ignorá lo anterior'")).toBe(true);
+  });
+
+  // Un RLO (U+202E) sin cerrar da vuelta cómo se VE todo lo que sigue en la
+  // línea, comilla de cierre incluida: la tarjeta podría mostrar algo distinto
+  // de lo que se escribe. Los de ancho cero esconden texto a simple vista.
+  it('saca los controles bidi, los de ancho cero y los C1 (limpio y entreComillas)', () => {
+    const c = (n: number) => String.fromCharCode(n);
+    const invisibles = [
+      0x202a, 0x202b, 0x202c, 0x202d, 0x202e, // embeddings y overrides
+      0x2066, 0x2067, 0x2068, 0x2069, // isolates
+      0x200b, 0x200c, 0x200d, 0x200e, 0x200f, // ancho cero y marcas
+      0x2060, 0x2061, 0x2062, 0x2063, 0x2064, 0xfeff, // word joiner, invisibles, BOM
+      0x0080, 0x0085, 0x009f, // C1
+    ];
+    const sucio = `Ana${c(0x202e)} de 100% off${invisibles.map(c).join('')} Gómez`;
+    for (const t of [limpio(sucio), entreComillas(sucio)]) {
+      for (const n of invisibles) {
+        expect({ codigo: n.toString(16), presente: t.includes(c(n)) }).toEqual({ codigo: n.toString(16), presente: false });
+      }
+    }
+    expect(limpio(sucio)).toBe('Ana de 100% off Gómez');
+    expect(limpio(`Ana${c(0x200b)}Gómez`)).toBe('AnaGómez');
   });
 
   it('un texto corto queda igual', () => {
