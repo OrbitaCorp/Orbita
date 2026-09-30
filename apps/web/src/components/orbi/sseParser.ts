@@ -61,3 +61,41 @@ export function crearParserSse(): { alimentar(pedazo: string): EventoSse[] } {
     },
   }
 }
+
+// Lo mínimo que se le pide al lector de un ReadableStream: así la lectura se
+// puede probar con un lector de mentira, sin red ni DOM.
+export interface LectorDeBytes {
+  read(): Promise<{ done: boolean; value?: Uint8Array }>
+  cancel(): Promise<void>
+}
+
+/**
+ * Lee el stream hasta que el servidor lo cierra (`done: true` del lector) y
+ * le pasa cada evento a `alProcesar`, en orden.
+ *
+ * Nunca corta la lectura por un evento: el `done` del protocolo (evento SSE)
+ * llega ANTES de que el servidor termine de escribir. En el wizard, por
+ * ejemplo, el `turn` se manda después del `done`, cuando termina de registrar
+ * el turno en la base; si se dejara de leer al ver `done`, ese `turn` se perdía
+ * y el feedback con los pulgares dejaba de andar sin avisar.
+ */
+export async function leerStreamSse(
+  lector: LectorDeBytes,
+  alProcesar: (evento: EventoSse) => void,
+): Promise<void> {
+  const decoder = new TextDecoder()
+  const parser = crearParserSse()
+  try {
+    while (true) {
+      const { done, value } = await lector.read()
+      if (done) break
+      for (const evento of parser.alimentar(decoder.decode(value, { stream: true }))) {
+        alProcesar(evento)
+      }
+    }
+  } finally {
+    // Si algo tiró a mitad de camino (un handler, la red) el lector no debe
+    // quedar abierto. Si ya terminó, cancelar no hace nada.
+    await lector.cancel().catch(() => undefined)
+  }
+}

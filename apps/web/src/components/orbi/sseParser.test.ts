@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { crearParserSse } from './sseParser'
+import { crearParserSse, leerStreamSse, type LectorDeBytes } from './sseParser'
 
 // El parser es puro: se le tira texto de a pedazos (como llegan de la red) y
 // devuelve los eventos que ya quedaron completos. Lo que importa probar es que
@@ -87,5 +87,58 @@ describe('crearParserSse', () => {
     expect(p.alimentar(': keep-alive\n\nevent: text\ndata: {"chunk":"a"}\n\n')).toEqual([
       { event: 'text', data: { chunk: 'a' } },
     ])
+  })
+})
+
+describe('orden de eventos después de done', () => {
+  it('el parser entrega turn aunque llegue en un pedazo posterior a done', () => {
+    const p = crearParserSse()
+    expect(p.alimentar('event: done\ndata: {}\n\n')).toEqual([{ event: 'done', data: {} }])
+    expect(p.alimentar('event: turn\ndata: {"turnId":"t1"}\n\n')).toEqual([
+      { event: 'turn', data: { turnId: 't1' } },
+    ])
+  })
+})
+
+// Lector de mentira: devuelve los pedazos en orden y después cierra.
+function lectorDe(pedazos: string[], opciones: { falla?: boolean } = {}) {
+  const enc = new TextEncoder()
+  let i = 0
+  let cancelado = false
+  const lector: LectorDeBytes = {
+    async read() {
+      if (i >= pedazos.length) {
+        if (opciones.falla) throw new Error('red caída')
+        return { done: true }
+      }
+      return { done: false, value: enc.encode(pedazos[i++]) }
+    },
+    async cancel() {
+      cancelado = true
+    },
+  }
+  return { lector, fueCancelado: () => cancelado }
+}
+
+describe('leerStreamSse', () => {
+  it('sigue leyendo después de done y entrega turn (wizard: turn va tras done)', async () => {
+    const { lector } = lectorDe([
+      'event: text\ndata: {"chunk":"hola"}\n\n',
+      'event: done\ndata: {}\n\n',
+      'event: turn\ndata: {"turnId":"t1"}\n\n',
+    ])
+    const vistos: string[] = []
+    await leerStreamSse(lector, e => vistos.push(e.event))
+    expect(vistos).toEqual(['text', 'done', 'turn'])
+  })
+
+  it('cancela el lector al terminar y cuando algo tira a mitad de camino', async () => {
+    const ok = lectorDe(['event: done\ndata: {}\n\n'])
+    await leerStreamSse(ok.lector, () => undefined)
+    expect(ok.fueCancelado()).toBe(true)
+
+    const roto = lectorDe(['event: text\ndata: {"chunk":"a"}\n\n'], { falla: true })
+    await expect(leerStreamSse(roto.lector, () => undefined)).rejects.toThrow('red caída')
+    expect(roto.fueCancelado()).toBe(true)
   })
 })
