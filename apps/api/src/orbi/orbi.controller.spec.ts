@@ -242,6 +242,36 @@ describe('OrbiController', () => {
     expect(res.chunks.join('')).not.toContain('event: error');
   });
 
+  it('wizard: una tool que pide confirmación NO se ejecuta; el modelo recibe el fallo', async () => {
+    // Defensa en profundidad: hoy ninguna escritura está en la surface del
+    // wizard, pero si algún día una entra por error (surfaces mal puesto),
+    // el wizard no tiene tarjeta ni /orbi/confirm: tiene que rechazarla igual
+    // que el panel rechaza lo que no pudo proponer.
+    registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+    registry.requiereConfirmacion.mockImplementation((n: string) => n === 'createCoupon');
+    registry.execute.mockResolvedValue({ success: true, label: 'Cupón creado' });
+
+    const recibidos: any[][] = [];
+    let vuelta = 0;
+    mockLlm.streamChat = async function* (params: { messages: any[] }) {
+      recibidos.push([...params.messages]);
+      vuelta += 1;
+      if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'GRATIS' } } };
+      else yield { type: 'text' as const, chunk: 'No puedo hacer eso acá.' };
+      yield { type: 'done' as const };
+    } as typeof mockLlm.streamChat;
+
+    const res = createMockResponse();
+    await controller.chatWizard({ message: 'hacé un cupón', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+    expect(registry.execute).not.toHaveBeenCalled();
+    const resultado = recibidos[1].find((m) => m.role === 'tool' && m.toolCallId === 'c1');
+    expect(JSON.parse(resultado.content)).toEqual(expect.objectContaining({ success: false, error: expect.any(String) }));
+    const all = res.chunks.join('');
+    expect(all).not.toContain('Cupón creado');
+    expect(all).toContain('No puedo hacer eso acá.');
+  });
+
   it('POST /orbi/chat/wizard returns text/event-stream with chunks', async () => {
     const res = createMockResponse();
     await controller.chatWizard(

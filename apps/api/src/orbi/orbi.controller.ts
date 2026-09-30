@@ -852,6 +852,28 @@ export class OrbiController {
               resetEnviado = true;
             }
             toolsUsadas.push(event.call.name);
+
+            // Defensa en profundidad: una escritura (requiresConfirmation) solo
+            // la ejecuta /orbi/confirm después de que la persona aprueba la
+            // tarjeta, y el wizard no tiene ni tarjeta ni confirmación. Hoy lo
+            // frena que ninguna escritura declara la surface WIZARD; si algún
+            // día una la declara por error, igual no se ejecuta acá: el modelo
+            // recibe el fallo, como en el panel.
+            if (this.toolRegistry.requiereConfirmacion(event.call.name)) {
+              messages.push({
+                role: 'assistant',
+                content: '',
+                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
+              });
+              messages.push({
+                role: 'tool',
+                content: JSON.stringify({ success: false, error: ESCRITURA_NO_DISPONIBLE }),
+                toolCallId: event.call.id,
+              });
+              continueLoop = true;
+              continue;
+            }
+
             // UUID: `step-${Date.now()}` repetía id en el mismo milisegundo (spec §3.8).
             const stepId = randomUUID();
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
