@@ -520,15 +520,13 @@ export class CostsService {
           const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
           const queryCount = Number(queries?._sum.quantity ?? 0);
 
-          if (queryCount > 0 || errorCount > 0) {
-            result['serper'] = {
-              slug: 'serper',
-              items: [
-                { category: 'Búsquedas de imágenes (mes)', value: queryCount, unit: 'queries', limit: 2500 },
-                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
-              ],
-            };
-          }
+          result['serper'] = {
+            slug: 'serper',
+            items: [
+              { category: 'Búsquedas de imágenes (mes)', value: queryCount, unit: 'queries', limit: 2500 },
+              ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+            ],
+          };
         }
 
         // Tavily Search
@@ -540,15 +538,13 @@ export class CostsService {
           const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
           const queryCount = Number(queries?._sum.quantity ?? 0);
 
-          if (queryCount > 0 || errorCount > 0) {
-            result['tavily'] = {
-              slug: 'tavily',
-              items: [
-                { category: 'Búsquedas web (mes)', value: queryCount, unit: 'queries', limit: 1000 },
-                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
-              ],
-            };
-          }
+          result['tavily'] = {
+            slug: 'tavily',
+            items: [
+              { category: 'Búsquedas web (mes)', value: queryCount, unit: 'queries', limit: 1000 },
+              ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+            ],
+          };
         }
       }
     } catch (err) {
