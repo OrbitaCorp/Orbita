@@ -726,14 +726,12 @@ export class SubscriptionsService {
         acceptsCash: pagos.includes('efectivo'),
         acceptsTransfer: pagos.includes('transferencia'),
         // `pagos` ya no lo manda el wizard del frontend (ver comentario en
-        // startPendingCheckout()) — SIEMPRE llega vacío en el flujo real de
-        // hoy. Sin este `pagos.length > 0 ? ... : true`, este updateConfig()
-        // pisaba con `false` el `acceptsMercadopago: true` que
-        // registerBusiness() ya había dejado segundos antes, y el dueño
-        // terminaba teniendo que prender el toggle a mano en Configuración
-        // después de conectar su cuenta de Mercado Pago (RBT — pedido de
-        // Ale 16/09: que arranque activo, así conectar la cuenta alcanza).
-        acceptsMercadopago: pagos.length > 0 ? pagos.includes('mercadopago') : true,
+        // startPendingCheckout()) — SIEMPRE llega vacío en el flujo real de hoy, y
+        // la tienda nace con todos los métodos de pago apagados (registerBusiness).
+        // Este updateConfig() no los puede volver a prender: antes dejaba
+        // Mercado Pago en true cuando `pagos` venía vacío. El dueño prende lo que
+        // ofrece desde Configuración, después de conectar su cuenta.
+        acceptsMercadopago: pagos.includes('mercadopago'),
         acceptsCard: pagos.includes('tarjeta'),
         ...(pagos.includes('transferencia') ? { transferAlias: wizard.transferAlias } : {}),
       }),
