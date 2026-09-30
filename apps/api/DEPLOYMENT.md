@@ -118,6 +118,26 @@ Hasta el 2026-09-30 el preflight (d) y esta documentación decían que "la base 
 producción". Era falso desde el corte: el preflight miraba dev y podía dar verde con una
 migración pendiente en producción.
 
+### Correr los e2e contra dev
+
+Los e2e (`test/*.e2e-spec.ts`) crean negocios, pedidos y cuentas de verdad, y CI no los corre
+(no tiene Postgres). Se corren a mano, antes del deploy, cuando el cambio toca algo que solo
+Postgres prueba de verdad (por ejemplo `orbi-fase1`: el claim atómico de acciones, la cuota
+diaria y el historial de Orbi). `test/e2e-guard.ts` los deja arrancar **solo** si
+`E2E_DATABASE_URL` (y `E2E_DIRECT_URL`) contienen la ref de dev (`hhaqlzrcskmwnvhgydon`) y no
+la de producción: es una lista blanca, no hay escape para producción. Las URLs se leen del
+`.env` local (que es dev) dentro de `$(...)`, así no se imprimen nunca. Desde `apps/api`, en
+Git Bash:
+
+```bash
+leer() { node -e 'require("dotenv").config({quiet:true});process.stdout.write(process.env[process.argv[1]]||"")' "$1"; }
+E2E_DATABASE_URL="$(leer DATABASE_URL)" E2E_DIRECT_URL="$(leer DIRECT_URL)" pnpm test:e2e -- orbi-fase1
+```
+
+Sin el `-- orbi-fase1` corren todos. La base de dev es compartida: si dos personas corren el
+mismo e2e a la vez, el barrido inicial de uno le borra los datos al otro. Nunca apuntarlos a
+producción ni pegar las URLs en el chat.
+
 ### Preflight: qué chequea y por qué
 
 Hallazgo `deploy-manual` de la auditoría interna (10/09/2026). Hasta el 15/09

@@ -6,9 +6,14 @@
  * pendiente (UPDATE condicional pending → executing), el INSERT … ON CONFLICT
  * con tope de la cuota diaria y el UPDATE de un solo statement del historial
  * (con el recorte a los últimos 200). Esto se corre A MANO contra la base de
- * desarrollo antes de cada deploy que toque Orbi:
+ * desarrollo antes de cada deploy que toque Orbi. Desde apps/api, en Git Bash
+ * (e2e-guard.ts exige E2E_DATABASE_URL/E2E_DIRECT_URL de dev; se leen del .env
+ * local, que es dev, dentro de $(...) para que la URL no se imprima nunca):
  *
- *   pnpm test:e2e -- orbi-fase1
+ *   leer() { node -e 'require("dotenv").config({quiet:true});process.stdout.write(process.env[process.argv[1]]||"")' "$1"; }
+ *   E2E_DATABASE_URL="$(leer DATABASE_URL)" E2E_DIRECT_URL="$(leer DIRECT_URL)" pnpm test:e2e -- orbi-fase1
+ *
+ * Detalle en DEPLOYMENT.md, "Correr los e2e contra dev". Tarda ~1 minuto.
  *
  * Se prueban los servicios reales contra la base, sin levantar la app entera
  * ni pasar por HTTP: lo que interesa es qué hace Postgres con los statements,
@@ -35,13 +40,14 @@ import { RetencionLogsService } from '../src/internal-cron/retencion-logs.servic
 import { fechaArgentina } from '../src/common/utils/hora-argentina';
 import { limpiarNegocios } from './helpers/limpiar-negocio';
 
-// Si se corre con E2E_PERMITIR_PRODUCCION=si en vez de E2E_DATABASE_URL, la URL
-// la lee Prisma del .env por su cuenta y acá no estaría: se carga para poder
-// mirarla abajo. No pisa lo que ya venga seteado (e2e-guard.ts manda).
+// Carga el resto del .env local (dev) para los servicios. No pisa lo que ya
+// venga seteado: DATABASE_URL/DIRECT_URL las dejó e2e-guard.ts desde
+// E2E_DATABASE_URL/E2E_DIRECT_URL, ya verificadas contra la ref de dev.
 cargarEnv({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
-// "Orbita Produccion". Estos tests escriben (negocios, acciones, cuotas): no
-// corren contra producción aunque el guard general lo permita.
+// "Orbita Produccion". Estos tests escriben (negocios, acciones, cuotas): se
+// niegan por su cuenta a correr contra producción, además del guard general
+// (lista blanca de dev en e2e-base.ts). Si alguien afloja uno, queda el otro.
 const REF_PRODUCCION = 'dgergykdihtvsglfumsb';
 
 const PREFIJO_SUBDOMINIO = 'e2e-orbi-fase1-';
@@ -117,6 +123,7 @@ describe('Orbi fase 1 contra Postgres (e2e)', () => {
     cuota = modulo.get(CuotaService);
     conversaciones = modulo.get(ConversationService);
 
+    // OJO: la base de dev es compartida; si otra persona corre este archivo a la vez, este barrido le borra sus negocios y su corrida falla.
     await limpiarResiduos();
     negocioA = await crearNegocio('A');
     negocioB = await crearNegocio('B');

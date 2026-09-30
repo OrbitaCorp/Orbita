@@ -103,7 +103,9 @@ este orden exacto, sin saltear pasos:
    en el paso 5, con `main` ya pusheado y CI verde, justo antes de `deploy.sh`. `deploy.sh` se
    niega a desplegar si en producción quedó alguna migración sin aplicar. Si la migración es
    destructiva (borra o renombra algo), leer antes `apps/api/DEPLOYMENT.md` § Rollback: se
-   hace en dos releases.
+   hace en dos releases. Si el cambio toca algo que solo Postgres prueba (por ejemplo Orbi:
+   acciones, cuota, historial), correr también sus e2e contra dev antes de desplegar
+   (`apps/api/DEPLOYMENT.md` § Correr los e2e contra dev; nunca contra producción).
 3. **Frontend: se pushea SOLO `main`. La rama de trabajo NO se pushea.** Vercel construye
    cada commit UNA sola vez. Si el commit llega primero por la rama de feature, Vercel lo
    despliega como *Preview*, y cuando `main` avanza al mismo commit por fast-forward lo
