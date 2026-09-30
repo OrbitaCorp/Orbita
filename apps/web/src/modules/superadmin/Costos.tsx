@@ -931,7 +931,10 @@ const AI_FEATURE_LABELS: Record<string, string> = {
   'ai-assist': 'Redactar y especificaciones (Orbi)',
   'ai-variants': 'Sugerir variantes (Orbi)',
   'ai-scan': 'Escaneo de producto por foto',
+  // Eventos anteriores a la fase 1 de Orbi, que no traían feature.
   'orbi-chat': 'Chat de Orbi',
+  'orbi-panel': 'Orbi (panel)',
+  'orbi-wizard': 'Orbi (wizard)',
 }
 
 // ─── Alert row ───────────────────────────────────────────────────────────────

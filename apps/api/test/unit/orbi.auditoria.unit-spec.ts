@@ -16,7 +16,7 @@ import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 const miembro = { type: 'member', businessId: 'biz-1', memberId: 'm-1', permissions: [] } as any;
 
 function respuesta() {
-  return { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn() } as any;
+  return { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn(), on: jest.fn(), writableEnded: false } as any;
 }
 
 function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<any>; hayCupo?: boolean } = {}) {
@@ -37,7 +37,7 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
   };
   const analitica = { logAiTurn: jest.fn().mockResolvedValue(null) };
   const cuota = { consumir: jest.fn().mockResolvedValue(opts.hayCupo ?? true) };
-  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any, cuota as any);
+  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any, cuota as any, { registrar: jest.fn().mockResolvedValue(undefined) } as any);
   return { ctrl, llm, tools, cuota };
 }
 

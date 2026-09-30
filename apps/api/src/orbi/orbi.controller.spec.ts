@@ -15,17 +15,40 @@ import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
+import { OrbiTurnService } from './orbi-turn.service';
 
-function createMockResponse() {
+interface MockResponse {
+  writableEnded: boolean;
+  setHeader: jest.Mock;
+  flushHeaders: jest.Mock;
+  write: jest.Mock;
+  end: jest.Mock;
+  on: jest.Mock;
+  cerrar: () => void;
+  chunks: string[];
+}
+
+function createMockResponse(): MockResponse {
   const chunks: string[] = [];
-  return {
+  const alCerrar: (() => void)[] = [];
+  const res: MockResponse = {
+    writableEnded: false,
     setHeader: jest.fn(),
     flushHeaders: jest.fn(),
     write: jest.fn((data: string) => chunks.push(data)),
-    end: jest.fn(),
+    end: jest.fn(() => { res.writableEnded = true; }),
+    on: jest.fn((evento: string, fn: () => void) => {
+      if (evento === 'close') alCerrar.push(fn);
+      return res;
+    }),
+    // Lo que hace Node cuando el cliente se va: dispara 'close' en la respuesta.
+    cerrar: () => alCerrar.forEach((fn) => fn()),
     chunks,
   };
+  return res;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 describe('OrbiController', () => {
   let controller: OrbiController;
@@ -35,6 +58,9 @@ describe('OrbiController', () => {
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
   let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock; getOrCreate: jest.Mock };
+  let turnos: { registrar: jest.Mock };
+  let metering: { track: jest.Mock };
+  let analitica: { logAiTurn: jest.Mock };
 
   // El wizard hashea la IP con JWT_SECRET para la clave de la cuota diaria.
   beforeAll(() => {
@@ -102,6 +128,7 @@ describe('OrbiController', () => {
         { provide: UsageMeteringService, useValue: { track: jest.fn() } },
         // La cuota diaria vive en Postgres: acá siempre hay cupo.
         { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true) } },
+        { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -109,6 +136,9 @@ describe('OrbiController', () => {
     contextBuilder = module.get(ContextBuilderService);
     acciones = module.get(PendingActionService);
     conversaciones = module.get(ConversationService);
+    turnos = module.get(OrbiTurnService);
+    metering = module.get(UsageMeteringService);
+    analitica = module.get(WizardAnalyticsService);
   });
 
   it('el texto que el modelo dice ANTES de llamar una tool NUNCA llega al cliente', async () => {
@@ -766,6 +796,374 @@ describe('OrbiController', () => {
       const id = await acciones.crear(cupon);
       await expect(controller.reject({ actionId: id }, duenio as any)).resolves.toEqual({ ok: true });
       expect(prisma.filas.get(id)?.status).toBe('rejected');
+    });
+  });
+
+  // Spec §3.7: cuando el cliente se va (cierra Orbi, navega, aprieta Detener),
+  // la API deja de gastar: no llama más al modelo, no ejecuta tools ni crea
+  // propuestas, y no guarda una respuesta que nadie leyó.
+  describe('cortar la respuesta cuando el cliente se va', () => {
+    const duenio = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'owner', permissions: [] as string[],
+    };
+    const chatPanel = () => ({ message: 'Mostrame los productos', context: { surface: OrbiSurface.PANEL } }) as any;
+    const guardoRespuesta = () =>
+      conversaciones.appendMessage.mock.calls.some(([, , , m]) => m.role === 'assistant');
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('el cierre del cliente aborta la señal que recibe el modelo; el cierre después de end() no', async () => {
+      const senales: AbortSignal[] = [];
+      const res = createMockResponse();
+      mockLlm.streamChat = async function* (p: { signal?: AbortSignal }) {
+        senales.push(p.signal!);
+        res.cerrar();
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat(chatPanel(), res as any, duenio as any);
+      expect(senales[0]).toBeDefined();
+      expect(senales[0].aborted).toBe(true);
+
+      // Node también emite 'close' después de res.end(): eso no es un corte.
+      const res2 = createMockResponse();
+      mockLlm.streamChat = async function* (p: { signal?: AbortSignal }) {
+        senales.push(p.signal!);
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat(chatPanel(), res2 as any, duenio as any);
+      res2.cerrar();
+      expect(senales[1].aborted).toBe(false);
+    });
+
+    it('cortado a mitad de la vuelta: no ejecuta la tool ni vuelve a llamar al modelo, sin error ni respuesta guardada', async () => {
+      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      const res = createMockResponse();
+      const llamadas = jest.fn();
+      mockLlm.streamChat = async function* () {
+        llamadas();
+        yield { type: 'text' as const, chunk: 'Busco...' };
+        res.cerrar();
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'listProducts', arguments: {} } };
+        yield { type: 'done' as const };
+      } as any;
+      const errorLog = jest.spyOn((controller as any).logger, 'error');
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(llamadas).toHaveBeenCalledTimes(1);
+      expect(registry.execute).not.toHaveBeenCalled();
+      const todo = res.chunks.join('');
+      expect(todo).not.toContain('event: error');
+      expect(todo).not.toContain('event: action_start');
+      expect(errorLog).not.toHaveBeenCalled();
+      expect(guardoRespuesta()).toBe(false);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled' }));
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('cortado mientras corre una tool: no hay otra llamada al modelo', async () => {
+      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
+      const res = createMockResponse();
+      registry.execute.mockImplementation(async () => {
+        res.cerrar();
+        return { success: true, label: 'ok' };
+      });
+      const llamadas = jest.fn();
+      mockLlm.streamChat = async function* () {
+        llamadas();
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'listProducts', arguments: {} } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(llamadas).toHaveBeenCalledTimes(1);
+      expect(res.chunks.join('')).not.toContain('event: error');
+      expect(guardoRespuesta()).toBe(false);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled', rounds: 1 }));
+    });
+
+    it('cortado mientras se arma la propuesta: no se crea la acción pendiente', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      const res = createMockResponse();
+      registry.proponer.mockImplementation(async () => {
+        res.cerrar();
+        return { resumen: 'Crear el cupón "VERANO"' };
+      });
+      mockLlm.streamChat = async function* () {
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(prisma.filas.size).toBe(0);
+      expect(res.chunks.join('')).not.toContain('event: action_pending');
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled', actionsProposed: 0 }));
+    });
+
+    it('el adapter tira el error de aborto: sin log de error, sin evento error, turno cancelled', async () => {
+      const res = createMockResponse();
+      mockLlm.streamChat = async function* (p: { signal?: AbortSignal }) {
+        yield { type: 'text' as const, chunk: 'Hola' };
+        res.cerrar();
+        p.signal!.throwIfAborted();
+        yield { type: 'done' as const };
+      } as any;
+      const errorLog = jest.spyOn((controller as any).logger, 'error');
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(errorLog).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).not.toContain('event: error');
+      expect(guardoRespuesta()).toBe(false);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled' }));
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('en el wizard, cortado: no registra WizardAiTurn ni manda turn, pero el metering sí', async () => {
+      const res = createMockResponse();
+      mockLlm.streamChat = async function* (p: { signal?: AbortSignal }) {
+        yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, provider: 'gemini' as const } };
+        res.cerrar();
+        p.signal!.throwIfAborted();
+        yield { type: 'done' as const };
+      } as any;
+      const errorLog = jest.spyOn((controller as any).logger, 'error');
+
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      expect(analitica.logAiTurn).not.toHaveBeenCalled();
+      const todo = res.chunks.join('');
+      expect(todo).not.toContain('event: turn');
+      expect(todo).not.toContain('event: error');
+      expect(errorLog).not.toHaveBeenCalled();
+      expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ providerSlug: 'gemini', category: 'prompt_tokens', quantity: 10 }));
+      expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ providerSlug: 'gemini', category: 'completion_tokens', quantity: 5 }));
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('en el wizard, cortado mientras corre una tool: no hay otra llamada al modelo', async () => {
+      registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
+      const res = createMockResponse();
+      registry.execute.mockImplementation(async () => {
+        res.cerrar();
+        return { success: true, label: 'ok' };
+      });
+      const llamadas = jest.fn();
+      mockLlm.streamChat = async function* () {
+        llamadas();
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'selectWizardOption', arguments: {} } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      expect(llamadas).toHaveBeenCalledTimes(1);
+      expect(analitica.logAiTurn).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).not.toContain('event: error');
+    });
+  });
+
+  // Spec §3.8: `step-${Date.now()}` repetía id cuando dos pasos caían en el
+  // mismo milisegundo, y el front pisaba una tarjeta con la otra.
+  describe('ids de los pasos', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const idsDe = (chunks: string[], evento: string) =>
+      chunks.filter(c => c.startsWith(`event: ${evento}\n`)).map(c => JSON.parse(c.split('data: ')[1]).id as string);
+
+    it('wizard: el stepId es un UUID y dos pasos seguidos no repiten, aunque caigan en el mismo milisegundo', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+      registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta <= 2) yield { type: 'tool_call' as const, call: { id: `c${vuelta}`, name: 'selectWizardOption', arguments: {} } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      const res = createMockResponse();
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      const ids = idsDe(res.chunks, 'action_start');
+      expect(ids).toHaveLength(2);
+      for (const id of ids) expect(id).toMatch(UUID);
+      expect(new Set(ids).size).toBe(2);
+    });
+
+    it('panel: action_pending y action_start llevan UUIDs distintos', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }, { name: 'listProducts' }]);
+      registry.proponer.mockImplementation(async (nombre: string) => (nombre === 'createCoupon' ? { resumen: 'Crear el cupón "VERANO"' } : null));
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        else if (vuelta === 2) yield { type: 'tool_call' as const, call: { id: 'c2', name: 'listProducts', arguments: {} } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      const res = createMockResponse();
+      await controller.chat(
+        { message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL } } as any,
+        res as any,
+        { type: 'member', memberId: 'member-1', businessId: 'biz-1', roleName: 'owner', permissions: [] } as any,
+      );
+
+      const ids = [...idsDe(res.chunks, 'action_pending'), ...idsDe(res.chunks, 'action_start')];
+      expect(ids).toHaveLength(2);
+      for (const id of ids) expect(id).toMatch(UUID);
+      expect(new Set(ids).size).toBe(2);
+    });
+  });
+
+  // Spec §3.6: la heurística `includes('groq')` clasificaba openai/gpt-oss-120b
+  // (que corre en Groq) como Gemini, y un turno puede mezclar proveedores
+  // porque el fallback se decide por llamada.
+  describe('metering por proveedor', () => {
+    const duenio = { type: 'member', memberId: 'member-1', businessId: 'biz-1', roleName: 'owner', permissions: [] };
+
+    it('panel: un track por proveedor, con feature, modelo, miembro y conversación', async () => {
+      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) {
+          yield { type: 'tool_call' as const, call: { id: 'c1', name: 'listProducts', arguments: {} } };
+          yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 100, completionTokens: 20, provider: 'gemini' as const } };
+        } else {
+          // La segunda vuelta la contestó el fallback.
+          yield { type: 'text' as const, chunk: 'Listo.' };
+          yield { type: 'usage' as const, usage: { model: 'openai/gpt-oss-120b', promptTokens: 70, completionTokens: 30, provider: 'groq' as const } };
+        }
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat({ message: 'Productos', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+
+      const meta = (model: string) => ({ feature: 'orbi-panel', model, memberId: 'member-1', conversationId: 'conv-1' });
+      const base = { businessId: 'biz-1', unit: 'tokens' };
+      expect(metering.track).toHaveBeenCalledTimes(4);
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'prompt_tokens', quantity: 100, metadata: meta('gemini-3.6-flash') });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'completion_tokens', quantity: 20, metadata: meta('gemini-3.6-flash') });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'prompt_tokens', quantity: 70, metadata: meta('openai/gpt-oss-120b') });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'completion_tokens', quantity: 30, metadata: meta('openai/gpt-oss-120b') });
+    });
+
+    it('wizard: openai/gpt-oss-120b cuenta como groq, con feature orbi-wizard', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'usage' as const, usage: { model: 'openai/gpt-oss-120b', promptTokens: 10, completionTokens: 5, provider: 'groq' as const } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, createMockResponse() as any);
+
+      const metadata = { feature: 'orbi-wizard', model: 'openai/gpt-oss-120b', memberId: null, conversationId: null };
+      expect(metering.track).toHaveBeenCalledTimes(2);
+      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 10, unit: 'tokens', metadata });
+      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'completion_tokens', quantity: 5, unit: 'tokens', metadata });
+    });
+
+    it('sin evento usage no se registra consumo', async () => {
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+      expect(metering.track).not.toHaveBeenCalled();
+    });
+  });
+
+  // Spec §3.6: una fila por turno del panel en orbi_turns, sin texto (la
+  // pregunta y la respuesta ya están en la conversación).
+  describe('telemetría del turno del panel', () => {
+    const duenio = { type: 'member', memberId: 'member-1', businessId: 'biz-1', roleName: 'owner', permissions: [] };
+
+    it('ok: registra el turno sin el texto de la pregunta ni de la respuesta', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'RESPUESTA-PRIVADA' };
+        yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, provider: 'gemini' as const } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(
+        { message: 'PREGUNTA-PRIVADA', context: { surface: OrbiSurface.PANEL, module: 'pedidos' } } as any,
+        createMockResponse() as any,
+        duenio as any,
+      );
+
+      expect(turnos.registrar).toHaveBeenCalledTimes(1);
+      const t = turnos.registrar.mock.calls[0][0];
+      expect(t).toEqual({
+        businessId: 'biz-1', memberId: 'member-1', conversationId: 'conv-1', module: 'pedidos',
+        model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, latencyMs: expect.any(Number),
+        rounds: 1, toolsUsed: [], actionsProposed: 0, status: 'ok',
+      });
+      expect(JSON.stringify(t)).not.toContain('PRIVADA');
+    });
+
+    it('cuenta las vueltas, las tools pedidas y las propuestas', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }, { name: 'listProducts' }]);
+      registry.proponer.mockImplementation(async (nombre: string) => (nombre === 'createCoupon' ? { resumen: 'Crear el cupón "VERANO"' } : null));
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        else if (vuelta === 2) yield { type: 'tool_call' as const, call: { id: 'c2', name: 'listProducts', arguments: {} } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat({ message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({
+        rounds: 3, toolsUsed: ['createCoupon', 'listProducts'], actionsProposed: 1, status: 'ok',
+      }));
+    });
+
+    it('error: status error', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'Ho' };
+        throw new Error('boom');
+      } as any;
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+
+      expect(res.chunks.join('')).toContain('event: error');
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', rounds: 1 }));
+    });
+
+    it('max_rounds: cuando el bucle de tools llega al tope', async () => {
+      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      mockLlm.streamChat = async function* () {
+        yield { type: 'tool_call' as const, call: { id: 't', name: 'listProducts', arguments: {} } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'max_rounds', rounds: 6 }));
+    });
+
+    it('no bloquea el stream: si registrar no termina nunca, la respuesta igual se cierra', async () => {
+      turnos.registrar.mockReturnValue(new Promise(() => { /* nunca */ }));
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('el wizard no escribe en orbi_turns (tiene su propia analítica)', async () => {
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, createMockResponse() as any);
+      expect(turnos.registrar).not.toHaveBeenCalled();
     });
   });
 

@@ -129,9 +129,23 @@ describe('GeminiAdapter', () => {
 
     expect(events).toEqual([
       { type: 'text', chunk: 'ok' },
-      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8 } },
+      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8, provider: 'gemini' } },
       { type: 'done' },
     ]);
+  });
+
+  // Spec §3.7. Ojo: el abortSignal de @google/genai corta del lado del
+  // cliente (deja de leer y cierra la conexión); lo ya generado se factura.
+  it('pasa la señal de corte como config.abortSignal', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+    const corte = new AbortController();
+
+    for await (const _ of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }], signal: corte.signal })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].config.abortSignal).toBe(corte.signal);
   });
 
   it('usa el modelo que le pasan por parámetro en vez del default', async () => {

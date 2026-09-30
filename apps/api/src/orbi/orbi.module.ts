@@ -7,6 +7,7 @@ import { ContextBuilderService } from './context/context-builder.service';
 import { ModuleDataService } from './context/module-data.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
 import { PendingActionService } from './tools/pending-action.service';
+import { OrbiTurnService } from './orbi-turn.service';
 import { NavigationTool } from './tools/definitions/navigation.tool';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';
@@ -58,6 +59,7 @@ import { PrismaService } from '../prisma/prisma.service';
     ModuleDataService,
     ToolRegistryService,
     PendingActionService,
+    OrbiTurnService,
   ],
 })
 export class OrbiModule {

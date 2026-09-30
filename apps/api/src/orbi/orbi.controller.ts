@@ -2,9 +2,11 @@ import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenExcepti
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
+import { randomUUID } from 'crypto';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
-import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
+import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
+import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -67,6 +69,36 @@ function historialParaElModelo(guardados: ConversationMessage[]): LlmMessage[] {
     .map(m => ({ role: m.role, content: m.content }));
 }
 
+/** Tokens de un turno, separados por quién respondió cada llamada. */
+type ConsumoPorProveedor = Map<LlmUsage['provider'], { model: string; promptTokens: number; completionTokens: number }>;
+
+/**
+ * Suma el `usage` de una llamada al proveedor que la contestó. El fallback se
+ * decide por llamada, así que un turno puede tener vueltas de Gemini y de Groq
+ * (spec §3.6). El modelo que queda es el de la última llamada de ese proveedor.
+ */
+function sumarConsumo(consumo: ConsumoPorProveedor, u: LlmUsage): void {
+  const previo = consumo.get(u.provider);
+  consumo.set(u.provider, {
+    model: u.model,
+    promptTokens: (previo?.promptTokens ?? 0) + u.promptTokens,
+    completionTokens: (previo?.completionTokens ?? 0) + u.completionTokens,
+  });
+}
+
+/**
+ * Engancha el corte de la respuesta al cierre de la conexión (spec §3.7).
+ * Node emite 'close' también después de un res.end() normal: solo es un corte
+ * si la respuesta todavía no terminó.
+ */
+function corteAlCerrar(res: Response): AbortController {
+  const corte = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) corte.abort();
+  });
+  return corte;
+}
+
 @Controller('orbi')
 export class OrbiController {
   private readonly logger = new Logger(OrbiController.name);
@@ -92,7 +124,32 @@ export class OrbiController {
     private readonly pendingActions: PendingActionService,
     private readonly usageMetering: UsageMeteringService,
     private readonly cuota: CuotaService,
+    private readonly orbiTurns: OrbiTurnService,
   ) {}
+
+  /**
+   * Un `track` por proveedor, con prompt y completion por separado como
+   * siempre. Antes se adivinaba el proveedor con `includes('groq')` sobre el
+   * nombre del modelo, y openai/gpt-oss-120b (que corre en Groq) se cobraba
+   * como Gemini. Sin await: track ya es best-effort y no puede demorar el
+   * cierre del stream.
+   */
+  private medirConsumo(
+    consumo: ConsumoPorProveedor,
+    ctx: { feature: 'orbi-panel' | 'orbi-wizard'; businessId?: string; memberId: string | null; conversationId: string | null },
+  ): void {
+    for (const [proveedor, c] of consumo) {
+      if (c.promptTokens <= 0 && c.completionTokens <= 0) continue;
+      const comun = {
+        providerSlug: proveedor,
+        businessId: ctx.businessId,
+        unit: 'tokens',
+        metadata: { feature: ctx.feature, model: c.model, memberId: ctx.memberId, conversationId: ctx.conversationId },
+      };
+      void this.usageMetering.track({ ...comun, category: 'prompt_tokens', quantity: c.promptTokens });
+      void this.usageMetering.track({ ...comun, category: 'completion_tokens', quantity: c.completionTokens });
+    }
+  }
 
   @Post('chat')
   @HttpCode(200)
@@ -147,8 +204,19 @@ export class OrbiController {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    let promptTokens = 0;
-    let completionTokens = 0;
+    // Spec §3.7: si el cliente se va (Detener, cerrar Orbi, navegar), se deja
+    // de gastar. La señal va al adapter y el loop la revisa antes de cada
+    // llamada al modelo, cada tool y cada propuesta.
+    const corte = corteAlCerrar(res);
+
+    // Telemetría del turno (orbi_turns, spec §3.6). Sin texto.
+    const arrancoEn = Date.now();
+    const consumo: ConsumoPorProveedor = new Map();
+    let modeloReportado: string | undefined;
+    let llamadasAlModelo = 0;
+    const toolsPedidas: string[] = [];
+    let propuestas = 0;
+    let estado: EstadoDelTurno = 'ok';
 
     // Visitante de la demo: todos comparten el mismo miembro readOnly, así que
     // su conversación NO se guarda (si no, cada visitante vería el chat de
@@ -156,12 +224,14 @@ export class OrbiController {
     // prompt le dice que es una demo.
     const esDemo = user.readOnly === true;
 
+    // La conversación del turno: solo existe en el panel y fuera de la demo,
+    // y siempre es propia (verificada o recién creada). El id del body nunca
+    // se usa tal cual. Es también la única que puede quedar guardada en una
+    // acción pendiente (ahí va la nota de confirmar o cancelar). Afuera del
+    // try porque el metering y la telemetría del finally la usan.
+    let conversacionVerificada: string | null = null;
+
     try {
-      // La conversación del turno: solo existe en el panel y fuera de la demo,
-      // y siempre es propia (verificada o recién creada). El id del body nunca
-      // se usa tal cual. Es también la única que puede quedar guardada en una
-      // acción pendiente (ahí va la nota de confirmar o cancelar).
-      let conversacionVerificada: string | null = null;
       let history: LlmMessage[] = [];
 
       if (dto.context.surface === OrbiSurface.PANEL && !esDemo) {
@@ -237,16 +307,23 @@ export class OrbiController {
       while (continueLoop) {
         if (++vueltas > MAX_VUELTAS_TOOLS) {
           fullResponse += this.cortarPorVueltas(res);
+          estado = 'max_rounds';
           break;
         }
+        // Cada vuelta es una llamada paga: si el cliente ya se fue, no se pide.
+        corte.signal.throwIfAborted();
+        llamadasAlModelo++;
         continueLoop = false;
         let textoVuelta = '';
         let resetEnviado = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo, signal: corte.signal })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
             if (!hayTools && !resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
+            // Con el cliente ido, ni se propone ni se ejecuta nada.
+            corte.signal.throwIfAborted();
+            toolsPedidas.push(event.call.name);
             // Si se bufereó, no hay nada que resetear: el preámbulo se descarta
             // acá sin que el usuario lo haya visto nunca.
             if (hayTools) {
@@ -255,7 +332,9 @@ export class OrbiController {
               res.write(`event: text_reset\ndata: {}\n\n`);
               resetEnviado = true;
             }
-            const stepId = `step-${Date.now()}`;
+            // UUID y no `step-${Date.now()}`: dos pasos en el mismo milisegundo
+            // repetían id y el front pisaba una tarjeta con la otra (spec §3.8).
+            const stepId = randomUUID();
 
             // Las herramientas que ESCRIBEN no se ejecutan acá: se proponen.
             // El usuario ve un botón con lo que va a pasar y la escritura
@@ -315,6 +394,10 @@ export class OrbiController {
             }
 
             if (propuesta) {
+              // proponer() es async (lee la base para armar la tarjeta): el
+              // cliente pudo irse mientras. Una propuesta que nadie va a ver
+              // quedaría pendiente hasta vencer.
+              corte.signal.throwIfAborted();
               const actionId = await this.pendingActions.crear({
                 tool: event.call.name,
                 args: event.call.arguments,
@@ -323,6 +406,7 @@ export class OrbiController {
                 conversationId: conversacionVerificada,
                 resumen: propuesta.resumen,
               });
+              propuestas++;
 
               res.write(`event: action_pending\ndata: ${JSON.stringify({
                 id: stepId,
@@ -354,6 +438,8 @@ export class OrbiController {
               continue;
             }
 
+            // Mismo motivo que antes de crear(): proponer() fue async.
+            corte.signal.throwIfAborted();
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
             // Acá solo llegan lecturas. soloLectura igual, como segunda barrera
@@ -374,8 +460,9 @@ export class OrbiController {
             });
             continueLoop = true;
           } else if (event.type === 'usage') {
-            promptTokens += event.usage.promptTokens;
-            completionTokens += event.usage.completionTokens;
+            // Se suma aunque el cliente ya se haya ido: la llamada se factura.
+            sumarConsumo(consumo, event.usage);
+            modeloReportado = event.usage.model;
           } else if (event.type === 'done') {
             if (!continueLoop) {
               // Vuelta final: si se bufereó, recién acá sale el texto — de una,
@@ -390,6 +477,9 @@ export class OrbiController {
         }
       }
 
+      // Una respuesta cortada no se guarda: queda el `user` sin respuesta, que
+      // el historial ya sabe manejar (spec §3.3).
+      corte.signal.throwIfAborted();
       if (conversacionVerificada) {
         await this.conversationService.appendMessage(conversacionVerificada, user.businessId, user.memberId, {
           role: 'assistant',
@@ -398,27 +488,47 @@ export class OrbiController {
         });
       }
     } catch (error) {
-      this.logger.error(`Orbi chat error: ${error}`);
-      res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
-    } finally {
-      if (promptTokens > 0) {
-        const slug = (this.modeloPara(dto.context.surface) ?? '').includes('groq') ? 'groq' : 'gemini';
-        this.usageMetering.track({
-          providerSlug: slug,
-          businessId: user.businessId,
-          category: 'prompt_tokens',
-          quantity: promptTokens,
-          unit: 'tokens',
-        });
-        this.usageMetering.track({
-          providerSlug: slug,
-          businessId: user.businessId,
-          category: 'completion_tokens',
-          quantity: completionTokens,
-          unit: 'tokens',
-        });
+      if (corte.signal.aborted) {
+        // El cliente se fue: no es un error nuestro ni hay a quién escribirle.
+        estado = 'cancelled';
+      } else {
+        estado = 'error';
+        this.logger.error(`Orbi chat error: ${error}`);
+        res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
       }
+    } finally {
+      this.medirConsumo(consumo, {
+        feature: 'orbi-panel',
+        businessId: user.businessId,
+        memberId: user.memberId,
+        conversationId: conversacionVerificada,
+      });
       res.end();
+
+      // Sin await: la telemetría no puede demorar ni romper el cierre del
+      // stream. registrar() nunca lanza. En un turno cancelado los tokens son
+      // un piso: la llamada cortada se factura igual y su `usage` no llegó.
+      let promptTokens = 0;
+      let completionTokens = 0;
+      for (const c of consumo.values()) {
+        promptTokens += c.promptTokens;
+        completionTokens += c.completionTokens;
+      }
+      void this.orbiTurns.registrar({
+        businessId: user.businessId,
+        memberId: user.memberId,
+        conversationId: conversacionVerificada,
+        module: dto.context.module,
+        model: modeloReportado ?? this.modeloPara(dto.context.surface),
+        // undefined y no 0 si el proveedor no informó consumo.
+        promptTokens: promptTokens || undefined,
+        completionTokens: completionTokens || undefined,
+        latencyMs: Date.now() - arrancoEn,
+        rounds: llamadasAlModelo,
+        toolsUsed: toolsPedidas,
+        actionsProposed: propuestas,
+        status: estado,
+      });
     }
   }
 
@@ -595,6 +705,9 @@ export class OrbiController {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    // Spec §3.7, igual que en el panel: si el cliente se va, se deja de gastar.
+    const corte = corteAlCerrar(res);
+
     // Telemetría del turno (ver wizard-analytics/). Se mide acá y no en el
     // front porque el servidor es el único que ve la respuesta completa, la
     // latencia real y qué tools terminó disparando el modelo.
@@ -622,6 +735,8 @@ export class OrbiController {
     let modeloReportado: string | undefined = modeloPedido;
     let promptTokens = 0;
     let completionTokens = 0;
+    // Lo mismo, separado por proveedor, para el metering (spec §3.6).
+    const consumo: ConsumoPorProveedor = new Map();
 
     try {
       const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
@@ -671,14 +786,16 @@ export class OrbiController {
           respuesta += this.cortarPorVueltas(res);
           break;
         }
+        corte.signal.throwIfAborted();
         continueLoop = false;
         let textoVuelta = '';
         let resetEnviado = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido, signal: corte.signal })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
             if (!hayTools && !resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
+            corte.signal.throwIfAborted();
             if (hayTools) {
               textoVuelta = '';
             } else if (textoVuelta.trim() && !resetEnviado) {
@@ -686,7 +803,8 @@ export class OrbiController {
               resetEnviado = true;
             }
             toolsUsadas.push(event.call.name);
-            const stepId = `step-${Date.now()}`;
+            // UUID: `step-${Date.now()}` repetía id en el mismo milisegundo (spec §3.8).
+            const stepId = randomUUID();
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
             const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName);
@@ -704,6 +822,7 @@ export class OrbiController {
             modeloReportado = event.usage.model;
             promptTokens += event.usage.promptTokens;
             completionTokens += event.usage.completionTokens;
+            sumarConsumo(consumo, event.usage);
           } else if (event.type === 'done') {
             // Solo la vuelta final (sin tool) cuenta como la respuesta de Orbi:
             // el preámbulo de las vueltas con tool ya se descartó.
@@ -718,49 +837,44 @@ export class OrbiController {
         }
       }
     } catch (error) {
-      fallo = true;
-      this.logger.error(`Orbi wizard chat error: ${error}`);
-      res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
+      // Cortado por el cliente: ni log de error ni evento (no hay a quién).
+      if (!corte.signal.aborted) {
+        fallo = true;
+        this.logger.error(`Orbi wizard chat error: ${error}`);
+        res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
+      }
     } finally {
-      // El id del turno viaja al front para que el pulgar arriba/abajo sepa
-      // qué está votando. Va DESPUÉS del stream: si el registro falla,
-      // simplemente no hay pulgar y la conversación no se entera de nada.
-      const turnId = await this.wizardAnalytics.logAiTurn({
-        sessionId: dto.context.sessionId,
-        anonId: dto.context.anonId,
-        step: dto.context.step,
-        stepName: dto.context.stepName,
-        rubro: dto.context.rubro,
-        question: dto.message,
-        answer: respuesta,
-        latencyMs: Date.now() - arrancoEn,
-        toolsUsed: toolsUsadas,
-        errored: fallo,
-        // undefined y no 0 cuando el proveedor no informó consumo: un 0 en la
-        // base se promedia como si el turno hubiera sido gratis y ensucia
-        // justamente el número que esto viene a medir.
-        model: modeloReportado,
-        promptTokens: promptTokens || undefined,
-        completionTokens: completionTokens || undefined,
-      });
-      if (turnId) res.write(`event: turn\ndata: ${JSON.stringify({ turnId })}\n\n`);
+      // Un turno cortado no se registra: sería una respuesta vacía que
+      // ensucia la analítica del wizard (spec §3.7). El metering sí, abajo:
+      // lo consumido se paga igual.
+      if (!corte.signal.aborted) {
+        // El id del turno viaja al front para que el pulgar arriba/abajo sepa
+        // qué está votando. Va DESPUÉS del stream: si el registro falla,
+        // simplemente no hay pulgar y la conversación no se entera de nada.
+        const turnId = await this.wizardAnalytics.logAiTurn({
+          sessionId: dto.context.sessionId,
+          anonId: dto.context.anonId,
+          step: dto.context.step,
+          stepName: dto.context.stepName,
+          rubro: dto.context.rubro,
+          question: dto.message,
+          answer: respuesta,
+          latencyMs: Date.now() - arrancoEn,
+          toolsUsed: toolsUsadas,
+          errored: fallo,
+          // undefined y no 0 cuando el proveedor no informó consumo: un 0 en la
+          // base se promedia como si el turno hubiera sido gratis y ensucia
+          // justamente el número que esto viene a medir.
+          model: modeloReportado,
+          promptTokens: promptTokens || undefined,
+          completionTokens: completionTokens || undefined,
+        });
+        if (turnId) res.write(`event: turn\ndata: ${JSON.stringify({ turnId })}\n\n`);
+      }
       res.end();
 
-      if (promptTokens > 0) {
-        const slug = (modeloReportado ?? '').includes('groq') ? 'groq' : 'gemini';
-        this.usageMetering.track({
-          providerSlug: slug,
-          category: 'prompt_tokens',
-          quantity: promptTokens,
-          unit: 'tokens',
-        });
-        this.usageMetering.track({
-          providerSlug: slug,
-          category: 'completion_tokens',
-          quantity: completionTokens,
-          unit: 'tokens',
-        });
-      }
+      // El wizard es público: sin negocio, miembro ni conversación.
+      this.medirConsumo(consumo, { feature: 'orbi-wizard', memberId: null, conversationId: null });
     }
   }
 }

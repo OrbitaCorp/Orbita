@@ -46,6 +46,7 @@ export class GeminiAdapter implements LlmAdapter {
     messages: LlmMessage[];
     tools?: LlmToolDefinition[];
     model?: string;
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent> {
     const client = this.getClient();
     const modeloEfectivo = params.model ?? this.modelo;
@@ -143,6 +144,11 @@ export class GeminiAdapter implements LlmAdapter {
         maxOutputTokens: 4096,
         thinkingConfig: { thinkingLevel: thinkingLevelFor(this.razonamiento) },
         ...(functionDeclarations?.length ? { tools: [{ functionDeclarations }] } : {}),
+        // Spec §3.7: el cliente se fue. En @google/genai el corte es solo del
+        // lado nuestro (deja de leer y cierra la conexión): Google no cancela
+        // la generación, así que lo ya generado se factura igual. Sirve para
+        // no seguir esperando ni pedir la vuelta siguiente.
+        abortSignal: params.signal,
       },
     });
 
@@ -185,7 +191,7 @@ export class GeminiAdapter implements LlmAdapter {
     }
 
     if (usage) {
-      yield { type: 'usage', usage: { model: modeloEfectivo, ...usage } };
+      yield { type: 'usage', usage: { model: modeloEfectivo, ...usage, provider: 'gemini' } };
     }
 
     yield { type: 'done' };
