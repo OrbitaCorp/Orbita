@@ -2231,6 +2231,16 @@ export class SubscriptionsService {
       p.auditLog.deleteMany(delNegocio),
       p.notification.deleteMany(delNegocio),
       p.orbiConversation.deleteMany(delNegocio),
+      // Lo que Orbi guardó además de la conversación (Orbi fase 1, spec §3.11):
+      // las acciones propuestas (guardan los argumentos, con nombres y montos
+      // de la tienda) y las métricas de cada turno. La baja solo pone
+      // `deletedAt`, así que el `onDelete: Cascade` del schema no corre nunca.
+      p.orbiPendingAction.deleteMany(delNegocio),
+      p.orbiTurn.deleteMany(delNegocio),
+      // daily_quota no tiene businessId ni relación: la clave es
+      // `<prefijo>:<negocio>` (orbi-panel:, ai-assist:, image-studio:). Los
+      // ids son uuid, así que el sufijo `:<id>` no puede confundirse con otro.
+      p.dailyQuota.deleteMany({ where: { key: { endsWith: `:${businessId}` } } }),
       p.refreshToken.deleteMany(delNegocio),
       p.passwordResetToken.deleteMany(delNegocio),
       p.emailVerificationToken.deleteMany({ where: { member: { businessId } } }),

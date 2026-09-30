@@ -724,11 +724,18 @@ de la analítica del wizard. Código:
 | `platform_admin_logs` | `PLATFORM_ADMIN_LOGS_RETENTION_DAYS` | 365 días | acciones del super admin sobre negocios y suscripciones |
 | `audit_logs` | `AUDIT_LOGS_RETENTION_DAYS` | 365 días | registro de solo agregado de cada negocio (quién cambió qué en el panel) |
 | `email_logs` | `EMAIL_LOGS_RETENTION_DAYS` | 180 días | qué mail se le mandó a quién y si salió |
+| `orbi_pending_actions` | `ORBI_PENDING_ACTIONS_RETENTION_DAYS` | 30 días | acciones que Orbi propuso al dueño, confirmadas, canceladas o vencidas |
+| `orbi_turns` | `ORBI_TURNS_RETENTION_DAYS` | 400 días | métricas de cada turno del chat de Orbi (sin texto); 400 alcanzan para comparar año contra año |
+| `daily_quota` | `DAILY_QUOTA_RETENTION_DAYS` | 30 días | contador diario compartido de Orbi, ayudas de IA y estudio de imágenes |
 | `wizard_events` / `wizard_ai_turns` | `WIZARD_ANALYTICS_RETENTION_DAYS` | 180 días | analítica del wizard (ya existía, `wizard-analytics.service.ts`) |
 
-Reglas, iguales para las tres nuevas:
+Reglas, iguales para las seis (las tres primeras, de `logs-sin-retencion`; las
+tres de Orbi, de la fase 1):
 
 - Se cuenta en días desde `created_at`, con el instante actual como referencia.
+  La excepción es `daily_quota`, que no tiene `created_at`: corta por su
+  columna `day` (texto `YYYY-MM-DD`, día de Argentina) y borra las filas con
+  `day` anterior al día argentino de hoy menos N días.
 - Nunca menos de **30** días: un valor menor se sube a 30. Por debajo de un
   mes se pierde la trazabilidad de cualquier reclamo reciente.
 - `0` u `off` **apaga** la purga de esa tabla sola; las otras siguen.
@@ -741,7 +748,7 @@ Reglas, iguales para las tres nuevas:
   excepción permitida y `test/unit/audit.auditoria.unit-spec.ts` la vigila
   (borra por fecha y nada más, nunca por negocio, entidad ni acción).
 
-Las tres variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
+Las seis variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
 están **comentadas con su default**. Para cambiar una, descomentarla, poner el
 valor y volver a desplegar (§ Actualizar variables NO sensibles).
 
