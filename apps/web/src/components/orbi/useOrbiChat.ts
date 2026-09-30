@@ -4,6 +4,24 @@ import type { OrbiContext, OrbiMessage } from './types'
 import { authedFetch } from '@/lib/auth/authClient'
 import { track, wizardIds } from '@/lib/analytics/wizardTracker'
 import { getWizardFormState } from './useOrbiContext'
+import { crearParserSse } from './sseParser'
+
+// Forma de los datos de los eventos del stream. Es permisiva a propósito: el
+// parser devuelve `unknown` (JSON ya decodificado) y cada evento usa solo
+// los campos que le tocan (el servidor los manda siempre que corresponden).
+interface DatosSse {
+  id: string
+  chunk: string
+  label: string
+  tool: string
+  resumen: string
+  actionId: string
+  result: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any
+  turnId: string
+  message?: string
+}
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -88,62 +106,67 @@ export function useOrbiChat() {
       if (!res.body) throw new Error('No response body')
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      let buffer = ''
+      // El parser guarda la línea partida y el tipo de evento entre lecturas:
+      // antes, si `event:` y `data:` llegaban en pedazos de red distintos, el
+      // dato se perdía (ver sseParser.ts).
+      const parser = crearParserSse()
+      let terminado = false
 
-      while (true) {
+      while (!terminado) {
         const { done, value } = await reader.read()
         if (done) break
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        let eventType = ''
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7).trim()
-          } else if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6))
-            if (eventType === 'text') {
-              store.appendToLastAssistant(data.chunk)
-            } else if (eventType === 'text_reset') {
-              // El backend descarta el texto que Orbi dijo antes de llamar una
-              // tool (ver resetLastAssistantText). Las actions ya emitidas quedan.
-              store.resetLastAssistantText()
-            } else if (eventType === 'action_start') {
-              store.addActionToLastAssistant({
-                id: data.id,
-                label: data.label,
-                tool: data.tool,
-                status: 'active',
-              })
-            } else if (eventType === 'action_pending') {
-              // Orbi propuso algo que escribe en la base. No pasó nada
-              // todavía: se muestra un botón y la acción ocurre si la persona
-              // lo aprieta (ver confirmarAccion).
-              store.addActionToLastAssistant({
-                id: data.id,
-                label: data.resumen,
-                tool: data.tool,
-                status: 'pending',
-                actionId: data.actionId,
-                resumen: data.resumen,
-              })
-            } else if (eventType === 'action_complete') {
-              store.updateAction(assistantMsg.id, data.id, {
-                status: 'complete',
-                result: data.result,
-                data: data.data,
-              })
-              if (data.data?.productId) {
-                store.markProductCreated(data.data.productId)
-              }
-            } else if (eventType === 'turn') {
-              store.setTurnIdOnLastAssistant(data.turnId)
-            } else if (eventType === 'error') {
-              store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
+        for (const { event: eventType, data: crudo } of parser.alimentar(decoder.decode(value, { stream: true }))) {
+          const data = (crudo ?? {}) as DatosSse
+          if (eventType === 'conversation') {
+            // El servidor emite primero el id de la conversación del panel
+            // (la crea si hace falta). Se guarda para mandarlo en el próximo
+            // mensaje y que Orbi siga el mismo hilo. En el wizard no viene.
+            // TODO(T11): el store todavía no descarta ids de un stream viejo
+            // ni aborta al reset; eso se agrega en la tarea del store.
+            if (typeof data.id === 'string') store.setConversationId(data.id)
+          } else if (eventType === 'text') {
+            store.appendToLastAssistant(data.chunk ?? '')
+          } else if (eventType === 'text_reset') {
+            // El backend descarta el texto que Orbi dijo antes de llamar una
+            // tool (ver resetLastAssistantText). Las actions ya emitidas quedan.
+            store.resetLastAssistantText()
+          } else if (eventType === 'action_start') {
+            store.addActionToLastAssistant({
+              id: data.id,
+              label: data.label,
+              tool: data.tool,
+              status: 'active',
+            })
+          } else if (eventType === 'action_pending') {
+            // Orbi propuso algo que escribe en la base. No pasó nada
+            // todavía: se muestra un botón y la acción ocurre si la persona
+            // lo aprieta (ver confirmarAccion).
+            store.addActionToLastAssistant({
+              id: data.id,
+              label: data.resumen,
+              tool: data.tool,
+              status: 'pending',
+              actionId: data.actionId,
+              resumen: data.resumen,
+            })
+          } else if (eventType === 'action_complete') {
+            store.updateAction(assistantMsg.id, data.id, {
+              status: 'complete',
+              result: data.result,
+              data: data.data,
+            })
+            if (data.data?.productId) {
+              store.markProductCreated(data.data.productId)
             }
-            eventType = ''
+          } else if (eventType === 'turn') {
+            store.setTurnIdOnLastAssistant(data.turnId)
+          } else if (eventType === 'error') {
+            store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
+          } else if (eventType === 'done') {
+            // El servidor avisa que terminó el turno: no hace falta esperar a
+            // que el proxy cierre la conexión para dejar de leer.
+            terminado = true
           }
         }
       }
