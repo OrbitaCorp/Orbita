@@ -15,6 +15,7 @@ import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
 import { DEMO_SLUG } from '@/lib/demo/modo'
 import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
 import { MenuDemoTienda } from '@/modules/demo/MenuDemoTienda'
+import { MenuPromociones } from '@/components/storefront/MenuPromociones'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -29,7 +30,7 @@ import {
 import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado, declinadoKey } from '@/modules/ventas/cliente/juegos/JuegoInline'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -274,6 +275,25 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
     function cerrarModalPromo() {
         setModalPromo(false)
+    }
+
+    // Pestaña flotante (paquete Avanzado): los modales se abren UNA sola vez por
+    // navegador y cerrarlos los da por descartados, así que sin esto un visitante
+    // que cerró sin querer no tenía forma de volver a jugar ni de ver el anuncio.
+    // Ofrece lo que sigue disponible: los juegos que no ganó ni perdió (los
+    // declinados incluidos: son los que cerró con la X) y el anuncio activo. Ganar
+    // o perder una campaña sí la cierra, igual que antes. Recién cuando no hay un
+    // modal abierto, para no taparlo ni superponerse.
+    const jugables = slug && !enDemo ? juegosActivos.filter(g => !yaGano(slug, g.type, g.campaignVersion) && !yaPerdio(slug, g.type, g.campaignVersion)) : []
+    const hayModalAbierto = modalJuego || modalPromo || !!reclamo
+    function reabrirJuego(g: ActiveGame) {
+        // El juego, al montarse, mira si esta campaña está declinada y en ese caso
+        // muestra "no querés jugar": se revierte y, si se cierra de nuevo, se
+        // vuelve a declinar en cerrarModal().
+        try { if (slug) localStorage.removeItem(declinadoKey(slug, g.type, g.campaignVersion)) } catch { /* sin localStorage: abre igual */ }
+        setModalPromo(false)
+        setJuegoElegido(g.type)
+        setModalJuego(true)
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
@@ -986,6 +1006,14 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 </ModalJuego>
             )}
 
+            {!enDemo && !hayModalAbierto && (jugables.length > 0 || promoActivo) && (
+                <MenuPromociones
+                    juegos={jugables}
+                    anuncios={promoActivo ? [promoActivo] : []}
+                    onJugar={reabrirJuego}
+                    onAnuncio={() => setModalPromo(true)}
+                />
+            )}
             {enDemo && (
                 <MenuDemoTienda juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
             )}
