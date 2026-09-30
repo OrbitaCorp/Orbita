@@ -34,7 +34,7 @@ describe('OrbiController', () => {
   let contextBuilder: { buildSystemPrompt: jest.Mock };
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
-  let conversaciones: { appendMessage: jest.Mock };
+  let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock; getOrCreate: jest.Mock };
 
   // El wizard hashea la IP con JWT_SECRET para la clave de la cuota diaria.
   beforeAll(() => {
@@ -69,9 +69,12 @@ describe('OrbiController', () => {
         {
           provide: ConversationService,
           useValue: {
-            getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-1' }),
+            // Sin id propio, el chat crea una conversación nueva (spec §3.3).
+            historialSiEsPropia: jest.fn().mockResolvedValue(null),
+            crear: jest.fn().mockResolvedValue({ id: 'conv-1' }),
             appendMessage: jest.fn().mockResolvedValue(undefined),
-            getMessages: jest.fn().mockResolvedValue([]),
+            // Ya no se usa en el chat: está para poder afirmarlo.
+            getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-vieja' }),
           },
         },
         {
@@ -433,6 +436,139 @@ describe('OrbiController', () => {
       );
       const [fila] = [...prisma.filas.values()];
       expect(fila.conversationId).toBeNull();
+    });
+  });
+
+  // Spec §3.3, memoria de conversación. Hasta acá el front nunca recibía el id
+  // de la conversación, así que cada mensaje arrancaba de cero (o seguía la
+  // última, con getOrCreate) y el modelo no veía lo que se había hablado.
+  describe('memoria de conversación', () => {
+    const duenio = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'owner', permissions: [] as string[],
+    };
+    const PROPIA = '11111111-1111-4111-8111-111111111111';
+    const OTRA = '22222222-2222-4222-8222-222222222222';
+
+    function llmQueAnota() {
+      const vistos: { role: string; content: string }[][] = [];
+      mockLlm.streamChat = async function* (req: { messages: { role: string; content: string }[] }) {
+        vistos.push(req.messages.map(m => ({ role: m.role, content: m.content })));
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      return vistos;
+    }
+
+    const chatPanel = (conversationId?: string) =>
+      ({ message: 'y ahora?', conversationId, context: { surface: OrbiSurface.PANEL } }) as any;
+
+    it('el primer evento del stream es conversation, antes de cualquier text', async () => {
+      const res = createMockResponse();
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(res.chunks[0]).toBe('event: conversation\ndata: {"id":"conv-1"}\n\n');
+      expect(res.chunks.findIndex(c => c.startsWith('event: text'))).toBeGreaterThan(0);
+      expect(res.chunks.filter(c => c.startsWith('event: conversation'))).toHaveLength(1);
+    });
+
+    it('con un id propio se usa esa conversación y se cargan los últimos HISTORIAL_PANEL', async () => {
+      const guardados = Array.from({ length: 40 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}`, timestamp: '' }));
+      conversaciones.historialSiEsPropia.mockResolvedValue(guardados);
+      const vistos = llmQueAnota();
+
+      const res = createMockResponse();
+      await controller.chat(chatPanel(PROPIA), res as any, duenio as any);
+
+      expect(conversaciones.historialSiEsPropia).toHaveBeenCalledWith(PROPIA, 'biz-1', 'member-1');
+      expect(conversaciones.crear).not.toHaveBeenCalled();
+      expect(res.chunks[0]).toBe(`event: conversation\ndata: {"id":"${PROPIA}"}\n\n`);
+      // system + 30 de historial + el mensaje nuevo.
+      expect(vistos[0]).toHaveLength(32);
+      expect(vistos[0][1]).toEqual({ role: 'user', content: 'm10' });
+      expect(vistos[0][31]).toEqual({ role: 'user', content: 'y ahora?' });
+      expect(conversaciones.appendMessage).toHaveBeenCalledWith(PROPIA, 'biz-1', 'member-1', expect.objectContaining({ role: 'user', content: 'y ahora?' }));
+      expect(conversaciones.appendMessage).toHaveBeenCalledWith(PROPIA, 'biz-1', 'member-1', expect.objectContaining({ role: 'assistant', content: 'Hola' }));
+    });
+
+    // Ajena e inexistente se ven igual desde afuera: si una diera error y la
+    // otra no, el endpoint serviría para averiguar qué ids existen.
+    it.each([
+      ['ajena', OTRA],
+      ['inexistente', PROPIA],
+    ])('con un id %s se crea una conversación nueva, sin error ni pista', async (_caso, id) => {
+      conversaciones.historialSiEsPropia.mockResolvedValue(null);
+      const vistos = llmQueAnota();
+
+      const res = createMockResponse();
+      await controller.chat(chatPanel(id), res as any, duenio as any);
+
+      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel');
+      const todo = res.chunks.join('');
+      expect(res.chunks[0]).toBe('event: conversation\ndata: {"id":"conv-1"}\n\n');
+      expect(todo).not.toContain(id);
+      expect(todo).not.toContain('event: error');
+      // Sin historial ajeno, y nada escrito en la conversación del id pedido.
+      expect(vistos[0]).toHaveLength(2);
+      expect(conversaciones.appendMessage).toHaveBeenCalled();
+      for (const [conv] of conversaciones.appendMessage.mock.calls) expect(conv).toBe('conv-1');
+    });
+
+    it('el chat ya no usa getOrCreate', async () => {
+      await controller.chat(chatPanel(), createMockResponse() as any, duenio as any);
+      await controller.chat(chatPanel(PROPIA), createMockResponse() as any, duenio as any);
+      expect(conversaciones.getOrCreate).not.toHaveBeenCalled();
+    });
+
+    // Un turno fallido deja dos `user` seguidos y una respuesta vacía se guarda
+    // como `assistant` vacío: al modelo no le llegan los vacíos.
+    it('al armar el historial se descartan los mensajes con contenido vacío', async () => {
+      conversaciones.historialSiEsPropia.mockResolvedValue([
+        { role: 'user', content: 'hola', timestamp: '' },
+        { role: 'assistant', content: '', timestamp: '' },
+        { role: 'user', content: '   ', timestamp: '' },
+        { role: 'user', content: 'segundo', timestamp: '' },
+        { role: 'assistant', content: 'respuesta', timestamp: '' },
+      ]);
+      const vistos = llmQueAnota();
+
+      await controller.chat(chatPanel(PROPIA), createMockResponse() as any, duenio as any);
+
+      expect(vistos[0].slice(1)).toEqual([
+        { role: 'user', content: 'hola' },
+        { role: 'user', content: 'segundo' },
+        { role: 'assistant', content: 'respuesta' },
+        { role: 'user', content: 'y ahora?' },
+      ]);
+    });
+
+    it('la acción pendiente guarda la conversación del id que vino, una vez verificada como propia', async () => {
+      conversaciones.historialSiEsPropia.mockResolvedValue([]);
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      registry.proponer.mockResolvedValue({ resumen: 'Crear el cupón "VERANO"' });
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(chatPanel(PROPIA), createMockResponse() as any, duenio as any);
+
+      const [fila] = [...prisma.filas.values()];
+      expect(fila.conversationId).toBe(PROPIA);
+    });
+
+    it('en la demo no hay evento conversation ni se guarda nada', async () => {
+      const res = createMockResponse();
+      await controller.chat(chatPanel(PROPIA), res as any, { ...duenio, readOnly: true } as any);
+
+      expect(res.chunks.join('')).not.toContain('event: conversation');
+      expect(res.chunks.join('')).toContain('event: text');
+      expect(conversaciones.historialSiEsPropia).not.toHaveBeenCalled();
+      expect(conversaciones.crear).not.toHaveBeenCalled();
+      expect(conversaciones.appendMessage).not.toHaveBeenCalled();
     });
   });
 

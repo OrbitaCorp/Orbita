@@ -24,9 +24,8 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
     streamChat: jest.fn(opts.eventos ?? (async function* () { yield { type: 'text', chunk: 'hola' }; yield { type: 'done' }; })),
   };
   const conversaciones = {
-    assertPropia: jest.fn().mockResolvedValue('conv-1'),
-    getMessages: jest.fn().mockResolvedValue(Array.from({ length: opts.mensajes ?? 0 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }))),
-    getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-1' }),
+    historialSiEsPropia: jest.fn().mockResolvedValue(Array.from({ length: opts.mensajes ?? 0 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }))),
+    crear: jest.fn().mockResolvedValue({ id: 'conv-1' }),
     appendMessage: jest.fn().mockResolvedValue(undefined),
   };
   const contexto = { buildSystemPrompt: jest.fn().mockResolvedValue('system') };
@@ -110,12 +109,12 @@ describe('Costo por mensaje acotado', () => {
   });
 
   it('la conversación guardada se queda con los últimos 200 mensajes', async () => {
-    const guardada = { id: 'conv-1', messages: Array.from({ length: 200 }, (_, i) => ({ role: 'user', content: `m${i}`, timestamp: '' })) };
-    const prisma = { orbiConversation: { findFirst: jest.fn().mockResolvedValue(guardada), update: jest.fn() } };
+    // El recorte lo hace el UPDATE en la base, en el mismo statement que agrega
+    // el mensaje (spec §3.3; el SQL completo se prueba en
+    // orbi.conversation.aislamiento.unit-spec.ts). Acá, que el tope siga en 200.
+    const prisma = { $executeRaw: jest.fn().mockResolvedValue(1) };
     await new ConversationService(prisma as any).appendMessage('conv-1', 'biz-1', 'm-1', { role: 'user', content: 'nuevo', timestamp: '' });
-    const { messages } = prisma.orbiConversation.update.mock.calls[0][0].data;
-    expect(messages).toHaveLength(200);
-    expect(messages[199].content).toBe('nuevo');
-    expect(messages[0].content).toBe('m1');
+    const [partes] = prisma.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(partes.join('?').replace(/\s+/g, ' ')).toContain('WHERE i > jsonb_array_length(messages || ?::jsonb) - 200');
   });
 });

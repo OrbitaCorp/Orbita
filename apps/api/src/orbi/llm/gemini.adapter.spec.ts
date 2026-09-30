@@ -169,4 +169,59 @@ describe('GeminiAdapter', () => {
       { role: 'model', parts: [{ text: 'buenas' }] },
     ]);
   });
+
+  // Spec §3.3, "Historial bien formado". Un turno fallido o cortado deja dos
+  // `user` seguidos en la conversación guardada, y una respuesta vacía queda
+  // como `assistant` vacío. Gemini espera turnos alternados y sin partes
+  // vacías: se unen los consecutivos del mismo rol y se tiran los vacíos.
+  it('une entradas consecutivas del mismo rol en un solo content y descarta las vacías', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'system', content: 'Sos Orbi.' },
+        { role: 'user', content: 'hola' },
+        { role: 'user', content: 'sigo acá?' },
+        { role: 'assistant', content: '' },
+        { role: 'assistant', content: 'uno' },
+        { role: 'assistant', content: 'dos' },
+        { role: 'user', content: '  ' },
+        { role: 'user', content: 'chau' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'hola' }, { text: 'sigo acá?' }] },
+      { role: 'model', parts: [{ text: 'uno' }, { text: 'dos' }] },
+      { role: 'user', parts: [{ text: 'chau' }] },
+    ]);
+  });
+
+  it('un assistant sin texto pero con tool call no se descarta, y la vuelta de tools sigue alternando', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'x' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name: 'listProducts', arguments: {} }] },
+        { role: 'tool', content: '{"ok":1}', toolCallId: 'c1' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c2', name: 'listOrders', arguments: {} }] },
+        { role: 'tool', content: '{"ok":2}', toolCallId: 'c2' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'x' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listProducts', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listProducts', response: { output: { ok: 1 } } } }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listOrders', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listOrders', response: { output: { ok: 2 } } } }] },
+    ]);
+  });
 });

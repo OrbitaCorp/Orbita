@@ -5,7 +5,7 @@ import { Response } from 'express';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
-import { ConversationService } from './conversation/conversation.service';
+import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
 import type { ToolExecutionContext, ToolResult } from './tools/tool.interface';
@@ -49,6 +49,23 @@ export const PROMPT_DEMO = [
   'En la demo no podés crear, editar ni borrar nada. Si te piden un cambio, explicá en pocos pasos cómo se hace desde el panel y aclarales que en la demo no se aplica.',
   'No inventes precios, planes, límites ni detalles internos de la plataforma. Si no sabés algo, decí que lo pueden consultar con el equipo de Órbita.',
 ].join('\n');
+
+/**
+ * Lo que se le manda al modelo de la conversación guardada. Sin los mensajes
+ * vacíos: el del usuario se guarda antes de llamar al modelo y la respuesta
+ * solo si no hubo error, así que un turno fallido o cortado deja un `user` sin
+ * respuesta, y una respuesta vacía queda como `assistant` vacío (spec §3.3).
+ * Los `user` seguidos que quedan los une GeminiAdapter.
+ *
+ * Los últimos HISTORIAL_PANEL, no la conversación entera: antes cada mensaje
+ * le mandaba al modelo todo lo anterior y el costo por mensaje crecía sin fin.
+ */
+function historialParaElModelo(guardados: ConversationMessage[]): LlmMessage[] {
+  return guardados
+    .filter(m => typeof m.content === 'string' && m.content.trim() !== '')
+    .slice(-HISTORIAL_PANEL)
+    .map(m => ({ role: m.role, content: m.content }));
+}
 
 @Controller('orbi')
 export class OrbiController {
@@ -140,31 +157,37 @@ export class OrbiController {
     const esDemo = user.readOnly === true;
 
     try {
-      let conversationId = dto.conversationId;
-      // La única conversación que puede quedar guardada en una acción pendiente
-      // (ahí va la nota de confirmar o cancelar): la que se verificó como
-      // propia en ESTE turno. El id del body, sin verificar, nunca.
+      // La conversación del turno: solo existe en el panel y fuera de la demo,
+      // y siempre es propia (verificada o recién creada). El id del body nunca
+      // se usa tal cual. Es también la única que puede quedar guardada en una
+      // acción pendiente (ahí va la nota de confirmar o cancelar).
       let conversacionVerificada: string | null = null;
       let history: LlmMessage[] = [];
 
       if (dto.context.surface === OrbiSurface.PANEL && !esDemo) {
-        // El id de la conversación viene del cliente: se verifica que sea de
-        // ESTE negocio y de ESTA persona antes de leerla o escribirle nada
-        // (ver ConversationService#propia). Antes se usaba tal cual.
-        if (conversationId) {
-          conversationId = await this.conversationService.assertPropia(conversationId, user.businessId, user.memberId);
-          const msgs = await this.conversationService.getMessages(conversationId, user.businessId, user.memberId);
-          // Los últimos HISTORIAL_PANEL, no la conversación entera: antes cada
-          // mensaje le mandaba al modelo todo lo anterior y el costo por
-          // mensaje crecía sin fin.
-          history = msgs.slice(-HISTORIAL_PANEL).map(m => ({ role: m.role, content: m.content }));
+        // Spec §3.3. El id viene del cliente: se verifica que sea de ESTE
+        // negocio y de ESTA persona antes de leerla o escribirle nada (ver
+        // ConversationService#propia). Si no lo es, o no existe, se arranca una
+        // nueva sin error: ajena e inexistente se ven igual desde afuera. El
+        // abuso (crear filas mandando ids inventados) lo acotan la cuota y el
+        // throttle, que ya cuentan cada mensaje.
+        const guardados = dto.conversationId
+          ? await this.conversationService.historialSiEsPropia(dto.conversationId, user.businessId, user.memberId)
+          : null;
+        if (guardados && dto.conversationId) {
+          conversacionVerificada = dto.conversationId;
+          history = historialParaElModelo(guardados);
         } else {
-          const conv = await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
-          conversationId = conv.id;
+          const conv = await this.conversationService.crear(user.businessId, user.memberId, 'panel');
+          conversacionVerificada = conv.id;
         }
-        conversacionVerificada = conversationId;
 
-        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
+        // El primer evento del stream: el front guarda el id y lo manda en el
+        // mensaje siguiente. Sin esto nunca lo tenía y el modelo no recibía
+        // historial.
+        res.write(`event: conversation\ndata: ${JSON.stringify({ id: conversacionVerificada })}\n\n`);
+
+        await this.conversationService.appendMessage(conversacionVerificada, user.businessId, user.memberId, {
           role: 'user',
           content: dto.message,
           timestamp: new Date().toISOString(),
@@ -367,8 +390,8 @@ export class OrbiController {
         }
       }
 
-      if (dto.context.surface === OrbiSurface.PANEL && conversationId && !esDemo) {
-        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
+      if (conversacionVerificada) {
+        await this.conversationService.appendMessage(conversacionVerificada, user.businessId, user.memberId, {
           role: 'assistant',
           content: fullResponse,
           timestamp: new Date().toISOString(),

@@ -65,25 +65,44 @@ export class GeminiAdapter implements LlmAdapter {
       .map(m => m.content)
       .join('\n\n') || undefined;
 
+    // Historial bien formado (spec §3.3): un turno fallido o cortado deja dos
+    // `user` seguidos en la conversación guardada, y una respuesta vacía queda
+    // como `assistant` vacío. Gemini espera turnos que alternan y sin partes
+    // vacías, así que los mensajes vacíos se descartan y los consecutivos del
+    // MISMO rol (cualquiera: dos user, dos assistant, dos resultados de tool)
+    // se unen en un solo content, con sus parts en orden.
     const contents: Content[] = [];
+    let rolAnterior: LlmMessage['role'] | null = null;
+    const agregar = (rol: LlmMessage['role'], content: Content) => {
+      const ultimo = contents[contents.length - 1];
+      if (ultimo && rolAnterior === rol) {
+        ultimo.parts = [...(ultimo.parts ?? []), ...(content.parts ?? [])];
+      } else {
+        contents.push(content);
+      }
+      rolAnterior = rol;
+    };
+
     for (const m of params.messages) {
       if (m.role === 'system') continue;
 
       if (m.role === 'user') {
-        contents.push({ role: 'user', parts: [{ text: m.content }] });
+        if (!m.content?.trim()) continue;
+        agregar('user', { role: 'user', parts: [{ text: m.content }] });
         continue;
       }
 
       if (m.role === 'assistant') {
         const parts: Part[] = [];
-        if (m.content) parts.push({ text: m.content });
+        if (m.content?.trim()) parts.push({ text: m.content });
         for (const tc of m.toolCalls ?? []) {
           parts.push({
             functionCall: { name: tc.name, args: tc.arguments },
             ...(tc.thoughtSignature ? { thoughtSignature: tc.thoughtSignature } : {}),
           });
         }
-        contents.push({ role: 'model', parts: parts.length ? parts : [{ text: '' }] });
+        if (!parts.length) continue;
+        agregar('assistant', { role: 'model', parts });
         continue;
       }
 
@@ -94,7 +113,7 @@ export class GeminiAdapter implements LlmAdapter {
       } catch {
         parsed = m.content;
       }
-      contents.push({
+      agregar('tool', {
         role: 'user',
         parts: [{
           functionResponse: {
