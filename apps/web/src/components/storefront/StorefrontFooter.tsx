@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Mail, Clock, MessageCircle, RotateCcw } from 'lucide-react'
+import { Mail, Clock, MessageCircle } from 'lucide-react'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { openWpp, urlRedSocial } from '@/lib/storefront/utils'
 import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
 import { ReturnRequestModal } from './ReturnRequestModal'
 import { SocialProofToast } from './SocialProofToast'
+import { CreditoOrbita } from './CreditoOrbita'
 
 type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
 type Props = {
@@ -15,14 +16,18 @@ type Props = {
   // Toggle de Apariencia — gatea solo la fila de íconos sociales, el resto del
   // footer (horario, email) se muestra automáticamente según haya o no dato real.
   showSocial?: boolean
-  // Toggle maestro "Mostrar footer" de Apariencia — antes no se chequeaba en
-  // ningún lado y el footer se veía siempre sin importar el valor guardado.
-  visible?: boolean
+  // Postventa activada en Configuración (BusinessConfig.returnsEnabled). Apagada, la
+  // tienda no ofrece ni el botón de Arrepentimiento / Devolución ni "Iniciar
+  // cambio". Sin dato todavía (la config no llegó) se muestra: mismo criterio que
+  // Devolucion.tsx, que solo corta con `=== false`.
+  returnsEnabled?: boolean
 }
 
-export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, visible = true }: Props) {
+// El pie NO se puede apagar desde Apariencia: lleva Términos y condiciones, la Política de
+// privacidad y el acceso a devoluciones, que son obligación de cualquier tienda online.
+export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, returnsEnabled }: Props) {
   const [devolucionAbierta, setDevolucionAbierta] = useState(false)
-  if (!visible) return null
+  const conDevoluciones = returnsEnabled !== false
   const socialLinks = [
     // El dueño puede haber cargado el usuario solo ("mi_negocio") o el link
     // completo — urlRedSocial() arma la URL de verdad en cualquiera de los
@@ -134,7 +139,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                 ['Ingresar', `${base}/login`],
                 ['Crear cuenta', `${base}/registro`],
                 ['Mis pedidos', `${base}/pedido`],
-                ['Iniciar cambio', `${base}/pedido`],
+                ...(conDevoluciones ? [['Iniciar cambio', `${base}/pedido`]] : []),
               ].map(([label, href]) => (
                 <a key={label} href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none' }}>
                   {label}
@@ -169,28 +174,11 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           fontSize: 12, color: 'var(--color-subtle)', gap: 12, flexWrap: 'wrap',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: '"Geist Mono", monospace' }}>
-              Powered by <strong style={{ color: 'var(--color-muted)' }}>Órbita</strong>
-            </div>
-            {/* Jerarquía visual propia (botón real, no un link más) — RBT-683:
-                derecho de arrepentimiento y garantía legal, sin login. */}
-            <button
-              type="button"
-              className="ds-hover"
-              onClick={() => setDevolucionAbierta(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                height: 34, padding: '0 14px', borderRadius: 999,
-                background: 'var(--color-primary-bg)',
-                border: '1px solid var(--color-primary)',
-                color: 'var(--color-primary)',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              <RotateCcw size={13} strokeWidth={2} /> Arrepentimiento / Devolución
-            </button>
-          </div>
+          {/* Antes acá iba el "Powered by Órbita" con el botón de Arrepentimiento al
+              lado, tan llamativo que tapaba el crédito de Órbita. Ahora el crédito
+              va solo (con enlace al home de Órbita y un mensajito para quien quiera
+              su tienda) y el botón pasó a los enlaces legales de la derecha. */}
+          <CreditoOrbita color="var(--color-muted)" colorSuave="var(--color-subtle)" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             {/* Documentos legales del Comercio hacia sus clientes (docs/legales/):
                 se arman con los datos de cada tienda, el dueño no redacta nada. */}
@@ -200,6 +188,18 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
             <a href={`${base}/legales/privacidad`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
               Política de privacidad
             </a>
+            {/* Derecho de arrepentimiento y garantía legal, sin login (RBT-683). Como un
+                enlace más de los legales, no como botón destacado. */}
+            {conDevoluciones && (
+              <button
+                type="button"
+                className="ds-link"
+                onClick={() => setDevolucionAbierta(true)}
+                style={{ padding: 0, border: 'none', background: 'none', fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Arrepentimiento / Devolución
+              </button>
+            )}
             <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
               © 2026 {tienda.nombre} · Todos los derechos reservados
             </div>
@@ -207,7 +207,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
         </div>
       </div>
 
-      <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
+      {conDevoluciones && <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />}
       <SocialProofToast slug={slug} />
     </footer>
   )

@@ -722,7 +722,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // navegan) y el contacto real (redes y horario).
                         baseUrl: base,
                         contacto: config?.contact,
-                        mostrarPie: config?.appearance?.showFooter ?? true,
+                        // El pie es obligatorio (lleva los legales): ya no se apaga desde Apariencia.
+                        mostrarPie: true,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
@@ -743,8 +744,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
-                        // la plantilla tiene que poder abrirlo igual.
-                        abrirDevolucion: () => setDevolucionAbierta(true),
+                        // la plantilla tiene que poder abrirlo igual — salvo
+                        // que la tienda haya apagado la postventa: sin
+                        // función, la plantilla no dibuja el botón.
+                        abrirDevolucion: config?.payment?.returnsEnabled === false ? undefined : () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
                         // La maqueta pone la forma y el tema; esto, el
@@ -964,7 +967,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 PlantillaHome (es parte de su diseño: columnas, tipografía y
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
-                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} returnsEnabled={config?.payment?.returnsEnabled} />
             )}
             {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
                 monta esta pagina: dentro de PlantillaHome no hay a donde. */}

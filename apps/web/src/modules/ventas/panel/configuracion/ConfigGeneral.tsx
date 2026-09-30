@@ -1259,7 +1259,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Habilitar devoluciones</div>
-                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Si lo apagás, tus clientes no van a poder pedir devoluciones.</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Si lo apagás, tus clientes no van a poder pedir devoluciones y se oculta el botón de Arrepentimiento / Devolución del pie de la tienda.</div>
                             </div>
                             <Toggle on={postventa.returnsEnabled} onChange={v => setPostventa(p => ({ ...p, returnsEnabled: v }))} />
                         </div>
