@@ -13,7 +13,7 @@ function makePrismaMock() {
   };
 }
 
-const ALL = ['orders.view', 'customers.view', 'catalog.view'];
+const ALL = ['orders.view', 'customers.view', 'catalog.view', 'discounts.view'];
 
 describe('SearchService (unit)', () => {
   it('no consulta nada y devuelve grupos vacíos si el término tiene menos de 2 caracteres', async () => {
@@ -29,7 +29,7 @@ describe('SearchService (unit)', () => {
     expect(prisma.discount.findMany).not.toHaveBeenCalled();
   });
 
-  it('sin permisos no consulta pedidos/clientes/productos, pero sí descuentos', async () => {
+  it('sin permisos no consulta ningún grupo', async () => {
     const prisma = makePrismaMock();
     const svc = new SearchService(prisma as any);
 
@@ -38,11 +38,22 @@ describe('SearchService (unit)', () => {
     expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.customer.findMany).not.toHaveBeenCalled();
     expect(prisma.product.findMany).not.toHaveBeenCalled();
-    // Descuentos/cupones no piden permiso para listar (igual que su módulo).
-    expect(prisma.discount.findMany).toHaveBeenCalledTimes(1);
+    // Descuentos/cupones piden discounts.view para listar (igual que su módulo).
+    expect(prisma.discount.findMany).not.toHaveBeenCalled();
     expect(res.pedidos).toEqual([]);
     expect(res.clientes).toEqual([]);
     expect(res.productos).toEqual([]);
+    expect(res.descuentos).toEqual([]);
+  });
+
+  it('con discounts.view consulta descuentos y cupones', async () => {
+    const prisma = makePrismaMock();
+    const svc = new SearchService(prisma as any);
+
+    await svc.search('biz-1', ['discounts.view'], 'verano');
+
+    expect(prisma.discount.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
   });
 
   it('con permiso de clientes filtra por nombre/email/tel/dni y solo dentro del negocio', async () => {
@@ -83,7 +94,7 @@ describe('SearchService (unit)', () => {
     ]);
     const svc = new SearchService(prisma as any);
 
-    const res = await svc.search('biz-1', [], 'ver');
+    const res = await svc.search('biz-1', ['discounts.view'], 'ver');
 
     expect(res.descuentos[0]).toMatchObject({ code: 'VERANO', esCupon: true });
     expect(res.descuentos[1]).toMatchObject({ code: null, esCupon: false });
