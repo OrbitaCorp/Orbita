@@ -187,9 +187,7 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
       {!isUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#3B82F6', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <OrbiIcon size={13} color="white" />
-          </div>
+          <OrbiIcon size={22} disc />
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)' }}>Orbi</span>
         </div>
       )}
@@ -339,9 +337,7 @@ export function OrbiMessages() {
   if (!messages.length) {
     return (
       <div className="orbi-messages-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
-        <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#3B82F6', display: 'grid', placeItems: 'center' }}>
-          <OrbiIcon size={28} color="white" />
-        </div>
+        <OrbiIcon size={48} disc />
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>Hola, soy Orbi</div>
           <div style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>

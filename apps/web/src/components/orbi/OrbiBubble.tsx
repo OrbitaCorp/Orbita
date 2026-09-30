@@ -116,13 +116,7 @@ export function OrbiBubble({ onChipClick }: Props) {
           pointerEvents: visible && !exiting ? 'auto' : 'none',
         }}
       >
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-          display: 'grid', placeItems: 'center', flexShrink: 0,
-        }}>
-          <OrbiIcon size={16} color="white" />
-        </div>
+        <OrbiIcon size={32} disc />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
