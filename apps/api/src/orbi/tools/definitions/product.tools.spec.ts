@@ -2,6 +2,7 @@ import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { ToolExecutionContext } from '../tool.interface';
 import { AI_ASSIST_DIA_NEGOCIO } from '../../../products/products.controller';
+import { ToolRegistryService } from '../tool-registry.service';
 
 const ctx: ToolExecutionContext = {
   businessId: 'biz-1',
@@ -41,7 +42,7 @@ describe('CreateProductTool', () => {
       create: jest.fn().mockResolvedValue({ id: 'p-new', name: 'Remera' }),
     };
 
-    const tool = new CreateProductTool(mockService as any);
+    const tool = new CreateProductTool(mockService as any, {} as any);
     const result = await tool.execute(
       { name: 'Remera', basePrice: 5000, categoryId: 'cat-1' },
       ctx,
@@ -58,9 +59,68 @@ describe('CreateProductTool', () => {
   });
 
   it('pide catalog.manage, el mismo permiso que POST /products', () => {
-    const tool = new CreateProductTool({} as any);
+    const tool = new CreateProductTool({} as any, {} as any);
     expect(tool.requiredPermissions).toEqual(['catalog.manage']);
     expect(tool.requiresConfirmation).toBe(true);
+  });
+});
+
+describe('CreateProductTool — la tarjeta y la validación', () => {
+  const CATEGORIA = '55555555-5555-4555-8555-555555555555';
+  const TAG1 = '66666666-6666-4666-8666-666666666666';
+  const TAG2 = '77777777-7777-4777-8777-777777777777';
+
+  function armar(categoria: unknown = { name: 'Ropa' }) {
+    const prisma = { category: { findFirst: jest.fn().mockResolvedValue(categoria) } };
+    const tool = new CreateProductTool({} as any, prisma as any);
+    const registry = new ToolRegistryService();
+    registry.register(tool);
+    return { prisma, tool, registry };
+  }
+
+  const validos = { name: 'Remera', basePrice: 5000, categoryId: CATEGORIA };
+
+  it('muestra nombre, precio, categoría, estado, descripción truncada y etiquetas', async () => {
+    const { tool } = armar();
+    const r = await tool.describirAccion({
+      ...validos, status: 'PUBLISHED', tags: [TAG1, TAG2],
+      description: `Algodón peinado\n"premium" ${'y'.repeat(200)}`,
+    }, ctx);
+    expect(r).toContain('"Remera"');
+    expect(r).toContain('$5000');
+    expect(r).toContain('"Ropa"');
+    expect(r).toContain('publicado');
+    expect(r).toContain('2 etiquetas');
+    expect(r).not.toMatch(/[\r\n]/);
+    const descripcion = r.match(/"(Algodón[^"]*)"/)?.[1] ?? '';
+    expect(Array.from(descripcion).length).toBeLessThanOrEqual(80);
+  });
+
+  it('sin estado dice que queda como borrador', async () => {
+    const { tool } = armar();
+    expect(await tool.describirAccion(validos, ctx)).toContain('borrador');
+  });
+
+  it('la categoría se busca acotada al negocio; si no es suya, error sin tarjeta', async () => {
+    const { registry, prisma } = armar(null);
+    expect(await registry.proponer('createProduct', validos, ctx)).toEqual({ error: 'Categoría no encontrada' });
+    expect(prisma.category.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: CATEGORIA, businessId: 'biz-1' }),
+    }));
+  });
+
+  it('valida con CreateProductDto: nombre de más de 150, categoría no UUID, precio 0, etiquetas no UUID', async () => {
+    const { registry } = armar();
+    expect(await registry.proponer('createProduct', validos, ctx)).toEqual({ resumen: expect.any(String) });
+    for (const malo of [
+      { ...validos, name: 'n'.repeat(151) },
+      { ...validos, categoryId: 'ropa' },
+      { ...validos, basePrice: 0 },
+      { ...validos, tags: ['verano'] },
+      { ...validos, status: 'ARCHIVED' },
+    ]) {
+      expect(await registry.proponer('createProduct', malo, ctx)).toEqual({ error: expect.any(String) });
+    }
   });
 });
 

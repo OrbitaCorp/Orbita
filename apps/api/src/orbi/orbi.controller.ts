@@ -231,12 +231,35 @@ export class OrbiController {
             // como resultado de listOrders o getOrderDetail, y puede
             // convencerlo de PEDIR un cupón del 100% — pero no puede hacer clic
             // por el dueño del negocio.
-            const propuesta = this.toolRegistry.proponer(
+            //
+            // En la demo no se propone nada (soloLectura): el visitante tiene
+            // rol owner, así que los permisos no lo frenan.
+            const propuesta = await this.toolRegistry.proponer(
               event.call.name,
               event.call.arguments,
               toolCtx,
               dto.context.stepName,
+              { soloLectura: esDemo },
             );
+
+            // Los argumentos no pasan el DTO del endpoint (o el pedido no
+            // existe): no hay tarjeta ni acción pendiente. El modelo recibe el
+            // motivo como resultado fallido de la tool, para corregir los
+            // argumentos o contarle a la persona qué faltó.
+            if (propuesta && 'error' in propuesta) {
+              messages.push({
+                role: 'assistant',
+                content: '',
+                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
+              });
+              messages.push({
+                role: 'tool',
+                content: JSON.stringify({ success: false, error: propuesta.error }),
+                toolCallId: event.call.id,
+              });
+              continueLoop = true;
+              continue;
+            }
 
             if (propuesta) {
               const actionId = this.pendingActions.crear({
@@ -279,7 +302,9 @@ export class OrbiController {
 
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
-            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName);
+            // soloLectura también acá: proponer() devuelve null en la demo, y
+            // sin esto una escritura pedida por el modelo se ejecutaría directo.
+            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName, { soloLectura: esDemo });
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 

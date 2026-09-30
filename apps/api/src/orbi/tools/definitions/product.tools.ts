@@ -5,6 +5,27 @@ import type { ProductsService } from '../../../products/products.service';
 import type { ProductAiService } from '../../../products/product-ai.service';
 import type { CuotaService } from '../../../common/cuota/cuota.service';
 import { AI_ASSIST_DIA_NEGOCIO } from '../../../products/products.controller';
+import type { PrismaService } from '../../../prisma/prisma.service';
+import { CreateProductDto } from '../../../products/dto/create-product.dto';
+import { AccionInvalida, validarConDto } from '../acciones/validar-args';
+import { cantidad, entreComillas, monto, presente } from '../acciones/formato';
+
+// Lo que se le manda a ProductsService.create, armado en un solo lugar:
+// validarArgs() lo pasa por CreateProductDto (el de POST /products) y
+// execute() lo escribe, así lo validado es exactamente lo escrito. Sin
+// conversiones de tipo: un precio "5000" como texto lo rechaza el DTO, igual
+// que por HTTP.
+function aDtoProducto(args: Record<string, unknown>): CreateProductDto {
+  return {
+    name: args.name as string,
+    description: (args.description ?? undefined) as string | undefined,
+    basePrice: args.basePrice as number,
+    categoryId: args.categoryId as string,
+    tagIds: (args.tags ?? undefined) as string[] | undefined,
+    status: (args.status as 'PUBLISHED' | 'DRAFT' | undefined) ?? 'DRAFT',
+    variants: [{ price: args.basePrice as number, optionValues: [] }],
+  };
+}
 
 export class ListProductsTool implements OrbiTool {
   name = 'listProducts';
@@ -61,9 +82,31 @@ export class CreateProductTool implements OrbiTool {
   requiredPermissions = ['catalog.manage'];
   requiresConfirmation = true;
 
-  describirAccion(args: Record<string, unknown>): string {
-    const precio = typeof args.basePrice === 'number' ? ` a $${args.basePrice}` : '';
-    return `Crear el producto "${String(args.name ?? 'sin nombre')}"${precio}`;
+  // Además de nombre y precio: la categoría (con su nombre, no el id), si
+  // queda publicado en la tienda o como borrador, la descripción y cuántas
+  // etiquetas. Publicar es lo que lo hace visible a los clientes: la persona
+  // tiene que ver eso antes de confirmar.
+  async describirAccion(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
+    // Acotada al negocio del token: una categoría de otro negocio no existe.
+    const categoria = await this.prisma.category.findFirst({
+      where: { id: String(args.categoryId), businessId: ctx.businessId },
+      select: { name: true },
+    });
+    if (!categoria) throw new AccionInvalida('Categoría no encontrada');
+
+    const estado = (args.status ?? 'DRAFT') === 'PUBLISHED' ? 'publicado en la tienda' : 'como borrador';
+    const partes = [
+      `Crear el producto ${entreComillas(args.name ?? 'sin nombre')} a ${monto(args.basePrice)}`,
+      `en la categoría ${entreComillas(categoria.name)}`,
+      estado,
+    ];
+    if (presente(args.description)) partes.push(`con la descripción ${entreComillas(args.description)}`);
+    if (presente(args.tags)) partes.push(`con ${cantidad(args.tags, 'etiqueta', 'etiquetas')}`);
+    return partes.join(', ');
+  }
+
+  validarArgs(args: Record<string, unknown>) {
+    return validarConDto(CreateProductDto, { ...aDtoProducto(args) });
   }
 
   parameters = {
@@ -79,7 +122,10 @@ export class CreateProductTool implements OrbiTool {
     required: ['name', 'basePrice', 'categoryId'],
   };
 
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -87,15 +133,7 @@ export class CreateProductTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const product = await this.productsService.create(ctx.businessId, {
-        name: args.name as string,
-        description: args.description as string | undefined,
-        basePrice: Number(args.basePrice),
-        categoryId: args.categoryId as string,
-        tagIds: args.tags as string[] | undefined,
-        status: (args.status as 'PUBLISHED' | 'DRAFT') ?? 'DRAFT',
-        variants: [{ price: Number(args.basePrice), optionValues: [] }],
-      });
+      const product = await this.productsService.create(ctx.businessId, aDtoProducto(args));
 
       return {
         success: true,

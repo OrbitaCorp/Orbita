@@ -35,6 +35,7 @@ import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
 import { CuotaService } from '../common/cuota/cuota.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [
@@ -74,13 +75,17 @@ export class OrbiModule {
     private readonly onboardingService: OnboardingService,
     // CuotaModule es global: la cuota diaria de la IA de productos.
     private readonly cuotaService: CuotaService,
+    // PrismaModule es global. Lo usan createProduct y updateOrderStatus para
+    // armar la tarjeta con datos legibles (categoría, pedido y cliente),
+    // siempre acotados al negocio del token.
+    private readonly prisma: PrismaService,
   ) {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
     this.toolRegistry.register(new NavigationTool());
 
     this.toolRegistry.register(new ListProductsTool(this.productsService));
-    this.toolRegistry.register(new CreateProductTool(this.productsService));
+    this.toolRegistry.register(new CreateProductTool(this.productsService, this.prisma));
     this.toolRegistry.register(new GenerateDescriptionTool(this.productAiService, this.cuotaService));
 
     this.toolRegistry.register(new ListDiscountsTool(this.discountsService));
@@ -89,7 +94,7 @@ export class OrbiModule {
 
     this.toolRegistry.register(new ListOrdersTool(this.ordersService));
     this.toolRegistry.register(new GetOrderDetailTool(this.ordersService));
-    this.toolRegistry.register(new UpdateOrderStatusTool(this.ordersService));
+    this.toolRegistry.register(new UpdateOrderStatusTool(this.ordersService, this.prisma));
 
     this.toolRegistry.register(new ListCustomersTool(this.customersService));
     this.toolRegistry.register(new GetCustomerDetailTool(this.customersService));

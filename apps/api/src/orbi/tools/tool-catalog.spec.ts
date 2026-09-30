@@ -16,6 +16,25 @@ import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
 // servicio.
 const stub = {} as any;
 
+// Las tools que resuelven datos para la tarjeta (el pedido, la categoría) leen
+// la base. Este falso devuelve nombres que LLEVAN el id buscado: así, en la
+// invariante 4, el centinela de un id aparece en el resumen si y solo si la
+// tool buscó ese id (y no otro).
+const prismaFalso = {
+  order: {
+    findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({
+      orderNumber: 9101,
+      status: 'PENDING',
+      channel: 'ONLINE',
+      customer: null,
+      onlineOrderDetails: { buyerName: `cliente-${where.id}`, buyerEmail: 'c@example.com' },
+    })),
+  },
+  category: {
+    findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({ name: `categoria-${where.id}` })),
+  },
+} as any;
+
 describe('Orbi — catálogo completo de tools', () => {
   let registry: ToolRegistryService;
 
@@ -23,14 +42,14 @@ describe('Orbi — catálogo completo de tools', () => {
     registry = new ToolRegistryService();
     registry.register(new NavigationTool());
     registry.register(new ListProductsTool(stub));
-    registry.register(new CreateProductTool(stub));
+    registry.register(new CreateProductTool(stub, prismaFalso));
     registry.register(new GenerateDescriptionTool(stub, stub));
     registry.register(new ListDiscountsTool(stub));
     registry.register(new CreateDiscountTool(stub));
     registry.register(new CreateCouponTool(stub));
     registry.register(new ListOrdersTool(stub));
     registry.register(new GetOrderDetailTool(stub));
-    registry.register(new UpdateOrderStatusTool(stub));
+    registry.register(new UpdateOrderStatusTool(stub, prismaFalso));
     registry.register(new ListCustomersTool(stub));
     registry.register(new GetCustomerDetailTool(stub));
     registry.register(new UpdateBusinessInfoTool(stub));
@@ -248,22 +267,113 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
-  it('proponer() no propone nada si faltan los permisos', () => {
+  it('proponer() no propone nada si faltan los permisos', async () => {
     const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: [] as string[] };
+    const cupon = { code: 'XYZ', name: 'Cupón', type: 'PERCENT_TICKET', value: 20, scope: 'TICKET' };
 
     // Sin discounts.manage no hay propuesta: no tiene sentido ofrecerle a alguien
     // un botón para algo que execute() le va a rechazar igual.
-    expect(registry.proponer('createCoupon', { code: 'X' }, ctx)).toBeNull();
+    expect(await registry.proponer('createCoupon', cupon, ctx)).toBeNull();
 
     const conPermiso = { ...ctx, permissions: ['discounts.manage'] };
-    expect(registry.proponer('createCoupon', { code: 'X', type: 'PERCENT_TICKET', value: 20 }, conPermiso))
-      .toEqual({ resumen: expect.stringContaining('X') });
+    expect(await registry.proponer('createCoupon', cupon, conPermiso))
+      .toEqual({ resumen: expect.stringContaining('XYZ') });
   });
 
-  it('una tool de lectura nunca se propone: se ejecuta y listo', () => {
+  it('una tool de lectura nunca se propone: se ejecuta y listo', async () => {
     const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: ['catalog.manage'] };
-    expect(registry.proponer('listProducts', {}, ctx)).toBeNull();
-    expect(registry.proponer('listOrders', {}, ctx)).toBeNull();
+    expect(await registry.proponer('listProducts', {}, ctx)).toBeNull();
+    expect(await registry.proponer('listOrders', {}, ctx)).toBeNull();
+  });
+
+  it('en la demo (soloLectura) ninguna escritura se propone, con todos los permisos', async () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: CODIGOS_DEL_CATALOGO };
+    for (const nombre of ESCRIBEN) {
+      expect({ nombre, propuesta: await registry.proponer(nombre, {}, ctx, undefined, { soloLectura: true }) })
+        .toEqual({ nombre, propuesta: null });
+    }
+  });
+
+  // Invariante 4 (spec §3.2): la tarjeta de confirmación muestra CADA valor que
+  // se va a escribir. Un texto de terceros (el nombre de un cliente, una
+  // reseña) puede convencer al modelo de meter un valor de más — un alias de
+  // transferencia, una política de envío — y si la tarjeta no lo muestra, la
+  // persona confirma sin verlo.
+  //
+  // Dos chequeos por propiedad de `parameters`, con todas cargadas a la vez:
+  // - Textos y números: el valor centinela aparece LITERAL en el resumen.
+  // - Todas (también enums, booleanos y listas, que se muestran traducidos o
+  //   contados): cambiar solo esa propiedad cambia el resumen. Si una propiedad
+  //   no mueve la tarjeta, la tarjeta no la está mostrando.
+  describe('invariante 4: describirAccion muestra cada parámetro', () => {
+    type Prop = { type?: string; enum?: unknown[]; items?: { type?: string; enum?: unknown[] } };
+    const ctx = { businessId: 'biz-cat', userId: 'u', surface: OrbiSurface.PANEL, permissions: CODIGOS_DEL_CATALOGO };
+
+    function centinelas(props: Record<string, Prop>) {
+      const base: Record<string, unknown> = {};
+      const otro: Record<string, unknown> = {};
+      const literal: Record<string, string> = {};
+      Object.entries(props).forEach(([nombre, p], i) => {
+        if (p.enum) {
+          base[nombre] = p.enum[0];
+          otro[nombre] = p.enum[1];
+        } else if (p.type === 'string') {
+          base[nombre] = `centinela-${nombre}`;
+          otro[nombre] = `otro-${nombre}`;
+          literal[nombre] = String(base[nombre]);
+        } else if (p.type === 'number') {
+          // Tres cifras: no dependen del separador de miles.
+          base[nombre] = 311 + i;
+          otro[nombre] = 611 + i;
+          literal[nombre] = String(base[nombre]);
+        } else if (p.type === 'boolean') {
+          base[nombre] = true;
+          otro[nombre] = false;
+        } else if (p.type === 'array') {
+          const valores = p.items?.enum ?? ['a1', 'a2', 'a3'];
+          base[nombre] = valores.slice(0, 1);
+          otro[nombre] = valores.slice(0, 2);
+        } else {
+          throw new Error(`Tipo sin centinela en ${nombre}: agregalo a este test`);
+        }
+      });
+      return { base, otro, literal };
+    }
+
+    it.each([
+      'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
+      'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
+    ])('%s', async (nombre) => {
+      const tool = (registry as any).tools.get(nombre);
+      expect(tool.requiresConfirmation).toBe(true);
+      const props = (tool.parameters as { properties: Record<string, Prop> }).properties;
+      const { base, otro, literal } = centinelas(props);
+
+      const resumen: string = await tool.describirAccion(base, ctx);
+      for (const [prop, valor] of Object.entries(literal)) {
+        expect({ tool: nombre, prop, aparece: resumen.includes(valor) }).toEqual({ tool: nombre, prop, aparece: true });
+      }
+      for (const prop of Object.keys(props)) {
+        const cambiado: string = await tool.describirAccion({ ...base, [prop]: otro[prop] }, ctx);
+        expect({ tool: nombre, prop, cambia: cambiado !== resumen }).toEqual({ tool: nombre, prop, cambia: true });
+      }
+    });
+
+    it('toda tool que confirma está cubierta por la invariante', () => {
+      const confirman = todasLasTools().filter(t => t.requiresConfirmation).map(t => t.name).sort();
+      expect(confirman).toEqual([...ESCRIBEN].sort());
+    });
+
+    it('lo que se lee de la base para la tarjeta sale acotado al negocio del token', async () => {
+      prismaFalso.order.findFirst.mockClear();
+      prismaFalso.category.findFirst.mockClear();
+      const orderTool = (registry as any).tools.get('updateOrderStatus');
+      const productTool = (registry as any).tools.get('createProduct');
+      await orderTool.describirAccion({ orderId: 'o-1', status: 'CONFIRMED' }, ctx);
+      await productTool.describirAccion({ name: 'R', basePrice: 1, categoryId: 'c-1' }, ctx);
+      expect(prismaFalso.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'o-1', businessId: 'biz-cat' }) }));
+      expect(prismaFalso.category.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'c-1', businessId: 'biz-cat' }) }));
+    });
   });
 
   it('un usuario sin permisos no ve ninguna tool de datos del negocio', () => {

@@ -32,7 +32,7 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
   const contexto = { buildSystemPrompt: jest.fn().mockResolvedValue('system') };
   const tools = {
     getTools: jest.fn().mockReturnValue([{ name: 'listProducts' }]),
-    proponer: jest.fn().mockReturnValue(null),
+    proponer: jest.fn().mockResolvedValue(null),
     execute: jest.fn().mockResolvedValue({ success: true, label: 'ok' }),
   };
   const analitica = { logAiTurn: jest.fn().mockResolvedValue(null) };

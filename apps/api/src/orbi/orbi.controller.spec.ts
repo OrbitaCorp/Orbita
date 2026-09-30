@@ -28,7 +28,7 @@ function createMockResponse() {
 describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
-  let registry: { getTools: jest.Mock; execute: jest.Mock };
+  let registry: { getTools: jest.Mock; execute: jest.Mock; proponer: jest.Mock };
   let contextBuilder: { buildSystemPrompt: jest.Mock };
 
   // El wizard hashea la IP con JWT_SECRET para la clave de la cuota diaria.
@@ -40,6 +40,7 @@ describe('OrbiController', () => {
     registry = {
       getTools: jest.fn().mockReturnValue([]),
       execute: jest.fn(),
+      proponer: jest.fn().mockResolvedValue(null),
     };
 
     mockLlm = {
@@ -291,6 +292,75 @@ describe('OrbiController', () => {
       usuario('empleado', ['orders.view']) as any,
     );
     expect(registry.getTools).toHaveBeenLastCalledWith(OrbiSurface.PANEL, ['orders.view'], undefined, { soloLectura: false });
+  });
+
+  // Escrituras seguras (spec §3.2): cuando los argumentos que armó el modelo no
+  // pasan el DTO del endpoint, no hay tarjeta ni acción pendiente — el modelo
+  // recibe el error como resultado de la tool y puede corregir o explicarlo.
+  describe('propuestas de escritura', () => {
+    const duenio = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'owner', permissions: [] as string[],
+    };
+
+    function llmQuePide(llamada: { name: string; arguments: Record<string, unknown> }) {
+      const vistos: { role: string; content: string }[][] = [];
+      let vuelta = 0;
+      mockLlm.streamChat = async function* (req: { messages: { role: string; content: string }[] }) {
+        vistos.push([...req.messages]);
+        vuelta += 1;
+        if (vuelta === 1) {
+          yield { type: 'tool_call' as const, call: { id: 'c1', ...llamada } };
+          yield { type: 'done' as const };
+        } else {
+          yield { type: 'text' as const, chunk: 'Listo.' };
+          yield { type: 'done' as const };
+        }
+      } as any;
+      return vistos;
+    }
+
+    it('si proponer devuelve { error }, el modelo lo recibe como fallo de la tool y no hay action_pending', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      registry.proponer.mockResolvedValue({ error: 'code: El código solo puede tener letras, números, guion y guion bajo' });
+      const vistos = llmQuePide({ name: 'createCoupon', arguments: { code: 'NO VALE!' } });
+
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+
+      const todo = res.chunks.join('');
+      expect(todo).not.toContain('event: action_pending');
+      expect(registry.execute).not.toHaveBeenCalled();
+      const resultado = vistos[1].find(m => m.role === 'tool');
+      expect(JSON.parse(resultado!.content)).toEqual({
+        success: false,
+        error: 'code: El código solo puede tener letras, números, guion y guion bajo',
+      });
+    });
+
+    it('con { resumen } sí hay action_pending', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      registry.proponer.mockResolvedValue({ resumen: 'Crear el cupón "VERANO"' });
+      llmQuePide({ name: 'createCoupon', arguments: { code: 'VERANO' } });
+
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+      expect(res.chunks.join('')).toContain('event: action_pending');
+    });
+
+    it('en la demo, proponer y execute reciben soloLectura: true', async () => {
+      registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
+      registry.execute.mockResolvedValue({ success: false, error: 'no', label: 'no' });
+      llmQuePide({ name: 'createCoupon', arguments: { code: 'VERANO' } });
+
+      await controller.chat(
+        { message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL } } as any,
+        createMockResponse() as any,
+        { ...duenio, readOnly: true } as any,
+      );
+      expect(registry.proponer).toHaveBeenCalledWith('createCoupon', { code: 'VERANO' }, expect.anything(), undefined, { soloLectura: true });
+      expect(registry.execute).toHaveBeenCalledWith('createCoupon', { code: 'VERANO' }, expect.anything(), undefined, { soloLectura: true });
+    });
   });
 
   it('el prompt del sistema se arma con los permisos efectivos del usuario', async () => {

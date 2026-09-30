@@ -2,6 +2,18 @@ import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OrdersService } from '../../../orders/orders.service';
+import type { PrismaService } from '../../../prisma/prisma.service';
+import { isUUID } from 'class-validator';
+import { UpdateOrderStatusDto } from '../../../orders/dto/update-order-status.dto';
+import { AccionInvalida, validarConDto } from '../acciones/validar-args';
+import { dato, entreComillas } from '../acciones/formato';
+
+const EN_CASTELLANO: Record<string, string> = {
+  PENDING: 'pendiente', CONFIRMED: 'confirmado', PREPARING: 'en preparación',
+  SHIPPED: 'enviado', DELIVERED: 'entregado', COMPLETED: 'completado',
+  CANCELLED: 'cancelado',
+};
+const estadoLegible = (s: unknown) => EN_CASTELLANO[String(s)] ?? dato(s);
 
 export class ListOrdersTool implements OrbiTool {
   name = 'listOrders';
@@ -132,14 +144,66 @@ export class UpdateOrderStatusTool implements OrbiTool {
   requiredPermissions = ['orders.manage'];
   requiresConfirmation = true;
 
-  describirAccion(args: Record<string, unknown>): string {
-    const enCastellano: Record<string, string> = {
-      PENDING: 'pendiente', CONFIRMED: 'confirmado', PREPARING: 'en preparación',
-      SHIPPED: 'enviado', DELIVERED: 'entregado', COMPLETED: 'completado',
-      CANCELLED: 'cancelado',
-    };
-    const estado = enCastellano[String(args.status)] ?? String(args.status);
-    return `Marcar el pedido como ${estado}`;
+  /**
+   * "Marcar el pedido como enviado" no alcanzaba: no decía CUÁL pedido, y un
+   * texto de terceros (el nombre de un cliente en otro pedido) podía llevar
+   * al modelo a cambiar uno distinto del que la persona tenía en mente. Ahora
+   * la tarjeta dice número, cliente, de qué estado a qué estado, y lo que
+   * pasa además: el mail al comprador y el movimiento de stock.
+   *
+   * Las reglas de mail y stock son las de OrdersService.updateStatus: si
+   * cambian allá, este texto queda desactualizado (no rompe nada, pero la
+   * tarjeta mentiría). Por eso están comentadas una por una.
+   */
+  async describirAccion(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
+    // SIEMPRE acotado al negocio del token: el orderId lo arma el modelo, y
+    // un id de otro negocio tiene que dar "no encontrado", no sus datos.
+    const pedido = await this.prisma.order.findFirst({
+      where: { id: String(args.orderId), businessId: ctx.businessId, deletedAt: null },
+      select: {
+        orderNumber: true,
+        status: true,
+        customer: { select: { firstName: true, lastName: true, email: true } },
+        onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
+      },
+    });
+    if (!pedido) throw new AccionInvalida('Pedido no encontrado');
+
+    const actual = String(pedido.status);
+    const nuevo = String(args.status);
+    const nombre = pedido.onlineOrderDetails?.buyerName
+      ?? ([pedido.customer?.firstName, pedido.customer?.lastName].filter(Boolean).join(' ') || null);
+    const cliente = nombre ? `de ${entreComillas(nombre)}` : 'sin cliente';
+
+    const extras: string[] = [];
+    // Pasar al mismo estado lo rechaza el service: no se promete nada.
+    const cambia = actual !== nuevo;
+    // Sale de pendiente a un estado comprometido: se descuenta el stock y se
+    // manda el mail de confirmación con el detalle.
+    const descuenta = cambia && actual === 'PENDING' && nuevo !== 'CANCELLED';
+    // Cancelar algo que ya había descontado: el stock vuelve.
+    const devuelve = nuevo === 'CANCELLED' && (actual === 'CONFIRMED' || actual === 'PREPARING');
+    if (descuenta) extras.push('Se descuenta el stock de los productos.');
+    if (devuelve) extras.push('El stock de los productos vuelve al inventario.');
+    // El mail va al comprador de la compra online o, si no hay, al de la ficha.
+    const hayMail = Boolean(pedido.onlineOrderDetails?.buyerEmail ?? pedido.customer?.email);
+    const avisa = cambia && (descuenta || nuevo === 'SHIPPED' || nuevo === 'CANCELLED' || nuevo === 'DELIVERED');
+    if (hayMail && avisa) extras.push('Le llega un mail al comprador avisándole.');
+
+    return [
+      `Pasar el pedido #${pedido.orderNumber} ${cliente} de ${estadoLegible(actual)} a ${estadoLegible(nuevo)}.`,
+      ...extras,
+    ].join(' ');
+  }
+
+  // El endpoint (PATCH /orders/:id/status) valida el estado con su DTO; el id
+  // va en la ruta. Acá los dos vienen del modelo: el id se chequea como UUID
+  // antes de ir a la base.
+  async validarArgs(args: Record<string, unknown>) {
+    if (!isUUID(args.orderId)) {
+      return { ok: false as const, error: 'Argumento inválido (orderId): tiene que ser el UUID del pedido (usá listOrders)' };
+    }
+    return validarConDto(UpdateOrderStatusDto, { status: args.status });
   }
 
   parameters = {
@@ -151,7 +215,10 @@ export class UpdateOrderStatusTool implements OrbiTool {
     required: ['orderId', 'status'],
   };
 
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };

@@ -61,8 +61,20 @@ export interface OrbiTool {
    * Sin esto el botón diría el nombre de la función, que es justo lo que no
    * tiene que ver — y además le impediría revisar si los argumentos que armó
    * el modelo son los que ella quería.
+   *
+   * Tiene que mostrar CADA valor que se va a escribir (invariante 4 del
+   * catálogo): lo que la tarjeta no muestra, la persona lo confirma sin verlo.
+   * Recibe el ctx y puede ser async para resolver datos legibles de la base
+   * (número de pedido, cliente, nombre de categoría), SIEMPRE acotados a
+   * ctx.businessId. Si el dato no existe, tira AccionInvalida.
    */
-  describirAccion?(args: Record<string, unknown>): string;
+  describirAccion?(args: Record<string, unknown>, ctx: ToolExecutionContext): string | Promise<string>;
+  /**
+   * Valida los argumentos con el DTO del endpoint HTTP equivalente (ver
+   * acciones/validar-args.ts). Corre en proponer(), antes de armar la
+   * tarjeta: si no pasa, no se propone y el modelo recibe el motivo.
+   */
+  validarArgs?(args: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string }>;
   execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult>;
   toLlmDefinition(): LlmToolDefinition;
 }
