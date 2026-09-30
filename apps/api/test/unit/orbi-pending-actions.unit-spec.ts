@@ -95,15 +95,26 @@ describe('PendingActionService', () => {
 
   describe('consumir', () => {
     it('pasa de pending a executing con un solo UPDATE condicional (negocio, persona, estado y vencimiento en el where)', async () => {
-      const prisma = prismaFijo({ count: 1, fila: fila({ status: 'executing' }) });
+      const prisma = prismaFijo({ count: 1, fila: fila({ status: 'pending' }) });
       const r = await new PendingActionService(prisma as any).consumir('a'.repeat(32), 'biz-1', 'member-1');
 
+      expect(prisma.orbiPendingAction.updateMany).toHaveBeenCalledTimes(1);
       expect(prisma.orbiPendingAction.updateMany).toHaveBeenCalledWith({
         where: { id: 'a'.repeat(32), businessId: 'biz-1', memberId: 'member-1', status: 'pending', expiresAt: { gt: expect.any(Date) } },
         data: { status: 'executing', startedAt: expect.any(Date) },
       });
       expect(r.tipo).toBe('ejecutar');
-      if (r.tipo === 'ejecutar') expect(r.accion.tool).toBe('createCoupon');
+      if (r.tipo === 'ejecutar') expect(r.accion).toEqual(expect.objectContaining({ tool: 'createCoupon', status: 'executing', startedAt: expect.any(Date) }));
+      // La fila se leyó ANTES del claim, y después del claim no se lee nada más.
+      expect(prisma.orbiPendingAction.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.orbiPendingAction.findFirst.mock.invocationCallOrder[0])
+        .toBeLessThan(prisma.orbiPendingAction.updateMany.mock.invocationCallOrder[0]);
+    });
+
+    it('una que ya no está pending no intenta el claim', async () => {
+      const prisma = prismaFijo({ count: 0, fila: fila({ status: 'rejected' }) });
+      await new PendingActionService(prisma as any).consumir('a'.repeat(32), 'biz-1', 'member-1');
+      expect(prisma.orbiPendingAction.updateMany).not.toHaveBeenCalled();
     });
 
     it.each(['executed', 'failed'])('una ya %s devuelve el mismo result (idempotente)', async (status) => {
@@ -164,6 +175,50 @@ describe('PendingActionService', () => {
       expect(await servicio.consumir(id, '', 'member-1')).toEqual({ tipo: 'no_disponible' });
       expect(prisma.orbiPendingAction.updateMany).not.toHaveBeenCalled();
       expect(prisma.filas.get(id)?.status).toBe('pending');
+    });
+
+    // Antes se reclamaba (pending → executing) y DESPUÉS se leía la fila: si
+    // esa lectura fallaba (un error transitorio de la base), el request
+    // terminaba en 500 con la acción ya en executing y sin ejecutar, y a los 2
+    // minutos quedaba como "no sé si se aplicó" para siempre.
+    it('una lectura que falla justo después del claim no deja la acción en executing sin ejecutar', async () => {
+      const prisma = prismaDeAcciones();
+      const servicio = new PendingActionService(prisma as any);
+      const id = await servicio.crear(base);
+      const leer = prisma.orbiPendingAction.findFirst.getMockImplementation()!;
+      prisma.orbiPendingAction.findFirst.mockImplementation(async (q: any) => {
+        if (prisma.filas.get(id)?.status === 'executing') throw new Error('conexión cortada');
+        return leer(q);
+      });
+
+      const r = await servicio.consumir(id, 'biz-1', 'member-1').catch((e: Error) => e);
+
+      // O se ejecuta (con los args de la fila), o la fila no quedó tomada.
+      if (r instanceof Error) {
+        expect(prisma.filas.get(id)?.status).toBe('pending');
+      } else {
+        expect(r.tipo).toBe('ejecutar');
+        if (r.tipo === 'ejecutar') expect(r.accion).toEqual(expect.objectContaining({ id, tool: 'createCoupon', args: base.args }));
+      }
+    });
+
+    // Doble clic o un reintento de red: dos confirmar a la vez. Las dos leen la
+    // fila en pending, pero el claim exige `status: 'pending'` en el where y el
+    // fake aplica cada UPDATE entero antes del siguiente (como el lock de fila
+    // de Postgres): gana una sola. La garantía contra la base real va en el e2e.
+    it('dos consumir concurrentes: exactamente uno obtiene ejecutar', async () => {
+      const prisma = prismaDeAcciones();
+      const servicio = new PendingActionService(prisma as any);
+      const id = await servicio.crear(base);
+
+      const resultados = await Promise.all([
+        servicio.consumir(id, 'biz-1', 'member-1'),
+        servicio.consumir(id, 'biz-1', 'member-1'),
+      ]);
+
+      expect(resultados.filter((r) => r.tipo === 'ejecutar')).toHaveLength(1);
+      expect(resultados.map((r) => r.tipo).sort()).toEqual(['aplicando', 'ejecutar']);
+      expect(prisma.filas.get(id)?.status).toBe('executing');
     });
 
     it('de un solo uso: el segundo consumir ya no ejecuta', async () => {

@@ -90,22 +90,41 @@ export class PendingActionService {
    * vencimiento en el where: de dos confirmar simultáneos gana uno solo, y un
    * intento desde otro negocio u otra persona no toca la fila (antes, en
    * memoria, ese intento "quemaba" la acción de su dueño).
+   *
+   * La fila se lee ANTES de reclamarla, no después: si la lectura posterior
+   * fallaba (un error transitorio de la base), la acción quedaba en
+   * `executing` sin haberse ejecutado y a los 2 minutos pasaba a "no sé si se
+   * aplicó" para siempre. Leerla antes es seguro porque lo que se ejecuta
+   * (tool y args) no cambia nunca, y el claim sigue siendo el UPDATE
+   * condicional de siempre: la lectura previa no decide quién gana.
    */
   async consumir(id: string, businessId: string, memberId: string): Promise<Consumo> {
     // Con un JWT sin memberId, Prisma sacaría ese filtro del where (undefined
     // no filtra) y cualquiera del negocio podría consumir la acción de otro.
     if (!businessId || !memberId) return { tipo: 'no_disponible' };
 
+    const previa = await this.prisma.orbiPendingAction.findFirst({ where: { id, businessId, memberId } });
+    if (!previa) return { tipo: 'no_disponible' };
+    if (previa.status !== 'pending') return this.explicar(previa);
+
     const ahora = new Date();
     const { count } = await this.prisma.orbiPendingAction.updateMany({
       where: { id, businessId, memberId, status: 'pending', expiresAt: { gt: ahora } },
       data: { status: 'executing', startedAt: ahora },
     });
+    // Después de ganar el claim no hay ninguna otra operación que pueda
+    // fallar antes de ejecutar.
+    if (count === 1) return { tipo: 'ejecutar', accion: { ...previa, status: 'executing', startedAt: ahora } };
 
-    const fila = await this.prisma.orbiPendingAction.findFirst({ where: { id, businessId, memberId } });
-    if (!fila) return { tipo: 'no_disponible' };
-    if (count === 1) return { tipo: 'ejecutar', accion: fila };
+    // No se pudo tomar: la ganó otro request en el medio, o estaba vencida.
+    // Se relee para contestar según cómo quedó. Si esta lectura falla, la
+    // fila no es de este request, así que no queda nada trabado por eso.
+    const actual = await this.prisma.orbiPendingAction.findFirst({ where: { id, businessId, memberId } });
+    return actual ? this.explicar(actual) : { tipo: 'no_disponible' };
+  }
 
+  /** Por qué una acción que no se pudo tomar no se ejecuta. */
+  private explicar(fila: FilaPendiente): Consumo {
     switch (fila.status) {
       case 'executed':
       case 'failed':
