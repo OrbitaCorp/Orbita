@@ -35,6 +35,7 @@ const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana s
 const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
 const MENSAJE_NO_DISPONIBLE = 'Esa acción ya no está disponible. Pedísela a Orbi de nuevo.';
 const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos.';
+const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';
 // Lo que recibe el modelo cuando pide una escritura que no puede proponerse
 // (demo, sin permiso, fuera del panel). Fijo y sin detalles.
 const ESCRITURA_NO_DISPONIBLE = 'No podés hacer esa acción desde acá: no tenés permiso o no está disponible.';
@@ -91,11 +92,28 @@ function sumarConsumo(consumo: ConsumoPorProveedor, u: LlmUsage): void {
  * Node emite 'close' también después de un res.end() normal: solo es un corte
  * si la respuesta todavía no terminó.
  */
+/**
+ * Los 409 de /orbi/confirm y /orbi/reject. Llevan su contrato (`estado`, y
+ * `mensaje` o `result`, spec §3.4) y además `error` y `message`, que es lo que
+ * lee el filtro global: sin ellos el 409 salía con `error: 'ConflictException'`
+ * y sin texto, distinto de cualquier otro 409 de la API.
+ */
+function conflicto(
+  cuerpo: { estado: 'aplicando' | 'desconocido'; mensaje: string } | { estado: 'ya_aplicada'; result: ToolResult },
+): ConflictException {
+  const message = 'mensaje' in cuerpo ? cuerpo.mensaje : MENSAJE_YA_APLICADA;
+  return new ConflictException({ error: 'Conflict', message, ...cuerpo });
+}
+
 function corteAlCerrar(res: Response): AbortController {
   const corte = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) corte.abort();
   });
+  // Si el cliente se fue ANTES de registrar el listener (durante el await de
+  // la cuota), el 'close' ya se emitió y no se repite: sin esto el turno
+  // entero se correría y se pagaría para nadie.
+  if (!res.writableEnded && (res.destroyed || res.socket?.destroyed)) corte.abort();
   return corte;
 }
 
@@ -505,30 +523,35 @@ export class OrbiController {
       });
       res.end();
 
-      // Sin await: la telemetría no puede demorar ni romper el cierre del
-      // stream. registrar() nunca lanza. En un turno cancelado los tokens son
-      // un piso: la llamada cortada se factura igual y su `usage` no llegó.
-      let promptTokens = 0;
-      let completionTokens = 0;
-      for (const c of consumo.values()) {
-        promptTokens += c.promptTokens;
-        completionTokens += c.completionTokens;
+      // La demo no se registra: todos sus visitantes comparten negocio y
+      // miembro, y sus turnos se mezclarían con las métricas de uso real del
+      // negocio. El metering de arriba sí: ese consumo se paga igual.
+      if (!esDemo) {
+        // Sin await: la telemetría no puede demorar ni romper el cierre del
+        // stream. registrar() nunca lanza. En un turno cancelado los tokens son
+        // un piso: la llamada cortada se factura igual y su `usage` no llegó.
+        let promptTokens = 0;
+        let completionTokens = 0;
+        for (const c of consumo.values()) {
+          promptTokens += c.promptTokens;
+          completionTokens += c.completionTokens;
+        }
+        void this.orbiTurns.registrar({
+          businessId: user.businessId,
+          memberId: user.memberId,
+          conversationId: conversacionVerificada,
+          module: dto.context.module,
+          model: modeloReportado ?? this.modeloPara(dto.context.surface),
+          // undefined y no 0 si el proveedor no informó consumo.
+          promptTokens: promptTokens || undefined,
+          completionTokens: completionTokens || undefined,
+          latencyMs: Date.now() - arrancoEn,
+          rounds: llamadasAlModelo,
+          toolsUsed: toolsPedidas,
+          actionsProposed: propuestas,
+          status: estado,
+        });
       }
-      void this.orbiTurns.registrar({
-        businessId: user.businessId,
-        memberId: user.memberId,
-        conversationId: conversacionVerificada,
-        module: dto.context.module,
-        model: modeloReportado ?? this.modeloPara(dto.context.surface),
-        // undefined y no 0 si el proveedor no informó consumo.
-        promptTokens: promptTokens || undefined,
-        completionTokens: completionTokens || undefined,
-        latencyMs: Date.now() - arrancoEn,
-        rounds: llamadasAlModelo,
-        toolsUsed: toolsPedidas,
-        actionsProposed: propuestas,
-        status: estado,
-      });
     }
   }
 
@@ -569,11 +592,11 @@ export class OrbiController {
       case 'resuelta':
         return consumo.result;
       case 'aplicando':
-        throw new ConflictException({ estado: 'aplicando', mensaje: MENSAJE_APLICANDO });
+        throw conflicto({ estado: 'aplicando', mensaje: MENSAJE_APLICANDO });
       case 'desconocido':
         // No se vuelve a ejecutar sola: si la escritura llegó a la base,
         // repetirla crearía dos cupones o cambiaría dos veces el pedido.
-        throw new ConflictException({ estado: 'desconocido', mensaje: `No sé si se aplicó; revisalo en ${pantallaDe(consumo.tool)}.` });
+        throw conflicto({ estado: 'desconocido', mensaje: `No sé si se aplicó; revisalo en ${pantallaDe(consumo.tool)}.` });
       case 'no_disponible':
         throw new NotFoundException(MENSAJE_NO_DISPONIBLE);
     }
@@ -619,7 +642,7 @@ export class OrbiController {
       case 'ya_rechazada':
         return { ok: true };
       case 'ya_aplicada':
-        throw new ConflictException({ estado: 'ya_aplicada', result: rechazo.result });
+        throw conflicto({ estado: 'ya_aplicada', result: rechazo.result });
       case 'no_disponible':
         throw new NotFoundException(MENSAJE_NO_DISPONIBLE);
     }
@@ -627,7 +650,8 @@ export class OrbiController {
 
   /**
    * Corre la acción tomada y SIEMPRE la deja resuelta (executed o failed, con
-   * result y resolvedAt), también si la tool tira. El result arranca como
+   * result y resolvedAt), también si la tool tira; salvo que la base no deje
+   * guardarlo ni al reintentar (ver guardarResultado). El result arranca como
    * fallo interno: si algo falla antes de asignarlo, o dentro del catch, el
    * finally igual tiene qué guardar. Si la fila quedara en executing, el
    * próximo clic recibiría "no sé si se aplicó" para siempre.
@@ -649,16 +673,41 @@ export class OrbiController {
       if (!(await this.toolRegistry.sigueVigente(accion.tool, args, ctx, accion.summary))) {
         result = { success: false, error: ERROR_DESACTUALIZADA, label: accion.tool };
       } else {
-        result = await this.toolRegistry.execute(accion.tool, args, ctx);
+        // soloLectura como en el chat: la demo ya la frena DemoGuard antes de
+        // llegar acá, pero si esa puerta se rompiera, una acción confirmada
+        // desde la demo se escribiría (las tools llaman a los services directo).
+        result = await this.toolRegistry.execute(accion.tool, args, ctx, undefined, { soloLectura: user.readOnly === true });
       }
     } catch (e) {
       // Sin el mensaje: puede traer valores e internos de Prisma.
       this.logger.warn(`Falló la acción confirmada ${accion.tool}: ${(e as Error)?.name ?? 'error'}`);
       result = { success: false, error: ERROR_INTERNO, label: accion.tool };
     } finally {
-      await this.pendingActions.resolver(accion.id, accion.businessId, result.success ? 'executed' : 'failed', result);
+      await this.guardarResultado(accion, result);
     }
     return result;
+  }
+
+  /**
+   * Deja la acción en su estado final, con un reintento. Nunca tira: cuando se
+   * llega acá la escritura ya ocurrió (o ya falló), y un 500 le haría creer a
+   * la persona que no pasó nada. Si los dos intentos fallan, la fila queda en
+   * `executing` y a los 2 minutos un segundo clic recibe "no sé si se aplicó;
+   * revisalo en...", que es la verdad; nunca se vuelve a ejecutar sola.
+   */
+  private async guardarResultado(accion: FilaPendiente, result: ToolResult): Promise<void> {
+    const estado = result.success ? 'executed' : 'failed';
+    for (let intento = 1; intento <= 2; intento++) {
+      try {
+        await this.pendingActions.resolver(accion.id, accion.businessId, estado, result);
+        return;
+      } catch (e) {
+        // Sin el mensaje: puede traer valores e internos de Prisma.
+        if (intento === 2) {
+          this.logger.warn(`No se pudo guardar el resultado de la acción confirmada ${accion.tool}: ${(e as Error)?.name ?? 'error'}`);
+        }
+      }
+    }
   }
 
   /**

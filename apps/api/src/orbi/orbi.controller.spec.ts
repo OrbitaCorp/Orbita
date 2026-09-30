@@ -16,6 +16,7 @@ import { CuotaService } from '../common/cuota/cuota.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
 import { OrbiTurnService } from './orbi-turn.service';
+import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
 
 interface MockResponse {
   writableEnded: boolean;
@@ -670,7 +671,9 @@ describe('OrbiController', () => {
       const err = await controller.confirm({ actionId: id }, duenio as any).catch(e => e);
 
       expect(err).toBeInstanceOf(ConflictException);
-      expect(err.getResponse()).toEqual({ estado: 'desconocido', mensaje: expect.stringContaining('Cupones') });
+      const mensaje = expect.stringContaining('Cupones');
+      expect(err.getResponse()).toEqual({ error: 'Conflict', message: mensaje, estado: 'desconocido', mensaje });
+      expect(err.getResponse().message).toBe(err.getResponse().mensaje);
       expect(registry.execute).not.toHaveBeenCalled();
       expect(prisma.filas.get(id)?.status).toBe('executing');
     });
@@ -682,8 +685,27 @@ describe('OrbiController', () => {
       const err = await controller.confirm({ actionId: id }, duenio as any).catch(e => e);
 
       expect(err).toBeInstanceOf(ConflictException);
-      expect(err.getResponse()).toEqual({ estado: 'aplicando', mensaje: expect.any(String) });
+      expect(err.getResponse()).toEqual({ error: 'Conflict', message: expect.any(String), estado: 'aplicando', mensaje: expect.any(String) });
+      expect(err.getResponse().message).toBe(err.getResponse().mensaje);
       expect(registry.execute).not.toHaveBeenCalled();
+    });
+
+    // El filtro global arma { error, statusCode, message }: sin `message` en el
+    // cuerpo, el 409 llegaba con `error: 'ConflictException'` y sin texto, a
+    // diferencia de cualquier otro 409 de la API.
+    it('el 409 pasa por el filtro global con la forma estándar y el contrato de Orbi', async () => {
+      const id = await acciones.crear(cupon);
+      Object.assign(prisma.filas.get(id)!, { status: 'executing', startedAt: new Date() });
+      const err = await controller.confirm({ actionId: id }, duenio as any).catch(e => e);
+
+      const json = jest.fn();
+      const res = { status: jest.fn(() => ({ json })) };
+      new HttpExceptionFilter().catch(err, { switchToHttp: () => ({ getResponse: () => res, getRequest: () => ({}) }) } as any);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      const cuerpo = json.mock.calls[0][0];
+      expect(cuerpo).toEqual({ error: 'Conflict', statusCode: 409, message: cuerpo.mensaje, estado: 'aplicando', mensaje: expect.any(String) });
+      expect(cuerpo.message.length).toBeGreaterThan(0);
     });
 
     it('una acción inexistente o ajena: 404, y la ajena sigue pending', async () => {
@@ -692,6 +714,36 @@ describe('OrbiController', () => {
       await expect(controller.confirm({ actionId: id }, { ...duenio, memberId: 'member-2' } as any)).rejects.toThrow(NotFoundException);
       await expect(controller.confirm({ actionId: id }, { ...duenio, businessId: 'biz-2' } as any)).rejects.toThrow(NotFoundException);
       expect(prisma.filas.get(id)?.status).toBe('pending');
+    });
+
+    // La escritura ya ocurrió: si guardar el estado final falla, un 500 le
+    // haría creer a la persona que no pasó nada (y reintentaría).
+    it('si guardar el estado falla una vez, se reintenta y se devuelve el result', async () => {
+      registry.execute.mockResolvedValue(OK);
+      const id = await acciones.crear(cupon);
+      // La primera vez falla; la segunda pasa al servicio real.
+      const resolver = jest.spyOn(acciones, 'resolver').mockRejectedValueOnce(new Error('conexión cortada'));
+
+      await expect(controller.confirm({ actionId: id }, duenio as any)).resolves.toEqual(OK);
+
+      expect(resolver).toHaveBeenCalledTimes(2);
+      expect(prisma.filas.get(id)?.status).toBe('executed');
+      resolver.mockRestore();
+    });
+
+    it('si guardar el estado falla siempre, igual se devuelve el result (sin 500) y se avisa solo el nombre del error', async () => {
+      registry.execute.mockResolvedValue(OK);
+      const id = await acciones.crear(cupon);
+      const resolver = jest.spyOn(acciones, 'resolver').mockRejectedValue(new Error('datos internos de Prisma'));
+      const warn = jest.spyOn((controller as any).logger, 'warn').mockImplementation(() => undefined);
+
+      await expect(controller.confirm({ actionId: id }, duenio as any)).resolves.toEqual(OK);
+
+      expect(resolver).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Error'));
+      for (const [mensaje] of warn.mock.calls) expect(String(mensaje)).not.toContain('datos internos');
+      resolver.mockRestore();
+      warn.mockRestore();
     });
 
     it('la conversación borrada no cambia la respuesta de confirmar', async () => {
@@ -713,12 +765,26 @@ describe('OrbiController', () => {
 
       expect(registry.execute).toHaveBeenCalledWith('createCoupon', { code: 'VERANO15' }, expect.objectContaining({
         businessId: 'biz-1', userId: 'member-1', surface: OrbiSurface.PANEL, permissions: ['orders.view'],
-      }));
+      }), undefined, { soloLectura: false });
       expect(r).toEqual(sinPermiso);
       expect(prisma.filas.get(id)?.status).toBe('failed');
       expect(conversaciones.appendMessage).toHaveBeenCalledWith('conv-1', 'biz-1', 'member-1', expect.objectContaining({
         content: 'No se pudo: Crear cupón VERANO15. Motivo: permiso.',
       }));
+    });
+
+    // Defensa en profundidad: hoy a la demo la frena DemoGuard antes de llegar
+    // acá, pero si esa puerta se rompiera, execute() igual se niega a escribir.
+    it.each([
+      ['en la demo', { readOnly: true }, true],
+      ['fuera de la demo', {}, false],
+    ])('%s: confirmar le pasa a execute el soloLectura que corresponde', async (_caso, extra, soloLectura) => {
+      registry.execute.mockResolvedValue(OK);
+      const id = await acciones.crear(cupon);
+
+      await controller.confirm({ actionId: id }, { ...duenio, ...extra } as any);
+
+      expect(registry.execute).toHaveBeenCalledWith('createCoupon', { code: 'VERANO15' }, expect.anything(), undefined, { soloLectura });
     });
 
     // La tarjeta del pedido se arma con el estado de ESE momento (qué pasa con
@@ -779,7 +845,7 @@ describe('OrbiController', () => {
       const err = await controller.reject({ actionId: id }, duenio as any).catch(e => e);
 
       expect(err).toBeInstanceOf(ConflictException);
-      expect(err.getResponse()).toEqual({ estado: 'ya_aplicada', result: OK });
+      expect(err.getResponse()).toEqual({ error: 'Conflict', message: expect.any(String), estado: 'ya_aplicada', result: OK });
       expect(prisma.filas.get(id)?.status).toBe('executed');
     });
 
@@ -838,6 +904,44 @@ describe('OrbiController', () => {
       expect(senales[1].aborted).toBe(false);
     });
 
+    // El cliente se fue durante el await de la cuota, antes de que se
+    // registrara el listener: el 'close' ya pasó y no vuelve a dispararse.
+    it.each([
+      ['la respuesta ya estaba cerrada', { destroyed: true }],
+      ['el socket ya estaba cerrado', { socket: { destroyed: true } }],
+    ])('panel: si %s al empezar, no se llama al modelo', async (_caso, cerrada) => {
+      const llamadas = jest.fn();
+      mockLlm.streamChat = async function* () {
+        llamadas();
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      const res = Object.assign(createMockResponse(), cerrada);
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(llamadas).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).not.toContain('event: error');
+      expect(guardoRespuesta()).toBe(false);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled', rounds: 0 }));
+    });
+
+    it('wizard: si la conexión ya estaba cerrada al empezar, no se llama al modelo ni se registra el turno', async () => {
+      const llamadas = jest.fn();
+      mockLlm.streamChat = async function* () {
+        llamadas();
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      const res = Object.assign(createMockResponse(), { socket: { destroyed: true } });
+
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      expect(llamadas).not.toHaveBeenCalled();
+      expect(analitica.logAiTurn).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).not.toContain('event: error');
+    });
+
     it('cortado a mitad de la vuelta: no ejecuta la tool ni vuelve a llamar al modelo, sin error ni respuesta guardada', async () => {
       registry.getTools.mockReturnValue([{ name: 'listProducts' }]);
       registry.execute.mockResolvedValue({ success: true, label: 'ok' });
@@ -861,8 +965,28 @@ describe('OrbiController', () => {
       expect(todo).not.toContain('event: action_start');
       expect(errorLog).not.toHaveBeenCalled();
       expect(guardoRespuesta()).toBe(false);
-      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled' }));
+      // El check del tool_call corta ANTES de contar la tool y de proponer:
+      // sin él, la tool pedida quedaba en toolsUsed y proponer() leía la base.
+      expect(registry.proponer).not.toHaveBeenCalled();
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled', toolsUsed: [] }));
       expect(res.end).toHaveBeenCalled();
+    });
+
+    // El último check antes de guardar: el cliente se fue justo cuando
+    // terminaba la última vuelta, sin que quedara otro check en el camino.
+    it('cortado al terminar la última vuelta: la respuesta no se guarda', async () => {
+      const res = createMockResponse();
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+        res.cerrar();
+      } as any;
+
+      await controller.chat(chatPanel(), res as any, duenio as any);
+
+      expect(guardoRespuesta()).toBe(false);
+      expect(res.chunks.join('')).not.toContain('event: error');
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'cancelled', rounds: 1 }));
     });
 
     it('cortado mientras corre una tool: no hay otra llamada al modelo', async () => {
@@ -945,6 +1069,24 @@ describe('OrbiController', () => {
       expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ providerSlug: 'gemini', category: 'prompt_tokens', quantity: 10 }));
       expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ providerSlug: 'gemini', category: 'completion_tokens', quantity: 5 }));
       expect(res.end).toHaveBeenCalled();
+    });
+
+    it('en el wizard, cortado antes del tool_call: no se ejecuta la tool', async () => {
+      registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
+      registry.execute.mockResolvedValue({ success: true, label: 'ok' });
+      const res = createMockResponse();
+      mockLlm.streamChat = async function* () {
+        res.cerrar();
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'selectWizardOption', arguments: {} } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      expect(registry.execute).not.toHaveBeenCalled();
+      const todo = res.chunks.join('');
+      expect(todo).not.toContain('event: action_start');
+      expect(todo).not.toContain('event: error');
     });
 
     it('en el wizard, cortado mientras corre una tool: no hay otra llamada al modelo', async () => {
@@ -1159,6 +1301,26 @@ describe('OrbiController', () => {
       const res = createMockResponse();
       await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
       expect(res.end).toHaveBeenCalled();
+    });
+
+    // Los visitantes de la demo comparten negocio y miembro: sus turnos se
+    // mezclarían con las métricas de uso real. El metering sí queda: el
+    // consumo se paga igual.
+    it('la demo no escribe en orbi_turns, pero el metering sí', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, provider: 'gemini' as const } };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(
+        { message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any,
+        createMockResponse() as any,
+        { ...duenio, readOnly: true } as any,
+      );
+
+      expect(turnos.registrar).not.toHaveBeenCalled();
+      expect(metering.track).toHaveBeenCalledWith(expect.objectContaining({ category: 'prompt_tokens', quantity: 10 }));
     });
 
     it('el wizard no escribe en orbi_turns (tiene su propia analítica)', async () => {

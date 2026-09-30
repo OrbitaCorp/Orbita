@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt, IsBoolean, IsIn, ArrayMaxSize, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SECCIONES_DEL_PANEL } from '../navegacion/secciones';
 
 export enum OrbiSurface {
   WIZARD = 'wizard',
@@ -74,13 +75,26 @@ export class OrbiOptionDto {
   description?: string;
 }
 
+/**
+ * Los valores posibles de `context.module`. Termina en el system prompt
+ * ("El usuario está viendo el módulo X") y en orbi_turns, así que no puede
+ * ser texto libre del cliente.
+ *
+ * El panel manda el penúltimo segmento de /admin/{moduloPadre}/{seccion}
+ * (useOrbiContext.ts), y el único moduloPadre que monta AdminSeccionShell es
+ * 'ventas'. Las secciones (SECCIONES_DEL_PANEL, espejo del front) son las
+ * claves que entienden el prompt del panel y los snapshots de module-data.
+ * Si el panel suma otro moduloPadre, va acá o Orbi responde 400 en esa
+ * pantalla. El wizard no manda module.
+ */
+export const MODULOS_DEL_CONTEXTO: readonly string[] = ['ventas', ...SECCIONES_DEL_PANEL];
+
 export class OrbiContextDto {
   @IsEnum(OrbiSurface)
   surface!: OrbiSurface;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
+  @IsIn(MODULOS_DEL_CONTEXTO)
   module?: string;
 
   @IsOptional()
