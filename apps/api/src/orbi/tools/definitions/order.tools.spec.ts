@@ -93,11 +93,79 @@ describe('UpdateOrderStatusTool — la tarjeta', () => {
     expect(r).toContain('"Ana ffo %001 ed"');
   });
 
+  it('un buyerName vacío no tapa al cliente de la ficha', async () => {
+    const { tool } = armar(pedido({ onlineOrderDetails: { buyerName: '', buyerEmail: 'ana@example.com' } }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx);
+    expect(r).toContain('"Ana Gómez"');
+    expect(r).not.toContain('sin cliente');
+  });
+
   it('una venta sin cliente lo dice', async () => {
     const { tool } = armar(pedido({ customer: null, onlineOrderDetails: null, channel: 'POS' }));
     const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CANCELLED' }, ctx);
     expect(r).toContain('#1042');
     expect(r).toContain('sin cliente');
+  });
+});
+
+// Espejo de OrdersService.updateStatus: si el pedido sale de pendiente, el
+// pago offline pendiente se aprueba; si se cancela, se rechaza. Mercado Pago
+// nunca se toca ahí (lo confirma solo el webhook).
+describe('UpdateOrderStatusTool — la tarjeta avisa qué pasa con el pago pendiente', () => {
+  const efectivo = { method: 'CASH', status: 'PENDING' };
+
+  it('pendiente → confirmado con un pago en efectivo pendiente: queda cobrado', async () => {
+    const { tool } = armar(pedido({ payments: [efectivo] }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx);
+    expect(r).toMatch(/pago pendiente \(efectivo\) queda marcado como cobrado/);
+  });
+
+  it('pendiente → enviado (salteo) también lo da por cobrado', async () => {
+    const { tool } = armar(pedido({ payments: [{ method: 'TRANSFER', status: 'PENDING' }] }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'SHIPPED' }, ctx);
+    expect(r).toMatch(/\(transferencia\) queda marcado como cobrado/);
+  });
+
+  it('cancelar un pedido pendiente con pago offline pendiente: queda rechazado', async () => {
+    const { tool } = armar(pedido({ payments: [efectivo] }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CANCELLED' }, ctx);
+    expect(r).toMatch(/pago pendiente \(efectivo\) queda rechazado/);
+    expect(r).not.toContain('cobrado');
+  });
+
+  it('cancelar un pedido ya confirmado con un pago todavía pendiente: también se rechaza', async () => {
+    const { tool } = armar(pedido({ status: 'CONFIRMED', payments: [{ method: 'DEBIT_CARD', status: 'PENDING' }] }));
+    const r = await tool.describirAccion({ orderId: PEDIDO, status: 'CANCELLED' }, ctx);
+    expect(r).toMatch(/queda rechazado/);
+  });
+
+  it('sin pago pendiente no dice nada del pago', async () => {
+    const sinPagos = armar(pedido({ payments: [] }));
+    expect(await sinPagos.tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx)).not.toMatch(/pago/i);
+
+    const yaAprobado = armar(pedido({ payments: [{ method: 'CASH', status: 'APPROVED' }] }));
+    expect(await yaAprobado.tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx)).not.toMatch(/pago/i);
+  });
+
+  it('un pago de Mercado Pago pendiente no se toca: la tarjeta no lo promete', async () => {
+    const { tool } = armar(pedido({ payments: [{ method: 'MERCADOPAGO', status: 'PENDING' }] }));
+    expect(await tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx)).not.toMatch(/pago/i);
+    expect(await tool.describirAccion({ orderId: PEDIDO, status: 'CANCELLED' }, ctx)).not.toMatch(/pago/i);
+  });
+
+  it('confirmado → en preparación no resuelve el pago aunque siga pendiente', async () => {
+    const { tool } = armar(pedido({ status: 'CONFIRMED', payments: [efectivo] }));
+    expect(await tool.describirAccion({ orderId: PEDIDO, status: 'PREPARING' }, ctx)).not.toMatch(/pago/i);
+  });
+
+  it('los pagos se leen acotados al negocio del token', async () => {
+    const { tool, prisma } = armar(pedido({ payments: [] }));
+    await tool.describirAccion({ orderId: PEDIDO, status: 'CONFIRMED' }, ctx);
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        payments: expect.objectContaining({ where: expect.objectContaining({ businessId: 'biz-1' }) }),
+      }),
+    }));
   });
 });
 

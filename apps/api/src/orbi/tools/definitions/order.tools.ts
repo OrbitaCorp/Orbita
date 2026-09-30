@@ -15,6 +15,14 @@ const EN_CASTELLANO: Record<string, string> = {
 };
 const estadoLegible = (s: unknown) => EN_CASTELLANO[String(s)] ?? dato(s);
 
+// Medios de pago en castellano, para que la tarjeta diga "efectivo" y no
+// "CASH". Un medio que no esté acá (uno nuevo del enum) sale tal cual.
+const MEDIO_EN_CASTELLANO: Record<string, string> = {
+  CASH: 'efectivo', TRANSFER: 'transferencia', DEBIT_CARD: 'tarjeta de débito',
+  CREDIT_CARD: 'tarjeta de crédito', QR: 'QR', CREDIT_NOTE: 'nota de crédito',
+  MERCADOPAGO: 'Mercado Pago',
+};
+
 export class ListOrdersTool implements OrbiTool {
   name = 'listOrders';
   description = 'Listar pedidos del negocio. Úsalo para mostrar pedidos recientes, buscar uno por cliente o número, o filtrar por estado.';
@@ -149,9 +157,10 @@ export class UpdateOrderStatusTool implements OrbiTool {
    * texto de terceros (el nombre de un cliente en otro pedido) podía llevar
    * al modelo a cambiar uno distinto del que la persona tenía en mente. Ahora
    * la tarjeta dice número, cliente, de qué estado a qué estado, y lo que
-   * pasa además: el mail al comprador y el movimiento de stock.
+   * pasa además: el mail al comprador, el movimiento de stock y qué pasa con
+   * el pago pendiente.
    *
-   * Las reglas de mail y stock son las de OrdersService.updateStatus: si
+   * Las reglas de mail, stock y pago son las de OrdersService.updateStatus: si
    * cambian allá, este texto queda desactualizado (no rompe nada, pero la
    * tarjeta mentiría). Por eso están comentadas una por una.
    */
@@ -165,14 +174,20 @@ export class UpdateOrderStatusTool implements OrbiTool {
         status: true,
         customer: { select: { firstName: true, lastName: true, email: true } },
         onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
+        // Los pagos también acotados al negocio, igual que el updateMany de
+        // updateStatus. El filtro de estado y medio va abajo, en código, para
+        // que la regla quede escrita en un solo lugar y a la vista.
+        payments: { where: { businessId: ctx.businessId }, select: { method: true, status: true } },
       },
     });
     if (!pedido) throw new AccionInvalida('Pedido no encontrado');
 
     const actual = String(pedido.status);
     const nuevo = String(args.status);
+    // `||` y no `??`: un buyerName vacío ('') tiene que caer al nombre de la
+    // ficha, no dejar la tarjeta diciendo "sin cliente" cuando sí hay uno.
     const nombre = pedido.onlineOrderDetails?.buyerName
-      ?? ([pedido.customer?.firstName, pedido.customer?.lastName].filter(Boolean).join(' ') || null);
+      || ([pedido.customer?.firstName, pedido.customer?.lastName].filter(Boolean).join(' ') || null);
     const cliente = nombre ? `de ${entreComillas(nombre)}` : 'sin cliente';
 
     const extras: string[] = [];
@@ -185,6 +200,29 @@ export class UpdateOrderStatusTool implements OrbiTool {
     const devuelve = nuevo === 'CANCELLED' && (actual === 'CONFIRMED' || actual === 'PREPARING');
     if (descuenta) extras.push('Se descuenta el stock de los productos.');
     if (devuelve) extras.push('El stock de los productos vuelve al inventario.');
+    // El pago offline pendiente se resuelve en el mismo cambio: aprobado (con
+    // paidAt y quien confirma como verifiedBy) si el pedido sale de pendiente,
+    // rechazado si se cancela. Misma condición que updateStatus
+    // (`descuentaStock || nuevo === 'CANCELLED'`) y mismo filtro que su
+    // updateMany (PENDING y no MERCADOPAGO: ese lo confirma solo el webhook).
+    // Sin esto la tarjeta callaba que confirmar un pedido lo da por cobrado.
+    const resuelvePago = cambia && (descuenta || nuevo === 'CANCELLED');
+    const medios = (pedido.payments ?? [])
+      .filter((p) => p.status === 'PENDING' && p.method !== 'MERCADOPAGO')
+      .map((p) => MEDIO_EN_CASTELLANO[String(p.method)] ?? dato(p.method));
+    if (resuelvePago && medios.length) {
+      const cuales = [...new Set(medios)].join(', ');
+      const uno = medios.length === 1;
+      if (nuevo === 'CANCELLED') {
+        extras.push(uno
+          ? `El pago pendiente (${cuales}) queda rechazado.`
+          : `Los pagos pendientes (${cuales}) quedan rechazados.`);
+      } else {
+        extras.push(uno
+          ? `El pago pendiente (${cuales}) queda marcado como cobrado.`
+          : `Los pagos pendientes (${cuales}) quedan marcados como cobrados.`);
+      }
+    }
     // El mail va al comprador de la compra online o, si no hay, al de la ficha.
     const hayMail = Boolean(pedido.onlineOrderDetails?.buyerEmail ?? pedido.customer?.email);
     const avisa = cambia && (descuenta || nuevo === 'SHIPPED' || nuevo === 'CANCELLED' || nuevo === 'DELIVERED');
