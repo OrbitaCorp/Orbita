@@ -11,7 +11,10 @@
 #
 # Antes de buildear corre un PREFLIGHT (ver más abajo) que exige que lo que se
 # despliega sea un commit de main, con el árbol limpio, typecheck + tests en
-# verde, sin migraciones pendientes y con el CI de GitHub en verde.
+# verde, sin migraciones pendientes EN PRODUCCIÓN y con el CI de GitHub en verde.
+#
+# Este script NO aplica migraciones: si el cambio trae una carpeta nueva en
+# prisma/migrations, primero se aplica con ./deploy/prisma-prod.sh migrate deploy.
 #   DEPLOY_SOLO_PREFLIGHT=1 ./deploy/deploy.sh   corre solo el preflight
 #   DEPLOY_SIN_PREFLIGHT=1  ./deploy/deploy.sh   emergencias, pide confirmar
 
@@ -52,8 +55,10 @@ SECRETS="DATABASE_URL=DATABASE_URL:latest,DIRECT_URL=DIRECT_URL:latest,GOOGLE_CL
 #   (b) HEAD contenido en origin/main  se despliega lo que ya está en main
 #   (c) pnpm typecheck + pnpm test     la misma red que CI, corrida acá (~10 min)
 #   (d) prisma migrate status al día   el código nuevo no puede salir antes que su
-#                                      migración (la base del .env ES producción;
-#                                      el chequeo es de solo lectura)
+#                                      migración. Se chequea contra la base de
+#                                      PRODUCCIÓN (deploy/prisma-prod.sh lee las
+#                                      URLs de Secret Manager; el .env local es
+#                                      la base de DEV). Solo lectura.
 #   (e) check runs de CI del sha       si `gh` está instalado y logueado; si no,
 #                                      avisa y sigue (los chequeos (c) y (d) ya
 #                                      cubren lo esencial)
@@ -131,23 +136,26 @@ preflight() {
   pnpm typecheck || preflight_fallo "(c) pnpm typecheck falló. Arreglalo en main antes de desplegar."
   pnpm test || preflight_fallo "(c) pnpm test falló. Un test rojo no va a producción."
 
-  # (d) Migraciones al día. La base del .env de apps/api ES producción: si hay
-  # una migración sin aplicar, el código nuevo saldría contra un schema viejo.
-  # `migrate status` es de solo lectura (no aplica nada).
-  echo "==> [4/5] prisma migrate status (solo lectura contra la base del .env, que es producción)"
+  # (d) Migraciones al día EN PRODUCCIÓN. El .env local de apps/api apunta a la
+  # base de DEV (desde el corte del 2026-09-20), así que un `prisma migrate
+  # status` pelado miraría la base equivocada y podría dar verde con una
+  # migración pendiente en producción. prisma-prod.sh arma las URLs desde
+  # Secret Manager (los mismos secrets que monta Cloud Run) y verifica que
+  # sean las de producción. `migrate status` es de solo lectura.
+  echo "==> [4/5] prisma migrate status contra la base de PRODUCCIÓN (solo lectura, URLs de Secret Manager)"
   local salida_migrate
-  if ! salida_migrate="$(pnpm exec prisma migrate status 2>&1)"; then
+  if ! salida_migrate="$("$SCRIPT_DIR/prisma-prod.sh" migrate status 2>&1)"; then
     if grep -q "not yet been applied" <<<"$salida_migrate"; then
       preflight_fallo \
         "(d) Hay migraciones de Prisma sin aplicar en la base de producción:" \
         "" \
         "$(sed -n '/not yet been applied/,/^$/p' <<<"$salida_migrate")" \
-        "PRIMERO aplicalas con: cd apps/api && pnpm exec prisma migrate deploy" \
+        "PRIMERO aplicalas con: cd apps/api && ./deploy/prisma-prod.sh migrate deploy" \
         "(y si la migración es destructiva, leé DEPLOYMENT.md § Rollback antes)." \
         "Después volvé a correr el script."
     fi
     preflight_fallo \
-      "(d) prisma migrate status falló (no se pudo leer el estado de la base):" \
+      "(d) No se pudo leer el estado de las migraciones de la base de PRODUCCIÓN:" \
       "" \
       "$salida_migrate"
   fi
@@ -209,7 +217,7 @@ preflight() {
     sed 's/^/      /; s/|/ · /g' <<<"$runs"
   fi
 
-  echo "==> Preflight OK: ${GIT_SHA} está en main, limpio, con tests y migraciones al día."
+  echo "==> Preflight OK: ${GIT_SHA} está en main, limpio, con tests y migraciones de producción al día."
 }
 
 if [[ "${DEPLOY_SOLO_PREFLIGHT:-}" == "1" ]]; then

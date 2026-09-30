@@ -31,6 +31,63 @@ interna). Ver [`apps/api/CLAUDE.md`](apps/api/CLAUDE.md) y
 [`apps/api/DEPLOYMENT.md`](apps/api/DEPLOYMENT.md) para el detalle completo
 antes de asumir que "pushear alcanza" o de mencionar Railway.
 
+### Cómo funciona el backend en producción (mapa rápido)
+
+Leer esto antes de tocar algo de deploy, migraciones o infraestructura. El runbook completo
+(accesos, secrets, rollback, cron, troubleshooting) está en `apps/api/DEPLOYMENT.md`.
+
+```
+Vercel (frontend, orbita.site)  ──fetch──▶  api.orbita.site
+   Firebase Hosting (proxy)  ──rewrite──▶  Cloud Run "orbita-api"
+   (proyecto GCP orbita-api-corp, southamerica-east1)  ──Prisma──▶  Supabase Postgres (PRODUCCIÓN)
+```
+
+- **Frontend:** un push a `main` lo publica solo (Vercel). Sin pasos manuales.
+- **Backend:** NO tiene CI/CD, a propósito. `apps/api/deploy/deploy.sh` corre un preflight,
+  buildea la imagen con Cloud Build (no hace falta Docker local), la sube a Artifact Registry
+  con el sha corto del commit y despliega esa imagen a Cloud Run. Escala a 0 instancias, 2 vCPU,
+  2 GiB.
+- **Preflight de `deploy.sh`** (corta con exit 1, sin buildear, en el primer fallo): árbol
+  limpio, HEAD contenido en `origin/main`, `pnpm typecheck` + `pnpm test` (~10 min), migraciones
+  de Prisma al día **en la base de producción**, y check runs de CI en verde para ese sha.
+  `DEPLOY_SOLO_PREFLIGHT=1` corre solo eso; `DEPLOY_SIN_PREFLIGHT=1` es la salida de emergencia
+  y la corre una persona en la consola, nunca un agente.
+- **Secrets** (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, claves de Gemini, Mercado Pago,
+  Resend, etc.): viven en **Secret Manager** y Cloud Run los monta con `--set-secrets`
+  (`SECRETS=` en `deploy.sh`, siempre `:latest`). Un secret nuevo hay que agregarlo también a
+  esa lista. Las variables NO sensibles están en `apps/api/deploy/env-vars.yaml` (se commitea).
+- **Cron:** no hay `@Cron` en el proceso. Son endpoints protegidos de `src/internal-cron/`
+  disparados por Cloud Scheduler (3 jobs).
+- **Freno de gasto:** si el gasto mensual llega al presupuesto, una Cloud Function corta el
+  servicio con 503 (`deploy/budget-guard/`).
+- **Rollback:** mover el tráfico a la revisión anterior con `gcloud run services update-traffic`
+  (segundos, sin rebuild). Un rollback de código NO revierte la base: las migraciones
+  destructivas se hacen en dos releases (`DEPLOYMENT.md` § Rollback).
+
+### Dos bases de datos: desarrollo y producción (no confundirlas)
+
+Desde el 2026-09-20 hay dos proyectos Supabase separados:
+
+| | Desarrollo | Producción |
+|---|---|---|
+| Proyecto | "orbitiando al backend" (`hhaqlzrcskmwnvhgydon`) | "Orbita Produccion" (`dgergykdihtvsglfumsb`) |
+| Quién la usa | el `.env` local de `apps/api`, tests e2e, `pnpm seed` | Cloud Run (secrets `DATABASE_URL` / `DIRECT_URL` en Secret Manager) |
+| Datos | ~145 negocios casi todos de prueba | solo los negocios reales |
+
+**El `.env` local es DEV.** Un `pnpm exec prisma migrate deploy` a secas migra dev, NO
+producción. Para producción se usa `apps/api/deploy/prisma-prod.sh`, que lee las URLs de
+Secret Manager, verifica que sean las de producción y corre prisma solo con esas variables (no
+las escribe a disco ni las imprime):
+
+```
+cd apps/api
+./deploy/prisma-prod.sh migrate status    # solo lectura
+./deploy/prisma-prod.sh migrate deploy    # aplica en PRODUCCIÓN
+```
+
+Necesita `gcloud auth login` con `contacto@orbita-corp.com` y acceso de lectura a esos dos
+secrets. Nunca leer, copiar ni pegar en el chat los valores de las URLs.
+
 ## Commit y push: cómo llevar un cambio a producción (OBLIGATORIO)
 
 Cuando Ale (o quien sea) pida "hacé commit y pusheá", "subilo", "metelo en producción" o
@@ -40,11 +97,13 @@ este orden exacto, sin saltear pasos:
 1. **Commitear en la rama de trabajo.** Antes, `git fetch origin` y, si `origin/main` avanzó,
    `git merge origin/main` en la rama y resolver conflictos. Correr typecheck (`tsc --noEmit`
    en `apps/web` y `apps/api`) y los tests unitarios de la API si se tocó `apps/api`.
-2. **Si el cambio toca `apps/api/prisma/migrations/`:** aplicar la migración en producción con
-   `cd apps/api && pnpm exec prisma migrate deploy` ANTES de desplegar la API. La base local
-   ES la de producción, así que esto ya es producción. `deploy.sh` se niega a desplegar si
-   quedó alguna migración sin aplicar. Si la migración es destructiva (borra o renombra
-   algo), leer antes `apps/api/DEPLOYMENT.md` § Rollback: se hace en dos releases.
+2. **Si el cambio toca `apps/api/prisma/migrations/`:** hay dos bases, así que son dos
+   aplicaciones. Ahora, en la rama, aplicarla en **DEV** (`cd apps/api && pnpm exec prisma
+   migrate deploy`: el `.env` local es dev) y probar contra eso. La de **producción** se aplica
+   en el paso 5, con `main` ya pusheado y CI verde, justo antes de `deploy.sh`. `deploy.sh` se
+   niega a desplegar si en producción quedó alguna migración sin aplicar. Si la migración es
+   destructiva (borra o renombra algo), leer antes `apps/api/DEPLOYMENT.md` § Rollback: se
+   hace en dos releases.
 3. **Frontend: se pushea SOLO `main`. La rama de trabajo NO se pushea.** Vercel construye
    cada commit UNA sola vez. Si el commit llega primero por la rama de feature, Vercel lo
    despliega como *Preview*, y cuando `main` avanza al mismo commit por fast-forward lo
@@ -72,7 +131,10 @@ este orden exacto, sin saltear pasos:
    Vercel CLI de esta máquina está logueado con una cuenta personal que no ve el proyecto
    de Órbita: no sirve para esto.
 5. **Si el cambio toca `apps/api/src/` o `apps/api/prisma/`: desplegar la API a Cloud Run
-   RECIÉN AHORA**, con `main` pusheado y CI verde, con `cd apps/api && ./deploy/deploy.sh`
+   RECIÉN AHORA**, con `main` pusheado y CI verde. Si hay migraciones nuevas, primero
+   `cd apps/api && ./deploy/prisma-prod.sh migrate deploy` y confirmar con `migrate status`
+   (mismo script) que no quedó nada pendiente en producción. Después, con
+   `cd apps/api && ./deploy/deploy.sh`
    (necesita `gcloud auth login` con `contacto@orbita-corp.com`; si no hay cuenta logueada,
    pedirle a Ale que corra `! gcloud auth login` y recién después correr el script). Un push
    a `main` NO despliega la API. Verificar con `gcloud run services describe orbita-api
@@ -93,7 +155,8 @@ este orden exacto, sin saltear pasos:
    que decirlo en el reporte. `DEPLOY_SOLO_PREFLIGHT=1` corre solo el preflight, sin
    desplegar, para responder "¿se puede desplegar ya?".
 6. **Reportar** en el mensaje final: sha en `main`, entorno del deployment de Vercel, si CI
-   quedó en verde, y (si aplica) la revisión de Cloud Run y si la migración quedó aplicada.
+   quedó en verde, y (si aplica) la revisión de Cloud Run y si la migración quedó aplicada en
+   **producción** (y en dev).
 
 ## Skill de UI/UX: ui-ux-pro-max
 
@@ -126,3 +189,6 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- El grafo (`graphify-out/`, ignorado por git) es local de cada máquina y se actualiza solo en cada
+  commit con el hook de git de graphify. Una vez por máquina nueva: `graphify hook install` en la
+  raíz del repo. Si un `graphify query` devuelve cosas que ya no existen, correr `graphify update .`.

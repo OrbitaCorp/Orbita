@@ -46,10 +46,12 @@ Cualquiera que vaya a correr `deploy/deploy.sh` necesita, en el proyecto GCP
 | `roles/cloudbuild.builds.editor` | Lanzar builds |
 | `roles/logging.viewer` | Ver logs |
 | `roles/iam.serviceAccountUser` (scoped a `681215569277-compute@developer.gserviceaccount.com`) | Necesario para desplegar "en nombre de" esa service account |
+| `roles/secretmanager.secretAccessor` **solo sobre `DATABASE_URL` y `DIRECT_URL`** | El preflight (d) y `prisma-prod.sh` las leen para mirar y migrar la base de producción |
 
-**NO hace falta** `roles/secretmanager.secretAccessor` para desplegar código nuevo
-— el deploy solo *referencia* los secrets por nombre (`--set-secrets`), no lee su
-contenido. Ese rol se lo damos solo a quien necesite ver/rotar un secret puntual.
+`gcloud run deploy` en sí no lee los secrets: solo los *referencia* por nombre
+(`--set-secrets`). El rol de arriba es para el preflight (d), que necesita conectarse a
+la base de producción. No hace falta darlo sobre el resto de los secrets; ese acceso se da solo a
+quien necesite ver o rotar uno puntual.
 
 Herramientas locales:
 - [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) instalado y autenticado
@@ -86,6 +88,36 @@ typecheck + tests unitarios de la API en cada push a `main` y en PRs), y el
 preflight del script es el puente entre las dos cosas: CI verifica, no
 despliega; el script despliega, pero solo lo que CI verificó.
 
+### Dos bases: desarrollo y producción, y cómo se migra cada una
+
+Desde el 2026-09-20 hay dos proyectos Supabase. El `.env` local de `apps/api` apunta a
+**desarrollo** (`hhaqlzrcskmwnvhgydon`, "orbitiando al backend"); Cloud Run usa
+**producción** (`dgergykdihtvsglfumsb`, "Orbita Produccion") por los secrets `DATABASE_URL` /
+`DIRECT_URL` de Secret Manager. Un `prisma migrate deploy` pelado migra dev, no producción.
+
+`deploy.sh` no aplica migraciones. El flujo, cuando el cambio trae una carpeta nueva en
+`prisma/migrations/`:
+
+```bash
+cd apps/api
+# 1. En dev, al escribir la migración (el .env es dev):
+pnpm exec prisma migrate deploy
+# 2. Con el cambio ya en main y CI verde, en PRODUCCIÓN:
+./deploy/prisma-prod.sh migrate deploy
+./deploy/prisma-prod.sh migrate status      # tiene que decir "Database schema is up to date"
+# 3. Recién ahora:
+./deploy/deploy.sh
+```
+
+`prisma-prod.sh` lee las dos URLs de Secret Manager (versión `latest`, la misma que monta
+Cloud Run), aborta si alguna apunta a dev o no es la de producción, y se las pasa solo al
+proceso de prisma por variables de entorno: no se escriben a disco ni se imprimen. Si producción
+se muda a otro proyecto Supabase hay que actualizar `PROD_REF` en el script.
+
+Hasta el 2026-09-30 el preflight (d) y esta documentación decían que "la base del `.env` es
+producción". Era falso desde el corte: el preflight miraba dev y podía dar verde con una
+migración pendiente en producción.
+
 ### Preflight: qué chequea y por qué
 
 Hallazgo `deploy-manual` de la auditoría interna (10/09/2026). Hasta el 15/09
@@ -99,7 +131,7 @@ con `exit 1` (sin buildear nada) en el primero que falla:
 | a | Árbol de git limpio | `git status --porcelain` vacío | lista lo sucio; commitear o descartar |
 | b | HEAD está en `main` | `git fetch origin` + `git merge-base --is-ancestor HEAD origin/main` | mergear a `main` (ff), pushear, esperar CI |
 | c | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**) | arreglar en `main` |
-| d | Migraciones al día | `pnpm exec prisma migrate status` (solo lectura, contra la base del `.env`, que es producción) | primero `pnpm exec prisma migrate deploy` (ver § Rollback si es destructiva) |
+| d | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
 | e | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success` | esperar o arreglar; si `gh` no está o no está logueado, avisa y sigue |
 
 `Web — lint (informativo)` tiene `continue-on-error` en `ci.yml` y su check run
