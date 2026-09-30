@@ -45,20 +45,37 @@ describe('trust proxy', () => {
 });
 
 describe('ai-assist: tope por negocio y por día', () => {
-  it(`después de ${AI_ASSIST_DIA_NEGOCIO} ayudas responde 429, y otro negocio sigue pudiendo`, () => {
-    const ai = { assist: jest.fn().mockResolvedValue({}) };
-    const c = new ProductsController({} as any, ai as any, {} as any);
-    const negocioA = { type: 'member', businessId: 'b-a' } as any;
-    for (let i = 0; i < AI_ASSIST_DIA_NEGOCIO; i++) c.aiAssist(negocioA, {} as any);
-    let status = 0;
-    try {
-      c.aiAssist(negocioA, {} as any);
-    } catch (e) {
-      status = (e as HttpException).getStatus();
+  // El contador (en Postgres) se prueba en cuota.service.unit-spec.ts; acá, que
+  // las tres ayudas lo consulten con la clave y el límite de siempre.
+  function controlador(hayCupo = true) {
+    const ai = { assist: jest.fn().mockResolvedValue({}), suggestVariants: jest.fn().mockResolvedValue({}), scanProductImage: jest.fn().mockResolvedValue({}) };
+    const cuota = { consumir: jest.fn().mockResolvedValue(hayCupo) };
+    return { c: new ProductsController({} as any, ai as any, {} as any, cuota as any), ai, cuota };
+  }
+  const negocioA = { type: 'member', businessId: 'b-a' } as any;
+
+  it(`las tres ayudas suman al mismo tope de ${AI_ASSIST_DIA_NEGOCIO} por negocio`, async () => {
+    const { c, cuota } = controlador();
+    await c.aiAssist(negocioA, {} as any);
+    await c.aiVariants(negocioA, {} as any);
+    await c.aiScan(negocioA, {} as Express.Multer.File);
+    expect(cuota.consumir).toHaveBeenCalledTimes(3);
+    for (const llamada of cuota.consumir.mock.calls) expect(llamada).toEqual(['ai-assist:b-a', AI_ASSIST_DIA_NEGOCIO]);
+  });
+
+  it('pasado el tope responde 429 con el mensaje de siempre y no llama al modelo', async () => {
+    const { c, ai } = controlador(false);
+    for (const llamar of [
+      () => c.aiAssist(negocioA, {} as any),
+      () => c.aiVariants(negocioA, {} as any),
+      () => c.aiScan(negocioA, {} as Express.Multer.File),
+    ]) {
+      const err = await llamar().catch((e: HttpException) => e);
+      expect((err as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      expect((err as HttpException).getResponse()).toBe('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.');
     }
-    expect(status).toBe(HttpStatus.TOO_MANY_REQUESTS);
-    expect(ai.assist).toHaveBeenCalledTimes(AI_ASSIST_DIA_NEGOCIO);
-    c.aiAssist({ type: 'member', businessId: 'b-b' } as any, {} as any);
-    expect(ai.assist).toHaveBeenCalledTimes(AI_ASSIST_DIA_NEGOCIO + 1);
+    expect(ai.assist).not.toHaveBeenCalled();
+    expect(ai.suggestVariants).not.toHaveBeenCalled();
+    expect(ai.scanProductImage).not.toHaveBeenCalled();
   });
 });

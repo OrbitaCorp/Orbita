@@ -10,6 +10,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { PendingActionStore } from './tools/pending-action.store';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
+import { CuotaService } from '../common/cuota/cuota.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 
 function createMockResponse() {
@@ -27,6 +28,11 @@ describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
   let registry: { getTools: jest.Mock; execute: jest.Mock };
+
+  // El wizard hashea la IP con JWT_SECRET para la clave de la cuota diaria.
+  beforeAll(() => {
+    process.env.JWT_SECRET ??= 'secreto-de-prueba-de-al-menos-32-caracteres';
+  });
 
   beforeEach(async () => {
     registry = {
@@ -79,6 +85,8 @@ describe('OrbiController', () => {
         // motivo para mockearlo — y así los tests ejercitan el flujo de verdad.
         PendingActionStore,
         { provide: UsageMeteringService, useValue: { track: jest.fn() } },
+        // La cuota diaria vive en Postgres: acá siempre hay cupo.
+        { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
 

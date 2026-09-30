@@ -15,7 +15,8 @@ import { Public } from '../common/decorators/public.decorator';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import type { AuthContext } from '../common/types/auth-context.type';
-import { CuotaDiaria } from './cuota-diaria';
+import { CuotaService } from '../common/cuota/cuota.service';
+import { hmacIp } from '../common/utils/hash-ip';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -44,7 +45,6 @@ export const PROMPT_DEMO = [
 @Controller('orbi')
 export class OrbiController {
   private readonly logger = new Logger(OrbiController.name);
-  private readonly cuota = new CuotaDiaria();
 
   /**
    * Modelo de Gemini para esta superficie. El panel puede correr un modelo más
@@ -66,6 +66,7 @@ export class OrbiController {
     private readonly wizardAnalytics: WizardAnalyticsService,
     private readonly pendingActions: PendingActionStore,
     private readonly usageMetering: UsageMeteringService,
+    private readonly cuota: CuotaService,
   ) {}
 
   @Post('chat')
@@ -107,7 +108,7 @@ export class OrbiController {
     dto.context.businessId = user.businessId;
 
     // Antes de abrir el stream, para que llegue como un 429 normal.
-    if (!this.cuota.consumir(`negocio:${user.businessId}`, TURNOS_DIA_NEGOCIO)) {
+    if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -394,7 +395,8 @@ export class OrbiController {
     // La IP sale de @IpDelCliente (no de @Ip): misma fuente que el throttler
     // global, por si algún día este pedido pasa por el BFF (hallazgo
     // rate-limit-ip-proxy).
-    if (!this.cuota.consumir(`wizard:${ip ?? 'desconocida'}`, TURNOS_DIA_IP_WIZARD)) {
+    // La IP va hasheada: la cuota ahora está en la base y la IP no se guarda en claro.
+    if (!(await this.cuota.consumir(`orbi-wizard:${hmacIp('orbi-wizard', ip)}`, TURNOS_DIA_IP_WIZARD))) {
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
     }
 

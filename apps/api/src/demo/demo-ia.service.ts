@@ -1,8 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { fechaArgentina } from '../common/utils/hora-argentina';
+import { hmacIp } from '../common/utils/hash-ip';
 import { ipDelCliente } from '../common/utils/proxy';
 import { DEMO_LIMITE_IA, FUNCIONES_DEMO_IA, FuncionDemoIa, mensajeLimiteDemo } from './demo-ia';
 
@@ -32,8 +33,7 @@ export class DemoIaService {
 
   /** La IP nunca se guarda en texto plano: HMAC con un secreto del servidor. */
   private claveDe(req: PedidoConIp): string {
-    const ip = ipDelCliente(req) ?? 'sin-ip';
-    return createHmac('sha256', this.sal).update(`demo-ia:${ip}`).digest('hex');
+    return hmacIp('demo-ia', ipDelCliente(req), this.sal);
   }
 
   private semana(): string {
