@@ -214,6 +214,31 @@ describe('GeminiAdapter', () => {
     ]);
   });
 
+  // 'tool' y 'user' son los dos 'user' en Gemini: se unen por el rol de
+  // Gemini, no por el nuestro. Hoy el chat no deja un user después de un
+  // resultado de tool, pero si pasara no pueden salir dos 'user' seguidos.
+  it('un resultado de tool seguido de un user sale como un solo content user', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'x' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name: 'listProducts', arguments: {} }] },
+        { role: 'tool', content: '{"ok":1}', toolCallId: 'c1' },
+        { role: 'user', content: 'y ahora?' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'x' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listProducts', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listProducts', response: { output: { ok: 1 } } } }, { text: 'y ahora?' }] },
+    ]);
+  });
+
   it('un assistant sin texto pero con tool call no se descarta, y la vuelta de tools sigue alternando', async () => {
     configService.get.mockReturnValue('test-key');
     const gen = mockStream(adapter, [textChunk('ok')]);

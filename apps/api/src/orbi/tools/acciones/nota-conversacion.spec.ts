@@ -53,6 +53,11 @@ describe('nota de la conversación (spec §3.4)', () => {
     ['Permisos insuficientes: discounts.manage', 'permiso'],
     ['En la demo no se pueden hacer cambios', 'permiso'],
     ['"createCoupon" no disponible en wizard', 'permiso'],
+    ['"createCoupon" no disponible en este paso', 'permiso'],
+    // Un "no disponible" que viene de adentro de la tool (el producto, el
+    // stock) no es un permiso: no se puede clasificar sin leerlo, es interno.
+    ['Producto no disponible', 'interno'],
+    ['El medio de pago no disponible en tu plan', 'interno'],
     ['Argumento inválido (orderId): tiene que ser el UUID', 'validación'],
     [ERROR_DESACTUALIZADA, 'conflicto'],
     [ERROR_INTERNO, 'interno'],

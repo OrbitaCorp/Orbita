@@ -71,10 +71,16 @@ function sujeto(tool: string, ctx: { pedido?: number; codigo?: string }): string
  * error que viene de adentro de la tool (el service tiró) no se puede
  * clasificar sin leer su texto, así que cuenta como interno.
  */
+// La forma exacta de ToolRegistryService#execute: `"<tool>" no disponible en
+// <surface>` o `en este paso`. Un "no disponible" cualquiera ("Producto no
+// disponible", que puede tirar el service de adentro de la tool) no es un
+// permiso.
+const TOOL_NO_DISPONIBLE = /^"[^"]+" no disponible en /;
+
 function categoria(error: string | undefined): Categoria {
   if (!error) return 'interno';
   if (error === ERROR_DESACTUALIZADA) return 'conflicto';
-  if (error.startsWith('Permisos insuficientes') || error.startsWith('En la demo') || error.includes('no disponible')) return 'permiso';
+  if (error.startsWith('Permisos insuficientes') || error.startsWith('En la demo') || TOOL_NO_DISPONIBLE.test(error)) return 'permiso';
   if (error.startsWith('Argumento inválido')) return 'validación';
   return 'interno';
 }

@@ -70,18 +70,18 @@ export class GeminiAdapter implements LlmAdapter {
     // `user` seguidos en la conversación guardada, y una respuesta vacía queda
     // como `assistant` vacío. Gemini espera turnos que alternan y sin partes
     // vacías, así que los mensajes vacíos se descartan y los consecutivos del
-    // MISMO rol (cualquiera: dos user, dos assistant, dos resultados de tool)
-    // se unen en un solo content, con sus parts en orden.
+    // MISMO rol de Gemini se unen en un solo content, con sus parts en orden.
+    // El rol de Gemini y no el nuestro: un resultado de tool y un mensaje del
+    // usuario son los dos 'user' para Gemini, y seguidos también rompen la
+    // alternancia.
     const contents: Content[] = [];
-    let rolAnterior: LlmMessage['role'] | null = null;
-    const agregar = (rol: LlmMessage['role'], content: Content) => {
+    const agregar = (content: Content) => {
       const ultimo = contents[contents.length - 1];
-      if (ultimo && rolAnterior === rol) {
+      if (ultimo && ultimo.role === content.role) {
         ultimo.parts = [...(ultimo.parts ?? []), ...(content.parts ?? [])];
       } else {
         contents.push(content);
       }
-      rolAnterior = rol;
     };
 
     for (const m of params.messages) {
@@ -89,7 +89,7 @@ export class GeminiAdapter implements LlmAdapter {
 
       if (m.role === 'user') {
         if (!m.content?.trim()) continue;
-        agregar('user', { role: 'user', parts: [{ text: m.content }] });
+        agregar({ role: 'user', parts: [{ text: m.content }] });
         continue;
       }
 
@@ -103,7 +103,7 @@ export class GeminiAdapter implements LlmAdapter {
           });
         }
         if (!parts.length) continue;
-        agregar('assistant', { role: 'model', parts });
+        agregar({ role: 'model', parts });
         continue;
       }
 
@@ -114,7 +114,7 @@ export class GeminiAdapter implements LlmAdapter {
       } catch {
         parsed = m.content;
       }
-      agregar('tool', {
+      agregar({
         role: 'user',
         parts: [{
           functionResponse: {
