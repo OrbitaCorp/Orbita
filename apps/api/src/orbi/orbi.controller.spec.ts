@@ -58,7 +58,7 @@ describe('OrbiController', () => {
   let contextBuilder: { buildSystemPrompt: jest.Mock };
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
-  let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock; getOrCreate: jest.Mock };
+  let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock };
   let turnos: { registrar: jest.Mock };
   let metering: { track: jest.Mock };
   let analitica: { logAiTurn: jest.Mock };
@@ -100,8 +100,6 @@ describe('OrbiController', () => {
             historialSiEsPropia: jest.fn().mockResolvedValue(null),
             crear: jest.fn().mockResolvedValue({ id: 'conv-1' }),
             appendMessage: jest.fn().mockResolvedValue(undefined),
-            // Ya no se usa en el chat: está para poder afirmarlo.
-            getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-vieja' }),
           },
         },
         {
@@ -543,12 +541,6 @@ describe('OrbiController', () => {
       expect(vistos[0]).toHaveLength(2);
       expect(conversaciones.appendMessage).toHaveBeenCalled();
       for (const [conv] of conversaciones.appendMessage.mock.calls) expect(conv).toBe('conv-1');
-    });
-
-    it('el chat ya no usa getOrCreate', async () => {
-      await controller.chat(chatPanel(), createMockResponse() as any, duenio as any);
-      await controller.chat(chatPanel(PROPIA), createMockResponse() as any, duenio as any);
-      expect(conversaciones.getOrCreate).not.toHaveBeenCalled();
     });
 
     // Un turno fallido deja dos `user` seguidos y una respuesta vacía se guarda

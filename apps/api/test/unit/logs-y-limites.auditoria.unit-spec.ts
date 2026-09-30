@@ -2,7 +2,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { rutaSinQuery } from '../../src/common/filters/http-exception.filter';
 import { MailService } from '../../src/mail/mail.service';
 import { saltosDeProxy } from '../../src/common/utils/proxy';
-import { ProductsController, AI_ASSIST_DIA_NEGOCIO } from '../../src/products/products.controller';
+import { ProductsController } from '../../src/products/products.controller';
+import { AI_ASSIST_DIA_NEGOCIO } from '../../src/common/cuota/limites';
 import { AuthController } from '../../src/auth/auth.controller';
 import { AppController } from '../../src/app.controller';
 

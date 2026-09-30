@@ -55,8 +55,8 @@ export class PendingActionService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * `conversationId` solo si el controller la verificó con assertPropia en
-   * este turno; si no, null. La nota de confirmar o cancelar se escribe ahí, y
+   * `conversationId` solo si es la conversación del turno, verificada o creada
+   * en este turno por el controller; si no, null. La nota de confirmar o cancelar se escribe ahí, y
    * un id sin verificar sería una forma de escribir en la conversación de otro.
    */
   async crear(a: {

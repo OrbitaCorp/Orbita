@@ -18,7 +18,7 @@ import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
 // Workers AI, pero eso puede cambiar) — mismo criterio que
-// AI_ASSIST_DIA_NEGOCIO en products.controller.ts: tope diario compartido
+// AI_ASSIST_DIA_NEGOCIO en common/cuota/limites.ts: tope diario compartido
 // (Postgres, ver CuotaService), por negocio, para no depender solo del
 // throttle global (20/min).
 export const IMAGE_STUDIO_DIA_NEGOCIO = 30;

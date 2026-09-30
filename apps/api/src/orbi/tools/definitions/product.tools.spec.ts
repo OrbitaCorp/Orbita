@@ -1,7 +1,7 @@
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './product.tools';
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { ToolExecutionContext } from '../tool.interface';
-import { AI_ASSIST_DIA_NEGOCIO } from '../../../products/products.controller';
+import { AI_ASSIST_DIA_NEGOCIO } from '../../../common/cuota/limites';
 import { ToolRegistryService } from '../tool-registry.service';
 
 const ctx: ToolExecutionContext = {

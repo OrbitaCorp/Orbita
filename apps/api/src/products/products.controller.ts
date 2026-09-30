@@ -39,15 +39,10 @@ import { AiVariantsDto } from './dto/ai-variants.dto';
 import { SuggestedImagesDto } from './dto/suggested-images.dto';
 import { ProxyImageDto } from './dto/proxy-image.dto';
 import { CuotaService } from '../common/cuota/cuota.service';
+import { AI_ASSIST_DIA_NEGOCIO } from '../common/cuota/limites';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
-
-// Cada ayuda de IA es una llamada paga al modelo, y solo tenía el throttle de
-// 20 por minuto: sin tope por día (auditoría interna 10/09, ítem trans.gasto-ia).
-// Mismo criterio que los topes de Orbi: contador compartido en Postgres
-// (CuotaService), por negocio; las tres ayudas suman al mismo `ai-assist:<negocio>`.
-export const AI_ASSIST_DIA_NEGOCIO = 100;
 
 @Controller('products')
 export class ProductsController {

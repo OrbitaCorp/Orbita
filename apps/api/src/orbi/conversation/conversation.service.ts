@@ -46,13 +46,6 @@ export class ConversationService {
     });
   }
 
-  /** Igual que `propia()`, pero para los caminos donde no seguir es un error. */
-  async assertPropia(conversationId: string, businessId: string, userId: string): Promise<string> {
-    const conv = await this.propia(conversationId, businessId, userId);
-    if (!conv) throw new NotFoundException('Conversación no encontrada');
-    return conv.id;
-  }
-
   /**
    * Agrega un mensaje en UN solo statement (spec §3.3). Antes se leía el JSON,
    * se agregaba en memoria y se reescribía entero, sin lock: desde la fase 1
@@ -92,11 +85,5 @@ export class ConversationService {
   async historialSiEsPropia(conversationId: string, businessId: string, userId: string): Promise<ConversationMessage[] | null> {
     const conv = await this.propia(conversationId, businessId, userId);
     return conv ? (conv.messages as unknown as ConversationMessage[]) : null;
-  }
-
-  async getMessages(conversationId: string, businessId: string, userId: string): Promise<ConversationMessage[]> {
-    const conv = await this.propia(conversationId, businessId, userId);
-    if (!conv) throw new NotFoundException('Conversación no encontrada');
-    return conv.messages as unknown as ConversationMessage[];
   }
 }

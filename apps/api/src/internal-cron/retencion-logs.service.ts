@@ -47,7 +47,8 @@ interface Regla {
  *    acción — y audit.auditoria.unit-spec.ts lo vigila.
  *  - email_logs, 180 días: solo sirve para "¿le llegó el mail del pedido?", y
  *    a los seis meses ya nadie pregunta.
- * Mínimo 30 en las tres; "0" u "off" apaga la purga de esa tabla.
+ * Mínimo 30 en todas, también en las de Orbi de abajo; "0" u "off" apaga la
+ * purga de esa tabla.
  *
  * Orbi fase 1 (spec §3.11) sumó tres tablas con el mismo mecanismo:
  *  - orbi_pending_actions, 30 días: una acción propuesta que el dueño nunca
@@ -61,9 +62,11 @@ interface Regla {
  * Lo corre el mantenimiento nocturno (internal-cron.controller), después de la
  * purga del wizard. deleteMany directo, sin lotes: hoy son cientos de filas
  * por tabla y el corte avanza un día por corrida, así que cada noche se van
- * las de un solo día. Ninguna de las tres tiene índice por created_at solo;
- * con estos volúmenes el barrido no se nota, y si algún día se nota, el índice
- * es una migración chica.
+ * las de un solo día. De las seis, solo orbi_pending_actions tiene índice por
+ * created_at solo; email_logs y orbi_turns lo tienen después de business_id, y
+ * daily_quota corta por `day`, segunda columna de su clave primaria. Con estos
+ * volúmenes el barrido no se nota, y si algún día se nota, el índice es una
+ * migración chica.
  */
 @Injectable()
 export class RetencionLogsService {

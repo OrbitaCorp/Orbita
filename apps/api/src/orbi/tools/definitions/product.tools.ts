@@ -4,7 +4,7 @@ import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { ProductsService } from '../../../products/products.service';
 import type { ProductAiService } from '../../../products/product-ai.service';
 import type { CuotaService } from '../../../common/cuota/cuota.service';
-import { AI_ASSIST_DIA_NEGOCIO } from '../../../products/products.controller';
+import { AI_ASSIST_DIA_NEGOCIO } from '../../../common/cuota/limites';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProductDto } from '../../../products/dto/create-product.dto';
 import { AccionInvalida, validarConDto } from '../acciones/validar-args';

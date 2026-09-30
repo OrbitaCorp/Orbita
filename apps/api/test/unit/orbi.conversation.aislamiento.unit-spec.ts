@@ -44,7 +44,6 @@ const MENSAJE = { role: 'user' as const, content: 'hola', timestamp: '2026-09-09
 describe('Conversaciones de Orbi — son de un negocio y de una persona', () => {
   it('el dueño de la conversación la lee y le escribe', async () => {
     const { svc, $executeRaw } = servicio();
-    await expect(svc.getMessages('conv-1', 'biz-1', 'member-1')).resolves.toHaveLength(1);
     await expect(svc.historialSiEsPropia('conv-1', 'biz-1', 'member-1')).resolves.toHaveLength(1);
     await expect(svc.appendMessage('conv-1', 'biz-1', 'member-1', MENSAJE)).resolves.toBeUndefined();
     expect($executeRaw).toHaveBeenCalledTimes(1);
@@ -52,16 +51,13 @@ describe('Conversaciones de Orbi — son de un negocio y de una persona', () => 
 
   it('otro NEGOCIO no puede leerla ni escribirle', async () => {
     const { svc, update } = servicio();
-    await expect(svc.getMessages('conv-1', 'biz-2', 'member-1')).rejects.toBeInstanceOf(NotFoundException);
     await expect(svc.historialSiEsPropia('conv-1', 'biz-2', 'member-1')).resolves.toBeNull();
     await expect(svc.appendMessage('conv-1', 'biz-2', 'member-1', MENSAJE)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(svc.assertPropia('conv-1', 'biz-2', 'member-1')).rejects.toBeInstanceOf(NotFoundException);
     expect(update).not.toHaveBeenCalled();
   });
 
   it('otra PERSONA del mismo negocio tampoco', async () => {
     const { svc, update } = servicio();
-    await expect(svc.getMessages('conv-1', 'biz-1', 'member-2')).rejects.toBeInstanceOf(NotFoundException);
     await expect(svc.historialSiEsPropia('conv-1', 'biz-1', 'member-2')).resolves.toBeNull();
     await expect(svc.appendMessage('conv-1', 'biz-1', 'member-2', MENSAJE)).rejects.toBeInstanceOf(NotFoundException);
     expect(update).not.toHaveBeenCalled();
@@ -69,14 +65,13 @@ describe('Conversaciones de Orbi — son de un negocio y de una persona', () => 
 
   it('una conversación que no existe se trata igual que una ajena', async () => {
     const { svc } = servicio();
-    await expect(svc.assertPropia('conv-inventada', 'biz-1', 'member-1')).rejects.toBeInstanceOf(NotFoundException);
     await expect(svc.historialSiEsPropia('conv-inventada', 'biz-1', 'member-1')).resolves.toBeNull();
     await expect(svc.appendMessage('conv-inventada', 'biz-1', 'member-1', MENSAJE)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('el filtro va en la consulta, no después de traer la fila', async () => {
     const { svc, findFirst } = servicio();
-    await svc.getMessages('conv-1', 'biz-1', 'member-1');
+    await svc.historialSiEsPropia('conv-1', 'biz-1', 'member-1');
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'conv-1', businessId: 'biz-1', userId: 'member-1' } });
   });
 });
