@@ -9,8 +9,9 @@ import {
   conversationIdParaEnviar,
   debeDescartar,
   esAborto,
-  filtrarPorSesion,
+  esEnvioVigente,
   idDeConversacionDelEvento,
+  soloSiVigente,
 } from './sesionOrbi'
 
 // Forma de los datos de los eventos del stream. Es permisiva a propósito: el
@@ -60,16 +61,32 @@ export function useOrbiChat() {
       track('orbi_message', { step: context.step, stepName: context.stepName, rubro: context.rubro })
     }
 
+    // Se leen del estado vivo (no del `store` de este render): la sesión y el
+    // id tienen que ser los de este instante. Un AbortController por envío,
+    // guardado en el store para que Detener, cerrar, reset y logout lo corten.
+    // iniciarEnvio corta el envío anterior si seguía en curso (un chip del
+    // wizard puede mandar mientras Orbi responde) ANTES de sumar las burbujas
+    // nuevas, y devuelve el número de este envío.
+    const sesionAlEnviar = useOrbiStore.getState().sesion
+    const corte = new AbortController()
+    const miEnvio = useOrbiStore.getState().iniciarEnvio(corte)
+    const sigueVigente = () => {
+      const s = useOrbiStore.getState()
+      return esEnvioVigente(sesionAlEnviar, s.sesion, miEnvio, s.envio)
+    }
+
     const userMsg: OrbiMessage = {
-      id: `user-${Date.now()}`,
+      id: `user-${Date.now()}-${miEnvio}`,
       role: 'user',
       content: message,
       timestamp: Date.now(),
     }
     store.addMessage(userMsg)
 
+    // El número de envío en el id lo hace único aunque dos envíos caigan en
+    // el mismo milisegundo: marcarDetenido tiene que dar con ESTA burbuja.
     const assistantMsg: OrbiMessage = {
-      id: `assistant-${Date.now()}`,
+      id: `assistant-${Date.now()}-${miEnvio}`,
       role: 'assistant',
       content: '',
       actions: [],
@@ -77,14 +94,6 @@ export function useOrbiChat() {
     }
     store.addMessage(assistantMsg)
     store.setStreaming(true)
-
-    // Se leen del estado vivo (no del `store` de este render): la sesión y el
-    // id tienen que ser los de este instante. Un AbortController por envío,
-    // guardado en el store para que Detener, cerrar, reset y logout lo corten.
-    const sesionAlEnviar = useOrbiStore.getState().sesion
-    const corte = new AbortController()
-    store.setAbort(corte)
-    const sigueVigente = () => !debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)
 
     try {
       const endpoint = context.surface === 'wizard' ? '/orbi/chat/wizard' : '/orbi/chat'
@@ -116,12 +125,14 @@ export function useOrbiChat() {
       // vacía y la persona no veía por qué (auditoría interna 10/09).
       if (!res.ok) {
         const cuerpo = await res.json().catch(() => null)
-        if (!sigueVigente()) return
+        if (debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)) return
         // Cortado mientras se leía el error: no se inventa un mensaje.
         if (corte.signal.aborted) {
           store.marcarDetenido(assistantMsg.id)
           return
         }
+        // Reemplazado por otro envío: la última burbuja ya es la del nuevo.
+        if (!sigueVigente()) return
         store.appendToLastAssistant(
           typeof cuerpo?.message === 'string' ? cuerpo.message : 'No pude responder ahora. Probá de nuevo en un rato.',
         )
@@ -130,10 +141,11 @@ export function useOrbiChat() {
       if (!res.body) throw new Error('No response body')
       // Se lee hasta que el servidor cierra el stream, sin cortar en `done`:
       // el wizard manda `turn` después (ver leerStreamSse).
-      // Cada evento pasa por el filtro de sesión: si hubo un reset desde que
-      // se mandó este mensaje, se tira todo lo que falte, `conversation`
-      // incluido (sería el hilo de otra persona o de la conversación vieja).
-      await leerStreamSse(res.body.getReader(), filtrarPorSesion(sesionAlEnviar, () => useOrbiStore.getState().sesion, ({ event: eventType, data: crudo }) => {
+      // Cada evento pasa por el filtro: si hubo un reset desde que se mandó
+      // este mensaje, o un envío nuevo lo reemplazó, se tira todo lo que
+      // falte, `conversation` incluido (sería el hilo de otra persona o de la
+      // conversación vieja, o texto que caería en la burbuja del envío nuevo).
+      await leerStreamSse(res.body.getReader(), soloSiVigente(sigueVigente, ({ event: eventType, data: crudo }) => {
         const data = (crudo ?? {}) as DatosSse
         if (eventType === 'conversation') {
           // El servidor emite primero el id de la conversación del panel
@@ -187,20 +199,21 @@ export function useOrbiChat() {
       }))
     } catch (err) {
       // Con la sesión cambiada (reset) la burbuja ya no existe: no se toca
-      // nada. Un corte pedido (Detener, cerrar el panel) no es un error de
-      // conexión: queda lo que llegó con la marca "Detenido".
-      if (!sigueVigente()) return
+      // nada. Un corte (Detener, cerrar el panel, o un envío nuevo que
+      // reemplazó a este) no es un error de conexión: la burbuja de ESTE
+      // envío, buscada por id, queda con lo que llegó y la marca "Detenido".
+      if (debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)) return
       if (esAborto(err) || corte.signal.aborted) {
         store.marcarDetenido(assistantMsg.id)
-      } else {
+      } else if (sigueVigente()) {
+        // appendToLastAssistant escribe en la última burbuja: solo si sigue
+        // siendo la de este envío.
         store.appendToLastAssistant('Error de conexión. Intentá de nuevo.')
       }
     } finally {
-      // Solo se suelta el controller si sigue siendo el de este envío, y solo
-      // se baja el "escribiendo" si nadie reinició el chat mientras tanto (el
-      // reset ya lo bajó, y puede haber otro envío en curso).
-      if (useOrbiStore.getState().abortEnCurso === corte) store.setAbort(null)
-      if (sigueVigente()) store.setStreaming(false)
+      // Solo el envío vigente suelta su controller y baja el "escribiendo":
+      // uno reemplazado o de antes de un reset no toca el estado del nuevo.
+      useOrbiStore.getState().terminarEnvio(miEnvio, sesionAlEnviar)
     }
   }, [store])
 

@@ -14,17 +14,31 @@ export function debeDescartar(sesionAlEnviar: number, sesionActual: number): boo
 }
 
 /**
- * Envuelve el manejador de eventos del stream: cada evento se chequea contra
- * la sesión ACTUAL al momento de llegar (no la del envío), así un reset en el
- * medio corta todo lo que falta, incluido el `conversation`.
+ * Un envío sigue mandando sobre el chat solo si no hubo reset (misma sesión)
+ * y ningún envío posterior lo reemplazó (mismo número de envío). Un chip del
+ * wizard puede mandar otro mensaje mientras Orbi responde: el envío viejo se
+ * corta y desde ahí no puede escribir ni bajar el "escribiendo" del nuevo.
  */
-export function filtrarPorSesion<E>(
+export function esEnvioVigente(
   sesionAlEnviar: number,
-  sesionActual: () => number,
+  sesionActual: number,
+  envioPropio: number,
+  envioActual: number,
+): boolean {
+  return !debeDescartar(sesionAlEnviar, sesionActual) && envioPropio === envioActual
+}
+
+/**
+ * Envuelve el manejador de eventos del stream: cada evento se chequea con
+ * `vigente()` al momento de llegar (no al enviar), así un reset o un envío
+ * nuevo en el medio corta todo lo que falta, incluido el `conversation`.
+ */
+export function soloSiVigente<E>(
+  vigente: () => boolean,
   alProcesar: (evento: E) => void,
 ): (evento: E) => void {
   return (evento) => {
-    if (debeDescartar(sesionAlEnviar, sesionActual())) return
+    if (!vigente()) return
     alProcesar(evento)
   }
 }

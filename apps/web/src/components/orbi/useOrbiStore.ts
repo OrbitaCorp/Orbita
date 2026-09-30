@@ -29,6 +29,10 @@ interface OrbiState {
   // useOrbiChat). Sin cortarlo, cerrar Orbi o navegar no cierra la conexión y
   // la API sigue gastando modelo para una respuesta que nadie va a leer.
   abortEnCurso: AbortController | null
+  // Número del envío vigente. Cada iniciarEnvio() lo sube: un envío que ya
+  // fue reemplazado por otro (chip tocado mientras Orbi respondía) lo ve
+  // distinto y no toca el estado del nuevo.
+  envio: number
 
   toggle: () => void
   open: () => void
@@ -50,6 +54,8 @@ interface OrbiState {
   marcarDetenido: (msgId: string) => void
   setAbort: (c: AbortController | null) => void
   abortar: () => void
+  iniciarEnvio: (c: AbortController) => number
+  terminarEnvio: (envio: number, sesionAlEnviar: number) => void
   reset: () => void
 }
 
@@ -63,6 +69,7 @@ export const useOrbiStore = create<OrbiState>((set, get) => ({
   welcomeGreetedStep: null,
   sesion: 0,
   abortEnCurso: null,
+  envio: 0,
 
   // Cerrar Orbi corta la respuesta en curso: la vista se desmonta y nadie la
   // va a leer. Abrir no toca nada.
@@ -163,6 +170,25 @@ export const useOrbiStore = create<OrbiState>((set, get) => ({
     if (!c) return
     set({ abortEnCurso: null })
     c.abort()
+  },
+
+  // Arranca un envío: corta el que estuviera en curso (si no, su conexión
+  // queda abierta sin nadie que la pueda cortar y la API sigue generando y
+  // facturando) y devuelve el número de este envío.
+  iniciarEnvio: (c) => {
+    get().abortar()
+    const envio = get().envio + 1
+    set({ abortEnCurso: c, envio })
+    return envio
+  },
+
+  // Cierre de un envío: solo el vigente suelta el controller y, si no hubo
+  // reset mientras tanto, baja el "escribiendo". Uno reemplazado no toca nada.
+  terminarEnvio: (envio, sesionAlEnviar) => {
+    const s = get()
+    if (s.envio !== envio) return
+    if (s.abortEnCurso) set({ abortEnCurso: null })
+    if (s.sesion === sesionAlEnviar) set({ isStreaming: false })
   },
 
   // Conversación nueva (botón Nueva conversación, logout, login de otra

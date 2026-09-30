@@ -4,7 +4,8 @@ import {
   conversationIdParaEnviar,
   debeDescartar,
   esAborto,
-  filtrarPorSesion,
+  esEnvioVigente,
+  soloSiVigente,
   idDeConversacionDelEvento,
 } from './sesionOrbi'
 import { leerStreamSse, type EventoSse, type LectorDeBytes } from './sseParser'
@@ -108,6 +109,98 @@ describe('cerrar el panel', () => {
   })
 })
 
+describe('envíos superpuestos', () => {
+  // Un chip del wizard puede mandar un mensaje mientras Orbi todavía responde
+  // el anterior. El envío nuevo reemplaza al viejo: el viejo se corta (si no,
+  // su conexión queda abierta y la API sigue facturando) y su cierre no puede
+  // tocar el estado del nuevo.
+  it('iniciar un segundo envío aborta el controller del primero', () => {
+    const c1 = new AbortController()
+    const c2 = new AbortController()
+    useOrbiStore.getState().iniciarEnvio(c1)
+    useOrbiStore.getState().iniciarEnvio(c2)
+
+    expect(c1.signal.aborted).toBe(true)
+    expect(c2.signal.aborted).toBe(false)
+    expect(useOrbiStore.getState().abortEnCurso).toBe(c2)
+  })
+
+  it('cada envío recibe un número distinto', () => {
+    const e1 = useOrbiStore.getState().iniciarEnvio(new AbortController())
+    const e2 = useOrbiStore.getState().iniciarEnvio(new AbortController())
+    expect(e2).not.toBe(e1)
+  })
+
+  it('el cierre del envío reemplazado no baja el streaming ni suelta el controller del nuevo', () => {
+    const sesion = useOrbiStore.getState().sesion
+    const e1 = useOrbiStore.getState().iniciarEnvio(new AbortController())
+    const c2 = new AbortController()
+    useOrbiStore.getState().iniciarEnvio(c2)
+    useOrbiStore.getState().setStreaming(true)
+
+    useOrbiStore.getState().terminarEnvio(e1, sesion)
+
+    expect(useOrbiStore.getState().isStreaming).toBe(true)
+    expect(useOrbiStore.getState().abortEnCurso).toBe(c2)
+  })
+
+  it('el cierre del envío vigente baja el streaming y suelta su controller', () => {
+    const sesion = useOrbiStore.getState().sesion
+    const e = useOrbiStore.getState().iniciarEnvio(new AbortController())
+    useOrbiStore.getState().setStreaming(true)
+
+    useOrbiStore.getState().terminarEnvio(e, sesion)
+
+    expect(useOrbiStore.getState().isStreaming).toBe(false)
+    expect(useOrbiStore.getState().abortEnCurso).toBeNull()
+  })
+
+  it('después de un reset, el cierre del envío viejo no toca nada', () => {
+    const sesion = useOrbiStore.getState().sesion
+    const e = useOrbiStore.getState().iniciarEnvio(new AbortController())
+    useOrbiStore.getState().reset()
+    useOrbiStore.getState().setStreaming(true) // p. ej. otro envío ya arrancó
+
+    useOrbiStore.getState().terminarEnvio(e, sesion)
+
+    expect(useOrbiStore.getState().isStreaming).toBe(true)
+  })
+
+  it('esEnvioVigente: vale solo con la misma sesión y el mismo envío', () => {
+    expect(esEnvioVigente(1, 1, 5, 5)).toBe(true)
+    expect(esEnvioVigente(1, 2, 5, 5)).toBe(false)
+    expect(esEnvioVigente(1, 1, 5, 6)).toBe(false)
+  })
+
+  it('los eventos del stream reemplazado no escriben en la burbuja del envío nuevo', async () => {
+    const s0 = useOrbiStore.getState()
+    s0.addMessage({ ...mensaje('a1', 'assistant'), content: '' })
+    const sesionAlEnviar = s0.sesion
+    const e1 = s0.iniciarEnvio(new AbortController())
+    const vigente1 = () => {
+      const s = useOrbiStore.getState()
+      return esEnvioVigente(sesionAlEnviar, s.sesion, e1, s.envio)
+    }
+    const lector = lectorCon(
+      ['event: text\ndata: {"chunk":"respuesta vieja"}\n\n'],
+      (i) => {
+        // Antes de que llegue el texto, un chip arranca otro envío.
+        if (i === 0) {
+          useOrbiStore.getState().iniciarEnvio(new AbortController())
+          useOrbiStore.getState().addMessage({ ...mensaje('a2', 'assistant'), content: '' })
+        }
+      },
+    )
+
+    await leerStreamSse(lector, soloSiVigente(vigente1, (e: EventoSse) => {
+      useOrbiStore.getState().appendToLastAssistant((e.data as { chunk: string }).chunk)
+    }))
+
+    const msgs = useOrbiStore.getState().messages
+    expect(msgs.find(m => m.id === 'a2')?.content).toBe('')
+  })
+})
+
 describe('marcarDetenido()', () => {
   it('marca el mensaje y conserva lo que ya había llegado', () => {
     useOrbiStore.getState().addMessage(mensaje('a1', 'assistant'))
@@ -115,6 +208,15 @@ describe('marcarDetenido()', () => {
     const m = useOrbiStore.getState().messages[0]
     expect(m.detenido).toBe(true)
     expect(m.content).toBe('hola')
+  })
+
+  it('solo marca la burbuja del envío cortado, no la del envío que lo reemplazó', () => {
+    useOrbiStore.getState().addMessage(mensaje('assistant-1-1', 'assistant'))
+    useOrbiStore.getState().addMessage(mensaje('assistant-1-2', 'assistant'))
+    useOrbiStore.getState().marcarDetenido('assistant-1-1')
+    const [viejo, nuevo] = useOrbiStore.getState().messages
+    expect(viejo.detenido).toBe(true)
+    expect(nuevo.detenido).toBeUndefined()
   })
 })
 
@@ -173,7 +275,7 @@ describe('stream con sesión vieja', () => {
       },
     )
 
-    await leerStreamSse(lector, filtrarPorSesion(sesionAlEnviar, () => useOrbiStore.getState().sesion, consumir))
+    await leerStreamSse(lector, soloSiVigente(() => !debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion), consumir))
 
     const s = useOrbiStore.getState()
     expect(s.conversationId).toBeNull()
@@ -188,7 +290,7 @@ describe('stream con sesión vieja', () => {
       'event: text\ndata: {"chunk":"listo"}\n\n',
     ])
 
-    await leerStreamSse(lector, filtrarPorSesion(sesionAlEnviar, () => useOrbiStore.getState().sesion, consumir))
+    await leerStreamSse(lector, soloSiVigente(() => !debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion), consumir))
 
     expect(useOrbiStore.getState().conversationId).toBe('conv-1')
     expect(useOrbiStore.getState().messages[0].content).toBe('listo')
