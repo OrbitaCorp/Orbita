@@ -6,6 +6,8 @@ import {
   esAborto,
   esEnvioVigente,
   soloSiVigente,
+  seMarcaDetenido,
+  muestraNoLlegueAResponder,
   idDeConversacionDelEvento,
 } from './sesionOrbi'
 import { leerStreamSse, type EventoSse, type LectorDeBytes } from './sseParser'
@@ -326,5 +328,54 @@ describe('esAborto()', () => {
   it('un error de red no es un aborto', () => {
     expect(esAborto(new TypeError('Failed to fetch'))).toBe(false)
     expect(esAborto(null)).toBe(false)
+  })
+})
+
+describe('seMarcaDetenido()', () => {
+  it('un corte antes de `done` marca la burbuja', () => {
+    expect(seMarcaDetenido(true, false)).toBe(true)
+  })
+
+  it('Detener entre `done` y el cierre del stream no marca una respuesta completa', () => {
+    expect(seMarcaDetenido(true, true)).toBe(false)
+  })
+
+  it('sin corte no hay nada que marcar', () => {
+    expect(seMarcaDetenido(false, false)).toBe(false)
+  })
+})
+
+describe('muestraNoLlegueAResponder()', () => {
+  const base = { id: 'a', role: 'assistant' as const, content: '', timestamp: 0, detenido: true }
+
+  it('detenida sin texto ni tarjetas: dice "No llegué a responder."', () => {
+    expect(muestraNoLlegueAResponder(base)).toBe(true)
+    expect(muestraNoLlegueAResponder({ ...base, actions: [] })).toBe(true)
+  })
+
+  it('detenida pero con tarjetas de acción: no lo dice (algo sí respondió)', () => {
+    expect(muestraNoLlegueAResponder({
+      ...base,
+      actions: [{ id: 'x', label: 'Crear cupón', tool: 'createCoupon', status: 'pending', actionId: 'acc' }],
+    })).toBe(false)
+  })
+
+  it('una tool de consulta que terminó no es una tarjeta: sin texto, lo sigue diciendo', () => {
+    expect(muestraNoLlegueAResponder({
+      ...base,
+      actions: [{ id: 'y', label: 'Pedidos', tool: 'listOrders', status: 'complete', data: { orders: [] } }],
+    })).toBe(true)
+  })
+
+  it('con el botón de ir a una pantalla (navigateTo) tampoco lo dice', () => {
+    expect(muestraNoLlegueAResponder({
+      ...base,
+      actions: [{ id: 'z', label: 'Ir', tool: 'navigateTo', status: 'complete', data: { path: '/admin/pedidos' } }],
+    })).toBe(false)
+  })
+
+  it('con texto, o sin cortar, no lo dice', () => {
+    expect(muestraNoLlegueAResponder({ ...base, content: 'Hola' })).toBe(false)
+    expect(muestraNoLlegueAResponder({ ...base, detenido: false })).toBe(false)
   })
 })

@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState, type ReactNode } from 'react'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Check, CircleAlert, CircleHelp, Loader2, RotateCw, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import { useOrbiChat } from './useOrbiChat'
 import type { OrbiAction, OrbiMessage } from './types'
+import { esNavegacion, esSeleccionDelWizard, esTarjetaDeAccion, muestraNoLlegueAResponder } from './sesionOrbi'
 
 // El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
 // además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
@@ -78,14 +79,28 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
  * Puede pedirlo; no puede apretar este botón.
  */
 function OrbiConfirmButton({ accion, mensajeId }: { accion: OrbiAction; mensajeId: string }) {
-  const { confirmarAccion } = useOrbiChat()
-  const [enviando, setEnviando] = useState(false)
+  const { confirmarAccion, rechazarAccion } = useOrbiChat()
+  const isStreaming = useOrbiStore(s => s.isStreaming)
+  // Entre el clic y la respuesta: evita el doble clic. El estado de verdad
+  // (active, complete…) vive en el store y lo cambia useOrbiChat.
+  const [ocupado, setOcupado] = useState(false)
 
-  const alConfirmar = async () => {
-    if (enviando || !accion.actionId) return
-    setEnviando(true)
-    await confirmarAccion(mensajeId, accion.id, accion.actionId)
+  // Confirmar y Cancelar quedan apagados en TODAS las tarjetas mientras Orbi
+  // responde: la nota de "confirmó" o "canceló" que escribe el servidor en la
+  // conversación caería entre la pregunta y la respuesta en curso.
+  const apagado = ocupado || isStreaming
+
+  const ejecutar = async (accionDelBoton: typeof confirmarAccion) => {
+    if (apagado || !accion.actionId) return
+    setOcupado(true)
+    try {
+      await accionDelBoton(mensajeId, accion.id, accion.actionId, accion.tool)
+    } finally {
+      setOcupado(false)
+    }
   }
+
+  const estado = accion.status
 
   return (
     <div style={{
@@ -93,33 +108,108 @@ function OrbiConfirmButton({ accion, mensajeId }: { accion: OrbiAction; mensajeI
       borderRadius: 12,
       border: '1.5px solid var(--color-border)',
       background: 'var(--color-surface)',
+      maxWidth: '85%',
     }}>
-      <div style={{ fontSize: 13, color: 'var(--color-text)', marginBottom: 10, lineHeight: 1.45 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-text)', lineHeight: 1.45 }}>
         {accion.resumen ?? accion.label}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button
-          onClick={alConfirmar}
-          disabled={enviando}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '7px 14px', borderRadius: 9,
-            border: '1.5px solid transparent',
-            background: enviando ? 'var(--color-surface-alt)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-            color: enviando ? 'var(--color-muted)' : 'white',
-            fontSize: 13, fontWeight: 600,
-            cursor: enviando ? 'default' : 'pointer',
-            transition: 'all 150ms',
-          }}
-        >
-          {enviando ? 'Aplicando…' : 'Confirmar'}
-        </button>
-        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-          No se hizo nada todavía
-        </span>
+      {/* La línea de estado se anuncia sola al lector de pantalla cuando
+          cambia (Aplicando → Listo), sin mover el foco. */}
+      <div role="status" aria-live="polite" style={{ marginTop: 8 }}>
+        {accion.nota && (
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', marginBottom: 4 }}>
+            {accion.nota}
+          </div>
+        )}
+        <EstadoDeLaTarjeta accion={accion} />
       </div>
+
+      {estado === 'pending' && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 10 }}>
+          <BotonTarjeta principal onClick={() => ejecutar(confirmarAccion)} disabled={apagado}>
+            Confirmar
+          </BotonTarjeta>
+          <BotonTarjeta onClick={() => ejecutar(rechazarAccion)} disabled={apagado}>
+            Cancelar
+          </BotonTarjeta>
+          <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+            {isStreaming ? 'Esperá a que Orbi termine de responder' : 'No se hizo nada todavía'}
+          </span>
+        </div>
+      )}
+
+      {estado === 'unknown' && (
+        <div style={{ marginTop: 10 }}>
+          {/* Reintenta el MISMO actionId: confirmar es idempotente en el
+              servidor, así que nunca crea la acción dos veces. */}
+          <BotonTarjeta onClick={() => ejecutar(confirmarAccion)} disabled={apagado}>
+            <RotateCw size={14} strokeWidth={2} aria-hidden />
+            Reintentar
+          </BotonTarjeta>
+        </div>
+      )}
     </div>
+  )
+}
+
+// Qué dice la tarjeta en cada estado (tabla de §3.9 del spec). Ícono y texto
+// juntos: el color solo nunca es lo único que cuenta qué pasó.
+function EstadoDeLaTarjeta({ accion }: { accion: OrbiAction }) {
+  const fila = (icono: ReactNode, titulo: string, color: string) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color }}>
+      {icono}
+      {titulo}
+    </div>
+  )
+  const detalle = accion.result ? (
+    <div style={{ fontSize: 12, color: 'var(--color-body)', marginTop: 2, lineHeight: 1.45 }}>{accion.result}</div>
+  ) : null
+
+  switch (accion.status) {
+    case 'pending':
+      return null
+    case 'active':
+      return fila(<Loader2 size={14} strokeWidth={2} aria-hidden className="orbi-girando" />, 'Aplicando…', 'var(--color-muted)')
+    case 'complete':
+      return <>{fila(<Check size={14} strokeWidth={2.5} aria-hidden />, 'Listo', 'var(--chip-success-fg)')}{detalle}</>
+    case 'error':
+      return <>{fila(<CircleAlert size={14} strokeWidth={2} aria-hidden />, 'No se pudo', 'var(--chip-error-fg)')}{detalle}</>
+    case 'rejected':
+      return fila(<X size={14} strokeWidth={2} aria-hidden />, 'Cancelado', 'var(--color-muted)')
+    case 'unknown':
+      return <>{fila(<CircleHelp size={14} strokeWidth={2} aria-hidden />, 'No sé si se aplicó', 'var(--chip-warning-fg)')}{detalle}</>
+  }
+}
+
+// Botón de la tarjeta: con texto, 44 px de alto (área táctil) y foco visible
+// (.orbi-foco en globals.css). El principal usa el primario del tema.
+function BotonTarjeta({ principal, disabled, onClick, children }: {
+  principal?: boolean
+  disabled?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="orbi-foco"
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        minHeight: 44, padding: '0 16px', borderRadius: 10,
+        font: 'inherit', fontSize: 13, fontWeight: 600,
+        border: principal ? '1.5px solid transparent' : '1.5px solid var(--color-border-strong)',
+        background: principal ? 'var(--color-primary)' : 'var(--color-bg)',
+        color: principal ? 'var(--color-on-primary)' : 'var(--color-text)',
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'opacity 150ms, background-color 150ms',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -174,14 +264,25 @@ function PulgaresOrbi({ msg }: { msg: OrbiMessage }) {
 function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage: boolean }) {
   const isUser = msg.role === 'user'
   const isStreaming = useOrbiStore(s => s.isStreaming)
-  const navigateAction = msg.actions?.find(a => a.status === 'complete' && a.data && typeof a.data === 'object' && 'path' in a.data)
-  const selectActions = msg.actions?.filter(a => a.status === 'complete' && a.tool === 'selectWizardOption' && a.data) ?? []
-  const pendingActions = msg.actions?.filter(a => a.status === 'pending') ?? []
+  const navigateAction = msg.actions?.find(esNavegacion)
+  const selectActions = msg.actions?.filter(esSeleccionDelWizard) ?? []
+  // Toda acción con actionId tiene su tarjeta, en cualquier estado: después
+  // de confirmar o cancelar la tarjeta queda con lo que pasó.
+  const tarjetas = msg.actions?.filter(esTarjetaDeAccion) ?? []
   // El tool_call llega ANTES que el texto explicativo (el modelo llama la tool,
   // el controller la ejecuta y manda action_complete, y DESPUÉS hace un segundo
   // LLM call que genera el texto). Si mostramos el botón de inmediato, el usuario
   // ve "Elegir X" flotando sin contexto durante 1-2 segundos.
   const hideActionsUntilDone = isLastMessage && isStreaming
+
+  const contenido = msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content
+  const pensando = msg.role === 'assistant' && isLastMessage && isStreaming
+  // Cortada antes de que llegara texto: se dice en la burbuja en vez de
+  // dejarla vacía, salvo que ya haya tarjetas o botones (ahí sí respondió).
+  const noLlego = muestraNoLlegueAResponder({ ...msg, content: contenido })
+  // Sin texto, sin "pensando" y sin aviso, la burbuja sería un globo vacío
+  // arriba de la tarjeta: no se dibuja.
+  const hayBurbuja = !!contenido || pensando || noLlego
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
@@ -193,28 +294,27 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)' }}>Orbi</span>
         </div>
       )}
-      <div style={{
-        maxWidth: '85%',
-        padding: '10px 14px',
-        borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        background: isUser ? '#3B82F6' : 'var(--color-surface-alt)',
-        color: isUser ? 'white' : 'var(--color-text)',
-        fontSize: 13,
-        lineHeight: 1.5,
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-      }}>
-        {(() => {
-          const contenido = msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content
-          if (contenido) return msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido
-          // Sin texto todavía: mientras Orbi trabaja (último mensaje + streaming)
-          // se muestra qué está haciendo. Un mensaje viejo sin texto no muestra nada.
-          if (msg.role === 'assistant' && isLastMessage && isStreaming) return <OrbiThinking msg={msg} />
-          // Cortada antes de que llegara texto: se dice en la burbuja en vez
-          // de dejarla vacía.
-          return msg.detenido ? <span style={{ color: 'var(--color-muted)' }}>No llegué a responder.</span> : null
-        })()}
-      </div>
+      {hayBurbuja && (
+        <div style={{
+          maxWidth: '85%',
+          padding: '10px 14px',
+          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          background: isUser ? '#3B82F6' : 'var(--color-surface-alt)',
+          color: isUser ? 'white' : 'var(--color-text)',
+          fontSize: 13,
+          lineHeight: 1.5,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}>
+          {contenido
+            ? (msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido)
+            // Sin texto todavía: mientras Orbi trabaja (último mensaje +
+            // streaming) se muestra qué está haciendo.
+            : pensando
+              ? <OrbiThinking msg={msg} />
+              : <span style={{ color: 'var(--color-muted)' }}>No llegué a responder.</span>}
+        </div>
+      )}
 
       {/* Respuesta cortada (Detener o cerrar el panel): lo que llegó queda y
           se aclara que no está completa. No es un error de conexión. */}
@@ -224,7 +324,7 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         </span>
       )}
 
-      {!hideActionsUntilDone && pendingActions.map(a => (
+      {!hideActionsUntilDone && tarjetas.map(a => (
         <OrbiConfirmButton key={a.id} accion={a} mensajeId={msg.id} />
       ))}
 

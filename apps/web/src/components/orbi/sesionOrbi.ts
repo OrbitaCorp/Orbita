@@ -1,7 +1,7 @@
 // Reglas puras del chat de Orbi que dependen de la "sesión" del store y de la
 // superficie (panel o wizard). Viven acá, sin fetch ni React, para poder
 // probarlas en node: useOrbiChat solo las aplica.
-import type { OrbiSurface } from './types'
+import type { OrbiAction, OrbiMessage, OrbiSurface } from './types'
 
 /**
  * Un stream arrancó con `sesionAlEnviar`; si mientras tanto hubo un reset
@@ -68,4 +68,38 @@ export function conversationIdParaEnviar(surface: OrbiSurface, id: string | null
  */
 export function esAborto(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'AbortError'
+}
+
+/**
+ * Si un corte deja la burbuja con la marca "Detenido". Apretar Detener entre
+ * `done` y el cierre del stream (el wizard todavía manda `turn`) corta la
+ * lectura, pero la respuesta ya estaba completa: marcarla sería mentir.
+ */
+export function seMarcaDetenido(fueCorte: boolean, recibioDone: boolean): boolean {
+  return fueCorte && !recibioDone
+}
+
+/** La tarjeta de confirmar: toda acción que el servidor dejó pendiente con un id. */
+export function esTarjetaDeAccion(a: OrbiAction): boolean {
+  return !!a.actionId
+}
+
+/** Botón "Ir a …" de navigateTo. */
+export function esNavegacion(a: OrbiAction): boolean {
+  return a.status === 'complete' && typeof a.data === 'object' && a.data !== null && 'path' in a.data
+}
+
+/** Botón "Elegir …" del wizard. */
+export function esSeleccionDelWizard(a: OrbiAction): boolean {
+  return a.status === 'complete' && a.tool === 'selectWizardOption' && !!a.data
+}
+
+/**
+ * Una burbuja cortada sin texto dice "No llegué a responder." salvo que ya
+ * muestre alguna tarjeta o botón: ahí Orbi sí respondió algo (propuso una
+ * acción, ofreció ir a una pantalla) y la frase contradiría lo que se ve.
+ */
+export function muestraNoLlegueAResponder(msg: OrbiMessage): boolean {
+  if (!msg.detenido || msg.content.trim()) return false
+  return !(msg.actions ?? []).some(a => esTarjetaDeAccion(a) || esNavegacion(a) || esSeleccionDelWizard(a))
 }

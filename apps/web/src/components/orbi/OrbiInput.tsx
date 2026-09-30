@@ -142,9 +142,6 @@ export function OrbiInput({ onSend, disabled, quickChips, streaming, onStop }: P
           </button>
         )}
       </div>
-      <style>{`
-        .orbi-foco:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-      `}</style>
     </div>
   )
 }

@@ -222,7 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // El chat de Orbi (y su stream en curso) es de quien se va. Hoy el logout
     // del panel recarga la página, pero el POS comparte terminal entre
     // empleados y no hay que depender de eso. reset() también aborta.
-    useOrbiStore.getState().reset()
+    // En try/catch: si limpiar Orbi fallara, el logout igual tiene que
+    // terminar; quedarse con la sesión abierta es peor que un chat sin vaciar.
+    try {
+      useOrbiStore.getState().reset()
+    } catch {
+      // Nada que hacer: lo importante es seguir con el cierre de sesión.
+    }
     // Visitante de la demo: su sesión no tiene cookie propia, y el logout del
     // BFF borraría la cookie de panel de un dueño real que esté mirando la
     // demo (ver lib/demo/modo.ts). Alcanza con olvidar el token.

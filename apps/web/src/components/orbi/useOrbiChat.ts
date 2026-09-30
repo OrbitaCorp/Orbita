@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useOrbiStore } from './useOrbiStore'
 import type { OrbiContext, OrbiMessage } from './types'
 import { authedFetch } from '@/lib/auth/authClient'
@@ -11,8 +12,20 @@ import {
   esAborto,
   esEnvioVigente,
   idDeConversacionDelEvento,
+  seMarcaDetenido,
   soloSiVigente,
 } from './sesionOrbi'
+import {
+  EVENTO_ACCION_EJECUTADA,
+  confirmarConReintentos,
+  interpretarRespuestaCancelar,
+  interpretarRespuestaConfirmar,
+  queriesARefrescar,
+  siguienteEstadoAlCancelar,
+  type DetalleAccionEjecutada,
+  type RespuestaCancelar,
+  type RespuestaConfirmar,
+} from './confirmarAccion'
 
 // Forma de los datos de los eventos del stream. Es permisiva a propósito: el
 // parser devuelve `unknown` (JSON ya decodificado) y cada evento usa solo
@@ -33,8 +46,40 @@ interface DatosSse {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
+// POST /orbi/confirm pasado a la respuesta tipada. Un fetch que tira (red
+// caída) lo convierte confirmarConReintentos en "no sé".
+async function pedirConfirmacion(actionId: string): Promise<RespuestaConfirmar> {
+  const res = await authedFetch(`${API}/orbi/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actionId }),
+  })
+  return interpretarRespuestaConfirmar(res.status, await res.json().catch(() => null))
+}
+
+const esperar = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+function esRegistro(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
 export function useOrbiChat() {
   const store = useOrbiStore()
+  const queryClient = useQueryClient()
+
+  // Después de una acción aplicada, la pantalla que la muestra tiene que
+  // enterarse: sin esto el dueño crea un cupón con Orbi y la lista de cupones
+  // abierta al lado sigue sin él hasta que recarga.
+  const alAplicarse = useCallback((tool: string, data?: Record<string, unknown>) => {
+    if (typeof data?.productId === 'string') {
+      useOrbiStore.getState().markProductCreated(data.productId)
+    }
+    for (const queryKey of queriesARefrescar(tool)) {
+      void queryClient.invalidateQueries({ queryKey })
+    }
+    const detail: DetalleAccionEjecutada = { tool, data }
+    window.dispatchEvent(new CustomEvent(EVENTO_ACCION_EJECUTADA, { detail }))
+  }, [queryClient])
 
   const send = useCallback(async (message: string, context: OrbiContext) => {
     // El wizard es público/stateless en el backend (sin conversationId
@@ -94,6 +139,11 @@ export function useOrbiChat() {
     }
     store.addMessage(assistantMsg)
     store.setStreaming(true)
+
+    // Si llegó `done` la respuesta está completa aunque el stream siga
+    // abierto (el wizard manda `turn` después): un Detener en ese hueco no
+    // tiene que marcarla "Detenido".
+    let recibioDone = false
 
     try {
       const endpoint = context.surface === 'wizard' ? '/orbi/chat/wizard' : '/orbi/chat'
@@ -192,9 +242,10 @@ export function useOrbiChat() {
         } else if (eventType === 'error') {
           store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
         } else if (eventType === 'done') {
-          // Señal de que la respuesta terminó. No hay nada que hacer: el
-          // estado de "escribiendo" lo baja el `finally` al cerrarse el
-          // stream, y todavía puede llegar `turn` (wizard).
+          // Señal de que la respuesta terminó. El estado de "escribiendo" lo
+          // baja el `finally` al cerrarse el stream, y todavía puede llegar
+          // `turn` (wizard); solo se anota para el catch.
+          recibioDone = true
         }
       }))
     } catch (err) {
@@ -204,7 +255,7 @@ export function useOrbiChat() {
       // envío, buscada por id, queda con lo que llegó y la marca "Detenido".
       if (debeDescartar(sesionAlEnviar, useOrbiStore.getState().sesion)) return
       if (esAborto(err) || corte.signal.aborted) {
-        store.marcarDetenido(assistantMsg.id)
+        if (seMarcaDetenido(true, recibioDone)) store.marcarDetenido(assistantMsg.id)
       } else if (sigueVigente()) {
         // appendToLastAssistant escribe en la última burbuja: solo si sigue
         // siendo la de este envío.
@@ -226,36 +277,53 @@ export function useOrbiChat() {
    * viene a tapar — cualquiera podría saltearse a Orbi y postear la escritura
    * que quisiera.
    */
-  const confirmarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string) => {
-    useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active' })
+  const confirmarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string, tool: string) => {
+    useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active', result: undefined, nota: undefined })
 
+    // Mientras la API diga "se está aplicando" se vuelve a preguntar con el
+    // MISMO actionId; red caída o 5xx quedan en "no sé" con Reintentar (ver
+    // confirmarAccion.ts: confirmar es idempotente, reintentar no duplica).
+    const final = await confirmarConReintentos(actionId, pedirConfirmacion, esperar, tool)
+    const data = esRegistro(final.data) ? final.data : undefined
+
+    // Si hubo un reset en el medio la burbuja ya no existe y esto no toca
+    // nada; el refresco de abajo igual corre, porque la acción sí se aplicó.
+    useOrbiStore.getState().updateAction(mensajeId, accionId, {
+      status: final.estado,
+      result: final.mensaje,
+      data,
+    })
+    if (final.estado === 'complete') alAplicarse(tool, data)
+  }, [alAplicarse])
+
+  /**
+   * Cancela una propuesta desde la tarjeta. Si alguien la confirmó antes
+   * (otra pestaña), la API devuelve lo que pasó y la tarjeta lo muestra con
+   * "Ya se aplicó" en vez de decir "Cancelado".
+   */
+  const rechazarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string, tool: string) => {
+    let respuesta: RespuestaCancelar
     try {
-      const res = await authedFetch(`${API}/orbi/confirm`, {
+      const res = await authedFetch(`${API}/orbi/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actionId }),
       })
-
-      if (!res.ok) throw new Error(String(res.status))
-
-      const result = await res.json()
-      useOrbiStore.getState().updateAction(mensajeId, accionId, {
-        status: result.success ? 'complete' : 'error',
-        result: result.success ? result.label : (result.error ?? 'No se pudo completar'),
-        data: result.data,
-      })
-      if (result?.data?.productId) {
-        useOrbiStore.getState().markProductCreated(result.data.productId as string)
-      }
+      respuesta = interpretarRespuestaCancelar(res.status, await res.json().catch(() => null))
     } catch {
-      useOrbiStore.getState().updateAction(mensajeId, accionId, {
-        status: 'error',
-        // La propuesta caduca a los 10 minutos y es de un solo uso, así que
-        // "volvé a pedírselo" es la salida real, no una frase de relleno.
-        result: 'No se pudo completar. Pedísela a Orbi de nuevo.',
-      })
+      respuesta = { http: 'red' }
     }
-  }, [])
 
-  return { send, confirmarAccion, isStreaming: store.isStreaming }
+    const paso = siguienteEstadoAlCancelar(respuesta, tool)
+    const data = esRegistro(paso.data) ? paso.data : undefined
+    useOrbiStore.getState().updateAction(mensajeId, accionId, {
+      status: paso.estado,
+      result: paso.mensaje,
+      nota: paso.nota,
+      ...(data ? { data } : {}),
+    })
+    if (paso.estado === 'complete') alAplicarse(tool, data)
+  }, [alAplicarse])
+
+  return { send, confirmarAccion, rechazarAccion, isStreaming: store.isStreaming }
 }
