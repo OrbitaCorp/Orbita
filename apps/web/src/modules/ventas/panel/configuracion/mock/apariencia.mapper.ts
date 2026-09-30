@@ -67,7 +67,7 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showNewArrivalsSection: ap.mostrarNuevos,
         showRecommendedSection: ap.mostrarRecomendados,
         showBestSellersSection: ap.mostrarTopVentas,
-        showFooter: ap.mostrarFooter,
+        showFooter: true, // el pie es obligatorio (lleva los legales): ya no se guarda apagado
         showSocialFooter: ap.mostrarRedesFooter,
         showAnnouncementBar: ap.mostrarBannerEnvio,
         announcementScroll: ap.bannerDesplazable,
@@ -201,7 +201,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         // exactamente lo que venía viendo — ver AP_DEFAULTS.
         estiloCategorias: (dto.categoryLayout as Ap['estiloCategorias']) ?? defaults.estiloCategorias,
         categoriasIds: dto.categoryIds ?? [],
-        mostrarFooter: dto.showFooter,
+        mostrarFooter: true, // ídem: aunque una tienda lo tuviera apagado de antes, se muestra
         mostrarRedesFooter: dto.showSocialFooter,
         mostrarBannerEnvio: dto.showAnnouncementBar,
         bannerDesplazable: dto.announcementScroll,

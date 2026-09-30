@@ -586,13 +586,14 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // (Inicio.tsx lo dibuja aparte del home, no lo arma la plantilla) — a
     // diferencia de Identidad/Paleta/Tipografía/Diseño, acá sí tiene sentido
     // seguir editando aunque haya una plantilla activa.
+    // El pie de página no se puede apagar: lleva Términos y condiciones, Política de
+    // privacidad y el acceso a devoluciones. Por eso no hay interruptor acá.
     const secPie = (
         <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom} ayuda={AYUDA_SECCIONES.pie}>
             <div style={{ marginBottom: 14 }}>
                 <FieldLabel help="Aparece debajo de tu logo, en el pie de página de la tienda.">Descripción</FieldLabel>
                 <Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={160} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/160</span>} />
             </div>
-            <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} ayuda={AYUDA_OPCIONES.mostrarFooter} />
             <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} ayuda={AYUDA_OPCIONES.mostrarRedesFooter} />
         </SecCard>
     )

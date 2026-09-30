@@ -78,12 +78,7 @@ export function OrbiPanel() {
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: '#3B82F6', display: 'grid', placeItems: 'center', flexShrink: 0,
-          }}>
-            <OrbiIcon size={17} color="white" />
-          </div>
+          <OrbiIcon size={30} disc />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (

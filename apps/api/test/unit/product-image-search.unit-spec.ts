@@ -59,4 +59,54 @@ describe('ProductImageSearchService', () => {
     expect(filtered[0].title).toContain('Mother of Pearl');
     expect(filtered[0].url).toContain('A1000D-7');
   });
+
+  describe('aviso a soporte cuando un proveedor falla', () => {
+    let mail: { sendCustomEmail: jest.Mock };
+    let prisma: { emailLog: { findFirst: jest.Mock } };
+    let conAviso: ProductImageSearchService;
+    const fetchOriginal = global.fetch;
+
+    beforeEach(() => {
+      mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+      prisma = { emailLog: { findFirst: jest.fn().mockResolvedValue(null) } };
+      configService.get.mockImplementation((k: string) => (k === 'SERPER_API_KEY' ? 'clave-serper' : undefined));
+      conAviso = new ProductImageSearchService(configService, usageMetering, costsService, mail as any, prisma as any);
+      // Serper responde 401 y DuckDuckGo también falla: alcanza para ejercitar el catch.
+      global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, text: async () => 'invalid key' }) as any;
+    });
+
+    afterEach(() => {
+      global.fetch = fetchOriginal;
+    });
+
+    it('manda un mail a soporte@orbita.site cuando Serper falla', async () => {
+      await conAviso.searchSuggestedImages({ query: 'Casio A1000D-7' });
+      await new Promise((r) => setImmediate(r));
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+      const [to, subject] = mail.sendCustomEmail.mock.calls[0];
+      expect(to).toBe('soporte@orbita.site');
+      expect(subject).toContain('Serper');
+    });
+
+    it('no repite el aviso dentro de las 12 horas', async () => {
+      await conAviso.searchSuggestedImages({ query: 'Casio A1000D-7' });
+      await conAviso.searchSuggestedImages({ query: 'Casio A1000D-7' });
+      await new Promise((r) => setImmediate(r));
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('no manda mail si ya salió uno registrado en email_logs', async () => {
+      prisma.emailLog.findFirst.mockResolvedValue({ id: 'x' });
+      await conAviso.searchSuggestedImages({ query: 'Casio A1000D-7' });
+      await new Promise((r) => setImmediate(r));
+      expect(mail.sendCustomEmail).not.toHaveBeenCalled();
+    });
+
+    it('sin claves configuradas no avisa (el fallback gratuito es lo esperado)', async () => {
+      configService.get.mockReturnValue(undefined);
+      await conAviso.searchSuggestedImages({ query: 'Casio A1000D-7' });
+      await new Promise((r) => setImmediate(r));
+      expect(mail.sendCustomEmail).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -51,12 +51,16 @@ export const LEGAL_CONTENT: Record<LegalKey, { title: string; date: string; sect
   },
   cookies: {
     title: 'Política de cookies',
-    date: 'Última actualización: 13 de Mayo, 2026',
+    date: 'Última actualización: 30 de septiembre, 2026',
+    // Reescrita el 2026-09-30 junto con el aviso de cookies (BannerCookies): describe lo que
+    // orbita.site realmente guarda en el navegador. Si cambia, actualizar acá la fecha y
+    // subir VERSION en lib/cookies/consentimiento.ts para volver a preguntar.
     sections: [
-      { subtitle: '1. ¿Qué son las cookies?', text: 'Las cookies son archivos con datos que se envían a tu navegador desde un sitio web y se almacenan en tu dispositivo.' },
-      { subtitle: '2. Cómo las usamos', text: 'Utilizamos cookies para el correcto funcionamiento de la plataforma y recordar tus preferencias.' },
-      { subtitle: '3. Tipos de cookies', text: 'Usamos cookies de sesión, preferencias y seguridad.' },
-      { subtitle: '4. Gestión', text: 'Puedes configurar tu navegador para rechazar cookies, aunque algunas partes del servicio podrían dejar de funcionar.' },
+      { subtitle: '1. ¿Qué son las cookies?', text: 'Las cookies son pequeños archivos que un sitio web guarda en tu navegador. Junto con ellas, los sitios usan otras tecnologías parecidas, como el almacenamiento local del navegador, para recordar cosas: quién sos, cómo preferís ver la página o en qué punto dejaste una tarea. En esta política las llamamos, en conjunto, "cookies".\n\nEsta política se refiere a orbita.site y al panel de Órbita. Cada tienda creada con Órbita tiene su propia política de cookies, que encontrás al pie de esa tienda.' },
+      { subtitle: '2. Qué cookies usamos', text: 'En orbita.site usamos únicamente cookies necesarias para que el servicio funcione. No usamos cookies de publicidad, ni de análisis de terceros, ni herramientas que te sigan por otros sitios.\n\n• Sesión del panel (orbita_refresh_panel): solo se crea si iniciás sesión. Te mantiene conectado por hasta 30 días y se borra al cerrar sesión. Es una cookie protegida: los scripts de la página no pueden leerla, solo viaja por conexiones seguras y no se envía desde otros sitios.\n• Preferencias y progreso: el tema claro u oscuro, los datos que vas completando al crear tu espacio, lo que probás en la demo (se guarda solo en tu navegador y nunca llega a nuestros servidores) y tu elección en el aviso de cookies.' },
+      { subtitle: '3. Servicios de terceros', text: 'Algunas funciones te llevan a servicios de otras empresas, que pueden guardar sus propias cookies y las tratan según sus políticas: Mercado Pago (al contratar y pagar la suscripción), Google (si ingresás con tu cuenta de Google o por las tipografías de Google Fonts) y Meta (al conectar WhatsApp Business).' },
+      { subtitle: '4. Cómo cambiar tu elección', text: 'Podés ver o cambiar tu elección en cualquier momento desde "Preferencias de cookies", al pie de la página. También podés borrar o bloquear las cookies desde la configuración de tu navegador; si bloqueás las necesarias, partes del servicio, como iniciar sesión, van a dejar de funcionar.' },
+      { subtitle: '5. Cambios y contacto', text: 'Si cambia qué cookies usamos o para qué, actualizamos esta política y volvemos a preguntarte tu elección. Ante cualquier consulta, escribinos a soporte@orbita.site.' },
     ],
   },
 };

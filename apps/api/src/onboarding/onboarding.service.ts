@@ -302,13 +302,20 @@ export class OnboardingService {
           },
         });
 
+        // La tienda nace SIN ningún método de pago ni de entrega habilitado: el
+        // dueño prende en Configuración solo lo que de verdad va a ofrecer (antes
+        // arrancaban prendidos Mercado Pago, Efectivo y Retiro, y un cliente podía
+        // elegir un medio que el dueño nunca configuró). Se pasan explícitos a
+        // propósito: los @default del schema siguen en true para otras altas.
         await tx.businessConfig.create({
           data: {
             businessId: business.id,
-            acceptsMercadopago: true,
-            acceptsCash: true,
+            acceptsMercadopago: false,
+            acceptsCash: false,
             acceptsTransfer: false,
-            acceptsPickup: true,
+            acceptsPickup: false,
+            acceptsCard: false,
+            acceptsCoordinateLater: false,
           },
         });
 

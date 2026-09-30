@@ -387,9 +387,8 @@ export default function Header({ onMenuClick }: Props) {
                         className="admin-orbi-btn ds-hover place-items-center rounded-lg"
                         style={{ width: 44, height: 44, background: 'transparent', border: '1px solid var(--color-border)', flexShrink: 0 }}
                     >
-                        <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', display: 'grid', placeItems: 'center' }}>
-                            <OrbiIcon size={15} color="white" />
-                        </span>
+                        {/* `disc` ya dibuja el logo sobre su disco navy (mismo uso que OrbiTrigger). */}
+                        <OrbiIcon size={30} disc />
                     </button>
 
                     {/* Dark mode toggle */}

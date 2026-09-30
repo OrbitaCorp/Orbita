@@ -15,14 +15,13 @@
 // NavbarV2.tsx, misma corrección: fuera del home, el link antepone "/" para
 // volver ahí y saltar a la sección en el mismo paso.
 
-import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { EMAIL_SOPORTE, useContacto } from './Contacto';
-import { LegalModal } from '@/modules/landing/components/ui/LegalModal';
+import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 
-// Cookies sigue abriendo el modal; Términos, Privacidad y Eliminación de datos
-// son páginas con URL propia (Meta las pide públicas para la app de WhatsApp).
+// Términos, Privacidad, Cookies y Eliminación de datos son páginas con URL propia (Meta
+// pide las de privacidad y eliminación públicas para la app de WhatsApp).
 
 const COLUMNAS = [
     {
@@ -55,11 +54,11 @@ const COL_AYUDA_LINKS = [
 const LEGALES_LINKS = [
     { label: 'Términos de uso',       href: '/terminos'              },
     { label: 'Privacidad',            href: '/privacidad'            },
+    { label: 'Cookies',               href: '/cookies'               },
     { label: 'Eliminación de datos',  href: '/eliminacion-de-datos'  },
 ];
 
 export function FooterV2() {
-    const [legal, setLegal] = useState<'cookies' | null>(null);
     const { abrir } = useContacto();
     const enHome = useRouter().pathname === '/';
     const hrefReal = (href: string) => (href.startsWith('#') && !enHome ? `/${href}` : href);
@@ -160,10 +159,10 @@ export function FooterV2() {
                             ))}
                             <li>
                                 <button
-                                    onClick={() => setLegal('cookies')}
+                                    onClick={abrirPreferenciasDeCookies}
                                     className="cursor-pointer text-[12.5px] text-slate-500 transition-colors duration-200 hover:text-slate-300"
                                 >
-                                    Cookies
+                                    Preferencias de cookies
                                 </button>
                             </li>
                         </ul>
@@ -171,7 +170,6 @@ export function FooterV2() {
                 </div>
             </footer>
 
-            <LegalModal isOpen={legal !== null} contentKey={legal} onClose={() => setLegal(null)} />
         </>
     );
 }

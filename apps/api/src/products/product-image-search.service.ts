@@ -2,6 +2,9 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { CostsService } from '../platform/costs/costs.service';
+import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { escaparHtml } from '../common/utils/html';
 
 export interface SuggestedImage {
   url: string;
@@ -57,10 +60,19 @@ function isPrivateIpOrLocal(rawUrl: string): boolean {
 export class ProductImageSearchService {
   private readonly logger = new Logger(ProductImageSearchService.name);
 
+  // Aviso a soporte cuando un proveedor de pago deja de andar: como hay
+  // fallback a DuckDuckGo, la búsqueda "sigue andando" y nadie se entera de que
+  // la key venció o se acabaron los créditos. Un mail por proveedor cada 12 h.
+  private static readonly SOPORTE_EMAIL = 'soporte@orbita.site';
+  private static readonly AVISO_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+  private readonly ultimoAviso = new Map<string, number>();
+
   constructor(
     private readonly config: ConfigService,
     private readonly usageMetering: UsageMeteringService,
     private readonly costsService: CostsService,
+    private readonly mail?: MailService,
+    private readonly prisma?: PrismaService,
   ) {}
 
   async searchSuggestedImages(params: {
@@ -113,6 +125,7 @@ export class ProductImageSearchService {
         }
       } catch (err) {
         this.logger.warn(`Error en búsqueda Serper, continuando con siguiente proveedor: ${err}`);
+        void this.avisarProveedorCaido('Serper', err);
       }
     }
 
@@ -128,6 +141,7 @@ export class ProductImageSearchService {
         }
       } catch (err) {
         this.logger.warn(`Error en búsqueda Tavily, continuando con fallback gratuito: ${err}`);
+        void this.avisarProveedorCaido('Tavily', err);
       }
     }
 
@@ -144,6 +158,45 @@ export class ProductImageSearchService {
     }
 
     return [];
+  }
+
+  // Nunca tira: un fallo al avisar no puede romper la búsqueda de fotos. El
+  // anti-repetición mira email_logs (sobrevive a reinicios y a varias
+  // instancias de Cloud Run) además del mapa en memoria, que cubre las
+  // búsquedas simultáneas que fallan a la vez.
+  private async avisarProveedorCaido(proveedor: 'Serper' | 'Tavily', err: unknown): Promise<void> {
+    try {
+      if (!this.mail) return;
+      const ahora = Date.now();
+      const previo = this.ultimoAviso.get(proveedor);
+      if (previo && ahora - previo < ProductImageSearchService.AVISO_COOLDOWN_MS) return;
+      this.ultimoAviso.set(proveedor, ahora);
+
+      const asunto = `Búsqueda de fotos: ${proveedor} dejó de funcionar`;
+      if (this.prisma) {
+        const reciente = await this.prisma.emailLog.findFirst({
+          where: {
+            to: ProductImageSearchService.SOPORTE_EMAIL,
+            subject: asunto,
+            status: { not: 'FAILED' },
+            createdAt: { gte: new Date(ahora - ProductImageSearchService.AVISO_COOLDOWN_MS) },
+          },
+          select: { id: true },
+        });
+        if (reciente) return;
+      }
+
+      const detalle = escaparHtml(String(err instanceof Error ? err.message : err).slice(0, 400));
+      const cuerpo =
+        `<p>La búsqueda de fotos de catálogo (alta y edición de productos) falló con <b>${proveedor}</b>. ` +
+        `Mientras tanto usa el siguiente proveedor y, si no queda ninguno, DuckDuckGo, que encuentra menos fotos.</p>` +
+        `<p>Puede ser que la key venció o es inválida, que se acabaron los créditos o que el servicio esté caído.</p>` +
+        `<p><b>Detalle:</b> ${detalle}</p>` +
+        `<p>Este aviso se manda como máximo una vez cada 12 horas por proveedor.</p>`;
+      await this.mail.sendCustomEmail(ProductImageSearchService.SOPORTE_EMAIL, asunto, cuerpo);
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar a soporte que ${proveedor} falló: ${e}`);
+    }
   }
 
   private filterStrict(

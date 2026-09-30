@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { FileText, ShieldCheck } from 'lucide-react'
+import { Cookie, FileText, ShieldCheck } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -18,10 +18,12 @@ import { SkeletonText } from '@/design-system/components/Skeleton'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { armarDocumentoLegal, type TipoDocumentoLegal } from '@/lib/storefront/legales'
 
-const META: Record<TipoDocumentoLegal, { corto: string; Icon: typeof FileText; otro: TipoDocumentoLegal; otroLabel: string }> = {
-  terminos: { corto: 'Términos y condiciones', Icon: FileText, otro: 'privacidad', otroLabel: 'Política de privacidad' },
-  privacidad: { corto: 'Política de privacidad', Icon: ShieldCheck, otro: 'terminos', otroLabel: 'Términos y condiciones' },
+const META: Record<TipoDocumentoLegal, { corto: string; Icon: typeof FileText }> = {
+  terminos: { corto: 'Términos y condiciones', Icon: FileText },
+  privacidad: { corto: 'Política de privacidad', Icon: ShieldCheck },
+  cookies: { corto: 'Política de cookies', Icon: Cookie },
 }
+const ORDEN: TipoDocumentoLegal[] = ['terminos', 'privacidad', 'cookies']
 
 export default function DocumentoLegal({ tipo }: { tipo: TipoDocumentoLegal }) {
   const router = useRouter()
@@ -101,13 +103,17 @@ export default function DocumentoLegal({ tipo }: { tipo: TipoDocumentoLegal }) {
 
             <div className="sf-legal-pie">
               <span>{tienda.nombre} · tienda creada con Órbita</span>
-              <a href={`${base}/legales/${meta.otro}`} className="ds-link">{meta.otroLabel} →</a>
+              <span style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {ORDEN.filter(t => t !== tipo).map(t => (
+                  <a key={t} href={`${base}/legales/${t}`} className="ds-link">{META[t].corto} →</a>
+                ))}
+              </span>
             </div>
           </article>
         )}
       </div>
 
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
   )
