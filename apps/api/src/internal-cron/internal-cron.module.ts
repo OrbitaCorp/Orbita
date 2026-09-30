@@ -8,9 +8,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
 import { DomainsModule } from '../domains/domains.module';
 import { MemberProfileModule } from '../member-profile/member-profile.module';
+import { CostsModule } from '../platform/costs/costs.module';
 
 @Module({
-  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule],
+  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule, CostsModule],
   controllers: [InternalCronController],
   providers: [InternalCronSecretGuard, CronRunsService, RetencionLogsService],
 })

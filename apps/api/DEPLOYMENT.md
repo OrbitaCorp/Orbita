@@ -506,7 +506,7 @@ request como cualquier otra.
 
 | Job de Scheduler | Horario (UTC) | Llama a |
 |---|---|---|
-| `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos) |
+| `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos). También sincroniza los costos de proveedores (`CostsService.syncAll()`) para la pantalla Costos del super admin |
 | `resumen-diario` | 22:00 diario | `resumenDiario()` |
 | `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
 

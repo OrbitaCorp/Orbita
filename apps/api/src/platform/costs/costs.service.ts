@@ -235,51 +235,86 @@ export class CostsService {
     return { month, rows, totalUsd: Math.round(rows.reduce((s, r) => s + r.costUsd, 0) * 1_000_000) / 1_000_000 };
   }
 
+  // Top de negocios por consumo. El costo sale del estimatedCostUsd del evento y, si no lo
+  // trae (los de tokens no lo traen), de cantidad × PRICING. Además de lo medido en
+  // usage_events se suma la huella en la base (productos, clientes, pedidos): un negocio sin
+  // IA ni emails igual ocupa datos, y así deja de aparecer todo en cero.
   async getByBusiness(month: string) {
     const start = new Date(`${month}-01`);
     const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
 
-    const events = await this.prisma.usageEvent.findMany({
-      where: { timestamp: { gte: start, lt: end }, businessId: { not: null } },
-      select: {
-        businessId: true,
-        category: true,
-        estimatedCostUsd: true,
-        provider: { select: { slug: true } },
-      },
-    });
+    const [events, businesses, products, customers, orders] = await Promise.all([
+      this.prisma.usageEvent.findMany({
+        where: { timestamp: { gte: start, lt: end }, businessId: { not: null } },
+        select: {
+          businessId: true,
+          category: true,
+          quantity: true,
+          estimatedCostUsd: true,
+          provider: { select: { slug: true } },
+        },
+      }),
+      this.prisma.business.findMany({ select: { id: true, name: true } }),
+      this.prisma.product.groupBy({ by: ['businessId'], _count: { _all: true } }),
+      this.prisma.customer.groupBy({ by: ['businessId'], _count: { _all: true } }),
+      this.prisma.order.groupBy({ by: ['businessId'], _count: { _all: true } }),
+    ]);
 
-    const byBiz: Record<string, { total: number; byCategory: Record<string, number> }> = {};
+    type Fila = {
+      total: number;
+      byCategory: Record<string, number>;
+      aiRequests: number;
+      aiTokens: number;
+      emails: number;
+    };
+    const byBiz = new Map<string, Fila>();
     for (const e of events) {
       const bId = e.businessId!;
-      if (!byBiz[bId]) byBiz[bId] = { total: 0, byCategory: {} };
-      const cost = Number(e.estimatedCostUsd ?? 0);
-      byBiz[bId].total += cost;
+      const fila = byBiz.get(bId) ?? { total: 0, byCategory: {}, aiRequests: 0, aiTokens: 0, emails: 0 };
+      const cantidad = Number(e.quantity);
+      const cost = e.estimatedCostUsd != null
+        ? Number(e.estimatedCostUsd)
+        : cantidad * (PRICING[e.provider.slug]?.[e.category] ?? 0);
+      fila.total += cost;
       const key = `${e.provider.slug}:${e.category}`;
-      byBiz[bId].byCategory[key] = (byBiz[bId].byCategory[key] ?? 0) + cost;
+      fila.byCategory[key] = (fila.byCategory[key] ?? 0) + cost;
+      if (e.category === 'prompt_tokens') fila.aiRequests += 1;
+      if (e.category === 'prompt_tokens' || e.category === 'completion_tokens') fila.aiTokens += cantidad;
+      if (e.category === 'email_sent') fila.emails += cantidad;
+      byBiz.set(bId, fila);
     }
 
-    const sorted = Object.entries(byBiz)
-      .map(([businessId, data]) => ({ businessId, ...data }))
-      .sort((a, b) => b.total - a.total);
+    const conteo = (rows: { businessId: string; _count: { _all: number } }[]) =>
+      new Map(rows.map((r) => [r.businessId, r._count._all]));
+    const nProducts = conteo(products);
+    const nCustomers = conteo(customers);
+    const nOrders = conteo(orders);
 
-    const grandTotal = sorted.reduce((s, r) => s + r.total, 0) || 1;
-
-    const businessIds = sorted.slice(0, 50).map((b) => b.businessId);
-    const businesses = await this.prisma.business.findMany({
-      where: { id: { in: businessIds } },
-      select: { id: true, name: true },
+    const filas = businesses.map((b) => {
+      const uso = byBiz.get(b.id) ?? { total: 0, byCategory: {}, aiRequests: 0, aiTokens: 0, emails: 0 };
+      const productos = nProducts.get(b.id) ?? 0;
+      const clientes = nCustomers.get(b.id) ?? 0;
+      const pedidos = nOrders.get(b.id) ?? 0;
+      return { businessId: b.id, businessName: b.name, ...uso, productos, clientes, pedidos, huella: productos + clientes + pedidos };
     });
-    const bizMap = new Map(businesses.map((b) => [b.id, b]));
+    filas.sort((a, b) => b.total - a.total || b.huella - a.huella);
+
+    const grandTotal = filas.reduce((s, r) => s + r.total, 0) || 1;
 
     return {
       month,
-      businesses: sorted.slice(0, 50).map((row) => ({
+      businesses: filas.slice(0, 50).map((row) => ({
         businessId: row.businessId,
-        businessName: bizMap.get(row.businessId)?.name ?? row.businessId,
+        businessName: row.businessName,
         totalEstimatedUsd: row.total,
         byCategory: row.byCategory,
         pctOfTotal: Math.round((row.total / grandTotal) * 1000) / 10,
+        aiRequests: row.aiRequests,
+        aiTokens: row.aiTokens,
+        emails: row.emails,
+        productos: row.productos,
+        clientes: row.clientes,
+        pedidos: row.pedidos,
       })),
     };
   }
@@ -485,15 +520,13 @@ export class CostsService {
           const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
           const queryCount = Number(queries?._sum.quantity ?? 0);
 
-          if (queryCount > 0 || errorCount > 0) {
-            result['serper'] = {
-              slug: 'serper',
-              items: [
-                { category: 'Búsquedas de imágenes (mes)', value: queryCount, unit: 'queries', limit: 2500 },
-                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
-              ],
-            };
-          }
+          result['serper'] = {
+            slug: 'serper',
+            items: [
+              { category: 'Búsquedas de imágenes (mes)', value: queryCount, unit: 'queries', limit: 2500 },
+              ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+            ],
+          };
         }
 
         // Tavily Search
@@ -505,19 +538,47 @@ export class CostsService {
           const errorCount = errors.reduce((acc, r) => acc + (r._count._all ?? 0), 0);
           const queryCount = Number(queries?._sum.quantity ?? 0);
 
-          if (queryCount > 0 || errorCount > 0) {
-            result['tavily'] = {
-              slug: 'tavily',
-              items: [
-                { category: 'Búsquedas web (mes)', value: queryCount, unit: 'queries', limit: 1000 },
-                ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
-              ],
-            };
-          }
+          result['tavily'] = {
+            slug: 'tavily',
+            items: [
+              { category: 'Búsquedas web (mes)', value: queryCount, unit: 'queries', limit: 1000 },
+              ...(errorCount > 0 ? [{ category: 'Fallos / Quota', value: errorCount, unit: 'errores' }] : []),
+            ],
+          };
         }
       }
     } catch (err) {
       this.logger.warn(`Error obteniendo usage de proveedores internos: ${err}`);
+    }
+
+    // Resend: la API key es solo de envío (no puede leer cuota), así que se arma con email_logs.
+    // El plan gratis corta a las 00:00 UTC (100/día) y el 1° de cada mes (3.000/mes).
+    try {
+      const now = new Date();
+      const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const [monthRows, sentToday] = await Promise.all([
+        this.prisma.emailLog.groupBy({
+          by: ['status'],
+          where: { createdAt: { gte: startOfMonth } },
+          _count: { _all: true },
+        }),
+        this.prisma.emailLog.count({ where: { status: 'SENT', createdAt: { gte: startOfDay } } }),
+      ]);
+      const sentMonth = monthRows.find((r) => r.status === 'SENT')?._count._all ?? 0;
+      const failedMonth = monthRows.find((r) => r.status === 'FAILED')?._count._all ?? 0;
+      if (sentMonth > 0 || failedMonth > 0) {
+        result['resend'] = {
+          slug: 'resend',
+          items: [
+            { category: 'Emails enviados (hoy)', value: sentToday, unit: 'emails', limit: 100 },
+            { category: 'Emails enviados (mes)', value: sentMonth, unit: 'emails', limit: 3000 },
+            ...(failedMonth > 0 ? [{ category: 'Envíos fallidos (mes)', value: failedMonth, unit: 'emails' }] : []),
+          ],
+        };
+      }
+    } catch (err) {
+      this.logger.warn(`Error obteniendo usage de resend: ${err}`);
     }
 
     return { providers: result, updatedAt: new Date().toISOString() };
