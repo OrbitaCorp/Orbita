@@ -60,7 +60,7 @@ const CSS_FICHA = `
     .sf-pd-col-izq  { display: contents !important; }
     .sf-pd-belowimg { order: 2; }
     .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
-    .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
+    .sf-pd-related  { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     /* La silueta de la foto sigue los MISMOS altos que la foto real de
        arriba: si el skeleton mide 560 y la foto 300, al terminar de
        cargar la página pega un salto de 260px. El !important es para

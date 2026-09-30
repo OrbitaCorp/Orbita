@@ -387,7 +387,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 <style>{`
                     .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
                     .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
-                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
+                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
@@ -627,7 +627,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 /* ── Tablet (≤1024px) ── */
                 @media(max-width:1024px){
                     .sf-w         { padding:0 24px }
-                    .sf-g4        { grid-template-columns:repeat(2,1fr); gap:12px }
+                    .sf-g4        { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
                     .sf-hero-grid { grid-template-columns:1fr; padding:0 32px }
                     .sf-hero-inner { min-height:max(520px, calc(100vh - 120px)); min-height:max(520px, calc(100svh - 120px)); padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
