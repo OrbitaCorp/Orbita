@@ -1,0 +1,5904 @@
+{
+  "fecha": "2026-10-01T14:29:47.563Z",
+  "ahora": "2026-10-01T14:25:36.235Z",
+  "modelo": "gemini-3.6-flash",
+  "razonamiento": "low",
+  "temperatura": "0.3",
+  "variante": "manual-entero",
+  "resultados": [
+    {
+      "id": "manual-envio-gratis",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ofrecer envío gratis a partir de un monto determinado, tenés que configurarlo desde la sección de Envíos.\n\nTe acabo de llevar directo a la pantalla. Los pasos son:\n\n1. Ingresá a **Configuración** → **Envíos**.\n2. En la sección de configuración de montos, buscá el campo **Envío gratis a partir de**.\n3. Ingresá el monto mínimo de compra en pesos (por ejemplo, 15000) a partir del cual querés que el envío sea sin costo para el cliente.\n4. Hacé clic en **Guardar cambios** abajo a la derecha.\n\nUna vez guardado, a los clientes que alcancen esa cifra en el carrito se les aplicará el bonificado automáticamente en el checkout.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "envios",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=envios",
+            "seccion": "configuracion",
+            "vista": "envios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 4463,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 301
+      }
+    },
+    {
+      "id": "manual-crear-cupon",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a la sección de **Cupones**.\n\nPara crear uno desde la pantalla, hacé clic en el botón **\"Nuevo cupón\"** (arriba a la derecha) y definí:\n\n- **Código:** El texto que va a ingresar el cliente (ej: `VERANO20`).\n- **Tipo y valor:** Porcentaje o monto fijo (ej: 20% o $1.000).\n- **Alcance:** Si aplica a toda la tienda, a una categoría o a productos específicos.\n- **Condiciones y límites:** Monto mínimo de compra, usos máximos por cliente o fecha de vencimiento.\n\nSi querés, decime el código, el valor y a qué aplica, y lo creamos juntos ahora mismo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "cupones"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/cupones",
+            "seccion": "cupones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3707,
+      "tokens": {
+        "entrada": 27661,
+        "salida": 337
+      }
+    },
+    {
+      "id": "manual-descuento-vs-cupon",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Un **descuento** se aplica de forma automática en tu tienda sin que el cliente tenga que hacer nada (por ejemplo, \"20% OFF en camperas\" o un 2x1).\n\nUn **cupón** es un código que el cliente debe escribir manualmente en el checkout para que se aplique la rebaja (por ejemplo, `VERANO20`). Sirve mucho para acciones dirigidas o clientes específicos.\n\n¿Querés que creemos alguno o te gustaría ver la lista de los que tenés activos?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1641,
+      "tokens": {
+        "entrada": 13800,
+        "salida": 109
+      }
+    },
+    {
+      "id": "manual-mercado-pago",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para conectar Mercado Pago y empezar a cobrar con tarjeta desde la tienda, tenés que ir a **Configuración → Pagos**.\n\nAhí vas a ver la opción de Mercado Pago y un botón que dice **\"Conectar cuenta\"**. Al tocarlo, te va a llevar a Mercado Pago para que inicies sesión y autorices la vinculación. Son solo un par de clics y volvés directo al panel con la cuenta ya lista para recibir pagos.\n\nYa te dejé en la pantalla de Pagos para que puedas hacerlo ahora mismo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "pagos",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3320,
+      "tokens": {
+        "entrada": 29213,
+        "salida": 245
+      }
+    },
+    {
+      "id": "manual-invitar-equipo",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para invitar a un miembro a tu equipo, tenés que ir a **Configuración → Equipo**.\n\nAhí vas a encontrar el botón para invitar por email. Podés asignarle el rol de **Empleado**, que le da acceso a la tarea diaria (pedidos, productos, mensajes) sin mostrarle las secciones sensibles de tu negocio como la configuración o los planes.\n\nYa te llevé a la pantalla de Equipo para que puedas hacerlo directo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "equipo",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=equipo",
+            "seccion": "configuracion",
+            "vista": "equipo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2969,
+      "tokens": {
+        "entrada": 27587,
+        "salida": 241
+      }
+    },
+    {
+      "id": "manual-logo",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés cambiar el logo y los colores desde la sección **Apariencia**, dentro de la Configuración de tu tienda.\n\nAhí vas a encontrar:\n- **Identidad de marca:** para subir tu logo y el favicon.\n- **Paleta de colores y Tipografía:** para elegir los colores principales y el estilo de texto de toda tu tienda.\n\nYa te navegué directo a esa pantalla para que puedas hacer los cambios. Te recuerdo hacer clic en \"Guardar cambios\" al finalizar.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "apariencia"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=apariencia",
+            "seccion": "configuracion",
+            "vista": "apariencia"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3274,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 128
+      }
+    },
+    {
+      "id": "manual-publicar",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para publicar tu tienda y que quede visible para tus clientes, tenés que tocar el botón **\"Publicar tienda\"** que está arriba a la derecha en el Inicio (Dashboard).\n\nUna vez que lo tocás, el botón pasa a decir **\"✓ Tienda online\"** y tu dirección web empieza a responder. Podés seguir editando tus productos o la apariencia de la tienda después de publicar, no congela nada.\n\nRecordá que antes de publicar es recomendable tener configurados los métodos de pago, envíos y al menos un producto cargado. Te dejé en la pantalla de Inicio para que puedas hacerlo directamente desde el botón superior.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "dashboard"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/dashboard",
+            "seccion": "dashboard"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2991,
+      "tokens": {
+        "entrada": 29177,
+        "salida": 148
+      }
+    },
+    {
+      "id": "manual-venta-whatsapp",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés cargarlo fácilmente con el botón **\"Nuevo pedido\"** que está arriba a la derecha en la sección de **Pedidos**.\n\nEl proceso es muy sencillo:\n1. Buscás y seleccionás los productos que te compró (descuentan stock automáticamente).\n2. Buscás al cliente o creás uno nuevo en el momento.\n3. Elegís el medio de pago, la entrega y cerrás la venta.\n\nCargar estas ventas te ayuda a mantener el stock al día y a ver los números reales de tu negocio en el Inicio.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2814,
+      "tokens": {
+        "entrada": 28594,
+        "salida": 133
+      }
+    },
+    {
+      "id": "manual-exportar-clientes",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para descargar la lista de clientes a Excel o CSV:\n\n1. Entrá a la sección **Clientes** desde el menú lateral.\n2. Arriba a la derecha, tocá el botón **Exportar**.\n\nSe te va a descargar un archivo CSV con toda tu base de clientes (pedidos, total gastado, ticket promedio, etc.), el cual podés abrir directamente en Excel o Google Sheets.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "clientes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/clientes",
+            "seccion": "clientes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2313,
+      "tokens": {
+        "entrada": 28541,
+        "salida": 99
+      }
+    },
+    {
+      "id": "manual-stock-rapido",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés editar el stock rápido de cualquier producto sin necesidad de entrar a la pantalla de edición.\n\nEn la lista de **Productos** (ya sea en grilla, tabla o tarjetas), el número de stock tiene un **subrayado punteado**. Solo tenés que hacer clic sobre el número de stock y se abrirá una ventana pequeña para actualizar la cantidad al instante.\n\nSi el producto tiene variantes (como talles o colores), la ventana desplegará cada una para que ajustes sus cantidades de forma independiente.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2154,
+      "tokens": {
+        "entrada": 28797,
+        "salida": 123
+      }
+    },
+    {
+      "id": "manual-dos-por-uno",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para armar un 2x1 en tu tienda, tenés dos formas según lo que busques:\n\nSi tenés el **Paquete Avanzado**, podés activar la función específica de **2x1 y 3x2**. Se aplica automáticamente en el carrito y les muestra un cartel directo en la tarjeta del producto. Podés configurarlo entrando a la sección **Avanzado**.\n\nSi querés armar una promoción o descuento estándar desde esta pantalla, podés crear un **descuento automático** (tipo \"Llevá X, pagá Y\") para que se aplique solo en los productos que elijas sin que el cliente tenga que ingresar un código.\n\n¿Querés que te lleve a la sección de **Avanzado** para ver la herramienta o prefieres que armemos un descuento automático desde acá?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1682,
+      "tokens": {
+        "entrada": 13799,
+        "salida": 172
+      }
+    },
+    {
+      "id": "manual-descuento-martes",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a descuentos (botón: ninguno)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, se puede hacer perfectamente.\n\nPodés configurar un descuento automático o un cupón eligiendo los días de la semana y la franja horaria específica para su vigencia (por ejemplo, los martes de 14 a 18 hs).\n\n¿Te gustaría que te ayude a crear un descuento automático (se aplica solo en el carrito) o un cupón con código para los martes a la tarde?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1372,
+      "tokens": {
+        "entrada": 13805,
+        "salida": 86
+      }
+    },
+    {
+      "id": "manual-cupon-por-mail",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para mandarle un cupón por mail a un cliente, seguí estos pasos:\n\n1. En la pantalla de **Cupones**, buscá el cupón que querés enviar y tocá el menú de los **tres puntitos** a la derecha.\n2. Seleccioná **Compartir**.\n3. En la sección **Enviar por email**, escribí el correo del destinatario (y su nombre si querés).\n4. Tocá **Enviar**.\n\nEl mail sale directo desde Órbita con el detalle del descuento y un botón para usarlo en tu tienda.\n\nSi preferís mandárselo a **muchos clientes juntos**, podés ir a **Clientes**, filtrar la lista y usar la opción de **Email masivo**.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "cupones"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/cupones",
+            "seccion": "cupones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3706,
+      "tokens": {
+        "entrada": 27671,
+        "salida": 342
+      }
+    },
+    {
+      "id": "manual-rendimiento",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés ver el rendimiento de tus promociones desde la pestaña **Rendimiento** dentro de la sección de Descuentos.\n\nAhí vas a encontrar cuántas veces se usó cada promo, cuánta plata movió y el total descontado para saber cuál funcionó mejor.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2126,
+      "tokens": {
+        "entrada": 27659,
+        "salida": 75
+      }
+    },
+    {
+      "id": "manual-notificaciones",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a Configuración → Notificaciones.\n\nAhí vas a ver una grilla con todos los eventos. En la sección \"Ventas\", dentro de la fila **Nuevo pedido**, marcá la casilla de la columna **Email**.\n\nAl final de la pantalla, tocá \"Guardar cambios\" para activar el aviso.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "notificaciones",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=notificaciones",
+            "seccion": "configuracion",
+            "vista": "notificaciones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2440,
+      "tokens": {
+        "entrada": 29232,
+        "salida": 92
+      }
+    },
+    {
+      "id": "manual-dominio",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, totalmente. Tu tienda viene con una dirección gratuita de Órbita, pero podés usar tu propio dominio (como `tunegocio.com` o `tunegocio.com.ar`).\n\nPodés comprar un dominio directamente desde el panel o conectar uno que ya hayas comprado en otro sitio (como NIC Argentina o GoDaddy).\n\nTe llevé a **Configuración → Dominios** para que puedas gestionarlo o configurarlo cuando quieras.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "dominios",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=dominios",
+            "seccion": "configuracion",
+            "vista": "dominios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2385,
+      "tokens": {
+        "entrada": 29210,
+        "salida": 117
+      }
+    },
+    {
+      "id": "manual-politica-devoluciones",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Las reglas de devoluciones se configuran en **Configuración → Cancelaciones y devoluciones**.\n\nAhí podés definir si aceptás devoluciones y cancelaciones, y con qué tipo de reembolso (nota de crédito, dinero por Mercado Pago o ambos). Lo que elijas ahí es lo que tus clientes podrán solicitar desde la tienda.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "postventa"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2344,
+      "tokens": {
+        "entrada": 29212,
+        "salida": 92
+      }
+    },
+    {
+      "id": "manual-confirmar-email",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para confirmar tu email, te llevé a la sección **Mi perfil**.\n\nAhí tenés que tocar el botón **Enviarme el código**. Te va a llegar un mail con un código de 6 números: lo copiás, lo pegás en la pantalla y listo.\n\nTenés hasta 7 días desde que creaste la tienda para hacer esta confirmación. Si no lo encontrás en tu bandeja de entrada, no te olvides de revisar la carpeta de spam.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2891,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 114
+      }
+    },
+    {
+      "id": "manual-contrasena",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cambiar tu contraseña, tenés que ir a **Mi perfil** (haciendo clic en tu avatar arriba a la derecha). \n\nAllí vas a encontrar la opción para actualizar tu contraseña directamente, sin necesidad de pasar por \"olvidé mi contraseña\". Te acabo de llevar a esa pantalla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2433,
+      "tokens": {
+        "entrada": 29178,
+        "salida": 79
+      }
+    },
+    {
+      "id": "manual-comision-mp",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "La **Comisión MP** es la suma de las comisiones que Mercado Pago te cobró por los cobros recibidos en el período que estás mirando.\n\nMercado Pago no aplica un porcentaje fijo, sino que varía según el medio de pago que usó el cliente y la cantidad de cuotas. Por eso, este número se calcula sobre los cobros reales efectuados.\n\nEn el Inicio te mostramos esta métrica para que sepas exactamente cuánto de tus ventas brutas se fue en comisiones de cobro. Se muestra con una flecha en rojo si sube, ya que un costo mayor implica menor margen directo para tu negocio.",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1898,
+      "tokens": {
+        "entrada": 14567,
+        "salida": 132
+      }
+    },
+    {
+      "id": "manual-ticket-promedio",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "El **ticket promedio** es cuánto gasta, en promedio, cada cliente por compra en tu negocio. Se calcula dividiendo las ventas totales por la cantidad de pedidos.\n\nEn lo que va del mes, tu ticket promedio es de **$17.533**.\n\nSi querés subir este número, podés implementar promociones por monto mínimo (por ejemplo, \"envío gratis a partir de $25.000\") o armar combos de productos.",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1261,
+      "tokens": {
+        "entrada": 14558,
+        "salida": 98
+      }
+    },
+    {
+      "id": "manual-quien-cambio",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés verlo desde el **Registro de actividad**.\n\nAhí queda guardado qué persona de tu equipo hizo cada cambio y en qué fecha, ideal para revisar modificaciones de precios o stock. \n\nTe acabo de llevar a la sección **Configuración → Registro de actividad** para que puedas consultar el historial.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "actividad",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=actividad",
+            "seccion": "configuracion",
+            "vista": "actividad"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2136,
+      "tokens": {
+        "entrada": 29215,
+        "salida": 89
+      }
+    },
+    {
+      "id": "manual-avanzado",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "El paquete Avanzado es un conjunto de herramientas adicionales para potenciar las ventas de tu tienda:\n\n- **Juegos con premio:** Mini-juegos de habilidad (como encestar o meter un gol) donde los clientes ganan descuentos automáticos al acertar.\n- **Modales de anuncios:** Pop-ups y avisos destacados para promociones, lanzamientos o colecciones de temporada.\n- **2x1 y 3x2:** Promociones por volumen aplicadas directamente en el carrito, con etiquetas visibles en los productos.\n- **Plantillas de Home:** Diseños exclusivos para personalizar la portada de tu tienda.\n- **Prueba social:** Notificaciones en vivo que muestran compras reales de otros clientes para generar confianza.\n- **Ofertas relámpago:** Promociones con tiempo limitado que muestran un reloj con cuenta regresiva en tu portada.\n\nYa te navegué a la sección para que puedas ver todas las funciones disponibles.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "avanzado"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/avanzado",
+            "seccion": "avanzado"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2798,
+      "tokens": {
+        "entrada": 29185,
+        "salida": 215
+      }
+    },
+    {
+      "id": "manual-categoria",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para crear una categoría nueva, andá a **Productos → Categorías** en el menú de la izquierda y hacé clic en el botón **\"Nueva categoría\"**.\n\nAhí vas a poder ponerle un nombre, elegir un ícono y un color, o definir si es subcategoría de otra. Cuando termines, tocá en **Guardar**.\n\nTe dejé en la pantalla de Categorías para que puedas crearla ahora mismo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "categorias"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/categorias",
+            "seccion": "categorias"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2385,
+      "tokens": {
+        "entrada": 28783,
+        "salida": 199
+      }
+    },
+    {
+      "id": "manual-plantillas-mensajes",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "¡Sí, totalmente! Podés usar las **plantillas de respuesta** para dejar guardadas las respuestas a las preguntas más frecuentes (como envíos, medios de pago o demoras).\n\nPara crearlas o usarlas, andá a la sección **Mensajes** y tocá el botón de plantillas dentro del chat. Al escribir, podés usar variables como `{nombre}` o `{tienda}` que se completan automáticamente.\n\n¿Querés que te ayude a redactar el texto para alguna plantilla en particular?",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "mensajes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/mensajes",
+            "seccion": "mensajes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2658,
+      "tokens": {
+        "entrada": 28506,
+        "salida": 124
+      }
+    },
+    {
+      "id": "manual-historial",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés ver todos los pedidos anteriores desde la pantalla de **Pedidos**.\n\nAhí mismo tenés la sub-sección **Historial**, que guarda el archivo completo de todo lo que pasó con sus fechas y estados finales. Además, podés usar las pestañas de estado (como **Entregados** o **Cancelados**) para filtrar rápido lo que buscás.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2561,
+      "tokens": {
+        "entrada": 28598,
+        "salida": 92
+      }
+    },
+    {
+      "id": "manual-devolucion-cliente",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para gestionar una devolución, el procedimiento estándar en el panel es el siguiente:\n\nPrimero, podés revisar o configurar tus reglas de reembolso (si aceptás devoluciones y si devolvés el dinero o emitís una nota de crédito) en Configuración → Cancelaciones y devoluciones.\n\nLuego, cuando la clienta inicie la solicitud o la gestiones vos, el pedido aparecerá en la sección de Pedidos → Cancelaciones y devoluciones. Desde allí podés revisar la solicitud y aprobarla o rechazarla.\n\nSi aprobás la devolución, podés emitir una nota de crédito para que le quede saldo a favor en su próxima compra, o gestionar el reembolso del dinero si pagó por Mercado Pago. Además, acordate de revisar si corresponde reingresar el producto al stock de tu catálogo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "postventa",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2785,
+      "tokens": {
+        "entrada": 28622,
+        "salida": 189
+      }
+    },
+    {
+      "id": "manual-ficha-tecnica",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para agregar especificaciones o características técnicas (como medidas, material, peso, etc.) a un producto:\n\n1. Entrá a **Productos** y hacé clic en el producto que querés editar (o creá uno nuevo).\n2. Dentro del formulario, buscá el interruptor **Especificaciones técnicas** y activalo.\n3. Se te van a desplegar los campos para agregar las filas. Hacé clic en **\"Agregar especificación\"**.\n4. Completá la etiqueta (ejemplo: *Material*) y el valor (ejemplo: *Algodón 100%*). Podés sumar todas las filas que necesites.\n5. Guardá los cambios al final de la página.\n\nEn tu tienda online se van a mostrar ordenadas en una sección llamada **Características** debajo de la compra. Si un producto no tiene especificaciones cargadas, esa sección directamente no aparece.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2498,
+      "tokens": {
+        "entrada": 28805,
+        "salida": 206
+      }
+    },
+    {
+      "id": "manual-cuenta-regresiva",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés. La función se llama **Oferta relámpago** y muestra un descuento en tu tienda acompañado por un reloj en cuenta regresiva para generar urgencia.\n\nEsta opción forma parte del **paquete Avanzado**. Se configura creando un descuento normal con fecha de fin desde la sección *Descuentos*, y luego se activa directamente desde *Avanzado*.\n\nTe acabo de llevar a la pantalla de **Avanzado** para que puedas ver sus funciones.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "avanzado"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/avanzado",
+            "seccion": "avanzado"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3020,
+      "tokens": {
+        "entrada": 29203,
+        "salida": 117
+      }
+    },
+    {
+      "id": "manual-ver-tienda",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ver tu tienda tal como la ven tus clientes, tenés que ir a tu avatar (arriba a la derecha del panel) y tocar la opción **\"Ir a la tienda\"**.\n\nTambién podés acceder desde la sección **Mi perfil**. Te acabo de llevar ahí para que puedas hacerlo directo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2023,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 79
+      }
+    },
+    {
+      "id": "manual-soporte",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés escribirme directamente por acá contándome qué problema estás teniendo para que te ayude a resolverlo. \n\nSi preferís contactar directamente al equipo de soporte de Órbita, podés hacerlo desde **Configuración → Soporte**. Ya te dejé pantalla abierta para que les envíes un mensaje.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "soporte"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=soporte",
+            "seccion": "configuracion",
+            "vista": "soporte"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2725,
+      "tokens": {
+        "entrada": 29217,
+        "salida": 89
+      }
+    },
+    {
+      "id": "manual-retiro-efectivo",
+      "categoria": "manual",
+      "intento": 1,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a la sección de **Pagos** en la Configuración.\n\nPara habilitar el pago en efectivo para retiros:\n\n1. Activá la opción **Retiro en local**.\n2. Ahí mismo se van a desplegar los medios de pago para el mostrador: marcá la casilla de **Efectivo**.\n3. Guardá los cambios abajo de todo.\n\nAsegurate de tener cargada la dirección de tu negocio en **Configuración → Negocio** para que tus clientes sepan dónde ir a retirar.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "pagos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2759,
+      "tokens": {
+        "entrada": 29225,
+        "salida": 148
+      }
+    },
+    {
+      "id": "manual-envio-gratis",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ofrecer envío gratis a partir de un monto determinado, tenés que configurarlo desde la sección de Envíos:\n\n1. Andá a Configuración → Envíos (te acabo de navegar hasta ahí).\n2. Buscá el campo \"Envío gratis a partir de\".\n3. Escribí el monto mínimo de compra en pesos a partir del cual querés que el envío sea gratuito para el cliente.\n4. Guardá los cambios.\n\nA partir de ese valor, el sistema bonificará el costo del envío automáticamente en el checkout.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "envios"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=envios",
+            "seccion": "configuracion",
+            "vista": "envios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2963,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 142
+      }
+    },
+    {
+      "id": "manual-crear-cupon",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a cupones (botón: ninguno)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para crear un cupón de descuento con código que tus clientes ingresen en el checkout, podés ir al módulo de **Descuentos y cupones** y seguir estos pasos:\n\n1. Entrá a la pestaña **Cupones** y tocá el botón para crear uno nuevo.\n2. Escribí el **código** (por ejemplo, `VERANO20`) y ponele un nombre descriptivo.\n3. Elegí el **tipo y valor**: si es un porcentaje (ej. 20%) o un monto fijo en pesos, y si aplica a productos específicos, una categoría o al total de la compra.\n4. Opcionalmente, podés definir condiciones como un monto mínimo de compra, límite de usos o fecha de vencimiento.\n\nSi querés, decime qué código y qué porcentaje o monto querés ofrecer, ¡y te ayudo a crearlo directamente!",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1740,
+      "tokens": {
+        "entrada": 13797,
+        "salida": 190
+      }
+    },
+    {
+      "id": "manual-descuento-vs-cupon",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "La diferencia principal es cómo se aplican:\n\n* **Descuento:** Se aplica **automáticamente** en la tienda cuando se cumple la condición que fijaste (por ejemplo, \"20% OFF en camperas\" o \"2x1 en remeras\"). El cliente no tiene que hacer nada.\n* **Cupón:** Requiere un **código** que el cliente ingresa manualmente en el checkout (ejemplo: `VERANO20`). Es ideal para promociones dirigidas a seguidores, clientes específicos o campañas de mailing.\n\nAmbos se gestionan desde esta misma sección. ¿Te gustaría crear un descuento automático o un cupón?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1306,
+      "tokens": {
+        "entrada": 13800,
+        "salida": 135
+      }
+    },
+    {
+      "id": "manual-mercado-pago",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para conectar Mercado Pago y ofrecer cobro con tarjeta en tu tienda, seguí estos pasos:\n\n1. Andá a **Configuración** → **Pagos** (te acabo de llevar ahí).\n2. En la sección de Mercado Pago, hacé clic en el botón **\"Conectar cuenta\"**.\n3. Se va a abrir la pantalla de Mercado Pago para que inicies sesión y autorices la conexión con Órbita.\n\nUna vez autorizado, volvés automáticamente a tu panel y los pagos con tarjeta van a quedar habilitados.\n\nEs un proceso opcional pero muy recomendado, y solo te lleva dos minutos.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "pagos",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2673,
+      "tokens": {
+        "entrada": 29213,
+        "salida": 155
+      }
+    },
+    {
+      "id": "manual-invitar-equipo",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para invitar a un colaborador, tenés que ir a **Configuración → Equipo**.\n\nAhí vas a ver el botón para agregar una persona por su correo electrónico. Le va a llegar una invitación por mail para que cree su cuenta y pueda ingresar a tu negocio.\n\nPodés elegir su rol según lo que necesites que haga:\n- **Propietario:** Acceso total al panel, incluyendo configuración, equipo y plan.\n- **Empleado:** Acceso al trabajo diario (pedidos, productos, clientes), sin las secciones sensibles del negocio.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "equipo",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=equipo",
+            "seccion": "configuracion",
+            "vista": "equipo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2861,
+      "tokens": {
+        "entrada": 27587,
+        "salida": 215
+      }
+    },
+    {
+      "id": "manual-logo",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés cambiar el logo y los colores desde **Configuración → Apariencia**.\n\nAhí vas a encontrar las secciones de **Identidad de marca** (para subir tu logo y favicon) y **Paleta de colores y Tipografía** para personalizar el diseño de tu tienda. Te acabo de redirigir a esa pantalla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "apariencia"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=apariencia",
+            "seccion": "configuracion",
+            "vista": "apariencia"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3036,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 94
+      }
+    },
+    {
+      "id": "manual-publicar",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para poner tu tienda online y empezar a vender, tenés que publicar tu tienda desde el Inicio del panel.\n\nArriba a la derecha vas a ver el botón \"Publicar tienda\". Al tocarlo, pasa a decir \"✓ Tienda online\" y tu dirección web ya queda pública para que te puedan comprar.\n\nAntes de publicar, asegurate de tener al menos:\n- Un método de cobro configurado (en Configuración → Pagos)\n- Al menos un producto cargado con stock y categoría\n- Las opciones de envío o retiro listas (en Configuración → Envíos)\n\n¿Querés que revisemos si te falta configurar algún paso antes de salir a vender?",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "dashboard"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/dashboard",
+            "seccion": "dashboard"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2487,
+      "tokens": {
+        "entrada": 29177,
+        "salida": 157
+      }
+    },
+    {
+      "id": "manual-venta-whatsapp",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cargar una venta de WhatsApp en el panel:\n\n1. Andá a la sección **Pedidos** y tocá el botón **\"Nuevo pedido\"** arriba a la derecha.\n2. Buscá y elegí los productos que vendiste (esto descuenta el stock de tu catálogo).\n3. Cargá o seleccioná los datos del cliente.\n4. Seleccioná el método de pago que usaron y guardá la venta.\n\nCargar estas ventas te ayuda a mantener el stock al día y ver todos los números reales de tu negocio en el Inicio. Ya te dejé en la pantalla de Pedidos para que puedas hacerlo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2520,
+      "tokens": {
+        "entrada": 28594,
+        "salida": 150
+      }
+    },
+    {
+      "id": "manual-exportar-clientes",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para bajar la lista de clientes a Excel, andá a **Clientes** en el menú de la izquierda y tocá el botón **Exportar** arriba a la derecha.\n\nEso te va a descargar un archivo en formato CSV con toda tu base de datos y sus datos de contacto, que podés abrir directamente con Excel o Google Sheets.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "clientes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/clientes",
+            "seccion": "clientes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3093,
+      "tokens": {
+        "entrada": 28541,
+        "salida": 84
+      }
+    },
+    {
+      "id": "manual-stock-rapido",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés editar el stock rápido de cualquier producto desde la misma lista de Productos, sin necesidad de entrar al editor completo.\n\nEn la lista (ya sea en vista de grilla, tabla o tarjetas), vas a ver que el número de stock tiene un subrayado punteado. Tocás ese número y se abre una ventana emergente donde podés modificar la cantidad directamente.\n\nSi el producto tiene variantes (como talles o colores), esa misma ventana te lista cada opción para que actualices el stock individual de cada una de forma súper ágil.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3958,
+      "tokens": {
+        "entrada": 28797,
+        "salida": 129
+      }
+    },
+    {
+      "id": "manual-dos-por-uno",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para armar una promo 2x1 podés hacerlo de dos formas distintas:\n\nSi tenés el **paquete Avanzado**, podés activar la función específica de 2x1 y 3x2 en el menú **Avanzado**. Se aplica sola en el carrito y les muestra un cartel en la tarjeta del producto a los clientes.\n\nSi no, podés crear un **descuento automático por porcentaje** desde **Descuentos**:\n1. Creás un nuevo descuento automático.\n2. Elegís el tipo **Porcentaje sobre producto** y ponés 50%.\n3. Definís la condición para que aplique cada 2 unidades del producto que elijas.\n\n¿Querés que te ayude a configurar un descuento automático para alguna categoría o producto en particular?",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 5524,
+      "tokens": {
+        "entrada": 27663,
+        "salida": 343
+      }
+    },
+    {
+      "id": "manual-descuento-martes",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, se puede hacer perfectamente. Cuando creás un descuento o cupón, en la parte de vigencia podés limitar los días de la semana y la franja horaria (por ejemplo, los martes de 14 a 18 hs).\n\n¿Querés que lo configuremos como un descuento automático que se aplique solo en el carrito, o como un cupón con código que ingresa el cliente? \n\nTambién contame de cuánto sería el descuento (porcentaje o monto fijo) y si aplica a toda la tienda o a productos/categorías específicas.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 5497,
+      "tokens": {
+        "entrada": 27675,
+        "salida": 251
+      }
+    },
+    {
+      "id": "manual-cupon-por-mail",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para mandarle un cupón por mail a alguien, podés hacerlo directo desde la sección de **Cupones**:\n\n1. En la lista de cupones, buscá el que querés mandar y tocá el botón de los tres puntitos a la derecha.\n2. Seleccioná la opción **Compartir**.\n3. En la ventana que se abre, andá a la pestaña **Enviar por email**, escribí la dirección de correo y su nombre (opcional).\n4. Tocá **Enviar**.\n\nLe va a llegar un mail con el código y un botón que aplica el descuento automáticamente al entrar a tu tienda.\n\n*Consejo:* Si querés mandarle un cupón a muchos clientes a la vez, conviene ir a **Clientes**, filtrar la lista y usar la opción **Email masivo**.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "cupones"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/cupones",
+            "seccion": "cupones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3832,
+      "tokens": {
+        "entrada": 27671,
+        "salida": 399
+      }
+    },
+    {
+      "id": "manual-rendimiento",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "En la sección **Descuentos**, arriba vas a ver la pestaña **Rendimiento**. \n\nAhí podés consultar cuántas veces se usó cada promo o cupón, cuánta plata movió y cuánto descuento otorgaste en total.\n\nTe dejé en la pantalla de Descuentos para que puedas hacer clic en la pestaña Rendimiento.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2000,
+      "tokens": {
+        "entrada": 27659,
+        "salida": 90
+      }
+    },
+    {
+      "id": "manual-notificaciones",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te acabo de llevar a **Configuración → Notificaciones**.\n\nAhí vas a ver una grilla con distintas opciones. Buscá la sección de **Ventas**, ubicá la fila de **Nuevo pedido** y tildá la casilla de la columna **Email**.\n\nAl final de la pantalla, tocá el botón **Guardar cambios** para que quede activo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "notificaciones",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=notificaciones",
+            "seccion": "configuracion",
+            "vista": "notificaciones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1961,
+      "tokens": {
+        "entrada": 29232,
+        "salida": 102
+      }
+    },
+    {
+      "id": "manual-dominio",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés tener tu propio dominio `.com` o `.com.ar`.\n\nTu tienda ya viene con una dirección gratuita de Órbita desde el primer día, pero si querés usar tu propio dominio, podés comprarlo directamente desde el panel o conectar uno que ya tengas comprado en otro sitio (como GoDaddy, DonWeb o NIC Argentina).\n\nTe llevé a **Configuración → Dominios** para que puedas vincularlo o comprarlo desde ahí.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "dominios"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=dominios",
+            "seccion": "configuracion",
+            "vista": "dominios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2370,
+      "tokens": {
+        "entrada": 29210,
+        "salida": 121
+      }
+    },
+    {
+      "id": "manual-politica-devoluciones",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Eso lo configurás en **Configuración → Cancelaciones y devoluciones**. \n\nAhí podés definir si aceptás devoluciones y cancelaciones, y con qué tipo de reembolso (nota de crédito, dinero por Mercado Pago, o ambos). Lo que elijas ahí es lo que van a ver tus clientes en la tienda.\n\nTe acabo de llevar a esa pantalla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "postventa",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2531,
+      "tokens": {
+        "entrada": 29212,
+        "salida": 101
+      }
+    },
+    {
+      "id": "manual-confirmar-email",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para confirmar tu email, tenés que ir a **Mi perfil** (te acabo de llevar ahí):\n\n1. Tocá el botón **\"Enviarme el código\"**.\n2. Revisá tu casilla de correo, donde te va a llegar un código de 6 números.\n3. Copiá ese código, pegalo en el campo correspondiente y guardá los cambios.\n\nTenés hasta 7 días desde que creaste la tienda para hacer esta confirmación. Es fundamental para que puedas recuperar el acceso a tu cuenta si alguna vez lo necesitás.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2929,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 134
+      }
+    },
+    {
+      "id": "manual-contrasena",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés cambiar tu contraseña desde la sección **Mi perfil**.\n\nPara hacerlo, hace clic en tu avatar arriba a la derecha y selecciona **Mi perfil**. Ahí vas a encontrar la opción para actualizar tu contraseña de forma directa, sin necesidad de recurrir a la recuperación por email.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2466,
+      "tokens": {
+        "entrada": 29178,
+        "salida": 72
+      }
+    },
+    {
+      "id": "manual-comision-mp",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "La **Comisión MP** muestra la plata que se llevó Mercado Pago por cobrar tus ventas a través de su plataforma durante el período que tengas seleccionado.\n\nNo es un porcentaje fijo, ya que varía según el medio de pago que haya usado el cliente (débito, crédito, transferencia) y la cantidad de cuotas. \n\nSe calcula sumando las comisiones reales de cada cobro. En la tarjeta del Inicio el color está invertido a propósito: si el número sube, te aparece en rojo porque representa un costo mayor.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "dashboard"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/dashboard",
+            "seccion": "dashboard"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2577,
+      "tokens": {
+        "entrada": 29193,
+        "salida": 125
+      }
+    },
+    {
+      "id": "manual-ticket-promedio",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "menciona",
+          "detalle": "No menciona \"dividido\" ni \"por compra\" ni \"cada compra\" ni \"cada pedido\" ni \"por pedido\""
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "El **ticket promedio** es la plata promedio que gasta cada cliente en una compra. Se calcula dividiendo las ventas totales por la cantidad de pedidos (en un período determinado).\n\nPor ejemplo, este mes tu ticket promedio es de **$17.533**. \n\nEs una métrica clave porque:\n* **Si sube:** significa que los clientes se están llevando productos más caros o agregando más ítems al carrito (por ejemplo, aprovechando promos por monto mínimo o combos).\n* **Si baja:** puede indicar que se venden productos de menor valor o que hay muchos descuentos activos.\n\n¿Querés que veamos cómo evolucionó respecto al mes pasado o cómo podés hacer para subirlo?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1904,
+      "tokens": {
+        "entrada": 14558,
+        "salida": 148
+      }
+    },
+    {
+      "id": "manual-quien-cambio",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés ver exactamente quién cambió un precio y cuándo desde el Registro de actividad.\n\nTe llevé a la sección dentro de Configuración. Ahí vas a encontrar el historial completo con las acciones realizadas por cada miembro de tu equipo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "actividad",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=actividad",
+            "seccion": "configuracion",
+            "vista": "actividad"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2441,
+      "tokens": {
+        "entrada": 29215,
+        "salida": 132
+      }
+    },
+    {
+      "id": "manual-avanzado",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a la sección de **Avanzado**.\n\nEl paquete Avanzado incluye herramientas adicionales para potenciar tu tienda:\n\n* **Juegos con premio:** Mini-juegos de habilidad para que los clientes jueguen y ganen descuentos automáticos.\n* **Modales de anuncios:** Carteles emergentes para promociones o avisos importantes en momentos clave.\n* **Promociones 2x1 y 3x2:** Descuentos automáticos por volumen aplicados directamente en el carrito.\n* **Plantillas de Home:** Diseños exclusivos para cambiar la portada de tu tienda.\n* **Prueba social:** Notificaciones automáticas en vivo mostrando compras reales de otros clientes.\n* **Oferta relámpago:** Descuentos temporales con un reloj en cuenta regresiva.\n\nSe activa y abona aparte de tu suscripción mensual. Si querés activarlo o ver los detalles, podés hacerlo desde **Configuración → Suscripción**.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "avanzado"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/avanzado",
+            "seccion": "avanzado"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2803,
+      "tokens": {
+        "entrada": 29185,
+        "salida": 221
+      }
+    },
+    {
+      "id": "manual-categoria",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para crear una categoría nueva, andá a **Productos → Categorías** en el menú de la izquierda y tocá el botón **\"Nueva categoría\"**.\n\nAhí le ponés un nombre, podés elegir un ícono y un color para identificarla, y definir si es una categoría principal o si va adentro de otra (subcategoría).\n\nTe recomiendo mantener entre 2 y 6 categorías principales para que tu tienda sea fácil de navegar.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "categorias"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/categorias",
+            "seccion": "categorias"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3405,
+      "tokens": {
+        "entrada": 28783,
+        "salida": 108
+      }
+    },
+    {
+      "id": "manual-plantillas-mensajes",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "¡Sí, recontra! Podés usar las **plantillas de respuesta** para dejar guardadas las cosas que te preguntan siempre (como envíos, medios de pago o demoras).\n\nDesde el chat, cuando estés respondiendo, podés elegirlas y mandarlas en un toque para ahorrar tiempo.\n\nYa te dejé en la pantalla de **Mensajes** para que puedas verlas y organizarlas. ¿Querés que te ayude a redactar el texto de alguna plantilla?",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "mensajes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/mensajes",
+            "seccion": "mensajes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2127,
+      "tokens": {
+        "entrada": 28506,
+        "salida": 117
+      }
+    },
+    {
+      "id": "manual-historial",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Los pedidos que ya se cerraron los podés consultar en **Pedidos → Historial**.\n\nAhí vas a encontrar el archivo completo de todo lo que pasó en tu negocio (pedidos entregados, cancelados o completados) con su fecha y estado final.\n\nPara ver lo del día a día, tenés las pestañas de estados arriba de la lista principal de Pedidos (como **Entregados** o **Cancelados**). Si querés ir al archivo histórico completo, usá la sub-sección **Historial**.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2354,
+      "tokens": {
+        "entrada": 28598,
+        "salida": 127
+      }
+    },
+    {
+      "id": "manual-devolucion-cliente",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a la sección de Cancelaciones y devoluciones en Configuración para que revisés tus reglas.\n\nEl proceso para gestionar una devolución tiene dos partes:\n\nPrimero, las reglas del negocio:\nEn la pantalla donde estamos definís si aceptás devoluciones y qué tipo de reembolso ofrecés (nota de crédito, devolución de plata por Mercado Pago o ambas).\n\nSegundo, la gestión del pedido:\n1. La clienta inicia la solicitud desde la tienda o se contacta con vos.\n2. Vas al módulo Pedidos → Cancelaciones y devoluciones para revisar la solicitud.\n3. Decidís si la aprobás o la rechazás.\n\nSi aprobás la devolución, podés emitirle una nota de crédito para que use en su próxima compra (lo que ayuda a retener a la clienta) o hacer el reembolso de la plata. Las devoluciones aprobadas se descuentan automáticamente del total de tus ventas.\n\n[Botón: Ver devoluciones]",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "postventa",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3426,
+      "tokens": {
+        "entrada": 28622,
+        "salida": 227
+      }
+    },
+    {
+      "id": "manual-ficha-tecnica",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "no-menciona",
+          "detalle": "Menciona \"Agregar característica\""
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para agregar características técnicas (como medidas, material, RAM, etc.), tenés que hacerlo desde el editor de cada producto.\n\nAl crear o editar un producto en **Productos**, vas a encontrar un interruptor llamado **\"Especificaciones técnicas\"** (está apagado por defecto). Al activarlo, podés ir agregando filas con la etiqueta y su valor (por ejemplo, *Material*: *Algodón 100%* o *Medidas*: *30x40 cm*).\n\nEn tu tienda se van a mostrar ordenadas en una sección propia llamada **\"Características\"**, justo debajo de los botones de compra.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2359,
+      "tokens": {
+        "entrada": 28805,
+        "salida": 149
+      }
+    },
+    {
+      "id": "manual-cuenta-regresiva",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés crear una **Oferta relámpago**. Muestra un porcentaje de descuento que termina a una hora exacta y aparece en tu tienda con un reloj en cuenta regresiva.\n\nEsta función forma parte del **paquete Avanzado**. \n\nPara activarla y configurarla:\n* Creás el descuento desde la sección **Descuentos**.\n* Lo prendés o apagás desde **Avanzado → Oferta relámpago**.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2298,
+      "tokens": {
+        "entrada": 29203,
+        "salida": 112
+      }
+    },
+    {
+      "id": "manual-ver-tienda",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ver tu tienda como la ve un comprador, abrí tu avatar arriba a la derecha en la barra superior y tocá \"Ir a la tienda\". \n\nTe va a abrir la tienda en una pestaña nueva con el catálogo y la portada tal cual la ven tus clientes. Te llevé a la sección de tu perfil por si querés revisar tus datos desde ahí.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2244,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 91
+      }
+    },
+    {
+      "id": "manual-soporte",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés escribirme a mí o al equipo de soporte directamente desde el panel.\n\nPara mandar un mensaje al equipo, andá a Configuración → Soporte. Ahí podés contarnos qué problema estás teniendo para que te ayudemos a resolverlo.\n\nTe acabo de llevar a esa pantalla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "soporte"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=soporte",
+            "seccion": "configuracion",
+            "vista": "soporte"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3226,
+      "tokens": {
+        "entrada": 29217,
+        "salida": 85
+      }
+    },
+    {
+      "id": "manual-retiro-efectivo",
+      "categoria": "manual",
+      "intento": 2,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cobrar en efectivo cuando retiran en el local, tenés que activar la opción desde la configuración de pagos:\n\n1. Andá a **Configuración** → **Pagos**.\n2. Buscá la sección **Retiro en local** y activala.\n3. Ahí mismo marcá la opción de **Efectivo** entre los medios de pago permitidos en el mostrador.\n4. Guardá los cambios.\n\nTe dejé abierta la pantalla de Pagos para que puedas configurarlo ahora mismo. \n\n*(Dato: Si todavía no cargaste la dirección de tu negocio, te conviene agregarla en **Configuración** → **Negocio** para que tus clientes sepan dónde ir a retirar).*",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "pagos",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 4088,
+      "tokens": {
+        "entrada": 29225,
+        "salida": 338
+      }
+    },
+    {
+      "id": "manual-envio-gratis",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ofrecer envío gratis a partir de un monto determinado, tenés que ir a **Configuración → Envíos**.\n\nAhí vas a encontrar el campo **Envío gratis a partir de**. Solo tenés que ingresar el monto mínimo de compra a partir del cual querés que el envío sea gratuito (por ejemplo, 20000) y guardar los cambios.\n\nTe acabo de llevar a la pantalla de configuración de envíos para que puedas definirlo directamente.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "envios"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=envios",
+            "seccion": "configuracion",
+            "vista": "envios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2999,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 242
+      }
+    },
+    {
+      "id": "manual-crear-cupon",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a cupones (botón: ninguno)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para crear un cupón de descuento con código que tus clientes ingresen en el checkout, podés ir a **Descuentos** y seguir estos pasos:\n\n1. Entrá a la sección de **Cupones** dentro del módulo de Descuentos.\n2. Tocá el botón para crear un nuevo cupón.\n3. Definí el código (por ejemplo, `VERANO20`), el tipo de beneficio (porcentaje o monto fijo) y a qué aplica (productos específicos, categoría o al ticket total).\n4. Configurá las condiciones opcionales como fechas de vigencia, monto mínimo de compra o límite de usos.\n\nSi querés, decime los datos (código, porcentaje o monto, y si aplica a toda la tienda o a productos específicos) y te lo creo directamente desde acá.",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1923,
+      "tokens": {
+        "entrada": 13797,
+        "salida": 172
+      }
+    },
+    {
+      "id": "manual-descuento-vs-cupon",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "La diferencia principal es cómo se aplican:\n\n- **Descuento:** Se aplica solo en la tienda, sin que el cliente tenga que hacer nada. Es la promo de vidriera, como un \"20% OFF en camperas\" o un \"2x1\".\n\n- **Cupón:** Requiere que el cliente escriba un código en el checkout (por ejemplo, `VERANO20`). Sirve para acciones más dirigidas: promos para seguidores de Instagram, clientes VIP o para recuperar a alguien que no compra hace tiempo.\n\n¿Te gustaría crear un descuento automático o un cupón?",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1456,
+      "tokens": {
+        "entrada": 13800,
+        "salida": 125
+      }
+    },
+    {
+      "id": "manual-mercado-pago",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a **Configuración → Pagos**, donde podés hacer la conexión.\n\nPara conectar Mercado Pago y empezar a cobrar con tarjeta:\n\n1. En la pantalla de **Pagos**, buscá la sección de **Mercado Pago**.\n2. Tocá el botón **\"Conectar cuenta\"**.\n3. Te va a redirigir a Mercado Pago para que inicies sesión y autorices la conexión con Órbita.\n\nUna vez autorizado, volvés al panel de forma automática y ya quedás habilitado para recibir pagos con tarjeta, débito y en cuotas desde la tienda.\n\n¿Querés que configuremos algo más de tus métodos de pago?",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "pagos",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2356,
+      "tokens": {
+        "entrada": 29213,
+        "salida": 165
+      }
+    },
+    {
+      "id": "manual-invitar-equipo",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para sumar a alguien a tu equipo:\n\n1. Vas a **Configuración** → **Equipo**.\n2. Tocás el botón para invitar a un nuevo miembro e ingresás su correo electrónico.\n3. Le asignás el rol correspondiente:\n   - **Propietario**: acceso total, incluyendo configuración, equipo y plan.\n   - **Empleado**: acceso al trabajo diario del negocio, sin ver las secciones sensibles ni la configuración.\n\nLe va a llegar un mail con la invitación para que cree su usuario. Ya te llevé a la pantalla de Equipo para que puedas hacerlo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "equipo",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=equipo",
+            "seccion": "configuracion",
+            "vista": "equipo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2716,
+      "tokens": {
+        "entrada": 27587,
+        "salida": 147
+      }
+    },
+    {
+      "id": "manual-logo",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cambiar el logo y los colores de tu tienda, tenés que ir a **Configuración → Apariencia**.\n\nAhí vas a encontrar la sección **Identidad de marca** para subir tu logo y **Paleta de colores** para personalizar los tonos de la tienda.\n\nTe acabo de llevar directamente a esa pantalla para que puedas hacer los cambios.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "apariencia",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=apariencia",
+            "seccion": "configuracion",
+            "vista": "apariencia"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2672,
+      "tokens": {
+        "entrada": 29218,
+        "salida": 99
+      }
+    },
+    {
+      "id": "manual-publicar",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para publicar tu tienda y que quede visible para tus clientes, tenés que tocar el botón **\"Publicar tienda\"** que está arriba a la derecha en la pantalla de **Inicio** (Dashboard).\n\nUna vez que lo tocás, va a pasar a decir **\"✓ Tienda online\"** y tu dirección web ya va a empezar a recibir visitas y compras. Podés seguir editando tus productos o la configuración después, sin que se apague.\n\nAntes de publicar, asegurate de haber completado los pasos básicos:\n- Confirmar tu email y datos del negocio\n- Definir tus medios de pago y envíos\n- Tener al menos un producto cargado con categoría\n\nTe dejé en el Inicio para que puedas tocar el botón directamente arriba a la derecha.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "dashboard"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/dashboard",
+            "seccion": "dashboard"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2355,
+      "tokens": {
+        "entrada": 29177,
+        "salida": 175
+      }
+    },
+    {
+      "id": "manual-venta-whatsapp",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cargar una venta realizada por WhatsApp, podés hacerlo desde el botón **\"Nuevo pedido\"** dentro de la sección de Pedidos.\n\nLos pasos son sencillos:\n1. **Buscá los productos:** Escribí el nombre de los productos en el buscador y elegí las cantidades. Se descuenta el stock automáticamente de tu catálogo real.\n2. **Cargá los datos del cliente:** Podés buscar un cliente que ya tengas registrado o crear uno nuevo en el momento.\n3. **Elegí el medio de pago:** Seleccioná cómo te pagó (efectivo, transferencia, etc.) y cerrá la venta.\n\nCargar estas ventas te ayuda a mantener el stock actualizado y a tener las métricas completas de tu negocio en el panel. ¡Ya te llevé a la pantalla de Pedidos para que puedas hacerlo!",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2706,
+      "tokens": {
+        "entrada": 28594,
+        "salida": 195
+      }
+    },
+    {
+      "id": "manual-exportar-clientes",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés descargar la lista completa entrando a **Clientes** y tocando el botón **\"Exportar\"** que está arriba a la derecha. \n\nSe te va a bajar un archivo `.csv` con todos los datos de tu base, que podés abrir directamente en Excel o Google Sheets para trabajarlo o guardarlo de respaldo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "clientes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/clientes",
+            "seccion": "clientes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2317,
+      "tokens": {
+        "entrada": 28541,
+        "salida": 83
+      }
+    },
+    {
+      "id": "manual-stock-rapido",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés editar el stock de forma rápida directamente desde la lista de Productos sin necesidad de abrir el editor completo.\n\nEn la tabla o lista de productos, vas a ver que el número de stock tiene un subrayado punteado. Al hacer clic sobre ese número, se abre una ventana pequeña para actualizar la cantidad al instante. Si el producto tiene variantes, la ventana te despliega cada una para ajustar su stock individualmente.\n\nTe dejé en la sección de Productos por si querés probarlo ahora.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2660,
+      "tokens": {
+        "entrada": 28797,
+        "salida": 120
+      }
+    },
+    {
+      "id": "manual-dos-por-uno",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Navegá a la sección de **Descuentos** y seguí estos pasos:\n\n1. Tocá el botón **\"Crear descuento\"**.\n2. Elegí la opción **\"Llevá X, pagá Y\"** (que es el formato para el 2x1 o 3x2).\n3. Seleccioná los productos o categorías a los que querés aplicar la promo.\n4. Definí la vigencia (cuándo empieza y cuándo termina) y guardá los cambios.\n\nEsta promo es automática: el cliente no necesita ingresar ningún código y el descuento se aplica solo en el carrito.\n\nOjo: si querés opciones avanzadas o personalizadas de 2x1, también podés gestionarlas desde la sección **Avanzado** (si tenés el paquete activo).",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1975,
+      "tokens": {
+        "entrada": 13799,
+        "salida": 173
+      }
+    },
+    {
+      "id": "manual-descuento-martes",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "¡Sí, totalmente! Podés programar un descuento o cupón configurando días y horarios de vigencia.\n\nAl crear el descuento o cupón, en la sección de **Vigencia** podés elegir los días de la semana (por ejemplo, los martes) y definir la franja horaria específica para la tarde.\n\n¿Querés que sea un **descuento automático** (se aplica solo en el carrito) o un **cupón con código**? Contame también qué valor querés ponerle (porcentaje o monto fijo) y a qué productos aplicaría.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2689,
+      "tokens": {
+        "entrada": 27675,
+        "salida": 138
+      }
+    },
+    {
+      "id": "manual-cupon-por-mail",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a cupones (botón: ninguno)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para mandarle un cupón por mail a una clienta específica:\n\n1. Andá a **Descuentos** (pestaña **Cupones**).\n2. Buscá el cupón que querés mandar y tocá los tres puntitos al final de la fila.\n3. Elegí **Compartir**.\n4. En la sección **Enviar por email**, escribí la dirección de correo y su nombre (opcional).\n5. Tocá **Enviar**. Órbita le manda un mail directo con el descuento y un botón para usarlo.\n\nSi querés mandarle un cupón a muchas clientas a la vez, conviene ir a **Clientes**, filtrar la lista y usar la opción **Email masivo** pegando el código del cupón.",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1601,
+      "tokens": {
+        "entrada": 13802,
+        "salida": 163
+      }
+    },
+    {
+      "id": "manual-rendimiento",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Eso lo podés ver en la pestaña Rendimiento, dentro de Descuentos.\n\nAhí vas a encontrar cuántas veces se usó cada promo o cupón, cuánta plata movieron y cuánto descuento otorgaste en total.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2037,
+      "tokens": {
+        "entrada": 27659,
+        "salida": 65
+      }
+    },
+    {
+      "id": "manual-notificaciones",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Te llevé a Configuración → Notificaciones.\n\nAhí vas a ver una lista con los eventos. En la fila \"Nuevo pedido\", marcá la casilla de la columna \"Email\". \n\nGuardá los cambios al final de la pantalla y listo, te va a llegar un correo cada vez que entre una compra.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "notificaciones"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=notificaciones",
+            "seccion": "configuracion",
+            "vista": "notificaciones"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2700,
+      "tokens": {
+        "entrada": 29232,
+        "salida": 90
+      }
+    },
+    {
+      "id": "manual-dominio",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés tener tu propio dominio `.com` o `.com.ar`.\n\nTu tienda ya viene con una dirección gratuita de Órbita desde el primer día, pero si querés usar tu propio dominio podés comprarlo directamente desde el panel o conectar uno que ya tengas comprado en otro sitio (como Nic.ar o GoDaddy).\n\nTe llevé a **Configuración → Dominios** para que puedas comprarlo o vincularlo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "dominios",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=dominios",
+            "seccion": "configuracion",
+            "vista": "dominios"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2520,
+      "tokens": {
+        "entrada": 29210,
+        "salida": 116
+      }
+    },
+    {
+      "id": "manual-politica-devoluciones",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Eso lo configurás desde **Configuración → Cancelaciones y devoluciones**.\n\nAhí podés definir si aceptás devoluciones y cancelaciones, y con qué tipo de reembolso vas a trabajar (nota de crédito, dinero de vuelta por Mercado Pago o ambos). Te acabo de llevar directamente a esa pantalla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "postventa"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3631,
+      "tokens": {
+        "entrada": 29404,
+        "salida": 329
+      }
+    },
+    {
+      "id": "manual-confirmar-email",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para confirmar tu email, andá a **Mi perfil** (en tu avatar arriba a la derecha). \n\nAhí tocás el botón **\"Enviarme el código\"**, te va a llegar un mail con 6 números y los pegás en esa misma pantalla.\n\nTenés 7 días desde que creaste la tienda para hacerlo. Te acabo de llevar a tu perfil para que lo hagas directo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2495,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 102
+      }
+    },
+    {
+      "id": "manual-contrasena",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés cambiar tu contraseña desde la sección **Mi perfil**, a la que accedés tocando tu avatar arriba a la derecha.\n\nEn esa pantalla vas a encontrar la opción para actualizar tu contraseña de forma directa, sin necesidad de pasar por \"olvidé mi contraseña\". Te acabo de redirigir a tu perfil para que puedas hacerlo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2011,
+      "tokens": {
+        "entrada": 29178,
+        "salida": 86
+      }
+    },
+    {
+      "id": "manual-comision-mp",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "La **Comisión MP** muestra el total de comisiones que te cobró Mercado Pago por las ventas cobradas a través de su plataforma durante el período seleccionado.\n\nComo Mercado Pago no cobra un porcentaje fijo —sino que varía según el medio de pago y las cuotas que elija el comprador—, este número se calcula sumando la comisión real de cada cobro.\n\nA diferencia de otros indicadores, si este número sube aparece en rojo, ya que representa un costo para tu negocio. Podés ver el detalle de la comisión de cada venta puntual dentro del detalle de ese pedido.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "dashboard"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/dashboard",
+            "seccion": "dashboard"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2482,
+      "tokens": {
+        "entrada": 29193,
+        "salida": 136
+      }
+    },
+    {
+      "id": "manual-ticket-promedio",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "El **ticket promedio** es cuánto gasta en promedio un cliente en cada compra dentro de tu tienda. Se calcula dividiendo las ventas totales por la cantidad de pedidos (en lo que va del mes, tu ticket promedio es de $17.533).\n\nEs un indicador clave: si sube, significa que tus clientes están llevando productos de mayor valor o sumando más ítems al carrito en un mismo pedido. \n\nPara aumentar tu ticket promedio, podés implementar promos por monto mínimo (por ejemplo, envío gratis a partir de cierto valor) o armar combos de productos.",
+        "toolCalls": [],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1516,
+      "tokens": {
+        "entrada": 14558,
+        "salida": 121
+      }
+    },
+    {
+      "id": "manual-quien-cambio",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés verlo desde el Registro de actividad. Ahí queda registrado qué persona del equipo hizo cada cambio y en qué fecha.\n\nTe llevé directo a **Configuración → Registro de actividad** para que puedas revisarlo.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "actividad",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=actividad",
+            "seccion": "configuracion",
+            "vista": "actividad"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2309,
+      "tokens": {
+        "entrada": 29215,
+        "salida": 70
+      }
+    },
+    {
+      "id": "manual-avanzado",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "El paquete Avanzado es un conjunto de herramientas adicionales que se pagan aparte de tu suscripción mensual e incluyen:\n\n* **Juegos con premio:** Mini-juegos de habilidad (como encestar o meter un gol) donde definís los descuentos que se ganan por acierto.\n* **Modales de anuncios:** Avisos emergentes en la tienda para dar la bienvenida, ofrecer un descuento o anunciar la temporada.\n* **Promociones 2x1 y 3x2:** Descuentos tipo \"llevá X, pagá Y\" que se aplican automáticamente en el carrito.\n* **Plantillas de Home:** Diseños exclusivos para cambiar la portada de tu tienda.\n* **Prueba social:** Notificaciones automáticas en la tienda sobre compras reales hechas por otros clientes.\n* **Oferta relámpago:** Promociones por tiempo limitado con un reloj en cuenta regresiva visible en tu portada.\n\nTené en cuenta que estas opciones solo las puede configurar la persona con rol de Propietario desde la sección Avanzado.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "avanzado"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/avanzado",
+            "seccion": "avanzado"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3244,
+      "tokens": {
+        "entrada": 29185,
+        "salida": 238
+      }
+    },
+    {
+      "id": "manual-categoria",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para crear una categoría nueva, andá a **Productos → Categorías** en el menú de la izquierda.\n\nUna vez ahí, tocá el botón **\"Nueva categoría\"**, elegí un nombre, un ícono y un color, y guardá los cambios.\n\nTe recomiendo mantener entre 2 y 6 categorías principales para que tu catálogo sea fácil de navegar.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "categorias"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/categorias",
+            "seccion": "categorias"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 1833,
+      "tokens": {
+        "entrada": 28783,
+        "salida": 91
+      }
+    },
+    {
+      "id": "manual-plantillas-mensajes",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "¡Sí, totalmente! Podés usar las **plantillas de respuesta** para dejar escritas las contestaciones a las preguntas más frecuentes (como envíos, medios de pago o tiempos de entrega).\n\nPara usarlas o crearlas, entrá a la sección de **Mensajes** y tocá la pestaña de **Plantillas**. Cuando estés en un chat con un cliente, podés elegirlas y mandarlas con un solo clic.\n\nLas plantillas además se completan automáticamente con los datos del cliente, como su nombre o el número de su pedido, para que la respuesta no quede fría o genérica.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "mensajes"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/mensajes",
+            "seccion": "mensajes"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2613,
+      "tokens": {
+        "entrada": 28506,
+        "salida": 141
+      }
+    },
+    {
+      "id": "manual-historial",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés ver el archivo histórico de tus ventas en la pestaña **Historial**, dentro de la sección Pedidos. \n\nAhí quedan guardados todos los pedidos finalizados con su fecha y estado final para que los consultes cuando quieras. \n\nTambién podés ver los pedidos ya finalizados filtrando por la pestaña **Entregados** en la lista principal de Pedidos.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "pedidos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/pedidos",
+            "seccion": "pedidos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2342,
+      "tokens": {
+        "entrada": 28598,
+        "salida": 94
+      }
+    },
+    {
+      "id": "manual-devolucion-cliente",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": false,
+      "violaciones": [
+        {
+          "regla": "navega",
+          "detalle": "El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)"
+        }
+      ],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para gestionar una devolución, tenés un par de opciones según lo que prefieras acordar con la clienta:\n\n1. **Emitir una nota de crédito:** Podés dejarle el saldo a favor para que lo use en su próxima compra en la tienda. Es la mejor alternativa para retener a la clienta.\n2. **Devolver el dinero:** Si pagó por Mercado Pago o transferencia, podés hacer el reembolso del monto.\n\n**Pasos a seguir:**\n- Primero, revisá tus reglas en **Configuración → Cancelaciones y devoluciones** para verificar qué condiciones tenés establecidas.\n- Cuando la clienta inicie la solicitud desde la tienda (o acuerden el reingreso del producto), andá a la sección **Pedidos → Cancelaciones y devoluciones** para revisar el caso, verificar el estado del producto y aprobar la devolución.\n- Una vez aprobada, podés generar la nota de crédito o registrar el reembolso correspondiente.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "postventa"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=postventa",
+            "seccion": "configuracion",
+            "vista": "postventa"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 3394,
+      "tokens": {
+        "entrada": 28622,
+        "salida": 223
+      }
+    },
+    {
+      "id": "manual-ficha-tecnica",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para agregar especificaciones o características técnicas a un producto (como medidas, material o peso), tenés que activar la ficha técnica.\n\nPodés hacerlo así:\n\n1. Entrá a Productos y hacé clic sobre el producto que querés editar.\n2. Bajá hasta la sección \"Especificaciones técnicas\" y activá el interruptor.\n3. Tocá en \"Agregar especificación\" y completá con los pares de datos que necesites (por ejemplo: \"Material\" → \"Algodón 100%\" o \"Medidas\" → \"30x40 cm\").\n4. Guardá los cambios.\n\nEn tu tienda se van a mostrar ordenadas en una sección propia llamada \"Características\".",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "catalogo"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/catalogo",
+            "seccion": "catalogo"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2573,
+      "tokens": {
+        "entrada": 28805,
+        "salida": 166
+      }
+    },
+    {
+      "id": "manual-cuenta-regresiva",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Sí, podés crear una **Oferta relámpago**. Es una función que muestra un descuento por tiempo limitado con un reloj en cuenta regresiva directamente en la portada de tu tienda.\n\nEsta herramienta forma parte del **paquete Avanzado**. \n\nPara activarla:\n1. Creás el descuento desde la sección **Descuentos** eligiendo el tipo \"Oferta relámpago\" y definiendo la fecha y hora de fin.\n2. Luego, la gestionás y activás desde el módulo **Avanzado**.\n\nTe llevé a la sección de Descuentos por si querés empezar a configurarla.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "descuentos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/descuentos",
+            "seccion": "descuentos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2326,
+      "tokens": {
+        "entrada": 29203,
+        "salida": 150
+      }
+    },
+    {
+      "id": "manual-ver-tienda",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para ver tu tienda tal cual la ve un comprador, abrí el menú de tu **avatar** arriba a la derecha en la barra superior y seleccioná la opción **\"Ir a la tienda\"**.\n\nTambién podés hacer este chequeo rápido ingresando a **Mi perfil** desde ese mismo menú. ¡Ahí te llevé para que lo tengas a mano!",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "perfil"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/perfil",
+            "seccion": "perfil"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2281,
+      "tokens": {
+        "entrada": 29188,
+        "salida": 91
+      }
+    },
+    {
+      "id": "manual-soporte",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Podés escribirnos directamente desde el panel entrando a **Configuración** → **Soporte**. \n\nAhí podés contarnos lo que está pasando para que el equipo te dé una mano. Cualquier persona de tu equipo que tenga acceso al panel puede usar ese canal.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "vista": "soporte",
+              "seccion": "configuracion"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=soporte",
+            "seccion": "configuracion",
+            "vista": "soporte"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2141,
+      "tokens": {
+        "entrada": 29217,
+        "salida": 80
+      }
+    },
+    {
+      "id": "manual-retiro-efectivo",
+      "categoria": "manual",
+      "intento": 3,
+      "ok": true,
+      "violaciones": [],
+      "noAplica": [
+        {
+          "tipo": "cita-tema",
+          "motivo": "la variante no tiene leerTemaDelManual"
+        }
+      ],
+      "turno": {
+        "texto": "Para cobrar en efectivo al momento del retiro, tenés que activar la opción de retiro en el local y seleccionar el pago en efectivo:\n\n1. Anda a **Configuración → Pagos**.\n2. Activá la opción **Retiro en local**.\n3. Ahí mismo se van a habilitar los medios de pago para el mostrador: marcá la casilla de **Efectivo**.\n4. Tocá en **Guardar cambios**.\n\nTe acabo de llevar a la pantalla de configuración de pagos para que puedas activarlo directamente. \n\nOjo: Si vas a ofrecer retiro en el local, asegurate de tener cargada la dirección física de tu negocio en **Configuración → Negocio** para que tus clientes sepan dónde ir.",
+        "toolCalls": [
+          {
+            "name": "navigateTo",
+            "arguments": {
+              "seccion": "configuracion",
+              "vista": "pagos"
+            }
+          }
+        ],
+        "propuestas": [],
+        "escriturasRechazadas": [],
+        "destinos": [
+          {
+            "tool": "navigateTo",
+            "path": "/admin/ventas/configuracion?vista=pagos",
+            "seccion": "configuracion",
+            "vista": "pagos"
+          }
+        ],
+        "temasLeidos": [],
+        "toolsOfrecidas": [
+          "navigateTo",
+          "listProducts",
+          "createProduct",
+          "generateDescription",
+          "listDiscounts",
+          "createDiscount",
+          "createCoupon",
+          "listOrders",
+          "getOrderDetail",
+          "updateOrderStatus",
+          "listCustomers",
+          "getCustomerDetail",
+          "updateBusinessInfo",
+          "updatePaymentMethods",
+          "updateShipping",
+          "getSalesReport",
+          "getProductReport",
+          "getCustomerReport",
+          "getResumenDelPeriodo",
+          "estadoPrimerosPasos",
+          "accesoDelEquipo"
+        ]
+      },
+      "ms": 2903,
+      "tokens": {
+        "entrada": 29225,
+        "salida": 178
+      }
+    }
+  ]
+}
