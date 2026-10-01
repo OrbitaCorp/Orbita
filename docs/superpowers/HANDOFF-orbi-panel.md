@@ -149,8 +149,19 @@ Precio/planes y cupos por plan; si hay entrada de Orbi en el menú lateral; si "
 | `c98b65a` | Las evals miden la línea de base real sobre `main` (Prisma en memoria + `ModuleDataService` real) |
 | `2e3b7b8` | Arreglos de la revisión de la fase 6 (causas de pausa, rol, contrato con el AST, "Redactar con Orbi") |
 | `e7d5787` | Merge de `origin/main` (conflicto add/add en este archivo: quedó la versión de `main`) |
+| `8eb1d26` | Frase de actividad del resumen por período; lista de tools de las evals |
+| `52d5d39` | Esta entrada del traspaso (primera versión) |
+| `7858701` | Hallazgos de la revisión final de la rama (ver abajo) |
 
-Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1527 + 440 en verde (8 skipped, ya estaban); web `tsc --noEmit` limpio, `pnpm test` 271 en verde. Las evals compilan y corren sobre un worktree de `main` (probado con un modelo guionado).
+Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1542 + 447 en verde (8 skipped, ya estaban); web `tsc --noEmit` limpio, `pnpm test` 271 en verde. Las evals compilan y corren sobre un worktree de `main` (probado con un modelo guionado, sin faltas en los fakes).
+
+**Revisión final de la rama** (un subagente revisor, adversarial, con el diff completo): **nada bloqueante en el código**. El único bloqueante es de proceso: la línea de base sin correr. Lo que encontró y se arregló en `7858701`:
+- `getResumenDelPeriodo` cortaba el turno entero con una fecha imposible (`2026-09-32`, mes 13): `RangeError` fuera del `try`.
+- El nombre del cliente que más gastó entraba **al prompt de sistema** (texto de terceros en el canal de más confianza; viene de antes de la rama). Se sacó del snapshot: probado que sobre `main` el apellido con la orden del dataset entra al prompt de Clientes y en la rama no.
+- Al admin se le ofrecía "Reactivar tienda"/"Reactivar espacio", que son solo del propietario (403).
+- `accesoDelEquipo` podía perder la coincidencia exacta detrás de seis parciales, y un empate de nombres no se distinguía.
+- `leerTemaDelManual` sin tope de ids y sensible a mayúsculas; la fecha del último pedido en UTC; un mes se comparaba "contra los N días anteriores" sin decirlo; "hoy" sin avisar que no terminó.
+- Dos tests que no probaban lo que decían (versión del manual; un caso que espera una tool que su rol no tiene pasaba como "no aplica").
 
 **Bugs de producción que la rama arregla** (los destapó el dataset de las evals):
 - "Sin stock" del snapshot siempre en 0: la API nunca escribe `OUT_OF_STOCK`. Ahora cuenta publicados con stock 0.
@@ -177,6 +188,7 @@ Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1527 +
 13. **Mantenimiento del manual con regla y tests, sin hook `PostToolUse`.** Se sumaron `.claude/rules/manual.md` y una sección al `CLAUDE.md` raíz (lo lee todo el equipo).
 14. **Sin capítulo "Qué no hace Órbita":** es una decisión de producto.
 15. **`navigateTo` y la forma de las rutas, sin tocar:** en el acceso viejo por `/admin/<negocioId>` los botones de Orbi pierden el negocio, y ya pasaba antes.
+16. **Sin el nombre del cliente top en el prompt de Clientes** (hallazgo de la revisión final). Costo: "¿quién es mi mejor cliente?" cuesta una llamada a `getCustomerReport` en vez de salir del prompt; el caso `datos-mejor-cliente` de las evals lo mide. La alternativa (sanearlo y rotularlo como dato) deja pasar una orden corta.
 
 **Qué falló o quedó a medias:**
 - **Línea de base de las evals: no corrida** (sin key). La tabla del spec de la fase 2 (§7) está vacía, y ese mismo spec dice que sin ella la fase 6 no se mergea. Es el primer paso de mañana.
@@ -189,6 +201,8 @@ Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1527 +
   - `orbi_turns.module` sigue guardando `'ventas'` (va en la fase 3, T7).
   - Las conversaciones de Orbi no tienen retención.
   - La demo llama "Generar con Orbi" a la función en su cartel de cupo (`apps/api/src/demo/demo-ia.ts`), y el botón dice "Redactar con Orbi".
+  - `productosSinStock` del snapshot trae todas las variantes con su stock en cada mensaje de Orbi en Inicio y Productos (el mismo cálculo que la tarjeta de Productos). Con catálogos grandes conviene un agregado o caché, sin separarse del criterio de la pantalla.
+  - `mes_pasado` compara contra los N días anteriores (así calcula el dashboard): ahora se le avisa al modelo, pero el número no es "contra el mes anterior".
 
 **Comandos para llevarlo a producción (en este orden):**
 
@@ -211,7 +225,7 @@ Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1527 +
    gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp
    ```
    El orden entre front y API no importa para este cambio: el front nuevo solo agrega frases para las tools nuevas, y la API nueva funciona con el front de hoy.
-7. Jira (¿RBT-695?): comentar los rulings 5, 8, 9, 11 y 12, los bugs arreglados y los anotados sin arreglar.
+7. Jira (¿RBT-695?): comentar los rulings 5, 8, 9, 11, 12 y 16, los bugs arreglados y los anotados sin arreglar.
 8. Después del deploy, mirar las primeras conversaciones reales con preguntas de "cómo hago X" y "¿qué me falta para publicar?".
 
 ---
