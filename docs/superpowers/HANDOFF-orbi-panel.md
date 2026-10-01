@@ -127,6 +127,93 @@ Precio/planes y cupos por plan; si hay entrada de Orbi en el menú lateral; si "
 
 - **2026-10-01 (sesión de diseño e implementación de la fase 1)** — Estudio, specs y fase 1 completa en producción, hotfix de tools paralelas, fix de snapshots por sección (ver sección 4 para el estado de despliegue de este último). Siguiente paso recomendado: fase 2 (evals del panel), después la fase 6 (base de conocimiento).
 
+- **2026-10-01, noche (agente en una sesión en la nube, rama `claude/awesome-cannon-s749lf`)** — Fase 2 (evals del panel) y fase 6 (base de conocimiento) implementadas; tool de resumen por período; spec y plan de la fase 3 para revisión. **Nada en `main`, nada desplegado, nada en producción.** Detalle abajo.
+
+### 2026-10-01, noche — para revisar mañana
+
+**Entorno.** Corrió en un contenedor efímero en la nube, no en la máquina de Alan: sin `.env` (ni `GEMINI_API_KEY` ni base dev), sin `gcloud`, sin Jira. Por eso **no** se corrieron la línea de base de las evals, los e2e, la verificación de Cloud Run ni el comentario de Jira. Tampoco se usó graphify (no hay grafo en el contenedor).
+
+**Commits** (rama `claude/awesome-cannon-s749lf`, pusheada a GitHub; ver ruling 1):
+
+| sha | Qué |
+|---|---|
+| `d8c5ee1` | Traspaso versionado (lo reemplazó la versión de `main` en el merge `e7d5787`) |
+| `0923d37` | Evals del panel: golden set, fakes, runner (`apps/api/test/evals/panel/`) |
+| `01066cc` | Manual: los dos desfases conocidos + contrato manual ↔ pantallas |
+| `f3f6bf0` | El manual llega a la API como artefacto generado (`manual.generated.ts`) |
+| `5db8fc4` | Orbi lee el manual (índice + `leerTemaDelManual`) y el estado real (`estadoPrimerosPasos`, `accesoDelEquipo`) |
+| `dbfcec8` | Evals corregidas tras la revisión adversarial (22 hallazgos) |
+| `7835261` | Regla de mantenimiento del manual (`.claude/rules/manual.md` + sección en el `CLAUDE.md` raíz) |
+| `1b40ecc` | `getResumenDelPeriodo` + snapshot del dashboard con los números del panel |
+| `d5845fe` | Spec y plan de la fase 3 (UI), **para revisión, sin implementar** |
+| `c98b65a` | Las evals miden la línea de base real sobre `main` (Prisma en memoria + `ModuleDataService` real) |
+| `2e3b7b8` | Arreglos de la revisión de la fase 6 (causas de pausa, rol, contrato con el AST, "Redactar con Orbi") |
+| `e7d5787` | Merge de `origin/main` (conflicto add/add en este archivo: quedó la versión de `main`) |
+
+Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1527 + 440 en verde (8 skipped, ya estaban); web `tsc --noEmit` limpio, `pnpm test` 271 en verde. Las evals compilan y corren sobre un worktree de `main` (probado con un modelo guionado).
+
+**Bugs de producción que la rama arregla** (los destapó el dataset de las evals):
+- "Sin stock" del snapshot siempre en 0: la API nunca escribe `OUT_OF_STOCK`. Ahora cuenta publicados con stock 0.
+- Snapshot del dashboard con meses en UTC y ventas brutas: ahora mes argentino y neto de devoluciones (los minors de la sección 4).
+- Pendientes: contaba solo los creados este mes; ahora todos.
+- `getOrderDetail` decía "Ana null" con el apellido vacío.
+- Estados con nombres internos en el prompt (PENDING, DRAFT…): ahora con las palabras de la pantalla; COMPLETED se suma a "entregados", como en Pedidos.
+- Manual: "Agregar especificación", sin "Ver más detalles", "Redactar con Orbi" (decía "Generar con Orbi") y Zona peligrosa con su destino (abría "Negocio"). El tutorial del paso "producto" apuntaba al botón con el nombre viejo: el ancla no lo encontraba.
+- La ayuda de las plantillas decía que `{id}` y `{tracking}` se completan a mano; el Composer los completa con el último pedido del cliente.
+
+**Rulings (decidido en nombre de Alan; qué cuesta si está mal):**
+1. **Push de la rama.** La sección 8 prohíbe pushear; el entorno de la sesión exige pushear a `claude/awesome-cannon-s749lf` y el contenedor es efímero (sin push se perdía todo). Se pusheó **solo esa rama**; `main` no se tocó. Costo: Vercel ya construyó estos commits como *Preview*. **No mergear a `main` por fast-forward** (producción quedaría vieja): usar el merge con commit propio de abajo.
+2. **Nombre de la rama:** el que fijó el entorno, no `feat/orbi-noche-20261001`.
+3. **Merge de `origin/main` en la rama** (paso 1 del `CLAUDE.md`): `main` había avanzado 5 commits (fondo IA, este traspaso). Único conflicto: este archivo.
+4. **Evals en memoria** (Prisma en memoria + `ModuleDataService` real) en vez de contra la base dev: deterministas, gratis y corren igual sobre `main`. Costo: un bug que solo aparece en Postgres no se ve; para eso están los e2e.
+5. **Permisos de las tools nuevas:** `estadoPrimerosPasos` y `getResumenDelPeriodo` piden `reports.dashboard`, `accesoDelEquipo` pide `config.team.view` y `leerTemaDelManual` va sin permiso, con la excepción verificada por el invariante 3. Costo: un Empleado por defecto no puede preguntar "¿qué me falta para publicar?" con datos reales; Orbi le contesta con el manual.
+6. **Índice + tool como default, sin medir.** El spec §3.7 lo propone; la comparación con "manual entero" queda para cuando corran las evals.
+7. **Artefacto `.ts` en vez de `.json`, íconos sin separar** (spec de la base de conocimiento, §8).
+8. **Se sacó del knowledge el consejo del "precio tachado":** el panel no deja cargar el precio anterior. Si se agrega el campo, hay que volver a escribirlo.
+9. **Cambió lo que dice el snapshot:** sin stock, ventas netas, mes argentino y pendientes de siempre. Orbi va a decir números distintos de los de hoy en producción; ahora coinciden con las pantallas.
+10. **Tool de período:** deja afuera la actividad reciente (nombres de clientes: texto de terceros), el canal (el dashboard lo suma solo en 2 semanas) y las imágenes.
+11. **Causas de pausa:** `estadoPrimerosPasos` distingue plataforma, mora, baja del espacio y pausa del dueño. A quien no es propietario o admin no le cuenta el detalle de la cuenta.
+12. **Fase 3, decisiones provisorias** (spec §11): selector de modos oculto hasta la fase 4, ruta `/admin/ventas/orbi?vista=chat`, título automático determinista, archivadas borradas a los 180 días sin actividad, flag global `NEXT_PUBLIC_ORBI_PANEL_V2`. Todas esperan a Alan.
+13. **Mantenimiento del manual con regla y tests, sin hook `PostToolUse`.** Se sumaron `.claude/rules/manual.md` y una sección al `CLAUDE.md` raíz (lo lee todo el equipo).
+14. **Sin capítulo "Qué no hace Órbita":** es una decisión de producto.
+15. **`navigateTo` y la forma de las rutas, sin tocar:** en el acceso viejo por `/admin/<negocioId>` los botones de Orbi pierden el negocio, y ya pasaba antes.
+
+**Qué falló o quedó a medias:**
+- **Línea de base de las evals: no corrida** (sin key). La tabla del spec de la fase 2 (§7) está vacía, y ese mismo spec dice que sin ella la fase 6 no se mergea. Es el primer paso de mañana.
+- La decisión entre índice + tool y manual entero depende de esa corrida.
+- e2e no corridos. Cambiaron consultas de `ModuleDataService` que solo se probaron con mocks y con la Prisma en memoria.
+- Jira sin comentar (sin acceso). Cloud Run sin verificar.
+- Anotados, sin arreglar:
+  - La segmentación de clientes del snapshot (VIP 10% / 60 días) no es la del reporte (percentil 85 / 90 días).
+  - El canal del dashboard suma solo 2 semanas.
+  - `orbi_turns.module` sigue guardando `'ventas'` (va en la fase 3, T7).
+  - Las conversaciones de Orbi no tienen retención.
+  - La demo llama "Generar con Orbi" a la función en su cartel de cupo (`apps/api/src/demo/demo-ia.ts`), y el botón dice "Redactar con Orbi".
+
+**Comandos para llevarlo a producción (en este orden):**
+
+1. Leer y decidir: `docs/superpowers/specs/2026-10-01-orbi-fase-3-ui-panel-design.md` (§11) y su plan; la §8 del spec de la base de conocimiento; los rulings de arriba.
+2. Correr las evals, en tu máquina con el `.env` de dev (~USD 4 las tres corridas). Los comandos exactos están en el spec de la fase 2, §7: worktree de `origin/main` → línea de base → rama con `--comparar` → variante `manual-entero`. Anotar la tabla en ese §7. Si la rama empeora alguna categoría respecto de la base, **no mergear**.
+3. Recomendado: los e2e de Orbi contra dev (`apps/api/DEPLOYMENT.md` § Correr los e2e contra dev).
+4. Merge a `main` **con commit de merge** (nunca fast-forward: la rama ya está pusheada y Vercel ignoraría el commit):
+   ```
+   git fetch origin
+   git checkout main && git pull --ff-only origin main
+   git merge --no-ff origin/claude/awesome-cannon-s749lf -m "Merge Orbi: evals del panel, base de conocimiento y resumen por período"
+   cd apps/web && pnpm exec tsc --noEmit && pnpm test && cd ../api && pnpm typecheck && pnpm test && cd ../..
+   git push origin main
+   ```
+   O un PR mergeado con "Create a merge commit" (no squash ni rebase si se quiere conservar los sha de arriba).
+5. Verificar el entorno y CI con los dos `gh api` del `CLAUDE.md` (paso 4) sobre el sha nuevo de `main`. Tiene que decir `Production`, y los checks de API y Web tienen que estar en `success`.
+6. API (**esta rama no tiene migraciones**: no hace falta `prisma-prod.sh migrate deploy`):
+   ```
+   cd apps/api && ./deploy/deploy.sh
+   gcloud run services describe orbita-api --region southamerica-east1 --project orbita-api-corp
+   ```
+   El orden entre front y API no importa para este cambio: el front nuevo solo agrega frases para las tools nuevas, y la API nueva funciona con el front de hoy.
+7. Jira (¿RBT-695?): comentar los rulings 5, 8, 9, 11 y 12, los bugs arreglados y los anotados sin arreglar.
+8. Después del deploy, mirar las primeras conversaciones reales con preguntas de "cómo hago X" y "¿qué me falta para publicar?".
+
 ---
 
 ## Anexo — Prompt listo para pegar al agente nocturno
