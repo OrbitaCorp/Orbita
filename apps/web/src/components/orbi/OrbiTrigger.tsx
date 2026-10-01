@@ -26,9 +26,9 @@ export function OrbiTrigger({ collapsed }: Props) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      {/* Sin disco: el pet suelto sobre el menú. Quieto: un personaje moviéndose
-          todo el tiempo al costado de la pantalla de trabajo distrae. */}
-      <OrbiPet size={44} animated={false} />
+      {/* Sin disco: el pet suelto sobre el menú, y vivo (flota, parpadea, el
+          satélite orbita) para que se sienta presente aunque no se lo toque. */}
+      <OrbiPet size={44} animated />
 
       {!collapsed && (
         <>
