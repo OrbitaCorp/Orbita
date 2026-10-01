@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "manual:generar": "vitest run src/modules/ventas/panel/manual/paraOrbi.test.ts -u"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",
