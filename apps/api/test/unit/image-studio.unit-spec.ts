@@ -184,3 +184,29 @@ describe('intensidadAroSegunLuminosidad — aro de luz sobre fondo negro', () =>
     expect(intensidadAroSegunLuminosidad(pixeles(0, 0, 0, 0))).toBe(1);
   });
 });
+
+describe('ImageStudioService — fondos lisos (blanco / negro)', () => {
+  const original = process.env.FONDO_IA_MANTENIMIENTO;
+  beforeEach(() => { process.env.FONDO_IA_MANTENIMIENTO = 'false'; });
+  afterEach(() => {
+    if (original === undefined) delete process.env.FONDO_IA_MANTENIMIENTO;
+    else process.env.FONDO_IA_MANTENIMIENTO = original;
+  });
+
+  // Flux redibuja el producto (texto de etiquetas deformado) y con "rim light"
+  // dibuja un resplandor alrededor de la silueta (feedback 01/10/2026): un
+  // fondo liso se compone siempre en local.
+  it.each(['negro_liso', 'blanco_liso'])('%s sin descripción: compone en local y NO llama a Workers AI', async (estilo) => {
+    const { svc, backgroundRemoval, cloudflareImage } = makeService(true);
+    const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, estilo);
+    expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+    expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
+    expect(result.mimeType).toBe('image/png');
+  });
+
+  it('negro_liso con descripción personalizada: sí pasa por Workers AI (es un pedido que el local no cubre)', async () => {
+    const { svc, cloudflareImage } = makeService(true);
+    await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'negro_liso', 'con humo suave');
+    expect(cloudflareImage.editImage).toHaveBeenCalledTimes(1);
+  });
+});
