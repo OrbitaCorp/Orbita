@@ -20,20 +20,31 @@
 //      renovación (ver SubscriptionsService.changePlan).
 
 import { useEffect, useState } from 'react'
-import { Crown, Check, Gamepad2, LayoutTemplate, MessageSquareText, Timer, Gift, ArrowRight } from 'lucide-react'
+import { Crown, Check, Gift, ArrowRight } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { SkeletonText } from '@/design-system/components/Skeleton'
+import { Modal } from '@/design-system/components/Modal'
+import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan, panelPreviewActivationDiscount,
+    panelGetBusiness, panelCancelBusiness, panelReactivateFromCancellation,
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
 
+// Todo lo que el add-on ADVANCED habilita de verdad en el backend (cada una de
+// estas funciones está detrás de AddonGuard / hasActiveAddon). Si se suma o se
+// saca una función del paquete, hay que cambiarla acá y en DETALLE_AVANZADO de
+// pages/onboarding/plan.tsx.
 const INCLUYE = [
-    { label: 'Juegos con premio', Icon: Gamepad2 },
-    { label: 'Modales de anuncios', Icon: MessageSquareText },
-    { label: 'Plantillas de Home', Icon: LayoutTemplate },
-    { label: 'Oferta relámpago y prueba social', Icon: Timer },
+    'Plantillas de Home',
+    'Modales de anuncios',
+    'Juegos con premio',
+    'Prueba social',
+    '2x1 y 3x2',
+    'Oferta relámpago',
+    'Fotos sin fondo automáticas',
+    'Fondo con IA para tus productos',
 ]
 
 // SUSPENDED y CANCELLED sumados (RBT — ciclo de vida de suscripciones,
@@ -226,6 +237,17 @@ export default function Suscripcion() {
     const [errorActivar, setErrorActivar] = useState<string | null>(null)
     // Código de descuento ya validado contra el backend (vale para el primer cobro).
     const [descuento, setDescuento] = useState<DescuentoActivacion | null>(null)
+    // Aviso de "listo" cuando se elige el plan con Avanzado y todavía no hay nada que pagar.
+    const [avisoPlan, setAvisoPlan] = useState<string | null>(null)
+
+    // Cancelación: la ventana de 60 días vive en el negocio, no en la suscripción.
+    const { user } = useAuth()
+    const esOwner = user?.type === 'member' && user.role === 'owner'
+    const [cancelledAt, setCancelledAt] = useState<string | null>(null)
+    const [scheduledDeletionAt, setScheduledDeletionAt] = useState<string | null>(null)
+    const [modalCancelar, setModalCancelar] = useState(false)
+    const [cancelando, setCancelando] = useState(false)
+    const [errorCancelar, setErrorCancelar] = useState<string | null>(null)
 
     const [editandoPlan, setEditandoPlan] = useState(false)
     const [guardandoPlan, setGuardandoPlan] = useState(false)
@@ -233,38 +255,100 @@ export default function Suscripcion() {
 
     useEffect(() => {
         let cancelado = false
-        Promise.all([panelGetSubscription(), panelGetAddons()])
-            .then(([s, a]) => {
+        Promise.all([panelGetSubscription(), panelGetAddons(), panelGetBusiness().catch(() => null)])
+            .then(([s, a, b]) => {
                 if (cancelado) return
                 setSub(s)
                 setAdvanced(a.advanced)
                 setAdvancedExpiresAt(a.advancedExpiresAt)
+                setCancelledAt(b?.cancelledAt ?? null)
+                setScheduledDeletionAt(b?.scheduledDeletionAt ?? null)
             })
             .catch(e => { if (!cancelado) setError(e instanceof ApiError ? e.message : 'No se pudo cargar tu suscripción') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
     }, [])
 
-    function activarPlan() {
+    // Si el usuario vuelve con "atrás" desde Mercado Pago, el navegador restaura
+    // la página tal cual quedó — con el botón en "Abriendo Mercado Pago…" para
+    // siempre. Al volver desde la caché se rehabilita.
+    useEffect(() => {
+        function alVolver(e: PageTransitionEvent) { if (e.persisted) setActivando(false) }
+        window.addEventListener('pageshow', alVolver)
+        return () => window.removeEventListener('pageshow', alVolver)
+    }, [])
+
+    function activarPlan(codigo?: string) {
         setActivando(true)
         setErrorActivar(null)
-        panelActivatePlan(descuento?.code)
-            .then(({ initPoint }) => { window.location.href = initPoint })
+        panelActivatePlan(codigo)
+            .then(({ initPoint }) => {
+                window.location.href = initPoint
+                // Si la redirección no llega a ocurrir (bloqueada, sin red), no dejar el botón muerto.
+                window.setTimeout(() => setActivando(false), 15000)
+            })
             .catch(e => {
                 setErrorActivar(e instanceof ApiError ? e.message : 'No se pudo iniciar la activación')
                 setActivando(false)
             })
     }
 
-    function elegirPlan(p: PlanKey) {
+    // `activar`: además de guardar el plan, seguir derecho a Mercado Pago cuando
+    // el período ya venció (lo que espera quien aprieta "Activar Avanzado").
+    async function elegirPlan(p: PlanKey, activar = false) {
         if (!sub) return
         setGuardandoPlan(true)
         setErrorPlan(null)
-        panelChangePlan(p)
-            .then(() => panelGetSubscription())
-            .then(s => { setSub(s); setEditandoPlan(false) })
-            .catch(e => setErrorPlan(e instanceof ApiError ? e.message : 'No se pudo guardar el cambio de plan'))
-            .finally(() => setGuardandoPlan(false))
+        setAvisoPlan(null)
+        try {
+            await panelChangePlan(p)
+            const s = await panelGetSubscription()
+            setSub(s)
+            setEditandoPlan(false)
+
+            // Un código aplicado se calculó contra el precio del plan anterior:
+            // se vuelve a calcular contra el nuevo, o se descarta si ya no sirve.
+            let codigo = descuento?.code
+            if (descuento) {
+                try { setDescuento(await panelPreviewActivationDiscount(descuento.code)) }
+                catch { setDescuento(null); codigo = undefined }
+            }
+
+            const vencido = s.origin !== 'COMP' && new Date(s.currentPeriodEnd ?? 0) <= new Date()
+            if (activar && vencido) {
+                setGuardandoPlan(false)
+                activarPlan(codigo)
+                return
+            }
+            if (activar) setAvisoPlan('Listo: cuando termine tu beneficio de bienvenida pasás al plan con Avanzado.')
+        } catch (e) {
+            setErrorPlan(e instanceof ApiError ? e.message : 'No se pudo guardar el cambio de plan')
+        } finally {
+            setGuardandoPlan(false)
+        }
+    }
+
+    async function confirmarCancelacion() {
+        setModalCancelar(false)
+        setCancelando(true)
+        setErrorCancelar(null)
+        try {
+            if (cancelledAt) {
+                await panelReactivateFromCancellation()
+                setCancelledAt(null)
+                setScheduledDeletionAt(null)
+            } else {
+                const r = await panelCancelBusiness()
+                setCancelledAt(new Date().toISOString())
+                setScheduledDeletionAt(r.scheduledDeletionAt)
+                setDescuento(null)
+            }
+            setSub(await panelGetSubscription())
+        } catch (e) {
+            setErrorCancelar(e instanceof ApiError ? e.message : 'No se pudo completar la operación')
+        } finally {
+            setCancelando(false)
+        }
     }
 
     const venciendo = sub ? new Date(sub.currentPeriodEnd ?? 0) <= new Date() : false
@@ -276,6 +360,7 @@ export default function Suscripcion() {
         ? Math.max(Math.ceil((new Date(sub.currentPeriodEnd).getTime() + sub.gracePeriodDays * 86_400_000 - new Date().getTime()) / 86_400_000), 0)
         : null
     const suspendida = sub?.status === 'SUSPENDED'
+    const cancelada = !!cancelledAt
     // Cortesías (COMP) no pasan por nada de esto: no tienen preapproval real
     // ni un plan que activar, se renuevan a mano desde la ficha del negocio.
     const esCortesia = sub?.origin === 'COMP'
@@ -327,7 +412,26 @@ export default function Suscripcion() {
                             entero está en modo solo-lectura en ese momento; estilo
                             de aviso (azul) mientras todavía está en gracia, con la
                             cuenta regresiva de días. */}
-                        {!esCortesia && venciendo && (
+                        {/* Cancelada: la tienda está pausada y dentro de la ventana de 60 días
+                            antes del borrado. Reactivar la deja como estaba; si el plan ya
+                            había vencido, abajo vuelve a aparecer "Activar mi plan". */}
+                        {cancelada && (
+                            <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)' }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>Tu suscripción está cancelada</div>
+                                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px', lineHeight: 1.5 }}>
+                                    Tu tienda está pausada y se elimina de forma definitiva el <strong style={{ color: 'var(--color-text)' }}>{formatFecha(scheduledDeletionAt)}</strong>.
+                                    {esOwner ? ' Si la reactivás antes, vuelve a estar como la dejaste.' : ' El dueño de la cuenta puede reactivarla antes de esa fecha.'}
+                                </p>
+                                {errorCancelar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorCancelar}</p>}
+                                {esOwner && (
+                                    <Button variant="primary" size="sm" onClick={() => setModalCancelar(true)} disabled={cancelando}>
+                                        {cancelando ? 'Reactivando…' : 'Reactivar mi suscripción'}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {!esCortesia && !cancelada && venciendo && (
                             <div style={{
                                 marginTop: 16, padding: 14, borderRadius: 12,
                                 background: suspendida ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
@@ -360,14 +464,14 @@ export default function Suscripcion() {
                                     disabled={activando}
                                 />
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
-                                <Button variant="primary" size="sm" onClick={activarPlan} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
+                                <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
                                     {activando ? 'Abriendo Mercado Pago…' : `Activar mi plan${planMostrado ? ` ${PLANES[planMostrado].nombre}` : ''}`}
                                 </Button>
                             </div>
                         )}
 
                         {/* ── Caso 1 y 3: elegir/cambiar el plan (todavía sin vencer) ── */}
-                        {!esCortesia && !venciendo && (
+                        {!esCortesia && !cancelada && !venciendo && (
                             <div style={{ marginTop: 16 }}>
                                 {!editandoPlan ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -448,20 +552,67 @@ export default function Suscripcion() {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0' }}>
-                        {INCLUYE.map(i => (
-                            <div key={i.label} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'var(--color-body)' }}>
+                        {INCLUYE.map(label => (
+                            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'var(--color-body)' }}>
                                 <Check size={14} strokeWidth={2.2} color="var(--color-success)" style={{ flexShrink: 0 }} />
-                                {i.label}
+                                {label}
                             </div>
                         ))}
                     </div>
 
-                    {errorPlan && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
-                    <Button variant="primary" onClick={() => elegirPlan(conAvanzado(sub?.plan))} disabled={guardandoPlan}>
-                        {guardandoPlan ? 'Guardando…' : 'Activar Avanzado'}
+                    {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
+                    {avisoPlan && <p role="status" style={{ fontSize: 12.5, color: 'var(--color-success)', margin: '0 0 10px' }}>{avisoPlan}</p>}
+                    <Button variant="primary" onClick={() => void elegirPlan(conAvanzado(sub?.plan), true)} disabled={guardandoPlan || activando || cancelada}>
+                        {guardandoPlan || activando ? 'Un momento…' : 'Activar Avanzado'}
                     </Button>
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 0' }}>
+                        {venciendo && !esCortesia && !cancelada
+                            ? 'Te llevamos a Mercado Pago para autorizar el plan con Avanzado.'
+                            : 'Se activa cuando termine tu beneficio de bienvenida.'}
+                    </p>
                 </Card>
             )}
+
+            {/* Cancelar suscripción — solo el dueño, y solo si no está ya cancelada
+                (cancelada se reactiva desde el aviso de arriba). Es la MISMA baja
+                que "Eliminar espacio" de Configuración general. */}
+            {!cargando && esOwner && !cancelada && sub && (
+                <Card padding="md" style={{ maxWidth: 820, marginTop: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 220 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Cancelar suscripción</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.5 }}>
+                                Se corta el cobro y tu tienda se pausa al instante. Tenés 60 días para reactivarla y recuperar todo.
+                            </div>
+                            {errorCancelar && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '8px 0 0' }}>{errorCancelar}</p>}
+                        </div>
+                        <Button variant="outline" onClick={() => setModalCancelar(true)} disabled={cancelando}>
+                            {cancelando ? 'Cancelando…' : 'Cancelar suscripción'}
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
+            <Modal
+                isOpen={modalCancelar}
+                onClose={() => setModalCancelar(false)}
+                title={cancelada ? '¿Reactivar tu suscripción?' : '¿Cancelar tu suscripción?'}
+                variant={cancelada ? 'default' : 'danger'}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setModalCancelar(false)}>Volver</Button>
+                        <Button variant={cancelada ? 'primary' : 'danger'} onClick={() => void confirmarCancelacion()}>
+                            {cancelada ? 'Sí, reactivar' : 'Sí, cancelar'}
+                        </Button>
+                    </>
+                }
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    {cancelada
+                        ? 'Tu tienda vuelve a estar visible para tus clientes, tal cual la dejaste. Si tu plan ya había vencido, vas a poder activarlo de nuevo desde esta misma pantalla.'
+                        : 'Se corta el cobro de tu suscripción y tu tienda se pausa al instante: tus clientes dejan de verla. Vas a poder reactivarla y recuperar todo durante los próximos 60 días; pasado ese plazo, se elimina de forma definitiva.'}
+                </div>
+            </Modal>
         </div>
     )
 }
