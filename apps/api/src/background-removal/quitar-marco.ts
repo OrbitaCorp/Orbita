@@ -22,6 +22,8 @@ const TOLERANCIA_MARCO = 30;
 const FRACCION_FILA_MARCO = 0.99;
 // Del borde recortado, qué fracción tiene que NO ser color de marco.
 const FRACCION_BORDE_FOTO = 0.85;
+// Cuántos píxeles hacia adentro del rectángulo se mide ese borde.
+const ADENTRO_BORDE = 2;
 // Mínimo de margen (fracción del lado) en algún costado para que valga la pena recortar.
 const MARGEN_MINIMO = 0.02;
 // Mínimo del área original que tiene que quedar.
@@ -77,19 +79,29 @@ export function detectarMarco(rgb: Uint8Array | Buffer, w: number, h: number): R
   if ((rect.width * rect.height) / (w * h) < AREA_MINIMA) return null;
 
   // El borde del rectángulo interior tiene que ser una foto, no más color de marco.
+  // Se mide unos píxeles hacia ADENTRO: la primera fila/columna del rectángulo
+  // es la transición antialiasada entre marco y foto, casi del color del marco
+  // (confirmado el 01/10/2026: pollera negra sobre alfombra, enmarcada por el
+  // estandarizador del panel — esa columna daba 83% "marco" y el borde entero
+  // no llegaba a FRACCION_BORDE_FOTO, así que no se recortaba nada).
+  const x0 = rect.left + ADENTRO_BORDE;
+  const x1 = rect.left + rect.width - 1 - ADENTRO_BORDE;
+  const y0 = rect.top + ADENTRO_BORDE;
+  const y1 = rect.top + rect.height - 1 - ADENTRO_BORDE;
+  if (x0 >= x1 || y0 >= y1) return null;
   let total = 0;
   let foto = 0;
   const visitar = (x: number, y: number) => {
     total++;
     if (!esMarco(x, y)) foto++;
   };
-  for (let x = rect.left; x < rect.left + rect.width; x++) {
-    visitar(x, rect.top);
-    visitar(x, rect.top + rect.height - 1);
+  for (let x = x0; x <= x1; x++) {
+    visitar(x, y0);
+    visitar(x, y1);
   }
-  for (let y = rect.top + 1; y < rect.top + rect.height - 1; y++) {
-    visitar(rect.left, y);
-    visitar(rect.left + rect.width - 1, y);
+  for (let y = y0 + 1; y < y1; y++) {
+    visitar(x0, y);
+    visitar(x1, y);
   }
   if (foto / total < FRACCION_BORDE_FOTO) return null;
   return rect;

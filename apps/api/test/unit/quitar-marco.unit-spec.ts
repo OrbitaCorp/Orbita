@@ -31,6 +31,18 @@ describe('quitar-marco — fotos enmarcadas', () => {
     expect(detectarMarco(rgb, w, h)).not.toBeNull();
   });
 
+  it('borde antialiasado (primera columna casi del color del marco): igual detecta el marco', () => {
+    const w = 120;
+    const h = 100;
+    // Como deja la foto el estandarizador del panel al achicarla: la columna de
+    // transición entre marco y foto queda casi blanca.
+    const rgb = rgbDe(w, h, (x, y) => {
+      if (!(x >= 20 && x < 100 && y >= 10 && y < 90)) return BLANCO;
+      return x === 20 || x === 99 ? [240, 240, 240] : CEMENTO(x, y);
+    });
+    expect(detectarMarco(rgb, w, h)).not.toBeNull();
+  });
+
   it('remera blanca sobre fondo blanco liso: NO hay marco, no se recorta nada', () => {
     const w = 120;
     const h = 100;
