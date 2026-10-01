@@ -15,6 +15,8 @@ import type { LlmAdapter, LlmMessage, LlmToolDefinition } from '../../../src/orb
 import { OrbiSurface } from '../../../src/orbi/dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../../../src/orbi/prompts/core';
 import { getPanelPrompt } from '../../../src/orbi/prompts/panel';
+import { capaDelManual } from '../../../src/orbi/prompts/manual';
+import { manualEntero } from '../../../src/orbi/manual/manual';
 import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
 import {
   ESCRITURA_NO_DISPONIBLE,
@@ -54,8 +56,53 @@ export type Variante = {
   ajustar(piezas: { systemPrompt: string; tools: LlmToolDefinition[] }): { systemPrompt: string; tools: LlmToolDefinition[] };
 };
 
+const SEPARADOR_DE_CAPAS = '\n\n---\n\n';
+
+/**
+ * Cambia la capa del manual del prompt por otra (o la saca). Si la capa no
+ * está, tira: una variante que no cambia nada mediría lo mismo que 'actual'
+ * con otro nombre.
+ */
+export function reemplazarCapaDelManual(systemPrompt: string, nueva: string | null): string {
+  const actual = capaDelManual();
+  if (!systemPrompt.includes(actual)) throw new Error('El prompt no tiene la capa del manual: la variante no aplica');
+  return nueva === null
+    ? systemPrompt.replace(`${actual}${SEPARADOR_DE_CAPAS}`, '')
+    : systemPrompt.replace(actual, nueva);
+}
+
+/** El manual completo en vez del índice (spec 2026-09-30-orbi-base-de-conocimiento, §3.7). */
+export function capaDelManualEntero(): string {
+  return `## Manual de uso del panel
+Este es el manual de Órbita completo. Si te preguntan cómo se hace algo en el panel, dónde está algo o qué significa algo de una pantalla, respondé desde el tema que corresponda.
+
+${manualEntero()}
+
+Cómo usarlo:
+- No inventes pasos, nombres de botones ni pantallas que no estén en el manual. Si nombrás un botón, usá el nombre exacto que aparece entre comillas.
+- Si hay una pantalla a la que ir, ofrecé llevar a la persona con navigateTo.
+- Si ningún tema lo cubre, decí que eso no está en el manual y ofrecé escribirle al equipo de Órbita desde Configuración → Soporte.
+- Hablá con las palabras de la pantalla (pendiente, borrador, publicado). Nunca nombres internos del sistema ni nombres de herramientas.`;
+}
+
+const TOOLS_DE_LA_FASE_6 = ['leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo'];
+
 export const VARIANTES: Record<string, Variante> = {
   actual: { descripcion: 'El prompt y las tools de producción, tal cual', ajustar: (p) => p },
+  'manual-entero': {
+    descripcion: 'El manual completo en el prompt en vez del índice, sin leerTemaDelManual',
+    ajustar: ({ systemPrompt, tools }) => ({
+      systemPrompt: reemplazarCapaDelManual(systemPrompt, capaDelManualEntero()),
+      tools: tools.filter((t) => t.name !== 'leerTemaDelManual'),
+    }),
+  },
+  'sin-manual': {
+    descripcion: 'Sin la capa del manual ni las tools de la fase 6 (aísla su efecto en la misma rama)',
+    ajustar: ({ systemPrompt, tools }) => ({
+      systemPrompt: reemplazarCapaDelManual(systemPrompt, null),
+      tools: tools.filter((t) => !TOOLS_DE_LA_FASE_6.includes(t.name)),
+    }),
+  },
 };
 
 // ─── Resultado de un caso ────────────────────────────────────────────────────

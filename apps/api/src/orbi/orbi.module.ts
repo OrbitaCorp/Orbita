@@ -9,6 +9,8 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 import { PendingActionService } from './tools/pending-action.service';
 import { OrbiTurnService } from './orbi-turn.service';
 import { NavigationTool } from './tools/definitions/navigation.tool';
+import { LeerTemaDelManualTool } from './tools/definitions/manual.tools';
+import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './tools/definitions/estado.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './tools/definitions/order.tools';
@@ -85,6 +87,7 @@ export class OrbiModule {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
     this.toolRegistry.register(new NavigationTool());
+    this.toolRegistry.register(new LeerTemaDelManualTool());
 
     this.toolRegistry.register(new ListProductsTool(this.productsService));
     this.toolRegistry.register(new CreateProductTool(this.productsService, this.prisma));
@@ -108,6 +111,10 @@ export class OrbiModule {
     this.toolRegistry.register(new GetSalesReportTool(this.reportsService));
     this.toolRegistry.register(new GetProductReportTool(this.reportsService));
     this.toolRegistry.register(new GetCustomerReportTool(this.reportsService));
+
+    // El estado real del negocio para las dudas del manual (fase 6).
+    this.toolRegistry.register(new EstadoPrimerosPasosTool(this.businessesService, this.prisma));
+    this.toolRegistry.register(new AccesoDelEquipoTool(this.prisma));
 
     this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService));
     this.toolRegistry.register(new SuggestDescriptionTool(this.config));

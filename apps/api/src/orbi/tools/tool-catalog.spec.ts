@@ -1,6 +1,8 @@
 import { ToolRegistryService } from './tool-registry.service';
 import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { NavigationTool } from './definitions/navigation.tool';
+import { LeerTemaDelManualTool } from './definitions/manual.tools';
+import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './definitions/estado.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './definitions/order.tools';
@@ -41,6 +43,7 @@ describe('Orbi — catálogo completo de tools', () => {
   beforeEach(() => {
     registry = new ToolRegistryService();
     registry.register(new NavigationTool());
+    registry.register(new LeerTemaDelManualTool());
     registry.register(new ListProductsTool(stub));
     registry.register(new CreateProductTool(stub, prismaFalso));
     registry.register(new GenerateDescriptionTool(stub, stub));
@@ -58,6 +61,8 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new GetSalesReportTool(stub));
     registry.register(new GetProductReportTool(stub));
     registry.register(new GetCustomerReportTool(stub));
+    registry.register(new EstadoPrimerosPasosTool(stub, stub));
+    registry.register(new AccesoDelEquipoTool(stub));
     registry.register(new SuggestBusinessNameTool(stub, stub));
     registry.register(new SuggestDescriptionTool(stub));
     registry.register(new SuggestSubdomainTool(stub));
@@ -73,6 +78,7 @@ describe('Orbi — catálogo completo de tools', () => {
     'listCustomers', 'getCustomerDetail',
     'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
     'getSalesReport', 'getProductReport', 'getCustomerReport',
+    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo',
   ];
   // Todas las tools del wizard están limitadas por paso (`steps`), así que
   // pedirlas sin stepName devuelve una lista vacía — no el catálogo. 'tu-negocio'
@@ -85,7 +91,7 @@ describe('Orbi — catálogo completo de tools', () => {
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 23 tools del catálogo completo', () => {
+  it('registra las 26 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
@@ -193,6 +199,7 @@ describe('Orbi — catálogo completo de tools', () => {
     'listOrders', 'getOrderDetail',
     'listCustomers', 'getCustomerDetail',
     'getSalesReport', 'getProductReport', 'getCustomerReport',
+    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo',
   ];
   const ESCRIBEN = [
     'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
@@ -221,11 +228,23 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
-  it('invariante 3: toda tool del panel pide al menos un permiso, salvo navigateTo', () => {
+  // Las únicas tools sin permiso son las que no pueden leer datos del negocio:
+  // su execute() NO recibe el contexto (ni businessId, ni userId). navigateTo
+  // arma una ruta; leerTemaDelManual lee el manual, que es igual para todos.
+  const SIN_DATOS_DEL_NEGOCIO = ['navigateTo', 'leerTemaDelManual'];
+
+  it('invariante 3: toda tool del panel pide al menos un permiso, salvo las que no reciben el contexto del negocio', () => {
     for (const tool of toolsDelPanel()) {
-      if (tool.name === 'navigateTo') continue;
+      if (SIN_DATOS_DEL_NEGOCIO.includes(tool.name)) continue;
       expect({ tool: tool.name, pidePermiso: tool.requiredPermissions.length > 0 })
         .toEqual({ tool: tool.name, pidePermiso: true });
+    }
+    // La excepción se verifica, no se declara: si una de estas tools empieza
+    // a recibir el ctx (y podría leer el negocio), tiene que pedir un permiso.
+    for (const nombre of SIN_DATOS_DEL_NEGOCIO) {
+      const tool = (registry as any).tools.get(nombre);
+      expect({ nombre, parametrosDeExecute: tool.execute.length, permisos: tool.requiredPermissions })
+        .toEqual({ nombre, parametrosDeExecute: 1, permisos: [] });
     }
   });
 
@@ -249,6 +268,9 @@ describe('Orbi — catálogo completo de tools', () => {
       getProductReport: ['reports.view'],
       getCustomerReport: ['reports.view'],
       navigateTo: [],
+      leerTemaDelManual: [],
+      estadoPrimerosPasos: ['reports.dashboard'],
+      accesoDelEquipo: ['config.team.view'],
     };
     for (const [nombre, permisos] of Object.entries(esperado)) {
       const tool = (registry as any).tools.get(nombre);
@@ -378,8 +400,9 @@ describe('Orbi — catálogo completo de tools', () => {
 
   it('un usuario sin permisos no ve ninguna tool de datos del negocio', () => {
     const names = registry.getTools(OrbiSurface.PANEL, []).map(t => t.name);
-    // Sin ningún permiso solo queda navegar: ni escrituras ni lecturas.
-    expect(names).toEqual(['navigateTo']);
+    // Sin ningún permiso solo queda navegar y leer el manual: ni escrituras ni
+    // lecturas del negocio.
+    expect(names).toEqual(['navigateTo', 'leerTemaDelManual']);
   });
 
   it('un empleado con solo lectura ve las lecturas de sus permisos y ninguna escritura', () => {

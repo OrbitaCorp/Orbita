@@ -195,7 +195,7 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Pedidos');
-    expect(prompt).toContain('PENDING');
+    expect(prompt).toContain('Pendiente');
     expect(prompt).toContain('updateOrderStatus');
   });
 
@@ -376,9 +376,12 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Lo que sabés sobre pedidos');
-    expect(prompt).toContain('PENDING');
-    expect(prompt).toContain('CANCELLED');
-    expect(prompt).toContain('irreversible');
+    expect(prompt).toContain('Pendiente');
+    expect(prompt).toContain('Cancelado');
+    expect(prompt).toContain('no tiene vuelta atrás');
+    // Las palabras de la pantalla, no los valores de la base: lo que está en
+    // el prompt es lo que Orbi le repite a la persona.
+    expect(prompt).not.toMatch(/\b(PENDING|CONFIRMED|PREPARING|SHIPPED|DELIVERED|COMPLETED|CANCELLED)\b/);
   });
 
   it('pedidos prompt interpolates dynamic data when snapshot is available', async () => {
@@ -395,7 +398,9 @@ describe('ContextBuilderService', () => {
       context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
     } as any, ['orders.view']);
 
-    expect(prompt).toContain('PENDING: 5');
+    expect(prompt).toContain('pendientes: 5');
+    expect(prompt).toContain('completados: 20');
+    expect(prompt).not.toContain('PENDING');
     expect(prompt).toContain('36h sin confirmar');
     expect(prompt).toContain('$8.500');
     expect(prompt).toContain('2026-09-07');
@@ -467,9 +472,10 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Lo que sabés sobre productos');
-    expect(prompt).toContain('PUBLISHED');
-    expect(prompt).toContain('DRAFT');
+    expect(prompt).toContain('Publicado');
+    expect(prompt).toContain('Borrador');
     expect(prompt).toContain('Precio psicológico');
+    expect(prompt).not.toMatch(/\b(PUBLISHED|DRAFT|OUT_OF_STOCK)\b|comparePrice/);
   });
 
   it('catalogo prompt interpolates dynamic data when snapshot is available', async () => {
@@ -686,5 +692,66 @@ describe('ContextBuilderService', () => {
       );
       expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
     });
+  });
+  describe('capa del manual (fase 6)', () => {
+    it('el panel lleva el índice del manual, antes de cualquier dato del negocio', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
+      } as any, CODIGOS_DEL_CATALOGO);
+
+      expect(prompt).toContain('## Manual de uso del panel');
+      expect(prompt).toContain('- cfg-envios · Envíos');
+      expect(prompt).toContain('leerTemaDelManual');
+      // El prefijo compartido (core + índice) termina antes del nombre del
+      // negocio: es lo que deja que la caché de Gemini lo reuse.
+      expect(prompt.indexOf('## Manual de uso del panel')).toBeLessThan(prompt.indexOf('Rama'));
+      expect(prompt.indexOf('Sos Orbi')).toBeLessThan(prompt.indexOf('## Manual de uso del panel'));
+    });
+
+    it('el prefijo hasta el índice es idéntico para dos negocios distintos', async () => {
+      const armar = async (nombre: string) => {
+        mockPrisma.business.findUnique.mockResolvedValueOnce({ name: nombre, industry: 'Tienda', mode: 'FULL' });
+        return service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos', businessId: 'biz-1' },
+        } as any, CODIGOS_DEL_CATALOGO);
+      };
+      const a = await armar('Negocio A');
+      const b = await armar('Negocio B');
+      const fin = (p: string) => p.indexOf('Configuración → Soporte');
+      expect(fin(a)).toBeGreaterThan(0);
+      expect(a.slice(0, fin(a))).toBe(b.slice(0, fin(b)));
+    });
+
+    it('el wizard no lleva el manual del panel', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.WIZARD, stepName: 'ubicacion' },
+      } as any);
+      expect(prompt).not.toContain('## Manual de uso del panel');
+    });
+
+    it('ninguna capa del panel manda a inventar pasos', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: 'inventario', businessId: 'biz-1' },
+      } as any);
+      expect(prompt).not.toContain('explicá los pasos para hacerlo manualmente');
+      expect(prompt).toContain('buscá en el manual');
+    });
+  });
+  it('ninguna capa del panel le enseña al modelo valores internos de la base', async () => {
+    // Valores de enum (PENDING, OUT_OF_STOCK, PERCENT_TICKET…): si están en el
+    // prompt, Orbi se los repite a la persona. Los nombres de las tools sí
+    // aparecen a propósito (las instrucciones las nombran): son camelCase.
+    const ENUM = /\b[A-Z]{3,}(?:_[A-Z]+)+\b|\b(?:PENDING|CONFIRMED|PREPARING|SHIPPED|DELIVERED|COMPLETED|CANCELLED|PUBLISHED|DRAFT|PRODUCT|CATEGORY|TICKET)\b/;
+    for (const mod of ['dashboard', 'pedidos', 'catalogo', 'clientes', 'descuentos', 'configuracion', 'mensajes', 'otro']) {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: mod, businessId: 'biz-1' },
+      } as any);
+      expect({ mod, enum: ENUM.exec(prompt)?.[0] ?? null }).toEqual({ mod, enum: null });
+    }
   });
 });

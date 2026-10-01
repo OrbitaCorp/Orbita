@@ -209,6 +209,25 @@ export const DESCUENTOS: Descuento[] = [
 
 export const CONVERSACIONES = { total: 6, sinLeer: 2 };
 
+/**
+ * El estado del alta (fase 6: estadoPrimerosPasos). La tienda ya está
+ * publicada y con suscripción; del checklist le faltan pasos de
+ * configuración. Los ids son los de TAREAS_CHECKLIST (apps/web tutoriales/copy.ts),
+ * que la API devuelve en BusinessesService#getTutorial.
+ */
+export const ESTADO_DEL_ALTA = {
+  publicada: true,
+  suscripcion: true,
+  emailVerificado: true,
+  cumplidas: ['negocio', 'mp', 'categorias', 'producto', 'publicar', 'pedidos', 'estados', 'clientes', 'plantillas', 'apariencia', 'contacto', 'descuentos', 'postventa'],
+};
+
+/** El equipo (fase 6: accesoDelEquipo). Carlos tiene el rol Empleado por defecto. */
+export const EQUIPO = [
+  { nombre: 'Ana Dueña', email: 'ana@yerbasdelsur.example', rol: 'owner', estado: 'ACTIVE' as const },
+  { nombre: 'Carlos Empleado', email: 'carlos@yerbasdelsur.example', rol: 'empleado', estado: 'ACTIVE' as const },
+];
+
 // ─── El dataset armado contra un "ahora" ─────────────────────────────────────
 
 export type Derivados = {

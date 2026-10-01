@@ -13,7 +13,7 @@ Tono ideal:
 Plantillas de mensaje:
 - Sirven para respuestas frecuentes: bienvenida, confirmación de pedido, seguimiento de envío, post-venta.
 - Ahorran tiempo pero deben personalizarse un mínimo — el cliente nota cuando le mandan un mensaje genérico.
-- Variables como {nombre} y {tracking} se reemplazan automáticamente.
+- En una plantilla, {nombre} y {tienda} se completan solos al usarla; {id} y {tracking} quedan para completar a mano.
 
 Buenas prácticas:
 - Responder TODOS los mensajes, aunque sea con "gracias por tu consulta, te respondo en un rato".

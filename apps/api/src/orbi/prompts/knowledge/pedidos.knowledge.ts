@@ -1,24 +1,23 @@
 export const PEDIDOS_KNOWLEDGE = `## Lo que sabés sobre pedidos en un e-commerce
 
-Flujo de estados y qué significa cada uno para el negocio:
-- PENDING: el cliente hizo el pedido, el negocio todavía no lo confirmó. Si lleva más de 24h es urgente — el cliente se enfría y puede cancelar.
-- CONFIRMED: el negocio aceptó. Siguiente paso: preparar el envío.
-- PREPARING: armando el paquete. Si se demora mucho el cliente empieza a preguntar.
-- SHIPPED: despachado. El cliente espera la entrega, es buen momento para mandarle el tracking.
-- DELIVERED: entregado. Esperando que el cliente confirme que está todo bien.
-- COMPLETED: cerrado satisfactoriamente.
-- CANCELLED: irreversible. Revisar si hay que reponer stock y/o reembolsar.
+Los estados, con los nombres de las pestañas de la pantalla de Pedidos, y qué significa cada uno para el negocio:
+- Pendiente: el cliente hizo el pedido y el negocio todavía no lo confirmó. Si lleva más de 24 h es urgente: el cliente se enfría y puede cancelar.
+- Confirmado: el negocio aceptó (el pago está). Siguiente paso: prepararlo.
+- En preparación: armando el paquete. Si se demora mucho, el cliente empieza a preguntar.
+- Enviado: despachado o listo para retirar. Buen momento para mandarle el seguimiento.
+- Entregado: llegó y el ciclo se cerró. Las ventas de mostrador ya cobradas entran directo acá.
+- Cancelado: no se concretó. Queda registrado. Revisar si hay que reponer stock o devolver plata.
 
 Buenas prácticas:
-- Confirmar pedidos rápido (idealmente en menos de 2h en horario comercial). Cada hora sin confirmación aumenta la chance de cancelación.
-- Notificar al cliente en cada cambio de estado — reduce consultas al chat de "¿dónde está mi pedido?".
+- Confirmar pedidos rápido (idealmente en menos de 2 h en horario comercial). Cada hora sin confirmar aumenta la chance de cancelación.
+- Avisar al cliente en cada cambio de estado: reduce las consultas de "¿dónde está mi pedido?".
 - Si hay muchos cancelados, investigar la causa: ¿stock desactualizado? ¿tiempos de envío irreales? ¿precios que cambiaron?
 
 Cancelaciones y devoluciones:
-- Cancelar un pedido es irreversible. Siempre confirmar con el usuario antes de hacerlo.
-- Ante un problema, ofrecer primero crédito o cambio antes que reembolso — retiene al cliente.
-- Las devoluciones generan notas de crédito que se pueden usar en compras futuras.
+- Cancelar un pedido no tiene vuelta atrás. Siempre confirmar con la persona antes.
+- Ante un problema, ofrecer primero un cambio o saldo a favor antes que devolver la plata: retiene al cliente.
+- Las devoluciones pueden resolverse con una nota de crédito, que el cliente usa en su próxima compra.
 
-Pedidos manuales (origen MANUAL):
-- Se crean desde el panel para ventas por teléfono, redes sociales o presenciales sin POS.
-- Útiles para registrar todo en un solo lugar y mantener las métricas completas.`;
+Ventas cargadas a mano ("Nuevo pedido"):
+- Son las de mostrador, WhatsApp, Instagram o teléfono.
+- Cargarlas deja todos los números del negocio en un solo lugar.`;

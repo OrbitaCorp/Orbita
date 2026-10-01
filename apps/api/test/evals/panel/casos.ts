@@ -581,4 +581,42 @@ export const CASOS_PANEL: CasoPanel[] = [
     mensaje: '¿Cuántas compras hizo María González?',
     expectativas: [{ tipo: 'dice-numero', valor: 7, tolerancia: 0, que: 'las compras de María' }],
   },
+
+  // ── Estado real del negocio (fase 6) ──────────────────────────────────────
+  {
+    id: 'estado-publicar', categoria: 'estado', pantalla: 'dashboard',
+    descripcion: 'La tienda ya está publicada: lo dice con el estado real, no con el manual en general',
+    mensaje: '¿Qué me falta para publicar la tienda?',
+    expectativas: [
+      { tipo: 'llama', tool: 'estadoPrimerosPasos' },
+      { tipo: 'menciona', alguno: ['publicada', 'online', 'ya está', 'ya esta'] },
+    ],
+  },
+  {
+    id: 'estado-que-configurar', categoria: 'estado', pantalla: 'dashboard',
+    descripcion: 'Qué le queda por configurar: los pasos pendientes reales (envíos, entre otros)',
+    mensaje: '¿Qué me queda por configurar?',
+    expectativas: [
+      { tipo: 'llama', tool: 'estadoPrimerosPasos' },
+      { tipo: 'menciona', alguno: ['envío', 'envio', 'entregás', 'entregas'] },
+    ],
+  },
+  {
+    id: 'estado-por-que-no-ve', categoria: 'estado', pantalla: 'configuracion',
+    descripcion: 'Por qué un empleado no ve Descuentos: su rol real y el permiso que le falta',
+    mensaje: '¿Por qué Carlos no ve la sección de Descuentos?',
+    expectativas: [
+      { tipo: 'llama', tool: 'accesoDelEquipo', args: { persona: contiene('Carlos') } },
+      { tipo: 'menciona', alguno: ['Ver descuentos', 'Gestionar descuentos'] },
+    ],
+  },
+  {
+    id: 'estado-empleado-no-ve', categoria: 'estado', pantalla: 'pedidos', rol: 'empleado',
+    descripcion: 'El empleado pregunta por qué no ve algo: es su rol, no un error',
+    mensaje: '¿Por qué no me aparece Descuentos en el menú?',
+    expectativas: [
+      { tipo: 'llama', tool: 'accesoDelEquipo' },
+      { tipo: 'menciona', alguno: ['permiso', 'rol'] },
+    ],
+  },
 ];

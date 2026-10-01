@@ -35,6 +35,8 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from '../..
 import { ListCustomersTool, GetCustomerDetailTool } from '../../../src/orbi/tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from '../../../src/orbi/tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from '../../../src/orbi/tools/definitions/report.tools';
+import { LeerTemaDelManualTool } from '../../../src/orbi/tools/definitions/manual.tools';
+import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from '../../../src/orbi/tools/definitions/estado.tools';
 import type {
   ModuleSnapshot,
   DashboardSnapshot,
@@ -46,6 +48,8 @@ import type {
 import { fechaArgentina, inicioDeDiaArgentina, inicioDeMesArgentina } from '../../../src/common/utils/hora-argentina';
 import {
   BUSINESS_ID,
+  EQUIPO,
+  ESTADO_DEL_ALTA,
   MIEMBRO_DUENO_ID,
   MIEMBRO_EMPLEADO_ID,
   esVenta,
@@ -610,8 +614,33 @@ export function armarFakes(d: NegocioDePrueba) {
     business: estricto('prisma.business', {
       async findUnique(args: { where: { id: string } }) {
         return args.where.id === BUSINESS_ID
-          ? { name: d.negocio.nombre, industry: d.negocio.rubro, mode: d.negocio.modo }
+          ? { name: d.negocio.nombre, industry: d.negocio.rubro, mode: d.negocio.modo, isActive: ESTADO_DEL_ALTA.publicada, isPaused: false }
           : null;
+      },
+    }),
+    subscription: estricto('prisma.subscription', {
+      async findUnique(args: { where: { businessId: string } }) {
+        return args.where.businessId === BUSINESS_ID && ESTADO_DEL_ALTA.suscripcion ? { id: 'sub-1' } : null;
+      },
+    }),
+    member: estricto('prisma.member', {
+      async findFirst(args: { where: { id: string; businessId: string } }) {
+        return args.where.businessId === BUSINESS_ID ? { emailVerified: ESTADO_DEL_ALTA.emailVerificado } : null;
+      },
+      // accesoDelEquipo: búsqueda por nombre o email, SIEMPRE dentro del negocio.
+      async findMany(args: { where: { businessId: string; OR: { name?: { contains: string }; email?: { contains: string } }[] } }) {
+        if (args.where.businessId !== BUSINESS_ID) return [];
+        const q = (args.where.OR[0]?.name?.contains ?? '').toLowerCase();
+        return EQUIPO
+          .filter((m) => m.nombre.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+          .map((m) => ({
+            name: m.nombre,
+            status: m.estado,
+            role: {
+              name: m.rol,
+              rolePermissions: (m.rol === 'owner' ? [] : PERMISOS_EMPLEADO).map((code) => ({ permission: { code } })),
+            },
+          }));
       },
     }),
     order: estricto('prisma.order', {
@@ -645,7 +674,11 @@ export function armarFakes(d: NegocioDePrueba) {
     },
   });
 
-  const businesses = estricto('BusinessesService', {});
+  const businesses = estricto('BusinessesService', {
+    async getTutorial(_businessId: string) {
+      return { tutorial: null, cumplidas: [...ESTADO_DEL_ALTA.cumplidas] };
+    },
+  });
   const coupons = estricto('CouponsService', {});
 
   return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, snapshots };
@@ -660,13 +693,14 @@ export function armarFakes(d: NegocioDePrueba) {
  * no acá, la eval mediría un Orbi con menos herramientas.
  */
 export const TOOLS_DEL_PANEL = [
-  'NavigationTool',
+  'NavigationTool', 'LeerTemaDelManualTool',
   'ListProductsTool', 'CreateProductTool', 'GenerateDescriptionTool',
   'ListDiscountsTool', 'CreateDiscountTool', 'CreateCouponTool',
   'ListOrdersTool', 'GetOrderDetailTool', 'UpdateOrderStatusTool',
   'ListCustomersTool', 'GetCustomerDetailTool',
   'UpdateBusinessInfoTool', 'UpdatePaymentMethodsTool', 'UpdateShippingTool',
   'GetSalesReportTool', 'GetProductReportTool', 'GetCustomerReportTool',
+  'EstadoPrimerosPasosTool', 'AccesoDelEquipoTool',
 ] as const;
 
 export function armarRegistry(f: Fakes): ToolRegistryService {
@@ -677,6 +711,7 @@ export function armarRegistry(f: Fakes): ToolRegistryService {
   (registry as unknown as { logger: { log: () => void } }).logger.log = () => undefined;
 
   registry.register(new NavigationTool());
+  registry.register(new LeerTemaDelManualTool());
 
   registry.register(new ListProductsTool(n(f.products)));
   registry.register(new CreateProductTool(n(f.products), n(f.prisma)));
@@ -700,6 +735,9 @@ export function armarRegistry(f: Fakes): ToolRegistryService {
   registry.register(new GetSalesReportTool(n(f.reports)));
   registry.register(new GetProductReportTool(n(f.reports)));
   registry.register(new GetCustomerReportTool(n(f.reports)));
+
+  registry.register(new EstadoPrimerosPasosTool(n(f.businesses), n(f.prisma)));
+  registry.register(new AccesoDelEquipoTool(n(f.prisma)));
 
   return registry;
 }
