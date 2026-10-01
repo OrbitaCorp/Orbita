@@ -12,6 +12,9 @@ import { useMediaQuery } from './useMediaQuery'
 import { track } from '@/lib/analytics/wizardTracker'
 import { ID_PANEL_ORBI } from './types'
 
+// Las cosquillas del encabezado no muestran texto: solo la reacción del pet.
+const sinAviso = () => {}
+
 export function OrbiPanel() {
   const isOpen = useOrbiStore(s => s.isOpen)
   const close = useOrbiStore(s => s.close)
@@ -76,13 +79,16 @@ export function OrbiPanel() {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '14px 16px',
+          padding: '10px 16px',
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
           {/* En el panel toma la forma del módulo y reacciona al chat; en "Crear tu
               espacio" (wizard) queda en su forma base. */}
-          {isWizard ? <OrbiPet modulo="dashboard" size={40} disc /> : <OrbiPet size={40} disc estado={estadoPet} />}
+          {/* Grande y sin disco: el pet suelto sobre el panel. Se le pueden hacer cosquillas. */}
+          {isWizard
+            ? <OrbiPet modulo="dashboard" size={56} onCosquillas={sinAviso} />
+            : <OrbiPet size={56} estado={estadoPet} onCosquillas={sinAviso} />}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (
