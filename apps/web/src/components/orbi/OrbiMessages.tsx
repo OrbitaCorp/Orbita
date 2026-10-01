@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, type ReactNode } from 'react'
 import { ThumbsUp, ThumbsDown, Check, CircleAlert, CircleHelp, Loader2, RotateCw, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
-import { OrbiIcon } from './OrbiIcon'
 import { OrbiPet } from './pet/OrbiPet'
 import { OrbiPetSay } from './pet/OrbiPetSay'
 import { petModulo, PET_COSQUILLAS } from './pet/petModulos'
@@ -293,7 +292,7 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
       {!isUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          {esPanel ? <OrbiPet size={22} disc /> : <OrbiIcon size={22} disc />}
+          <OrbiPet modulo={esPanel ? undefined : 'dashboard'} size={22} disc />
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)' }}>Orbi</span>
         </div>
       )}
@@ -472,7 +471,7 @@ export function OrbiMessages() {
   if (!messages.length) {
     return (
       <div className="orbi-messages-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
-        {esPanel ? <EscenarioPet /> : <OrbiIcon size={48} disc />}
+        {esPanel ? <EscenarioPet /> : <OrbiPet modulo="dashboard" size={48} disc />}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>Hola, soy Orbi</div>
           <div style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>

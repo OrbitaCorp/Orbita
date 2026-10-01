@@ -3,7 +3,6 @@ import { SquarePen, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
 import { useOrbiContext } from './useOrbiContext'
-import { OrbiIcon } from './OrbiIcon'
 import { OrbiPet } from './pet/OrbiPet'
 import { usePetEstado } from './pet/usePetEstado'
 import { OrbiMessages } from './OrbiMessages'
@@ -81,7 +80,9 @@ export function OrbiPanel() {
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
-          {isWizard ? <OrbiIcon size={30} disc /> : <OrbiPet size={40} disc estado={estadoPet} />}
+          {/* En el panel toma la forma del módulo y reacciona al chat; en "Crear tu
+              espacio" (wizard) queda en su forma base. */}
+          {isWizard ? <OrbiPet modulo="dashboard" size={40} disc /> : <OrbiPet size={40} disc estado={estadoPet} />}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (

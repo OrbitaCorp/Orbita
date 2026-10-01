@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 import { useOrbiContext } from './useOrbiContext'
 import { useOrbiChat } from './useOrbiChat'
 import { ORBI_STEP_LABELS } from './orbiWizardSteps'
@@ -22,7 +22,7 @@ export function OrbiWizardCtx({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ flexShrink: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
       <div className="orbi-ctx-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 9px' }}>
-        <OrbiIcon size={28} disc />
+        <OrbiPet modulo="dashboard" size={28} disc />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--color-text)' }}>Orbi</div>
           {sub && <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>{sub}</div>}
