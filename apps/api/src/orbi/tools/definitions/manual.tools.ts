@@ -59,15 +59,14 @@ export class LeerTemaDelManualTool implements OrbiTool {
       return { success: false, error: 'Pasá al menos un id del índice del manual.', label };
     }
 
-    const leidos = ids.slice(0, MAX_TEMAS_POR_LLAMADA);
+    // Primero se separan los que existen y RECIÉN después se recorta: con
+    // ['x', 'y', 'z', 'cfg-envios'] el tema válido no se puede perder.
+    const existentes = ids.filter((id) => temaDelManual(id));
+    const noEncontrados = ids.filter((id) => !temaDelManual(id)).map(idParaLog);
+    const leidos = existentes.slice(0, MAX_TEMAS_POR_LLAMADA);
     const temas: { id: string; capitulo: string; titulo: string; texto: string; irA?: { label: string; path: string } }[] = [];
-    const noEncontrados: string[] = [];
     for (const id of leidos) {
-      const tema = temaDelManual(id);
-      if (!tema) {
-        noEncontrados.push(idParaLog(id));
-        continue;
-      }
+      const tema = temaDelManual(id)!;
       temas.push({
         id: tema.id,
         capitulo: tema.capitulo,
@@ -95,7 +94,7 @@ export class LeerTemaDelManualTool implements OrbiTool {
       data: {
         temas,
         ...(noEncontrados.length ? { noEncontrados } : {}),
-        ...(ids.length > leidos.length ? { sinLeer: ids.slice(leidos.length).map(idParaLog) } : {}),
+        ...(existentes.length > leidos.length ? { sinLeer: existentes.slice(leidos.length).map(idParaLog) } : {}),
         ...(destino ? { path: destino.path } : {}),
       },
     };

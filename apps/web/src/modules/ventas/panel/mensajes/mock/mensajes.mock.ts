@@ -132,12 +132,13 @@ export const DATOS_EJEMPLO: Record<string, string> = {
   nombre: 'María', id: '1284', tracking: 'AR3489573', tienda: 'Rama Indumentaria',
 }
 
-// Reemplaza SOLO las variables para las que hay un dato real de la conversación
-// o del negocio ({nombre}, {tienda}). {id} y {tracking} — que dependen de un
-// pedido puntual que este chat no conoce (el hilo es por cliente, no por
-// pedido) — quedan literales para que el vendedor las complete a mano antes de
-// enviar. Preferimos un hueco visible ("{tracking}") a mandarle al cliente un
-// dato inventado, que es lo que hacía antes (constantes hardcodeadas del mock).
+// Reemplaza SOLO las variables para las que hay un dato real: {nombre} y
+// {tienda} de la conversación y del negocio; {id} y {tracking} del pedido más
+// reciente del cliente, si lo hay (el hilo es por cliente, no por pedido: el
+// Composer pasa pedidos[0]). Lo que no tiene dato queda literal para que el
+// vendedor lo complete a mano antes de enviar. Preferimos un hueco visible
+// ("{tracking}") a mandarle al cliente un dato inventado, que es lo que hacía
+// antes (constantes hardcodeadas del mock).
 export function resolverVariables(
   texto: string,
   datos: { nombre?: string; tienda?: string; pedido?: { numero: number; tracking: string | null } },

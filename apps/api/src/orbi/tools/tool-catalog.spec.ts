@@ -243,10 +243,28 @@ describe('Orbi — catálogo completo de tools', () => {
     }
     // La excepción se verifica, no se declara: si una de estas tools empieza
     // a recibir el ctx (y podría leer el negocio), tiene que pedir un permiso.
+    // `execute.length` solo no alcanza: un parámetro con default o un rest no
+    // cuenta, `arguments` lee el ctx igual, y un service inyectado por el
+    // constructor llega a la base sin pasar por el ctx.
     for (const nombre of SIN_DATOS_DEL_NEGOCIO) {
       const tool = (registry as any).tools.get(nombre);
-      expect({ nombre, parametrosDeExecute: tool.execute.length, permisos: tool.requiredPermissions })
-        .toEqual({ nombre, parametrosDeExecute: 1, permisos: [] });
+      const fuente: string = tool.execute.toString();
+      const firma = fuente.slice(0, fuente.indexOf(')') + 1);
+      expect({
+        nombre,
+        parametrosDeExecute: tool.execute.length,
+        firmaDeUnSoloParametro: /^(async\s+)?execute\(\s*[A-Za-z_$][\w$]*\s*\)$/.test(firma),
+        usaArguments: /\barguments\b/.test(fuente),
+        serviciosInyectados: tool.constructor.length,
+        permisos: tool.requiredPermissions,
+      }).toEqual({
+        nombre,
+        parametrosDeExecute: 1,
+        firmaDeUnSoloParametro: true,
+        usaArguments: false,
+        serviciosInyectados: 0,
+        permisos: [],
+      });
     }
   });
 

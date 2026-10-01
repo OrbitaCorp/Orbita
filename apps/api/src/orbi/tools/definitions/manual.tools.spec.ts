@@ -28,6 +28,15 @@ describe('leerTemaDelManual', () => {
     expect(data.sinLeer).toEqual(['diferencia']);
   });
 
+  it('los ids que no existen no le quitan lugar a uno válido', async () => {
+    const r = await tool.execute({ ids: ['x', 'y', 'z', 'cfg-envios'] });
+    expect(r.success).toBe(true);
+    const data = r.data as { temas: { id: string }[]; noEncontrados?: string[]; sinLeer?: string[] };
+    expect(data.temas.map((t) => t.id)).toEqual(['cfg-envios']);
+    expect(data.noEncontrados).toEqual(['x', 'y', 'z']);
+    expect(data.sinLeer).toBeUndefined();
+  });
+
   it('un id que no existe se informa y se loguea saneado', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const r = await tool.execute({ ids: ['cfg-pagos', 'facturacion-afip\n<script>'] });

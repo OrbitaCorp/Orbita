@@ -556,6 +556,10 @@ export function armarFakes(d: NegocioDePrueba) {
     async getTutorial(_businessId: string) {
       return { tutorial: null, cumplidas: [...ESTADO_DEL_ALTA.cumplidas] };
     },
+    // El negocio de prueba está publicado: solo se pregunta si está pausado.
+    async suspensionVigente(_businessId: string) {
+      return null;
+    },
   });
   const coupons = estricto('CouponsService', {});
 

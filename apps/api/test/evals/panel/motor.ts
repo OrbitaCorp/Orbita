@@ -203,12 +203,15 @@ export async function correrCaso(
   };
   const { systemPrompt, tools } = variante.ajustar(base);
 
-  const toolCtx: ToolExecutionContext = {
+  // `roleName` es de la rama (estadoPrimerosPasos lo usa); con el `as` esto
+  // también compila sobre main, donde el contexto no lo tiene (línea de base).
+  const toolCtx = {
     businessId: BUSINESS_ID,
     userId: usuario.memberId,
     surface: OrbiSurface.PANEL,
     permissions: permisos,
-  };
+    roleName: usuario.roleName,
+  } as ToolExecutionContext;
 
   const messages: LlmMessage[] = [
     { role: 'system', content: systemPrompt },

@@ -4,6 +4,7 @@ import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { BusinessesService } from '../../../businesses/businesses.service';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import { MANUAL, rutaDeDestino } from '../../manual/manual';
+import { rutaDelPanel } from '../../navegacion/ruta';
 import { CODIGOS_DEL_CATALOGO, PERMISSIONS } from '../../../common/permisos/catalogo';
 
 // Las dos tools que contestan con el ESTADO REAL del negocio lo que el manual
@@ -13,12 +14,22 @@ import { CODIGOS_DEL_CATALOGO, PERMISSIONS } from '../../../common/permisos/cata
 
 /**
  * Pasos del checklist que la base no puede detectar: mirar una pantalla no
- * deja rastro (ver BusinessesService#getTutorial). `verificar-email` sí se
- * detecta, pero de quien pregunta, no del negocio: se resuelve aparte.
+ * deja rastro (ver BusinessesService#getTutorial). Cuentan como hechos solo si
+ * la persona los tildó a mano (tutorial.hechas).
  */
-const PASOS_SIN_RASTRO = new Set(['herramientas', 'reportes', 'plan']);
+export const PASOS_SIN_RASTRO = new Set(['herramientas', 'reportes', 'plan']);
 
-const RUTA_SUSCRIPCION = '/admin/ventas/configuracion?vista=suscripcion';
+/** Pasos que no hacen falta para vender: no se usan para el botón de "¿qué me falta?". */
+const PASOS_OPCIONALES = new Set(['mp', 'verificar-email']);
+
+const RUTA_SUSCRIPCION = rutaDelPanel('configuracion', 'suscripcion');
+const RUTA_SOPORTE = rutaDelPanel('configuracion', 'soporte');
+const RUTA_ZONA_PELIGROSA = rutaDelPanel('configuracion', 'peligro');
+
+/** Por HTTP, la suscripción y publicar son `@Roles('owner','admin')`. */
+const VE_LA_CUENTA = new Set(['owner', 'admin']);
+
+type Bloqueante = { motivo: string; irA?: { label: string; path: string } };
 
 export class EstadoPrimerosPasosTool implements OrbiTool {
   name = 'estadoPrimerosPasos';
@@ -43,53 +54,78 @@ export class EstadoPrimerosPasosTool implements OrbiTool {
     return { name: this.name, description: this.description, parameters: this.parameters };
   }
 
+  /**
+   * Lo único que de verdad impide vender. `isPaused` lo usan tres causas
+   * (suspension.ts: "el campo solo no distingue 'la pausé yo' de 'me la
+   * bajaron'"), así que se pregunta cuál: decirle "debés un pago" a quien la
+   * pausó a propósito sería mentirle.
+   */
+  private async bloqueante(
+    businessId: string,
+    negocio: { isActive: boolean; isPaused: boolean; cancelledAt: Date | null } | null,
+    conSuscripcion: boolean,
+  ): Promise<Bloqueante | undefined> {
+    if (negocio?.isPaused) {
+      const suspension = await this.businesses.suspensionVigente(businessId);
+      if (suspension === 'PLATAFORMA') return { motivo: 'La tienda está suspendida por Órbita. Se reactiva escribiendo a Soporte.', irA: { label: 'Abrir Soporte', path: RUTA_SOPORTE } };
+      // La baja del espacio también pausa y deja la suscripción en CANCELLED:
+      // sin este caso, suspensionVigente diría MORA ("debés un pago") a quien
+      // se dio de baja él mismo (SubscriptionsService, baja del negocio).
+      if (negocio.cancelledAt) return { motivo: 'El espacio está dado de baja: la tienda no se ve. Dentro de los 60 días se recupera con "Reactivar espacio" en Configuración → Zona peligrosa.', irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA } };
+      if (suspension === 'MORA') return { motivo: 'La tienda está suspendida por un pago pendiente de la suscripción.', irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION } };
+      return { motivo: 'La tienda está pausada desde el panel. Se reactiva con "Reactivar tienda" en Configuración → Zona peligrosa.', irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA } };
+    }
+    if (!negocio?.isActive && !conSuscripcion) {
+      return { motivo: 'Para publicar la tienda falta activar la suscripción.', irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION } };
+    }
+    return undefined;
+  }
+
   async execute(_args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     const label = 'Primeros pasos';
     try {
-      const [{ cumplidas }, suscripcion, negocio, miembro] = await Promise.all([
+      const [{ tutorial, cumplidas }, suscripcion, negocio, miembro] = await Promise.all([
         this.businesses.getTutorial(ctx.businessId),
         // Mismo gate que BusinessesService#publish: sin fila de suscripción no
-        // se puede publicar. Es el ÚNICO bloqueante real; lo demás recomienda.
+        // se puede publicar.
         this.prisma.subscription.findUnique({ where: { businessId: ctx.businessId }, select: { id: true } }),
-        this.prisma.business.findUnique({ where: { id: ctx.businessId }, select: { isActive: true, isPaused: true } }),
+        this.prisma.business.findUnique({ where: { id: ctx.businessId }, select: { isActive: true, isPaused: true, cancelledAt: true } }),
         this.prisma.member.findFirst({ where: { id: ctx.userId, businessId: ctx.businessId }, select: { emailVerified: true } }),
       ]);
 
       const publicada = !!negocio?.isActive && !negocio.isPaused;
-      let bloqueante: { motivo: string; irA: { label: string; path: string } } | undefined;
-      if (!publicada && !suscripcion) {
-        bloqueante = {
-          motivo: 'Para publicar la tienda falta activar la suscripción.',
-          irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION },
-        };
-      } else if (negocio?.isPaused) {
-        bloqueante = {
-          motivo: 'La tienda está pausada por un pago pendiente de la suscripción.',
-          irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION },
-        };
-      }
+      const bloqueante = await this.bloqueante(ctx.businessId, negocio, !!suscripcion);
+      // La suscripción y su estado son de propietario/admin por HTTP: a otro
+      // rol no se le cuenta el detalle, solo que hay algo que resolver.
+      const veLaCuenta = VE_LA_CUENTA.has(ctx.roleName ?? '');
+      const bloqueanteVisible: Bloqueante | undefined = bloqueante && (veLaCuenta
+        ? bloqueante
+        : { motivo: 'Hay algo de la cuenta de la tienda que tiene que resolver el propietario.' });
 
-      const hechos = new Set(cumplidas);
+      // Lo que la base detecta, más lo que la persona tildó a mano en la tarjeta.
+      const hechos = new Set([...cumplidas, ...(tutorial?.hechas ?? [])]);
       if (miembro?.emailVerified) hechos.add('verificar-email');
 
-      const detectables = MANUAL.primerosPasos.filter((p) => !PASOS_SIN_RASTRO.has(p.id));
-      const pendientes = detectables
+      const pendientes = MANUAL.primerosPasos
         .filter((p) => !hechos.has(p.id))
-        .map((p) => ({ titulo: p.titulo, etapa: p.etapa, irA: { label: p.destino.label, path: rutaDeDestino(p.destino) } }));
-      const sinDatos = MANUAL.primerosPasos.filter((p) => PASOS_SIN_RASTRO.has(p.id)).map((p) => p.titulo);
+        .map((p) => ({ id: p.id, titulo: p.titulo, etapa: p.etapa, irA: { label: p.destino.label, path: rutaDeDestino(p.destino) } }))
+        // Etapa 1 primero: son los pasos para salir a vender.
+        .sort((a, b) => a.etapa - b.etapa);
+      const sinDatos = MANUAL.primerosPasos.filter((p) => PASOS_SIN_RASTRO.has(p.id) && !hechos.has(p.id)).map((p) => p.titulo);
 
-      const primero = bloqueante?.irA ?? pendientes[0]?.irA;
+      // El botón: el bloqueante, o el primer paso que de verdad hace falta.
+      const siguiente = pendientes.find((p) => !PASOS_OPCIONALES.has(p.id) && !PASOS_SIN_RASTRO.has(p.id));
+      const primero = bloqueanteVisible?.irA ?? siguiente?.irA;
       return {
         success: true,
         label: primero?.label ?? label,
         data: {
           publicada,
-          ...(bloqueante ? { bloqueante: bloqueante.motivo } : {}),
-          // Etapa 1 primero: son los pasos para salir a vender.
-          pendientes: [...pendientes].sort((a, b) => a.etapa - b.etapa),
-          cumplidos: detectables.length - pendientes.length,
-          total: detectables.length,
-          noSePuedenVerificar: sinDatos,
+          ...(bloqueanteVisible ? { bloqueante: bloqueanteVisible.motivo } : {}),
+          pendientes: pendientes.filter((p) => !PASOS_SIN_RASTRO.has(p.id)).map(({ titulo, etapa, irA }) => ({ titulo, etapa, irA })),
+          cumplidos: MANUAL.primerosPasos.length - pendientes.length,
+          total: MANUAL.primerosPasos.length,
+          ...(sinDatos.length ? { noSePuedenVerificar: sinDatos } : {}),
           ...(primero ? { path: primero.path } : {}),
         },
       };
@@ -102,7 +138,9 @@ export class EstadoPrimerosPasosTool implements OrbiTool {
 const ETIQUETA_DEL_PERMISO = new Map(PERMISSIONS.map((p) => [p.code, p.label]));
 
 /** Los roles por defecto con el nombre que muestra la pantalla de Equipo; los personalizados, tal cual. */
-const NOMBRE_DEL_ROL: Record<string, string> = { owner: 'Propietario', empleado: 'Empleado', admin: 'Administrador' };
+// "admin" ya no se crea, pero los negocios viejos lo tienen: la pantalla de
+// Equipo lo muestra como Propietario (Equipo.tsx).
+const NOMBRE_DEL_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Propietario', empleado: 'Empleado' };
 
 /** Qué módulos del menú ve alguien con esos permisos, y qué le falta para los demás. */
 export function accesoPorModulo(permisos: string[], esDueno: boolean) {
@@ -166,6 +204,8 @@ export class AccesoDelEquipoTool implements OrbiTool {
         },
         select: {
           name: true,
+          // Solo para reconocer la coincidencia exacta: no se devuelve.
+          email: true,
           status: true,
           role: { select: { name: true, rolePermissions: { select: { permission: { select: { code: true } } } } } },
         },
@@ -175,7 +215,10 @@ export class AccesoDelEquipoTool implements OrbiTool {
       if (!miembros.length) {
         return { success: false, error: `No encontré a nadie del equipo que se llame "${persona}".`, label };
       }
-      if (miembros.length > 1) {
+      // "Ana" también matchea "Juliana": si hay UNA coincidencia exacta (nombre o
+      // email, sin mayúsculas), es esa.
+      const exacta = miembros.filter((m) => m.name.trim().toLowerCase() === persona.toLowerCase() || m.email?.toLowerCase() === persona.toLowerCase());
+      if (miembros.length > 1 && exacta.length !== 1) {
         // Ambiguo: que la persona elija, sin adivinar.
         return {
           success: true,
@@ -184,7 +227,7 @@ export class AccesoDelEquipoTool implements OrbiTool {
         };
       }
 
-      const m = miembros[0];
+      const m = exacta.length === 1 ? exacta[0] : miembros[0];
       const esDueno = m.role.name === 'owner';
       const permisos = m.role.rolePermissions.map((rp) => rp.permission.code);
       return {

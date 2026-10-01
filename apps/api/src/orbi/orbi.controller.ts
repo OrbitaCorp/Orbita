@@ -306,6 +306,7 @@ export class OrbiController {
         userId: user.memberId,
         surface: dto.context.surface,
         permissions: permisos,
+        roleName: user.roleName,
       };
 
       let fullResponse = '';
@@ -627,6 +628,7 @@ export class OrbiController {
         userId: user.memberId,
         surface: OrbiSurface.PANEL,
         permissions: permisosDeOrbi(user),
+        roleName: user.roleName,
       };
       // Si la tarjeta ya no describe lo que pasaría (el pedido cambió de
       // estado desde la propuesta), no se ejecuta: la persona aprobó otra cosa.

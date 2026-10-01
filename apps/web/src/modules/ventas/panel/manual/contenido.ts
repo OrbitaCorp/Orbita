@@ -394,7 +394,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Categoría', texto: 'Dónde vive dentro de tu catálogo.' },
                     { titulo: 'Publicado o borrador', texto: 'Borrador lo deja invisible hasta que esté listo.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Generar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Redactar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
             ],
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
@@ -760,9 +760,15 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'cfg-peligro', titulo: 'Zona peligrosa',
             bloques: [
-                { tipo: 'parrafo', texto: 'Las acciones que no tienen vuelta atrás, como dar de baja el negocio. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada.' },
-                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, leé el botón "¿Qué pasa si...?": te explica exactamente qué se pierde.' },
+                { tipo: 'parrafo', texto: 'Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso **Editar configuración**.' },
+                { tipo: 'lista', items: [
+                    '**Pausar tienda**: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice **Reactivar tienda**.',
+                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver.',
+                    '**Eliminar espacio**: la tienda se pausa al instante y tenés 60 días para arrepentirte con **Reactivar espacio**. Pasado ese plazo se borra todo y no hay vuelta atrás.',
+                ] },
+                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, abrí el "¿Qué pasa si…?" de cada opción: te explica exactamente qué cambia y qué se pierde.' },
             ],
+            ir: { label: 'Abrir Zona peligrosa', seccion: 'configuracion', query: { vista: 'peligro' } },
         },
     ],
 },

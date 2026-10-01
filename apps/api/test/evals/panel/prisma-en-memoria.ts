@@ -68,7 +68,7 @@ export function crearTablas(d: NegocioDePrueba): Record<string, Fila[]> {
   return {
     business: [{
       id: BUSINESS_ID, name: d.negocio.nombre, industry: d.negocio.rubro, mode: d.negocio.modo,
-      isActive: ESTADO_DEL_ALTA.publicada, isPaused: false,
+      isActive: ESTADO_DEL_ALTA.publicada, isPaused: false, cancelledAt: null,
     }],
     order,
     onlineOrderDetails: d.pedidos.filter((p) => p.comprador).map((p) => ({ orderId: p.id, buyerName: p.comprador, buyerEmail: null })),

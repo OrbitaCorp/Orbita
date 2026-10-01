@@ -586,7 +586,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                                     <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--color-body)' }}>{t.detalle}</div>
                                     {t.tip && (
                                         // Tip con la estética de Orbi (violeta + Sparkles, como el
-                                        // botón real "Generar con Orbi" de la pantalla de producto):
+                                        // botón real "Redactar con Orbi" de la pantalla de producto):
                                         // tokens --color-violet-bg / --chip-violet-fg del sistema.
                                         <div style={{
                                             display: 'flex', gap: 8, marginTop: 8, padding: '8px 10px',

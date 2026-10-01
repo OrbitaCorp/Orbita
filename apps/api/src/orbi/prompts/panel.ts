@@ -69,13 +69,15 @@ function formatDashboardData(data: DashboardSnapshot): string {
   return lines.join('\n');
 }
 
+// Las pestañas de Pedidos: COMPLETED (venta de mostrador cobrada) se ve como
+// "Entregado" (PedidoLista.tsx), así que se suma ahí.
 const ESTADO_DEL_PEDIDO: Record<string, string> = {
   PENDING: 'pendientes',
   CONFIRMED: 'confirmados',
   PREPARING: 'en preparación',
   SHIPPED: 'enviados',
   DELIVERED: 'entregados',
-  COMPLETED: 'completados',
+  COMPLETED: 'entregados',
   CANCELLED: 'cancelados',
 };
 
@@ -102,10 +104,13 @@ function formatPedidosData(data: PedidosSnapshot): string {
   const total = Object.values(data.countByStatus).reduce((a, b) => a + b, 0);
   // Con las palabras de la pantalla: si el prompt dice PENDING, Orbi le dice
   // "PENDING" a la persona.
-  const statusLines = Object.entries(data.countByStatus)
-    .filter(([, n]) => n > 0)
-    .map(([s, n]) => `  ${ESTADO_DEL_PEDIDO[s] ?? s.toLowerCase()}: ${n}`)
-    .join('\n');
+  const porEtiqueta = new Map<string, number>();
+  for (const [s, n] of Object.entries(data.countByStatus)) {
+    if (n <= 0) continue;
+    const etiqueta = ESTADO_DEL_PEDIDO[s] ?? s.toLowerCase();
+    porEtiqueta.set(etiqueta, (porEtiqueta.get(etiqueta) ?? 0) + n);
+  }
+  const statusLines = [...porEtiqueta].map(([etiqueta, n]) => `  ${etiqueta}: ${n}`).join('\n');
 
   const lines = [
     `## Estado actual de pedidos`,

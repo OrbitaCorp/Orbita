@@ -400,7 +400,8 @@ describe('ContextBuilderService', () => {
     } as any, ['orders.view']);
 
     expect(prompt).toContain('pendientes: 5');
-    expect(prompt).toContain('completados: 20');
+    // COMPLETED se ve como "Entregado" en la pantalla.
+    expect(prompt).toContain('entregados: 20');
     expect(prompt).not.toContain('PENDING');
     expect(prompt).toContain('36h sin confirmar');
     expect(prompt).toContain('$8.500');

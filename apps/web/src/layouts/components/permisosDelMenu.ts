@@ -7,7 +7,7 @@
 //   accesoDelEquipo explica "tu empleado no ve Descuentos porque le falta
 //   «Ver descuentos»" con estos mismos datos, no con una copia.
 //
-// Las etiquetas son las de MODULOS en Sidebar.tsx; permisosDelMenu.test.ts
+// Las etiquetas son las de MODULOS en Sidebar.tsx; el test "permisos del menú" de manual/paraOrbi.test.ts
 // compara las dos listas.
 
 export const MODULOS_DEL_MENU: { id: string; label: string; permisos: string[] }[] = [
