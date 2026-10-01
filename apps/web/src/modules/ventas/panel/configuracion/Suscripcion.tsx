@@ -45,6 +45,7 @@ const INCLUYE = [
     'Oferta relámpago',
     'Fotos sin fondo automáticas',
     'Fondo con IA para tus productos',
+    'Escaneo de productos con IA (cargá un producto desde su foto)',
 ]
 
 // SUSPENDED y CANCELLED sumados (RBT — ciclo de vida de suscripciones,

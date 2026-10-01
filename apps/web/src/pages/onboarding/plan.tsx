@@ -46,6 +46,7 @@ const DETALLE_AVANZADO: DetalleItem[] = [
   { titulo: 'Oferta relámpago', texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta.' },
   { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic.' },
   { titulo: 'Fondo con IA', texto: 'Generá un fondo profesional para la foto de tu producto, sin sesión de fotos.' },
+  { titulo: 'Escaneo de productos con IA', texto: 'Sacale una foto a tu producto y Orbi completa el nombre, la categoría y la descripción.' },
 ]
 
 interface CardPlan {

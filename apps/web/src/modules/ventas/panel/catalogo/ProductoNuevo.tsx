@@ -815,7 +815,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
             setOrbiScanKey(key)
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            // El servidor responde 403 ADDON_REQUIRED:ADVANCED si el negocio no tiene el
+            // paquete (el botón ya no se ofrece sin él, pero el plan pudo vencer con la
+            // pantalla abierta).
+            if (err instanceof ApiError && err.message.startsWith('ADDON_REQUIRED')) {
+                onToast('Escanear productos con una foto es parte del paquete Avanzado.')
+            } else {
+                onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            }
         } finally {
             setOrbiScanGen(false)
             if (fileInputScanRef.current) {
@@ -2037,7 +2044,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
-                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                    {fotoParaOrbi && !orbiScanSuccess && avanzado && (
                                         <button
                                             type="button"
                                             onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
@@ -2048,6 +2055,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                             {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
                                         </button>
+                                    )}
+                                    {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
+                                        de dejar un botón que el servidor va a rechazar. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
+                                        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+                                            Completar el producto con una foto es parte del paquete Avanzado.{' '}
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
+                                                className="ds-link"
+                                                style={{ ...enlace, display: 'inline', fontSize: 12.5 }}
+                                            >
+                                                Ver el paquete
+                                            </button>
+                                        </div>
                                     )}
                                     {orbiScanSuccess && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
