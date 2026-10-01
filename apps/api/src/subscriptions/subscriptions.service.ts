@@ -246,7 +246,11 @@ export class SubscriptionsService {
   private get urlWebhookAltas(): string | undefined {
     const redirect = this.config.get<string>('MERCADOPAGO_REDIRECT_URI') ?? '';
     const url = redirect.replace('/mercadopago/oauth/callback', '/webhooks/mercadopago/preapproval');
-    return url.startsWith('https://') && url !== redirect ? url : undefined;
+    // source_news=webhooks: sin esto MP manda además el aviso IPN viejo
+    // (topic=payment / merchant_order, "Feed v2.0"), que no trae firma y cae
+    // en "firma inválida" en el log por cada pago (se vio el 01/10). El aviso
+    // que sirve es el webhook firmado.
+    return url.startsWith('https://') && url !== redirect ? `${url}?source_news=webhooks` : undefined;
   }
 
   private mpConfig(): MercadoPagoConfig {
@@ -1811,7 +1815,15 @@ export class SubscriptionsService {
         const ref = pago.external_reference ?? '';
         if (ref.startsWith(PENDING_REF_PREFIX) || ref.startsWith(FREE_SIGNUP_PREFIX)) {
           const result = await this.confirmAndCreate(ref);
-          this.logger.log(`Webhook pago de bienvenida ${id} (ref ${ref}): ${JSON.stringify(result)}`);
+          // SIN accessToken/refreshToken: confirmAndCreate devuelve la sesión
+          // recién creada del dueño (la usa la vuelta del navegador) y
+          // loguear el resultado entero dejaba un refresh token válido en
+          // texto plano en Cloud Logging. Se vio el 01/10 en la primera alta
+          // confirmada por este webhook.
+          const { accessToken: _a, refreshToken: _r, ...seguro } = result as Record<string, unknown>;
+          void _a;
+          void _r;
+          this.logger.log(`Webhook pago de bienvenida ${id} (ref ${ref}): ${JSON.stringify(seguro)}`);
         } else {
           const result = await this.recordPayment(String(id));
           this.logger.log(`Webhook pago ${id}: ${JSON.stringify(result)}`);
