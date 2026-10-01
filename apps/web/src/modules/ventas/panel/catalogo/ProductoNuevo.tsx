@@ -1810,6 +1810,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         ...imagenes.filter(i => i.fondoIA).map(i => i.preview),
     ])
 
+    // Fotos que se están procesando ahora (la vista previa les dibuja un spinner
+    // encima): una pendiente con fondo aplicándose o con "Quitar fondo" corriendo,
+    // y una guardada con "Quitar fondo" corriendo. url -> texto del overlay.
+    const urlsEnProceso = new Map<string, string>([
+        ...imagenes
+            .filter(i => i.aplicandoFondo || fondoEnProceso.has(i.key))
+            .map((i): [string, string] => [i.preview, i.aplicandoFondo ? 'Aplicando fondo…' : 'Quitando fondo…']),
+        ...guardadas
+            .filter(g => fondoEnProceso.has(g.id))
+            .map((g): [string, string] => [g.url, 'Quitando fondo…']),
+    ])
+
     if (cargando) {
         return <ProductoNuevoSkeleton />
     }
@@ -2780,6 +2792,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
                             stockTotal={stockTotal}
                             urlsConFondoIA={urlsConFondoIA}
+                            urlsEnProceso={urlsEnProceso}
                         />
                     </Card>
                 </div>
@@ -2827,7 +2840,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA, urlsEnProceso,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -2843,6 +2856,9 @@ function PreviewProducto({
     // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
     // comentario largo más abajo, sigue aplicando a las fotos comunes.
     urlsConFondoIA: Set<string>
+    // URL de foto -> texto, para las que se están procesando (fondo aplicándose o
+    // quitándose): se les dibuja un spinner encima mientras dura.
+    urlsEnProceso: Map<string, string>
 }) {
     const p = Number(precio) || 0
 
@@ -2896,6 +2912,20 @@ function PreviewProducto({
                             <div style={{ fontSize: 11, marginTop: 6 }}>Sin foto todavía</div>
                         </div>
                     </div>}
+                {imagenMostrada && urlsEnProceso.has(imagenMostrada) && (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(15, 23, 42, 0.6)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: 8, color: '#fff', backdropFilter: 'blur(2px)',
+                        }}
+                    >
+                        <Loader2 size={30} className="animate-spin" />
+                        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.02em' }}>{urlsEnProceso.get(imagenMostrada)}</span>
+                    </div>
+                )}
                 {estado === 'DRAFT' && (
                     <span style={{ position: 'absolute', top: 10, right: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                         BORRADOR
@@ -3399,14 +3429,15 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         {/* Controles de orden: número de posición y flechas táctiles */}
@@ -3575,14 +3606,15 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         <ControlOrdenFoto
