@@ -83,7 +83,13 @@ export type BloqueReceta =
   | { t: 'categorias'; estilo: 'grilla' | 'pastillas' | 'tira' | 'altas'; cols?: number }
   // Una fila de productos. `id` es la clave de su encabezado editable, así que
   // dos filas de la misma plantilla no pueden repetirlo.
-  | { t: 'fila'; id: string; fuente?: 'destacados' | 'masVendidos' | 'catalogo'; estilo?: 'grilla' | 'tira' | 'sangre'; cols?: number }
+  //
+  // `fuente` es uno de los cuatro estantes de Apariencia, y se llena con lo
+  // mismo que en el home clásico: los marcados con la estrella, lo último
+  // cargado, lo recomendado y lo que más se vendió. Cada uno tiene su
+  // interruptor en Apariencia, y uno sin productos no se dibuja — una tienda
+  // que recién empieza no tiene "Top ventas" que mostrar.
+  | { t: 'fila'; id: string; fuente: Estante; estilo?: 'grilla' | 'tira' | 'sangre'; cols?: number }
   // El nombre de una categoría y, abajo, productos DE esa categoría.
   | { t: 'porCategoria'; cuantas?: number; porFila?: number }
   // Un espacio de anuncio. No todas las plantillas llevan uno, y las que sí
@@ -91,14 +97,37 @@ export type BloqueReceta =
   // punta a punta, `filete` una línea fina con el texto centrado, `cartelera`
   // el texto corriendo en loop, y `apilada` un bloque centrado con aire.
   | { t: 'franja'; estilo?: 'plena' | 'filete' | 'cartelera' | 'apilada' }
-  // Banner con la foto quieta y el contenido pasando por encima. Es el mismo
-  // efecto que ofrece Apariencia; acá es un bloque más, para las plantillas
-  // donde pega. En celular y con `prefers-reduced-motion` se apaga solo.
+  // La barra de estadísticas de Apariencia ("+1.200 ventas", "48 hs").
+  | { t: 'stats' }
+  // El banner parallax de Apariencia: la foto quieta y el contenido pasando
+  // por encima. En celular y con `prefers-reduced-motion` se apaga solo.
   | { t: 'parallax' }
+  // "Marcas con las que trabajás", de Apariencia.
+  | { t: 'marcas' }
+  // "Video en tu tienda", de Apariencia.
+  | { t: 'video' }
   // Una foto ancha con texto encima, al final.
   | { t: 'campana' }
   // El bloque de consulta por WhatsApp.
   | { t: 'whatsapp' }
+
+// Los cuatro estantes de productos de Apariencia.
+export type Estante = 'destacados' | 'nuevos' | 'recomendados' | 'topVentas'
+
+// ─── El estándar ─────────────────────────────────────────────────────────────
+//
+// Lo que el dueño puede prender, apagar y cargar en Apariencia tiene que poder
+// hacerlo igual con una plantilla activa: son los MISMOS datos, y la plantilla
+// decide dónde va cada cosa y cómo se ve. Por eso toda receta ubica todos
+// estos bloques, aunque en una tienda puntual la mitad no se dibuje (un
+// estante apagado o sin productos, un parallax sin foto, una tira sin marcas).
+//
+// Antes cada receta elegía dos o tres: una traía solo "más vendidos", y a un
+// negocio que recién empieza no le servía — ni podía cambiarla.
+//
+// `categorias` se cumple también con `porCategoria`.
+export const BLOQUES_ESTANDAR = ['hero', 'stats', 'categorias', 'parallax', 'marcas', 'video', 'whatsapp'] as const
+export const ESTANTES: Estante[] = ['destacados', 'nuevos', 'recomendados', 'topVentas']
 
 export interface Receta {
   /** Dónde va el logo del header: a la izquierda (default) o centrado. */
@@ -320,6 +349,25 @@ export interface Plantilla {
   // su foto, y `productos` de acá arriba son los destacados nomás. En el
   // panel no existe.
   catalogo?: Producto[]
+  // ── Lo que viene de Apariencia (solo tienda real) ──
+  // Todo esto lo llena `plantillaReal()` con lo que el dueño cargó y prendió
+  // en Apariencia. En la vitrina del panel no existe, y cada bloque cae a su
+  // muestra.
+  //
+  // Los cuatro estantes, ya filtrados por su interruptor: uno apagado llega
+  // vacío, igual que uno sin productos.
+  estantes?: Record<Estante, Producto[]>
+  // "Sección de categorías" apagada.
+  ocultarCategorias?: boolean
+  // El anuncio de arriba del header, con su modo cartelera.
+  anuncio?: { texto: string; cartelera: boolean }
+  parallax?: { img: string; titulo: string; bajada: string; cta: string; link?: string; volanta?: string }
+  marcas?: { titulo: string; items: { nombre: string; logo?: string | null }[] }
+  // El banner de WhatsApp apagado, o sin un número cargado.
+  ocultarWhatsapp?: boolean
+  // "Barra de búsqueda" apagada.
+  ocultarBuscador?: boolean
+
   // Con esto puesto, el layout es 'receta': los bloques y su orden salen
   // de acá y el render es el compartido. Ver Receta más arriba.
   receta?: Receta
@@ -418,6 +466,8 @@ export interface AccionesHome {
   renderBuscador?: (opts: { compacto?: boolean }) => ReactNode
   /** Los enlaces de navegación reales del header (Apariencia → Header). */
   nav?: { label: string; onClick: () => void; activo?: boolean }[]
+  /** "Video en tu tienda" de Apariencia, ya resuelto. Null si no hay nada que mostrar. */
+  renderVideo?: () => ReactNode
   /** El pie real de la tienda, para las plantillas que no dibujan uno propio. */
   renderPie?: () => ReactNode
 }

@@ -25,7 +25,7 @@
 //  4. `max` es un tope de DISEÑO (el texto desborda la caja a ese tamaño),
 //     no de seguridad.
 
-import type { Receta, SeccionPlantilla } from './tipos'
+import type { Estante, Receta, SeccionPlantilla } from './tipos'
 import { PLANTILLAS } from './datos'
 import { IMG } from './tipos'
 
@@ -995,16 +995,21 @@ export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
  *
  * Sumar una plantilla nueva no es escribir un editor — es elegir bloques.
  */
+// Cómo se llama cada estante en el panel, y el encabezado con el que sale si
+// el dueño no lo cambia: los mismos del home clásico.
+export const TITULOS_ESTANTE: Record<Estante, [nombre: string, volanta: string, titulo: string]> = {
+  destacados: ['Destacados', 'Destacados', 'Productos destacados'],
+  nuevos: ['Nuevos ingresos', 'Nuevos ingresos', 'Recién llegados'],
+  recomendados: ['Recomendados', 'Recomendados', 'Recomendados para vos'],
+  topVentas: ['Top ventas', 'Top ventas', 'Más vendidos'],
+}
+
 export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
-  const out: SeccionPlantilla[] = [{
-    id: 'cintillo',
-    nombre: 'Cintillo superior',
-    nota: 'La línea de arriba de todo. Vacía, no se dibuja.',
-    campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, help: 'Ej: envío gratis desde cierto monto, o una promo vigente.', porDefecto: 'Envío gratis en compras superiores a $80.000' },
-      { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch', help: 'En vez de quedarse fijo, el texto corre en loop.' },
-    ],
-  }]
+  // Sin cintillo, sin parallax, sin marcas, sin video y sin estadísticas: eso
+  // se carga en Apariencia y vale igual con cualquier plantilla (ver
+  // BLOQUES_ESTANDAR en tipos.ts). Acá queda solo lo que es de la plantilla:
+  // los encabezados de sus filas y sus bloques propios.
+  const out: SeccionPlantilla[] = []
 
   const encabezado = (id: string, nombre: string, nota: string, vol: string, tit: string, accion?: string): SeccionPlantilla => ({
     id, nombre, nota,
@@ -1037,10 +1042,8 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         // aunque los productos de cada una fueran distintos (reportado con
         // captura). Distingue por `fuente`, no por posición: una plantilla
         // con una sola fila (sin fuente) se queda con el default de siempre.
-        const [vol, tit] =
-          b.fuente === 'masVendidos' ? ['Recién llegado', 'Nuevo lanzamiento']
-            : ['Lo más elegido', 'Destacados']
-        out.push(encabezado(b.id, 'Fila de productos', 'El encabezado de esta fila. Los productos salen de tu catálogo.', vol, tit, 'Ver todo →'))
+        const [nombre, vol, tit] = TITULOS_ESTANTE[b.fuente]
+        out.push(encabezado(b.id, `Fila: ${nombre}`, `El encabezado de esta fila. Se prende y se apaga en Contenido → "${nombre}".`, vol, tit, 'Ver todo →'))
         break
       }
       case 'franja':
@@ -1051,20 +1054,6 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
           campos: [
             { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, afirmacion: true, help: 'Lo que querés anunciar.', porDefecto: 'Envío gratis desde $80.000' },
             { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' },
-            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
-          ],
-        })
-        break
-      case 'parallax':
-        out.push({
-          id: 'parallax',
-          nombre: 'Banner con parallax',
-          nota: 'Foto ancha que se queda quieta mientras la página scrollea. Sin foto o sin título no se dibuja.',
-          campos: [
-            { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Bien apaisada, 1600px de ancho o más: se ve a pantalla completa.' },
-            { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24 },
-            { id: 'titulo', label: 'Título', tipo: 'texto', max: 50 },
-            { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140 },
             { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
           ],
         })
@@ -1096,8 +1085,13 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         })
         break
       // `porCategoria` no lleva formulario: sus títulos son los nombres de las
-      // categorías del negocio, que ya se editan en Categorías.
+      // categorías del negocio, que ya se editan en Categorías. Y los otros
+      // cuatro se cargan en Apariencia.
       case 'porCategoria':
+      case 'stats':
+      case 'parallax':
+      case 'marcas':
+      case 'video':
         break
     }
   }
@@ -1122,8 +1116,12 @@ export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlan
  * cantidad) en vez de ser una etiqueta? Ver `afirmacion` en tipos.ts.
  */
 export function esAfirmacion(idPlantilla: string, seccion: string, campo: string): boolean {
-  return !!SECCIONES_POR_PLANTILLA[idPlantilla]
-    ?.find(s => s.id === seccion)
+  // `seccionesDe` y no SECCIONES_POR_PLANTILLA: el esquema de una receta no
+  // está en ese registro (se arma desde sus bloques), y mirando solo ahí sus
+  // afirmaciones nunca se callaban — diez plantillas prometían "Envío gratis
+  // desde $80.000" en tiendas que no lo habían escrito.
+  return !!seccionesDe(idPlantilla)
+    .find(s => s.id === seccion)
     ?.campos.find(c => c.id === campo)
     ?.afirmacion
 }

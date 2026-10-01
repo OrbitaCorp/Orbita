@@ -308,10 +308,23 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       />
     )
 
-    const fuenteDe = (b: Extract<BloqueReceta, { t: 'fila' }>, n: number) =>
-      b.fuente === 'destacados' ? fila(n, b.id, p.productos)
-        : b.fuente === 'masVendidos' ? fila(n, b.id, p.productosSecundarios ?? [])
-        : fila(n, b.id)
+    // Los productos de un estante. En la tienda son los de Apariencia, en el
+    // orden en que vienen —"Top ventas" barajado deja de ser un ranking— y ya
+    // filtrados por su interruptor: apagado o sin productos llega vacío y la
+    // fila no se dibuja.
+    //
+    // En la vitrina no hay estantes y la muestra trae cuatro productos: con
+    // las cuatro filas a la vista serían los mismos cuatro, cuatro veces. Se
+    // muestran Destacados y Nuevos ingresos, que es además lo que ve una
+    // tienda que recién empieza.
+    const fuenteDe = (b: Extract<BloqueReceta, { t: 'fila' }>, n: number) => {
+      if (p.estantes) return p.estantes[b.fuente].slice(0, n)
+      if (b.fuente === 'destacados') return fila(n, b.id, p.productos)
+      return b.fuente === 'nuevos' ? fila(n, b.id) : []
+    }
+
+    // El anuncio de Apariencia. En la vitrina, el cartel de muestra.
+    const anuncio = acciones ? p.anuncio : (p.cartel ? { texto: p.cartel, cartelera: false } : undefined)
 
     const heroTexto = (alineado: 'izq' | 'centro', claro: boolean) => (
       <div style={{ textAlign: alineado === 'centro' ? 'center' : 'left', maxWidth: alineado === 'centro' ? 640 : 520, margin: alineado === 'centro' ? '0 auto' : undefined }}>
@@ -372,9 +385,27 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           )
         }
 
+        // ── La barra de estadísticas de Apariencia ─────────────────────────
+        case 'stats': {
+          const items = (p.confianza ?? []).slice(0, 4)
+          if (items.length === 0) return null
+          return (
+            <div key={i} style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: movil ? '16px' : '20px 40px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, items.length, 2), gap: movil ? 14 : 20 }}>
+                {items.map(([valor, etiqueta]) => (
+                  <div key={valor + etiqueta} style={{ textAlign: 'center' }}>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 16 : 19, fontWeight: 800, letterSpacing: '-0.02em', color: t.primary }}>{valor}</div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{etiqueta}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
         // ── Categorías, cuatro formas de la misma lista ────────────────────
         case 'categorias': {
-          if (cats.length === 0) return null
+          if (cats.length === 0 || p.ocultarCategorias) return null
           const max = b.cols ?? 4
           const visibles = cats.slice(0, max)
           const cab = encabezadoDe('categorias', b.estilo === 'pastillas')
@@ -558,27 +589,59 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         // lo hace `.pl-parallax` (piezas.tsx), que además lo apaga solo en
         // celular y con prefers-reduced-motion.
         case 'parallax': {
-          const foto = txt('parallax', 'foto')
-          const titulo = txt('parallax', 'titulo')
-          if (!foto || !titulo) return null
+          const px = p.parallax
+          if (!px) return null
           return (
             <div
               key={i} className="pl-parallax"
-              style={{ backgroundImage: `url(${foto})`, minHeight: movil ? 320 : 440, display: 'flex', alignItems: 'center', position: 'relative' }}
+              style={{ backgroundImage: `url(${px.img})`, minHeight: movil ? 320 : 440, display: 'flex', alignItems: 'center', position: 'relative' }}
             >
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,0.72), rgba(0,0,0,0.18))' }} />
               <div style={{ position: 'relative', padding: movil ? '38px 20px' : '60px', maxWidth: 560 }}>
-                {txt('parallax', 'volanta') && (
-                  <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 800, color: t.accent, marginBottom: 12 }}>{txt('parallax', 'volanta')}</div>
+                {px.volanta && (
+                  <div style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 800, color: t.accent, marginBottom: 12 }}>{px.volanta}</div>
                 )}
-                <h2 style={{ fontFamily: t.fh, fontSize: movil ? 26 : 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.12, color: '#fff', margin: 0, textShadow: '0 2px 16px rgba(0,0,0,0.35)' }}>{titulo}</h2>
-                {txt('parallax', 'texto') && (
-                  <p style={{ fontSize: movil ? 14 : 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, margin: '14px 0 24px', maxWidth: 440 }}>{txt('parallax', 'texto')}</p>
+                {px.titulo && <h2 style={{ fontFamily: t.fh, fontSize: movil ? 26 : 40, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.12, color: '#fff', margin: 0, textShadow: '0 2px 16px rgba(0,0,0,0.35)' }}>{px.titulo}</h2>}
+                {px.bajada && (
+                  <p style={{ fontSize: movil ? 14 : 16, color: 'rgba(255,255,255,0.9)', lineHeight: 1.6, margin: '14px 0 24px', maxWidth: 440 }}>{px.bajada}</p>
                 )}
-                {txt('parallax', 'cta') && <Boton t={t} grande={!movil} onClick={acciones?.irACatalogo}>{txt('parallax', 'cta')}</Boton>}
+                {px.cta && (
+                  <Boton t={t} grande={!movil} onClick={px.link && acciones?.irALink ? () => acciones.irALink!(px.link!) : acciones?.irACatalogo}>{px.cta}</Boton>
+                )}
               </div>
             </div>
           )
+        }
+
+        // ── Marcas con las que trabaja el negocio ──────────────────────────
+        // Sin logo se escribe el nombre, con la tipografía de la plantilla.
+        case 'marcas': {
+          const m = p.marcas
+          if (!m || m.items.length === 0) return null
+          return (
+            <Reveal key={i}>
+              <div style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, background: t.surf, padding: movil ? '26px 16px' : '38px 40px', textAlign: 'center' }}>
+                {m.titulo && <div style={{ fontSize: 11.5, letterSpacing: '0.16em', textTransform: 'uppercase', fontWeight: 700, color: t.muted, marginBottom: movil ? 16 : 22 }}>{m.titulo}</div>}
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: movil ? '14px 24px' : '18px 44px' }}>
+                  {m.items.map((x) => (
+                    x.logo
+                      ? <img key={x.nombre} src={x.logo} alt={x.nombre} loading="lazy" style={{ height: movil ? 26 : 34, maxWidth: 140, objectFit: 'contain', filter: 'grayscale(1)', opacity: 0.75 }} />
+                      : <span key={x.nombre} style={{ fontFamily: t.fh, fontSize: movil ? 16 : 20, fontWeight: 700, letterSpacing: '-0.01em', color: t.muted }}>{x.nombre}</span>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          )
+        }
+
+        // ── Video ──────────────────────────────────────────────────────────
+        // Lo dibuja el mismo componente del home clásico (links de YouTube,
+        // archivos subidos, cuatro diseños): reescribirlo acá era duplicar
+        // todo eso. Hereda la paleta y las fuentes de la plantilla por las
+        // variables CSS del chrome.
+        case 'video': {
+          const video = acciones?.renderVideo?.()
+          return video ? <div key={i}>{video}</div> : null
         }
 
         // ── Campaña: foto ancha con el texto encima ─────────────────────────
@@ -604,6 +667,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         // ── Consulta por WhatsApp ──────────────────────────────────────────
         case 'whatsapp': {
+          // Apagado en Apariencia, o sin un número al que escribirle.
+          if (p.ocultarWhatsapp || (acciones && !acciones.abrirWhatsapp)) return null
           if (!txt('whatsapp', 'titulo')) return null
           return (
             <Reveal key={i}>
@@ -624,17 +689,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // plantilla — lo que las distingue es el tema, no dónde cae el logo.
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
-          activo('cintillo', 'cartelera')
-            ? <Marquee t={t} texto={txt('cintillo', 'texto')} />
+        {!!anuncio?.texto && (
+          anuncio.cartelera
+            ? <Marquee t={t} texto={anuncio.texto} />
             : (
               <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em' }}>
-                {txt('cintillo', 'texto')}
+                {anuncio.texto}
               </div>
             )
         )}
         {r.header === 'centrado' ? (
-          <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
+          <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador={!p.ocultarBuscador} movil={movil} acciones={acciones} />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: movil ? 12 : 26, padding: movil ? '13px 16px' : '16px 40px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
             {movil && <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />}
@@ -654,9 +719,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               )
             })()}
             <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 14 }}>
-              {!movil && acciones?.renderBuscador && acciones.renderBuscador({})}
+              {!movil && !p.ocultarBuscador && acciones?.renderBuscador && acciones.renderBuscador({})}
               <AccionesTienda t={t} movil={movil} acciones={acciones} />
             </span>
+          </div>
+        )}
+        {/* En celular el buscador no entra en la barra: va en un renglón
+            propio debajo. Buscar es parte de cualquier tienda de Órbita, y
+            esconderlo en el teléfono dejaba sin buscador a la mayoría. */}
+        {movil && !p.ocultarBuscador && acciones?.renderBuscador && (
+          <div style={{ padding: '10px 16px', background: t.surf, borderBottom: `1px solid ${t.border}`, display: 'flex' }}>
+            {acciones.renderBuscador({})}
           </div>
         )}
       </>

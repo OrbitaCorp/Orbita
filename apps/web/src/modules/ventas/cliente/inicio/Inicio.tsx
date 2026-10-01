@@ -368,8 +368,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     }
     const nuevosIngresos = productos.slice(0, limiteNuevos)
     const badgesEstante = { showNew: ap?.showNewBadge, showOffer: ap?.showOfferBadge, showLowStock: ap?.showLowStock }
-    const estanteRecomendados = recomendados.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
-    const estanteTopVentas = topVentas.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
+    // Enteros (hasta 8) para las plantillas: cada una corta por el ancho de SU
+    // grilla, que puede ser de tres, de cinco o una tira de seis. El home
+    // clásico se queda con una fila de la grilla de Apariencia.
+    const todosRecomendados = recomendados.map(p => toProducto(p, badgesEstante))
+    const todosTopVentas = topVentas.map(p => toProducto(p, badgesEstante))
+    const estanteRecomendados = todosRecomendados.slice(0, porEstante)
+    const estanteTopVentas = todosTopVentas.slice(0, porEstante)
     // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
     // (la segunda tanda de lo más nuevo): sus filas se configuran en la
     // pestaña Secciones de cada plantilla, no con estos interruptores.
@@ -727,6 +732,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
+                        // Lo de Apariencia: interruptores, anuncio, parallax,
+                        // marcas, y los estantes con lo que dice su nombre.
+                        apariencia: config?.appearance,
+                        nuevos: productos,
+                        recomendados: todosRecomendados,
+                        topVentas: todosTopVentas,
+                        hayWhatsapp: !!tienda.wpp,
                     })}
                     movil={movil}
                     // `soloCuerpo` recorta header, hero y pie de la maqueta
@@ -759,6 +771,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             />
                         ),
                         renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Video en tu tienda": el mismo componente del
+                        // home clásico. Sin ningún link válido devuelve null
+                        // y el bloque de la plantilla no se dibuja.
+                        renderVideo: () => (config?.appearance?.showVideo ?? false) ? (
+                            <SeccionVideos
+                                titulo={tituloVideo}
+                                subtitulo={subtituloVideo}
+                                layout={config?.appearance?.videoLayout}
+                                videos={config?.appearance?.videos}
+                                videoUrlLegado={config?.appearance?.videoUrl}
+                                go={go}
+                            />
+                        ) : null,
                         // "Estilo de header" de Apariencia: con plantilla
                         // activa antes se ignoraba del todo.
                         navLayout: (config?.appearance?.headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
@@ -776,7 +801,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // de quedar siempre con el look por defecto de Órbita
                         // adentro de una grilla pensada para otra cosa.
                         renderProducto: (x, _i, opts) => {
-                            const real = productos.find(pr => pr.id === x.slug) ?? destacados.find(pr => pr.id === x.slug)
+                            // En todos los estantes: Recomendados y Top
+                            // ventas vienen de pedidos aparte y pueden traer
+                            // un producto que no está entre los últimos 16.
+                            const real = [productos, destacados, todosRecomendados, todosTopVentas]
+                                .map(lista => lista.find(pr => pr.id === x.slug)).find(Boolean)
                             return real ? (
                                 <ProductCard
                                     producto={real}

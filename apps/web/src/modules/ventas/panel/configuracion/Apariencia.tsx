@@ -183,6 +183,37 @@ const TABS_PLANTILLA: [TabPlantilla, string][] = [
     ['pie', 'Pie de página'],
 ]
 
+// Las recetas tenían un cintillo y un parallax PROPIOS, cargados en la pestaña
+// Secciones, aparte del anuncio y el parallax de Apariencia: el dueño cargaba
+// lo mismo dos veces. Ahora usan los de Apariencia, y esos dos campos ya no
+// tienen formulario.
+//
+// La tienda sigue mostrando lo que estaba guardado en ellos (ver
+// plantillaReal.ts), así que acá se pasa a los campos de Apariencia al abrir
+// el editor: el dueño lo ve donde ahora se edita, y al guardar queda en un
+// solo lugar. Sin esto quedaba publicado un texto que no se podía cambiar ni
+// borrar desde ninguna pantalla.
+function pasarAApariencia(ap: Ap, homeTemplate: string | null): Ap {
+    if (!PLANTILLAS.find(x => x.id === homeTemplate)?.receta) return ap
+    const { cintillo, parallax, ...resto } = ap.seccionesPlantilla
+    if (!cintillo && !parallax) return ap
+    const out: Ap = { ...ap, seccionesPlantilla: resto }
+    if (cintillo?.texto?.trim()) {
+        out.textoEnvio = cintillo.texto.trim()
+        out.mostrarBannerEnvio = true
+        out.bannerDesplazable = cintillo.cartelera === 'si'
+    }
+    // Solo si el de Apariencia no se está mostrando: ese gana en la tienda.
+    if (parallax?.foto && parallax?.titulo && !(ap.mostrarParallax && ap.parallaxImagen)) {
+        out.mostrarParallax = true
+        out.parallaxImagen = parallax.foto
+        out.parallaxTitulo = parallax.titulo
+        out.parallaxSubtitulo = parallax.texto ?? ''
+        out.parallaxCtaTexto = parallax.cta || 'Ver el catálogo'
+    }
+    return out
+}
+
 export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
     const router = useRouter()
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
@@ -261,7 +292,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         ])
             .then(([dto, biz]) => {
                 if (cancelado) return
-                const cargado = dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda })
+                const cargado = pasarAApariencia(
+                    dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }),
+                    soloContenido ? dto.homeTemplate : null,
+                )
                 setApRaw(cargado)
                 setPublicado(cargado)
                 setHomeTemplateLocal(dto.homeTemplate)
@@ -364,7 +398,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // era prometer un interruptor que no mueve nada (reportado con captura
     // sobre Premium).
     const plantillaActiva = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
-    const usaAnuncio = soloContenido ? !plantillaActiva?.headerPropio : true
+    //
+    // Una plantilla con receta es otra cosa: ubica TODO lo de Apariencia en
+    // su portada (ver BLOQUES_ESTANDAR en plantillas/tipos.ts), así que se le
+    // ofrecen los mismos interruptores y las mismas tarjetas de contenido que
+    // a una tienda sin plantilla. Lo único que no se toca es el diseño.
+    const esEstandar = !!plantillaActiva?.receta
+    const usaAnuncio = soloContenido ? (!plantillaActiva?.headerPropio || esEstandar) : true
     const usaStats = soloContenido ? plantillaActiva?.usaStats !== false : true
 
     const ESTANTES: [keyof Ap, string][] = [
@@ -377,7 +417,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const toggles: [keyof Ap, string][] = soloContenido
         ? ([
             ...(usaAnuncio ? [['mostrarBannerEnvio', 'Anuncio arriba del header'] as [keyof Ap, string]] : []),
-            ...(usaStats ? [['mostrarStats', 'Barra de confianza debajo del hero'] as [keyof Ap, string]] : []),
+            ...(usaStats ? [['mostrarStats', esEstandar ? 'Barra de estadísticas' : 'Barra de confianza debajo del hero'] as [keyof Ap, string]] : []),
+            ...(esEstandar ? [
+                ['mostrarCategorias', 'Sección de categorías'],
+                ['mostrarBuscador', 'Barra de búsqueda'],
+                ['mostrarWhatsapp', 'WhatsApp (flotante y banner)'],
+            ] as [keyof Ap, string][] : []),
         ])
         // `mostrarFooter`/`mostrarRedesFooter` viven en la nueva sección
         // "Pie de página" (tienen su propia tarjeta ahí, con la descripción
@@ -398,11 +443,11 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                 ))}
             </div>
-            {/* Los estantes de productos del home clásico (Ale, 19/09): cada
-                uno muestra lo que dice su nombre, y cada uno se puede apagar.
-                Con plantilla activa no aplican — las filas de productos las
-                define la plantilla (pestaña Secciones). */}
-            {!soloContenido && (
+            {/* Los estantes de productos (Ale, 19/09): cada uno muestra lo que
+                dice su nombre, y cada uno se puede apagar. Valen en el home
+                clásico y en las plantillas con receta, que ubican los cuatro.
+                Las de bloque propio todavía definen sus filas a mano. */}
+            {(!soloContenido || esEstandar) && (
                 <>
                     <Divider />
                     <FieldLabel help="Las filas de productos del inicio. Cada una se arma sola con datos reales; si no hay productos para mostrar, no aparece.">Filas de productos en el inicio</FieldLabel>
@@ -411,7 +456,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                         ))}
                     </div>
-                    {ap.mostrarNuevos && (
+                    {ap.mostrarNuevos && !soloContenido && (
                         <div style={{
                             marginTop: 14,
                             padding: '12px 14px',
@@ -793,7 +838,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // algún interruptor que de verdad mueva algo en su portada.
     const tabsVisibles = TABS_PLANTILLA.filter(([k]) => {
         if (k === 'secciones') return seccionesPlantilla.length > 0
-        if (k === 'contenido') return usaAnuncio || usaStats
+        if (k === 'contenido') return usaAnuncio || usaStats || esEstandar
         return true
     })
     // Si la pestaña elegida no está entre las visibles (cambió la plantilla
@@ -942,6 +987,122 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
             setVolviendo(false)
         }
     }
+
+    // Parallax, marcas y video: las mismas tarjetas en Apariencia completa y
+    // editando una plantilla con receta, que ubica esos tres bloques en su
+    // portada (ver BLOQUES_ESTANDAR en plantillas/tipos.ts). Por eso son
+    // piezas sueltas y no JSX escrito adentro de una de las dos pantallas.
+    const secParallax = (
+        <SecCard id="ap-sec-parallax" title="Banner con efecto parallax" icon={ImageIcon} ayuda={AYUDA_SECCIONES.parallax}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                Una imagen grande a todo el ancho, en medio del home, que queda fija mientras el resto de la
+                página se desplaza. Necesita una imagen cargada para mostrarse.
+            </p>
+            <div style={{ marginBottom: 14 }}>
+                <ToggleRow label="Mostrar este banner en el home" on={ap.mostrarParallax} onChange={v => set('mostrarParallax', v)} />
+            </div>
+            <Divider />
+            <FieldLabel help="Foto ancha y de buena resolución — se recomienda al menos 1600×900px.">Imagen de fondo</FieldLabel>
+            <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
+            <Divider />
+            <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.parallaxTitulo} onChange={v => set('parallaxTitulo', v)} /></div>
+            <div style={{ marginBottom: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.parallaxSubtitulo} onChange={v => set('parallaxSubtitulo', v)} /></div>
+            <div style={{ marginBottom: 10 }}><FieldLabel>Texto del botón</FieldLabel><Inp value={ap.parallaxCtaTexto} onChange={v => set('parallaxCtaTexto', v)} maxLength={30} /></div>
+            <div>
+                <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
+                <Inp value={ap.parallaxCtaLink} onChange={v => set('parallaxCtaLink', v)} />
+            </div>
+        </SecCard>
+    )
+
+    const secMarcas = (
+        <SecCard id="ap-sec-marcas" title="Marcas con las que trabajás" icon={BadgeCheck} ayuda={AYUDA_SECCIONES.marcas}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                Una tira que se desliza sola en el home, con las marcas que vendés. Se ven en gris y toman
+                color cuando el visitante les pasa el mouse por encima. Necesita al menos una marca cargada
+                para mostrarse.
+            </p>
+            <div style={{ marginBottom: 14 }}>
+                <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarMarcas} onChange={v => set('mostrarMarcas', v)} />
+            </div>
+            <Divider />
+            <FieldLabel help="El texto chiquito que va arriba de los logos.">Título de la sección</FieldLabel>
+            <Inp value={ap.marcasTitulo} onChange={v => set('marcasTitulo', v)} maxLength={80} placeholder="Trabajamos con las mejores marcas" />
+            <Divider />
+            <FieldLabel help="El logo es opcional: sin logo se muestra el nombre escrito. El nombre siempre hace falta — es lo que leen los lectores de pantalla.">
+                Marcas
+            </FieldLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {ap.marcas.map((m, i) => (
+                    <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <LogoPicker
+                            value={m.logo}
+                            nombre={m.name}
+                            onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, logo: v } : x))}
+                            onUpload={subirImagenApariencia}
+                            onToast={onToast}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <Inp
+                                value={m.name}
+                                onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, name: v } : x))}
+                                maxLength={60}
+                                placeholder="Nombre de la marca"
+                            />
+                        </div>
+                        <button
+                            onClick={() => set('marcas', ap.marcas.filter((_, j) => j !== i))}
+                            title="Quitar"
+                            aria-label={`Quitar ${m.name.trim() || 'esta marca'}`}
+                            style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+            {/* Mismo tope que el DTO del backend (ArrayMaxSize(20)):
+                si acá se pudieran cargar más, el guardado fallaría
+                entero con un error de validación poco claro. */}
+            {ap.marcas.length < 20 && (
+                <button
+                    onClick={() => set('marcas', [...ap.marcas, { id: 'mk' + Date.now(), name: '', logo: null }])}
+                    className="ds-hover"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                >
+                    <Plus size={14} strokeWidth={2} /> Agregar marca
+                </button>
+            )}
+        </SecCard>
+    )
+
+    const secVideo = (
+        <SecCard id="ap-sec-video" title="Video en tu tienda" icon={Video} ayuda={AYUDA_SECCIONES.video}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                Uno o varios videos en el home, después del banner parallax. Cada uno puede ser un link de
+                YouTube o de Vimeo, o un archivo de video que subas. Necesita al menos un video válido para mostrarse.
+            </p>
+            <div style={{ marginBottom: 14 }}>
+                <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarVideo} onChange={v => set('mostrarVideo', v)} />
+            </div>
+            <Divider />
+            <div style={{ marginBottom: 10 }}><FieldLabel help="Va arriba de los videos. Opcional.">Título de la sección</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} placeholder="Mirá cómo funciona" /></div>
+            <div><FieldLabel>Bajada</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
+            <Divider />
+            <FieldLabel help="Cómo se acomodan los videos en el home.">Diseño</FieldLabel>
+            <div style={{ marginBottom: 4 }}>
+                <VisualPick
+                    value={ap.videoLayout}
+                    onChange={v => set('videoLayout', v as VideoLayout)}
+                    options={VIDEO_LAYOUTS.map(op => ({ id: op.id, label: op.label, ayuda: op.desc, svg: MINIATURA_VIDEO[op.id] }))}
+                />
+            </div>
+            <Divider />
+            <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} onToast={onToast} />
+        </SecCard>
+    )
 
     if (cargando) {
         return <AparienciaSkeleton />
@@ -1141,6 +1302,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             {toggles.length > 0 && secVisibilidad}
                             {usaAnuncio && secTextos}
                             {usaStats && secEstadisticas}
+                            {esEstandar && <>{secParallax}{secMarcas}{secVideo}</>}
                         </>}
                         {tabActiva === 'pie' && <>{secPie}{secCupon}</>}
                     </div>
@@ -1363,26 +1525,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         activa (por eso vive acá, no en `tarjetasSecundarias`):
                         mismo motivo que Paleta/Tipografía/Diseño, la portada
                         de la plantilla es asunto suyo. */}
-                    <SecCard id="ap-sec-parallax" title="Banner con efecto parallax" icon={ImageIcon} ayuda={AYUDA_SECCIONES.parallax}>
-                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
-                            Una imagen grande a todo el ancho, en medio del home, que queda fija mientras el resto de la
-                            página se desplaza. Necesita una imagen cargada para mostrarse.
-                        </p>
-                        <div style={{ marginBottom: 14 }}>
-                            <ToggleRow label="Mostrar este banner en el home" on={ap.mostrarParallax} onChange={v => set('mostrarParallax', v)} />
-                        </div>
-                        <Divider />
-                        <FieldLabel help="Foto ancha y de buena resolución — se recomienda al menos 1600×900px.">Imagen de fondo</FieldLabel>
-                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
-                        <Divider />
-                        <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.parallaxTitulo} onChange={v => set('parallaxTitulo', v)} /></div>
-                        <div style={{ marginBottom: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.parallaxSubtitulo} onChange={v => set('parallaxSubtitulo', v)} /></div>
-                        <div style={{ marginBottom: 10 }}><FieldLabel>Texto del botón</FieldLabel><Inp value={ap.parallaxCtaTexto} onChange={v => set('parallaxCtaTexto', v)} maxLength={30} /></div>
-                        <div>
-                            <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
-                            <Inp value={ap.parallaxCtaLink} onChange={v => set('parallaxCtaLink', v)} />
-                        </div>
-                    </SecCard>
+                    {secParallax}
 
                     {/* Tira de marcas con las que trabaja el negocio — pedido
                         explícito del dueño, con una tienda de referencia (una
@@ -1394,66 +1537,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         El logo es opcional a propósito (ver LogoPicker y
                         brand-item.dto.ts): sin logo, la tira dibuja el nombre
                         en tipografía, que es justo como se ve la referencia. */}
-                    <SecCard id="ap-sec-marcas" title="Marcas con las que trabajás" icon={BadgeCheck} ayuda={AYUDA_SECCIONES.marcas}>
-                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
-                            Una tira que se desliza sola en el home, con las marcas que vendés. Se ven en gris y toman
-                            color cuando el visitante les pasa el mouse por encima. Necesita al menos una marca cargada
-                            para mostrarse.
-                        </p>
-                        <div style={{ marginBottom: 14 }}>
-                            <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarMarcas} onChange={v => set('mostrarMarcas', v)} />
-                        </div>
-                        <Divider />
-                        <FieldLabel help="El texto chiquito que va arriba de los logos.">Título de la sección</FieldLabel>
-                        <Inp value={ap.marcasTitulo} onChange={v => set('marcasTitulo', v)} maxLength={80} placeholder="Trabajamos con las mejores marcas" />
-                        <Divider />
-                        <FieldLabel help="El logo es opcional: sin logo se muestra el nombre escrito. El nombre siempre hace falta — es lo que leen los lectores de pantalla.">
-                            Marcas
-                        </FieldLabel>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                            {ap.marcas.map((m, i) => (
-                                <div key={m.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                                    <LogoPicker
-                                        value={m.logo}
-                                        nombre={m.name}
-                                        onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, logo: v } : x))}
-                                        onUpload={subirImagenApariencia}
-                                        onToast={onToast}
-                                    />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <Inp
-                                            value={m.name}
-                                            onChange={v => set('marcas', ap.marcas.map((x, j) => j === i ? { ...x, name: v } : x))}
-                                            maxLength={60}
-                                            placeholder="Nombre de la marca"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => set('marcas', ap.marcas.filter((_, j) => j !== i))}
-                                        title="Quitar"
-                                        aria-label={`Quitar ${m.name.trim() || 'esta marca'}`}
-                                        style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
-                                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
-                                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        {/* Mismo tope que el DTO del backend (ArrayMaxSize(20)):
-                            si acá se pudieran cargar más, el guardado fallaría
-                            entero con un error de validación poco claro. */}
-                        {ap.marcas.length < 20 && (
-                            <button
-                                onClick={() => set('marcas', [...ap.marcas, { id: 'mk' + Date.now(), name: '', logo: null }])}
-                                className="ds-hover"
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
-                            >
-                                <Plus size={14} strokeWidth={2} /> Agregar marca
-                            </button>
-                        )}
-                    </SecCard>
+                    {secMarcas}
 
                     {/* Video en el home — pedido explícito del dueño: "después
                         del efecto parallax, antes del pie". Un LINK, no una
@@ -1464,29 +1548,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         vive acá (no en `tarjetasSecundarias`) porque es del
                         home CLÁSICO — con una plantilla activa, la portada es
                         asunto de la plantilla. */}
-                    <SecCard id="ap-sec-video" title="Video en tu tienda" icon={Video} ayuda={AYUDA_SECCIONES.video}>
-                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
-                            Uno o varios videos en el home, después del banner parallax. Cada uno puede ser un link de
-                            YouTube o de Vimeo, o un archivo de video que subas. Necesita al menos un video válido para mostrarse.
-                        </p>
-                        <div style={{ marginBottom: 14 }}>
-                            <ToggleRow label="Mostrar esta sección en el home" on={ap.mostrarVideo} onChange={v => set('mostrarVideo', v)} />
-                        </div>
-                        <Divider />
-                        <div style={{ marginBottom: 10 }}><FieldLabel help="Va arriba de los videos. Opcional.">Título de la sección</FieldLabel><Inp value={ap.videoTitulo} onChange={v => set('videoTitulo', v)} maxLength={120} placeholder="Mirá cómo funciona" /></div>
-                        <div><FieldLabel>Bajada</FieldLabel><Inp value={ap.videoSubtitulo} onChange={v => set('videoSubtitulo', v)} maxLength={300} /></div>
-                        <Divider />
-                        <FieldLabel help="Cómo se acomodan los videos en el home.">Diseño</FieldLabel>
-                        <div style={{ marginBottom: 4 }}>
-                            <VisualPick
-                                value={ap.videoLayout}
-                                onChange={v => set('videoLayout', v as VideoLayout)}
-                                options={VIDEO_LAYOUTS.map(op => ({ id: op.id, label: op.label, ayuda: op.desc, svg: MINIATURA_VIDEO[op.id] }))}
-                            />
-                        </div>
-                        <Divider />
-                        <EditorVideos videos={ap.videos} layout={ap.videoLayout} onChange={v => set('videos', v)} onToast={onToast} />
-                    </SecCard>
+                    {secVideo}
 
                     {/* Banner de WhatsApp — antes un solo diseño fijo (pedido
                         explícito: variedad). El toggle sigue siendo

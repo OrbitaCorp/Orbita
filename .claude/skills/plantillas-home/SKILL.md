@@ -9,17 +9,68 @@ Diseños alternativos **para la portada** de una tienda de Órbita. El dueño la
 elige desde el panel: Avanzado → Plantillas de Home. Hay **veintiséis**, todas
 del módulo tienda, y todas se aplican de verdad en un negocio.
 
-## El modelo, en tres líneas
+## El modelo, en cuatro líneas
 
 1. **El diseño es de la plantilla y es fijo.** Paleta, tipografías, radio,
    sombra, tipo de hero, forma de las categorías, orden de los bloques. El
    dueño no los cambia: eligió la plantilla justamente por eso.
-2. **El contenido es del negocio y es editable.** Con la plantilla activa, el
-   dueño edita en cinco pestañas —Hero, Header, Secciones, Contenido, Pie— que
-   son el mismo editor de Apariencia en modo `soloContenido`. Todo lo demás
-   (productos, categorías, WhatsApp, redes) sale solo de lo que ya cargó.
-3. **Una plantilla no está lista hasta que pasa el modo check.** No alcanza
+2. **El contenido es el de Apariencia.** Todo lo que el dueño puede prender,
+   apagar y cargar en Configuración → Apariencia tiene que poder hacerlo igual
+   con una plantilla activa, con los mismos datos. La plantilla decide dónde
+   va cada cosa y cómo se ve; no decide qué hay. Ver § El estándar.
+3. **La funcionalidad es la de cualquier tienda de Órbita.** Buscador, cuenta,
+   carrito, los enlaces del menú, el pie con sus legales. Una plantilla no
+   agrega un ícono ni una página que la tienda no tiene, y no saca ninguno.
+4. **Una plantilla no está lista hasta que pasa el modo check.** No alcanza
    con que la vitrina se vea bien: ahí siempre se ve bien.
+
+## El estándar
+
+Una plantilla que traía una sola fila de productos, "Top ventas", no le servía
+a un negocio que recién empieza: no vendió nada, y no podía cambiarla. De ahí
+sale la regla: **toda plantilla ubica todos los bloques de Apariencia**, y el
+dueño decide cuáles se ven.
+
+| Bloque | Se prende y se carga en | Cuándo no se dibuja |
+|---|---|---|
+| Anuncio (fijo o cartelera) | Contenido → Textos de tu tienda | Apagado o sin texto |
+| Hero | Hero | Sin slides |
+| Barra de estadísticas | Contenido → Barra de estadísticas | Apagada o sin ítems |
+| Categorías | Contenido → Sección de categorías | Apagada o sin categorías |
+| Destacados | Contenido → Filas de productos | Apagado, o ningún producto con la estrella |
+| Nuevos ingresos | ídem | Apagado, o la tienda no tiene productos |
+| Recomendados | ídem | Apagado, o nada con reseñas ni en oferta |
+| Top ventas | ídem | Apagado, o todavía no hubo ventas |
+| Banner parallax | Contenido → Banner con efecto parallax | Apagado o sin foto |
+| Marcas | Contenido → Marcas con las que trabajás | Apagado o sin marcas |
+| Video | Contenido → Video en tu tienda | Apagado o sin un link válido |
+| WhatsApp | Contenido → WhatsApp | Apagado o sin número en Contacto |
+| Buscador | Contenido → Barra de búsqueda | Apagado |
+| Pie | Pie de página | Nunca: lleva los legales |
+
+Cómo funciona: `plantillaReal()` lee Apariencia y resuelve los interruptores
+**antes** del render (`contenidoDeApariencia`). Un estante apagado llega vacío;
+un parallax apagado o sin foto no llega. El bloque dibuja lo que hay, y una
+plantilla nueva respeta los interruptores sin escribir nada.
+
+- Los cuatro estantes se llenan con lo mismo que el home clásico: los pide
+  `Inicio.tsx` y llegan en `p.estantes`. No se barajan: "Top ventas" es un ranking.
+- En la **vitrina** no hay Apariencia: se ven Destacados y Nuevos ingresos con
+  los productos de muestra, y el `cartel` como anuncio. Parallax, marcas, video
+  y estadísticas no se ven ahí (no hay nada cargado), igual que en una tienda nueva.
+- Las **secciones propias** siguen existiendo (`franja`, `campana`, "El taller"
+  de Premium): son de la plantilla y se editan en la pestaña Secciones. Lo que
+  no puede pasar es que una sección propia duplique un dato de Apariencia.
+  Las recetas tenían un cintillo y un parallax propios; se unificaron, y lo
+  que una tienda ya había cargado ahí se sigue mostrando y se pasa a los
+  campos de Apariencia al abrir el editor (`pasarAApariencia`).
+
+**Estado:** las diez plantillas con receta cumplen el estándar completo. Las
+dieciséis de bloque propio todavía no (fase 2): definen sus filas a mano,
+ignoran los interruptores de estantes y varias no tienen buscador en celular.
+Está anotado en `PENDIENTES`. Sigue sin entrar al estándar la oferta con
+cuenta regresiva de la portada (paquete Avanzado) y la cantidad de productos
+de "Nuevos ingresos": en una plantilla cada fila es de un renglón.
 
 ## Las cinco reglas que no se negocian
 
@@ -81,26 +132,44 @@ receta: {
   header: 'centrado',                              // o 'izquierda' (default)
   bloques: [
     { t: 'hero', estilo: 'partido' },
+    { t: 'stats' },
     { t: 'categorias', estilo: 'altas', cols: 4 },
-    { t: 'fila', id: 'fila', cols: 4 },
-    { t: 'franja', estilo: 'apilada' },
+    { t: 'fila', id: 'destacados', fuente: 'destacados', cols: 4 },
+    { t: 'franja', estilo: 'apilada' },            // propio de esta plantilla
+    { t: 'fila', id: 'nuevos', fuente: 'nuevos', estilo: 'tira' },
+    { t: 'parallax' },
+    { t: 'fila', id: 'recomendados', fuente: 'recomendados', cols: 4 },
+    { t: 'fila', id: 'topVentas', fuente: 'topVentas', cols: 4 },
+    { t: 'marcas' },
+    { t: 'video' },
     { t: 'whatsapp' },
   ],
 }
 ```
 
-| Bloque | Variantes | Qué edita el dueño |
+| Bloque | Variantes | De dónde sale |
 |---|---|---|
-| `hero` | `pleno` · `partido` · `minimo` · `tarjeta` | Slides (pestaña Hero) y un segundo botón |
-| `categorias` | `grilla` · `pastillas` · `tira` · `altas` | El encabezado. Las categorías son las suyas |
-| `fila` | `grilla` · `tira` · `sangre`; `fuente`: destacados / masVendidos / catálogo | El encabezado. Los productos salen del catálogo |
-| `porCategoria` | `cuantas`, `porFila` | Nada: usa los nombres de sus categorías |
-| `franja` | `plena` · `filete` · `cartelera` · `apilada` | Título, bajada y botón. Vacía, no se dibuja |
-| `parallax` | — | Foto, volanta, título, texto, botón |
-| `campana` | — | Foto, volanta, título, texto, botón |
-| `whatsapp` | — | Título, bajada y botón. El número sale de Configuración |
+| `hero` | `pleno` · `partido` · `minimo` · `tarjeta` | Slides de Apariencia, más un segundo botón propio |
+| `stats` | — | Barra de estadísticas de Apariencia |
+| `categorias` | `grilla` · `pastillas` · `tira` · `altas` | Las categorías del negocio. El encabezado es editable |
+| `porCategoria` | `cuantas`, `porFila` | Productos de cada categoría. Cuenta como `categorias` |
+| `fila` | `grilla` · `tira` · `sangre`; `fuente`: uno de los cuatro estantes | El estante. El encabezado es editable |
+| `parallax` | — | Banner parallax de Apariencia |
+| `marcas` | — | Marcas de Apariencia |
+| `video` | — | Video de Apariencia |
+| `whatsapp` | — | Título, bajada y botón propios. El número sale de Configuración |
+| `franja` | `plena` · `filete` · `cartelera` · `apilada` | **Propio.** Título, bajada y botón. Vacía, no se dibuja |
+| `campana` | — | **Propio.** Foto, volanta, título, texto, botón |
 
-Cada `fila` lleva un `id` distinto: es la clave de su encabezado editable.
+**Una receta lleva todos los del estándar:** `hero`, `stats`, `categorias` (o
+`porCategoria`), una `fila` por cada estante (`destacados`, `nuevos`,
+`recomendados`, `topVentas`), `parallax`, `marcas`, `video` y `whatsapp`. El
+check falla si falta uno. Lo que diferencia una receta de otra es el orden, el
+estilo de cada bloque y los propios que sume en el medio.
+
+Cada `fila` lleva un `id` distinto: es la clave de su encabezado editable. No
+cambiar el `id` de una fila de una plantilla ya publicada: lo que el dueño
+escribió se busca por ahí.
 
 ### 2. Definir el tema
 
@@ -184,6 +253,11 @@ receta a la vez. Es lo que se busca, pero hay que mirar más de una después.
 el tipo en `BloqueReceta` (`tipos.ts`), su render en la rama de receta, y sus
 campos en `esquemaDeReceta()`. Solo si lo llena un dato que Órbita ya tiene.
 
+**Si Apariencia suma un contenido nuevo**, entra al estándar: el dato en
+`contenidoDeApariencia()` (`plantillaReal.ts`), el bloque en `BLOQUES_ESTANDAR`
+(`tipos.ts`) y en la rama de receta, su lugar en las diez recetas, su tarjeta
+en la pestaña Contenido, y su prueba de prendido/apagado en el check.
+
 ## El editor: qué puede tocar el dueño
 
 Con la plantilla activa, Configuración → Apariencia queda bloqueada y el
@@ -191,11 +265,16 @@ dueño edita desde Avanzado → Plantillas de Home:
 
 | Pestaña | Qué edita | De dónde sale |
 |---|---|---|
-| Hero | Slides: foto, título, bajada, botón, enlace | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
+| Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
 | Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
-| Secciones | Los textos y fotos propios de la plantilla | `seccionesDe(id)`: de la receta, o declarado a mano |
-| Contenido | Anuncio y barra de stats | Solo si la plantilla los dibuja (`usaStats`, cintillo) |
+| Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia. Completo en las recetas; en bloque propio, solo lo que esa plantilla dibuja |
 | Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
+
+Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`
+(`secTextos`, `secEstadisticas`, `secParallax`, `secMarcas`, `secVideo`): si
+Apariencia suma un contenido nuevo, se suma como bloque al estándar y su
+tarjeta se muestra acá, no se escribe un formulario aparte.
 
 Lo guardado va a `homeTemplateData.secciones[idSeccion][idCampo]`, un JSON por
 negocio: sumar un campo no necesita migración.
@@ -248,7 +327,8 @@ categorías, cuarenta productos).
 | editor | Cada `txt()` del bloque tiene su campo en `secciones.ts`, y cada campo se dibuja (solo bloque propio; el de una receta se genera) |
 | tema | Contraste del texto y del botón |
 | vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
-| tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta y carrito reales en el header; enlaces reales del menú (o menú en celular); Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
+| tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
+| estándar | Cada receta ubica todos los bloques y los cuatro estantes; cada cosa se ve prendida y desaparece apagada; una tienda sin ventas no muestra "Más vendidos" |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 
 ### Cómo leer un fallo

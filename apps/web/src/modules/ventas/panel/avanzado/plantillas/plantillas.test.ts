@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { PLANTILLAS } from './datos'
 import { Home, LAYOUTS_CON_HEADER_PROPIO } from './homes'
 import { SECCIONES_POR_PLANTILLA, seccionesDe } from './secciones'
-import type { AccionesHome, Plantilla } from './tipos'
+import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto } from '@/lib/storefront/types'
 
@@ -49,6 +49,15 @@ const visibles = PLANTILLAS.filter(p => !p.oculta)
 // si aparece un problema que no está acá, falla; y si uno de acá deja de
 // pasar, también falla, pidiendo que se lo borre. La lista solo se achica.
 const PENDIENTES: Record<string, string[]> = {
+  // Sin buscador: en ninguna pantalla, o solo en celular. Es de la fase 2 del
+  // estándar (ver la skill): las recetas ya lo traen en las dos.
+  // Va primero: las entradas de abajo, que suman otros problemas a la misma
+  // plantilla, repiten 'no hay buscador' y pisan esta.
+  ...Object.fromEntries(
+    ['mosaico', 'premium', 'nocturno', 'glow', 'papeleria', 'corralon', 'atleta', 'patitas', 'bodega', 'crecer', 'circuito', 'vera', 'cobijo', 'nitida']
+      .map(id => [`tienda > ${id}`, ['no hay buscador']]),
+  ),
+
   // Bloque nombra dos fuentes que nadie baja: se ve con la del sistema.
   'catálogo > tipografías': ['bloque: Rubik', 'bloque: Nunito Sans'],
 
@@ -64,30 +73,17 @@ const PENDIENTES: Record<string, string[]> = {
   'tienda > bajada de la maqueta': ['*'],
   'tienda > hero de la maqueta': ['*'],
 
-  // `esAfirmacion()` mira solo SECCIONES_POR_PLANTILLA, y el esquema de una
-  // receta sale de `esquemaDeReceta()`: sus afirmaciones nunca se callan.
-  'tienda > lienzo': ['promete "Envío gratis'],
-  'tienda > pulso': ['promete "Envío gratis'],
-  'tienda > terracota': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > base': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > carbon': ['promete "Envío gratis'],
-  'tienda > bloque': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > sobrio': ['promete "Envío gratis'],
-  'tienda > roble': ['promete "Envío gratis'],
-  'tienda > petalo': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > sello': ['promete "Envío gratis'],
-
   // Textos de muestra escritos para el rubro de la maqueta, sin su versión
   // neutra (`porDefectoReal`).
-  'tienda > bodega': ['categoría de muestra "Malbec"', 'categoría de muestra "Cabernet Franc"'],
+  'tienda > bodega': ['no hay buscador', 'categoría de muestra "Malbec"', 'categoría de muestra "Cabernet Franc"'],
 
   // Solo dibujan destacados: una tienda con productos y ninguno destacado
   // queda con la portada sin un solo producto.
   'tienda > vidriera': ['la portada no muestra ninguno'],
   'tienda > escaparate': ['la portada no muestra ninguno'],
-  'tienda > vera': ['la portada no muestra ninguno'],
-  'tienda > corralon': ['la portada no muestra ninguno'],
-  'tienda > cobijo': ['la portada no muestra ninguno'],
+  'tienda > vera': ['no hay buscador', 'la portada no muestra ninguno'],
+  'tienda > corralon': ['no hay buscador', 'la portada no muestra ninguno'],
+  'tienda > cobijo': ['no hay buscador', 'la portada no muestra ninguno'],
 }
 
 /**
@@ -150,6 +146,27 @@ const categoria = (i: number, conFoto: boolean) => ({
 })
 
 type Tienda = Omit<Parameters<typeof plantillaReal>[0], 'base'>
+type Apariencia = NonNullable<Tienda['apariencia']>
+
+// Lo que el dueño carga en Apariencia. Los textos llevan "Check" para poder
+// buscarlos en la portada sin confundirlos con nada de la plantilla.
+const APARIENCIA = {
+  showFeaturedSection: true, showNewArrivalsSection: true, showRecommendedSection: true, showBestSellersSection: true,
+  showCategoriesSection: true, showSearch: true, showWhatsapp: true,
+  showAnnouncementBar: true, shippingText: 'Anuncio Check', announcementScroll: false,
+  showParallaxBanner: true, parallaxImageUrl: 'https://fotos.check/parallax.jpg',
+  parallaxTitle: 'Parallax Check', parallaxSubtitle: 'Bajada del parallax', parallaxCtaText: 'Ver', parallaxCtaLink: '/catalogo',
+  showBrands: true, brandsTitle: 'Marcas Check', brands: [{ id: 'm', name: 'Marca Check' }],
+  showVideo: true,
+} as unknown as Apariencia
+
+// Recién creada: Apariencia tal como viene, sin nada cargado.
+const APARIENCIA_NUEVA = {
+  showFeaturedSection: true, showNewArrivalsSection: true, showRecommendedSection: true, showBestSellersSection: true,
+  showCategoriesSection: true, showSearch: true, showWhatsapp: true,
+  showAnnouncementBar: true, shippingText: null, announcementScroll: false,
+  showParallaxBanner: false, parallaxImageUrl: null, showBrands: false, brands: [], showVideo: false,
+} as unknown as Apariencia
 
 function tienda(nCats: number, nProductos: number, conFoto: boolean, completa: boolean): Tienda {
   const categorias = Array.from({ length: nCats }, (_, i) => categoria(i, conFoto))
@@ -161,8 +178,13 @@ function tienda(nCats: number, nProductos: number, conFoto: boolean, completa: b
     tagline: completa ? 'Bajada Check' : undefined,
     productos,
     categorias,
+    apariencia: completa ? APARIENCIA : APARIENCIA_NUEVA,
+    // Una tienda sin armar no marcó destacados ni vendió nada: lo único que
+    // tiene para mostrar es lo que cargó ("Nuevos ingresos").
     destacados: completa ? productos.slice(0, 5) : [],
-    masVendidos: completa ? productos.slice(5, 10) : [],
+    masVendidos: [],
+    recomendados: completa ? productos.slice(4, 9) : [],
+    topVentas: completa ? productos.slice(7, 12) : [],
     stats: completa ? [{ id: 's', value: 'Dato Check', label: 'etiqueta check' }] : [],
     cupon: completa ? { titulo: 'Cupón Check', bajada: 'Bajada check', codigo: 'CHECK' } : null,
     heroSlides: completa
@@ -196,6 +218,7 @@ const ACCIONES: AccionesHome = {
   nav: [{ label: 'Enlace Check Uno', onClick: nada }, { label: 'Enlace Check Dos', onClick: nada }],
   renderAcciones: () => marca('acciones'),
   renderBuscador: () => marca('buscador'),
+  renderVideo: () => marca('video'),
   renderProducto: (x) => marca('producto', x.nombre),
 }
 
@@ -251,6 +274,14 @@ function basura(html: string): string[] {
   return [...new Set(out)]
 }
 
+// Las páginas que una tienda de Órbita tiene de verdad (src/pages/tienda/[slug]).
+// Una plantilla no puede mandar a otra: sería un 404 con el diseño puesto.
+const RUTAS = /^\/tienda\/check(\/|\/catalogo(\/[\w-]+)?(\?.*)?|\/carrito|\/login|\/registro|\/perfil(\?.*)?|\/producto\/[\w-]+|\/legales\/(terminos|privacidad|cookies)|\/pedido\/[\w-]+)?$/
+const rutasInexistentes = (html: string) =>
+  [...new Set([...html.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)].map(m => m[1]))]
+    .filter(h => h.startsWith('/') && !RUTAS.test(h))
+    .map(h => `un enlace a ${h}, que no es una página de la tienda`)
+
 // Lo que la maqueta escribe en su hero y en su bajada. Se revisa aparte (ver
 // "lo que el adaptador deja pasar", más abajo), así que acá se saca del medio:
 // si no, "Oro 18k y piedras seleccionadas a mano" del hero de muestra de
@@ -270,7 +301,7 @@ function enTiendaReal(base: Plantilla, nombreTienda: string, movil: boolean): st
   const html = dibujar({ p, movil, acciones: ACCIONES, soloCuerpo })
   const maqueta = deLaMaqueta(base)
   const n = nodos(html).filter(x => !maqueta.has(x))
-  const out = basura(html)
+  const out = [...basura(html), ...rutasInexistentes(html)]
 
   if (!html) out.push('no dibuja nada')
 
@@ -306,6 +337,8 @@ function enTiendaReal(base: Plantilla, nombreTienda: string, movil: boolean): st
         ? 'en celular no hay forma de llegar al catálogo: ni enlaces ni MenuMovil'
         : 'el header no muestra los enlaces reales de Apariencia (acciones.nav)')
     }
+    // Buscar es parte de cualquier tienda: en las dos pantallas.
+    if (!html.includes('data-check="buscador"')) out.push('no hay buscador')
     if (base.piePropio) {
       for (const legal of ['Términos y condiciones', 'Política de privacidad', 'Arrepentimiento / Devolución']) {
         if (!n.includes(legal)) out.push(`al pie le falta "${legal}", que es obligatorio`)
@@ -501,6 +534,108 @@ describe('aplicada en una tienda de verdad', () => {
     sinProblemas('tienda > hero de la maqueta', PLANTILLAS
       .filter(p => { const n = enMinima(p); return p.slides.some(s => n.includes(limpio(s.titulo))) })
       .map(p => `${p.id}: se lee "${limpio(p.slides[0].titulo)}"`))
+  })
+})
+
+// ─── El estándar: lo de Apariencia vale con plantilla ────────────────────────
+//
+// Toda receta ubica todos los bloques de Apariencia, y el dueño los prende y
+// los apaga con los mismos interruptores que sin plantilla. Acá se prueba de
+// los dos lados: prendido se ve, apagado no.
+
+describe('una receta respeta lo que se configura en Apariencia', () => {
+  const recetas = PLANTILLAS.filter(p => p.receta)
+  const t0 = TIENDAS.completa
+  const ver = (p: Plantilla, ap: Partial<Apariencia>, movil = false) =>
+    nodos(dibujar({
+      p: plantillaReal({ base: p, ...t0, apariencia: { ...APARIENCIA, ...ap } as Apariencia }),
+      movil, acciones: ACCIONES, soloCuerpo: false,
+    }))
+  const tiene = (n: string[], frase: string) => n.some(x => x.includes(frase))
+  // El primer producto de cada estante (ver `tienda()`): es el que entra en
+  // cualquier fila, por angosta que sea. Se prueba con un estante prendido
+  // por vez, así que no importa que dos arranquen con el mismo.
+  const PRIMERO = { destacados: 'Articulo aa', nuevos: 'Articulo aa', recomendados: 'Articulo ae', topVentas: 'Articulo ah' } as const
+  const INTERRUPTOR = { destacados: 'showFeaturedSection', nuevos: 'showNewArrivalsSection', recomendados: 'showRecommendedSection', topVentas: 'showBestSellersSection' } as const
+
+  for (const p of recetas) {
+    it(p.id, () => {
+      const mal: string[] = []
+      const bloques = p.receta!.bloques
+
+      // Todos los bloques, una vez cada uno.
+      for (const b of BLOQUES_ESTANDAR) {
+        const n = bloques.filter(x => x.t === b || (b === 'categorias' && x.t === 'porCategoria')).length
+        if (n === 0) mal.push(`no ubica el bloque '${b}': el dueño lo prende en Apariencia y no aparece`)
+        if (n > 1 && b !== 'categorias') mal.push(`ubica ${n} veces el bloque '${b}'`)
+      }
+      for (const e of ESTANTES) {
+        const n = bloques.filter(x => x.t === 'fila' && x.fuente === e).length
+        if (n !== 1) mal.push(`tiene ${n} filas de '${e}' (tiene que ser una)`)
+      }
+
+      for (const movil of [false, true]) {
+        const donde = movil ? 'celular' : 'escritorio'
+        const todo = ver(p, {}, movil)
+        const nada = ver(p, {
+          showFeaturedSection: false, showNewArrivalsSection: false, showRecommendedSection: false, showBestSellersSection: false,
+          showAnnouncementBar: false, showParallaxBanner: false, showBrands: false, showWhatsapp: false, showSearch: false,
+        }, movil)
+        const htmlNada = dibujar({
+          p: plantillaReal({ base: p, ...t0, stats: [], apariencia: { ...APARIENCIA, showSearch: false, showVideo: false } as Apariencia }),
+          movil, acciones: { ...ACCIONES, renderVideo: () => null }, soloCuerpo: false,
+        })
+
+        for (const e of ESTANTES) {
+          const solo = ver(p, { showFeaturedSection: false, showNewArrivalsSection: false, showRecommendedSection: false, showBestSellersSection: false, [INTERRUPTOR[e]]: true }, movil)
+          if (!tiene(solo, PRIMERO[e])) mal.push(`[${donde}] el estante '${e}' prendido no se ve`)
+        }
+        // `porCategoria` no es un estante: muestra productos de cada categoría
+        // y no tiene interruptor propio.
+        if (!bloques.some(b => b.t === 'porCategoria') && tiene(nada, 'Articulo ')) {
+          mal.push(`[${donde}] con los cuatro estantes apagados sigue mostrando productos`)
+        }
+
+        const pares: [string, string][] = [['el anuncio', 'Anuncio Check'], ['el parallax', 'Parallax Check'], ['las marcas', 'Marca Check'], ['las estadísticas', 'Dato Check']]
+        for (const [que, frase] of pares) {
+          if (!tiene(todo, frase)) mal.push(`[${donde}] ${que} de Apariencia no se ve`)
+        }
+        for (const [que, frase] of pares.slice(0, 3)) {
+          if (tiene(nada, frase)) mal.push(`[${donde}] ${que} se ve aunque esté apagado en Apariencia`)
+        }
+        if (htmlNada.includes('Dato Check')) mal.push(`[${donde}] las estadísticas se ven aunque no haya ninguna`)
+        if (htmlNada.includes('data-check="video"')) mal.push(`[${donde}] dibuja el video aunque no haya ninguno`)
+        if (htmlNada.includes('data-check="buscador"')) mal.push(`[${donde}] el buscador se ve aunque esté apagado en Apariencia`)
+      }
+
+      // Las categorías y el WhatsApp se prueban contra la portada entera:
+      // sus textos son de la plantilla, no de la tienda de prueba.
+      const con = dibujar({ p: plantillaReal({ base: p, ...t0 }), movil: false, acciones: ACCIONES, soloCuerpo: false })
+      const sin = dibujar({
+        p: plantillaReal({ base: p, ...t0, apariencia: { ...APARIENCIA, showCategoriesSection: false, showWhatsapp: false } as Apariencia }),
+        movil: false, acciones: ACCIONES, soloCuerpo: false,
+      })
+      if (!(sin.length < con.length)) mal.push('apagar categorías y WhatsApp no saca nada de la portada')
+      if (bloques.some(b => b.t === 'categorias')) {
+        // En el pie siguen estando: es un enlace, no la sección.
+        const veces = (h: string) => h.split('Rubro Alfa').length
+        if (!(veces(sin) < veces(con))) mal.push('la sección de categorías se ve aunque esté apagada en Apariencia')
+      }
+
+      sinProblemas(`estándar > ${p.id}`, mal)
+    })
+  }
+
+  // El caso por el que existe todo esto: una plantilla que traía una sola
+  // fila, "Top ventas", en una tienda que todavía no vendió nada.
+  it('una tienda que recién empieza muestra sus productos, y no un "Más vendidos" vacío', () => {
+    sinProblemas('estándar > tienda nueva', recetas.flatMap(p => {
+      const n = nodos(dibujar({ p: plantillaReal({ base: p, ...TIENDAS.minima }), movil: false, acciones: ACCIONES, soloCuerpo: false }))
+      return [
+        ...(tiene(n, 'Articulo aa') ? [] : [`${p.id}: no muestra los productos que la tienda cargó`]),
+        ...(['Más vendidos', 'Recomendados para vos', 'Productos destacados'].filter(t => n.includes(t)).map(t => `${p.id}: dibuja "${t}" sin productos`)),
+      ]
+    }))
   })
 })
 
