@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { yaEsRecorteConAlfa } from './transparencia';
+import { quitarMarco } from './quitar-marco';
 import { endurecer, completarHuecos, estimarPrimerPlano, guidedFilter, recuperarFinos } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
@@ -190,6 +191,10 @@ export class BackgroundRemovalService {
     if (metaInicial.orientation && metaInicial.orientation > 1) {
       buffer = await sharp(buffer, ENTRADA_IMAGEN).rotate().toBuffer();
     }
+
+    // Foto "enmarcada" (borde liso alrededor de la foto real): se saca el marco
+    // antes del modelo, ver quitarMarco. Solo imágenes sin transparencia.
+    buffer = await quitarMarco(buffer);
 
     // Todas las lecturas del original con el tope de píxeles de las subidas
     // (ENTRADA_IMAGEN): un PNG chico puede declarar cientos de megapíxeles.
