@@ -26,7 +26,9 @@ export function OrbiTrigger({ collapsed }: Props) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <OrbiPet size={28} disc />
+      {/* Sin disco: el pet suelto sobre el menú. Quieto: un personaje moviéndose
+          todo el tiempo al costado de la pantalla de trabajo distrae. */}
+      <OrbiPet size={44} animated={false} />
 
       {!collapsed && (
         <>
