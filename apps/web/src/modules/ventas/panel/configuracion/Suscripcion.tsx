@@ -382,6 +382,10 @@ export default function Suscripcion() {
     // ni un plan que activar, se renuevan a mano desde la ficha del negocio.
     const esCortesia = sub?.origin === 'COMP'
     const planMostrado = sub && esPlanKey(sub.nextPlan ?? sub.plan) ? (sub.nextPlan ?? sub.plan) as PlanKey : null
+    // El bloque de activación ya trae el selector con "Base + Avanzado": mientras se
+    // ve, la tarjeta del paquete de más abajo NO ofrece activarlo (era la misma
+    // acción dos veces) y queda solo como explicación de qué suma.
+    const activacionVisible = !esCortesia && !cancelada && venciendo
 
     return (
         <div className="panel-page panel-page--form">
@@ -563,12 +567,16 @@ export default function Suscripcion() {
                             <Crown size={19} strokeWidth={1.8} color="var(--color-primary)" />
                         </div>
                         <div>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Paquete Avanzado</div>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{activacionVisible ? 'Qué suma el paquete Avanzado' : 'Paquete Avanzado'}</div>
                             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
-                                {/* El precio del plan que le tocaría a ESTE negocio, no el
-                                    mensual fijo: quien está en semestral/anual pasa al
-                                    combinado de su mismo período (ver conAvanzado). */}
-                                {fmtPesos(PLANES[conAvanzado(sub?.plan)].precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                                {activacionVisible
+                                    ? 'Para activarlo, elegí un plan "Base + Avanzado" más arriba.'
+                                    : <>
+                                        {/* El precio del plan que le tocaría a ESTE negocio, no el
+                                            mensual fijo: quien está en semestral/anual pasa al
+                                            combinado de su mismo período (ver conAvanzado). */}
+                                        {fmtPesos(PLANES[conAvanzado(sub?.plan)].precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                                    </>}
                             </div>
                         </div>
                     </div>
@@ -582,16 +590,18 @@ export default function Suscripcion() {
                         ))}
                     </div>
 
-                    {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
-                    {avisoPlan && <p role="status" style={{ fontSize: 12.5, color: 'var(--color-success)', margin: '0 0 10px' }}>{avisoPlan}</p>}
-                    <Button variant="primary" onClick={() => void elegirPlan(conAvanzado(sub?.plan), true)} disabled={guardandoPlan || activando || cancelada}>
-                        {guardandoPlan || activando ? 'Un momento…' : 'Activar Avanzado'}
-                    </Button>
-                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 0' }}>
-                        {venciendo && !esCortesia && !cancelada
-                            ? 'Te llevamos a Mercado Pago para autorizar el plan con Avanzado.'
-                            : 'Se activa cuando termine tu beneficio de bienvenida.'}
-                    </p>
+                    {!activacionVisible && (
+                        <>
+                            {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
+                            {avisoPlan && <p role="status" style={{ fontSize: 12.5, color: 'var(--color-success)', margin: '0 0 10px' }}>{avisoPlan}</p>}
+                            <Button variant="primary" onClick={() => void elegirPlan(conAvanzado(sub?.plan), true)} disabled={guardandoPlan || activando || cancelada}>
+                                {guardandoPlan || activando ? 'Un momento…' : 'Activar Avanzado'}
+                            </Button>
+                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 0' }}>
+                                Se activa cuando termine tu beneficio de bienvenida.
+                            </p>
+                        </>
+                    )}
                 </Card>
             )}
 
