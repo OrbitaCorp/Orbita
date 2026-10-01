@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "a10fd36b9e782e07",
+  "version": "ae31a1cc75befcf4",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -165,6 +165,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "historial",
       "capitulo": "Pedidos",
       "titulo": "Historial",
+      "pista": "los pedidos viejos: ya cerrados, entregados o cancelados",
       "texto": "La lista viva muestra lo que está en juego. El Historial es el archivo completo: todo lo que pasó, con su fecha y su estado final, para consultar hacia atrás sin que te estorbe en el día a día.",
       "destino": {
         "seccion": "pedidos",

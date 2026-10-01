@@ -41,7 +41,7 @@ export function indiceDelManual(): string {
     porCapitulo.get(t.capitulo)!.push(t);
   }
   return capitulos
-    .map((c) => [`${c}:`, ...porCapitulo.get(c)!.map((t) => `- ${t.id} · ${t.titulo}`)].join('\n'))
+    .map((c) => [`${c}:`, ...porCapitulo.get(c)!.map((t) => `- ${t.id} · ${t.titulo}${t.pista ? ` (${t.pista})` : ''}`)].join('\n'))
     .join('\n');
 }
 

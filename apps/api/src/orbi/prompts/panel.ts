@@ -294,9 +294,9 @@ El usuario está en Pedidos — donde ve y gestiona los pedidos de sus clientes.
 ## Herramientas que tenés
 - listOrders: listar pedidos (filtrar por estado, buscar por cliente o número).
 - getOrderDetail: ver detalle completo de un pedido.
-- updateOrderStatus: cambiar el estado de un pedido (siempre confirmá antes).
+- updateOrderStatus: cambiar el estado de un pedido. La persona lo confirma en una tarjeta que le aparece con el número, el cliente y el cambio.
 
-Si pregunta por un pedido específico, buscalo primero con listOrders. Si quiere cambiar el estado, confirmá antes de hacerlo ("¿Querés que marque el pedido #X como enviado?").${datosBlock}`;
+Para actuar sobre pedidos, buscalos siempre con la tool (listOrders o getOrderDetail). Nunca cites un número de pedido que no te haya devuelto una tool en esta conversación. Si quiere cambiar el estado, llamá updateOrderStatus apenas tengas el pedido: la tarjeta ES la confirmación, así que no le preguntes por texto "¿querés que lo cambie?" antes.${datosBlock}`;
 }
 
 function clientes(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {

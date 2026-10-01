@@ -17,7 +17,7 @@ import { MODULOS_DEL_MENU } from '@/layouts/components/permisosDelMenu'
 
 // La misma forma que apps/api/src/orbi/manual/manual.types.ts (ManualGenerado).
 export type DestinoParaOrbi = { seccion: string; vista?: string; label: string }
-export type TemaParaOrbi = { id: string; capitulo: string; titulo: string; texto: string; destino?: DestinoParaOrbi }
+export type TemaParaOrbi = { id: string; capitulo: string; titulo: string; pista?: string; texto: string; destino?: DestinoParaOrbi }
 export type PasoParaOrbi = { id: string; titulo: string; etapa: 1 | 2; grupo?: string; destino: DestinoParaOrbi }
 export type ModuloParaOrbi = { id: string; label: string; permisos: string[] }
 export type ManualParaOrbi = {
@@ -82,6 +82,7 @@ export function armarManualParaOrbi(): ManualParaOrbi {
             id: t.id,
             capitulo: c.titulo,
             titulo: t.titulo,
+            ...(t.pista ? { pista: t.pista } : {}),
             texto: t.bloques.map(textoDeBloque).join('\n\n'),
             ...(destino ? { destino } : {}),
         }

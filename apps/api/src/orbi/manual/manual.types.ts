@@ -9,6 +9,8 @@ export type TemaDelManual = {
   id: string;
   capitulo: string;
   titulo: string;
+  /** Cómo lo preguntaría la persona, cuando el título solo no alcanza. Va en el índice. */
+  pista?: string;
   /** Texto plano: los botones van entre comillas, con el nombre exacto de la pantalla. */
   texto: string;
   destino?: DestinoDelManual;

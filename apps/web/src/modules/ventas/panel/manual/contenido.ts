@@ -55,6 +55,12 @@ export type Bloque =
 export interface Tema {
     id: string
     titulo: string
+    /** Solo para el índice de Orbi (la persona no la ve): cómo lo preguntaría
+     *  alguien cuando el título solo no alcanza. "Historial" no le dice a un
+     *  modelo que ahí están "los pedidos viejos que ya se cerraron". Una por
+     *  tema que lo necesite, no una por tema: cada una suma tokens a CADA
+     *  mensaje del chat. */
+    pista?: string
     bloques: Bloque[]
     /** Esquema de la pantalla. Solo en los temas donde la FORMA de la
      *  pantalla es parte de la explicación — no uno por tema, que convierte
@@ -299,6 +305,7 @@ export const CAPITULOS: Capitulo[] = [
         },
         {
             id: 'historial', titulo: 'Historial',
+            pista: 'los pedidos viejos: ya cerrados, entregados o cancelados',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista viva muestra lo que está en juego. El **Historial** es el archivo completo: todo lo que pasó, con su fecha y su estado final, para consultar hacia atrás sin que te estorbe en el día a día.' },
             ],
