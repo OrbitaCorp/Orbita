@@ -244,8 +244,17 @@ function contenidoDeApariencia(
   // hay logo, y sin él la marca es un hueco (mismo filtro que el home clásico).
   const marcas = (ap?.brands ?? []).filter(m => m.name.trim() !== '')
 
+  const todos = { destacados: estante('destacados'), nuevos: estante('nuevos'), recomendados: estante('recomendados'), topVentas: estante('topVentas') }
+  // Las filas propias de una plantilla con bloque propio: el primer estante
+  // con productos y el siguiente (ver `estante` en SeccionPlantilla).
+  const [principal, secundario] = (['destacados', 'nuevos', 'recomendados', 'topVentas'] as Estante[]).filter(e => todos[e].length > 0)
+
   return {
-    estantes: { destacados: estante('destacados'), nuevos: estante('nuevos'), recomendados: estante('recomendados'), topVentas: estante('topVentas') },
+    estantes: todos,
+    estantePrincipal: principal,
+    estanteSecundario: secundario,
+    productos: principal ? todos[principal] : [],
+    productosSecundarios: secundario ? todos[secundario] : [],
     ocultarCategorias: !(ap?.showCategoriesSection ?? true),
     anuncio: anuncioReal(ap, secciones),
     parallax,
@@ -264,7 +273,7 @@ function contenidoDeApariencia(
  * radios, sombras). Lo que se reemplaza es solo el contenido.
  */
 export function plantillaReal({
-  base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
+  base, productos, destacados, categorias, stats, cupon, heroSlides, transferPct,
   marca, tagline, secciones, baseUrl, contacto, mostrarPie = true,
   apariencia, nuevos, recomendados = [], topVentas = [], hayWhatsapp = true,
 }: {
@@ -300,7 +309,8 @@ export function plantillaReal({
   secciones?: ContenidoSecciones
   productos: Producto[]
   destacados: Producto[]
-  masVendidos: Producto[]
+  /** Sin uso: "más vendidos" era la segunda tanda de lo más nuevo. Ahora es `topVentas`. */
+  masVendidos?: Producto[]
   categorias: CatReal[]
   stats: StorefrontStatsItem[]
   cupon?: { titulo: string; bajada: string; codigo: string } | null
@@ -355,15 +365,16 @@ export function plantillaReal({
     // Barra de confianza: los stats reales del negocio (Apariencia → statsBar),
     // con el mismo par [fuerte, apagado] que usa la plantilla.
     confianza: stats.map(s => [s.value, s.label] as [string, string]),
-    categorias: cats,
+    categorias: (apariencia?.showCategoriesSection ?? true) ? cats : [],
+    categoriasTodas: cats,
     // Sin código no hay cupón. El panel ya manda null al vaciarlo, pero un
     // negocio que lo guardó antes de esa validación podría traer strings
     // vacíos — y ahí el home dibujaría el bloque oscuro con la caja punteada
     // en blanco, que se ve peor que no tener cupón.
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
-    productos: destacados.map(p => aProductoPlantilla(p, transferPct)),
+    // `productos` y `productosSecundarios` ya vienen de `contenidoDeApariencia`:
+    // son los estantes que muestran las filas propias de la plantilla.
     catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
-    productosSecundarios: masVendidos.map(p => aProductoPlantilla(p, transferPct)),
     // Sin slides editados, se queda con los de muestra de `base` (mismo
     // criterio que categorías/cupón: no dejar la sección vacía si el negocio
     // todavía no cargó nada).

@@ -65,12 +65,41 @@ plantilla nueva respeta los interruptores sin escribir nada.
   que una tienda ya había cargado ahí se sigue mostrando y se pasa a los
   campos de Apariencia al abrir el editor (`pasarAApariencia`).
 
-**Estado:** las diez plantillas con receta cumplen el estándar completo. Las
-dieciséis de bloque propio todavía no (fase 2): definen sus filas a mano,
-ignoran los interruptores de estantes y varias no tienen buscador en celular.
-Está anotado en `PENDIENTES`. Sigue sin entrar al estándar la oferta con
+### Cómo lo cumple cada tipo de plantilla
+
+**Con receta:** declara todos los bloques en su lista (el check falla si falta
+uno). El lugar y el estilo de cada uno son su diseño.
+
+**Con bloque propio:** dibuja con su diseño lo que la distingue, y lo demás
+sale de piezas comunes de `Home()`:
+
+- **Su fila de productos no tiene un estante fijo.** La sección se marca con
+  `estante: 0` en `secciones.ts` (`1` para una segunda fila, como en Vidriera
+  y Circuito). `plantillaReal()` le pasa en `p.productos` el **primer estante
+  con productos** —Destacados, si no Nuevos ingresos, si no Recomendados, si no
+  Top ventas— y en `p.productosSecundarios` el siguiente. Así la fila que
+  distingue a la plantilla nunca queda vacía porque el negocio no marcó
+  destacados o todavía no vendió.
+- **Su título sale del estante que le tocó** si el dueño no escribió uno
+  (`txt()` lo resuelve solo con `estante`). En el editor esos dos campos van
+  vacíos, con la aclaración, en vez de precargar "Top ventas".
+- **`{resto(n)}`** antes del cupón o del pie dibuja lo que el bloque no tiene:
+  los estantes que sobran (`n` es cuántas filas propias tiene), el parallax,
+  las marcas y el video, con el tema de la plantilla. `resto(n, true)` suma las
+  categorías, para la que no tiene una sección propia (Glow).
+- **`aviso` / `avisoCartelera`** en lugar de un cintillo propio: es el anuncio
+  de Apariencia. `{barraAnuncio}` para la que no tenía cintillo.
+- **`{buscador()}`** debajo del header: el buscador en celular.
+  `buscador(true)` si la barra tampoco lo trae en computadora.
+- **`hayFila`, `hayFila2`, `(p.categorias ?? []).length > 0`, `!sinWpp`**
+  delante de cada sección: sin productos, sin categorías o sin WhatsApp, la
+  sección no se dibuja. Un título arriba de una grilla vacía es peor que nada.
+
+**Estado:** las veintiséis cumplen el estándar. Sigue afuera la oferta con
 cuenta regresiva de la portada (paquete Avanzado) y la cantidad de productos
-de "Nuevos ingresos": en una plantilla cada fila es de un renglón.
+de "Nuevos ingresos": con plantilla cada fila es de un renglón. Las filas que
+agrega `resto()` en un bloque propio salen con el nombre del estante, sin
+título editable.
 
 ## Las seis reglas que no se negocian
 
@@ -308,7 +337,7 @@ dueño edita desde Avanzado → Plantillas de Home:
 | Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
 | Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
 | Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
-| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia. Completo en las recetas; en bloque propio, solo lo que esa plantilla dibuja |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las veintiséis. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
 | Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
 
 Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`
@@ -368,7 +397,7 @@ categorías, cuarenta productos).
 | tema | Contraste del texto y del botón |
 | vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
 | tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
-| estándar | Cada receta ubica todos los bloques y los cuatro estantes; cada cosa se ve prendida y desaparece apagada; una tienda sin ventas no muestra "Más vendidos" |
+| estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos". En las recetas, además, que estén todos los bloques |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 
 ### Cómo leer un fallo
@@ -421,7 +450,8 @@ expresar: el panel lateral fijo de Circuito, el muro de Mosaico, "Comprá el
 look" de Escaparate. No por querer mover un margen.
 
 Cuesta: escribir el bloque en `homes.tsx`, declarar el esquema a mano en
-`secciones.ts`, y cumplir a mano lo que una receta trae resuelto. Antes de
+`secciones.ts`, y cumplir el estándar con las piezas comunes (ver § El
+estándar → Cómo lo cumple cada tipo de plantilla): una receta lo trae resuelto. Antes de
 empezar, leer `referencia/bloque-propio.md` (cómo se engancha y el checklist)
 y `referencia/errores.md` (los dieciocho bugs que ya pasaron). Las dieciséis
 que existen quedan como están; se tocan si el dueño lo pide o si el check

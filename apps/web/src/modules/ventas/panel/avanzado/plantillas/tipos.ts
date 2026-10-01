@@ -238,6 +238,21 @@ export interface SeccionPlantilla {
   nombre: string
   /** Una línea que ubique la sección dentro de la portada. */
   nota?: string
+  /**
+   * Esta sección es una FILA DE PRODUCTOS de la plantilla, dibujada con su
+   * propio diseño (las piezas numeradas de Vera, las fichas de Corralón).
+   *
+   * `0` es la fila principal y `1` la segunda. No tienen un estante fijo: la
+   * principal muestra el primer estante de Apariencia que tenga productos
+   * (Destacados, si no Nuevos ingresos, si no…) y la segunda, el siguiente.
+   * Así la fila que distingue a la plantilla nunca queda vacía porque el
+   * negocio todavía no marcó destacados o no vendió nada.
+   *
+   * Por eso su título no puede ser fijo: si el dueño no lo escribió, sale el
+   * del estante que se esté mostrando (ver `txt()` en homes.tsx). Una fila
+   * que dice "Top ventas" arriba de los productos recién cargados miente.
+   */
+  estante?: 0 | 1
   campos: CampoSeccion[]
 }
 
@@ -357,8 +372,17 @@ export interface Plantilla {
   // Los cuatro estantes, ya filtrados por su interruptor: uno apagado llega
   // vacío, igual que uno sin productos.
   estantes?: Record<Estante, Producto[]>
-  // "Sección de categorías" apagada.
+  // Cuál de los cuatro muestra la fila principal de una plantilla con bloque
+  // propio, y cuál la segunda (ver `estante` en SeccionPlantilla). `productos`
+  // y `productosSecundarios` traen esos dos.
+  estantePrincipal?: Estante
+  estanteSecundario?: Estante
+  // "Sección de categorías" apagada. Ahí `categorias` llega vacío, y las
+  // secciones que las muestran no se dibujan; `categoriasTodas` las sigue
+  // trayendo, para lo que no es esa sección (las filas por categoría, una
+  // categoría elegida a mano en un campo `seleccion`).
   ocultarCategorias?: boolean
+  categoriasTodas?: [string, string, string?][]
   // El anuncio de arriba del header, con su modo cartelera.
   anuncio?: { texto: string; cartelera: boolean }
   parallax?: { img: string; titulo: string; bajada: string; cta: string; link?: string; volanta?: string }

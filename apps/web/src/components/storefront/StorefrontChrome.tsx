@@ -213,7 +213,7 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
             renderAcciones: ({ movil: m }) => (
               <AccionesPlantilla t={plantilla.tema} movil={m} esVidriera={config?.business?.mode === 'SHOWCASE'} />
             ),
-            renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+            renderBuscador: () => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} /> : null,
           }}
         />
         {lateral && <div style={{ flex: 1, minWidth: 0 }}>{children}</div>}

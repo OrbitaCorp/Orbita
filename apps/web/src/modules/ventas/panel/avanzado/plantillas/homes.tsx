@@ -3,12 +3,12 @@ import { esPreview } from '@/lib/storefront/previewBridge'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
 // se ven salen del catálogo del negocio, de sus categorías, o de una sección
 // editable cuyo `porDefecto` vive en secciones.ts.
-import type { BloqueReceta, Plantilla, Producto, AccionesHome } from './tipos'
+import type { BloqueReceta, Estante, Plantilla, Producto, AccionesHome } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
   HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, MenuMovil,
 } from './piezas'
-import { esAfirmacion, porDefectoDe } from './secciones'
+import { esAfirmacion, estanteDeSeccion, porDefectoDe, TITULOS_ESTANTE } from './secciones'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
 //
@@ -152,7 +152,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
    * `base` solo lo pasan las secciones que de verdad piden destacados o más
    * vendidos ("Destacados", "Top ventas"); el resto sale del catálogo.
    */
-  const fila = (n: number, clave: string, base?: Producto[]) => {
+  const delCatalogo = (n: number, clave: string, base?: Producto[]) => {
     const pool = base && base.length > 0 ? base : barajado
     if (pool.length === 0) return []
     const desde = Math.abs(hash(clave)) % pool.length
@@ -160,6 +160,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     for (let i = 0; i < Math.min(n, pool.length); i++) salida.push(pool[(desde + i) % pool.length])
     return salida
   }
+  /**
+   * Los productos de una fila propia de la plantilla.
+   *
+   * En la tienda real es un estante de Apariencia, en su orden: el principal
+   * si no se pide otro (`p.productos`, ver `estantePrincipal` en tipos.ts).
+   * Un estante vacío da una fila vacía — no cae al catálogo, que es lo que
+   * hacía que una plantilla mostrara productos con los cuatro estantes
+   * apagados. En la vitrina sigue saliendo de la muestra, barajada.
+   */
+  const fila = (n: number, clave: string, base?: Producto[]) =>
+    p.estantes ? (base ?? p.productos).slice(0, n) : delCatalogo(n, clave, base)
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
   // Contenido de una sección editable de ESTA plantilla. Si el dueño no lo
@@ -177,6 +188,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   const txt = (seccion: string, campo: string) => {
     const guardado = p.sec?.[seccion]?.[campo]?.trim()
     if (guardado) return guardado
+    // Una fila propia no tiene un estante fijo (ver `estante` en tipos.ts),
+    // así que su título por defecto es el del estante que le tocó mostrar.
+    if (acciones && p.estantes && (campo === 'volanta' || campo === 'titulo')) {
+      const cual = estanteDeSeccion(p.id, seccion)
+      const estante = cual === 0 ? p.estantePrincipal : cual === 1 ? p.estanteSecundario : undefined
+      if (estante) return TITULOS_ESTANTE[estante][campo === 'volanta' ? 1 : 2]
+    }
     if (acciones && esAfirmacion(p.id, seccion, campo)) return ''
     // `!!acciones` = tienda real. Ahí, un campo escrito para el rubro de la
     // maqueta ("Buscá por rubro" de Papelería) cae a su versión neutra.
@@ -205,7 +223,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     if (!v) return null
     if (v.startsWith('cat:')) {
       const slug = v.slice(4)
-      const cat = (p.categorias ?? []).find(([, , s]) => s === slug)
+      const cat = (p.categoriasTodas ?? p.categorias ?? []).find(([, , s]) => s === slug)
       if (!cat) return null
       return { nombre: cat[0], img: cat[1], ir: acciones ? () => acciones.irACategoria(slug) : undefined }
     }
@@ -233,7 +251,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
    * fila vacía abajo es peor que no mostrar esa categoría.
    */
   const porCategoria = (cuantas: number, porFila: number) =>
-    (p.categorias ?? [])
+    (p.categoriasTodas ?? p.categorias ?? [])
       .map(([nombre, , slug]) => ({
         nombre,
         slug,
@@ -253,7 +271,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
    * había perdido una sección.
    */
   const lugares = (n: number, seccion: string, clave: string): Elegido[] => {
-    const relleno = fila(n, clave)
+    const relleno = delCatalogo(n, clave)
     const salida: Elegido[] = []
     for (let i = 0; i < n; i++) {
       const puesto = elegido(txt(seccion, `i${i + 1}`))
@@ -289,19 +307,25 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // Todo lo que muestra sale de la tienda —categorías, catálogo, destacados— y
   // los textos van por `txt()`, así que el editor de estas plantillas se
   // genera solo desde la receta y no hay que escribirle uno a mano.
-  if (p.receta) {
-    const r = p.receta
+  // Los bloques de abajo (`bloque()`) los escribió la rama de receta, pero
+  // los usan todas: una plantilla con bloque propio dibuja con SU diseño lo
+  // que la distingue, y lo de Apariencia que no tiene diseño propio —los
+  // estantes que le sobran, el parallax, las marcas, el video— sale de acá,
+  // pintado con su tema (ver `resto()`).
     const s = p.slides[iActual]
     const cats = p.categorias ?? []
 
     // El encabezado de cada bloque, editable. La clave es el id del bloque,
     // así que dos filas de la misma plantilla no comparten título.
-    const encabezadoDe = (id: string, centrado?: boolean) => (
+    // `estante` es para las filas que agrega `resto()` en una plantilla con
+    // bloque propio: no tienen campos en su esquema, y sale el nombre del
+    // estante.
+    const encabezadoDe = (id: string, centrado?: boolean, estante?: Estante) => (
       <Titulo
         t={t}
-        volanta={txt(id, 'volanta')}
-        texto={txt(id, 'titulo')}
-        accion={txt(id, 'accion')}
+        volanta={txt(id, 'volanta') || (estante ? TITULOS_ESTANTE[estante][1] : '')}
+        texto={txt(id, 'titulo') || (estante ? TITULOS_ESTANTE[estante][2] : id === 'categorias' ? 'Comprá por categoría' : '')}
+        accion={txt(id, 'accion') || (estante ? 'Ver todo →' : '')}
         centrado={centrado}
         movil={movil}
         onAccion={acciones?.irACatalogo}
@@ -324,7 +348,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     }
 
     // El anuncio de Apariencia. En la vitrina, el cartel de muestra.
-    const anuncio = acciones ? p.anuncio : (p.cartel ? { texto: p.cartel, cartelera: false } : undefined)
+    //
+    // Las plantillas con bloque propio traían cada una su cintillo, con un
+    // texto de muestra en su esquema: en la vitrina se sigue viendo ese.
+    const anuncio = acciones ? p.anuncio : { texto: txt('cintillo', 'texto') || p.cartel || '', cartelera: activo('cintillo', 'cartelera') }
+    const aviso = anuncio?.texto ?? ''
+    const avisoCartelera = !!anuncio?.cartelera
 
     const heroTexto = (alineado: 'izq' | 'centro', claro: boolean) => (
       <div style={{ textAlign: alineado === 'centro' ? 'center' : 'left', maxWidth: alineado === 'centro' ? 640 : 520, margin: alineado === 'centro' ? '0 auto' : undefined }}>
@@ -333,7 +362,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         <p style={{ fontSize: movil ? 15 : 17, lineHeight: 1.6, margin: '16px 0 26px', color: claro ? 'rgba(255,255,255,0.88)' : t.muted }}>{s?.bajada}</p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: alineado === 'centro' ? 'center' : undefined }}>
           <Boton t={t} grande={!movil} onClick={s?.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : acciones?.irACatalogo}>{s?.cta}</Boton>
-          {txt('hero', 'cta2') && <Boton t={t} grande={!movil} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
+          {txt('hero', 'cta2') && !(acciones && (!acciones.abrirWhatsapp || p.ocultarWhatsapp)) && <Boton t={t} grande={!movil} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
         </div>
         {navHero({ marginTop: 22, justifyContent: alineado === 'centro' ? 'center' : undefined })}
       </div>
@@ -476,7 +505,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             if (items.length === 0) return null
             return (
               <Reveal key={i}><div style={{ padding: movil ? '28px 0 28px 16px' : '52px 0 52px 40px' }}>
-                <div style={{ paddingRight: movil ? 16 : 40 }}>{encabezadoDe(b.id)}</div>
+                <div style={{ paddingRight: movil ? 16 : 40 }}>{encabezadoDe(b.id, false, b.fuente)}</div>
                 <Tira gap={14}>
                   {items.map((x, j) => (
                     <div key={x.slug ?? x.nombre} style={{ width: movil ? 200 : 260, flexShrink: 0 }}>
@@ -492,7 +521,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           if (items.length === 0) return null
           return (
             <Reveal key={i}><div style={{ padding: sangre ? (movil ? '28px 0' : '52px 0') : pad }}>
-              <div style={{ padding: sangre ? (movil ? '0 16px' : '0 40px') : undefined }}>{encabezadoDe(b.id)}</div>
+              <div style={{ padding: sangre ? (movil ? '0 16px' : '0 40px') : undefined }}>{encabezadoDe(b.id, false, b.fuente)}</div>
               <div style={{ display: 'grid', gridTemplateColumns: cols(nCols, 2), gap: sangre ? 0 : (movil ? 12 : 18), borderTop: sangre ? `1px solid ${t.border}` : undefined, borderBottom: sangre ? `1px solid ${t.border}` : undefined }}>
                 {items.map((x, j) => producto(x, j, { sangre, alto: movil ? 170 : 250 }))}
               </div>
@@ -685,6 +714,73 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       }
     }
 
+    // ── El estándar, para las plantillas con bloque propio ──────────────────
+
+    // El anuncio de Apariencia como franja, para las plantillas que no traían
+    // un cintillo con diseño propio (Mosaico, Corralón).
+    const barraAnuncio = !aviso ? null : avisoCartelera
+      ? <Marquee t={t} texto={aviso} />
+      : (
+        <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em' }}>
+          {aviso}
+        </div>
+      )
+
+    // ¿Hay algo para mostrar en la fila principal, y en la segunda? En la
+    // vitrina siempre: se dibuja con la muestra.
+    const hayFila = !p.estantes || p.productos.length > 0
+    const hayFila2 = !p.estantes || (p.productosSecundarios ?? []).length > 0
+
+    // Sin WhatsApp (apagado en Apariencia, o sin número cargado) los botones
+    // que abren el chat no se dibujan: un botón que no hace nada es peor.
+    const sinWpp = !!acciones && (!acciones.abrirWhatsapp || !!p.ocultarWhatsapp)
+
+    /**
+     * El buscador, en un renglón propio debajo del header.
+     *
+     * En celular va siempre así: en la barra no entra al lado de la marca, y
+     * esconderlo dejaba sin buscador a quien entra desde el teléfono, que es
+     * la mayoría. `enEscritorio` es para los headers que tampoco tienen dónde
+     * ponerlo en pantalla grande (el logo centrado de Glow y de Crecer).
+     */
+    const buscador = (enEscritorio = false) => {
+      if (!(movil || enEscritorio) || p.ocultarBuscador || !acciones?.renderBuscador) return null
+      return (
+        <div style={{ padding: movil ? '10px 16px' : '10px 34px', background: t.surf, borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: movil ? undefined : 'center' }}>
+          {acciones.renderBuscador({})}
+        </div>
+      )
+    }
+
+    /**
+     * Lo de Apariencia que esta plantilla no dibuja con un diseño propio: los
+     * estantes que no usaron sus filas, el parallax, las marcas y el video.
+     *
+     * `filasPropias` es cuántas filas de productos tiene el bloque (una, o dos
+     * en Vidriera y Circuito): esas ya mostraron el estante principal y el
+     * segundo, así que acá van los que siguen. En la vitrina no dibuja nada:
+     * ahí no hay Apariencia.
+     */
+    const resto = (filasPropias: number, conCategorias = false) => {
+      if (!acciones || !p.estantes) return null
+      const sobran = (['destacados', 'nuevos', 'recomendados', 'topVentas'] as Estante[])
+        .filter(e => p.estantes![e].length > 0)
+        .slice(filasPropias)
+      return (
+        <>
+          {/* Para la plantilla que no tiene una sección de categorías propia. */}
+          {conCategorias && bloque({ t: 'categorias', estilo: 'pastillas', cols: 6 }, 899)}
+          {sobran.map((e, k) => bloque({ t: 'fila', id: `est-${e}`, fuente: e, cols: 4 }, 900 + k))}
+          {bloque({ t: 'parallax' }, 910)}
+          {bloque({ t: 'marcas' }, 911)}
+          {bloque({ t: 'video' }, 912)}
+        </>
+      )
+    }
+
+  if (p.receta) {
+    const r = p.receta
+
     // El header: el mismo de siempre en dos variantes. No hace falta uno por
     // plantilla — lo que las distingue es el tema, no dónde cae el logo.
     const encabezado = (
@@ -801,7 +897,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
         )}
 
-        {categorias.length > 0 && (
+        {(p.categorias ?? []).length > 0 && categorias.length > 0 && (
           <Reveal>
             <div style={{ padding: movil ? '30px 16px' : '46px 40px' }}>
               <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
@@ -825,7 +921,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         {/* Segunda fila de productos: el home real de Órbita tiene varias
             (destacados, nuevos ingresos, más vendidos), no una sola. */}
-        {masVendidos.length > 0 && (
+        {hayFila2 && masVendidos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 30px' : '0 40px 44px' }}>
             <Titulo t={t} volanta={txt('masVendidos', 'volanta')} texto={txt('masVendidos', 'titulo')} accion={txt('masVendidos', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -836,6 +932,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
         )}
 
+        {resto(2)}
         {p.cupon && (
           <Reveal>
             <div style={{ margin: movil ? '0 16px 30px' : '0 40px 42px', background: t.text, color: t.bg, padding: movil ? 22 : '30px 34px', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
@@ -850,6 +947,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         {/* Banner de WhatsApp — esto SÍ lo arma Órbita (ver Inicio.tsx), a
             diferencia del newsletter que estaba acá antes. */}
+        {!sinWpp && (
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 20px' : '38px 40px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', justifyContent: 'center', textAlign: movil ? 'center' : 'left' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
@@ -859,6 +957,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
+        )}
 
         {!soloCuerpo && !p.ocultarPie && (
           <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />
@@ -875,7 +974,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // Los cuatro bloques chicos del muro son categorías REALES del negocio, no
     // una lista de casa y deco: el descuento de cada uno lo escribe el dueño
     // (sección "Muro"), porque es lo único que Órbita no sabe solo.
-    const tiles = (p.categorias ?? []).slice(0, 4)
+    const tiles = (p.categoriasTodas ?? p.categorias ?? []).slice(0, 4)
     // Una lista separada por comas, para no pedirle seis campos al dueño.
     const marcas = txt('marcas', 'lista').split(',').map((m) => m.trim()).filter(Boolean)
 
@@ -917,11 +1016,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </div>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{barraAnuncio}{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
+        {barraAnuncio}
         {encabezado}
+        {buscador()}
 
         {/* El muro. Alturas desparejas a propósito. */}
         <div style={{ padding: movil ? 12 : 16, display: 'grid', gridTemplateColumns: movil ? '1fr 1fr' : '1.7fr 1fr 1fr', gap: 12 }}>
@@ -955,6 +1056,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
 
         {/* Productos compactos: cinco por fila, imagen cuadrada, sin ficha larga. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '24px 16px 30px' : '34px 28px 40px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -976,6 +1078,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* La franja prometía "Envío gratis desde $70.000" y "llega en 48 a 72
             horas" en cualquier tienda que aplicara Mosaico, la ofreciera o no.
@@ -1012,6 +1115,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
         )}
+
+        {resto(1)}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -1180,7 +1285,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
-        {cats.length > 0 && (
+        {(p.categorias ?? []).length > 0 && cats.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px' : '48px 34px' }}>
             {/* Grilla del ancho de la cantidad real de categorías (2 a 4) —
@@ -1207,6 +1312,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
         )}
+
+        {resto(1)}
 
         {!soloCuerpo && !p.ocultarPie && (
           <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />
@@ -1237,16 +1344,16 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             versión cartelera conserva el dorado sobre carbón de Premium en vez
             de usar el `Marquee` compartido, que va en negativo (fondo oscuro
             del tema) y acá se vería como una franja pegada de otra plantilla. */}
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.22em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, overflow: 'hidden' }}>
-            {activo('cintillo', 'cartelera') ? (
+            {avisoCartelera ? (
               <div className="pl-marquee-track">
                 {[0, 1].map((k) => (
-                  <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>
+                  <span key={k}>{`${aviso}   ·   `.repeat(6)}</span>
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}
           </div>
         )}
@@ -1278,11 +1385,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         {/* Hero a sangre: la pieza ocupa todo y el texto se apoya abajo a la
             izquierda. Antes era una columna de texto al lado de una foto
@@ -1307,11 +1415,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                   onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
                   style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 11.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', cursor: s.link && acciones ? 'pointer' : undefined }}
                 >{s.cta}</span>
-                <span
+                {!sinWpp && (<span
                   className="pl-cta"
                   onClick={acciones?.abrirWhatsapp}
                   style={{ border: '1px solid rgba(247,242,232,0.35)', color: '#F7F2E8', padding: '14px 26px', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', cursor: acciones ? 'pointer' : undefined }}
-                >{txt('hero', 'cta2')}</span>
+                >{txt('hero', 'cta2')}</span>)}
               </div>
               {navHero({ marginTop: 30 })}
             </div>
@@ -1362,6 +1470,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         )}
 
         {/* Las piezas: tres, grandes, con aire. Sin tachados ni badges de oferta. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '26px 16px 34px' : '46px 44px 62px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -1388,6 +1497,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* El taller: foto a la izquierda, números grandes en serif a la derecha. */}
         <Reveal>
@@ -1423,14 +1533,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '0 0 24px', maxWidth: 400, whiteSpace: 'pre-line' }}>
                 {txt('grabado', 'texto')}
               </p>
-              <span
+              {!sinWpp && (<span
                 style={{ ...enlaceOro, cursor: acciones ? 'pointer' : undefined }}
                 onClick={acciones?.abrirWhatsapp}
-              >{txt('grabado', 'cta')}</span>
+              >{txt('grabado', 'cta')}</span>)}
             </div>
             <div style={{ order: movil ? 1 : 2 }}><Foto src={txt('grabado', 'foto')} alto={movil ? 260 : 420} /></div>
           </div>
         </Reveal>
+
+
+        {resto(1)}
 
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
@@ -1451,6 +1564,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // (categoría o producto), no el orden en que estén cargadas las
     // categorías. Sin elegir nada la sección no se dibuja.
     const pasos = lugares(3, 'pasos', 'nocturno-pasos')
+    // El cintillo: lo que el dueño escribió acá, si no el anuncio de
+    // Apariencia, y recién después el texto con el que se diseñó.
+    const lanzamiento = p.sec?.lanzamiento?.texto?.trim() || aviso || txt('lanzamiento', 'texto')
 
     const encabezado = (
       <>
@@ -1459,9 +1575,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             Avanzado → Oferta relámpago, que se dibuja sola arriba de la
             portada. Acá queda el anuncio como texto editable, y vacío no se
             dibuja. */}
-        {txt('lanzamiento', 'texto') && (
+        {lanzamiento && (
           <div style={{ background: t.soft, borderBottom: `1px solid ${t.border}`, padding: '9px 16px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{txt('lanzamiento', 'texto')}</span>
+            <span style={{ fontSize: 11.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{lanzamiento}</span>
             {!movil && txt('lanzamiento', 'aclaracion') && <span style={{ fontSize: 12, color: t.muted }}>· {txt('lanzamiento', 'aclaracion')}</span>}
           </div>
         )}
@@ -1484,11 +1600,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         <div style={{ position: 'relative', overflow: 'hidden', background: `radial-gradient(1100px 500px at 72% 46%, rgba(34,211,238,0.20), transparent 62%), ${t.bg}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1.05fr', gap: movil ? 0 : 40, padding: movil ? '30px 18px' : '62px 40px', alignItems: 'center' }}>
@@ -1503,7 +1620,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <p style={{ fontSize: 15, color: t.muted, margin: '18px 0 26px', lineHeight: 1.7, maxWidth: 420 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
                 <Boton t={t} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
-                <Boton t={t} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>
+                {!sinWpp && <Boton t={t} secundario onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
               </div>
               {navHero({ marginBottom: 24 })}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1527,6 +1644,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
 
         {/* Categorías con cantidad de artículos. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '24px 16px 10px' : '34px 40px 12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: colsDe(4, (p.categorias ?? []).length, 2), gap: 12 }}>
@@ -1548,7 +1666,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '20px 0 30px 16px' : '26px 0 44px 40px' }}>
             <div style={{ paddingRight: movil ? 16 : 40 }}>
@@ -1586,6 +1706,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </Tira>
           </div>
         </Reveal>
+        )}
 
         {/* Armá tu setup: los tres pasos los elige el dueño desde el editor
             (categoría o producto). Los que no eligió se llenan con el
@@ -1639,6 +1760,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
+        {resto(1)}
+
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
@@ -1659,9 +1782,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
-            {txt('cintillo', 'texto')}
+            {aviso}
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: movil ? 12 : 24, padding: movil ? '13px 16px' : '16px 32px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
@@ -1694,11 +1817,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         {/* Hero: el campo de búsqueda es el protagonista, no un adorno. */}
         <div style={{ background: t.soft, borderBottom: `1px solid ${t.border}` }}>
@@ -1722,6 +1846,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '26px 16px 6px' : '44px 40px 10px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -1741,6 +1866,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Armador de lista escolar: es lo que realmente resuelve el problema
             de marzo, y ninguna otra plantilla lo tiene. */}
@@ -1772,12 +1898,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 <div style={{ fontSize: 12, color: t.muted, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>{txt('lista', 'volantaCaja')}</div>
                 <div style={{ fontFamily: t.fh, fontSize: movil ? 26 : 32, fontWeight: 800, letterSpacing: '-0.03em', margin: '8px 0 10px', lineHeight: 1.15 }}>{txt('lista', 'tituloCaja')}</div>
                 <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 18 }}>{txt('lista', 'bajadaCaja')}</div>
-                <Boton t={t} ancho onClick={acciones?.abrirWhatsapp}>{txt('lista', 'cta')}</Boton>
+                {!sinWpp && <Boton t={t} ancho onClick={acciones?.abrirWhatsapp}>{txt('lista', 'cta')}</Boton>}
               </div>
             </div>
           </div>
         </Reveal>
 
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '10px 16px 30px' : '16px 40px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -1786,7 +1913,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {/* Sin WhatsApp no hay a dónde mandar la lista: no se dibuja. */}
+        {!sinWpp && (
         <Reveal>
           <div className="pl-tile" style={{ position: 'relative', margin: movil ? '0 16px 28px' : '0 40px 48px', borderRadius: t.radio, overflow: 'hidden' }}>
             <Foto src={txt('campana', 'foto')} alto={movil ? 220 : 300} radio={t.radio} />
@@ -1797,10 +1927,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               {/* Abre el WhatsApp del negocio. No se personaliza: el número
                   ya está en Configuración, y pedirlo de nuevo acá sería tener
                   el mismo dato en dos lados. Antes el botón no hacía nada. */}
-              <div><span className="pl-cta" onClick={acciones?.abrirWhatsapp} style={{ display: 'inline-block', background: '#fff', color: t.primary, padding: '12px 24px', borderRadius: t.radio, fontSize: 13.5, fontWeight: 800, cursor: acciones?.abrirWhatsapp ? 'pointer' : undefined }}>{txt('campana', 'cta')}</span></div>
+              <div>{!sinWpp && (<span className="pl-cta" onClick={acciones?.abrirWhatsapp} style={{ display: 'inline-block', background: '#fff', color: t.primary, padding: '12px 24px', borderRadius: t.radio, fontSize: 13.5, fontWeight: 800, cursor: acciones?.abrirWhatsapp ? 'pointer' : undefined }}>{txt('campana', 'cta')}</span>)}</div>
             </div>
           </div>
         </Reveal>
+        )}
+
+        {resto(1)}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -1853,11 +1986,13 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{barraAnuncio}{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
+        {barraAnuncio}
         {encabezado}
+        {buscador()}
 
         {/* Hero partido en tres: la promo grande y dos avisos operativos. */}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1.9fr 1fr', gap: 10, padding: movil ? 12 : 18 }}>
@@ -1890,6 +2025,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '16px 12px' : '26px 18px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -1910,6 +2046,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Calculadora de materiales. */}
         <Reveal>
@@ -1926,13 +2063,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <div style={{ fontSize: 12, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{txt('calculo', 'volantaCaja')}</div>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 23, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 14 }}>{txt('calculo', 'tituloCaja')}</div>
               <div style={{ borderTop: `1px dashed ${t.border}`, paddingTop: 14 }}>
-                <Boton t={t} ancho onClick={acciones?.abrirWhatsapp}>{txt('calculo', 'cta')}</Boton>
+                {!sinWpp && <Boton t={t} ancho onClick={acciones?.abrirWhatsapp}>{txt('calculo', 'cta')}</Boton>}
               </div>
             </div>
           </div>
         </Reveal>
 
         {/* Productos en lista, con la ficha técnica al lado — no en grilla. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '0 12px 24px' : '0 18px 44px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -1961,6 +2099,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, padding: movil ? '22px 16px' : '34px 30px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 18 }}>
@@ -1977,6 +2116,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             ))}
           </div>
         </div>
+        {resto(1)}
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
@@ -1999,7 +2139,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       porCategoria(3, 3).map((c) => [c.nombre, c.slug, c.productos])
     const encabezado = (
       <>
-        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
+        {aviso && <Marquee t={t} texto={aviso} />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '16px 34px', borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -2020,11 +2160,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador(true)}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador(true)}
 
         {/* Hero a sangre: la foto ocupa todo y el titular se come el ancho. */}
         <div className="pl-tile" style={{ position: 'relative' }}>
@@ -2039,10 +2180,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
                 style={{ background: t.primary, color: t.onPrimary, padding: '14px 30px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh, cursor: s.link && acciones ? 'pointer' : undefined }}
               >{s.cta}</span>
-              <span
+              {!sinWpp && (<span
                 className="pl-cta" onClick={acciones?.abrirWhatsapp}
                 style={{ border: '1px solid rgba(250,250,250,0.4)', color: '#fff', padding: '14px 26px', fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: t.fh, cursor: acciones ? 'pointer' : undefined }}
-              >{txt('hero', 'cta2')}</span>
+              >{txt('hero', 'cta2')}</span>)}
             </div>
             {navHero({ marginTop: 26 })}
           </div>
@@ -2079,6 +2220,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </Reveal>
         ))}
 
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '20px 16px 28px' : '34px 34px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2109,6 +2251,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Números de la comunidad. */}
         <div style={{ background: t.primary, color: t.onPrimary, padding: movil ? '26px 16px' : '40px 34px' }}>
@@ -2127,6 +2270,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
 
+        {resto(1)}
+
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
@@ -2141,14 +2286,14 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ background: t.soft, padding: '9px 0', fontSize: 12, fontWeight: 700, color: t.primary, overflow: 'hidden' }}>
-            {activo('cintillo', 'cartelera') ? (
+            {avisoCartelera ? (
               <div className="pl-marquee-track">
-                {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   `.repeat(6)}</span>)}
+                {[0, 1].map((k) => <span key={k}>{`${aviso}   `.repeat(6)}</span>)}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}
           </div>
         )}
@@ -2170,11 +2315,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador(true)}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador(true)}
 
         <div style={{ background: `linear-gradient(160deg, ${t.soft} 0%, ${t.bg} 60%)` }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 22 : 36, padding: movil ? '28px 20px' : '52px 40px', alignItems: 'center' }}>
@@ -2184,7 +2330,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <p style={{ fontSize: 15, color: t.muted, margin: '16px 0 24px', lineHeight: 1.7, maxWidth: 400 }}>{s.bajada}</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <Boton t={t} grande onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
-                <Boton t={t} secundario grande onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>
+                {!sinWpp && <Boton t={t} secundario grande onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
               </div>
               {navHero({ marginTop: 20 })}
             </div>
@@ -2195,6 +2341,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
 
         {/* El selector que reemplaza al menú de categorías. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '26px 16px' : '46px 40px' }}>
             <Titulo t={t} centrado volanta={txt('selector', 'volanta')} texto={txt('selector', 'titulo')} movil={movil} />
@@ -2218,7 +2365,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 26px' : '10px 40px 44px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2227,6 +2376,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
+
+        {resto(1)}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -2251,9 +2403,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, borderBottom: `1px solid ${t.border}` }}>
-            {txt('cintillo', 'texto')}
+            {aviso}
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '15px 16px' : '24px 44px', borderBottom: `1px solid ${t.border}`, gap: 14 }}>
@@ -2278,11 +2430,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'stretch' }}>
           <div style={{ padding: movil ? '32px 22px' : '70px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'center', order: movil ? 2 : 1 }}>
@@ -2300,6 +2453,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
 
         {/* La carta de varietales: puro texto, sin una sola foto. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '32px 22px' : '64px 52px', borderTop: `1px solid ${t.border}` }}>
             <Titulo t={t} volanta={txt('carta', 'volanta')} texto={txt('carta', 'titulo')} accion={txt('carta', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2318,8 +2472,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Botellas: altas y angostas, sobre crema para que recorten. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '10px 22px 34px' : '20px 52px 60px' }}>
             <Titulo t={t} volanta={txt('seleccion', 'volanta')} texto={txt('seleccion', 'titulo')} movil={movil} />
@@ -2342,6 +2498,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '28px 22px' : '46px 52px' }}>
@@ -2361,6 +2518,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
+        {resto(1)}
+
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
     )
@@ -2379,9 +2538,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, color: t.text, fontWeight: 600 }}>
-            {txt('cintillo', 'texto')}
+            {aviso}
           </div>
         )}
         <div style={{ textAlign: 'center', padding: movil ? '15px 16px' : '20px 34px 16px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
@@ -2400,11 +2559,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador(true)}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador(true)}
 
         <div style={{ background: `linear-gradient(150deg, ${t.soft} 0%, ${t.bg} 55%)`, padding: movil ? '30px 20px' : '56px 44px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 24 : 40, alignItems: 'center' }}>
@@ -2422,6 +2582,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
 
         {/* La línea de tiempo por edad, que reemplaza al menú de categorías. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px' : '52px 44px' }}>
             <Titulo t={t} centrado volanta={txt('edades', 'volanta')} texto={txt('edades', 'titulo')} movil={movil} />
@@ -2445,7 +2606,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 28px' : '6px 44px 48px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2454,6 +2617,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         <div style={{ padding: movil ? '24px 16px' : '38px 44px', borderTop: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 20 }}>
@@ -2470,6 +2634,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             ))}
           </div>
         </div>
+
+        {resto(1)}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -2528,20 +2694,21 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     if (soloHeader) {
       return (
         <div style={marco}>
-          {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
+          {aviso && <Marquee t={t} texto={aviso} />}
           {panel}
+          {buscador()}
         </div>
       )
     }
 
     return (
       <div style={marco}>
-        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
+        {aviso && <Marquee t={t} texto={aviso} />}
         {/* En celular el panel deja de ser una columna al costado y pasa a
             ser una barra arriba: en fila los dos hijos no entran en 390 px y
             el marco se llenaba de scroll horizontal. */}
         <div style={{ display: 'flex', flexDirection: movil ? 'column' : 'row', alignItems: movil ? 'stretch' : 'flex-start' }}>
-          {panel}
+          {movil ? <div>{panel}{buscador()}</div> : panel}
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Hero a sangre: la promo grande sobre la foto, sin carrusel. Con
                 una sola campaña arriba el ojo va derecho a la ficha técnica. */}
@@ -2574,6 +2741,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             {/* Fichas partidas: foto a la izquierda, specs y precio a la
                 derecha. Es la diferencia con las demás — nadie más muestra el
                 producto así, y es como se compra un periférico. */}
+            {hayFila && (
             <Reveal>
               <div style={{ padding: movil ? '26px 16px 8px' : '44px 44px 10px' }}>
                 <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2601,9 +2769,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 </div>
               </div>
             </Reveal>
+            )}
 
             {/* Categorías en lista con flecha, no en mosaico de fotos: en el
                 panel lateral ya hay nav, esto es el atajo largo. */}
+            {(p.categorias ?? []).length > 0 && (
             <Reveal>
               <div style={{ padding: movil ? '20px 16px' : '30px 44px' }}>
                 <Titulo t={t} texto={txt('categorias', 'titulo')} movil={movil} />
@@ -2622,17 +2792,21 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 </div>
               </div>
             </Reveal>
+            )}
 
+            {hayFila2 && (
             <Reveal>
               <div style={{ padding: movil ? '4px 16px 26px' : '10px 44px 40px' }}>
                 <Titulo t={t} volanta={txt('fila2', 'volanta')} texto={txt('fila2', 'titulo')} movil={movil} />
                 <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
-                  {fila(cuantos(4), 'circuito-nuevos').map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
+                  {fila(cuantos(4), 'circuito-nuevos', p.productosSecundarios).map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} onClick={abrir(x)} />)}
                 </div>
               </div>
             </Reveal>
+            )}
 
-            {p.cupon && (
+            {resto(2)}
+        {p.cupon && (
               <Reveal>
                 <div style={{ margin: movil ? '0 16px 26px' : '0 44px 38px', border: `1px solid ${t.primary}`, borderRadius: t.radio, padding: movil ? 20 : '26px 30px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', background: t.soft }}>
                   <div style={{ flex: 1, minWidth: 220 }}>
@@ -2644,6 +2818,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               </Reveal>
             )}
 
+            {!sinWpp && (
             <Reveal>
               <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '24px 18px' : '32px 44px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
@@ -2653,6 +2828,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
               </div>
             </Reveal>
+            )}
 
             {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
           </div>
@@ -2672,26 +2848,27 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!txt('cintillo', 'texto') && (
+        {!!aviso && (
           <div style={{ padding: '9px 0', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft, overflow: 'hidden' }}>
-            {activo('cintillo', 'cartelera') ? (
+            {avisoCartelera ? (
               <div className="pl-marquee-track">
-                {[0, 1].map((k) => <span key={k}>{`${txt('cintillo', 'texto')}   ·   `.repeat(6)}</span>)}
+                {[0, 1].map((k) => <span key={k}>{`${aviso}   ·   `.repeat(6)}</span>)}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '0 12px' }}>{txt('cintillo', 'texto')}</div>
+              <div style={{ textAlign: 'center', padding: '0 12px' }}>{aviso}</div>
             )}
           </div>
         )}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 380 : 500} />
@@ -2722,6 +2899,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         {/* Las piezas, numeradas y en lista. Foto cuadrada chica a la
             izquierda, nombre en serif, precio a la derecha alineado. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px 10px' : '50px 44px 16px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} centrado movil={movil} />
@@ -2753,9 +2931,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Índice de categorías: foto cuadrada chica y el nombre al lado en
             versalitas, en dos columnas. Ni mosaico ni pastillas. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '18px 16px 30px' : '26px 44px 48px' }}>
             <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
@@ -2774,7 +2954,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {resto(1)}
         {p.cupon && (
           <Reveal>
             <div style={{ borderTop: filete, borderBottom: filete, padding: movil ? '26px 20px' : '36px 44px', textAlign: 'center', background: t.soft }}>
@@ -2785,6 +2967,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </Reveal>
         )}
 
+        {!sinWpp && (
         <Reveal>
           <div style={{ padding: movil ? '26px 20px' : '38px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', justifyContent: 'center', textAlign: movil ? 'center' : 'left' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
@@ -2794,6 +2977,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
+        )}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -2818,16 +3002,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
+        {aviso && <Marquee t={t} texto={aviso} />}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         <div style={{ position: 'relative' }}>
           <Foto src={s.img} alto={movil ? 340 : 470} />
@@ -2886,6 +3071,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </Reveal>
         ))}
 
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 30px' : '34px 44px 44px' }}>
             <Titulo t={t} volanta={txt('categorias', 'volanta')} texto={txt('categorias', 'titulo')} accion={txt('categorias', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -2910,7 +3096,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
+        {resto(0)}
         {p.cupon && (
           <Reveal>
             <div style={{ margin: movil ? '0 16px 28px' : '0 44px 40px', background: t.primary, color: t.onPrimary, borderRadius: t.radio, padding: movil ? 22 : '30px 34px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
@@ -2923,6 +3111,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </Reveal>
         )}
 
+        {!sinWpp && (
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
@@ -2932,6 +3121,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
+        )}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -2953,16 +3143,17 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {txt('cintillo', 'texto') && <Marquee t={t} texto={txt('cintillo', 'texto')} />}
-        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} acciones={acciones} />
+        {aviso && <Marquee t={t} texto={aviso} />}
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
 
-    if (soloHeader) return <div style={marco}>{encabezado}</div>
+    if (soloHeader) return <div style={marco}>{encabezado}{buscador()}</div>
 
     return (
       <div style={marco}>
         {encabezado}
+        {buscador()}
 
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
           <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -2990,6 +3181,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
         {/* Fichas horizontales: foto cuadrada a la izquierda, el resto al
             lado. Dos por fila en escritorio, una en celular. */}
+        {hayFila && (
         <Reveal>
           <div style={{ padding: movil ? '28px 16px 8px' : '46px 44px 12px' }}>
             <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -3017,9 +3209,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Categorías verticales (3:4), altas y angostas, con el nombre
             debajo de la foto en vez de encima. */}
+        {(p.categorias ?? []).length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '22px 16px 26px' : '32px 44px 40px' }}>
             <Titulo t={t} texto={txt('categorias', 'titulo')} centrado movil={movil} />
@@ -3038,6 +3232,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {/* Segunda campaña a lo ancho, con la promo del slide que sobra. */}
         <Reveal>
@@ -3051,6 +3246,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </Reveal>
 
+        {resto(1)}
         {p.cupon && (
           <Reveal>
             <div style={{ margin: movil ? '0 16px 26px' : '0 44px 38px', border: `1px solid ${t.border}`, background: t.soft, borderRadius: t.radio, padding: movil ? 22 : '28px 32px', textAlign: 'center' }}>
@@ -3061,6 +3257,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </Reveal>
         )}
 
+        {!sinWpp && (
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 240 }}>
@@ -3070,6 +3267,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>{txt('whatsapp', 'cta')}</Boton>
           </div>
         </Reveal>
+        )}
 
         {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
       </div>
@@ -3079,13 +3277,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // ── GLOW ──────────────────────────────────────────────────────────────────
   // Belleza: degradé rosa, rutina mostrada con PRODUCTOS numerados (no
   // párrafos), antes y después, y galería de Instagram al pie.
-  const s = p.slides[iActual]
-
   const encabezado = (
     <>
-      {!!txt('cintillo', 'texto') && (
+      {!!aviso && (
         <div style={{ background: t.primary, color: '#fff', textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
-          {txt('cintillo', 'texto')}
+          {aviso}
         </div>
       )}
       <div style={{ textAlign: 'center', padding: movil ? '14px 16px' : '18px 34px 14px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
@@ -3106,11 +3302,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     </>
   )
 
-  if (soloHeader) return <div style={marco}>{encabezado}</div>
+  if (soloHeader) return <div style={marco}>{encabezado}{buscador(true)}</div>
 
   return (
     <div style={marco}>
       {encabezado}
+      {buscador(true)}
 
       <div style={{ background: `linear-gradient(120deg, ${t.soft} 0%, #FFFFFF 52%, ${t.soft} 100%)` }}>
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 0 : 30, padding: movil ? '30px 20px 0' : '54px 44px', alignItems: 'center' }}>
@@ -3120,7 +3317,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             <p style={{ fontSize: 15.5, color: t.muted, margin: '18px 0 26px', lineHeight: 1.75, maxWidth: 400 }}>{s.bajada}</p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Boton t={t} grande onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
-              <Boton t={t} secundario grande onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>
+              {!sinWpp && <Boton t={t} secundario grande onClick={acciones?.abrirWhatsapp}>{txt('hero', 'cta2')}</Boton>}
             </div>
           </div>
           <div style={{ order: movil ? 1 : 2 }}>
@@ -3185,6 +3382,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </div>
       </Reveal>
 
+      {hayFila && (
       <Reveal>
         <div style={{ background: t.soft, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '32px 16px' : '52px 40px' }}>
           <Titulo t={t} volanta={txt('fila', 'volanta')} texto={txt('fila', 'titulo')} accion={txt('fila', 'accion')} movil={movil} onAccion={acciones?.irACatalogo} />
@@ -3214,6 +3412,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
       </Reveal>
+      )}
 
       {/* Antes y después. */}
       <Reveal>
@@ -3248,6 +3447,8 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           </div>
         </div>
       </Reveal>
+
+      {resto(1, true)}
 
       {!p.ocultarPie && <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} redes={p.pie?.redes} legales={p.pie?.legales} onDevolucion={acciones?.abrirDevolucion} />}
     </div>

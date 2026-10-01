@@ -183,10 +183,10 @@ const TABS_PLANTILLA: [TabPlantilla, string][] = [
     ['pie', 'Pie de página'],
 ]
 
-// Las recetas tenían un cintillo y un parallax PROPIOS, cargados en la pestaña
-// Secciones, aparte del anuncio y el parallax de Apariencia: el dueño cargaba
-// lo mismo dos veces. Ahora usan los de Apariencia, y esos dos campos ya no
-// tienen formulario.
+// Las plantillas tenían un cintillo PROPIO (y las recetas, además, un
+// parallax), cargados en la pestaña Secciones, aparte del anuncio y el
+// parallax de Apariencia: el dueño cargaba lo mismo dos veces. Ahora usan los
+// de Apariencia, y esos campos ya no tienen formulario.
 //
 // La tienda sigue mostrando lo que estaba guardado en ellos (ver
 // plantillaReal.ts), así que acá se pasa a los campos de Apariencia al abrir
@@ -194,9 +194,14 @@ const TABS_PLANTILLA: [TabPlantilla, string][] = [
 // solo lugar. Sin esto quedaba publicado un texto que no se podía cambiar ni
 // borrar desde ninguna pantalla.
 function pasarAApariencia(ap: Ap, homeTemplate: string | null): Ap {
-    if (!PLANTILLAS.find(x => x.id === homeTemplate)?.receta) return ap
-    const { cintillo, parallax, ...resto } = ap.seccionesPlantilla
+    const plantilla = PLANTILLAS.find(x => x.id === homeTemplate)
+    if (!plantilla) return ap
+    const { cintillo, ...sinCintillo } = ap.seccionesPlantilla
+    // El parallax propio era solo de las recetas.
+    const parallax = plantilla.receta ? sinCintillo.parallax : undefined
     if (!cintillo && !parallax) return ap
+    const resto = { ...sinCintillo }
+    if (parallax) delete resto.parallax
     const out: Ap = { ...ap, seccionesPlantilla: resto }
     if (cintillo?.texto?.trim()) {
         out.textoEnvio = cintillo.texto.trim()
@@ -265,7 +270,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const conIconoOpcional = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.headerBold
     // Las secciones propias de la plantilla activa, en el orden en que se ven
     // en la portada (lo define cada plantilla en secciones.ts).
-    const seccionesPlantilla = soloContenido ? seccionesDe(homeTemplate) : []
+    // Sin el cintillo: el anuncio de arriba es el de Apariencia (pestaña
+    // Contenido), y el texto que cada esquema declara ahí es solo la muestra
+    // que se ve en la vitrina.
+    const seccionesPlantilla = soloContenido ? seccionesDe(homeTemplate).filter(x => x.id !== 'cintillo') : []
     const [modalVolver, setModalVolver] = useState(false)
     const [volviendo, setVolviendo] = useState(false)
     // Pestaña activa del editor de plantilla (ver TABS_PLANTILLA) — sin uso
@@ -399,12 +407,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // sobre Premium).
     const plantillaActiva = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
     //
-    // Una plantilla con receta es otra cosa: ubica TODO lo de Apariencia en
-    // su portada (ver BLOQUES_ESTANDAR en plantillas/tipos.ts), así que se le
+    // Lo demás es de todas: una plantilla ubica TODO lo de Apariencia en su
+    // portada (ver § El estándar en la skill plantillas-home), así que se le
     // ofrecen los mismos interruptores y las mismas tarjetas de contenido que
     // a una tienda sin plantilla. Lo único que no se toca es el diseño.
-    const esEstandar = !!plantillaActiva?.receta
-    const usaAnuncio = soloContenido ? (!plantillaActiva?.headerPropio || esEstandar) : true
+    const esEstandar = !!plantillaActiva
+    const usaAnuncio = true
     const usaStats = soloContenido ? plantillaActiva?.usaStats !== false : true
 
     const ESTANTES: [keyof Ap, string][] = [
@@ -818,13 +826,22 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const valorSeccion = (seccion: string, campo: CampoSeccion) => {
         const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
         if (guardado !== undefined) return guardado
-        if (campo.afirmacion) return ''
+        if (campo.afirmacion || tituloSegunFila(seccion, campo)) return ''
         // La versión neutra cuando existe: el editor edita la TIENDA, no la
         // vitrina, así que tiene que mostrar el mismo texto que el cliente ve.
         return campo.porDefectoReal ?? campo.porDefecto ?? ''
     }
-    const pistaSeccion = (campo: CampoSeccion) =>
-        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '') : undefined
+    // El título de una fila de productos de la plantilla no tiene un texto
+    // fijo: la fila muestra el primer estante que tenga productos, y vacío
+    // sale el nombre de ese (ver `estante` en plantillas/tipos.ts). Precargar
+    // "Top ventas" acá era mostrar un título que la tienda no está usando.
+    const tituloSegunFila = (seccion: string, campo: CampoSeccion) =>
+        (campo.id === 'volanta' || campo.id === 'titulo')
+        && seccionesPlantilla.find(x => x.id === seccion)?.estante !== undefined
+    const pistaSeccion = (campo: CampoSeccion, seccion?: string) =>
+        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '')
+            : seccion && tituloSegunFila(seccion, campo) ? 'Vacío: el nombre de la fila que se muestre'
+            : undefined
     const setSeccion = (seccion: string, campo: string, valor: string) => {
         const actual = ap.seccionesPlantilla ?? {}
         set('seccionesPlantilla', {
@@ -885,7 +902,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 value={valorSeccion(sec.id, campo)}
                                 onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
                                 maxLength={campo.max}
-                                placeholder={pistaSeccion(campo)}
+                                placeholder={pistaSeccion(campo, sec.id)}
                                 rows={3}
                                 style={{
                                     width: '100%', borderRadius: 8, border: '1px solid var(--color-border)',
@@ -922,7 +939,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 )}
                             </select>
                         ) : (
-                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo)} />
+                            <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo, sec.id)} />
                         )}
                     </div>
                 ))}

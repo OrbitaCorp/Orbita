@@ -752,7 +752,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irACatalogo: () => go('/catalogo'),
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),
-                        abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
+                        // Con el interruptor de WhatsApp apagado no hay a
+                        // quién escribirle: los botones de la plantilla que
+                        // abren el chat no se dibujan.
+                        abrirWhatsapp: tienda.wpp && config?.appearance?.showWhatsapp !== false ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
@@ -770,7 +773,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                                 esVidriera={config?.business?.mode === 'SHOWCASE'}
                             />
                         ),
-                        renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Barra de búsqueda" apagada: null, y no `undefined`
+                        // — sin la función, el header dibuja el buscador de
+                        // muestra de la vitrina, que no busca nada.
+                        renderBuscador: () => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} /> : null,
                         // "Video en tu tienda": el mismo componente del
                         // home clásico. Sin ningún link válido devuelve null
                         // y el bloque de la plantilla no se dibuja.

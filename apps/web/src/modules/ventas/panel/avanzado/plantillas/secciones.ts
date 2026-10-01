@@ -118,6 +118,7 @@ const PREMIUM: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de piezas',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -169,6 +170,7 @@ const MOSAICO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de destacados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -216,6 +218,7 @@ const ATLETA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de la temporada',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -258,6 +261,7 @@ const PATITAS: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de recomendados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -307,6 +311,7 @@ const BODEGA: SeccionPlantilla[] = [
   },
   {
     id: 'seleccion',
+    estante: 0,
     nombre: 'Selección del mes',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -353,6 +358,7 @@ const CRECER: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de recomendados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -440,6 +446,7 @@ const NOCTURNO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de accesorios',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -479,6 +486,7 @@ const VERA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de piezas',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -584,6 +592,7 @@ const NITIDA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de esenciales',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -665,6 +674,7 @@ const PAPELERIA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más vendidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -738,6 +748,7 @@ const CORRALON: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más pedidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -829,6 +840,7 @@ const GLOW: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más elegidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -862,6 +874,7 @@ const CIRCUITO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más vendidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -880,6 +893,7 @@ const CIRCUITO: SeccionPlantilla[] = [
   },
   {
     id: 'fila2',
+    estante: 1,
     nombre: 'Fila de nuevos ingresos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -896,6 +910,7 @@ const CIRCUITO: SeccionPlantilla[] = [
 const VIDRIERA: SeccionPlantilla[] = [
   {
     id: 'destacados',
+    estante: 0,
     nombre: 'Fila de destacados',
     nota: 'La primera fila de productos, a sangre.',
     campos: [
@@ -913,6 +928,7 @@ const VIDRIERA: SeccionPlantilla[] = [
   },
   {
     id: 'masVendidos',
+    estante: 1,
     nombre: 'Fila de más vendidos',
     nota: 'La segunda fila de productos.',
     campos: [
@@ -939,6 +955,7 @@ const VIDRIERA: SeccionPlantilla[] = [
 const ESCAPARATE: SeccionPlantilla[] = [
   {
     id: 'tira',
+    estante: 0,
     nombre: 'Tira de lo nuevo',
     nota: 'La fila que se arrastra, debajo de las dos campañas.',
     campos: [
@@ -1096,6 +1113,11 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
     }
   }
   return out
+}
+
+/** ¿Esa sección es una fila de productos de la plantilla? Ver `estante` en tipos.ts. */
+export function estanteDeSeccion(idPlantilla: string, seccion: string): 0 | 1 | undefined {
+  return SECCIONES_POR_PLANTILLA[idPlantilla]?.find(s => s.id === seccion)?.estante
 }
 
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {
