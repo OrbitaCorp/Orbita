@@ -17,11 +17,9 @@
  * Las escrituras nunca se ejecutan: el runner solo propone (igual que el chat
  * del panel) y los métodos que escribirían ni siquiera existen acá.
  *
- * Los snapshots copian la semántica de ModuleDataService tal cual está hoy,
- * con sus diferencias contra los reportes de la pantalla (VIP = 10% de arriba,
- * inactivo = 60 días, pendientes solo del mes). Se mide el Orbi que hay, no
- * uno corregido. La única diferencia: los meses se cortan en hora de Argentina
- * (ModuleDataService usa la hora del servidor, que en Cloud Run es UTC).
+ * Los snapshots copian la semántica de ModuleDataService tal cual está, con
+ * sus diferencias contra los reportes de la pantalla (VIP = 10% de arriba,
+ * inactivo = 60 días). Se mide el Orbi que hay, no uno corregido.
  */
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -37,6 +35,7 @@ import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } 
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from '../../../src/orbi/tools/definitions/report.tools';
 import { LeerTemaDelManualTool } from '../../../src/orbi/tools/definitions/manual.tools';
 import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from '../../../src/orbi/tools/definitions/estado.tools';
+import { GetResumenDelPeriodoTool } from '../../../src/orbi/tools/definitions/periodo.tools';
 import type {
   ModuleSnapshot,
   DashboardSnapshot,
@@ -135,13 +134,13 @@ export function snapshotsDe(d: NegocioDePrueba): Record<string, ModuleSnapshot> 
   const dashboard: DashboardSnapshot = {
     salesThisMonth: { total: mes.total, count: mes.count, avgTicket: mes.count > 0 ? redondear(mes.total / mes.count) : 0 },
     salesLastMonth: { total: anterior.total, count: anterior.count },
-    pendingOrders: delMes.filter((p) => p.estado === 'PENDING').length,
+    // Todos los pendientes, como la pestaña (ModuleDataService desde 2026-10-01).
+    pendingOrders: d.pedidos.filter((p) => p.estado === 'PENDING').length,
     cancelledThisMonth: mes.cancelled,
     totalProducts: d.productos.length,
-    // ESPEJO de un bug real: ModuleDataService cuenta status OUT_OF_STOCK, que
-    // la API nunca escribe, así que en producción esto da 0 aunque haya
-    // productos con stock 0. Se mide lo que hay (caso datos-sin-stock).
-    outOfStockProducts: 0,
+    // Stock 0, como la tarjeta de Productos (ModuleDataService desde 2026-10-01;
+    // antes contaba un estado que la API nunca escribe y daba 0).
+    outOfStockProducts: d.productos.filter((p) => p.stock === 0).length,
     totalCustomers: d.clientes.length,
     newCustomersThisMonth: d.clientes.filter((c) => c.creadoEl >= inicioMes).length,
     unreadMessages: d.conversaciones.sinLeer,
@@ -197,7 +196,7 @@ export function snapshotsDe(d: NegocioDePrueba): Record<string, ModuleSnapshot> 
     totalProducts: d.productos.length,
     publishedProducts: d.productos.filter((p) => p.estado === 'PUBLISHED').length,
     draftProducts: d.productos.filter((p) => p.estado === 'DRAFT').length,
-    outOfStock: 0, // mismo bug que outOfStockProducts, arriba
+    outOfStock: d.productos.filter((p) => p.stock === 0).length,
     totalCategories: d.categorias.length,
     emptyCategories: d.categorias.filter((c) => !d.productos.some((p) => p.categoriaId === c.id)).length,
     avgPrice: redondear(d.productos.reduce((s, p) => s + p.precio, 0) / d.productos.length),
@@ -722,7 +721,7 @@ export function armarFakes(d: NegocioDePrueba) {
   });
   const coupons = estricto('CouponsService', {});
 
-  return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, snapshots };
+  return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, snapshots, ahora: d.ahora };
 }
 
 // ─── Armado de las piezas reales ─────────────────────────────────────────────
@@ -740,7 +739,7 @@ export const TOOLS_DEL_PANEL = [
   'ListOrdersTool', 'GetOrderDetailTool', 'UpdateOrderStatusTool',
   'ListCustomersTool', 'GetCustomerDetailTool',
   'UpdateBusinessInfoTool', 'UpdatePaymentMethodsTool', 'UpdateShippingTool',
-  'GetSalesReportTool', 'GetProductReportTool', 'GetCustomerReportTool',
+  'GetSalesReportTool', 'GetProductReportTool', 'GetCustomerReportTool', 'GetResumenDelPeriodoTool',
   'EstadoPrimerosPasosTool', 'AccesoDelEquipoTool',
 ] as const;
 
@@ -776,6 +775,8 @@ export function armarRegistry(f: Fakes): ToolRegistryService {
   registry.register(new GetSalesReportTool(n(f.reports)));
   registry.register(new GetProductReportTool(n(f.reports)));
   registry.register(new GetCustomerReportTool(n(f.reports)));
+  // El "hoy" de la tool es el del dataset, no el del reloj.
+  registry.register(new GetResumenDelPeriodoTool(n(f.reports), () => f.ahora));
 
   registry.register(new EstadoPrimerosPasosTool(n(f.businesses), n(f.prisma)));
   registry.register(new AccesoDelEquipoTool(n(f.prisma)));

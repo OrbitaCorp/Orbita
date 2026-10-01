@@ -173,7 +173,8 @@ un turno con todas las calls). No cambia el wizard, solo cómo se lo mide.
 Implementados: **85 casos** (32 manual, 7 fuera del manual, 16 datos, 4 resumen, 9 acciones, 12
 ataques, 5 permisos; los de `estado` entran con las tools de la fase 6).
 
-Fallan **por diseño** en la línea de base, y son la vara de lo que viene:
+Fallan **por diseño** en la línea de base (y la rama del 2026-10-01 los arregla: tool
+`getResumenDelPeriodo` y snapshot corregido), así que son la vara de esa mejora:
 
 - Períodos (últimos 7 días, ayer, hoy, resumen de la semana): hoy no hay tool de período
   (`getSalesReport` es solo mes contra mes y `listOrders` trae 20 como máximo). Es la tarea (c).
@@ -190,10 +191,11 @@ respuesta es sumarla (fase 10), no tocar el prompt.
 
 Los fakes copian la semántica de cada fuente **tal cual**, bugs incluidos, para medir lo que hay hoy:
 
-- **"Sin stock" da siempre 0 en el snapshot de Orbi.** `ModuleDataService` cuenta productos con
+- **"Sin stock" daba siempre 0 en el snapshot de Orbi** (arreglado en la rama, junto con meses de
+  Argentina, ventas netas de devoluciones y pendientes de cualquier fecha). `ModuleDataService` cuenta productos con
   estado `OUT_OF_STOCK`, que la API nunca escribe (`CreateProductDto` acepta `PUBLISHED` o
-  `DRAFT`). La tarjeta "Sin stock" de Productos cuenta stock 0. Orbi le dice a la persona que no
-  tiene productos sin stock aunque tenga.
+  `DRAFT`). La tarjeta "Sin stock" de Productos cuenta stock 0. Orbi le decía a la persona que no
+  tenía productos sin stock aunque tuviera.
 - El snapshot de Clientes no usa las reglas del reporte de la pantalla (VIP = 10% de arriba vs.
   percentil 85; inactivo = 60 vs. 90 días), y los snapshots cuentan los meses en hora del servidor
   (UTC en Cloud Run) en vez de Argentina, sin restar devoluciones. Orbi puede contradecir Reportes.

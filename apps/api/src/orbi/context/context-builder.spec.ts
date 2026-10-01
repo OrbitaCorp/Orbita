@@ -351,7 +351,8 @@ describe('ContextBuilderService', () => {
 
     expect(prompt).toContain('cifras exactas');
     expect(prompt).toContain('conclusión');
-    expect(prompt).toMatch(/getProductReport[^\n]*days/);
+    // Otros períodos: la tool de período, con los números del Inicio.
+    expect(prompt).toMatch(/otro período[^\n]*getResumenDelPeriodo/);
     // listOrders trae como mucho 20 pedidos: sumarlos no es "las ventas de la semana".
     expect(prompt).toContain('No sumes pedidos de listOrders');
   });

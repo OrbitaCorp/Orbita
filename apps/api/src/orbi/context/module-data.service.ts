@@ -1,6 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from './module-data.types';
+import { inicioDeMesArgentina } from '../../common/utils/hora-argentina';
+
+// Los números del snapshot tienen que ser LOS MISMOS que la persona ve en el
+// panel: si Orbi dice "vendiste $X" y el Inicio dice otra cosa, se pierde la
+// confianza en los dos. Por eso (evals del panel, 2026-10-01):
+// - Meses de Argentina, como ReportsService. El servidor corre en UTC: con
+//   `new Date(y, m, 1)` el mes arrancaba a las 21 h del último día.
+// - Ventas netas de devoluciones aprobadas, ticket promedio bruto (las mismas
+//   reglas que ReportsService.sales y el Inicio).
+// - "Sin stock" = stock 0, como la tarjeta de Productos (ProductsService.stats).
+//   Antes contaba el estado OUT_OF_STOCK, que la API nunca escribe: daba 0.
+// - Pendientes: TODOS, como la pestaña Pendientes y las alertas del Inicio, no
+//   solo los creados este mes.
 
 @Injectable()
 export class ModuleDataService {
@@ -17,20 +30,43 @@ export class ModuleDataService {
     }
   }
 
+  /** Productos con stock 0 sumando todas sus variantes y sucursales (mismo criterio que ProductsService.stats). */
+  private async productosSinStock(businessId: string): Promise<number> {
+    const productos = await this.prisma.product.findMany({
+      where: { businessId, deletedAt: null },
+      select: { variants: { select: { stock: { select: { quantity: true } } } } },
+    });
+    return productos.filter(
+      (p) => p.variants.reduce((s, v) => s + v.stock.reduce((x, st) => x + st.quantity, 0), 0) === 0,
+    ).length;
+  }
+
+  /** Lo devuelto en devoluciones aprobadas en el rango (fechadas por su resolución, como ReportsService). */
+  private async devuelto(businessId: string, desde: Date, hasta?: Date): Promise<number> {
+    const agg = await this.prisma.return.aggregate({
+      _sum: { amount: true },
+      where: { businessId, status: 'APPROVED', updatedAt: { gte: desde, ...(hasta ? { lt: hasta } : {}) } },
+    });
+    return agg._sum.amount != null ? Number(agg._sum.amount) : 0;
+  }
+
   private async dashboardSnapshot(businessId: string): Promise<DashboardSnapshot> {
     const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+    const inicioMes = inicioDeMesArgentina(ahora);
+    const inicioMesPasado = inicioDeMesArgentina(ahora, -1);
 
     try {
       const [
         orderGroupsThisMonth,
         orderGroupsLastMonth,
+        devueltoEsteMes,
+        devueltoMesPasado,
         totalProducts,
         outOfStockProducts,
         totalCustomers,
         newCustomersThisMonth,
         unreadMessages,
+        pendingOrders,
       ] = await Promise.all([
         this.prisma.order.groupBy({
           by: ['status'],
@@ -44,39 +80,44 @@ export class ModuleDataService {
           _count: true,
           _sum: { total: true },
         }),
+        this.devuelto(businessId, inicioMes),
+        this.devuelto(businessId, inicioMesPasado, inicioMes),
         this.prisma.product.count({ where: { businessId, deletedAt: null } }),
-        this.prisma.product.count({ where: { businessId, deletedAt: null, status: 'OUT_OF_STOCK' } }),
+        this.productosSinStock(businessId),
         this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
         this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
         this.prisma.conversation.count({ where: { businessId, isUnread: true, isArchived: false } }),
+        this.prisma.order.count({ where: { businessId, deletedAt: null, status: 'PENDING' } }),
       ]);
 
-      const summarize = (groups: typeof orderGroupsThisMonth) => {
+      const summarize = (groups: typeof orderGroupsThisMonth, devuelto: number) => {
         let count = 0;
-        let total = 0;
+        let bruto = 0;
         let cancelled = 0;
         for (const g of groups) {
           const n = typeof g._count === 'number' ? g._count : 0;
           if (g.status === 'CANCELLED') { cancelled += n; continue; }
           count += n;
-          total += g._sum.total != null ? Number(g._sum.total) : 0;
+          bruto += g._sum.total != null ? Number(g._sum.total) : 0;
         }
-        return { total: Math.round(total * 100) / 100, count, cancelled };
+        return {
+          // Neto de devoluciones, como el Inicio. El ticket queda bruto a
+          // propósito (ReportsService): mide cuánto gasta un cliente por compra.
+          total: Math.round((bruto - devuelto) * 100) / 100,
+          count,
+          cancelled,
+          avgTicket: count > 0 ? Math.round((bruto / count) * 100) / 100 : 0,
+        };
       };
 
-      const thisMonth = summarize(orderGroupsThisMonth);
-      const lastMonth = summarize(orderGroupsLastMonth);
-
-      const pending = orderGroupsThisMonth.find(g => g.status === 'PENDING');
-      const pendingOrders = pending ? (typeof pending._count === 'number' ? pending._count : 0) : 0;
+      const thisMonth = summarize(orderGroupsThisMonth, devueltoEsteMes);
+      const lastMonth = summarize(orderGroupsLastMonth, devueltoMesPasado);
 
       return {
         salesThisMonth: {
           total: thisMonth.total,
           count: thisMonth.count,
-          avgTicket: thisMonth.count > 0
-            ? Math.round((thisMonth.total / thisMonth.count) * 100) / 100
-            : 0,
+          avgTicket: thisMonth.avgTicket,
         },
         salesLastMonth: { total: lastMonth.total, count: lastMonth.count },
         pendingOrders,
@@ -94,7 +135,7 @@ export class ModuleDataService {
 
   private async pedidosSnapshot(businessId: string): Promise<PedidosSnapshot> {
     const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const inicioMes = inicioDeMesArgentina(ahora);
 
     try {
       const [
@@ -175,7 +216,7 @@ export class ModuleDataService {
 
   private async clientesSnapshot(businessId: string): Promise<ClientesSnapshot> {
     const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const inicioMes = inicioDeMesArgentina(ahora);
     const sixtyDaysAgo = new Date(ahora.getTime() - 60 * 24 * 3_600_000);
 
     try {
@@ -246,6 +287,7 @@ export class ModuleDataService {
         avgPriceResult,
         totalCategories,
         emptyCategories,
+        outOfStock,
       ] = await Promise.all([
         this.prisma.product.groupBy({
           by: ['status'],
@@ -260,18 +302,17 @@ export class ModuleDataService {
         this.prisma.category.count({
           where: { businessId, products: { none: { deletedAt: null } } },
         }),
+        this.productosSinStock(businessId),
       ]);
 
       let totalProducts = 0;
       let publishedProducts = 0;
       let draftProducts = 0;
-      let outOfStock = 0;
       for (const g of statusGroups) {
         const n = typeof g._count === 'number' ? g._count : 0;
         totalProducts += n;
         if (g.status === 'PUBLISHED') publishedProducts = n;
         else if (g.status === 'DRAFT') draftProducts = n;
-        else if (g.status === 'OUT_OF_STOCK') outOfStock = n;
       }
 
       const avgPrice = avgPriceResult._avg.basePrice != null

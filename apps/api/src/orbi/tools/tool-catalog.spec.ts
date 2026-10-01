@@ -3,6 +3,7 @@ import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { NavigationTool } from './definitions/navigation.tool';
 import { LeerTemaDelManualTool } from './definitions/manual.tools';
 import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './definitions/estado.tools';
+import { GetResumenDelPeriodoTool } from './definitions/periodo.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './definitions/order.tools';
@@ -61,6 +62,7 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new GetSalesReportTool(stub));
     registry.register(new GetProductReportTool(stub));
     registry.register(new GetCustomerReportTool(stub));
+    registry.register(new GetResumenDelPeriodoTool(stub));
     registry.register(new EstadoPrimerosPasosTool(stub, stub));
     registry.register(new AccesoDelEquipoTool(stub));
     registry.register(new SuggestBusinessNameTool(stub, stub));
@@ -78,7 +80,7 @@ describe('Orbi — catálogo completo de tools', () => {
     'listCustomers', 'getCustomerDetail',
     'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
     'getSalesReport', 'getProductReport', 'getCustomerReport',
-    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo',
+    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo', 'getResumenDelPeriodo',
   ];
   // Todas las tools del wizard están limitadas por paso (`steps`), así que
   // pedirlas sin stepName devuelve una lista vacía — no el catálogo. 'tu-negocio'
@@ -91,7 +93,7 @@ describe('Orbi — catálogo completo de tools', () => {
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 26 tools del catálogo completo', () => {
+  it('registra las 27 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
@@ -199,7 +201,7 @@ describe('Orbi — catálogo completo de tools', () => {
     'listOrders', 'getOrderDetail',
     'listCustomers', 'getCustomerDetail',
     'getSalesReport', 'getProductReport', 'getCustomerReport',
-    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo',
+    'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo', 'getResumenDelPeriodo',
   ];
   const ESCRIBEN = [
     'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
@@ -271,6 +273,7 @@ describe('Orbi — catálogo completo de tools', () => {
       leerTemaDelManual: [],
       estadoPrimerosPasos: ['reports.dashboard'],
       accesoDelEquipo: ['config.team.view'],
+      getResumenDelPeriodo: ['reports.dashboard'],
     };
     for (const [nombre, permisos] of Object.entries(esperado)) {
       const tool = (registry as any).tools.get(nombre);

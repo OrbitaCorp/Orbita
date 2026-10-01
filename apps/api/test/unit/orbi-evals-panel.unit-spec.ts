@@ -243,7 +243,7 @@ describe('negocio de prueba', () => {
 
     const dash = f.snapshots.dashboard as { salesThisMonth: { total: number; count: number }; pendingOrders: number };
     expect(dash.salesThisMonth.total).toBe(n.derivados.ventasMesActual);
-    expect(dash.pendingOrders).toBe(n.derivados.pendientesMesActual);
+    expect(dash.pendingOrders).toBe(n.derivados.pendientesTotal);
 
     const pedidos = f.snapshots.pedidos as { countByStatus: Record<string, number> };
     expect(pedidos.countByStatus.PENDING).toBe(n.derivados.pendientesTotal);
@@ -273,17 +273,29 @@ describe('negocio de prueba', () => {
     expect((f.snapshots.clientes as { topCustomerName: string }).topCustomerName).toContain(APELLIDO_INYECCION_SNAPSHOT);
   });
 
-  it('"sin stock" es stock 0 (como la tarjeta de Productos) y el snapshot copia el bug de producción (0)', () => {
+  it('"sin stock" es stock 0 (como la tarjeta de Productos), también en el snapshot', () => {
     expect(d.derivados.productosSinStock).toBe(3);
     expect(d.productos.every((p) => p.estado === 'PUBLISHED' || p.estado === 'DRAFT')).toBe(true);
     const f = armarFakes(d);
-    expect((f.snapshots.catalogo as { outOfStock: number }).outOfStock).toBe(0);
-    expect((f.snapshots.dashboard as { outOfStockProducts: number }).outOfStockProducts).toBe(0);
+    expect((f.snapshots.catalogo as { outOfStock: number }).outOfStock).toBe(3);
+    expect((f.snapshots.dashboard as { outOfStockProducts: number }).outOfStockProducts).toBe(3);
   });
 
-  it('hay un pendiente de más de un mes: el Inicio (solo pendientes del mes) y la pestaña no coinciden', () => {
+  it('hay un pendiente de más de un mes, y el Inicio cuenta todos los pendientes', () => {
     expect(d.derivados.pendientesTotal).toBe(4);
     expect(d.derivados.pendientesMesActual).toBe(3);
+    expect((armarFakes(d).snapshots.dashboard as { pendingOrders: number }).pendingOrders).toBe(4);
+  });
+
+  it('la tool de período usa el "hoy" del dataset y da los números del Inicio', async () => {
+    const registry = armarRegistry(armarFakes(d));
+    const ctx = { businessId: BUSINESS_ID, userId: 'm', surface: OrbiSurface.PANEL, permissions: permisosDelRol('dueno') };
+    const semana = await registry.execute('getResumenDelPeriodo', { periodo: 'ultimos_7_dias' }, ctx);
+    expect((semana.data as { ventas: number }).ventas).toBe(d.derivados.ventasUltimos7Dias);
+    const ayer = await registry.execute('getResumenDelPeriodo', { periodo: 'ayer' }, ctx);
+    expect((ayer.data as { ventas: number }).ventas).toBe(d.derivados.ventasAyer);
+    const hoy = await registry.execute('getResumenDelPeriodo', { periodo: 'hoy' }, ctx);
+    expect((hoy.data as { ventas: number }).ventas).toBe(d.derivados.ventasHoy);
   });
 
   it('las compras de los clientes que nombran los casos', async () => {

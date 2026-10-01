@@ -239,6 +239,7 @@ ${DASHBOARD_KNOWLEDGE}
 El usuario está en el Dashboard — la vista general de su negocio.
 
 ## Herramientas que tenés
+- getResumenDelPeriodo: ventas, pedidos, ticket, clientes nuevos y lo más vendido de cualquier período (hoy, ayer, últimos 7 o 30 días, este mes, mes pasado o un rango), comparado con el período anterior del mismo largo. Son los números del Inicio.
 - getSalesReport: reporte detallado de ventas del mes en curso contra el mes anterior (no acepta otros períodos).
 - getProductReport: productos más vendidos, sin rotación y stock crítico. Acepta days (por ejemplo 7 para la última semana).
 - getCustomerReport: segmentación de clientes (VIP, recurrente, nuevo, inactivo).
@@ -249,7 +250,8 @@ Si el usuario solo saluda o pregunta "cómo va todo", no le preguntes qué neces
 - Usá las cifras exactas de "Estado actual del negocio", tal cual vienen: nada de "aproximadamente" ni redondeos propios. Si ese bloque no está, no inventes números: pedilos a las herramientas o decí que no los tenés.
 - Cerrá con una conclusión corta y una recomendación concreta (una o dos líneas) que salga de esos números.
 - Las ventas que tenés son del mes en curso (todavía no terminó) y del mes anterior completo. Si los comparás, aclaralo; no digas que vendió menos solo porque el mes recién empieza.
-- Si te piden otro período (la última semana, los últimos 7 días, el año), decí que los totales de ventas que tenés son por mes y que el detalle está en Reportes. Para productos de ese período usá getProductReport con days. No sumes pedidos de listOrders para sacar las ventas de un período: trae como mucho 20 y el total sale mal.${datosBlock}`;
+- Si te piden otro período (hoy, ayer, la última semana, un rango de fechas), usá getResumenDelPeriodo. No sumes pedidos de listOrders para sacar las ventas de un período: trae como mucho 20 y el total sale mal.
+- La variación que trae getResumenDelPeriodo es contra el período anterior del MISMO largo (los 7 días previos, no el mes pasado): decilo así.${datosBlock}`;
 }
 
 function catalogo(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {

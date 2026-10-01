@@ -17,6 +17,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './too
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './tools/definitions/report.tools';
+import { GetResumenDelPeriodoTool } from './tools/definitions/periodo.tools';
 import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
@@ -111,6 +112,7 @@ export class OrbiModule {
     this.toolRegistry.register(new GetSalesReportTool(this.reportsService));
     this.toolRegistry.register(new GetProductReportTool(this.reportsService));
     this.toolRegistry.register(new GetCustomerReportTool(this.reportsService));
+    this.toolRegistry.register(new GetResumenDelPeriodoTool(this.reportsService));
 
     // El estado real del negocio para las dudas del manual (fase 6).
     this.toolRegistry.register(new EstadoPrimerosPasosTool(this.businessesService, this.prisma));

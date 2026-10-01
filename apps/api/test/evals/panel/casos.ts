@@ -9,12 +9,12 @@
  * se reportan como "no aplica" si la variante que se corre no tiene esas
  * tools: así la línea de base y la rama se comparan en lo demás.
  *
- * Huecos conocidos que estos casos MUESTRAN a propósito (fallan hoy por diseño,
- * no por un caso mal escrito):
- * - Períodos (últimos 7 días, ayer, hoy): no hay tool de período todavía.
- * - "Sin stock": el snapshot de Orbi cuenta un estado que la API nunca
- *   escribe y dice 0 (datos-sin-stock).
- * - Pendientes desde el Inicio: el snapshot cuenta solo los del mes, y hay
+ * Huecos que estos casos mostraban en producción (fallan en la línea de base
+ * por diseño, y la rama del 2026-10-01 los arregla):
+ * - Períodos (últimos 7 días, ayer, hoy): no había tool de período.
+ * - "Sin stock": el snapshot de Orbi contaba un estado que la API nunca
+ *   escribe y decía 0 (datos-sin-stock).
+ * - Pendientes desde el Inicio: el snapshot contaba solo los del mes, y hay
  *   uno olvidado de hace más de un mes (datos-pendientes-desde-inicio).
  *
  * Y uno que mide si el modelo encuentra el camino largo: createProduct y
@@ -285,13 +285,13 @@ export const CASOS_PANEL: CasoPanel[] = [
   },
   {
     id: 'datos-pendientes-desde-inicio', categoria: 'datos', pantalla: 'dashboard',
-    descripcion: 'Pendientes desde el Inicio (el snapshot cuenta solo los del mes: falla si hay pendientes viejos)',
+    descripcion: 'Pendientes desde el Inicio, con uno olvidado de hace más de un mes (el snapshot contaba solo los del mes)',
     mensaje: '¿Cuántos pedidos tengo sin confirmar?',
     expectativas: [{ tipo: 'dice-numero', valor: (x) => x.pendientesTotal, que: 'los pendientes' }],
   },
   {
     id: 'datos-sin-stock', categoria: 'datos', pantalla: 'catalogo',
-    descripcion: 'Productos sin stock, como la tarjeta de Productos (hueco conocido: el snapshot dice 0)',
+    descripcion: 'Productos sin stock, como la tarjeta de Productos (en producción el snapshot decía 0)',
     mensaje: '¿Cuántos productos tengo sin stock?',
     expectativas: [{ tipo: 'dice-numero', valor: (x) => x.productosSinStock, que: 'los productos sin stock' }],
   },
@@ -316,19 +316,19 @@ export const CASOS_PANEL: CasoPanel[] = [
   },
   {
     id: 'datos-ventas-7-dias', categoria: 'datos', pantalla: 'dashboard',
-    descripcion: 'Ventas de los últimos 7 días (hueco conocido: sin tool de período)',
+    descripcion: 'Ventas de los últimos 7 días (no había tool de período)',
     mensaje: '¿Cuánto vendí en los últimos 7 días?',
     expectativas: [{ tipo: 'dice-numero', valor: (x) => x.ventasUltimos7Dias, que: 'las ventas de 7 días' }],
   },
   {
     id: 'datos-ventas-ayer', categoria: 'datos', pantalla: 'dashboard',
-    descripcion: 'Ventas de ayer (hueco conocido: sin tool de período)',
+    descripcion: 'Ventas de ayer (no había tool de período)',
     mensaje: '¿Cuánto vendí ayer?',
     expectativas: [{ tipo: 'dice-numero', valor: (x) => x.ventasAyer, que: 'las ventas de ayer' }],
   },
   {
     id: 'datos-ventas-hoy', categoria: 'datos', pantalla: 'dashboard',
-    descripcion: 'Ventas de hoy (hueco conocido: sin tool de período)',
+    descripcion: 'Ventas de hoy (no había tool de período)',
     mensaje: '¿Cuánto llevo vendido hoy?',
     expectativas: [{ tipo: 'dice-numero', valor: (x) => x.ventasHoy, que: 'las ventas de hoy' }],
   },
@@ -388,7 +388,7 @@ export const CASOS_PANEL: CasoPanel[] = [
   },
   {
     id: 'resumen-semana', categoria: 'resumen', pantalla: 'dashboard',
-    descripcion: 'Resumen de la última semana (hueco conocido: sin tool de período)',
+    descripcion: 'Resumen de la última semana (no había tool de período)',
     mensaje: 'Haceme un resumen de cómo me fue la última semana',
     topeDeLargo: 1500,
     expectativas: [
