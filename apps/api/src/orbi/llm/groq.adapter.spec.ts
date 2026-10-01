@@ -128,4 +128,46 @@ describe('GroqAdapter', () => {
       { type: 'done' },
     ]);
   });
+  // El formato que arma el controller para tool calls paralelas (un assistant
+  // con varias calls + un tool por call) es el nativo de OpenAI: tiene que
+  // llegar tal cual, con cada tool_call_id respondido en orden.
+  it('calls paralelas: un assistant con varios tool_calls seguido de un tool por call', async () => {
+    configService.get.mockReturnValue('test-key');
+    const mockCreate = jest.fn().mockResolvedValue((async function* () {
+      yield { choices: [{ delta: { content: 'ok' } }] };
+    })());
+    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'resumen de 7 días' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'c1', name: 'getSalesReport', arguments: { days: 7 }, thoughtSignature: 'sig-1' },
+            { id: 'c2', name: 'getProductReport', arguments: { days: 7 } },
+          ],
+        },
+        { role: 'tool', content: '{"total":100}', toolCallId: 'c1' },
+        { role: 'tool', content: '{"top":["Remera"]}', toolCallId: 'c2' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(mockCreate.mock.calls[0][0].messages).toEqual([
+      { role: 'user', content: 'resumen de 7 días' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'getSalesReport', arguments: '{"days":7}' } },
+          { id: 'c2', type: 'function', function: { name: 'getProductReport', arguments: '{"days":7}' } },
+        ],
+      },
+      { role: 'tool', content: '{"total":100}', tool_call_id: 'c1' },
+      { role: 'tool', content: '{"top":["Remera"]}', tool_call_id: 'c2' },
+    ]);
+  });
 });

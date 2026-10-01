@@ -52,6 +52,7 @@ export function CuponesListado({ onEditar, onVerMetricas, onCrear }: Props) {
       </div>
       <CuponesTabla
         datos={data?.data ?? []}
+        sinFiltros={filtros.estado === 'todos' && filtros.tipo === 'todos' && !filtros.busqueda}
         isLoading={isLoading}
         ordenColumna={filtros.ordenColumna}
         ordenDireccion={filtros.ordenDireccion}

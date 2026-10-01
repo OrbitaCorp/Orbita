@@ -12,6 +12,7 @@ import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
 import { useDuplicarDescuento } from '../hooks/useDuplicarDescuento'
 import type { Descuento, OrdenDireccion } from '../types'
 import { fmtFechaHora, fmtRangoVigencia, isoADisplay } from '../utils'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 // Columna "Vigencia": para la oferta relámpago el fin es un instante exacto,
 // así que se muestra con la hora ("04/09 – 12/09/2026 23:59"); el resto,
@@ -58,6 +59,8 @@ interface Props {
   onVerDetalle: (id: string) => void
   onEditar: (id: string) => void
   onVerMetricas: () => void
+  /** Sin estado, tipo ni búsqueda: el vacío es que todavía no hay ninguno. */
+  sinFiltros?: boolean
 }
 
 function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
@@ -237,12 +240,16 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   )
 }
 
-export function DescuentosTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onVerDetalle, onEditar, onVerMetricas }: Props) {
+export function DescuentosTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onVerDetalle, onEditar, onVerMetricas, sinFiltros = false }: Props) {
   if (isLoading) {
     return <SkeletonTablaDescuentos />
   }
 
-  const emptyState = (
+  // Sin filtros puestos, la tabla vacía es que todavía no hay ninguno: va el
+  // pet del módulo. Con filtros, el mensaje de siempre.
+  const emptyState = sinFiltros ? (
+    <OrbiPetVacio modulo="descuentos" titulo="Todavía no tenés descuentos" descripcion="Creá el primero con «Crear descuento»." />
+  ) : (
     <div style={{ padding: '56px 16px', textAlign: 'center' }}>
       <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>
         <Tag size={26} />
