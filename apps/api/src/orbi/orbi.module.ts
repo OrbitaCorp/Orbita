@@ -38,6 +38,7 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
+import { OrbiSaludModule } from './salud/orbi-salud.module';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -53,6 +54,7 @@ import { PrismaService } from '../prisma/prisma.service';
     WizardAnalyticsModule,
     OnboardingModule,
     CostsModule,
+    OrbiSaludModule,
   ],
   controllers: [OrbiController],
   providers: [

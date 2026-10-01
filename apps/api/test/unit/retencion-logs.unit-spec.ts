@@ -34,6 +34,7 @@ function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean
     emailLog: { deleteMany: jest.fn().mockResolvedValue({ count: 12 }) },
     orbiPendingAction: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
     orbiTurn: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
+    orbiProviderFailure: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
     dailyQuota: { deleteMany: jest.fn().mockResolvedValue({ count: 9 }) },
   };
   const original = { ...process.env };
@@ -67,6 +68,7 @@ describe('Retención de logs y registros', () => {
         email_logs: 12,
         orbi_pending_actions: 3,
         orbi_turns: 5,
+        orbi_provider_failures: 2,
         daily_quota: 9,
       });
     } finally {
@@ -80,6 +82,8 @@ describe('Retención de logs y registros', () => {
       await svc.purgar();
       expect(prisma.orbiPendingAction.deleteMany).toHaveBeenCalledWith(corteHace(30));
       expect(prisma.orbiTurn.deleteMany).toHaveBeenCalledWith(corteHace(400));
+      // Las fallas del proveedor de IA (mantenimiento automático de Orbi): 30 días.
+      expect(prisma.orbiProviderFailure.deleteMany).toHaveBeenCalledWith(corteHace(30));
       expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledWith(corteDiaHace(30));
       // Es un string, no un Date: la columna `day` es 'YYYY-MM-DD'.
       expect(prisma.dailyQuota.deleteMany.mock.calls[0][0].where.day.lt).toBe('2026-08-15');
