@@ -24,7 +24,7 @@ import {
 import {
   FaltaEnElFake,
   PERMISOS_EMPLEADO,
-  TOOLS_DEL_PANEL,
+  toolsDelPanelDelModulo,
   armarContextBuilder,
   armarFakes,
   armarRegistry,
@@ -234,6 +234,18 @@ describe('expectativas por caso', () => {
 // ─── Negocio de prueba contra sus fakes ──────────────────────────────────────
 
 describe('negocio de prueba', () => {
+  // ModuleDataService (real) calcula el mes con new Date(): tiene que ver el
+  // mismo "ahora" que el dataset. Solo se finge Date, no los timers.
+  const conReloj = async (ahora: Date, fn: () => Promise<void>) => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'setInterval', 'queueMicrotask', 'clearTimeout', 'clearInterval', 'clearImmediate'] });
+    jest.setSystemTime(ahora);
+    try {
+      await fn();
+    } finally {
+      jest.useRealTimers();
+    }
+  };
+
   async function chequearConsistencia(n: NegocioDePrueba) {
     const f = armarFakes(n);
     const ventas = await f.reports.sales(BUSINESS_ID);
@@ -241,11 +253,11 @@ describe('negocio de prueba', () => {
     expect(ventas.actual.pedidos).toBe(n.derivados.pedidosMesActual);
     expect(ventas.anterior.ventas).toBe(n.derivados.ventasMesAnterior);
 
-    const dash = f.snapshots.dashboard as { salesThisMonth: { total: number; count: number }; pendingOrders: number };
+    const dash = await f.moduleData.getSnapshot(BUSINESS_ID, 'dashboard') as { salesThisMonth: { total: number; count: number }; pendingOrders: number };
     expect(dash.salesThisMonth.total).toBe(n.derivados.ventasMesActual);
     expect(dash.pendingOrders).toBe(n.derivados.pendientesTotal);
 
-    const pedidos = f.snapshots.pedidos as { countByStatus: Record<string, number> };
+    const pedidos = await f.moduleData.getSnapshot(BUSINESS_ID, 'pedidos') as { countByStatus: Record<string, number> };
     expect(pedidos.countByStatus.PENDING).toBe(n.derivados.pendientesTotal);
 
     const hoy = fechaArgentina(n.ahora);
@@ -260,31 +272,36 @@ describe('negocio de prueba', () => {
     expect(productos.masVendidos[0].name).toBe(n.derivados.productoMasVendido30Dias.nombre);
   }
 
-  it('los números derivados coinciden con lo que devuelven los fakes', async () => {
-    await chequearConsistencia(d);
+  it('los números derivados coinciden con lo que devuelven los fakes y el snapshot real', async () => {
+    await conReloj(d.ahora, () => chequearConsistencia(d));
   });
 
   it('sigue consistente el 1° del mes a la madrugada (el mes en curso casi vacío)', async () => {
-    await chequearConsistencia(crearNegocioDePrueba(new Date('2026-10-01T03:30:00.000Z')));
+    const madrugada = new Date('2026-10-01T03:30:00.000Z');
+    await conReloj(madrugada, () => chequearConsistencia(crearNegocioDePrueba(madrugada)));
   });
 
-  it('el cliente que más gastó es el del apellido con la orden (llega al prompt)', () => {
+  it('el cliente que más gastó es el del apellido con la orden (llega al prompt)', async () => {
     const f = armarFakes(d);
-    expect((f.snapshots.clientes as { topCustomerName: string }).topCustomerName).toContain(APELLIDO_INYECCION_SNAPSHOT);
+    expect((await f.moduleData.getSnapshot(BUSINESS_ID, 'clientes') as { topCustomerName: string }).topCustomerName).toContain(APELLIDO_INYECCION_SNAPSHOT);
   });
 
-  it('"sin stock" es stock 0 (como la tarjeta de Productos), también en el snapshot', () => {
+  it('"sin stock" es stock 0 (como la tarjeta de Productos), también en el snapshot real', async () => {
     expect(d.derivados.productosSinStock).toBe(3);
     expect(d.productos.every((p) => p.estado === 'PUBLISHED' || p.estado === 'DRAFT')).toBe(true);
     const f = armarFakes(d);
-    expect((f.snapshots.catalogo as { outOfStock: number }).outOfStock).toBe(3);
-    expect((f.snapshots.dashboard as { outOfStockProducts: number }).outOfStockProducts).toBe(3);
+    await conReloj(d.ahora, async () => {
+      expect((await f.moduleData.getSnapshot(BUSINESS_ID, 'catalogo') as { outOfStock: number }).outOfStock).toBe(3);
+      expect((await f.moduleData.getSnapshot(BUSINESS_ID, 'dashboard') as { outOfStockProducts: number }).outOfStockProducts).toBe(3);
+    });
   });
 
-  it('hay un pendiente de más de un mes, y el Inicio cuenta todos los pendientes', () => {
+  it('hay un pendiente de más de un mes, y el Inicio cuenta todos los pendientes', async () => {
     expect(d.derivados.pendientesTotal).toBe(4);
     expect(d.derivados.pendientesMesActual).toBe(3);
-    expect((armarFakes(d).snapshots.dashboard as { pendingOrders: number }).pendingOrders).toBe(4);
+    await conReloj(d.ahora, async () => {
+      expect((await armarFakes(d).moduleData.getSnapshot(BUSINESS_ID, 'dashboard') as { pendingOrders: number }).pendingOrders).toBe(4);
+    });
   });
 
   it('la tool de período usa el "hoy" del dataset y da los números del Inicio', async () => {
@@ -319,14 +336,21 @@ describe('fakes', () => {
   });
 
   it('registra las tools del panel de OrbiModule, en el mismo orden', () => {
-    const fuente = readFileSync(resolve(__dirname, '../../src/orbi/orbi.module.ts'), 'utf8');
-    const registradas = [...fuente.matchAll(/register\(new (\w+)\(/g)].map((m) => m[1]);
-    const delWizard = ['SuggestBusinessNameTool', 'SuggestDescriptionTool', 'SuggestSubdomainTool', 'SelectWizardOptionTool', 'FillWizardFieldTool'];
-    expect(registradas.filter((n) => !delWizard.includes(n))).toEqual([...TOOLS_DEL_PANEL]);
-
     const registry = armarRegistry(armarFakes(d));
     const enElRegistry = [...(registry as unknown as { tools: Map<string, object> }).tools.values()].map((t) => t.constructor.name);
-    expect(enElRegistry).toEqual([...TOOLS_DEL_PANEL]);
+    expect(enElRegistry).toEqual(toolsDelPanelDelModulo());
+    expect(enElRegistry).toEqual(expect.arrayContaining(['NavigationTool', 'LeerTemaDelManualTool', 'GetResumenDelPeriodoTool']));
+  });
+
+  it('el snapshot es el de ModuleDataService REAL, sobre la Prisma en memoria', async () => {
+    faltasDelFake.length = 0;
+    const f = armarFakes(d);
+    for (const modulo of ['dashboard', 'pedidos', 'clientes', 'catalogo', 'mensajes']) {
+      const snap = await f.moduleData.getSnapshot(BUSINESS_ID, modulo);
+      // ModuleDataService devuelve {} si una consulta falla: acá no puede pasar.
+      expect({ modulo, vacio: Object.keys(snap).length === 0 }).toEqual({ modulo, vacio: false });
+    }
+    expect(faltasDelFake).toEqual([]);
   });
 
   it('los permisos del Empleado son los de onboarding.service.ts', () => {

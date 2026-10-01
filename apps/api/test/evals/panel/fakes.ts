@@ -17,9 +17,14 @@
  * Las escrituras nunca se ejecutan: el runner solo propone (igual que el chat
  * del panel) y los métodos que escribirían ni siquiera existen acá.
  *
- * Los snapshots copian la semántica de ModuleDataService tal cual está, con
- * sus diferencias contra los reportes de la pantalla (VIP = 10% de arriba,
- * inactivo = 60 días). Se mide el Orbi que hay, no uno corregido.
+ * Lo que lee Prisma (el snapshot del prompt, las tarjetas, las tools de
+ * estado) corre con el código REAL sobre una Prisma en memoria
+ * (prisma-en-memoria.ts): mide la versión de ModuleDataService que esté en
+ * el checkout. Los services de alto nivel (reportes, listas) sí son fakes.
+ *
+ * Las tools se registran leyendo orbi.module.ts del mismo checkout, y las
+ * que no existen en esa versión se saltean: así estas evals se pueden copiar
+ * sobre main y medir la línea de base (spec de la fase 2, §7).
  */
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -33,21 +38,14 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from '../..
 import { ListCustomersTool, GetCustomerDetailTool } from '../../../src/orbi/tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from '../../../src/orbi/tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from '../../../src/orbi/tools/definitions/report.tools';
-import { LeerTemaDelManualTool } from '../../../src/orbi/tools/definitions/manual.tools';
-import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from '../../../src/orbi/tools/definitions/estado.tools';
-import { GetResumenDelPeriodoTool } from '../../../src/orbi/tools/definitions/periodo.tools';
-import type {
-  ModuleSnapshot,
-  DashboardSnapshot,
-  PedidosSnapshot,
-  ClientesSnapshot,
-  CatalogoSnapshot,
-  MensajesSnapshot,
-} from '../../../src/orbi/context/module-data.types';
+import { ModuleDataService } from '../../../src/orbi/context/module-data.service';
+import type { OrbiTool } from '../../../src/orbi/tools/tool.interface';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { crearPrismaEnMemoria, crearTablas } from './prisma-en-memoria';
 import { fechaArgentina, inicioDeDiaArgentina, inicioDeMesArgentina } from '../../../src/common/utils/hora-argentina';
 import {
   BUSINESS_ID,
-  EQUIPO,
   ESTADO_DEL_ALTA,
   MIEMBRO_DUENO_ID,
   MIEMBRO_EMPLEADO_ID,
@@ -110,105 +108,6 @@ export function usuarioDelRol(rol: Rol): { memberId: string; roleName: string; p
 /** Los permisos EFECTIVOS, con la misma función que usa el chat (el dueño pasa siempre). */
 export function permisosDelRol(rol: Rol): string[] {
   return permisosDeOrbi(usuarioDelRol(rol));
-}
-
-// ─── Snapshots (semántica de ModuleDataService) ──────────────────────────────
-
-export function snapshotsDe(d: NegocioDePrueba): Record<string, ModuleSnapshot> {
-  const inicioMes = inicioDeMesArgentina(d.ahora);
-  const inicioMesAnterior = inicioDeMesArgentina(d.ahora, -1);
-  const delMes = d.pedidos.filter((p) => p.creadoEl >= inicioMes);
-  const delMesAnterior = d.pedidos.filter((p) => p.creadoEl >= inicioMesAnterior && p.creadoEl < inicioMes);
-
-  const resumir = (ps: PedidoConFecha[]) => {
-    const ventas = ps.filter(esVenta);
-    return {
-      total: redondear(ventas.reduce((s, p) => s + p.total, 0)),
-      count: ventas.length,
-      cancelled: ps.length - ventas.length,
-    };
-  };
-  const mes = resumir(delMes);
-  const anterior = resumir(delMesAnterior);
-
-  const dashboard: DashboardSnapshot = {
-    salesThisMonth: { total: mes.total, count: mes.count, avgTicket: mes.count > 0 ? redondear(mes.total / mes.count) : 0 },
-    salesLastMonth: { total: anterior.total, count: anterior.count },
-    // Todos los pendientes, como la pestaña (ModuleDataService desde 2026-10-01).
-    pendingOrders: d.pedidos.filter((p) => p.estado === 'PENDING').length,
-    cancelledThisMonth: mes.cancelled,
-    totalProducts: d.productos.length,
-    // Stock 0, como la tarjeta de Productos (ModuleDataService desde 2026-10-01;
-    // antes contaba un estado que la API nunca escribe y daba 0).
-    outOfStockProducts: d.productos.filter((p) => p.stock === 0).length,
-    totalCustomers: d.clientes.length,
-    newCustomersThisMonth: d.clientes.filter((c) => c.creadoEl >= inicioMes).length,
-    unreadMessages: d.conversaciones.sinLeer,
-  };
-
-  const countByStatus: Record<string, number> = {};
-  for (const p of d.pedidos) countByStatus[p.estado] = (countByStatus[p.estado] ?? 0) + 1;
-  const pendientes = d.pedidos.filter((p) => p.estado === 'PENDING');
-  const masViejo = pendientes.reduce<PedidoConFecha | null>((a, p) => (!a || p.creadoEl < a.creadoEl ? p : a), null);
-  const ultimo = d.pedidos.reduce((a, p) => (p.creadoEl > a.creadoEl ? p : a));
-  const porMedio = new Map<string, number>();
-  for (const p of d.pedidos) porMedio.set(p.pago.medio, (porMedio.get(p.pago.medio) ?? 0) + 1);
-  const pedidos: PedidosSnapshot = {
-    countByStatus,
-    oldestPendingHours: masViejo ? Math.round((d.ahora.getTime() - masViejo.creadoEl.getTime()) / HORA_MS) : null,
-    avgTicketThisMonth: mes.count > 0 ? redondear(mes.total / mes.count) : 0,
-    lastOrderDate: ultimo.creadoEl.toISOString().split('T')[0],
-    topPaymentMethod: [...porMedio.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
-  };
-
-  // Agrupado por cliente con TODOS sus pedidos, cancelados incluidos (así lo
-  // hace el groupBy de ModuleDataService).
-  const porCliente = new Map<string, { n: number; total: number }>();
-  for (const p of d.pedidos) {
-    if (!p.clienteId) continue;
-    const a = porCliente.get(p.clienteId) ?? { n: 0, total: 0 };
-    porCliente.set(p.clienteId, { n: a.n + 1, total: a.total + p.total });
-  }
-  const ordenados = [...porCliente.entries()].sort((a, b) => b[1].total - a[1].total);
-  const vipCut = Math.ceil(ordenados.length * 0.1);
-  let vip = 0;
-  let recurrent = 0;
-  let nuevos = 0;
-  ordenados.forEach(([, r], i) => {
-    if (i < vipCut) vip++;
-    else if (r.n >= 2) recurrent++;
-    else nuevos++;
-  });
-  const hace60 = new Date(d.ahora.getTime() - 60 * DIA_MS);
-  const inactivos = d.clientes.filter((c) => {
-    const suyos = d.pedidos.filter((p) => p.clienteId === c.id);
-    return suyos.length > 0 && !suyos.some((p) => p.creadoEl >= hace60);
-  }).length;
-  const top = ordenados[0] ? d.clientes.find((c) => c.id === ordenados[0][0]) : undefined;
-  const clientes: ClientesSnapshot = {
-    totalCustomers: d.clientes.length,
-    newThisMonth: dashboard.newCustomersThisMonth,
-    segmentation: { vip, recurrent, new: nuevos, inactive: inactivos },
-    topCustomerName: top ? nombreDeCliente(top) : null,
-  };
-
-  const catalogo: CatalogoSnapshot = {
-    totalProducts: d.productos.length,
-    publishedProducts: d.productos.filter((p) => p.estado === 'PUBLISHED').length,
-    draftProducts: d.productos.filter((p) => p.estado === 'DRAFT').length,
-    outOfStock: d.productos.filter((p) => p.stock === 0).length,
-    totalCategories: d.categorias.length,
-    emptyCategories: d.categorias.filter((c) => !d.productos.some((p) => p.categoriaId === c.id)).length,
-    avgPrice: redondear(d.productos.reduce((s, p) => s + p.precio, 0) / d.productos.length),
-  };
-
-  const mensajes: MensajesSnapshot = {
-    unreadCount: d.conversaciones.sinLeer,
-    totalConversations: d.conversaciones.total,
-    avgResponseTimeHours: null,
-  };
-
-  return { dashboard, pedidos, clientes, catalogo, mensajes };
 }
 
 // ─── Reportes (semántica de ReportsService) ──────────────────────────────────
@@ -648,71 +547,10 @@ export function armarFakes(d: NegocioDePrueba) {
     },
   });
 
-  // Solo lo que leen ContextBuilderService y los describirAccion de las
-  // escrituras. Siempre acotado al negocio, como la base.
-  const prisma = estricto('PrismaService', {
-    business: estricto('prisma.business', {
-      async findUnique(args: { where: { id: string } }) {
-        return args.where.id === BUSINESS_ID
-          ? { name: d.negocio.nombre, industry: d.negocio.rubro, mode: d.negocio.modo, isActive: ESTADO_DEL_ALTA.publicada, isPaused: false }
-          : null;
-      },
-    }),
-    subscription: estricto('prisma.subscription', {
-      async findUnique(args: { where: { businessId: string } }) {
-        return args.where.businessId === BUSINESS_ID && ESTADO_DEL_ALTA.suscripcion ? { id: 'sub-1' } : null;
-      },
-    }),
-    member: estricto('prisma.member', {
-      async findFirst(args: { where: { id: string; businessId: string } }) {
-        return args.where.businessId === BUSINESS_ID ? { emailVerified: ESTADO_DEL_ALTA.emailVerificado } : null;
-      },
-      // accesoDelEquipo: búsqueda por nombre o email, SIEMPRE dentro del negocio.
-      async findMany(args: { where: { businessId: string; OR: { name?: { contains: string }; email?: { contains: string } }[] } }) {
-        if (args.where.businessId !== BUSINESS_ID) return [];
-        const q = (args.where.OR[0]?.name?.contains ?? '').toLowerCase();
-        return EQUIPO
-          .filter((m) => m.nombre.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
-          .map((m) => ({
-            name: m.nombre,
-            status: m.estado,
-            role: {
-              name: m.rol,
-              rolePermissions: (m.rol === 'owner' ? [] : PERMISOS_EMPLEADO).map((code) => ({ permission: { code } })),
-            },
-          }));
-      },
-    }),
-    order: estricto('prisma.order', {
-      async findFirst(args: { where: { id: string; businessId: string } }) {
-        if (args.where.businessId !== BUSINESS_ID) return null;
-        const p = d.pedidos.find((x) => x.id === args.where.id);
-        if (!p) return null;
-        const cliente = p.clienteId ? d.clientes.find((c) => c.id === p.clienteId) : undefined;
-        return {
-          orderNumber: p.numero,
-          status: p.estado,
-          customer: cliente ? { firstName: cliente.nombre, lastName: cliente.apellido, email: cliente.email } : null,
-          onlineOrderDetails: p.comprador ? { buyerName: p.comprador, buyerEmail: null } : null,
-          payments: [{ method: p.pago.medio, status: p.pago.estado }],
-        };
-      },
-    }),
-    category: estricto('prisma.category', {
-      async findFirst(args: { where: { id: string; businessId: string } }) {
-        if (args.where.businessId !== BUSINESS_ID) return null;
-        const c = d.categorias.find((x) => x.id === args.where.id);
-        return c ? { name: c.nombre } : null;
-      },
-    }),
-  });
-
-  const snapshots = snapshotsDe(d);
-  const moduleData = estricto('ModuleDataService', {
-    async getSnapshot(_businessId: string, modulo: string): Promise<ModuleSnapshot> {
-      return snapshots[modulo] ?? {};
-    },
-  });
+  // La base: el código real (ModuleDataService, describirAccion, tools de
+  // estado) sobre una Prisma en memoria con el dataset.
+  const prisma = crearPrismaEnMemoria(crearTablas(d), (que) => faltasDelFake.push(que));
+  const moduleData = new ModuleDataService(prisma as never);
 
   const businesses = estricto('BusinessesService', {
     async getTutorial(_businessId: string) {
@@ -721,66 +559,85 @@ export function armarFakes(d: NegocioDePrueba) {
   });
   const coupons = estricto('CouponsService', {});
 
-  return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, snapshots, ahora: d.ahora };
+  return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, ahora: d.ahora };
 }
 
 // ─── Armado de las piezas reales ─────────────────────────────────────────────
 
-/**
- * Las clases de tools del panel que registra OrbiModule, en el MISMO orden
- * (el orden de las tools en el request puede cambiar lo que elige el modelo).
- * El unit test lo compara contra orbi.module.ts: si se suma una tool al panel y
- * no acá, la eval mediría un Orbi con menos herramientas.
- */
-export const TOOLS_DEL_PANEL = [
-  'NavigationTool', 'LeerTemaDelManualTool',
-  'ListProductsTool', 'CreateProductTool', 'GenerateDescriptionTool',
-  'ListDiscountsTool', 'CreateDiscountTool', 'CreateCouponTool',
-  'ListOrdersTool', 'GetOrderDetailTool', 'UpdateOrderStatusTool',
-  'ListCustomersTool', 'GetCustomerDetailTool',
-  'UpdateBusinessInfoTool', 'UpdatePaymentMethodsTool', 'UpdateShippingTool',
-  'GetSalesReportTool', 'GetProductReportTool', 'GetCustomerReportTool', 'GetResumenDelPeriodoTool',
-  'EstadoPrimerosPasosTool', 'AccesoDelEquipoTool',
-] as const;
+const DEFINICIONES = join(__dirname, '../../../src/orbi/tools/definitions');
+const ORBI_MODULE = join(__dirname, '../../../src/orbi/orbi.module.ts');
 
+/** Una clase de tool del checkout, o undefined si esa versión no la tiene. */
+function claseDeTool(archivo: string, clase: string): (new (...args: never[]) => OrbiTool) | undefined {
+  const ruta = join(DEFINICIONES, archivo);
+  if (!existsSync(`${ruta}.ts`) && !existsSync(`${ruta}.js`)) return undefined;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return (require(ruta) as Record<string, new (...args: never[]) => OrbiTool>)[clase];
+}
+
+/** Cómo construir cada tool del panel con los fakes. Una tool nueva del módulo que no esté acá hace fallar el armado. */
+const FABRICAS: Record<string, (f: Fakes) => OrbiTool | undefined> = {
+  NavigationTool: () => new NavigationTool(),
+  ListProductsTool: (f) => new ListProductsTool(f.products as never),
+  CreateProductTool: (f) => new CreateProductTool(f.products as never, f.prisma as never),
+  GenerateDescriptionTool: (f) => new GenerateDescriptionTool(f.productAi as never, f.cuota as never),
+  ListDiscountsTool: (f) => new ListDiscountsTool(f.discounts as never),
+  CreateDiscountTool: (f) => new CreateDiscountTool(f.discounts as never),
+  CreateCouponTool: (f) => new CreateCouponTool(f.coupons as never),
+  ListOrdersTool: (f) => new ListOrdersTool(f.orders as never),
+  GetOrderDetailTool: (f) => new GetOrderDetailTool(f.orders as never),
+  UpdateOrderStatusTool: (f) => new UpdateOrderStatusTool(f.orders as never, f.prisma as never),
+  ListCustomersTool: (f) => new ListCustomersTool(f.customers as never),
+  GetCustomerDetailTool: (f) => new GetCustomerDetailTool(f.customers as never),
+  UpdateBusinessInfoTool: (f) => new UpdateBusinessInfoTool(f.businesses as never),
+  UpdatePaymentMethodsTool: (f) => new UpdatePaymentMethodsTool(f.businesses as never),
+  UpdateShippingTool: (f) => new UpdateShippingTool(f.businesses as never),
+  GetSalesReportTool: (f) => new GetSalesReportTool(f.reports as never),
+  GetProductReportTool: (f) => new GetProductReportTool(f.reports as never),
+  GetCustomerReportTool: (f) => new GetCustomerReportTool(f.reports as never),
+  // Las de la fase 6 y la de período: solo existen desde la rama del 2026-10-01.
+  LeerTemaDelManualTool: () => {
+    const C = claseDeTool('manual.tools', 'LeerTemaDelManualTool');
+    return C ? new C() : undefined;
+  },
+  EstadoPrimerosPasosTool: (f) => {
+    const C = claseDeTool('estado.tools', 'EstadoPrimerosPasosTool');
+    return C ? new C(f.businesses as never, f.prisma as never) : undefined;
+  },
+  AccesoDelEquipoTool: (f) => {
+    const C = claseDeTool('estado.tools', 'AccesoDelEquipoTool');
+    return C ? new C(f.prisma as never) : undefined;
+  },
+  // El "hoy" de la tool es el del dataset, no el del reloj.
+  GetResumenDelPeriodoTool: (f) => {
+    const C = claseDeTool('periodo.tools', 'GetResumenDelPeriodoTool');
+    return C ? new C(f.reports as never, (() => f.ahora) as never) : undefined;
+  },
+};
+
+const DEL_WIZARD = ['SuggestBusinessNameTool', 'SuggestDescriptionTool', 'SuggestSubdomainTool', 'SelectWizardOptionTool', 'FillWizardFieldTool'];
+
+/** Las clases de tools del panel que registra OrbiModule en ESTE checkout, en su orden. */
+export function toolsDelPanelDelModulo(): string[] {
+  const fuente = readFileSync(ORBI_MODULE, 'utf8');
+  return [...fuente.matchAll(/register\(new (\w+)\(/g)].map((m) => m[1]).filter((n) => !DEL_WIZARD.includes(n));
+}
+
+/**
+ * Las tools reales del panel, en el MISMO orden que OrbiModule (el orden de
+ * las tools en el request puede cambiar lo que elige el modelo).
+ */
 export function armarRegistry(f: Fakes): ToolRegistryService {
-  // `never`: los fakes implementan solo lo que la tool usa, no la clase entera.
-  const n = <T>(x: unknown) => x as T as never;
   const registry = new ToolRegistryService();
   // El logger de Nest anuncia cada tool registrada: ruido en el reporte.
   (registry as unknown as { logger: { log: () => void } }).logger.log = () => undefined;
-
-  registry.register(new NavigationTool());
-  registry.register(new LeerTemaDelManualTool());
-
-  registry.register(new ListProductsTool(n(f.products)));
-  registry.register(new CreateProductTool(n(f.products), n(f.prisma)));
-  registry.register(new GenerateDescriptionTool(n(f.productAi), n(f.cuota)));
-
-  registry.register(new ListDiscountsTool(n(f.discounts)));
-  registry.register(new CreateDiscountTool(n(f.discounts)));
-  registry.register(new CreateCouponTool(n(f.coupons)));
-
-  registry.register(new ListOrdersTool(n(f.orders)));
-  registry.register(new GetOrderDetailTool(n(f.orders)));
-  registry.register(new UpdateOrderStatusTool(n(f.orders), n(f.prisma)));
-
-  registry.register(new ListCustomersTool(n(f.customers)));
-  registry.register(new GetCustomerDetailTool(n(f.customers)));
-
-  registry.register(new UpdateBusinessInfoTool(n(f.businesses)));
-  registry.register(new UpdatePaymentMethodsTool(n(f.businesses)));
-  registry.register(new UpdateShippingTool(n(f.businesses)));
-
-  registry.register(new GetSalesReportTool(n(f.reports)));
-  registry.register(new GetProductReportTool(n(f.reports)));
-  registry.register(new GetCustomerReportTool(n(f.reports)));
-  // El "hoy" de la tool es el del dataset, no el del reloj.
-  registry.register(new GetResumenDelPeriodoTool(n(f.reports), () => f.ahora));
-
-  registry.register(new EstadoPrimerosPasosTool(n(f.businesses), n(f.prisma)));
-  registry.register(new AccesoDelEquipoTool(n(f.prisma)));
-
+  for (const nombre of toolsDelPanelDelModulo()) {
+    const fabrica = FABRICAS[nombre];
+    if (!fabrica) throw new Error(`OrbiModule registra ${nombre} y las evals no saben armarla: sumala a FABRICAS en fakes.ts`);
+    const tool = fabrica(f);
+    if (!tool) throw new Error(`OrbiModule registra ${nombre} pero su archivo no está en este checkout`);
+    registry.register(tool);
+  }
   return registry;
 }
 

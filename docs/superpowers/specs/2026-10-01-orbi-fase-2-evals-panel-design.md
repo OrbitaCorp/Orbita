@@ -234,17 +234,34 @@ Los fakes copian la semántica de cada fuente **tal cual**, bugs incluidos, para
 **Pendiente.** Esta fase se implementó en una sesión en la nube sin `GEMINI_API_KEY` ni `.env`, así
 que no se pudo correr. Hay que correrla antes de mergear cualquier cambio de prompt de la rama:
 
-```bash
-# 1. Línea de base: el código de producción de hoy + las evals (el commit de las evals,
-#    antes de cualquier cambio de prompt o tool). Ver el sha en el HANDOFF § 9.
-git worktree add ../orbi-base <sha-del-commit-de-evals>
-cd ../orbi-base/apps/api && cp ../../../Orbita/apps/api/.env . && pnpm install
-pnpm test:evals:panel -- --repeticiones=3 --salida=../../../base.json
+Las evals están hechas para correr **sobre `main`** (el código de producción) sin cambios: registran
+las tools que `orbi.module.ts` registre en ese checkout, cargan las de la fase 6 solo si existen, y
+el snapshot del prompt sale del `ModuleDataService` **real** sobre una Prisma en memoria
+(`panel/prisma-en-memoria.ts`), así que la línea de base mide los bugs de producción tal cual
+(probado: sobre `main` el snapshot dice 0 productos sin stock). Correr las dos **el mismo día**, una
+detrás de la otra (o con el mismo `--ahora`):
 
-# 2. Con los cambios de la rama (fase 6, tool de período):
+```bash
+# 0. Desde la raíz del repo, con la rama bajada.
+git worktree add ../orbi-base origin/main
+mkdir -p ../orbi-base/apps/api/test/evals/panel ../orbi-base/apps/api/src/orbi/turno
+cp apps/api/test/evals/panel/*.ts ../orbi-base/apps/api/test/evals/panel/
+cp apps/api/src/orbi/turno/vuelta.ts ../orbi-base/apps/api/src/orbi/turno/
+cp apps/api/.env ../orbi-base/apps/api/.env
+
+# 1. Línea de base (producción de hoy). TZ=UTC reproduce los meses de Cloud Run.
+cd ../orbi-base/apps/api && pnpm install
+TZ=UTC npx ts-node -P tsconfig.json test/evals/panel/run.ts --repeticiones=3 --salida=../../../base.json
+
+# 2. La rama (fase 6 + período + snapshot corregido), con el mismo "ahora" que la base.
 cd <repo>/apps/api
-pnpm test:evals:panel -- --repeticiones=3 --comparar=../../base.json --salida=../../rama.json
+TZ=UTC pnpm test:evals:panel -- --repeticiones=3 --comparar=../../base.json --salida=../../rama.json
+
+# 3. Índice + tool contra manual entero (decide la fase 6, spec §3.7).
+TZ=UTC pnpm test:evals:panel -- --categoria=manual --repeticiones=3 --variante=manual-entero --comparar=../../rama.json
 ```
+
+Costo: ~USD 1,5 cada corrida con `--repeticiones=3`. Las tres: ~USD 4.
 
 Anotar acá el resultado (modelo, razonamiento, temperatura, limpias/total y desglose por regla y
 categoría). Sin esa tabla, la fase 6 no está "medida" y no se mergea.

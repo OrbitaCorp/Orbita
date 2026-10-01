@@ -36,6 +36,7 @@ import { GeminiAdapter } from '../../../src/orbi/llm/gemini.adapter';
 import { crearNegocioDePrueba } from './negocio-de-prueba';
 import { CASOS_PANEL, CATEGORIAS_DE_CASOS, type CasoPanel } from './casos';
 import { VARIANTES, correrCaso, type Resultado } from './motor';
+import { correrRelojA } from './reloj';
 
 // dotenv NO pisa lo que ya está en el entorno: `ORBI_MODEL_PANEL=x pnpm …` manda.
 cargarDotenv({ path: resolve(__dirname, '../../../.env') });
@@ -210,6 +211,9 @@ async function main(): Promise<void> {
 
   // Un solo "ahora" para toda la corrida: los números esperados y los que
   // devuelven los fakes salen del mismo dataset.
+  // Con un "ahora" fijo, el código real (ModuleDataService) tiene que ver la
+  // misma fecha que el dataset.
+  if (ahoraIso) correrRelojA(ahora);
   const d = crearNegocioDePrueba(ahora);
   console.log(`Corriendo ${casos.length} caso(s) x ${repeticiones} con ${modelo}, variante ${nombreVariante}, ahora ${ahora.toISOString()}…`);
 

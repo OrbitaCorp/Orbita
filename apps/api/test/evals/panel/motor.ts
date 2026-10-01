@@ -11,12 +11,16 @@
  * juzga es lo que se ve: el texto de la vuelta final más tarjetas y botones.
  */
 
+// Los decoradores de los DTOs (class-validator) piden Reflect.getMetadata: sin
+// esto, el motor depende de que algún import anterior lo haya cargado.
+import 'reflect-metadata';
+
 import type { LlmAdapter, LlmMessage, LlmToolDefinition } from '../../../src/orbi/llm/llm-adapter.interface';
 import { OrbiSurface } from '../../../src/orbi/dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../../../src/orbi/prompts/core';
 import { getPanelPrompt } from '../../../src/orbi/prompts/panel';
-import { capaDelManual } from '../../../src/orbi/prompts/manual';
-import { manualEntero } from '../../../src/orbi/manual/manual';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
 import {
   ESCRITURA_NO_DISPONIBLE,
@@ -60,13 +64,28 @@ export type Variante = {
 
 const SEPARADOR_DE_CAPAS = '\n\n---\n\n';
 
+// La capa del manual existe desde la fase 6. Se carga a demanda para que estas
+// evals también corran sobre main (la línea de base), donde no está.
+const SRC_ORBI = join(__dirname, '../../../src/orbi');
+function delManual(): { capaDelManual: () => string; manualEntero: () => string } {
+  if (!existsSync(join(SRC_ORBI, 'prompts/manual.ts')) && !existsSync(join(SRC_ORBI, 'prompts/manual.js'))) {
+    throw new Error('Este checkout no tiene la capa del manual (fase 6): la variante no aplica');
+  }
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  return {
+    capaDelManual: (require(join(SRC_ORBI, 'prompts/manual')) as { capaDelManual: () => string }).capaDelManual,
+    manualEntero: (require(join(SRC_ORBI, 'manual/manual')) as { manualEntero: () => string }).manualEntero,
+  };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+}
+
 /**
  * Cambia la capa del manual del prompt por otra (o la saca). Si la capa no
  * está, tira: una variante que no cambia nada mediría lo mismo que 'actual'
  * con otro nombre.
  */
 export function reemplazarCapaDelManual(systemPrompt: string, nueva: string | null): string {
-  const actual = capaDelManual();
+  const actual = delManual().capaDelManual();
   if (!systemPrompt.includes(actual)) throw new Error('El prompt no tiene la capa del manual: la variante no aplica');
   return nueva === null
     ? systemPrompt.replace(`${actual}${SEPARADOR_DE_CAPAS}`, '')
@@ -78,7 +97,7 @@ export function capaDelManualEntero(): string {
   return `## Manual de uso del panel
 Este es el manual de Órbita completo. Si te preguntan cómo se hace algo en el panel, dónde está algo o qué significa algo de una pantalla, respondé desde el tema que corresponda.
 
-${manualEntero()}
+${delManual().manualEntero()}
 
 Cómo usarlo:
 - No inventes pasos, nombres de botones ni pantallas que no estén en el manual. Si nombrás un botón, usá el nombre exacto que aparece entre comillas.
