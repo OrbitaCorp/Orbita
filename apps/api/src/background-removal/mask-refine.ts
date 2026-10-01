@@ -80,6 +80,60 @@ export function endurecer(mascara: Float32Array, centro: number, ancho: number):
 }
 
 /**
+ * Descontaminación de color del borde (estimación de primer plano). Los píxeles
+ * de alfa parcial de un recorte conservan parte del color del fondo ORIGINAL
+ * (madera marrón detrás de una remera blanca): sobre un fondo oscuro eso se ve
+ * como un contorno sucio. Acá a esos píxeles se les reemplaza el color por el
+ * del producto "real" más cercano, propagado hacia afuera desde el interior
+ * firme (convolución normalizada a radios crecientes).
+ *
+ * A propósito NO usa la fórmula clásica de unpremultiply (F = (C - (1-α)·B)/α):
+ * divide por α y en el anillo de alfa muy bajo amplifica el ruido hasta negro
+ * puro (ver la nota del 22/09/2026 en background-removal.service.ts). Esto solo
+ * promedia colores del interior, no puede overshootear.
+ *
+ * Si un píxel de borde no tiene interior firme cerca (estructura fina: un
+ * cable, un cordón), conserva su color original en vez de inventarlo.
+ */
+export function estimarPrimerPlano(
+  rgb: Uint8Array | Buffer,
+  alfa: Float32Array,
+  w: number,
+  h: number,
+  opciones: { umbralNucleo?: number; radios?: number[] } = {},
+): Uint8Array {
+  const umbral = opciones.umbralNucleo ?? 0.95;
+  const radios = opciones.radios ?? [2, 6, 18];
+  const n = w * h;
+
+  const peso = new Float32Array(n);
+  const pre = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+  let hayBorde = false;
+  for (let i = 0; i < n; i++) {
+    if (alfa[i] >= umbral) {
+      peso[i] = 1;
+      for (let c = 0; c < 3; c++) pre[c][i] = rgb[i * 3 + c];
+    } else if (alfa[i] > 0.01) {
+      hayBorde = true;
+    }
+  }
+  const out = Uint8Array.from(rgb);
+  if (!hayBorde) return out;
+
+  const resuelto = new Uint8Array(n);
+  for (const r of radios) {
+    const bw = boxFilter(peso, w, h, r);
+    const bc = pre.map((canal) => boxFilter(canal, w, h, r));
+    for (let i = 0; i < n; i++) {
+      if (resuelto[i] || alfa[i] >= umbral || alfa[i] <= 0.01 || bw[i] < 0.04) continue;
+      for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.max(0, Math.min(255, Math.round(bc[c][i] / bw[i])));
+      resuelto[i] = 1;
+    }
+  }
+  return out;
+}
+
+/**
  * Recupera estructuras finas (brazo de un micrófono, un cable) que la erosión
  * de borde borra: el modelo (320 px) las ve como ~1 px, y un choke de varios
  * px las elimina. La `mascara` que recibe es la YA erosionada. Solo aplica con fondo

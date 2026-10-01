@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
-import { ImageStudioService } from '../../src/image-studio/image-studio.service';
+import { ImageStudioService, intensidadAroSegunLuminosidad } from '../../src/image-studio/image-studio.service';
 
 // ImageStudioService (fondos de producto + "prenda en modelo", paquete
 // Avanzado, Cloudflare Workers AI). Cubre lo que la auditoría interna del
@@ -155,5 +155,32 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
       expect(cloudflareImage.generateImage).toHaveBeenCalledTimes(1);
       expect(result.mimeType).toBe('image/png');
     });
+  });
+});
+
+describe('intensidadAroSegunLuminosidad — aro de luz sobre fondo negro', () => {
+  const pixeles = (r: number, g: number, b: number, a = 255) => Buffer.from([r, g, b, a, r, g, b, a]);
+
+  it('un producto claro (remera blanca) no lleva aro: ya contrasta con el negro', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(245, 245, 245))).toBe(0);
+  });
+
+  it('un producto negro lleva el aro completo para no fundirse con el fondo', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(10, 10, 10))).toBe(1);
+  });
+
+  it('un producto intermedio lleva un aro parcial', () => {
+    const v = intensidadAroSegunLuminosidad(pixeles(95, 95, 95));
+    expect(v).toBeGreaterThan(0.2);
+    expect(v).toBeLessThan(0.8);
+  });
+
+  it('los píxeles transparentes no cuentan (el lienzo vacío no aclara el promedio)', () => {
+    const buf = Buffer.concat([pixeles(10, 10, 10), pixeles(255, 255, 255, 0)]);
+    expect(intensidadAroSegunLuminosidad(buf)).toBe(1);
+  });
+
+  it('sin ningún píxel visible no rompe', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(0, 0, 0, 0))).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 import {
   recuperarFinos,
-  completarHuecos, boxFilter, endurecer, guidedFilter } from '../../src/background-removal/mask-refine';
+  completarHuecos, boxFilter, endurecer, estimarPrimerPlano, guidedFilter } from '../../src/background-removal/mask-refine';
 
 // Fase 3 de "Fondo con IA": refinamiento de la máscara de recorte (bordes
 // pixelados al agrandar la máscara de 320x320 de U2Netp).
@@ -114,5 +114,57 @@ describe('completarHuecos', () => {
     const mascara = new Float32Array(W * H);
     for (let y = 10; y < 50; y++) for (let x = 20; x < 60; x++) mascara[y * W + x] = 1;
     expect(completarHuecos(rgb, mascara, W, H)).toBe(0);
+  });
+
+  describe('estimarPrimerPlano', () => {
+    // Producto blanco (x >= 10) sobre madera marrón, con un anillo de 2 px de
+    // alfa parcial cuyo color es mezcla de ambos: lo que sobre negro se ve como
+    // contorno sucio.
+    const w = 24;
+    const h = 6;
+    const armar = () => {
+      const rgb = new Uint8Array(w * h * 3);
+      const alfa = new Float32Array(w * h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          const [c, a] = x >= 10 ? [[250, 250, 250], 1] : x >= 8 ? [[190, 150, 120], 0.5] : [[120, 70, 30], 0];
+          rgb.set(c as number[], i * 3);
+          alfa[i] = a as number;
+        }
+      }
+      return { rgb, alfa };
+    };
+
+    it('el anillo de alfa parcial toma el color del producto, no el del fondo', () => {
+      const { rgb, alfa } = armar();
+      const out = estimarPrimerPlano(rgb, alfa, w, h);
+      const i = 3 * w + 8;
+      expect([out[i * 3], out[i * 3 + 1], out[i * 3 + 2]]).toEqual([250, 250, 250]);
+    });
+
+    it('no toca el interior firme ni el fondo transparente', () => {
+      const { rgb, alfa } = armar();
+      const out = estimarPrimerPlano(rgb, alfa, w, h);
+      expect(Array.from(out.slice((3 * w + 15) * 3, (3 * w + 15) * 3 + 3))).toEqual([250, 250, 250]);
+      expect(Array.from(out.slice((3 * w + 2) * 3, (3 * w + 2) * 3 + 3))).toEqual([120, 70, 30]);
+    });
+
+    it('sin interior firme cerca (estructura fina) conserva el color original', () => {
+      const w2 = 60;
+      const rgb = new Uint8Array(w2 * 3).fill(0);
+      const alfa = new Float32Array(w2).fill(0);
+      rgb.set([30, 40, 50], 30 * 3);
+      alfa[30] = 0.6; // un cable de 1 px, sin ningún píxel opaco a 18 px a la redonda
+      const out = estimarPrimerPlano(rgb, alfa, w2, 1);
+      expect(Array.from(out.slice(30 * 3, 30 * 3 + 3))).toEqual([30, 40, 50]);
+    });
+
+    it('sin borde parcial devuelve una copia idéntica', () => {
+      const rgb = new Uint8Array([10, 20, 30, 40, 50, 60]);
+      const out = estimarPrimerPlano(rgb, new Float32Array([1, 1]), 2, 1);
+      expect(Array.from(out)).toEqual(Array.from(rgb));
+      expect(out).not.toBe(rgb);
+    });
   });
 });

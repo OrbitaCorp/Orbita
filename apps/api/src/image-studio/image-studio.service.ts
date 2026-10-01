@@ -26,6 +26,25 @@ export interface ImageStudioResult {
   advertencia?: string;
 }
 
+/**
+ * 0..1 — cuánto aro de luz necesita un producto sobre fondo negro, según la
+ * luminosidad media (ponderada por alfa) de su RGBA crudo: 1 para productos
+ * oscuros (luma <= 40), 0 para claros (luma >= 150).
+ */
+export function intensidadAroSegunLuminosidad(rgba: Buffer): number {
+  let suma = 0;
+  let pesos = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const a = rgba[i + 3];
+    if (a === 0) continue;
+    suma += (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * a;
+    pesos += a;
+  }
+  if (pesos === 0) return 1;
+  const luma = suma / pesos;
+  return Math.min(1, Math.max(0, 1 - (luma - 40) / 110));
+}
+
 const PROMPT_MODELO_DEFAULT =
   'a photorealistic person wearing this exact garment, natural studio lighting, e-commerce fashion photography, neutral background';
 
@@ -516,25 +535,30 @@ export class ImageStudioService {
 
       const alphaAmbiente = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
         .toColourspace('b-w')
-        .blur(22)
+        .blur(16)
         .toColourspace('b-w')
         .raw()
         .toBuffer();
 
       // Mismas dos capas que componerFondoBlanco(), pero con RGB claro
       // (aclara) en vez de oscuro — sobre fondo negro, oscurecer no se nota.
+      // La intensidad depende de qué tan oscuro es el producto: uno claro (una
+      // remera blanca) ya se separa solo del negro, y el aro le dibujaba un
+      // resplandor alrededor de toda la silueta (feedback 30/09/2026); uno
+      // oscuro (zapatilla negra) sí lo necesita para no fundirse con el fondo.
+      const intensidadAro = intensidadAroSegunLuminosidad(await sharp(prodFull).raw().toBuffer());
       const contactoRgba = Buffer.alloc(width * height * 4);
       const ambienteRgba = Buffer.alloc(width * height * 4);
       for (let i = 0; i < width * height; i++) {
         contactoRgba[i * 4] = 235;
         contactoRgba[i * 4 + 1] = 235;
         contactoRgba[i * 4 + 2] = 235;
-        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.18);
+        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.18 * intensidadAro);
 
         ambienteRgba[i * 4] = 245;
         ambienteRgba[i * 4 + 1] = 245;
         ambienteRgba[i * 4 + 2] = 245;
-        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.08);
+        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.08 * intensidadAro);
       }
 
       const rimContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
