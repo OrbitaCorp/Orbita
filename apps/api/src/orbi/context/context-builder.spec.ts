@@ -439,7 +439,6 @@ describe('ContextBuilderService', () => {
       totalCustomers: 120,
       newThisMonth: 15,
       segmentation: { vip: 12, recurrent: 40, new: 30, inactive: 18 },
-      topCustomerName: 'María González',
     });
 
     const prompt = await service.buildSystemPrompt({
@@ -451,7 +450,7 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('Nuevos este mes: 15');
     expect(prompt).toContain('12 VIP');
     expect(prompt).toContain('18 inactivos');
-    expect(prompt).toContain('María González');
+    expect(prompt).not.toContain('Cliente top');
   });
 
   it('clientes prompt works without dynamic data (graceful degradation)', async () => {

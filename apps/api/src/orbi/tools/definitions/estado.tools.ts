@@ -29,7 +29,12 @@ const RUTA_ZONA_PELIGROSA = rutaDelPanel('configuracion', 'peligro');
 /** Por HTTP, la suscripción y publicar son `@Roles('owner','admin')`. */
 const VE_LA_CUENTA = new Set(['owner', 'admin']);
 
-type Bloqueante = { motivo: string; irA?: { label: string; path: string } };
+/**
+ * `paraAdmin`: lo que se le dice al admin cuando lo resuelve SOLO el
+ * propietario. Pausar/reactivar la tienda y dar de baja/recuperar el espacio
+ * son `@Roles('owner')`: mandarlo al botón sería mandarlo a un 403.
+ */
+type Bloqueante = { motivo: string; irA?: { label: string; path: string }; paraAdmin?: string };
 
 export class EstadoPrimerosPasosTool implements OrbiTool {
   name = 'estadoPrimerosPasos';
@@ -71,9 +76,19 @@ export class EstadoPrimerosPasosTool implements OrbiTool {
       // La baja del espacio también pausa y deja la suscripción en CANCELLED:
       // sin este caso, suspensionVigente diría MORA ("debés un pago") a quien
       // se dio de baja él mismo (SubscriptionsService, baja del negocio).
-      if (negocio.cancelledAt) return { motivo: 'El espacio está dado de baja: la tienda no se ve. Dentro de los 60 días se recupera con "Reactivar espacio" en Configuración → Zona peligrosa.', irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA } };
+      if (negocio.cancelledAt) {
+        return {
+          motivo: 'El espacio está dado de baja: la tienda no se ve. Dentro de los 60 días se recupera con "Reactivar espacio" en Configuración → Zona peligrosa.',
+          irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA },
+          paraAdmin: 'El espacio está dado de baja: la tienda no se ve. Dentro de los 60 días lo puede recuperar el propietario.',
+        };
+      }
       if (suspension === 'MORA') return { motivo: 'La tienda está suspendida por un pago pendiente de la suscripción.', irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION } };
-      return { motivo: 'La tienda está pausada desde el panel. Se reactiva con "Reactivar tienda" en Configuración → Zona peligrosa.', irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA } };
+      return {
+        motivo: 'La tienda está pausada desde el panel. Se reactiva con "Reactivar tienda" en Configuración → Zona peligrosa.',
+        irA: { label: 'Abrir Zona peligrosa', path: RUTA_ZONA_PELIGROSA },
+        paraAdmin: 'La tienda está pausada desde el panel. La reactiva el propietario.',
+      };
     }
     if (!negocio?.isActive && !conSuscripcion) {
       return { motivo: 'Para publicar la tienda falta activar la suscripción.', irA: { label: 'Abrir Suscripción', path: RUTA_SUSCRIPCION } };
@@ -96,11 +111,13 @@ export class EstadoPrimerosPasosTool implements OrbiTool {
       const publicada = !!negocio?.isActive && !negocio.isPaused;
       const bloqueante = await this.bloqueante(ctx.businessId, negocio, !!suscripcion);
       // La suscripción y su estado son de propietario/admin por HTTP: a otro
-      // rol no se le cuenta el detalle, solo que hay algo que resolver.
-      const veLaCuenta = VE_LA_CUENTA.has(ctx.roleName ?? '');
-      const bloqueanteVisible: Bloqueante | undefined = bloqueante && (veLaCuenta
-        ? bloqueante
-        : { motivo: 'Hay algo de la cuenta de la tienda que tiene que resolver el propietario.' });
+      // rol no se le cuenta el detalle, solo que hay algo que resolver. Al
+      // admin, lo que es solo del propietario se le dice sin botón.
+      const rol = ctx.roleName ?? '';
+      let bloqueanteVisible: Bloqueante | undefined;
+      if (!bloqueante || rol === 'owner') bloqueanteVisible = bloqueante;
+      else if (VE_LA_CUENTA.has(rol)) bloqueanteVisible = bloqueante.paraAdmin ? { motivo: bloqueante.paraAdmin } : bloqueante;
+      else bloqueanteVisible = { motivo: 'Hay algo de la cuenta de la tienda que tiene que resolver el propietario.' };
 
       // Lo que la base detecta, más lo que la persona tildó a mano en la tarjeta.
       const hechos = new Set([...cumplidas, ...(tutorial?.hechas ?? [])]);
@@ -193,41 +210,53 @@ export class AccesoDelEquipoTool implements OrbiTool {
     }
 
     try {
-      // SIEMPRE dentro del negocio del token: un nombre de otro negocio no existe.
-      const miembros = await this.prisma.member.findMany({
+      const select = {
+        name: true,
+        status: true,
+        role: { select: { name: true, rolePermissions: { select: { permission: { select: { code: true } } } } } },
+      } as const;
+      // SIEMPRE dentro del negocio del token: un nombre de otro negocio no
+      // existe. Primero la coincidencia exacta (nombre o email, sin mayúsculas):
+      // con una búsqueda parcial con tope, "Ana" podía quedar afuera detrás de
+      // seis "Juliana", "Mariana"…
+      const exactas = await this.prisma.member.findMany({
         where: {
           businessId: ctx.businessId,
-          OR: [
-            { name: { contains: persona, mode: 'insensitive' } },
-            { email: { contains: persona, mode: 'insensitive' } },
-          ],
+          OR: [{ name: { equals: persona, mode: 'insensitive' } }, { email: { equals: persona, mode: 'insensitive' } }],
         },
-        select: {
-          name: true,
-          // Solo para reconocer la coincidencia exacta: no se devuelve.
-          email: true,
-          status: true,
-          role: { select: { name: true, rolePermissions: { select: { permission: { select: { code: true } } } } } },
-        },
+        select,
+        orderBy: { name: 'asc' },
         take: 6,
       });
+      const miembros = exactas.length
+        ? exactas
+        : await this.prisma.member.findMany({
+            where: {
+              businessId: ctx.businessId,
+              OR: [
+                { name: { contains: persona, mode: 'insensitive' } },
+                { email: { contains: persona, mode: 'insensitive' } },
+              ],
+            },
+            select,
+            orderBy: { name: 'asc' },
+            take: 6,
+          });
 
       if (!miembros.length) {
         return { success: false, error: `No encontré a nadie del equipo que se llame "${persona}".`, label };
       }
-      // "Ana" también matchea "Juliana": si hay UNA coincidencia exacta (nombre o
-      // email, sin mayúsculas), es esa.
-      const exacta = miembros.filter((m) => m.name.trim().toLowerCase() === persona.toLowerCase() || m.email?.toLowerCase() === persona.toLowerCase());
-      if (miembros.length > 1 && exacta.length !== 1) {
-        // Ambiguo: que la persona elija, sin adivinar.
+      if (miembros.length > 1) {
+        // Ambiguo: que la persona elija, sin adivinar. Con el rol, para
+        // distinguir a dos que se llaman igual.
         return {
           success: true,
           label,
-          data: { ambiguo: true, coincidencias: miembros.slice(0, 5).map((m) => m.name) },
+          data: { ambiguo: true, coincidencias: miembros.slice(0, 5).map((m) => `${m.name} (${NOMBRE_DEL_ROL[m.role.name] ?? m.role.name})`) },
         };
       }
 
-      const m = exacta.length === 1 ? exacta[0] : miembros[0];
+      const m = miembros[0];
       const esDueno = m.role.name === 'owner';
       const permisos = m.role.rolePermissions.map((rp) => rp.permission.code);
       return {
@@ -239,7 +268,7 @@ export class AccesoDelEquipoTool implements OrbiTool {
           rol: NOMBRE_DEL_ROL[m.role.name] ?? m.role.name,
           ...(m.status === 'PENDING' ? { invitacionPendiente: true } : {}),
           ...accesoPorModulo(permisos, esDueno),
-          path: '/admin/ventas/configuracion?vista=equipo',
+          path: rutaDelPanel('configuracion', 'equipo'),
         },
       };
     } catch {

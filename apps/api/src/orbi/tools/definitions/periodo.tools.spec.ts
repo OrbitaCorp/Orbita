@@ -64,6 +64,30 @@ describe('getResumenDelPeriodo', () => {
     expect(reports.dashboard).not.toHaveBeenCalled();
   });
 
+  it('una fecha imposible no corta el turno: vuelve al modelo como error', async () => {
+    const { tool, reports } = armar();
+    for (const [desde, hasta] of [['2026-09-01', '2026-09-32'], ['2026-13-01', '2026-13-05']]) {
+      const r = await tool.execute({ periodo: 'rango', desde, hasta }, ctx);
+      expect(r).toMatchObject({ success: false, error: expect.stringContaining('AAAA-MM-DD') });
+    }
+    expect(reports.dashboard).not.toHaveBeenCalled();
+  });
+
+  it('avisa cuando el período incluye hoy (no terminó) y cómo se compara un mes', async () => {
+    const { tool } = armar();
+    const mes = (await tool.execute({ periodo: 'mes_pasado' }, ctx)).data as Record<string, unknown>;
+    // Agosto (31 días) se compara con los 31 días anteriores, no con julio.
+    expect(mes).toMatchObject({ periodo: { desde: '2026-08-01', hasta: '2026-08-31', dias: 31 }, comparadoCon: { desde: '2026-07-01', hasta: '2026-07-31' } });
+    expect(mes.notaDeLaComparacion).toContain('no contra el mes calendario');
+    expect(mes.incluyeHoyQueNoTermino).toBeUndefined();
+
+    const hoy = (await tool.execute({ periodo: 'hoy' }, ctx)).data as Record<string, unknown>;
+    expect(hoy.incluyeHoyQueNoTermino).toBe(true);
+    expect(hoy.notaDeLaComparacion).toBeUndefined();
+    const ayer = (await tool.execute({ periodo: 'ayer' }, ctx)).data as Record<string, unknown>;
+    expect(ayer.incluyeHoyQueNoTermino).toBeUndefined();
+  });
+
   it('un 400 del service (rango de más de 400 días) se explica; otro error, sin detalles', async () => {
     const { tool, reports } = armar();
     reports.dashboard.mockRejectedValueOnce(new BadRequestException('El rango puede ser de hasta 400 días'));
@@ -99,6 +123,8 @@ describe('rangoDelPeriodo', () => {
     expect(esFecha('2026-02-28')).toBe(true);
     expect(esFecha('2026-02-29')).toBe(false);
     expect(esFecha('28/02/2026')).toBe(false);
+    // Un día 32 o un mes 13 son Invalid Date: tiene que decir false, no tirar.
+    for (const imposible of ['2026-09-32', '2026-13-01', '2026-00-10', '2026-09-00']) expect(esFecha(imposible)).toBe(false);
     expect(sumarDias('2026-03-01', -1)).toBe('2026-02-28');
   });
 });

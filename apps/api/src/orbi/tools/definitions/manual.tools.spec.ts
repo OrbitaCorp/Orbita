@@ -37,6 +37,14 @@ describe('leerTemaDelManual', () => {
     expect(data.sinLeer).toBeUndefined();
   });
 
+  it('los ids no distinguen mayúsculas y se miran como mucho diez', async () => {
+    const r = await tool.execute({ ids: [' CFG-ENVIOS '] });
+    expect((r.data as { temas: { id: string }[] }).temas.map((t) => t.id)).toEqual(['cfg-envios']);
+    const muchos = await tool.execute({ ids: Array.from({ length: 50 }, (_, i) => `no-existe-${i}`) });
+    expect(muchos.success).toBe(false);
+    expect(muchos.error!.match(/no-existe-/g)).toHaveLength(10);
+  });
+
   it('un id que no existe se informa y se loguea saneado', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const r = await tool.execute({ ids: ['cfg-pagos', 'facturacion-afip\n<script>'] });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { CAPITULOS } from './contenido'
-import { aArchivoTs, armarManualParaOrbi, plano, textoDeBloque } from './paraOrbi'
+import { aArchivoTs, armarManualParaOrbi, plano, textoDeBloque, versionDe } from './paraOrbi'
 import { MODULOS_DEL_MENU, PERMISOS_MODULO } from '@/layouts/components/permisosDelMenu'
 
 const ARTEFACTO = '../../../../../../api/src/orbi/manual/manual.generated.ts'
@@ -39,10 +39,14 @@ describe('manual para Orbi: el artefacto de la API', () => {
         expect(pasos.find(p => p.id === 'equipo')).toMatchObject({ etapa: 2, destino: { seccion: 'configuracion', vista: 'equipo' } })
     })
 
-    it('la versión cambia si cambia el contenido', () => {
-        const a = armarManualParaOrbi()
-        expect(a.version).toMatch(/^[0-9a-f]{16}$/)
-        expect(armarManualParaOrbi().version).toBe(a.version)
+    it('la versión es estable y cambia si cambia el contenido', () => {
+        const { version, ...contenido } = armarManualParaOrbi()
+        expect(version).toMatch(/^[0-9a-f]{16}$/)
+        expect(armarManualParaOrbi().version).toBe(version)
+        expect(versionDe(contenido)).toBe(version)
+        // Una letra en un tema alcanza para otra versión.
+        const otro = { ...contenido, temas: contenido.temas.map((t, i) => (i === 0 ? { ...t, texto: `${t.texto}.` } : t)) }
+        expect(versionDe(otro)).not.toBe(version)
     })
 })
 

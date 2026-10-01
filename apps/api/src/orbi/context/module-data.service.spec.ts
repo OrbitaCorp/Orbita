@@ -139,6 +139,20 @@ describe('ModuleDataService', () => {
     expect((result as any).oldestPendingHours).toBeGreaterThanOrEqual(47);
   });
 
+  it('el último pedido se fecha con el día de Argentina, no el de UTC', async () => {
+    mockPrisma.order.groupBy.mockResolvedValueOnce([]);
+    mockPrisma.order.findFirst
+      .mockResolvedValueOnce(null)
+      // 1/10 01:00 UTC = 30/09 22:00 en Argentina.
+      .mockResolvedValueOnce({ createdAt: new Date('2026-10-01T01:00:00.000Z') });
+    mockPrisma.order.aggregate.mockResolvedValueOnce({ _sum: { total: null }, _count: 0 });
+    mockPrisma.payment.groupBy.mockResolvedValueOnce([]);
+
+    const result = await service.getSnapshot('biz-1', 'pedidos');
+
+    expect(result).toMatchObject({ lastOrderDate: '2026-09-30' });
+  });
+
   it('handles zero orders in pedidos gracefully', async () => {
     mockPrisma.order.groupBy.mockResolvedValueOnce([]);
     mockPrisma.order.findFirst
@@ -188,10 +202,6 @@ describe('ModuleDataService', () => {
       { customerId: 'c9', _count: 1, _sum: { total: 5000 } },
       { customerId: 'c10', _count: 1, _sum: { total: 3000 } },
     ]);
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
-      firstName: 'María',
-      lastName: 'González',
-    });
 
     const result = await service.getSnapshot('biz-1', 'clientes');
 
@@ -199,8 +209,10 @@ describe('ModuleDataService', () => {
       totalCustomers: 50,
       newThisMonth: 8,
       segmentation: { vip: 1, recurrent: 6, new: 3, inactive: 5 },
-      topCustomerName: 'María González',
     });
+    // El nombre del cliente top es texto de terceros: no se busca ni se devuelve.
+    expect(result).not.toHaveProperty('topCustomerName');
+    expect(mockPrisma.customer.findUnique).not.toHaveBeenCalled();
   });
 
   it('handles zero customers gracefully', async () => {
@@ -216,7 +228,6 @@ describe('ModuleDataService', () => {
       totalCustomers: 0,
       newThisMonth: 0,
       segmentation: { vip: 0, recurrent: 0, new: 0, inactive: 0 },
-      topCustomerName: null,
     });
   });
 

@@ -28,9 +28,13 @@ export function sumarDias(fecha: string, dias: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** AAAA-MM-DD y además una fecha que existe (2026-02-31 no). */
+/** AAAA-MM-DD y además una fecha que existe (2026-02-31 y 2026-09-32 no). */
 export function esFecha(texto: unknown): texto is string {
-  return typeof texto === 'string' && DIA.test(texto) && new Date(`${texto}T12:00:00.000Z`).toISOString().slice(0, 10) === texto;
+  if (typeof texto !== 'string' || !DIA.test(texto)) return false;
+  // Un mes 13 o un día 32 dan Invalid Date, y toISOString() TIRA: sin este
+  // chequeo, "ventas del 1 al 32" cortaba el turno entero.
+  const d = new Date(`${texto}T12:00:00.000Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
 }
 
 /**
@@ -116,13 +120,16 @@ export class GetResumenDelPeriodoTool implements OrbiTool {
       return { success: false, error: `Período inválido. Opciones: ${PERIODOS.join(', ')}.`, label };
     }
 
-    const hoy = fechaArgentina(this.ahora());
-    const rango = rangoDelPeriodo(periodo as Periodo, hoy, args.desde, args.hasta);
-    if ('error' in rango) return { success: false, error: rango.error, label };
-
     try {
+      // Dentro del try: una tool que tira corta el turno entero (el registry
+      // no atrapa), y los argumentos vienen del modelo.
+      const hoy = fechaArgentina(this.ahora());
+      const rango = rangoDelPeriodo(periodo as Periodo, hoy, args.desde, args.hasta);
+      if ('error' in rango) return { success: false, error: rango.error, label };
+
       const d = await this.reports.dashboard(ctx.businessId, rango.desde, rango.hasta);
       const dias = diasEntre(rango.desde, rango.hasta);
+      const comparadoCon = { desde: sumarDias(rango.desde, -dias), hasta: sumarDias(rango.desde, -1) };
       return {
         success: true,
         label,
@@ -132,7 +139,18 @@ export class GetResumenDelPeriodoTool implements OrbiTool {
         // rangos largos); las imágenes no le dicen nada al modelo.
         data: {
           periodo: { desde: rango.desde, hasta: rango.hasta, dias },
-          comparadoCon: { desde: sumarDias(rango.desde, -dias), hasta: sumarDias(rango.desde, -1) },
+          comparadoCon,
+          // El dashboard compara contra los N días anteriores, no contra el
+          // mes calendario: septiembre (30 días) va contra 2 al 31 de agosto.
+          // Dicho, para que el modelo no diga "contra agosto".
+          ...(periodo === 'mes_pasado' || periodo === 'este_mes'
+            ? { notaDeLaComparacion: `Se compara contra los ${dias} días anteriores (${comparadoCon.desde} a ${comparadoCon.hasta}), no contra el mes calendario anterior.` }
+            : {}),
+          // Hoy todavía no terminó: comparado contra un período completo, a la
+          // mañana todo da para abajo.
+          ...(rango.hasta === hoy
+            ? { incluyeHoyQueNoTermino: true, notaDeHoy: 'El período incluye el día de hoy, que todavía no terminó: la comparación contra el período anterior completo puede dar más baja de lo que va a ser.' }
+            : {}),
           ventas: d.kpis.ventas,
           pedidos: d.kpis.pedidos,
           ticketPromedio: d.kpis.ticketPromedio,

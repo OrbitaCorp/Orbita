@@ -7,6 +7,9 @@ import { rutaDeDestino, temaDelManual } from '../../manual/manual';
 /** Temas por llamada: con más, el contexto se llena de manual y el modelo pierde el foco. */
 export const MAX_TEMAS_POR_LLAMADA = 3;
 
+/** Ids que se miran por llamada: el resto se descarta, para que el error y el log no crezcan sin techo. */
+export const MAX_IDS_POR_LLAMADA = 10;
+
 /** Un id que vino del modelo, apto para un log: sin saltos ni caracteres raros. */
 export function idParaLog(id: unknown): string {
   return String(id).toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || '(vacío)';
@@ -54,7 +57,8 @@ export class LeerTemaDelManualTool implements OrbiTool {
     const label = 'Manual';
     // El schema pide un array, pero el modelo a veces manda un string suelto.
     const crudos = Array.isArray(args.ids) ? args.ids : typeof args.ids === 'string' ? [args.ids] : [];
-    const ids = [...new Set(crudos.map(String))];
+    // Los ids del índice son en minúscula: "CFG-ENVIOS" es el mismo tema.
+    const ids = [...new Set(crudos.map((id) => String(id).trim().toLowerCase()))].filter(Boolean).slice(0, MAX_IDS_POR_LLAMADA);
     if (!ids.length) {
       return { success: false, error: 'Pasá al menos un id del índice del manual.', label };
     }

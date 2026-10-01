@@ -93,6 +93,15 @@ describe('estadoPrimerosPasos', () => {
     expect(data.path).toBe('/admin/ventas/configuracion?vista=peligro');
   });
 
+  it('al admin, lo que solo hace el propietario se le dice sin botón (el endpoint es solo owner)', async () => {
+    for (const o of [{ suspension: null }, { suspension: 'MORA' as const, cancelledAt: new Date() }]) {
+      const { tool } = armar({ suscripcion: true, isActive: true, isPaused: true, ...o });
+      const data = await datos(tool, ctx(CODIGOS_DEL_CATALOGO, 'admin'));
+      expect(data.bloqueante).toContain('propietario');
+      expect(data.path ?? '').not.toContain('peligro');
+    }
+  });
+
   it('a quien no es propietario no se le cuenta el detalle de la cuenta', async () => {
     const { tool } = armar({ isActive: true, isPaused: true, suspension: 'MORA' });
     const data = await datos(tool, ctx(['reports.dashboard'], 'empleado'));
@@ -166,8 +175,19 @@ describe('estadoPrimerosPasos', () => {
 });
 
 describe('accesoDelEquipo', () => {
-  function armar(miembros: unknown[]) {
-    const prisma = { member: { findMany: jest.fn().mockResolvedValue(miembros) } };
+  type Miembro = { name: string; email: string };
+  type Cond = { equals?: string; contains?: string };
+  /** Filtra como Postgres (equals/contains sin mayúsculas, orden por nombre, take). */
+  function armar(miembros: Miembro[]) {
+    const cumple = (valor: string, c: Cond) =>
+      c.equals !== undefined ? valor.toLowerCase() === c.equals.toLowerCase() : valor.toLowerCase().includes(c.contains!.toLowerCase());
+    const findMany = jest.fn(async (a: { where: { OR: [{ name: Cond }, { email: Cond }] }; take: number }) =>
+      miembros
+        .filter((m) => cumple(m.name, a.where.OR[0].name) || cumple(m.email, a.where.OR[1].email))
+        .sort((x, y) => x.name.localeCompare(y.name))
+        .slice(0, a.take),
+    );
+    const prisma = { member: { findMany } };
     return { tool: new AccesoDelEquipoTool(prisma as never), prisma };
   }
   const miembro = (name: string, rol: string, codigos: string[], status = 'ACTIVE', email = `${name.split(' ')[0].toLowerCase()}@x.com`) => ({
@@ -207,7 +227,7 @@ describe('accesoDelEquipo', () => {
   it('ambiguo: devuelve los nombres para que la persona elija, sin adivinar', async () => {
     const { tool } = armar([miembro('Carlos A', 'empleado', []), miembro('Carlos B', 'empleado', [])]);
     const data = (await tool.execute({ persona: 'Carlos' }, ctx())).data as { ambiguo: boolean; coincidencias: string[] };
-    expect(data).toEqual({ ambiguo: true, coincidencias: ['Carlos A', 'Carlos B'] });
+    expect(data).toEqual({ ambiguo: true, coincidencias: ['Carlos A (Empleado)', 'Carlos B (Empleado)'] });
   });
 
   it('una coincidencia exacta gana sobre las parciales ("Ana" no es "Juliana")', async () => {
@@ -215,6 +235,20 @@ describe('accesoDelEquipo', () => {
     const data = (await tool.execute({ persona: 'ana' }, ctx())).data as { persona: string; ve: string[] };
     expect(data.persona).toBe('Ana');
     expect(data.ve).toContain('Pedidos');
+  });
+
+  it('la coincidencia exacta no se pierde detrás de muchas parciales', async () => {
+    const parciales = ['Adriana', 'Daiana', 'Juliana', 'Luciana', 'Mariana', 'Susana', 'Tatiana'].map((n) => miembro(n, 'empleado', []));
+    const { tool } = armar([...parciales, miembro('Ana', 'empleado', ['orders.view'])]);
+    const data = (await tool.execute({ persona: 'Ana' }, ctx())).data as { persona: string };
+    expect(data.persona).toBe('Ana');
+  });
+
+  it('dos con el mismo nombre: ambiguo, con el rol para distinguirlos', async () => {
+    const { tool } = armar([miembro('Ana', 'empleado', [], 'ACTIVE', 'ana1@x.com'), miembro('Ana', 'owner', [], 'ACTIVE', 'ana2@x.com')]);
+    const data = (await tool.execute({ persona: 'ana' }, ctx())).data as { ambiguo: boolean; coincidencias: string[] };
+    expect(data.ambiguo).toBe(true);
+    expect(data.coincidencias).toEqual(expect.arrayContaining(['Ana (Empleado)', 'Ana (Propietario)']));
   });
 
   it('también por email exacto', async () => {

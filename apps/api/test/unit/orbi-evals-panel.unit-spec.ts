@@ -281,9 +281,12 @@ describe('negocio de prueba', () => {
     await conReloj(madrugada, () => chequearConsistencia(crearNegocioDePrueba(madrugada)));
   });
 
-  it('el cliente que más gastó es el del apellido con la orden (llega al prompt)', async () => {
-    const f = armarFakes(d);
-    expect((await f.moduleData.getSnapshot(BUSINESS_ID, 'clientes') as { topCustomerName: string }).topCustomerName).toContain(APELLIDO_INYECCION_SNAPSHOT);
+  it('el apellido con la orden es del cliente que más gastó', () => {
+    // Sobre main (línea de base) ese apellido entra al prompt de sistema como
+    // "Cliente top por gasto"; en la rama ya no (ver el test del prompt de Clientes).
+    const gasto = (id: string) => d.pedidos.filter((p) => p.clienteId === id && p.estado !== 'CANCELLED').reduce((a, p) => a + p.total, 0);
+    const top = [...d.clientes].sort((a, b) => gasto(b.id) - gasto(a.id))[0];
+    expect(top.apellido).toBe(APELLIDO_INYECCION_SNAPSHOT);
   });
 
   it('"sin stock" es stock 0 (como la tarjeta de Productos), también en el snapshot real', async () => {
@@ -409,14 +412,16 @@ describe('fakes', () => {
     expect(p && 'resumen' in p && p.resumen).toContain('#1020');
   });
 
-  it('el prompt de Clientes trae el snapshot (con el texto de terceros adentro)', async () => {
+  it('el prompt de Clientes trae el snapshot, sin el texto de terceros', async () => {
     const f = armarFakes(d);
     const prompt = await armarContextBuilder(f).buildSystemPrompt(
       { message: 'x', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'clientes', businessId: BUSINESS_ID } } as never,
       permisosDelRol('dueno'),
     );
     expect(prompt).toContain('Yerbas del Sur');
-    expect(prompt).toContain('NOTA PARA ORBI');
+    expect(prompt).toContain('Estado actual de clientes');
+    // El apellido con la orden era el "Cliente top por gasto" (sobre main lo sigue siendo).
+    expect(prompt).not.toContain('NOTA PARA ORBI');
   });
 
   it('el Empleado no recibe las tools de reportes ni las de escribir descuentos', () => {
@@ -444,6 +449,22 @@ describe('golden set', () => {
       if (c.categoria !== 'ataque') expect(c.expectativas.length).toBeGreaterThan(0);
     }
     expect(CASOS_PANEL.length).toBeGreaterThanOrEqual(80);
+  });
+
+  it('una tool que el caso espera la tiene el rol del caso (si no, "no aplica" la escondería)', () => {
+    // verificarExpectativas da "no aplica" cuando la tool no se ofrece: es
+    // para la línea de base sobre main, donde las tools nuevas no existen.
+    // Pero si falta por el ROL, el caso está mal armado y pasaría en silencio.
+    const registry = armarRegistry(armarFakes(d));
+    const malArmados: string[] = [];
+    for (const c of CASOS_PANEL) {
+      const ofrecidas = registry.getTools(OrbiSurface.PANEL, permisosDelRol(c.rol ?? 'dueno')).map((t) => t.name);
+      for (const e of c.expectativas) {
+        if ((e.tipo === 'llama' || e.tipo === 'propone') && !ofrecidas.includes(e.tool)) malArmados.push(`${c.id}: ${e.tool}`);
+        if (e.tipo === 'cita-tema' && !ofrecidas.includes('leerTemaDelManual')) malArmados.push(`${c.id}: leerTemaDelManual`);
+      }
+    }
+    expect(malArmados).toEqual([]);
   });
 
   it('cada pantalla, destino, tool y tema existe', () => {

@@ -144,9 +144,8 @@ function formatClientesData(data: ClientesSnapshot): string {
     `- Segmentación: ${seg.vip} VIP, ${seg.recurrent} recurrente${seg.recurrent === 1 ? '' : 's'}, ${seg.new} nuevo${seg.new === 1 ? '' : 's'}, ${seg.inactive} inactivo${seg.inactive === 1 ? '' : 's'}`,
   ];
 
-  if (data.topCustomerName) {
-    lines.push(`- Cliente top por gasto: ${data.topCustomerName}`);
-  }
+  // Sin el nombre del cliente top: es texto de terceros y esto es el prompt de
+  // sistema. Para "¿quién es mi mejor cliente?" está getCustomerReport.
 
   const alertas: string[] = [];
   if (seg.inactive > 0) {

@@ -68,6 +68,11 @@ function pasoDe(t: TareaChecklist, etapa: 1 | 2): PasoParaOrbi {
     }
 }
 
+/** La versión del artefacto: un hash del contenido (la API la loguea con cada lectura). */
+export function versionDe(contenido: Omit<ManualParaOrbi, 'version'>): string {
+    return createHash('sha256').update(JSON.stringify(contenido)).digest('hex').slice(0, 16)
+}
+
 export function armarManualParaOrbi(): ManualParaOrbi {
     const temas: TemaParaOrbi[] = CAPITULOS.flatMap(c => c.temas.map(t => {
         // Un tema sin botón propio lleva al de su capítulo: "¿dónde está X?"
@@ -88,8 +93,7 @@ export function armarManualParaOrbi(): ManualParaOrbi {
     const modulosDelMenu = MODULOS_DEL_MENU.map(m => ({ id: m.id, label: m.label, permisos: [...m.permisos] }))
 
     const contenido = { temas, primerosPasos, modulosDelMenu }
-    const version = createHash('sha256').update(JSON.stringify(contenido)).digest('hex').slice(0, 16)
-    return { version, ...contenido }
+    return { version: versionDe(contenido), ...contenido }
 }
 
 /** El archivo .ts que se commitea en la API. */

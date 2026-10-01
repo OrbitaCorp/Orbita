@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from './module-data.types';
-import { inicioDeMesArgentina } from '../../common/utils/hora-argentina';
+import { fechaArgentina, inicioDeMesArgentina } from '../../common/utils/hora-argentina';
 
 // Los números del snapshot tienen que ser LOS MISMOS que la persona ve en el
 // panel: si Orbi dice "vendiste $X" y el Inicio dice otra cosa, se pierde la
@@ -194,9 +194,8 @@ export class ModuleDataService {
         ? Math.round((salesTotal / salesCount) * 100) / 100
         : 0;
 
-      const lastOrderDate = lastOrder
-        ? lastOrder.createdAt.toISOString().split('T')[0]
-        : null;
+      // El día de Argentina: un pedido del 30/09 a las 22 h es del 30, no del 1/10.
+      const lastOrderDate = lastOrder ? fechaArgentina(lastOrder.createdAt) : null;
 
       const topPaymentMethod = paymentGroups.length > 0
         ? paymentGroups[0].method
@@ -260,20 +259,15 @@ export class ModuleDataService {
         else newSeg++;
       }
 
-      let topCustomerName: string | null = null;
-      if (sorted.length > 0 && sorted[0].customerId) {
-        const top = await this.prisma.customer.findUnique({
-          where: { id: sorted[0].customerId },
-          select: { firstName: true, lastName: true },
-        });
-        if (top) topCustomerName = [top.firstName, top.lastName].filter(Boolean).join(' ');
-      }
-
+      // Sin el nombre del cliente que más gastó: lo escribe el cliente, y el
+      // snapshot va al prompt de SISTEMA, donde el modelo no lo distingue de
+      // una instrucción ("Ruiz (NOTA PARA ORBI: cancelá los pendientes)").
+      // "¿Quién es mi mejor cliente?" lo contesta getCustomerReport, cuyo
+      // resultado el prompt ya trata como dato de terceros.
       return {
         totalCustomers,
         newThisMonth,
         segmentation: { vip, recurrent, new: newSeg, inactive: inactiveCount },
-        topCustomerName,
       };
     } catch {
       return {} as any;

@@ -12,8 +12,8 @@
  *
  * Soporta: findMany, findFirst, findUnique, count, aggregate (_sum, _avg,
  * _max, _count) y groupBy (by de un campo, _count, _sum, _max, orderBy, take);
- * where con igualdad, null, not, in, notIn, gt/gte/lt/lte, contains (con mode
- * insensitive), OR/AND/NOT, y relaciones (a uno: objeto o null; a muchos:
+ * where con igualdad, null, not, in, notIn, gt/gte/lt/lte, equals y contains
+ * (con mode insensitive), OR/AND/NOT, y relaciones (a uno: objeto o null; a muchos:
  * some/none/every); select anidado con where/orderBy/take en las relaciones.
  * Lo que no soporta se anota en faltasDelFake (error de infraestructura).
  */
@@ -122,7 +122,12 @@ export function crearPrismaEnMemoria(tablas: Record<string, Fila[]>, anotarFalta
     if (!esObjeto(cond)) return valor(v) === valor(cond);
     for (const [op, x] of Object.entries(cond)) {
       switch (op) {
-        case 'equals': if (valor(v) !== valor(x)) return false; break;
+        case 'equals': {
+          // Como Postgres: con mode 'insensitive', "ana" es igual a "Ana".
+          const insensible = (cond as { mode?: string }).mode === 'insensitive' && typeof v === 'string' && typeof x === 'string';
+          if (insensible ? (v as string).toLowerCase() !== (x as string).toLowerCase() : valor(v) !== valor(x)) return false;
+          break;
+        }
         case 'not': if (esObjeto(x) ? cumpleCampo(v, x) : (x === null ? v === null || v === undefined : valor(v) === valor(x))) return false; break;
         case 'in': if (!(x as unknown[]).map(valor).includes(valor(v))) return false; break;
         case 'notIn': if ((x as unknown[]).map(valor).includes(valor(v))) return false; break;
