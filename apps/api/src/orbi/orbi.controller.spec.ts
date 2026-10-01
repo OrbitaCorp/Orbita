@@ -1385,4 +1385,134 @@ describe('OrbiController', () => {
 
     expect(registry.getTools).not.toHaveBeenCalled();
   });
+  // Bug de producción (2026-09-30): "hazme un resumen de mi tienda de los
+  // últimos 7 días" respondía "Error procesando tu mensaje". Gemini 3.x pide
+  // varias tools EN PARALELO en una misma vuelta (getSalesReport +
+  // getProductReport) y solo la PRIMERA functionCall trae thoughtSignature.
+  // El controller devolvía cada call como su propio par assistant/tool, así
+  // que la segunda quedaba primera de su turno sin firma y Gemini cortaba con
+  // 400 INVALID_ARGUMENT ("Function call is missing a thought_signature").
+  // La regla de Gemini: todas las calls de la vuelta en UN solo assistant, en
+  // el orden en que llegaron, y después un tool por call en ese mismo orden.
+  describe('tool calls paralelas en una misma vuelta', () => {
+    const duenio = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'owner', permissions: [] as string[],
+    };
+
+    type Llamada = { name: string; arguments: Record<string, unknown> };
+
+    // Primera vuelta: dos tool_call (la primera con firma, la segunda sin,
+    // como las manda Gemini). Segunda vuelta: el texto final.
+    function llmConDosCalls(primera: Llamada, segunda: Llamada) {
+      const vistos: any[][] = [];
+      let vuelta = 0;
+      mockLlm.streamChat = async function* (req: { messages: any[] }) {
+        // Copia de cada mensaje: el controller sigue empujando al mismo array.
+        vistos.push(req.messages.map(m => ({ ...m })));
+        vuelta += 1;
+        if (vuelta === 1) {
+          yield { type: 'tool_call' as const, call: { id: 'c1', ...primera, thoughtSignature: 'sig-1' } };
+          yield { type: 'tool_call' as const, call: { id: 'c2', ...segunda } };
+          yield { type: 'done' as const };
+        } else {
+          yield { type: 'text' as const, chunk: 'Resumen listo.' };
+          yield { type: 'done' as const };
+        }
+      } as any;
+      return vistos;
+    }
+
+    // Lo que la vuelta 1 le agregó al historial que ve la vuelta 2.
+    const agregados = (vistos: any[][]) => vistos[1].slice(vistos[0].length);
+
+    const eventos = (res: MockResponse) =>
+      res.chunks.map(c => /^event: (\w+)/.exec(c)?.[1]).filter(Boolean);
+
+    it('panel: dos lecturas van en UN assistant con las dos calls (la primera con su firma) y dos tool en orden', async () => {
+      registry.getTools.mockReturnValue([{ name: 'getSalesReport' }, { name: 'getProductReport' }]);
+      const ventas = { success: true, label: 'Ventas', data: { total: 100 } };
+      const productos = { success: true, label: 'Productos', data: { top: ['Remera'] } };
+      registry.execute.mockImplementation(async (n: string) => (n === 'getSalesReport' ? ventas : productos));
+      const vistos = llmConDosCalls(
+        { name: 'getSalesReport', arguments: { days: 7 } },
+        { name: 'getProductReport', arguments: { days: 7 } },
+      );
+
+      const res = createMockResponse();
+      await controller.chat({ message: 'resumen de 7 días', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+
+      expect(vistos).toHaveLength(2);
+      expect(agregados(vistos)).toEqual([
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'c1', name: 'getSalesReport', arguments: { days: 7 }, thoughtSignature: 'sig-1' },
+            { id: 'c2', name: 'getProductReport', arguments: { days: 7 } },
+          ],
+        },
+        { role: 'tool', content: JSON.stringify(ventas), toolCallId: 'c1' },
+        { role: 'tool', content: JSON.stringify(productos), toolCallId: 'c2' },
+      ]);
+      // La segunda call no inventa una firma que Gemini no mandó.
+      expect(agregados(vistos)[0].toolCalls[1].thoughtSignature).toBeUndefined();
+      // Los eventos al front no cambian: cada tool se ejecuta y se anuncia al llegar
+      // (el panel arranca con el id de la conversación).
+      expect(eventos(res)).toEqual(['conversation', 'action_start', 'action_complete', 'action_start', 'action_complete', 'text', 'done']);
+      expect(registry.execute.mock.calls.map(c => c[0])).toEqual(['getSalesReport', 'getProductReport']);
+    });
+
+    it('panel: una propuesta de escritura y una lectura en la misma vuelta van en el mismo lote', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }, { name: 'listProducts' }]);
+      registry.proponer.mockImplementation(async (n: string) => (n === 'createCoupon' ? { resumen: 'Crear el cupón "VERANO"' } : null));
+      const lectura = { success: true, label: 'Productos' };
+      registry.execute.mockResolvedValue(lectura);
+      const vistos = llmConDosCalls(
+        { name: 'createCoupon', arguments: { code: 'VERANO' } },
+        { name: 'listProducts', arguments: {} },
+      );
+
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hacé un cupón y listame productos', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+
+      const nuevos = agregados(vistos);
+      expect(nuevos.map(m => m.role)).toEqual(['assistant', 'tool', 'tool']);
+      expect(nuevos[0].toolCalls).toEqual([
+        { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' }, thoughtSignature: 'sig-1' },
+        { id: 'c2', name: 'listProducts', arguments: {} },
+      ]);
+      expect(nuevos[1].toolCallId).toBe('c1');
+      expect(JSON.parse(nuevos[1].content).estado).toBe('pendiente_de_confirmacion');
+      expect(nuevos[2]).toEqual({ role: 'tool', content: JSON.stringify(lectura), toolCallId: 'c2' });
+      expect(eventos(res)).toEqual(['conversation', 'action_pending', 'action_start', 'action_complete', 'text', 'done']);
+      expect(registry.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('wizard: dos calls en la misma vuelta también van en un solo assistant', async () => {
+      registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }, { name: 'getWizardHint' }]);
+      registry.execute.mockImplementation(async (n: string) => ({ success: true, label: n }));
+      const vistos = llmConDosCalls(
+        { name: 'selectWizardOption', arguments: { option: 'tienda' } },
+        { name: 'getWizardHint', arguments: {} },
+      );
+
+      const res = createMockResponse();
+      await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, res as any);
+
+      expect(agregados(vistos)).toEqual([
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'c1', name: 'selectWizardOption', arguments: { option: 'tienda' }, thoughtSignature: 'sig-1' },
+            { id: 'c2', name: 'getWizardHint', arguments: {} },
+          ],
+        },
+        { role: 'tool', content: JSON.stringify({ success: true, label: 'selectWizardOption' }), toolCallId: 'c1' },
+        { role: 'tool', content: JSON.stringify({ success: true, label: 'getWizardHint' }), toolCallId: 'c2' },
+      ]);
+      expect(eventos(res)).toEqual(['action_start', 'action_complete', 'action_start', 'action_complete', 'text', 'done']);
+    });
+  });
 });

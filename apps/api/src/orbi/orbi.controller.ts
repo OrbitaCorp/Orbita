@@ -5,7 +5,7 @@ import { Response } from 'express';
 import { randomUUID } from 'crypto';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
-import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
+import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmToolCall, type LlmUsage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
@@ -40,6 +40,41 @@ const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';
 // (demo, sin permiso, fuera del panel). Fijo y sin detalles.
 const ESCRITURA_NO_DISPONIBLE = 'No podés hacer esa acción desde acá: no tenés permiso o no está disponible.';
 const ESCRITURA_EN_DEMO = 'En la demo no se pueden hacer cambios';
+
+/**
+ * Junta las tool calls de UNA vuelta del modelo y sus resultados, para
+ * devolverlos al historial todos juntos cuando la vuelta termina.
+ *
+ * Gemini 3.x pide varias tools en paralelo en una misma vuelta (ej.
+ * getSalesReport + getProductReport para "resumen de los últimos 7 días") y
+ * solo la PRIMERA functionCall trae thoughtSignature. Si cada call vuelve como
+ * su propio par assistant/tool, la segunda queda primera de su turno sin firma
+ * y Gemini rechaza el request entero con 400 INVALID_ARGUMENT ("Function call
+ * is missing a thought_signature"): el usuario ve "Error procesando tu
+ * mensaje". La regla de Gemini es UN turno del modelo con todas las calls en
+ * el orden en que llegaron (cada una con la firma tal cual vino) y después las
+ * respuestas en ese mismo orden. Por eso: un solo assistant con todas las
+ * calls y un tool por call; GeminiAdapter une los tool consecutivos en un solo
+ * content con todos los functionResponse, y para Groq es el formato nativo.
+ *
+ * Las tools se siguen ejecutando (o proponiendo) apenas llega cada call, con
+ * los mismos eventos al front: lo único que se difiere es el armado del
+ * historial.
+ */
+function vueltaDeTools() {
+  const calls: LlmToolCall[] = [];
+  const resultados: LlmMessage[] = [];
+  return {
+    responder(call: LlmToolCall, content: string) {
+      calls.push({ id: call.id, name: call.name, arguments: call.arguments, thoughtSignature: call.thoughtSignature });
+      resultados.push({ role: 'tool', content, toolCallId: call.id });
+    },
+    volcarEn(messages: LlmMessage[]) {
+      if (!calls.length) return;
+      messages.push({ role: 'assistant', content: '', toolCalls: calls }, ...resultados);
+    },
+  };
+}
 
 // Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
 // (miembro readOnly, ver demo/demo-ia.ts). Va al final del prompt de
@@ -334,6 +369,9 @@ export class OrbiController {
         continueLoop = false;
         let textoVuelta = '';
         let resetEnviado = false;
+        // Las calls de esta vuelta vuelven al historial juntas, al terminar
+        // el stream (ver vueltaDeTools: tool calls paralelas de Gemini).
+        const vuelta = vueltaDeTools();
         for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo, signal: corte.signal })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
@@ -379,16 +417,7 @@ export class OrbiController {
             // motivo como resultado fallido de la tool, para corregir los
             // argumentos o contarle a la persona qué faltó.
             if (propuesta && 'error' in propuesta) {
-              messages.push({
-                role: 'assistant',
-                content: '',
-                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-              });
-              messages.push({
-                role: 'tool',
-                content: JSON.stringify({ success: false, error: propuesta.error }),
-                toolCallId: event.call.id,
-              });
+              vuelta.responder(event.call, JSON.stringify({ success: false, error: propuesta.error }));
               continueLoop = true;
               continue;
             }
@@ -397,16 +426,7 @@ export class OrbiController {
             // surface) NO se ejecuta directo: solo /orbi/confirm escribe. El
             // modelo recibe el fallo, igual que con un { error }.
             if (!propuesta && this.toolRegistry.requiereConfirmacion(event.call.name)) {
-              messages.push({
-                role: 'assistant',
-                content: '',
-                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-              });
-              messages.push({
-                role: 'tool',
-                content: JSON.stringify({ success: false, error: esDemo ? ESCRITURA_EN_DEMO : ESCRITURA_NO_DISPONIBLE }),
-                toolCallId: event.call.id,
-              });
+              vuelta.responder(event.call, JSON.stringify({ success: false, error: esDemo ? ESCRITURA_EN_DEMO : ESCRITURA_NO_DISPONIBLE }));
               continueLoop = true;
               continue;
             }
@@ -437,21 +457,12 @@ export class OrbiController {
               // que falló: si le decimos que falló, reintenta en loop; si le
               // decimos que salió bien, le cuenta al usuario que ya está hecho
               // cuando todavía no apretó nada.
-              messages.push({
-                role: 'assistant',
-                content: '',
-                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-              });
-              messages.push({
-                role: 'tool',
-                content: JSON.stringify({
-                  estado: 'pendiente_de_confirmacion',
-                  mensaje:
-                    'La acción NO se ejecutó todavía. El usuario tiene en pantalla un botón para confirmarla. ' +
-                    'Contale en una línea qué va a pasar si lo aprieta. No digas que ya está hecho.',
-                }),
-                toolCallId: event.call.id,
-              });
+              vuelta.responder(event.call, JSON.stringify({
+                estado: 'pendiente_de_confirmacion',
+                mensaje:
+                  'La acción NO se ejecutó todavía. El usuario tiene en pantalla un botón para confirmarla. ' +
+                  'Contale en una línea qué va a pasar si lo aprieta. No digas que ya está hecho.',
+              }));
               continueLoop = true;
               continue;
             }
@@ -466,16 +477,7 @@ export class OrbiController {
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 
-            messages.push({
-              role: 'assistant',
-              content: '',
-              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-            });
-            messages.push({
-              role: 'tool',
-              content: JSON.stringify(result),
-              toolCallId: event.call.id,
-            });
+            vuelta.responder(event.call, JSON.stringify(result));
             continueLoop = true;
           } else if (event.type === 'usage') {
             // Se suma aunque el cliente ya se haya ido: la llamada se factura.
@@ -493,6 +495,9 @@ export class OrbiController {
             }
           }
         }
+        // Terminó el stream de la vuelta: recién ahora sus calls y resultados
+        // entran al historial, todos en un solo turno del modelo.
+        vuelta.volcarEn(messages);
       }
 
       // Una respuesta cortada no se guarda: queda el `user` sin respuesta, que
@@ -839,6 +844,7 @@ export class OrbiController {
         continueLoop = false;
         let textoVuelta = '';
         let resetEnviado = false;
+        const vuelta = vueltaDeTools();
         for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido, signal: corte.signal })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
@@ -860,16 +866,7 @@ export class OrbiController {
             // día una la declara por error, igual no se ejecuta acá: el modelo
             // recibe el fallo, como en el panel.
             if (this.toolRegistry.requiereConfirmacion(event.call.name)) {
-              messages.push({
-                role: 'assistant',
-                content: '',
-                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-              });
-              messages.push({
-                role: 'tool',
-                content: JSON.stringify({ success: false, error: ESCRITURA_NO_DISPONIBLE }),
-                toolCallId: event.call.id,
-              });
+              vuelta.responder(event.call, JSON.stringify({ success: false, error: ESCRITURA_NO_DISPONIBLE }));
               continueLoop = true;
               continue;
             }
@@ -882,12 +879,7 @@ export class OrbiController {
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 
-            messages.push({
-              role: 'assistant',
-              content: '',
-              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
-            });
-            messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
+            vuelta.responder(event.call, JSON.stringify(result));
             continueLoop = true;
           } else if (event.type === 'usage') {
             modeloReportado = event.usage.model;
@@ -906,6 +898,9 @@ export class OrbiController {
             }
           }
         }
+        // Mismo motivo que en el panel: las calls paralelas de la vuelta
+        // vuelven al historial en un solo turno del modelo.
+        vuelta.volcarEn(messages);
       }
     } catch (error) {
       // Cortado por el cliente: ni log de error ni evento (no hay a quién).
