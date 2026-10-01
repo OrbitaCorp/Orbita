@@ -402,8 +402,8 @@ export const CAPITULOS: Capitulo[] = [
             id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
             bloques: [
                 { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
-                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[+ Agregar característica]], en el orden en que querés que aparezcan.' },
-                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link [[Ver más detalles →]] que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
+                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[Agregar especificación]], en el orden en que querés que aparezcan.' },
+                { tipo: 'parrafo', texto: 'En la tienda se ven en una sección propia, **"Características"**, debajo de los botones de compra y a todo el ancho: completas y en dos columnas, sin importar cuántas cargues.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Si no cargás ninguna, la sección de Características directamente no aparece en la tienda: no hay nada genérico que rellenar de más.' },
             ],
         },
