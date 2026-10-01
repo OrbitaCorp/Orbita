@@ -24,4 +24,5 @@ Antes de terminar:
 
 Si sumaste una tool de Orbi, revisá también la lista de solo lectura y el invariante 3 de
 `apps/api/src/orbi/tools/tool-catalog.spec.ts`, y registrala en las evals
-(`apps/api/test/evals/panel/fakes.ts`, `TOOLS_DEL_PANEL`).
+(su fábrica en `FABRICAS` de `apps/api/test/evals/panel/fakes.ts` y su nombre en
+`NOMBRES_DE_TOOLS_DEL_PANEL` de `reglas.ts`; los tests de las evals fallan si falta alguna).

@@ -102,7 +102,7 @@ Archivo: `apps/api/src/orbi/tools/definitions/manual.tools.ts` (+ spec).
   `label` = la etiqueta del destino ("Abrir Envíos").
 - Un id que no existe se informa y se loguea, saneado (`[a-z0-9-]`, 40 caracteres): señal de
   producción de §3.6 capa 4.
-- Se registra en `OrbiModule` (y en `TOOLS_DEL_PANEL` de las evals).
+- Se registra en `OrbiModule` (y en las evals: `FABRICAS` de `fakes.ts` y `NOMBRES_DE_TOOLS_DEL_PANEL` de `reglas.ts`).
 
 ### 6. API: tools de estado
 

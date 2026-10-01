@@ -342,6 +342,14 @@ describe('fakes', () => {
     expect(enElRegistry).toEqual(expect.arrayContaining(['NavigationTool', 'LeerTemaDelManualTool', 'GetResumenDelPeriodoTool']));
   });
 
+  it('la regla sin-nombres-internos conoce todas las tools registradas', () => {
+    // Una tool nueva que no está en la lista podría aparecer por nombre en la
+    // respuesta sin que ninguna eval lo marque.
+    const registry = armarRegistry(armarFakes(d));
+    const nombres = [...(registry as unknown as { tools: Map<string, { name: string }> }).tools.values()].map((t) => t.name);
+    expect(nombres.filter((n) => !NOMBRES_DE_TOOLS_DEL_PANEL.includes(n))).toEqual([]);
+  });
+
   it('el snapshot es el de ModuleDataService REAL, sobre la Prisma en memoria', async () => {
     faltasDelFake.length = 0;
     const f = armarFakes(d);

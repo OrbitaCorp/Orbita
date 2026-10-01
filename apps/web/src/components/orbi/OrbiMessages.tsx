@@ -396,6 +396,7 @@ const FRASE_POR_TOOL: Record<string, string> = {
   getSalesReport: 'Sacando los números',
   getProductReport: 'Sacando los números',
   getCustomerReport: 'Sacando los números',
+  getResumenDelPeriodo: 'Sacando los números',
   leerTemaDelManual: 'Leyendo el manual',
   estadoPrimerosPasos: 'Revisando tus primeros pasos',
   accesoDelEquipo: 'Revisando los permisos del equipo',
