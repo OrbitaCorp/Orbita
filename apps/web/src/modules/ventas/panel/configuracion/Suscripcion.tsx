@@ -67,13 +67,16 @@ const ESTADO_META: Record<string, { label: string; color: string; bg: string }> 
 // plan que YA NO se ofrece en el alta (ver StartPendingCheckoutDto) pero sigue
 // disponible acá — es el que arma "Activar Avanzado" más abajo, y cualquier
 // cliente puede pasarse a él (o salir) como cualquier otro cambio de plan.
-const PLANES: Record<PlanKey, { nombre: string; precioMes: number; total: number | null; periodo: string }> = {
-    mensual:           { nombre: 'Mensual',             precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
-    semestral:         { nombre: 'Semestral',           precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
-    anual:             { nombre: 'Anual',               precioMes: 13000, total: 156000, periodo: 'por año' },
-    mensualAvanzado:   { nombre: 'Mensual + Avanzado',   precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
-    semestralAvanzado: { nombre: 'Semestral + Avanzado', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
-    anualAvanzado:     { nombre: 'Anual + Avanzado',     precioMes: 17083, total: 205000, periodo: 'por año' },
+// `nombre` es el nombre completo (paquete · período), el que se usa en las frases;
+// `corto` es solo el período, para las filas del selector, que ya están agrupadas
+// por paquete (Base / Base + Avanzado, como en el wizard de alta).
+const PLANES: Record<PlanKey, { nombre: string; corto: string; precioMes: number; total: number | null; periodo: string }> = {
+    mensual:           { nombre: 'Base · mensual',               corto: 'Mensual',   precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
+    semestral:         { nombre: 'Base · semestral',             corto: 'Semestral', precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
+    anual:             { nombre: 'Base · anual',                 corto: 'Anual',     precioMes: 13000, total: 156000, periodo: 'por año' },
+    mensualAvanzado:   { nombre: 'Base + Avanzado · mensual',    corto: 'Mensual',   precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
+    semestralAvanzado: { nombre: 'Base + Avanzado · semestral',  corto: 'Semestral', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
+    anualAvanzado:     { nombre: 'Base + Avanzado · anual',      corto: 'Anual',     precioMes: 17083, total: 205000, periodo: 'por año' },
 }
 const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
 
@@ -109,33 +112,46 @@ function formatFecha(iso: string | null): string {
 // Selector compacto de plan — mismo uso en dos lugares (elegir el próximo
 // plan durante el beneficio, y pedir un cambio con un plan ya activo), así
 // que queda de una vez como pieza chica en vez de duplicar el markup.
-function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey; onElegir: (p: PlanKey) => void; disabled?: boolean }) {
+function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey | null; onElegir: (p: PlanKey) => void; disabled?: boolean }) {
+    // Dos grupos, para que se entienda qué cambia entre uno y otro: Base, o Base
+    // más el paquete Avanzado. Cada grupo arranca con su título.
+    const TITULOS: Partial<Record<PlanKey, string>> = {
+        mensual: 'Base',
+        mensualAvanzado: 'Base + Avanzado — suma juegos, modales, 2x1, fondo con IA y más',
+    }
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div role="radiogroup" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {PLAN_KEYS.map(key => {
                 const p = PLANES[key]
                 const activo = key === valor
+                const titulo = TITULOS[key]
                 return (
-                    <button
-                        key={key}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onElegir(key)}
-                        className="ds-hover"
-                        style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                            width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
-                            padding: '9px 12px', borderRadius: 10,
-                            border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                            background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                            opacity: disabled && !activo ? 0.55 : 1,
-                        }}
-                    >
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.nombre}</span>
-                        <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                            {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
-                        </span>
-                    </button>
+                    <div key={key} style={{ display: 'contents' }}>
+                        {titulo && (
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body)', margin: key === 'mensual' ? '0 0 0' : '8px 0 0' }}>{titulo}</div>
+                        )}
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked={activo}
+                            disabled={disabled}
+                            onClick={() => onElegir(key)}
+                            className="ds-hover"
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                                width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                                padding: '9px 12px', borderRadius: 10,
+                                border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                opacity: disabled && !activo ? 0.55 : 1,
+                            }}
+                        >
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.corto}</span>
+                            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
+                            </span>
+                        </button>
+                    </div>
                 )
             })}
         </div>
@@ -451,13 +467,18 @@ export default function Suscripcion() {
                                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px' }}>
                                     {suspendida
                                         ? 'Tu panel sigue funcionando en modo solo lectura — podés ver todo, pero para volver a editar y que tu tienda sea visible de nuevo hay que activar tu plan.'
-                                        : planMostrado
-                                            ? `Activá el plan ${PLANES[planMostrado].nombre} (${fmtPesos(PLANES[planMostrado].precioMes)}${PLANES[planMostrado].total ? '/mes' : ` · ${PLANES[planMostrado].periodo}`}) para seguir usando Órbita sin cortes.`
-                                            : 'Activá tu plan para seguir usando Órbita sin cortes.'}
+                                        : 'Para seguir usando Órbita sin cortes, elegí tu plan y activalo.'}
                                     {diasDeGracia !== null && (
                                         <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                                     )}
                                 </p>
+                                {/* Elegir el plan acá mismo: antes solo se podía con el período
+                                    vigente, y quien llegaba con el Avanzado guardado no tenía
+                                    cómo volver a Base. */}
+                                <div style={{ margin: '0 0 14px' }}>
+                                    <SelectorPlan valor={planMostrado} onElegir={p => void elegirPlan(p)} disabled={guardandoPlan || activando} />
+                                    {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '8px 0 0' }}>{errorPlan}</p>}
+                                </div>
                                 <CodigoDescuento
                                     descuento={descuento}
                                     onAplicado={setDescuento}
@@ -465,8 +486,8 @@ export default function Suscripcion() {
                                     disabled={activando}
                                 />
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
-                                <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
-                                    {activando ? 'Abriendo Mercado Pago…' : `Activar mi plan${planMostrado ? ` ${PLANES[planMostrado].nombre}` : ''}`}
+                                <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando || guardandoPlan || !planMostrado} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
+                                    {activando ? 'Abriendo Mercado Pago…' : planMostrado ? `Activar ${PLANES[planMostrado].nombre}` : 'Activar mi plan'}
                                 </Button>
                             </div>
                         )}
