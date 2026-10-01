@@ -48,18 +48,15 @@ function formatDashboardData(data: DashboardSnapshot): string {
     alertas.push(`- ⚠ ${data.unreadMessages} mensaje${data.unreadMessages === 1 ? '' : 's'} sin leer`);
   }
 
-  const variacion = data.salesLastMonth.count > 0
-    ? Math.round(((data.salesThisMonth.total - data.salesLastMonth.total) / data.salesLastMonth.total) * 100)
-    : null;
-
-  const variacionTexto = variacion !== null
-    ? ` (${variacion >= 0 ? '+' : ''}${variacion}% vs. mes anterior)`
-    : '';
-
+  // Antes iba un "+X% vs. mes anterior" que comparaba el mes en curso (a
+  // medias) contra el anterior completo: el 1° del mes siempre daba -100% y
+  // Orbi lo repetía como una caída. Van los dos números, cada uno con su
+  // período, y la comparación la hace el modelo sabiendo eso.
   const lines = [
     `## Estado actual del negocio`,
-    `- Ventas del mes: ${fmtArs(data.salesThisMonth.total)} en ${data.salesThisMonth.count} pedido${data.salesThisMonth.count === 1 ? '' : 's'}${variacionTexto}`,
-    `- Ticket promedio: ${fmtArs(data.salesThisMonth.avgTicket)}`,
+    `- Ventas del mes en curso (todavía no terminó): ${fmtArs(data.salesThisMonth.total)} en ${data.salesThisMonth.count} pedido${data.salesThisMonth.count === 1 ? '' : 's'}`,
+    `- Mes anterior completo: ${fmtArs(data.salesLastMonth.total)} en ${data.salesLastMonth.count} pedido${data.salesLastMonth.count === 1 ? '' : 's'}`,
+    `- Ticket promedio del mes en curso: ${fmtArs(data.salesThisMonth.avgTicket)}`,
     `- Pedidos cancelados este mes: ${data.cancelledThisMonth}`,
     `- Catálogo: ${data.totalProducts} producto${data.totalProducts === 1 ? '' : 's'}`,
     `- Clientes: ${data.totalCustomers} totales, ${data.newCustomersThisMonth} nuevo${data.newCustomersThisMonth === 1 ? '' : 's'} este mes`,
@@ -230,11 +227,17 @@ ${DASHBOARD_KNOWLEDGE}
 El usuario está en el Dashboard — la vista general de su negocio.
 
 ## Herramientas que tenés
-- getSalesReport: reporte detallado de ventas con comparación mes a mes.
-- getProductReport: productos más vendidos, sin rotación y stock crítico.
+- getSalesReport: reporte detallado de ventas del mes en curso contra el mes anterior (no acepta otros períodos).
+- getProductReport: productos más vendidos, sin rotación y stock crítico. Acepta days (por ejemplo 7 para la última semana).
 - getCustomerReport: segmentación de clientes (VIP, recurrente, nuevo, inactivo).
 
-Si el usuario solo saluda o pregunta "cómo va todo", no le preguntes qué necesita: ofrecé directamente un resumen con los datos que ya tenés y preguntá si quiere profundizar en algo.${datosBlock}`;
+Si el usuario solo saluda o pregunta "cómo va todo", no le preguntes qué necesita: ofrecé directamente un resumen con los datos que ya tenés y preguntá si quiere profundizar en algo.
+
+## Cómo armar un resumen
+- Usá las cifras exactas de "Estado actual del negocio", tal cual vienen: nada de "aproximadamente" ni redondeos propios. Si ese bloque no está, no inventes números: pedilos a las herramientas o decí que no los tenés.
+- Cerrá con una conclusión corta y una recomendación concreta (una o dos líneas) que salga de esos números.
+- Las ventas que tenés son del mes en curso (todavía no terminó) y del mes anterior completo. Si los comparás, aclaralo; no digas que vendió menos solo porque el mes recién empieza.
+- Si te piden otro período (la última semana, los últimos 7 días, el año), decí que los totales de ventas que tenés son por mes y que el detalle está en Reportes. Para productos de ese período usá getProductReport con days. No sumes pedidos de listOrders para sacar las ventas de un período: trae como mucho 20 y el total sale mal.${datosBlock}`;
 }
 
 function catalogo(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {

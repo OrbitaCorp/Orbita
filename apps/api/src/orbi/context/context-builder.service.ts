@@ -6,6 +6,7 @@ import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../prompts/core';
 import { getWizardPrompt } from '../prompts/wizard';
 import { getPanelPrompt } from '../prompts/panel';
+import { resolverModuloDelPanel } from '../navegacion/modulo-de-orbi';
 
 // Permiso que hace falta para meterle al prompt el snapshot de cada módulo. Es
 // el mismo que exige la pantalla equivalente por HTTP: el snapshot son números
@@ -56,14 +57,22 @@ export class ContextBuilderService {
         } catch { /* non-critical */ }
       }
 
-      const permisoNecesario = dto.context.module ? PERMISO_DEL_SNAPSHOT[dto.context.module] : undefined;
-      const moduleSnapshot = dto.context.businessId && dto.context.module && permisoNecesario && permisos.includes(permisoNecesario)
-        ? await this.moduleData.getSnapshot(dto.context.businessId, dto.context.module)
+      // El panel manda module 'ventas' y la pantalla en section: sin esta
+      // traducción ninguna pantalla recibía su capa ni su snapshot. El permiso
+      // se busca con el módulo YA resuelto, así que llegar por section no
+      // saltea el gate.
+      const { modulo, seccion } = resolverModuloDelPanel(dto.context.module, dto.context.section);
+
+      const permisoNecesario = modulo && Object.prototype.hasOwnProperty.call(PERMISO_DEL_SNAPSHOT, modulo)
+        ? PERMISO_DEL_SNAPSHOT[modulo]
+        : undefined;
+      const moduleSnapshot = dto.context.businessId && modulo && permisoNecesario && permisos.includes(permisoNecesario)
+        ? await this.moduleData.getSnapshot(dto.context.businessId, modulo)
         : {};
 
       layers.push(getPanelPrompt(
-        dto.context.module,
-        dto.context.section,
+        modulo,
+        seccion,
         businessInfo,
         moduleSnapshot,
       ));
