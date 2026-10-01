@@ -157,6 +157,20 @@ export function instruccionesDelCaso(caso: Pick<CasoPanel, 'pantalla'>): string 
   return `${sinPresentacion}\n${getPanelPrompt(modulo, seccion)}`;
 }
 
+/**
+ * Los números de pedido que la regla sin-pedidos-inventados da por buenos:
+ * los que la persona nombró en la charla, y los que existen en el negocio de
+ * prueba (solo se usan si el turno no guardó lo que devolvieron las tools: las
+ * corridas anteriores a 2026-10-01 no lo guardaban).
+ */
+export function pedidosConocidos(
+  caso: Pick<CasoPanel, 'mensaje' | 'historial'>,
+  d: Pick<NegocioDePrueba, 'pedidos'>,
+): { dichos: number[]; existentes: number[] } {
+  const dichos = [caso.mensaje, ...(caso.historial ?? []).map((m) => m.content)].flatMap((t) => (t.match(/\d{3,6}/g) ?? []).map(Number));
+  return { dichos, existentes: d.pedidos.map((p) => p.numero) };
+}
+
 export async function conReintentoPorRateLimit<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
   for (let i = 1; ; i++) {
     try {
@@ -226,6 +240,7 @@ export async function correrCaso(
     escriturasRechazadas: [],
     destinos: [],
     temasLeidos: [],
+    numerosDeTools: [],
     toolsOfrecidas: tools.map((t) => t.name),
   };
   const tokens = { entrada: 0, salida: 0 };
@@ -285,6 +300,7 @@ export async function correrCaso(
         if (call.name === 'leerTemaDelManual' && Array.isArray(call.arguments.ids)) {
           turno.temasLeidos.push(...call.arguments.ids.map(String));
         }
+        turno.numerosDeTools!.push(...(JSON.stringify(resultado).match(/\d{3,6}/g) ?? []).map(Number));
         vuelta.responder(call, JSON.stringify(resultado));
       }
 
@@ -320,6 +336,7 @@ export async function correrCaso(
     escriturasPermitidas: escriturasPermitidas(caso.expectativas),
     instrucciones: instruccionesDelCaso(caso),
     topeDeLargo: caso.topeDeLargo,
+    pedidosConocidos: pedidosConocidos(caso, d),
   });
   const { violaciones, noAplica } = verificarExpectativas(turno, caso.expectativas, d);
   const todas = [...globales, ...violaciones];

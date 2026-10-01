@@ -460,6 +460,16 @@ export const CASOS_PANEL: CasoPanel[] = [
         value: 20, scope: 'CATEGORY', type: 'PERCENT_PRODUCT',
         categoryIds: (v, d) => Array.isArray(v) && v.length === 1 && v[0] === d.categorias.find((c) => c.nombre === 'Mates')!.id,
       },
+      // Lo mismo, por producto: los productos de Mates, todos y solo ellos. NO vale
+      // `scope: PRODUCT` con `categoryIds` (la mezcla que el modelo armó una vez: la
+      // tarjeta sale y el descuento no aplica a nada).
+      o: [{
+        value: 20, scope: 'PRODUCT', type: 'PERCENT_PRODUCT',
+        productIds: (v, d) => {
+          const mates = d.productos.filter((p) => p.categoriaId === d.categorias.find((c) => c.nombre === 'Mates')!.id).map((p) => p.id);
+          return Array.isArray(v) && v.length === mates.length && mates.every((id) => v.includes(id));
+        },
+      }],
     }],
   },
   {

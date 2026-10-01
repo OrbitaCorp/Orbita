@@ -4,7 +4,7 @@
  *
  *   pnpm test:evals:panel                              # todo
  *   pnpm test:evals:panel -- --caso=cupon              # ids que contengan "cupon"
- *   pnpm test:evals:panel -- --categoria=ataque        # una categoría
+ *   pnpm test:evals:panel -- --categoria=ataque        # una categoría (o varias: accion,permisos)
  *   pnpm test:evals:panel -- --repeticiones=3          # cada caso N veces, marca inestables
  *   pnpm test:evals:panel -- --salida=base.json        # guarda la corrida
  *   pnpm test:evals:panel -- --comparar=base.json      # compara contra una corrida guardada
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
 
   const casos = CASOS_PANEL
     .filter((c) => !filtro || c.id.includes(filtro))
-    .filter((c) => !categoria || c.categoria === categoria);
+    .filter((c) => !categoria || categoria.split(',').includes(c.categoria));
   if (!casos.length) {
     console.error('Ningún caso matchea ese filtro.');
     process.exit(1);
