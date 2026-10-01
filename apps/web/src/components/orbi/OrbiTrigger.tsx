@@ -26,13 +26,7 @@ export function OrbiTrigger({ collapsed }: Props) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-        display: 'grid', placeItems: 'center', flexShrink: 0,
-      }}>
-        <OrbiIcon size={15} color="white" />
-      </div>
+      <OrbiIcon size={28} disc />
 
       {!collapsed && (
         <>

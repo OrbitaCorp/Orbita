@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { SquarePen, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
 import { useOrbiContext } from './useOrbiContext'
@@ -9,10 +9,13 @@ import { OrbiInput } from './OrbiInput'
 import { OrbiBottomSheet } from './OrbiBottomSheet'
 import { useMediaQuery } from './useMediaQuery'
 import { track } from '@/lib/analytics/wizardTracker'
+import { ID_PANEL_ORBI } from './types'
 
 export function OrbiPanel() {
   const isOpen = useOrbiStore(s => s.isOpen)
   const close = useOrbiStore(s => s.close)
+  const reset = useOrbiStore(s => s.reset)
+  const abortar = useOrbiStore(s => s.abortar)
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
   const isWizard = context.surface === 'wizard'
@@ -50,6 +53,7 @@ export function OrbiPanel() {
       />
 
       <div
+        id={ID_PANEL_ORBI}
         className="orbi-panel-root"
         style={{
           position: 'fixed',
@@ -74,12 +78,7 @@ export function OrbiPanel() {
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: '#3B82F6', display: 'grid', placeItems: 'center', flexShrink: 0,
-          }}>
-            <OrbiIcon size={17} color="white" />
-          </div>
+          <OrbiIcon size={30} disc />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (
@@ -88,6 +87,31 @@ export function OrbiPanel() {
               </div>
             )}
           </div>
+          {/* Solo en el panel: el wizard no guarda la conversación en el
+              servidor, así que ahí no hay hilo que reiniciar. reset() corta
+              lo que esté en curso y el saludo vuelve a aparecer. El alto
+              visible es 32px; el margen negativo extiende el área táctil a
+              44px sin agrandar el encabezado. */}
+          {!isWizard && (
+            <button
+              type="button"
+              onClick={reset}
+              aria-label="Nueva conversación con Orbi"
+              className="orbi-foco"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                minHeight: 44, margin: '-6px 0', padding: '0 6px',
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                borderRadius: 8, font: 'inherit', fontSize: 12, fontWeight: 600,
+                color: 'var(--color-muted)', whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)' }}
+            >
+              <SquarePen size={14} strokeWidth={2} aria-hidden />
+              Nueva conversación
+            </button>
+          )}
           <button
             onClick={close}
             aria-label="Cerrar Orbi"
@@ -111,6 +135,8 @@ export function OrbiPanel() {
         <OrbiInput
           onSend={(message) => send(message, context)}
           disabled={isStreaming}
+          streaming={isStreaming}
+          onStop={abortar}
         />
       </div>
 

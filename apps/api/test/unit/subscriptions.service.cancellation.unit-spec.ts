@@ -29,6 +29,8 @@ function makeService() {
         'stockMovement', 'discount', 'gameSession', 'message', 'conversation', 'review', 'emailLog',
         'auditLog', 'notification', 'orbiConversation', 'passwordResetToken', 'emailVerificationToken',
         'mpCredentials', 'address', 'customer',
+        // Orbi fase 1 (spec §3.11): la purga también borra estas tres tablas.
+        'orbiPendingAction', 'orbiTurn', 'dailyQuota',
       ].map((modelo) => [modelo, { updateMany: jest.fn(), deleteMany: jest.fn() }]),
     ),
     $transaction: jest.fn((arr: any[]) => Promise.all(arr.map((p) => (typeof p === 'function' ? p() : p)))),

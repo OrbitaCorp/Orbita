@@ -69,3 +69,6 @@ apps/api/CLAUDE.md
 # veces a mano (ver 5a4ff16c).
 package-lock.json
 apps/api/src/background-removal/models/birefnet*.onnx
+
+# Configuración personal de Claude Code (permisos, rutas de cada máquina): no se comparte.
+.claude/settings.local.json

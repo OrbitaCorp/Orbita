@@ -10,7 +10,7 @@ import { ImageStudioService } from './image-studio.service';
 import { GenerateBackgroundDto } from './dto/generate-background.dto';
 import { ListBackgroundStylesDto } from './dto/list-background-styles.dto';
 import { GenerateModelDto } from './dto/generate-model.dto';
-import { CuotaDiaria } from '../orbi/cuota-diaria';
+import { CuotaService } from '../common/cuota/cuota.service';
 import { BACKGROUND_STYLES, SIN_FONDO_KEY, BLANCO_LISO_KEY, NEGRO_LISO_KEY } from './background-styles';
 import { R2Service } from '../r2/r2.service';
 import { DemoIa } from '../demo/demo-ia';
@@ -18,8 +18,9 @@ import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
 // Cada generación es una llamada paga (hoy cae dentro del free tier de
 // Workers AI, pero eso puede cambiar) — mismo criterio que
-// AI_ASSIST_DIA_NEGOCIO en products.controller.ts: tope diario en memoria,
-// por negocio, para no depender solo del throttle global (20/min).
+// AI_ASSIST_DIA_NEGOCIO en common/cuota/limites.ts: tope diario compartido
+// (Postgres, ver CuotaService), por negocio, para no depender solo del
+// throttle global (20/min).
 export const IMAGE_STUDIO_DIA_NEGOCIO = 30;
 
 // Paquete "Avanzado" — mismo gate que games/promo-modal/two-for-one
@@ -29,11 +30,10 @@ export const IMAGE_STUDIO_DIA_NEGOCIO = 30;
 // generador de banners, etc. — ver resumen de la tarea).
 @Controller('image-studio')
 export class ImageStudioController {
-  private readonly cuota = new CuotaDiaria();
-
   constructor(
     private readonly imageStudio: ImageStudioService,
     private readonly r2: R2Service,
+    private readonly cuota: CuotaService,
   ) {}
 
   // Sin RequiresAddon a propósito: es solo el catálogo (metadata estática),
@@ -89,7 +89,7 @@ export class ImageStudioController {
     // `file` (foto pendiente, alta) o `dto.imageUrl` (foto ya guardada,
     // edición) — uno de los dos, ver comentario de ImageStudioService.
     if (!file && !dto.imageUrl) throw new BadRequestException('Falta el archivo "file" o "imageUrl"');
-    this.consumirCuota(member.businessId);
+    await this.consumirCuota(member.businessId);
     return this.imageStudio.generateBackground(
       member.businessId,
       file,
@@ -111,12 +111,12 @@ export class ImageStudioController {
   ) {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
-    this.consumirCuota(member.businessId);
+    await this.consumirCuota(member.businessId);
     return this.imageStudio.generateModelWearing(member.businessId, file, dto.descripcion);
   }
 
-  private consumirCuota(businessId: string): void {
-    if (!this.cuota.consumir(businessId, IMAGE_STUDIO_DIA_NEGOCIO)) {
+  private async consumirCuota(businessId: string): Promise<void> {
+    if (!(await this.cuota.consumir(`image-studio:${businessId}`, IMAGE_STUDIO_DIA_NEGOCIO))) {
       throw new ForbiddenException(`Límite diario de generación de imágenes alcanzado (${IMAGE_STUDIO_DIA_NEGOCIO}/día). Probá de nuevo mañana.`);
     }
   }

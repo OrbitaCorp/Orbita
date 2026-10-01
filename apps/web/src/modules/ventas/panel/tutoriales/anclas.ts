@@ -65,6 +65,27 @@ function botonPorTexto(texto: string): HTMLElement | null {
     return null
 }
 
+// El botón de Orbi existe en dos lugares: el de la barra del celular
+// (aria-label) y el del menú lateral (title, que en el celular queda dentro
+// del drawer cerrado). Los dos están SIEMPRE en el DOM y cada uno se oculta con
+// CSS según el ancho, así que no alcanza con "el primero que exista": hay que
+// tomar el primero que se vea, o en escritorio el tutorial apuntaría al botón
+// oculto de la barra.
+export const SELECTORES_ORBI = ['[aria-label="Abrir Orbi"]', '[title="Orbi AI (Ctrl+K)"]'] as const
+
+/** Primer selector de la lista cuyo elemento existe Y se ve. Pura: el DOM entra por parámetro. */
+export function primeroVisible<T>(
+    selectores: readonly string[],
+    buscar: (selector: string) => T | null,
+    visible: (el: T) => boolean,
+): T | null {
+    for (const sel of selectores) {
+        const el = buscar(sel)
+        if (el && visible(el)) return el
+    }
+    return null
+}
+
 function anclaHeader(id: string): HTMLElement | null {
     switch (id) {
         case 'buscador': return document.querySelector<HTMLElement>('.admin-search-wrap')
@@ -72,7 +93,7 @@ function anclaHeader(id: string): HTMLElement | null {
         case 'tema': return document.querySelector<HTMLElement>('[aria-label="Modo oscuro"], [aria-label="Modo claro"]')
         case 'campana': return document.querySelector('svg.lucide-bell')?.closest('button') ?? null
         case 'usuario': return document.querySelector('.admin-user-name')?.closest('button') ?? null
-        case 'orbi': return document.querySelector<HTMLElement>('[title="Orbi AI (Ctrl+K)"]')
+        case 'orbi': return primeroVisible(SELECTORES_ORBI, sel => document.querySelector<HTMLElement>(sel), esVisible)
         default: return null
     }
 }

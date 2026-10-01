@@ -455,6 +455,23 @@ html.light body { background: #eef4ff; color: #0f172a; }
   outline-offset: 2px;
 }
 
+/* ─── Orbi ────────────────────────────────────────────────────────────────
+   Foco visible de los botones de Orbi (Detener, Nueva conversación, los de la
+   tarjeta de acción). Vive acá y no en el <style> de un componente: antes
+   estaba en OrbiInput y el botón de Nueva conversación dependía de que el
+   input estuviera montado para tener foco visible. */
+.orbi-foco:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+/* El ícono de "Aplicando…" de la tarjeta de acción. Sin movimiento para quien
+   lo pidió: el texto ya dice qué está pasando. */
+@keyframes orbi-girar { to { transform: rotate(360deg); } }
+.orbi-girando { animation: orbi-girar 900ms linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .orbi-girando { animation: none; }
+}
+
 /* ─── Ayuda contextual ("qué es esto") ────────────────────────────────────
    El ícono de exclamación que abre la descripción de una sección o de una
    opción — hoy lo usa Apariencia en cada tarjeta y en cada interruptor (ver

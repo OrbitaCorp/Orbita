@@ -92,6 +92,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Vitest en entorno node: lógica pura (parser SSE, store, reducers), sin
+      # DOM ni servicios externos, así que corre en el mismo job sin nada extra.
+      # Va en este job y no en uno aparte para no cambiar el nombre del check
+      # (`Web — typecheck`), que es el que exige el flujo de deploy.
+      - name: Tests
+        run: pnpm test
+
   web-lint:
     name: Web — lint (informativo)
     runs-on: ubuntu-latest

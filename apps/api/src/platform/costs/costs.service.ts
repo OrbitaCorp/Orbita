@@ -186,8 +186,8 @@ export class CostsService {
 
   // Consumo de IA (Gemini y Groq) del mes agrupado por función, proveedor y modelo:
   // `metadata.feature` lo pone cada ayuda al registrar el uso (ai-assist, ai-variants,
-  // ai-scan…); los eventos del chat de Orbi no traen feature y se agrupan como
-  // 'orbi-chat'. El costo sale del estimatedCostUsd del evento si lo trae y, si no, de
+  // ai-scan…; el chat de Orbi pone orbi-panel u orbi-wizard). Los eventos viejos del
+  // chat, que no traían feature, se agrupan como 'orbi-chat'. El costo sale del estimatedCostUsd del evento si lo trae y, si no, de
   // tokens × precio de PRICING (la misma tabla del adapter interno).
   async getAiUsageByFeature(month: string) {
     const start = new Date(`${month}-01`);

@@ -9,11 +9,31 @@ import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } 
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './definitions/report.tools';
 import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
 import { getWizardPrompt } from '../prompts/wizard';
+import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
 
 // Solo se necesita que existan como objetos — ninguno de estos tests llama a
 // execute(), así que no hace falta implementar los métodos reales de cada
 // servicio.
 const stub = {} as any;
+
+// Las tools que resuelven datos para la tarjeta (el pedido, la categoría) leen
+// la base. Este falso devuelve nombres que LLEVAN el id buscado: así, en la
+// invariante 4, el centinela de un id aparece en el resumen si y solo si la
+// tool buscó ese id (y no otro).
+const prismaFalso = {
+  order: {
+    findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({
+      orderNumber: 9101,
+      status: 'PENDING',
+      channel: 'ONLINE',
+      customer: null,
+      onlineOrderDetails: { buyerName: `cliente-${where.id}`, buyerEmail: 'c@example.com' },
+    })),
+  },
+  category: {
+    findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({ name: `categoria-${where.id}` })),
+  },
+} as any;
 
 describe('Orbi — catálogo completo de tools', () => {
   let registry: ToolRegistryService;
@@ -22,14 +42,14 @@ describe('Orbi — catálogo completo de tools', () => {
     registry = new ToolRegistryService();
     registry.register(new NavigationTool());
     registry.register(new ListProductsTool(stub));
-    registry.register(new CreateProductTool(stub));
-    registry.register(new GenerateDescriptionTool(stub));
+    registry.register(new CreateProductTool(stub, prismaFalso));
+    registry.register(new GenerateDescriptionTool(stub, stub));
     registry.register(new ListDiscountsTool(stub));
     registry.register(new CreateDiscountTool(stub));
     registry.register(new CreateCouponTool(stub));
     registry.register(new ListOrdersTool(stub));
     registry.register(new GetOrderDetailTool(stub));
-    registry.register(new UpdateOrderStatusTool(stub));
+    registry.register(new UpdateOrderStatusTool(stub, prismaFalso));
     registry.register(new ListCustomersTool(stub));
     registry.register(new GetCustomerDetailTool(stub));
     registry.register(new UpdateBusinessInfoTool(stub));
@@ -67,14 +87,14 @@ describe('Orbi — catálogo completo de tools', () => {
 
   it('registra las 23 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
-      ...registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']).map(t => t.name),
+      ...registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
     ]);
     expect(allWithAllPerms.size).toBe(PANEL_TOOL_NAMES.length + WIZARD_TOOL_NAMES.length);
   });
 
   it('panel surface devuelve todas las panel tools (con permisos de escritura)', () => {
-    const names = registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']).map(t => t.name);
+    const names = registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO).map(t => t.name);
     for (const expected of PANEL_TOOL_NAMES) {
       expect(names).toContain(expected);
     }
@@ -146,7 +166,7 @@ describe('Orbi — catálogo completo de tools', () => {
   it('ninguna tool acepta un businessId (ni nada que huela a tenant) por parámetro', () => {
     const prohibidos = ['businessid', 'business_id', 'tenantid', 'tenant_id', 'negocioid', 'slug', 'subdomain'];
 
-    for (const tool of registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view'])) {
+    for (const tool of registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO)) {
       const params = Object.keys((tool.parameters as { properties?: Record<string, unknown> })?.properties ?? {});
       for (const p of params) {
         expect({ tool: tool.name, parametro: p, prohibido: false })
@@ -155,23 +175,84 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
-  // La regla, para que no haya que acordarse: si una tool cambia algo en la
-  // base, se propone y la confirma una persona (RBT-695). Leer no, y generar
-  // texto con IA tampoco, porque no persiste nada.
-  //
-  // Se ata a requiredPermissions porque es lo mismo por otro lado: los permisos
-  // de escritura existen justamente para las tools que escriben. Si alguien
-  // agrega una con `:write` y se olvida del flag, esto rompe.
-  it('toda tool que pide un permiso de escritura exige confirmación humana', () => {
-    const todas = registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']);
+  // Invariantes de permisos y confirmación (spec de la fase 1, §3.2). Antes
+  // "escribe" se deducía de un permiso que terminara en ":write", y esos
+  // códigos no existían en el catálogo real: ninguna tool de escritura se
+  // habilitaba nunca para un rol que no fuera owner. Ahora se ata al catálogo.
+  const todasLasTools = () => Array.from(((registry as any).tools as Map<string, any>).values());
+  const toolsDelPanel = () => todasLasTools().filter(t => t.surfaces.includes(OrbiSurface.PANEL));
 
-    for (const def of todas) {
-      const tool = (registry as any).tools.get(def.name);
-      const escribe = tool.requiredPermissions.some((p: string) => p.endsWith(':write'));
-      if (!escribe) continue;
+  // Lista EXPLÍCITA de las tools que no piden confirmación. Una tool nueva que
+  // escribe y se olvida de requiresConfirmation no está acá, y el test rompe.
+  // generateDescription no persiste (genera texto), pero gasta IA paga: por eso
+  // pide catalog.manage y consume la cuota diaria.
+  const SOLO_LECTURA = [
+    'navigateTo',
+    'listProducts', 'generateDescription',
+    'listDiscounts',
+    'listOrders', 'getOrderDetail',
+    'listCustomers', 'getCustomerDetail',
+    'getSalesReport', 'getProductReport', 'getCustomerReport',
+  ];
+  const ESCRIBEN = [
+    'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
+    'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
+  ];
 
-      expect({ tool: def.name, confirma: Boolean(tool.requiresConfirmation) })
-        .toEqual({ tool: def.name, confirma: true });
+  it('invariante 1: todo permiso que pide una tool existe en el catálogo real', () => {
+    for (const tool of todasLasTools()) {
+      for (const permiso of tool.requiredPermissions as string[]) {
+        expect({ tool: tool.name, permiso, existe: CODIGOS_DEL_CATALOGO.includes(permiso) })
+          .toEqual({ tool: tool.name, permiso, existe: true });
+      }
+    }
+  });
+
+  it('invariante 2: toda tool sin requiresConfirmation está en la lista explícita de solo lectura', () => {
+    for (const tool of toolsDelPanel()) {
+      if (tool.requiresConfirmation) continue;
+      expect({ tool: tool.name, enLista: SOLO_LECTURA.includes(tool.name) })
+        .toEqual({ tool: tool.name, enLista: true });
+    }
+    // Y al revés: lo que escribe de verdad tiene que confirmar.
+    for (const nombre of ESCRIBEN) {
+      const tool = (registry as any).tools.get(nombre);
+      expect({ nombre, confirma: Boolean(tool?.requiresConfirmation) }).toEqual({ nombre, confirma: true });
+    }
+  });
+
+  it('invariante 3: toda tool del panel pide al menos un permiso, salvo navigateTo', () => {
+    for (const tool of toolsDelPanel()) {
+      if (tool.name === 'navigateTo') continue;
+      expect({ tool: tool.name, pidePermiso: tool.requiredPermissions.length > 0 })
+        .toEqual({ tool: tool.name, pidePermiso: true });
+    }
+  });
+
+  it('el mapeo de permisos por tool es el del spec (§3.1)', () => {
+    const esperado: Record<string, string[]> = {
+      createProduct: ['catalog.manage'],
+      generateDescription: ['catalog.manage'],
+      createDiscount: ['discounts.manage'],
+      createCoupon: ['discounts.manage'],
+      updateOrderStatus: ['orders.manage'],
+      updateBusinessInfo: ['config.edit'],
+      updatePaymentMethods: ['config.edit'],
+      updateShipping: ['config.edit'],
+      listOrders: ['orders.view'],
+      getOrderDetail: ['orders.view'],
+      listCustomers: ['customers.view'],
+      getCustomerDetail: ['customers.view'],
+      listProducts: ['catalog.view'],
+      listDiscounts: ['discounts.view'],
+      getSalesReport: ['reports.view'],
+      getProductReport: ['reports.view'],
+      getCustomerReport: ['reports.view'],
+      navigateTo: [],
+    };
+    for (const [nombre, permisos] of Object.entries(esperado)) {
+      const tool = (registry as any).tools.get(nombre);
+      expect({ nombre, permisos: tool.requiredPermissions }).toEqual({ nombre, permisos });
     }
   });
 
@@ -186,37 +267,129 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
-  it('proponer() no propone nada si faltan los permisos', () => {
+  it('proponer() no propone nada si faltan los permisos', async () => {
     const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: [] as string[] };
+    const cupon = { code: 'XYZ', name: 'Cupón', type: 'PERCENT_TICKET', value: 20, scope: 'TICKET' };
 
-    // Sin discounts:write no hay propuesta: no tiene sentido ofrecerle a alguien
+    // Sin discounts.manage no hay propuesta: no tiene sentido ofrecerle a alguien
     // un botón para algo que execute() le va a rechazar igual.
-    expect(registry.proponer('createCoupon', { code: 'X' }, ctx)).toBeNull();
+    expect(await registry.proponer('createCoupon', cupon, ctx)).toBeNull();
 
-    const conPermiso = { ...ctx, permissions: ['discounts:write'] };
-    expect(registry.proponer('createCoupon', { code: 'X', type: 'PERCENT_TICKET', value: 20 }, conPermiso))
-      .toEqual({ resumen: expect.stringContaining('X') });
+    const conPermiso = { ...ctx, permissions: ['discounts.manage'] };
+    expect(await registry.proponer('createCoupon', cupon, conPermiso))
+      .toEqual({ resumen: expect.stringContaining('XYZ') });
   });
 
-  it('una tool de lectura nunca se propone: se ejecuta y listo', () => {
-    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: ['products:write'] };
-    expect(registry.proponer('listProducts', {}, ctx)).toBeNull();
-    expect(registry.proponer('listOrders', {}, ctx)).toBeNull();
+  it('una tool de lectura nunca se propone: se ejecuta y listo', async () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: ['catalog.manage'] };
+    expect(await registry.proponer('listProducts', {}, ctx)).toBeNull();
+    expect(await registry.proponer('listOrders', {}, ctx)).toBeNull();
   });
 
-  it('un usuario sin permisos de escritura no ve las tools de escritura', () => {
+  it('en la demo (soloLectura) ninguna escritura se propone, con todos los permisos', async () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: CODIGOS_DEL_CATALOGO };
+    for (const nombre of ESCRIBEN) {
+      expect({ nombre, propuesta: await registry.proponer(nombre, {}, ctx, undefined, { soloLectura: true }) })
+        .toEqual({ nombre, propuesta: null });
+    }
+  });
+
+  // Invariante 4 (spec §3.2): la tarjeta de confirmación muestra CADA valor que
+  // se va a escribir. Un texto de terceros (el nombre de un cliente, una
+  // reseña) puede convencer al modelo de meter un valor de más — un alias de
+  // transferencia, una política de envío — y si la tarjeta no lo muestra, la
+  // persona confirma sin verlo.
+  //
+  // Dos chequeos por propiedad de `parameters`, con todas cargadas a la vez:
+  // - Textos y números: el valor centinela aparece LITERAL en el resumen.
+  // - Todas (también enums, booleanos y listas, que se muestran traducidos o
+  //   contados): cambiar solo esa propiedad cambia el resumen. Si una propiedad
+  //   no mueve la tarjeta, la tarjeta no la está mostrando.
+  describe('invariante 4: describirAccion muestra cada parámetro', () => {
+    type Prop = { type?: string; enum?: unknown[]; items?: { type?: string; enum?: unknown[] } };
+    const ctx = { businessId: 'biz-cat', userId: 'u', surface: OrbiSurface.PANEL, permissions: CODIGOS_DEL_CATALOGO };
+
+    function centinelas(props: Record<string, Prop>) {
+      const base: Record<string, unknown> = {};
+      const otro: Record<string, unknown> = {};
+      const literal: Record<string, string> = {};
+      Object.entries(props).forEach(([nombre, p], i) => {
+        if (p.enum) {
+          base[nombre] = p.enum[0];
+          otro[nombre] = p.enum[1];
+        } else if (p.type === 'string') {
+          base[nombre] = `centinela-${nombre}`;
+          otro[nombre] = `otro-${nombre}`;
+          literal[nombre] = String(base[nombre]);
+        } else if (p.type === 'number') {
+          // Tres cifras: no dependen del separador de miles.
+          base[nombre] = 311 + i;
+          otro[nombre] = 611 + i;
+          literal[nombre] = String(base[nombre]);
+        } else if (p.type === 'boolean') {
+          base[nombre] = true;
+          otro[nombre] = false;
+        } else if (p.type === 'array') {
+          const valores = p.items?.enum ?? ['a1', 'a2', 'a3'];
+          base[nombre] = valores.slice(0, 1);
+          otro[nombre] = valores.slice(0, 2);
+        } else {
+          throw new Error(`Tipo sin centinela en ${nombre}: agregalo a este test`);
+        }
+      });
+      return { base, otro, literal };
+    }
+
+    it.each([
+      'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
+      'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
+    ])('%s', async (nombre) => {
+      const tool = (registry as any).tools.get(nombre);
+      expect(tool.requiresConfirmation).toBe(true);
+      const props = (tool.parameters as { properties: Record<string, Prop> }).properties;
+      const { base, otro, literal } = centinelas(props);
+
+      const resumen: string = await tool.describirAccion(base, ctx);
+      for (const [prop, valor] of Object.entries(literal)) {
+        expect({ tool: nombre, prop, aparece: resumen.includes(valor) }).toEqual({ tool: nombre, prop, aparece: true });
+      }
+      for (const prop of Object.keys(props)) {
+        const cambiado: string = await tool.describirAccion({ ...base, [prop]: otro[prop] }, ctx);
+        expect({ tool: nombre, prop, cambia: cambiado !== resumen }).toEqual({ tool: nombre, prop, cambia: true });
+      }
+    });
+
+    it('toda tool que confirma está cubierta por la invariante', () => {
+      const confirman = todasLasTools().filter(t => t.requiresConfirmation).map(t => t.name).sort();
+      expect(confirman).toEqual([...ESCRIBEN].sort());
+    });
+
+    it('lo que se lee de la base para la tarjeta sale acotado al negocio del token', async () => {
+      prismaFalso.order.findFirst.mockClear();
+      prismaFalso.category.findFirst.mockClear();
+      const orderTool = (registry as any).tools.get('updateOrderStatus');
+      const productTool = (registry as any).tools.get('createProduct');
+      await orderTool.describirAccion({ orderId: 'o-1', status: 'CONFIRMED' }, ctx);
+      await productTool.describirAccion({ name: 'R', basePrice: 1, categoryId: 'c-1' }, ctx);
+      expect(prismaFalso.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'o-1', businessId: 'biz-cat' }) }));
+      expect(prismaFalso.category.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'c-1', businessId: 'biz-cat' }) }));
+    });
+  });
+
+  it('un usuario sin permisos no ve ninguna tool de datos del negocio', () => {
     const names = registry.getTools(OrbiSurface.PANEL, []).map(t => t.name);
-    expect(names).not.toContain('createProduct');
-    expect(names).not.toContain('createDiscount');
-    expect(names).not.toContain('createCoupon');
-    expect(names).not.toContain('updateOrderStatus');
-    expect(names).not.toContain('updateBusinessInfo');
-    expect(names).not.toContain('updatePaymentMethods');
-    expect(names).not.toContain('updateShipping');
-    // Las de solo lectura siguen disponibles sin ningún permiso especial.
-    expect(names).toContain('listProducts');
-    expect(names).toContain('listOrders');
-    expect(names).toContain('listCustomers');
+    // Sin ningún permiso solo queda navegar: ni escrituras ni lecturas.
+    expect(names).toEqual(['navigateTo']);
+  });
+
+  it('un empleado con solo lectura ve las lecturas de sus permisos y ninguna escritura', () => {
+    const names = registry.getTools(OrbiSurface.PANEL, ['orders.view', 'customers.view', 'catalog.view']).map(t => t.name);
+    for (const lectura of ['listOrders', 'getOrderDetail', 'listCustomers', 'getCustomerDetail', 'listProducts']) {
+      expect(names).toContain(lectura);
+    }
+    for (const escritura of ESCRIBEN) expect(names).not.toContain(escritura);
+    // Ni descuentos ni reportes ni la IA paga: no tiene esos permisos.
+    for (const n of ['listDiscounts', 'getSalesReport', 'generateDescription']) expect(names).not.toContain(n);
   });
 
   it('las reports tools exigen reports.view', () => {
@@ -232,7 +405,7 @@ describe('Orbi — catálogo completo de tools', () => {
   });
 
   it('zona prohibida: ninguna tool destructiva existe en el registro, con ningún permiso', () => {
-    const todosLosPermisos = ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view', 'admin:write', 'owner'];
+    const todosLosPermisos = [...CODIGOS_DEL_CATALOGO, 'admin:write', 'owner'];
     const panelNames = registry.getTools(OrbiSurface.PANEL, todosLosPermisos).map(t => t.name);
     const wizardNames = registry.getTools(OrbiSurface.WIZARD, todosLosPermisos, PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name);
     for (const forbidden of FORBIDDEN_TOOL_NAMES) {

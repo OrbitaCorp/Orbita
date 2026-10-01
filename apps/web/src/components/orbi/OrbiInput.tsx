@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Square } from 'lucide-react'
 
 interface Props {
   onSend: (message: string) => void
   disabled?: boolean
   quickChips?: string[]
+  /** Orbi está respondiendo: con `onStop`, el botón de enviar pasa a Detener. */
+  streaming?: boolean
+  /** Corta la respuesta en curso (aborta el stream). */
+  onStop?: () => void
 }
 
 const MAX_H = 96 // ~4 líneas
 
-export function OrbiInput({ onSend, disabled, quickChips }: Props) {
+export function OrbiInput({ onSend, disabled, quickChips, streaming, onStop }: Props) {
+  // Mientras Orbi escribe no hay nada que enviar (el texto está bloqueado),
+  // así que ese mismo lugar se usa para poder cortarlo: sin esto, la única
+  // forma de frenar una respuesta larga era cerrar el panel.
+  const mostrarDetener = !!streaming && !!onStop
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -92,19 +100,47 @@ export function OrbiInput({ onSend, disabled, quickChips }: Props) {
             maxHeight: MAX_H, padding: '8px 0',
           }}
         />
-        <button
-          onClick={() => handleSend()}
-          disabled={disabled || !text.trim()}
-          aria-label="Enviar"
-          style={{
-            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-            background: text.trim() && !disabled ? '#3B82F6' : 'var(--color-border)',
-            border: 'none', cursor: text.trim() && !disabled ? 'pointer' : 'default',
-            display: 'grid', placeItems: 'center', transition: 'background 200ms',
-          }}
-        >
-          <Send size={15} strokeWidth={2} color="white" style={{ marginLeft: 1 }} />
-        </button>
+        {mostrarDetener ? (
+          // El área táctil es de 44px de alto: el margen negativo la deja
+          // crecer sobre el padding de la barra sin agrandar la barra; lo
+          // visible es la píldora de adentro, del mismo alto que Enviar.
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label="Detener la respuesta de Orbi"
+            className="orbi-foco"
+            style={{
+              flexShrink: 0, minHeight: 44, margin: '-5px 0', padding: 0,
+              border: 'none', background: 'transparent', cursor: 'pointer',
+              display: 'grid', placeItems: 'center', borderRadius: 999,
+              font: 'inherit',
+            }}
+          >
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 34, padding: '0 12px', borderRadius: 999,
+              border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+              color: 'var(--color-text)', fontSize: 13, fontWeight: 600,
+            }}>
+              <Square size={11} strokeWidth={0} fill="currentColor" aria-hidden />
+              Detener
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleSend()}
+            disabled={disabled || !text.trim()}
+            aria-label="Enviar"
+            style={{
+              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+              background: text.trim() && !disabled ? '#3B82F6' : 'var(--color-border)',
+              border: 'none', cursor: text.trim() && !disabled ? 'pointer' : 'default',
+              display: 'grid', placeItems: 'center', transition: 'background 200ms',
+            }}
+          >
+            <Send size={15} strokeWidth={2} color="white" style={{ marginLeft: 1 }} />
+          </button>
+        )}
       </div>
     </div>
   )

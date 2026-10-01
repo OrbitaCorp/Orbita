@@ -7,6 +7,18 @@ import { CORE_PROMPT } from '../prompts/core';
 import { getWizardPrompt } from '../prompts/wizard';
 import { getPanelPrompt } from '../prompts/panel';
 
+// Permiso que hace falta para meterle al prompt el snapshot de cada módulo. Es
+// el mismo que exige la pantalla equivalente por HTTP: el snapshot son números
+// del negocio (facturación, clientes, mensajes) y no tiene que salir de acá para
+// alguien que por el panel no los vería.
+const PERMISO_DEL_SNAPSHOT: Record<string, string> = {
+  dashboard: 'reports.dashboard',
+  pedidos: 'orders.view',
+  clientes: 'customers.view',
+  catalogo: 'catalog.view',
+  mensajes: 'messages.view',
+};
+
 @Injectable()
 export class ContextBuilderService {
   constructor(
@@ -14,7 +26,12 @@ export class ContextBuilderService {
     private readonly moduleData: ModuleDataService,
   ) {}
 
-  async buildSystemPrompt(dto: OrbiChatDto): Promise<string> {
+  /**
+   * `permisos`: los efectivos de quien pregunta (ver permisosDeOrbi). Sin
+   * permisos no hay snapshot, nunca "todo": el wizard y las evals llaman sin
+   * pasarlos y no reciben datos de ningún negocio.
+   */
+  async buildSystemPrompt(dto: OrbiChatDto, permisos: string[] = []): Promise<string> {
     const layers: string[] = [CORE_PROMPT];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {
@@ -39,7 +56,8 @@ export class ContextBuilderService {
         } catch { /* non-critical */ }
       }
 
-      const moduleSnapshot = dto.context.businessId && dto.context.module
+      const permisoNecesario = dto.context.module ? PERMISO_DEL_SNAPSHOT[dto.context.module] : undefined;
+      const moduleSnapshot = dto.context.businessId && dto.context.module && permisoNecesario && permisos.includes(permisoNecesario)
         ? await this.moduleData.getSnapshot(dto.context.businessId, dto.context.module)
         : {};
 

@@ -114,6 +114,9 @@ model Business {
   manualFeedback       ManualFeedback[]
   usageEvents          UsageEvent[]
   visits               StoreVisit[]
+  // Orbi fase 1: acciones pendientes de confirmar y telemetría por turno.
+  orbiPendingActions   OrbiPendingAction[]
+  orbiTurns            OrbiTurn[]
 
   @@map("businesses")
 }
@@ -2894,4 +2897,66 @@ model SubscriptionActivationDiscount {
   @@index([businessId])
   @@index([status])
   @@map("subscription_activation_discounts")
+}
+
+// Orbi fase 1 (spec 2026-09-30 §3.4): acciones que Orbi propone y la persona
+// confirma. Viven en Postgres (no en memoria) para sobrevivir reinicios y
+// varias instancias de Cloud Run; el consumo es atómico vía updateMany.
+model OrbiPendingAction {
+  id             String    @id // token aleatorio de 32 hex, igual que hoy
+  businessId     String    @map("business_id")
+  memberId       String    @map("member_id")
+  conversationId String?   @map("conversation_id")
+  tool           String
+  args           Json
+  summary        String
+  status         String    @default("pending") // pending | executing | executed | failed | rejected
+  result         Json?
+  expiresAt      DateTime  @map("expires_at")
+  startedAt      DateTime? @map("started_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, memberId, status])
+  @@index([createdAt])
+  @@map("orbi_pending_actions")
+}
+
+// Orbi fase 1 (spec §3.5): cuota diaria compartida entre instancias. Sin
+// relación: la clave es un string con prefijo (`orbi-panel:<negocio>`,
+// `orbi-wizard:<ipHash>`, `ai-assist:<negocio>`...).
+model DailyQuota {
+  key   String
+  day   String // 'YYYY-MM-DD' de fechaArgentina, como `week` en demo_ai_usage
+  count Int    @default(0)
+
+  @@id([key, day])
+  @@map("daily_quota")
+}
+
+// Orbi fase 1 (spec §3.6): un registro por turno del chat del panel, solo con
+// métricas. Sin texto: la pregunta y la respuesta ya están en la conversación.
+model OrbiTurn {
+  id               String   @id @default(uuid())
+  businessId       String   @map("business_id")
+  memberId         String   @map("member_id")
+  conversationId   String?  @map("conversation_id")
+  module           String?
+  model            String? // ID que usó el adapter
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  latencyMs        Int      @map("latency_ms")
+  rounds           Int
+  toolsUsed        String[] @default([]) @map("tools_used")
+  actionsProposed  Int      @default(0) @map("actions_proposed")
+  status           String // ok | error | cancelled | max_rounds
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([memberId, createdAt])
+  @@map("orbi_turns")
 }

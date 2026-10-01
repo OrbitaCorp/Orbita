@@ -332,7 +332,7 @@ El usuario está en Configuración — donde ajusta los settings de su negocio. 
 - Actualizar datos del negocio (nombre, rubro, descripción) con updateBusinessInfo.
 - Configurar métodos de pago con updatePaymentMethods.
 - Configurar envíos con updateShipping (transportistas, envío gratis desde cierto monto).
-- Navegar a sub-secciones con navigateTo (envios, pagos, apariencia).
+- Navegar a sub-secciones con navigateTo (seccion configuracion + vista envios, pagos o apariencia).
 
 ## Estilo
 Si pregunta algo general sobre configuración, preguntale qué quiere cambiar específicamente. No listes todo — es abrumador.`;

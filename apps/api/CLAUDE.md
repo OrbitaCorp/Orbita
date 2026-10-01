@@ -27,12 +27,28 @@ cd apps/api
 `main` → CI verde (`.github/workflows/ci.yml`) → `deploy.sh`, nunca al revés.
 El script lo hace cumplir con un preflight antes del build: árbol de git
 limpio, HEAD contenido en `origin/main`, `pnpm typecheck` + `pnpm test` (~10
-minutos, avisá que está corriendo), `prisma migrate status` sin pendientes y
-los check runs de CI del sha en `success`. Si algo falla corta con exit 1 sin
+minutos, avisá que está corriendo), `prisma migrate status` sin pendientes
+**contra la base de producción** y los check runs de CI del sha en `success`. Si algo falla corta con exit 1 sin
 buildear nada. `DEPLOY_SOLO_PREFLIGHT=1` corre solo el preflight;
 `DEPLOY_SIN_PREFLIGHT=1` es el escape para emergencias y pide confirmación por
 teclado, así que lo corre una persona, no un agente. Detalle en
 `DEPLOYMENT.md` § Deploy y en el `CLAUDE.md` de la raíz, § Commit y push.
+
+### Dos bases: el `.env` local es DEV, no producción
+
+Desde el 2026-09-20 el `.env` local de `apps/api` apunta a la base de **desarrollo**
+(Supabase `hhaqlzrcskmwnvhgydon`). Producción es otro proyecto ("Orbita Produccion",
+`dgergykdihtvsglfumsb`) al que solo llega Cloud Run, con `DATABASE_URL` / `DIRECT_URL` de
+Secret Manager. Consecuencias para el trabajo diario:
+
+- `pnpm exec prisma migrate deploy` y `pnpm seed` sin más tocan **dev**. Sirven para probar.
+- Para producción se usa `./deploy/prisma-prod.sh migrate deploy` (y `migrate status` para
+  confirmar). El script lee las URLs de Secret Manager, se niega si no son las de producción
+  y no las escribe ni las imprime. `deploy.sh` usa el mismo script en su preflight (d).
+- Una migración nueva se aplica en dev al escribirla, y en producción recién con el cambio ya
+  en `main` con CI verde, justo antes de `deploy.sh`. Secuencia completa en el `CLAUDE.md` de
+  la raíz, § Commit y push, pasos 2 y 5.
+- Nunca leer ni pegar en el chat el valor de esas URLs: alcanza con que el script las use.
 
 Necesita `gcloud` CLI autenticado (`gcloud auth login`, cuenta `@orbita-corp.com`)
 con permisos sobre `orbita-api-corp` — ver **`apps/api/DEPLOYMENT.md`** para el

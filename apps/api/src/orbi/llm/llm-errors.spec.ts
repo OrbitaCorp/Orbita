@@ -1,4 +1,5 @@
 import { ApiError } from '@google/genai';
+import { APIUserAbortError } from 'groq-sdk';
 import { esErrorDeDisponibilidad } from './llm-errors';
 
 /** Reproduce la forma real del error del SDK: el cuerpo va como JSON en `message`. */
@@ -53,5 +54,34 @@ describe('esErrorDeDisponibilidad', () => {
 
   it('un Error genérico sin status NO cae al fallback', () => {
     expect(esErrorDeDisponibilidad(new Error('algo raro'))).toBe(false);
+  });
+
+  // Spec §3.7: un corte del cliente NO es indisponibilidad. Si cayera al
+  // fallback, cada panel cerrado dispararía una llamada paga a Groq que nadie
+  // va a leer.
+  describe('errores de aborto', () => {
+    function razonDeAborto(): unknown {
+      const c = new AbortController();
+      c.abort();
+      return c.signal.reason;
+    }
+
+    it('un AbortError (DOMException) no cae al fallback', () => {
+      expect(esErrorDeDisponibilidad(razonDeAborto())).toBe(false);
+    });
+
+    it('el aborto del SDK de Groq no cae al fallback', () => {
+      expect(esErrorDeDisponibilidad(new APIUserAbortError())).toBe(false);
+    });
+
+    it('un "fetch failed" cuya causa es un aborto no cae al fallback', () => {
+      const err = Object.assign(new TypeError('fetch failed'), { cause: razonDeAborto() });
+      expect(esErrorDeDisponibilidad(err)).toBe(false);
+    });
+
+    it('un AbortError con código de red tampoco cae al fallback', () => {
+      const err = Object.assign(new Error('socket hang up'), { name: 'AbortError', code: 'ECONNRESET' });
+      expect(esErrorDeDisponibilidad(err)).toBe(false);
+    });
   });
 });

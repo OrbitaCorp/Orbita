@@ -22,12 +22,7 @@ export function OrbiWizardCtx({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ flexShrink: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
       <div className="orbi-ctx-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 9px' }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#3B82F6,#8B5CF6)',
-          display: 'grid', placeItems: 'center', flexShrink: 0,
-        }}>
-          <OrbiIcon size={16} color="white" />
-        </div>
+        <OrbiIcon size={28} disc />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--color-text)' }}>Orbi</div>
           {sub && <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>{sub}</div>}

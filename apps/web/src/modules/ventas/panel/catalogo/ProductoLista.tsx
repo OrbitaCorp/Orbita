@@ -24,6 +24,7 @@ import {
 } from '@/lib/productUploadTracker'
 
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { EVENTO_ACCION_EJECUTADA, recargaProductos } from '@/components/orbi/confirmarAccion'
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -860,6 +861,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             }
         })()
     }, [edits, cargarSilencioso, onToast])
+
+    // Orbi creó un producto desde el chat (tarjeta de acción confirmada): se
+    // trae la lista de nuevo para que aparezca. createdProductIds solo marca
+    // filas que ya están cargadas; sin esto el producto nuevo no se veía
+    // hasta cambiar de filtro o recargar.
+    useEffect(() => {
+        const alEjecutar = (e: Event) => {
+            if (recargaProductos((e as CustomEvent).detail)) void cargarSilencioso()
+        }
+        window.addEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+        return () => window.removeEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+    }, [cargarSilencioso])
 
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
