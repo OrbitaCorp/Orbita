@@ -22,7 +22,8 @@
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:src": "jest --config ./test/jest-src.json",
     "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --runInBand",
-    "test:evals": "ts-node -P tsconfig.json test/evals/run.ts"
+    "test:evals": "ts-node -P tsconfig.json test/evals/run.ts",
+    "test:evals:panel": "ts-node -P tsconfig.json test/evals/panel/run.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

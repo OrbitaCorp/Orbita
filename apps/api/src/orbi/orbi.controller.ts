@@ -5,7 +5,7 @@ import { Response } from 'express';
 import { randomUUID } from 'crypto';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
-import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmToolCall, type LlmUsage } from './llm/llm-adapter.interface';
+import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
@@ -21,6 +21,7 @@ import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
 import { permisosDeOrbi } from './permisos-orbi';
+import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, RESPUESTA_DE_PROPUESTA, vueltaDeTools } from './turno/vuelta';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -30,51 +31,11 @@ import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 const TURNOS_DIA_NEGOCIO = 300; // mensajes por negocio y por día en el panel
 const TURNOS_DIA_IP_WIZARD = 100; // mensajes por IP y por día en el wizard (público)
 const HISTORIAL_PANEL = 30; // mensajes previos que se le mandan al modelo
-const MAX_VUELTAS_TOOLS = 6; // llamadas al modelo por mensaje (cada tool es otra vuelta)
 const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.';
 const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
 const MENSAJE_NO_DISPONIBLE = 'Esa acción ya no está disponible. Pedísela a Orbi de nuevo.';
 const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos.';
 const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';
-// Lo que recibe el modelo cuando pide una escritura que no puede proponerse
-// (demo, sin permiso, fuera del panel). Fijo y sin detalles.
-const ESCRITURA_NO_DISPONIBLE = 'No podés hacer esa acción desde acá: no tenés permiso o no está disponible.';
-const ESCRITURA_EN_DEMO = 'En la demo no se pueden hacer cambios';
-
-/**
- * Junta las tool calls de UNA vuelta del modelo y sus resultados, para
- * devolverlos al historial todos juntos cuando la vuelta termina.
- *
- * Gemini 3.x pide varias tools en paralelo en una misma vuelta (ej.
- * getSalesReport + getProductReport para "resumen de los últimos 7 días") y
- * solo la PRIMERA functionCall trae thoughtSignature. Si cada call vuelve como
- * su propio par assistant/tool, la segunda queda primera de su turno sin firma
- * y Gemini rechaza el request entero con 400 INVALID_ARGUMENT ("Function call
- * is missing a thought_signature"): el usuario ve "Error procesando tu
- * mensaje". La regla de Gemini es UN turno del modelo con todas las calls en
- * el orden en que llegaron (cada una con la firma tal cual vino) y después las
- * respuestas en ese mismo orden. Por eso: un solo assistant con todas las
- * calls y un tool por call; GeminiAdapter une los tool consecutivos en un solo
- * content con todos los functionResponse, y para Groq es el formato nativo.
- *
- * Las tools se siguen ejecutando (o proponiendo) apenas llega cada call, con
- * los mismos eventos al front: lo único que se difiere es el armado del
- * historial.
- */
-function vueltaDeTools() {
-  const calls: LlmToolCall[] = [];
-  const resultados: LlmMessage[] = [];
-  return {
-    responder(call: LlmToolCall, content: string) {
-      calls.push({ id: call.id, name: call.name, arguments: call.arguments, thoughtSignature: call.thoughtSignature });
-      resultados.push({ role: 'tool', content, toolCallId: call.id });
-    },
-    volcarEn(messages: LlmMessage[]) {
-      if (!calls.length) return;
-      messages.push({ role: 'assistant', content: '', toolCalls: calls }, ...resultados);
-    },
-  };
-}
 
 // Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
 // (miembro readOnly, ver demo/demo-ia.ts). Va al final del prompt de
@@ -457,12 +418,7 @@ export class OrbiController {
               // que falló: si le decimos que falló, reintenta en loop; si le
               // decimos que salió bien, le cuenta al usuario que ya está hecho
               // cuando todavía no apretó nada.
-              vuelta.responder(event.call, JSON.stringify({
-                estado: 'pendiente_de_confirmacion',
-                mensaje:
-                  'La acción NO se ejecutó todavía. El usuario tiene en pantalla un botón para confirmarla. ' +
-                  'Contale en una línea qué va a pasar si lo aprieta. No digas que ya está hecho.',
-              }));
+              vuelta.responder(event.call, JSON.stringify(RESPUESTA_DE_PROPUESTA));
               continueLoop = true;
               continue;
             }

@@ -1,5 +1,10 @@
 # Evals de Orbi
 
+> **Panel administrativo:** las evals del panel viven en `panel/` (golden set de ~85 casos sobre un
+> negocio de prueba en memoria, con ataques de inyección). Se corren con `pnpm test:evals:panel`.
+> Diseño, reglas y línea de base en
+> `docs/superpowers/specs/2026-10-01-orbi-fase-2-evals-panel-design.md`. Lo de abajo es el wizard.
+
 Mide si Orbi contesta bien en el wizard de onboarding. No reemplaza al criterio
 humano — reemplaza al *"a mí me pareció que quedó mejor"*, que es con lo que se
 venían tocando los prompts hasta ahora.

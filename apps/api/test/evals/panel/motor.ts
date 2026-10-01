@@ -1,0 +1,245 @@
+/**
+ * El motor de las evals del panel: corre UN caso contra un LlmAdapter y
+ * devuelve lo que quedó en pantalla, juzgado con las reglas. Separado de
+ * run.ts (la CLI) para que el unit test lo pruebe con un modelo guionado:
+ * así el loop que decide QUÉ se juzga también corre en CI.
+ *
+ * El loop replica OrbiController.chat con las mismas piezas
+ * (src/orbi/turno/vuelta.ts): proponer → error al modelo / escritura no
+ * disponible / tarjeta pendiente / lectura ejecutada, y las calls de una
+ * vuelta vuelven al historial juntas (tools paralelas de Gemini 3). Lo que se
+ * juzga es lo que se ve: el texto de la vuelta final más tarjetas y botones.
+ */
+
+import type { LlmAdapter, LlmMessage, LlmToolDefinition } from '../../../src/orbi/llm/llm-adapter.interface';
+import { OrbiSurface } from '../../../src/orbi/dto/orbi-chat.dto';
+import { CORE_PROMPT } from '../../../src/orbi/prompts/core';
+import { getPanelPrompt } from '../../../src/orbi/prompts/panel';
+import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
+import {
+  ESCRITURA_NO_DISPONIBLE,
+  MAX_VUELTAS_TOOLS,
+  RESPUESTA_DE_PROPUESTA,
+  vueltaDeTools,
+} from '../../../src/orbi/turno/vuelta';
+import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
+import {
+  armarContextBuilder,
+  armarFakes,
+  armarRegistry,
+  faltasDelFake,
+  permisosDelRol,
+  usuarioDelRol,
+} from './fakes';
+import type { CasoPanel } from './casos';
+import {
+  destinoDelPath,
+  escriturasPermitidas,
+  evaluarReglasGlobales,
+  verificarExpectativas,
+  type NoAplica,
+  type TurnoDelPanel,
+  type Violacion,
+} from './reglas';
+
+// ─── Variantes ───────────────────────────────────────────────────────────────
+
+/**
+ * Una variante cambia el prompt o las tools que ve el modelo, sin tocar el
+ * código de producción. La fase 6 suma 'manual-entero' (el manual completo en
+ * el prompt en vez de índice + leerTemaDelManual) para decidir con datos.
+ */
+export type Variante = {
+  descripcion: string;
+  ajustar(piezas: { systemPrompt: string; tools: LlmToolDefinition[] }): { systemPrompt: string; tools: LlmToolDefinition[] };
+};
+
+export const VARIANTES: Record<string, Variante> = {
+  actual: { descripcion: 'El prompt y las tools de producción, tal cual', ajustar: (p) => p },
+};
+
+// ─── Resultado de un caso ────────────────────────────────────────────────────
+
+export type Resultado = {
+  id: string;
+  categoria: string;
+  intento: number;
+  ok: boolean;
+  violaciones: Violacion[];
+  noAplica: NoAplica[];
+  error?: string;
+  /** Un error de los fakes, no del modelo. */
+  infra?: boolean;
+  turno: TurnoDelPanel;
+  ms: number;
+  tokens: { entrada: number; salida: number };
+};
+
+// ─── Armado ──────────────────────────────────────────────────────────────────
+
+/** Las instrucciones del prompt (sin datos de ningún negocio): lo que no se puede filtrar. */
+export const INSTRUCCIONES = `${CORE_PROMPT}\n${getPanelPrompt()}`;
+
+export async function conReintentoPorRateLimit<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const esRateLimit = msg.includes('rate_limit') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+      if (!esRateLimit || i >= intentos) throw error;
+      const segundos = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? /try again in ([\d.]+)s/.exec(msg)?.[1] ?? 15);
+      console.log(`  … rate limit, esperando ${segundos.toFixed(0)}s`);
+      await new Promise((r) => setTimeout(r, Math.ceil((segundos + 1) * 1000)));
+    }
+  }
+}
+
+export type Modelo = { llm: Pick<LlmAdapter, 'streamChat'>; nombre?: string };
+
+export async function correrCaso(
+  caso: CasoPanel,
+  intento: number,
+  d: NegocioDePrueba,
+  variante: Variante,
+  modelo: Modelo,
+): Promise<Resultado> {
+  const arrancoEn = Date.now();
+  faltasDelFake.length = 0;
+
+  const fakes = armarFakes(d);
+  const registry = armarRegistry(fakes);
+  const contextBuilder = armarContextBuilder(fakes);
+
+  const rol = caso.rol ?? 'dueno';
+  const permisos = permisosDelRol(rol);
+  const usuario = usuarioDelRol(rol);
+
+  // Lo mismo que manda el front hoy: module 'ventas' y la pantalla en section.
+  const dto = {
+    message: caso.mensaje,
+    context: { surface: OrbiSurface.PANEL, module: 'ventas', section: caso.pantalla, businessId: BUSINESS_ID },
+  };
+  const base = {
+    systemPrompt: await contextBuilder.buildSystemPrompt(dto as never, permisos),
+    tools: registry.getTools(OrbiSurface.PANEL, permisos),
+  };
+  const { systemPrompt, tools } = variante.ajustar(base);
+
+  const toolCtx: ToolExecutionContext = {
+    businessId: BUSINESS_ID,
+    userId: usuario.memberId,
+    surface: OrbiSurface.PANEL,
+    permissions: permisos,
+  };
+
+  const messages: LlmMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...(caso.historial ?? []).map((m) => ({ role: m.role, content: m.content })),
+    { role: 'user', content: caso.mensaje },
+  ];
+
+  const turno: TurnoDelPanel = {
+    texto: '',
+    toolCalls: [],
+    propuestas: [],
+    escriturasRechazadas: [],
+    destinos: [],
+    temasLeidos: [],
+    toolsOfrecidas: tools.map((t) => t.name),
+  };
+  const tokens = { entrada: 0, salida: 0 };
+
+  try {
+    let continuar = true;
+    let vueltas = 0;
+    while (continuar) {
+      if (++vueltas > MAX_VUELTAS_TOOLS) {
+        // El controller corta con un mensaje fijo: es lo que se ve.
+        turno.texto = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
+        break;
+      }
+      continuar = false;
+      const vuelta = vueltaDeTools();
+
+      const parcial = await conReintentoPorRateLimit(async () => {
+        const p = { texto: '', llamadas: [] as { id: string; name: string; arguments: Record<string, unknown>; thoughtSignature?: string }[], entrada: 0, salida: 0 };
+        for await (const ev of modelo.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo.nombre })) {
+          if (ev.type === 'text') p.texto += ev.chunk;
+          else if (ev.type === 'tool_call') p.llamadas.push(ev.call);
+          else if (ev.type === 'usage') { p.entrada += ev.usage.promptTokens; p.salida += ev.usage.completionTokens; }
+        }
+        return p;
+      });
+      tokens.entrada += parcial.entrada;
+      tokens.salida += parcial.salida;
+
+      for (const call of parcial.llamadas) {
+        continuar = true;
+        turno.toolCalls.push({ name: call.name, arguments: call.arguments });
+
+        const propuesta = await registry.proponer(call.name, call.arguments, toolCtx);
+        if (propuesta && 'error' in propuesta) {
+          turno.escriturasRechazadas.push({ name: call.name, arguments: call.arguments });
+          vuelta.responder(call, JSON.stringify({ success: false, error: propuesta.error }));
+          continue;
+        }
+        if (!propuesta && registry.requiereConfirmacion(call.name)) {
+          turno.escriturasRechazadas.push({ name: call.name, arguments: call.arguments });
+          vuelta.responder(call, JSON.stringify({ success: false, error: ESCRITURA_NO_DISPONIBLE }));
+          continue;
+        }
+        if (propuesta) {
+          turno.propuestas.push({ tool: call.name, args: call.arguments, resumen: propuesta.resumen });
+          vuelta.responder(call, JSON.stringify(RESPUESTA_DE_PROPUESTA));
+          continue;
+        }
+
+        const resultado = await registry.execute(call.name, call.arguments, toolCtx);
+        const data = resultado.data as { path?: unknown } | undefined;
+        if (resultado.success && typeof data?.path === 'string') {
+          const destino = destinoDelPath(data.path);
+          if (destino) turno.destinos.push({ tool: call.name, path: data.path, ...destino });
+        }
+        if (call.name === 'leerTemaDelManual' && Array.isArray(call.arguments.ids)) {
+          turno.temasLeidos.push(...call.arguments.ids.map(String));
+        }
+        vuelta.responder(call, JSON.stringify(resultado));
+      }
+
+      // Con tools en juego el chat descarta el texto de las vueltas con tool:
+      // en pantalla queda solo el de la vuelta final.
+      if (!continuar) turno.texto = parcial.texto.trim();
+      vuelta.volcarEn(messages);
+    }
+  } catch (error) {
+    return {
+      id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
+      ms: Date.now() - arrancoEn, tokens,
+      error: error instanceof Error ? error.message : String(error),
+      infra: faltasDelFake.length > 0,
+    };
+  }
+
+  if (faltasDelFake.length) {
+    return {
+      id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
+      ms: Date.now() - arrancoEn, tokens,
+      error: `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}`,
+      infra: true,
+    };
+  }
+
+  const globales = evaluarReglasGlobales(turno, {
+    escriturasPermitidas: escriturasPermitidas(caso.expectativas),
+    instrucciones: INSTRUCCIONES,
+    topeDeLargo: caso.topeDeLargo,
+  });
+  const { violaciones, noAplica } = verificarExpectativas(turno, caso.expectativas, d);
+  const todas = [...globales, ...violaciones];
+
+  return {
+    id: caso.id, categoria: caso.categoria, intento, ok: todas.length === 0,
+    violaciones: todas, noAplica, turno, ms: Date.now() - arrancoEn, tokens,
+  };
+}

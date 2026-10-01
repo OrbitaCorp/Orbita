@@ -29,7 +29,8 @@ import { resolve } from 'node:path';
 import { config as cargarDotenv } from 'dotenv';
 import { ConfigService } from '@nestjs/config';
 import { GeminiAdapter } from '../../src/orbi/llm/gemini.adapter';
-import type { LlmMessage } from '../../src/orbi/llm/llm-adapter.interface';
+import type { LlmMessage, LlmToolCall } from '../../src/orbi/llm/llm-adapter.interface';
+import { vueltaDeTools } from '../../src/orbi/turno/vuelta';
 import { ContextBuilderService } from '../../src/orbi/context/context-builder.service';
 import { ToolRegistryService } from '../../src/orbi/tools/tool-registry.service';
 import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
@@ -164,7 +165,7 @@ async function correrCaso(caso: Caso, intento: number): Promise<Resultado> {
     // y eso es peor que no medir: manda a "arreglar" prompts que están bien.
     for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
       const parcial = await conReintentoPorRateLimit(async () => {
-        const p: { texto: string; llamadas: { id: string; name: string; arguments: Record<string, unknown> }[] } =
+        const p: { texto: string; llamadas: LlmToolCall[] } =
           { texto: '', llamadas: [] };
         for await (const evento of llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
           if (evento.type === 'text') p.texto += evento.chunk;
@@ -178,6 +179,12 @@ async function correrCaso(caso: Caso, intento: number): Promise<Resultado> {
 
       if (!parcial.llamadas.length) break;
 
+      // Todas las calls de la vuelta vuelven al historial en UN turno, con su
+      // thoughtSignature (vueltaDeTools, igual que el controller). Antes cada
+      // una iba como su propio par assistant/tool: con dos calls paralelas de
+      // Gemini 3 la segunda quedaba sin firma y la API respondía 400, que el
+      // reporte contaba como error del caso.
+      const vuelta = vueltaDeTools();
       for (const llamada of parcial.llamadas) {
         const resultado = await registry.execute(
           llamada.name,
@@ -185,13 +192,9 @@ async function correrCaso(caso: Caso, intento: number): Promise<Resultado> {
           { ...ctxDeTools, availableOptions: caso.availableOptions },
           caso.stepName,
         );
-        messages.push({
-          role: 'assistant',
-          content: parcial.texto,
-          toolCalls: [{ id: llamada.id, name: llamada.name, arguments: llamada.arguments }],
-        });
-        messages.push({ role: 'tool', content: JSON.stringify(resultado), toolCallId: llamada.id });
+        vuelta.responder(llamada, JSON.stringify(resultado));
       }
+      vuelta.volcarEn(messages);
     }
   } catch (error) {
     return {
