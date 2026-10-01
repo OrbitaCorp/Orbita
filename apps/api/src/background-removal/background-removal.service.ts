@@ -139,6 +139,49 @@ export class BackgroundRemovalService {
     else this.enCurso--;
   }
 
+  // Arma el PNG RGBA final: alfa y color descontaminado (a resolución de
+  // trabajo) se reescalan a la resolución real; solo el anillo de alfa parcial
+  // toma el color descontaminado, el interior conserva los píxeles originales.
+  private async componerConPrimerPlano(
+    buffer: Buffer,
+    alfaT: Float32Array,
+    primerPlanoT: Uint8Array,
+    wT: number,
+    hT: number,
+    origWidth: number,
+    origHeight: number,
+  ): Promise<Buffer> {
+    const alfaBytesT = Buffer.alloc(wT * hT);
+    for (let i = 0; i < alfaBytesT.length; i++) alfaBytesT[i] = Math.round(alfaT[i] * 255);
+
+    const escalar = async (data: Uint8Array | Buffer, channels: 1 | 3, kernel: 'mitchell' | 'linear') => {
+      if (wT === origWidth && hT === origHeight) return Buffer.from(data);
+      const s = sharp(data, { raw: { width: wT, height: hT, channels } }).resize(origWidth, origHeight, { fit: 'fill', kernel });
+      // Trampa de sharp: sin toColourspace('b-w') un raw de 1 canal se promueve a 3.
+      return channels === 1 ? s.toColourspace('b-w').raw().toBuffer() : s.raw().toBuffer();
+    };
+    const maskResized = await escalar(alfaBytesT, 1, 'mitchell');
+    const primerPlano = await escalar(primerPlanoT, 3, 'linear');
+
+    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    for (let i = 0; i < maskResized.length; i++) {
+      if (maskResized[i] > 0 && maskResized[i] < 242) {
+        rgbRaw[i * 3] = primerPlano[i * 3];
+        rgbRaw[i * 3 + 1] = primerPlano[i * 3 + 1];
+        rgbRaw[i * 3 + 2] = primerPlano[i * 3 + 2];
+      }
+    }
+
+    return sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
+      .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
+      .png()
+      .toBuffer();
+  }
+
   private async procesar(buffer: Buffer): Promise<Buffer> {
     // Si la imagen de entrada tiene orientación EXIF (típica de fotos tomadas con
     // celular en vertical), auto-orientamos los píxeles antes de calcular dimensiones
@@ -278,37 +321,7 @@ export class BackgroundRemovalService {
 
       const primerPlanoT = estimarPrimerPlano(rgbT, alfaT, wT, hT);
 
-      const alfaBytesT = Buffer.alloc(wT * hT);
-      for (let i = 0; i < alfaBytesT.length; i++) alfaBytesT[i] = Math.round(alfaT[i] * 255);
-
-      const resizeSiHaceFalta = async (data: Uint8Array | Buffer, channels: 1 | 3, kernel: 'mitchell' | 'linear') => {
-        if (wT === origWidth && hT === origHeight) return Buffer.from(data);
-        const s = sharp(data, { raw: { width: wT, height: hT, channels } }).resize(origWidth, origHeight, { fit: 'fill', kernel });
-        return channels === 1 ? s.toColourspace('b-w').raw().toBuffer() : s.raw().toBuffer();
-      };
-      const maskResized = await resizeSiHaceFalta(alfaBytesT, 1, 'mitchell');
-      const primerPlano = await resizeSiHaceFalta(primerPlanoT, 3, 'linear');
-
-      const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
-        .removeAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      // Solo el anillo de alfa parcial toma el color descontaminado; el interior
-      // conserva los píxeles originales (a resolución completa, sin pasar por
-      // la reducción de trabajo).
-      for (let i = 0; i < maskResized.length; i++) {
-        if (maskResized[i] > 0 && maskResized[i] < 242) {
-          rgbRaw[i * 3] = primerPlano[i * 3];
-          rgbRaw[i * 3 + 1] = primerPlano[i * 3 + 1];
-          rgbRaw[i * 3 + 2] = primerPlano[i * 3 + 2];
-        }
-      }
-
-      const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
-        .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
-        .png()
-        .toBuffer();
+      const compuesta = await this.componerConPrimerPlano(buffer, alfaT, primerPlanoT, wT, hT, origWidth, origHeight);
 
       try {
         return await sharp(compuesta)
@@ -440,28 +453,18 @@ export class BackgroundRemovalService {
         maskFinalT[i] = Math.max(maskFinalT[i], Math.min(1, (finosSuaves[i] / 255) * 1.6));
       }
     }
-    const maskFinalBytes = Buffer.alloc(wT * hT);
-    for (let i = 0; i < maskFinalBytes.length; i++) maskFinalBytes[i] = Math.round(maskFinalT[i] * 255);
-
-    const maskResized =
-      wT === origWidth && hT === origHeight
-        ? maskFinalBytes
-        : await sharp(maskFinalBytes, { raw: { width: wT, height: hT, channels: 1 } })
-            .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
-            .toColourspace('b-w')
-            .raw()
-            .toBuffer();
+    // Solo el COLOR del anillo de alfa parcial (no su forma): ver
+    // estimarPrimerPlano. La NOTA de abajo (22/09/2026) descartó el unpremultiply;
+    // esto promedia colores del interior firme y no puede overshootear a negro.
+    const primerPlanoT = estimarPrimerPlano(rgbTrabajo, maskFinalT, wT, hT);
 
     // Compone: RGB original + la máscara como canal alfa. joinChannel() sobre
     // un sharp() todavía "encoded" (recién decodificado de PNG/JPEG, sin pasar
     // por .raw()) descarta el canal unido en silencio (channels:3,
     // hasAlpha:false en la salida, sin error) — hay que forzar la decodificación
-    // a píxeles crudos primero y recién ahí encadenar joinChannel.
-    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
+    // a píxeles crudos primero y recién ahí encadenar joinChannel (ver
+    // componerConPrimerPlano).
+    //
     // NOTA (22/09/2026): hubo acá una "descontaminación" de color por
     // unpremultiply (recuperar el color real del producto en píxeles de
     // alfa parcial, contra un fondo blanco asumido) — se sacó por inestable:
@@ -472,12 +475,8 @@ export class BackgroundRemovalService {
     // (bóxer + caja): quedó un contorno negro grueso rodeando todo el
     // producto. La erosión + el desenfoque de arriba ya sacan el halo del
     // caso real que motivó esto (sombra de contacto mal clasificada, ver
-    // comentario de RADIO_EROSION) sin este riesgo — no hacía falta la
-    // descontaminación además.
-    const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
-      .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
-      .png()
-      .toBuffer();
+    // comentario de RADIO_EROSION).
+    const compuesta = await this.componerConPrimerPlano(buffer, maskFinalT, primerPlanoT, wT, hT, origWidth, origHeight);
 
     // Recorta el margen transparente que queda alrededor del producto — SIN
     // esto, la foto conserva el tamaño de lienzo original completo (solo se
