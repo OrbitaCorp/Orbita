@@ -33,8 +33,8 @@ function Tipeo({ texto }: { texto: string }) {
       // El texto completo para lectores de pantalla; lo tipeado es solo visual.
       aria-label={texto}
       style={{
-        background: '#131a33', border: '1px solid #2a3670', borderRadius: 14,
-        padding: '10px 14px', fontSize: 13, lineHeight: 1.45, color: '#e8ecf7',
+        background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 14,
+        padding: '10px 14px', fontSize: 13, lineHeight: 1.45, color: 'var(--color-text)',
         textAlign: 'center', maxWidth: 280, minHeight: 20, textWrap: 'pretty',
       }}
     >

@@ -4,10 +4,12 @@
 // engranaje en Configuración…— con su cara, su accesorio y su gesto. Inicio es
 // la forma base y la que se usa cuando no se sabe el módulo.
 //
-// Grande (≥40px) está vivo: flota, parpadea, el satélite orbita, cambia de forma
-// con un resorte, hace el gesto del módulo al llegar y, si se lo toca, se ríe.
-// Chico (menú, avatar de los mensajes) queda quieto: a ese tamaño el movimiento
-// no se lee y solo distrae. Con `prefers-reduced-motion` también queda quieto.
+// Grande (≥40px) está vivo: flota, parpadea, el satélite orbita y, si se lo
+// toca, se ríe. Chico, o con `animated={false}`, queda quieto: un personaje
+// moviéndose todo el tiempo al costado de la pantalla de trabajo distrae.
+// Vivo o quieto, al cambiar de módulo SIEMPRE se lo ve transformarse (las
+// formas se cruzan con un resorte y hace el gesto del módulo): es un movimiento
+// corto que pasa solo en el cambio. Con `prefers-reduced-motion` no se mueve nada.
 //
 // Es un dibujo a colores fijos pensado para fondo oscuro: `disc` lo apoya sobre
 // el disco navy, igual que la estrella que reemplaza, para que se lea en tema
@@ -39,7 +41,10 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
   const moduloRuta = useModuloPet()
   const m = petModulo(modulo ?? moduloRuta)
   const reducido = useMovimientoReducido()
+  /** Vivo: animaciones continuas (flotar, parpadeo, órbita). */
   const anim = (animated ?? size >= 40) && !reducido
+  /** Transformarse al cambiar de módulo: siempre, salvo movimiento reducido. */
+  const trans = !reducido
   const interactivo = anim && !!onCosquillas
 
   // useId trae ":" — válido en ids pero incómodo dentro de url(#…).
@@ -69,10 +74,15 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
     return () => a.cancel()
   }, [anim])
 
-  // El gesto del módulo, al aparecer y cada vez que cambia de módulo.
+  // El gesto del módulo: al aparecer solo si está vivo; al cambiar de módulo,
+  // siempre (también el pet quieto del menú tiene que verse cambiar).
+  const moduloPrevio = useRef<string | null>(null)
   useEffect(() => {
-    if (anim) gesto(m.gesto)
-  }, [anim, m.gesto, gesto])
+    const primera = moduloPrevio.current === null
+    const cambio = !primera && moduloPrevio.current !== m.id
+    moduloPrevio.current = m.id
+    if ((primera && anim) || (cambio && trans)) gesto(m.gesto)
+  }, [anim, trans, m.id, m.gesto, gesto])
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
@@ -117,9 +127,10 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
         <g ref={flotarRef} style={{ transformOrigin: '50px 50px' }}>
           <g ref={gestoRef} style={{ transformOrigin: '50px 50px' }}>
             <g filter={u('sh')}>
-              {anim
-                // Animado: están las nueve formas y se cruzan con un resorte.
-                // Solo la activa lleva sus animaciones SMIL (engranaje, destellos).
+              {trans
+                // Están las nueve formas y se cruzan con un resorte al cambiar de
+                // módulo. Solo la activa, y solo si está vivo, lleva sus animaciones
+                // SMIL (engranaje, destellos).
                 ? PET_MODULOS.map(x => {
                   const on = x.id === m.id
                   return (
@@ -129,7 +140,7 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
                       opacity: on ? 1 : 0,
                       transition: `transform .6s ${RESORTE}, opacity .3s`,
                     }}>
-                      <Cuerpo id={x.cuerpo} a={on} u={u} />
+                      <Cuerpo id={x.cuerpo} a={on && anim} u={u} />
                     </g>
                   )
                 })
@@ -137,15 +148,15 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
             </g>
 
             <g
-              transform={anim ? undefined : `translate(${vx} ${vy})`}
-              style={anim ? { transform: `translate(${vx}px, ${vy}px)`, transition: `transform .6s ${RESORTE}` } : undefined}
+              transform={trans ? undefined : `translate(${vx} ${vy})`}
+              style={trans ? { transform: `translate(${vx}px, ${vy}px)`, transition: `transform .6s ${RESORTE}` } : undefined}
             >
               <Visor a={anim} u={u} />
-              <g key={cara} className={anim ? 'orbi-pet-cara' : undefined}><Cara id={cara} a={anim} /></g>
+              <g key={cara} className={trans ? 'orbi-pet-cara' : undefined}><Cara id={cara} a={anim} /></g>
             </g>
 
             {accesorio && (
-              <g key={accesorio} className={anim ? 'orbi-pet-ac' : undefined} style={{ pointerEvents: 'none' }}>
+              <g key={accesorio} className={trans ? 'orbi-pet-ac' : undefined} style={{ pointerEvents: 'none' }}>
                 <Accesorio id={accesorio} a={anim} />
               </g>
             )}
@@ -154,7 +165,7 @@ export function OrbiPet({ modulo, size = 40, animated, disc = false, estado = 'n
 
         <OrbitaAdelante a={anim} u={u} />
       </svg>
-      {anim && (
+      {trans && (
         <style>{`
           .orbi-pet-cara { animation: orbiPetAparece .2s ease-out }
           .orbi-pet-ac { transform-origin: 80px 22px; animation: orbiPetPop .5s ${RESORTE} }

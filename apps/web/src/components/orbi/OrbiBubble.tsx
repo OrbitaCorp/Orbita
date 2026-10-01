@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { X } from 'lucide-react'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 import { useOrbiStore } from './useOrbiStore'
 import type { OrbiBubbleData } from './useOrbiStore'
 
@@ -116,7 +116,8 @@ export function OrbiBubble({ onChipClick }: Props) {
           pointerEvents: visible && !exiting ? 'auto' : 'none',
         }}
       >
-        <OrbiIcon size={32} disc />
+        {/* En "Crear tu espacio" el pet va siempre en su forma base (Inicio). */}
+        <OrbiPet modulo="dashboard" size={32} disc />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{

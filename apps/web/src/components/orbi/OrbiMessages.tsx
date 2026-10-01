@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, type ReactNode } from 'react'
 import { ThumbsUp, ThumbsDown, Check, CircleAlert, CircleHelp, Loader2, RotateCw, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
-import { OrbiIcon } from './OrbiIcon'
 import { OrbiPet } from './pet/OrbiPet'
 import { OrbiPetSay } from './pet/OrbiPetSay'
 import { petModulo, PET_COSQUILLAS } from './pet/petModulos'
@@ -293,7 +292,9 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
       {!isUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          {esPanel ? <OrbiPet size={22} disc /> : <OrbiIcon size={22} disc />}
+          {/* Quieto (se transforma al cambiar de módulo): con varias respuestas en
+              pantalla, muchos pets moviéndose a la vez marean. */}
+          <OrbiPet modulo={esPanel ? undefined : 'dashboard'} size={30} animated={false} />
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)' }}>Orbi</span>
         </div>
       )}
@@ -432,20 +433,16 @@ function OrbiThinking({ msg }: { msg: OrbiMessage }) {
   )
 }
 
-// Pantalla vacía del panel: el pet grande, con la forma del módulo, diciendo su
-// frase. Se le pueden hacer cosquillas. Va sobre un escenario navy porque el
-// dibujo es de colores fijos pensados para fondo oscuro.
+// Pantalla vacía del panel: el pet grande, suelto sobre el panel, con la forma
+// del módulo y diciendo su frase. Se le pueden hacer cosquillas.
 function EscenarioPet() {
   const m = petModulo(useModuloPet())
   const [cosquillas, setCosquillas] = useState(false)
   return (
-    <div style={{
-      width: '100%', maxWidth: 300, background: '#0a0e1a', border: '1px solid #1c2440', borderRadius: 16,
-      padding: '18px 16px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-    }}>
-      <OrbiPet modulo={m.id} size={120} onCosquillas={setCosquillas} />
+    <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <OrbiPet modulo={m.id} size={140} onCosquillas={setCosquillas} />
       <OrbiPetSay texto={cosquillas ? PET_COSQUILLAS : m.frase} />
-      <div style={{ fontSize: 11, color: '#8a95c2' }}>Tocá a Orbi para hacerle cosquillas</div>
+      <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>Tocá a Orbi para hacerle cosquillas</div>
     </div>
   )
 }
@@ -472,7 +469,7 @@ export function OrbiMessages() {
   if (!messages.length) {
     return (
       <div className="orbi-messages-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
-        {esPanel ? <EscenarioPet /> : <OrbiIcon size={48} disc />}
+        {esPanel ? <EscenarioPet /> : <OrbiPet modulo="dashboard" size={96} />}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginBottom: 4 }}>Hola, soy Orbi</div>
           <div style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
