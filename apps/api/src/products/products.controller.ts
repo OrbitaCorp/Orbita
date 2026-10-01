@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Throttle } from '@nestjs/throttler';
+import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -108,8 +109,14 @@ export class ProductsController {
     return this.productAiService.suggestVariants(member.businessId, dto);
   }
 
+  // Paquete "Avanzado" (decisión del 01/10): escanear una foto para completar
+  // nombre, categoría, descripción y variantes es exclusivo del add-on. Hasta
+  // entonces lo usaba cualquier plan. ai-assist y ai-variants (completar por
+  // NOMBRE, sin foto) siguen abiertos a todos. La demo pública no se ve
+  // afectada: su negocio tiene el add-on activo (ver seed-demo.ts).
   @Post('ai-scan')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 15, ttl: 60000 } })
   @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN), DemoIaInterceptor)

@@ -125,12 +125,36 @@ describe('SubscriptionsService — notification_url del pago de bienvenida', () 
 
   it('se deriva de MERCADOPAGO_REDIRECT_URI', () => {
     expect(url('https://api.orbita.site/api/v1/mercadopago/oauth/callback')).toBe(
-      'https://api.orbita.site/api/v1/webhooks/mercadopago/preapproval',
+      'https://api.orbita.site/api/v1/webhooks/mercadopago/preapproval?source_news=webhooks',
     );
   });
 
   it('no se manda en local (http) ni si la variable falta', () => {
     expect(url('http://localhost:3000/api/v1/mercadopago/oauth/callback')).toBeUndefined();
     expect(url(undefined)).toBeUndefined();
+  });
+});
+
+describe('SubscriptionsService.handleWebhook — pago de bienvenida', () => {
+  it('no deja la sesión del dueño (accessToken/refreshToken) en el log', async () => {
+    const { WebhookSignatureValidator } = jest.requireActual('mercadopago');
+    jest.spyOn(WebhookSignatureValidator, 'validate').mockImplementation(() => undefined as any);
+
+    const { service } = armar({ MP_ACCESS_TOKEN: 'tok', MP_WEBHOOK_SECRET: 'secreto' });
+    (service as any)._payment = { get: jest.fn().mockResolvedValue({ external_reference: 'PEND-9' }) };
+    jest.spyOn(service, 'confirmAndCreate').mockResolvedValue({
+      activated: true, subdomain: 'mateo', businessId: 'b1', free: false,
+      accessToken: 'ACCESS-SECRETO', refreshToken: 'REFRESH-SECRETO',
+    } as any);
+    const log = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
+
+    await service.handleWebhook({ type: 'payment', data: { id: '123' } }, { 'x-signature': 'x', 'x-request-id': 'y' }, {});
+
+    const todo = log.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(todo).toContain('"activated":true');
+    expect(todo).toContain('"subdomain":"mateo"');
+    expect(todo).not.toContain('SECRETO');
+    expect(todo).not.toContain('accessToken');
+    expect(todo).not.toContain('refreshToken');
   });
 });

@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { yaEsRecorteConAlfa } from './transparencia';
 import { quitarMarco } from './quitar-marco';
-import { endurecer, completarHuecos, estimarPrimerPlano, guidedFilter, recuperarFinos } from './mask-refine';
+import { endurecer, completarHuecos, estimarPrimerPlano, guidedFilter, quitarIslas, recuperarFinos } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -458,6 +458,11 @@ export class BackgroundRemovalService {
         maskFinalT[i] = Math.max(maskFinalT[i], Math.min(1, (finosSuaves[i] / 255) * 1.6));
       }
     }
+    // Trocitos de fleco/hilo que a 320 px quedan flotando sueltos junto a la prenda:
+    // se borran las islas diminutas (ver quitarIslas). Solo en esta rama: BiRefNet
+    // sí ve los hilos enteros y no los fragmenta.
+    quitarIslas(maskFinalT, wT, hT);
+
     // Solo el COLOR del anillo de alfa parcial (no su forma): ver
     // estimarPrimerPlano. La NOTA de abajo (22/09/2026) descartó el unpremultiply;
     // esto promedia colores del interior firme y no puede overshootear a negro.

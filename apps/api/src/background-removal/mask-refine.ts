@@ -80,6 +80,70 @@ export function endurecer(mascara: Float32Array, centro: number, ancho: number):
 }
 
 /**
+ * Borra las "islas": pedacitos de máscara desconectados del producto y mucho
+ * más chicos que él (un trozo de hilo suelto, una mota de la alfombra). A
+ * resolución de U2Netp (320 px) un fleco de 1 px se fragmenta en trocitos que
+ * quedan flotando al lado de la prenda y se ven como basura. Una pieza que sí
+ * es parte del producto (la otra mitad de un conjunto, un aro del par) es lo
+ * bastante grande como para quedarse.
+ *
+ * Una isla se borra si su área es menor que `minFraccion` de la componente más
+ * grande (y que `minPx`, para no tocar nada en imágenes diminutas). Modifica
+ * `mascara` en el lugar; devuelve cuántas islas borró.
+ */
+export function quitarIslas(
+  mascara: Float32Array,
+  w: number,
+  h: number,
+  opciones: { umbral?: number; minFraccion?: number; minPx?: number } = {},
+): number {
+  const umbral = opciones.umbral ?? 0.05; // cuenta también el borde suave, no solo el núcleo
+  const minFraccion = opciones.minFraccion ?? 0.0025;
+  const minPx = opciones.minPx ?? 60;
+  const n = w * h;
+
+  const etiqueta = new Int32Array(n); // 0 = sin visitar / fondo; >0 = id de componente
+  const cola = new Int32Array(n);
+  const areas: number[] = [0];
+  let id = 0;
+  for (let i0 = 0; i0 < n; i0++) {
+    if (mascara[i0] <= umbral || etiqueta[i0] !== 0) continue;
+    id++;
+    let ini = 0;
+    let fin = 0;
+    cola[fin++] = i0;
+    etiqueta[i0] = id;
+    while (ini < fin) {
+      const i = cola[ini++];
+      const x = i % w;
+      const vecinos = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i < n - w ? i + w : -1];
+      for (const j of vecinos) {
+        if (j >= 0 && etiqueta[j] === 0 && mascara[j] > umbral) {
+          etiqueta[j] = id;
+          cola[fin++] = j;
+        }
+      }
+    }
+    areas.push(fin);
+  }
+  if (id <= 1) return 0;
+
+  const mayor = Math.max(...areas);
+  const corte = Math.max(minPx, mayor * minFraccion);
+  const borrar = new Uint8Array(id + 1);
+  let borradas = 0;
+  for (let c = 1; c <= id; c++) {
+    if (areas[c] < corte) {
+      borrar[c] = 1;
+      borradas++;
+    }
+  }
+  if (borradas === 0) return 0;
+  for (let i = 0; i < n; i++) if (etiqueta[i] !== 0 && borrar[etiqueta[i]]) mascara[i] = 0;
+  return borradas;
+}
+
+/**
  * Descontaminación de color del borde (estimación de primer plano). Los píxeles
  * de alfa parcial de un recorte conservan parte del color del fondo ORIGINAL
  * (madera marrón detrás de una remera blanca): sobre un fondo oscuro eso se ve

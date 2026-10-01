@@ -815,7 +815,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
             setOrbiScanKey(key)
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            // El servidor responde 403 ADDON_REQUIRED:ADVANCED si el negocio no tiene el
+            // paquete (el botón ya no se ofrece sin él, pero el plan pudo vencer con la
+            // pantalla abierta).
+            if (err instanceof ApiError && err.message.startsWith('ADDON_REQUIRED')) {
+                onToast('Escanear productos con una foto es parte del paquete Avanzado.')
+            } else {
+                onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            }
         } finally {
             setOrbiScanGen(false)
             if (fileInputScanRef.current) {
@@ -2037,7 +2044,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
-                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                    {fotoParaOrbi && !orbiScanSuccess && avanzado && (
                                         <button
                                             type="button"
                                             onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
@@ -2048,6 +2055,36 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                             {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
                                         </button>
+                                    )}
+                                    {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
+                                        de dejar un botón que el servidor va a rechazar. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
+                                        <div
+                                            role="note"
+                                            style={{
+                                                marginTop: 14, padding: '11px 14px', borderRadius: 10,
+                                                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 260px', minWidth: 0 }}>
+                                                <Sparkles size={15} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Cargá tus productos más rápido</div>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, marginTop: 1 }}>
+                                                        Con el paquete Avanzado, Orbi completa el nombre, la categoría y la descripción a partir de una sola foto.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
+                                                className="ds-link"
+                                                style={{ ...enlace, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+                                            >
+                                                Conocer el paquete <ChevronRight size={13} strokeWidth={2.2} />
+                                            </button>
+                                        </div>
                                     )}
                                     {orbiScanSuccess && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
