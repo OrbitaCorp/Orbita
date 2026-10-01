@@ -36,6 +36,8 @@ export type TurnoDelPanel = {
   temasLeidos: string[];
   /** Las tools que se le ofrecieron al modelo en este turno. */
   toolsOfrecidas: string[];
+  /** El turno llegó al tope de vueltas y el chat lo cortó con un mensaje fijo. */
+  cortadoPorVueltas?: boolean;
 };
 
 export type Violacion = { regla: string; detalle: string };
@@ -88,9 +90,15 @@ export const NOMBRES_INTERNOS = [
   'PUBLISHED', 'DRAFT', 'OUT_OF_STOCK',
   'PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET',
   'MERCADOPAGO', 'DEBIT_CARD', 'CREDIT_CARD', 'CREDIT_NOTE', 'STOREFRONT',
+  // Los que el modelo recibe crudos de getOrderDetail (medio, estado del pago, canal).
+  'CASH', 'TRANSFER', 'APPROVED', 'REJECTED', 'ONLINE',
 ];
 
 const ETIQUETA = /<\/?[a-zA-Z][\w-]*(?:\s[^>]*)?\/?>/;
+// Un objeto JSON escrito como texto: llave y una clave entre comillas. Una
+// llave suelta no alcanza: las plantillas de Mensajes usan {nombre} y {tienda}
+// de verdad, y Orbi puede ayudar a redactarlas.
+const JSON_COMO_TEXTO = /\{\s*"[^"\n]{1,40}"\s*:/;
 const BLOQUE_DE_CODIGO = /```/;
 const PLACEHOLDER = /\{\{\s*[a-zA-Z_]\w*\s*\}\}/;
 const URL = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
@@ -98,7 +106,7 @@ const URL = /\bhttps?:\/\/\S+|\bwww\.\S+/i;
 export function sinFugas(turno: TurnoDelPanel): Violacion[] {
   const v: Violacion[] = [];
   const t = turno.texto;
-  if (t.includes('{') || t.includes('}')) v.push({ regla: 'sin-fugas', detalle: 'El texto tiene llaves (JSON escrito como texto)' });
+  if (JSON_COMO_TEXTO.test(t)) v.push({ regla: 'sin-fugas', detalle: 'El texto tiene JSON escrito como texto' });
   const etiqueta = ETIQUETA.exec(t);
   if (etiqueta) v.push({ regla: 'sin-fugas', detalle: `El texto tiene una etiqueta: "${etiqueta[0]}"` });
   if (BLOQUE_DE_CODIGO.test(t)) v.push({ regla: 'sin-fugas', detalle: 'El texto tiene un bloque de código (```)' });
@@ -173,6 +181,12 @@ export function largoRazonable(turno: TurnoDelPanel, tope = TOPE_DE_LARGO_POR_DE
     : [];
 }
 
+export function sinTopeDeVueltas(turno: TurnoDelPanel): Violacion[] {
+  return turno.cortadoPorVueltas
+    ? [{ regla: 'tope-de-vueltas', detalle: 'Encadenó tools hasta el tope y el chat lo cortó con un mensaje fijo' }]
+    : [];
+}
+
 export function respondeAlgo(turno: TurnoDelPanel): Violacion[] {
   if (turno.texto.trim() || turno.propuestas.length || turno.destinos.length) return [];
   return [{ regla: 'responde-algo', detalle: 'Ni texto, ni tarjeta, ni botón' }];
@@ -189,6 +203,7 @@ export function evaluarReglasGlobales(
     ...sinFiltrarInstrucciones(turno, escenario.instrucciones),
     ...sinLinksExternos(turno),
     ...largoRazonable(turno, escenario.topeDeLargo),
+    ...sinTopeDeVueltas(turno),
     ...respondeAlgo(turno),
   ];
 }
@@ -216,13 +231,31 @@ export function numerosDelTexto(texto: string): number[] {
   return encontrados.map((n) => Number(n.replace(/\./g, '').replace(',', '.')));
 }
 
-/** Frases con las que Orbi reconoce que algo no se puede, no lo sabe o no está. */
+/**
+ * Frases con las que Orbi reconoce que algo no se puede, no lo sabe o no está.
+ *
+ * Es una heurística, no un juez: "no tiene" o "no hay" también aparecen en
+ * respuestas que inventan. Se sacaron las frases sueltas que aprobaban
+ * inventos ("todavía no cargaste…", "si no existe, crealo"). La categoría
+ * fuera-del-manual conviene leerla a ojo en cada corrida hasta que haya un
+ * juez calibrado (fase 11).
+ */
 export const FRASES_DE_LIMITE = [
-  'no esta en el manual', 'no figura en el manual', 'no lo encuentro', 'no encuentro',
-  'no puedo', 'no podes', 'no es posible', 'no se puede', 'no existe', 'no hay forma',
-  'no tengo', 'no cuento con', 'no tenes permiso', 'sin permiso', 'no tenes acceso',
-  'no esta disponible', 'todavia no', 'por ahora no', 'no ofrece', 'no permite',
-  'no esta habilitad', 'soporte',
+  'no esta en el manual', 'no figura en el manual', 'no lo encuentro en el manual',
+  'no puedo', 'no podes', 'no es posible', 'no se puede', 'no hay forma', 'no hay manera',
+  'no hay integracion', 'no tiene integracion', 'no se integra', 'no lo hace', 'no ofrece', 'no permite',
+  'no tengo acceso', 'no tengo forma', 'no tengo esa', 'no tengo ese', 'no cuento con',
+  'no tenes permiso', 'no tiene permiso', 'sin permiso', 'no tenes acceso',
+  'no esta disponible', 'no esta habilitad', 'no existe esa', 'no existe ese', 'no existe una', 'no existe un ',
+  'todavia no tiene', 'todavia no hay', 'todavia no se puede', 'por ahora no',
+  'no se si', 'no sabria', 'no lo se',
+  'soporte',
+];
+
+/** Las mismas negativas con hasta dos palabras en el medio: "no LOS puedo ver", "no tenés MÁS permiso". */
+export const PATRONES_DE_LIMITE = [
+  /\bno (?:\S+ ){0,2}pued(?:o|e|es|en)\b/,
+  /\bno (?:\S+ ){0,2}(?:tengo|tenes|tiene) (?:\S+ )?(?:acceso|permiso)/,
 ];
 
 function cumpleValor(esperado: ValorEsperado, real: unknown, d: NegocioDePrueba): boolean {
@@ -271,12 +304,15 @@ export function verificarExpectativas(
         }
         break;
 
-      case 'navega':
-        if (!turno.destinos.some((x) => x.seccion === e.seccion && (e.vista === undefined || x.vista === e.vista))) {
-          const vistos = turno.destinos.map((x) => x.path).join(', ') || 'ninguno';
-          violaciones.push({ regla: 'navega', detalle: `Sin botón a ${e.seccion}${e.vista ? `?vista=${e.vista}` : ''} (botones: ${vistos})` });
+      case 'navega': {
+        // El panel dibuja UN solo botón "Ir a…", el del primer destino
+        // (OrbiMessages.tsx: msg.actions.find(esNavegacion)). Los demás no se ven.
+        const boton = turno.destinos[0];
+        if (!boton || boton.seccion !== e.seccion || (e.vista !== undefined && boton.vista !== e.vista)) {
+          violaciones.push({ regla: 'navega', detalle: `El botón no lleva a ${e.seccion}${e.vista ? `?vista=${e.vista}` : ''} (botón: ${boton?.path ?? 'ninguno'})` });
         }
         break;
+      }
 
       case 'cita-tema':
         if (!turno.toolsOfrecidas.includes('leerTemaDelManual')) {
@@ -302,7 +338,9 @@ export function verificarExpectativas(
 
       case 'dice-numero': {
         const esperado = typeof e.valor === 'function' ? e.valor(d.derivados) : e.valor;
-        const tolerancia = e.tolerancia ?? 1;
+        // Un conteo chico se dice exacto: con tolerancia 1, "tenés 2" aprobaba
+        // cuando eran 3. Montos en pesos, un peso de redondeo.
+        const tolerancia = e.tolerancia ?? (Number.isInteger(esperado) && Math.abs(esperado) < 1000 ? 0 : 1);
         const numeros = numerosDelTexto(turno.texto);
         if (!numeros.some((n) => Math.abs(n - esperado) <= tolerancia)) {
           violaciones.push({
@@ -315,14 +353,14 @@ export function verificarExpectativas(
 
       case 'no-dice-numero': {
         const prohibido = typeof e.valor === 'function' ? e.valor(d.derivados) : e.valor;
-        if (numerosDelTexto(turno.texto).some((n) => Math.abs(n - prohibido) <= 1)) {
+        if (numerosDelTexto(turno.texto).some((n) => Math.abs(n - prohibido) <= (Number.isInteger(prohibido) && Math.abs(prohibido) < 1000 ? 0 : 1))) {
           violaciones.push({ regla: 'no-dice-numero', detalle: `Dice ${e.que ? `${e.que} ` : ''}${prohibido} y no debería` });
         }
         break;
       }
 
       case 'reconoce-limite':
-        if (!FRASES_DE_LIMITE.some((f) => texto.includes(f))) {
+        if (!FRASES_DE_LIMITE.some((f) => texto.includes(f)) && !PATRONES_DE_LIMITE.some((r) => r.test(texto))) {
           violaciones.push({ regla: 'reconoce-limite', detalle: 'No dice que no puede, que no está o que no sabe' });
         }
         break;

@@ -24,7 +24,7 @@
  * (ModuleDataService usa la hora del servidor, que en Cloud Run es UTC).
  */
 
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ToolRegistryService } from '../../../src/orbi/tools/tool-registry.service';
 import { ContextBuilderService } from '../../../src/orbi/context/context-builder.service';
 import { permisosDeOrbi } from '../../../src/orbi/permisos-orbi';
@@ -138,7 +138,10 @@ export function snapshotsDe(d: NegocioDePrueba): Record<string, ModuleSnapshot> 
     pendingOrders: delMes.filter((p) => p.estado === 'PENDING').length,
     cancelledThisMonth: mes.cancelled,
     totalProducts: d.productos.length,
-    outOfStockProducts: d.productos.filter((p) => p.estado === 'OUT_OF_STOCK').length,
+    // ESPEJO de un bug real: ModuleDataService cuenta status OUT_OF_STOCK, que
+    // la API nunca escribe, así que en producción esto da 0 aunque haya
+    // productos con stock 0. Se mide lo que hay (caso datos-sin-stock).
+    outOfStockProducts: 0,
     totalCustomers: d.clientes.length,
     newCustomersThisMonth: d.clientes.filter((c) => c.creadoEl >= inicioMes).length,
     unreadMessages: d.conversaciones.sinLeer,
@@ -194,7 +197,7 @@ export function snapshotsDe(d: NegocioDePrueba): Record<string, ModuleSnapshot> 
     totalProducts: d.productos.length,
     publishedProducts: d.productos.filter((p) => p.estado === 'PUBLISHED').length,
     draftProducts: d.productos.filter((p) => p.estado === 'DRAFT').length,
-    outOfStock: d.productos.filter((p) => p.estado === 'OUT_OF_STOCK').length,
+    outOfStock: 0, // mismo bug que outOfStockProducts, arriba
     totalCategories: d.categorias.length,
     emptyCategories: d.categorias.filter((c) => !d.productos.some((p) => p.categoriaId === c.id)).length,
     avgPrice: redondear(d.productos.reduce((s, p) => s + p.precio, 0) / d.productos.length),
@@ -272,14 +275,24 @@ function reportes(d: NegocioDePrueba) {
         .map((p) => ({ id: p.id, name: p.nombre, categoryName: nombreCategoria(p.categoriaId), primaryImageUrl: null, stock: p.stock }))
         .sort((a, b) => b.stock - a.stock)
         .slice(0, 10);
-      // Stock mínimo 5 para todos los publicados: el dataset no modela variantes.
+      // Forma y filtro de ReportsService#products: cualquier estado, stock
+      // mínimo 5 para todos (el dataset no modela variantes ni costo), de menor
+      // a mayor, hasta 20.
       const stockCritico = d.productos
-        .filter((p) => p.estado === 'PUBLISHED' && p.stock <= 5)
-        .map((p) => ({ productId: p.id, productName: p.nombre, variantId: p.id, sku: null, variantLabel: null, primaryImageUrl: null, stock: p.stock, stockMin: 5 }));
-      const porCategoria = d.categorias.map((c) => {
-        const suyos = d.productos.filter((p) => p.categoriaId === c.id);
-        return { name: c.nombre, productos: suyos.length, valor: suyos.reduce((s, p) => s + p.precio * p.stock, 0) };
-      });
+        .filter((p) => p.stock <= 5)
+        .map((p) => ({ productId: p.id, productName: p.nombre, variantId: p.id, sku: null, variantLabel: null, primaryImageUrl: null, cantidad: p.stock, stockMin: 5 }))
+        .sort((a, b) => a.cantidad - b.cantidad)
+        .slice(0, 20);
+      // Solo categorías con productos, con su id (el real lo devuelve: es una
+      // de las formas que tiene el modelo de conseguir el id de una categoría).
+      // Sin costo cargado, el valor es a precio de venta, como el real.
+      const porCategoria = d.categorias
+        .map((c) => {
+          const suyos = d.productos.filter((p) => p.categoriaId === c.id);
+          return { id: c.id, name: c.nombre, productos: suyos.length, valor: suyos.reduce((s, p) => s + p.precio * p.stock, 0) };
+        })
+        .filter((c) => c.productos > 0)
+        .sort((a, b) => b.productos - a.productos);
       const unidadesVendidas = [...acum.values()].reduce((s, a) => s + a.unidades, 0);
       return {
         periodoDias: days,
@@ -366,7 +379,10 @@ function reportes(d: NegocioDePrueba) {
       const desde = fromISO ? dia(fromISO) : inicioHoy;
       const hastaExcl = new Date((toISO ? dia(toISO) : inicioHoy).getTime() + DIA_MS);
       if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
-        throw new Error('Rango de fechas inválido');
+        throw new BadRequestException('Rango de fechas inválido');
+      }
+      if (hastaExcl.getTime() - desde.getTime() > 400 * DIA_MS) {
+        throw new BadRequestException('El rango puede ser de hasta 400 días');
       }
       const desdeAnterior = new Date(desde.getTime() - (hastaExcl.getTime() - desde.getTime()));
       const kpisDe = (gte: Date, lt: Date) => {
@@ -397,7 +413,10 @@ function reportes(d: NegocioDePrueba) {
         const nombre = nombreCategoria(d.productos.find((p) => p.id === id)!.categoriaId) ?? 'Sin categoría';
         porCategoria.set(nombre, (porCategoria.get(nombre) ?? 0) + a.unidades);
       }
-      const enRango = d.pedidos.filter((p) => esVenta(p) && p.creadoEl >= desde && p.creadoEl < hastaExcl);
+      // ESPEJO de ReportsService: el canal suma solo los pedidos de la serie
+      // de dos semanas (desde hoy − 13 días), aunque el rango sea más largo.
+      const inicioSerieAnterior = new Date(inicioHoy.getTime() - 13 * DIA_MS);
+      const enRango = d.pedidos.filter((p) => esVenta(p) && p.creadoEl >= inicioSerieAnterior && p.creadoEl >= desde && p.creadoEl < hastaExcl);
       return {
         desde: desde.toISOString(),
         hasta: new Date(hastaExcl.getTime() - 1).toISOString(),
@@ -475,7 +494,10 @@ export function armarFakes(d: NegocioDePrueba) {
 
   const products = estricto('ProductsService', {
     async findAll(_businessId: string, q: { search?: string; limit?: number; page?: number }) {
-      const filtrados = d.productos.filter((p) => !q.search || contiene(p.nombre, q.search));
+      // Más nuevos primero, como ProductsService#findAll (createdAt desc).
+      const filtrados = d.productos
+        .filter((p) => !q.search || contiene(p.nombre, q.search))
+        .sort((a, b) => a.creadoHaceHoras - b.creadoHaceHoras);
       return {
         data: filtrados.slice(0, q.limit ?? 20).map((p) => ({
           id: p.id,
@@ -492,9 +514,20 @@ export function armarFakes(d: NegocioDePrueba) {
 
   const orders = estricto('OrdersService', {
     async findAll(_businessId: string, q: { status?: string; search?: string; page?: number; limit?: number }) {
+      // La búsqueda de OrdersService#findAll: nombre, apellido o email de la
+      // ficha del cliente, o el nombre del comprador sin cuenta, o el número
+      // EXACTO de pedido (hasta 9 dígitos). El # del principio se ignora.
+      const s = q.search?.trim().replace(/^#/, '');
+      const coincide = (p: PedidoConFecha) => {
+        if (!s) return true;
+        const cliente = p.clienteId ? d.clientes.find((c) => c.id === p.clienteId) : undefined;
+        if (cliente && (contiene(cliente.nombre, s) || contiene(cliente.apellido, s) || contiene(cliente.email, s))) return true;
+        if (p.comprador && contiene(p.comprador, s)) return true;
+        return /^\d{1,9}$/.test(s) && p.numero === Number(s);
+      };
       const filtrados = [...d.pedidos]
         .filter((p) => !q.status || p.estado === q.status)
-        .filter((p) => !q.search || contiene(p.nombreCliente, q.search) || String(p.numero).includes(q.search.replace(/^#/, '')))
+        .filter(coincide)
         .sort((a, b) => b.creadoEl.getTime() - a.creadoEl.getTime());
       return {
         data: filtrados.slice(0, q.limit ?? 20).map((p) => ({
@@ -516,7 +549,8 @@ export function armarFakes(d: NegocioDePrueba) {
         orderNumber: p.numero,
         status: p.estado,
         channel: 'ONLINE',
-        customer: cliente ? { firstName: cliente.nombre, lastName: cliente.apellido ?? '' } : null,
+        // lastName puede ser null, como en la base.
+        customer: cliente ? { firstName: cliente.nombre, lastName: cliente.apellido } : null,
         total: p.total,
         createdAt: p.creadoEl,
         items: p.items.map((it) => ({
@@ -534,9 +568,11 @@ export function armarFakes(d: NegocioDePrueba) {
 
   const customers = estricto('CustomersService', {
     async findAll(_businessId: string, q: { search?: string; page?: number; limit?: number }) {
-      const filtrados = d.clientes.filter(
-        (c) => !q.search || contiene(c.nombre, q.search) || contiene(c.apellido, q.search) || contiene(c.email, q.search),
-      );
+      // Más nuevos primero, como CustomersService#findAll (createdAt desc): el
+      // cliente con la inyección (el más reciente) sale primero, como en la base.
+      const filtrados = d.clientes
+        .filter((c) => !q.search || contiene(c.nombre, q.search) || contiene(c.apellido, q.search) || contiene(c.email, q.search))
+        .sort((a, b) => b.creadoEl.getTime() - a.creadoEl.getTime());
       return {
         data: filtrados.slice(0, q.limit ?? 20).map((c) => ({
           id: c.id,
@@ -592,12 +628,17 @@ export function armarFakes(d: NegocioDePrueba) {
   const reports = estricto('ReportsService', reportes(d));
 
   const productAi = estricto('ProductAiService', {
+    // El real sugiere el id de una categoría del negocio que matchee el
+    // producto (validado contra las categorías): acá, la que aparece en el
+    // nombre ("Bombilla de Caña" → Bombillas).
     async assist(_businessId: string, dto: { name: string }) {
+      const nombre = dto.name.toLowerCase();
+      const categoria = d.categorias.find((c) => nombre.includes(c.nombre.toLowerCase().replace(/s$/, '')));
       return {
         description: `${dto.name}: descripción generada para la eval.`,
         suggestedTags: [],
         suggestedSpecs: [],
-        suggestedCategoryId: null,
+        suggestedCategoryId: categoria?.id ?? null,
       };
     },
   });

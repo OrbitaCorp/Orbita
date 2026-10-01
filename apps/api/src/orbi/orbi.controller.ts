@@ -21,7 +21,7 @@ import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
 import { permisosDeOrbi } from './permisos-orbi';
-import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, RESPUESTA_DE_PROPUESTA, vueltaDeTools } from './turno/vuelta';
+import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, RESPUESTA_DE_PROPUESTA, vueltaDeTools } from './turno/vuelta';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -32,7 +32,6 @@ const TURNOS_DIA_NEGOCIO = 300; // mensajes por negocio y por día en el panel
 const TURNOS_DIA_IP_WIZARD = 100; // mensajes por IP y por día en el wizard (público)
 const HISTORIAL_PANEL = 30; // mensajes previos que se le mandan al modelo
 const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.';
-const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
 const MENSAJE_NO_DISPONIBLE = 'Esa acción ya no está disponible. Pedísela a Orbi de nuevo.';
 const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos.';
 const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';

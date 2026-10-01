@@ -117,8 +117,9 @@ export class GetOrderDetailTool implements OrbiTool {
           status: order.status,
           channel: order.channel,
           // Solo el nombre de pila y el apellido, no el mail ni el avatar.
+          // filter(Boolean): lastName es opcional y el modelo recibía "Ana null".
           customerName: order.customer
-            ? `${order.customer.firstName} ${order.customer.lastName}`.trim()
+            ? [order.customer.firstName, order.customer.lastName].filter(Boolean).join(' ')
             : null,
           total: order.total,
           createdAt: order.createdAt,

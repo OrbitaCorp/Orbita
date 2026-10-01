@@ -9,6 +9,9 @@ import type { LlmMessage, LlmToolCall } from '../llm/llm-adapter.interface';
 /** Llamadas al modelo por mensaje (cada tool es otra vuelta). */
 export const MAX_VUELTAS_TOOLS = 6;
 
+/** Lo que ve la persona cuando una respuesta encadena más vueltas que el tope. */
+export const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
+
 /**
  * Lo que recibe el modelo cuando pide una escritura que no puede proponerse
  * (demo, sin permiso, fuera del panel). Fijo y sin detalles.

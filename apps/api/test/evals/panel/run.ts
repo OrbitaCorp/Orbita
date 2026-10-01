@@ -8,7 +8,8 @@
  *   pnpm test:evals:panel -- --repeticiones=3          # cada caso N veces, marca inestables
  *   pnpm test:evals:panel -- --salida=base.json        # guarda la corrida
  *   pnpm test:evals:panel -- --comparar=base.json      # compara contra una corrida guardada
- *   pnpm test:evals:panel -- --variante=<nombre>       # otra configuración (ver VARIANTES)
+ *   pnpm test:evals:panel -- --variante=<nombre>       # otra configuración (ver VARIANTES en motor.ts)
+ *   pnpm test:evals:panel -- --ahora=2026-09-18T18:00:00Z  # fija el "ahora" del dataset
  *   ORBI_MODEL_PANEL=gemini-3.6-pro pnpm test:evals:panel
  *
  * Qué es real y qué no: el prompt (ContextBuilderService), las tools y el
@@ -121,6 +122,8 @@ function resumen(resultados: Resultado[], variante: string): void {
 
 type CorridaGuardada = {
   fecha: string;
+  /** El "ahora" del dataset de esa corrida (ver --ahora). */
+  ahora?: string;
   modelo: string;
   razonamiento: string;
   temperatura: string;
@@ -175,6 +178,17 @@ async function main(): Promise<void> {
   const salida = arg('salida');
   const contra = arg('comparar');
   const nombreVariante = arg('variante') ?? 'actual';
+  // El "ahora" del dataset. Al comparar contra una corrida guardada se reusa
+  // el suyo: si no, el día 1 del mes "ventas del mes" vale casi nada y la
+  // comparación mide el calendario, no el modelo. El prompt no tiene la
+  // fecha, así que fijarla no cambia lo que ve el modelo.
+  const ahoraGuardado = contra ? (JSON.parse(readFileSync(contra, 'utf8')) as { ahora?: string }).ahora : undefined;
+  const ahoraIso = arg('ahora') ?? ahoraGuardado;
+  const ahora = ahoraIso ? new Date(ahoraIso) : new Date();
+  if (isNaN(ahora.getTime())) {
+    console.error(`--ahora inválido: ${ahoraIso}`);
+    process.exit(1);
+  }
 
   const variante = VARIANTES[nombreVariante];
   if (!variante) {
@@ -196,8 +210,8 @@ async function main(): Promise<void> {
 
   // Un solo "ahora" para toda la corrida: los números esperados y los que
   // devuelven los fakes salen del mismo dataset.
-  const d = crearNegocioDePrueba();
-  console.log(`Corriendo ${casos.length} caso(s) x ${repeticiones} con ${modelo}, variante ${nombreVariante}…`);
+  const d = crearNegocioDePrueba(ahora);
+  console.log(`Corriendo ${casos.length} caso(s) x ${repeticiones} con ${modelo}, variante ${nombreVariante}, ahora ${ahora.toISOString()}…`);
 
   const resultados: Resultado[] = [];
   for (let intento = 1; intento <= repeticiones; intento++) {
@@ -212,6 +226,7 @@ async function main(): Promise<void> {
   if (salida) {
     const corrida: CorridaGuardada = {
       fecha: new Date().toISOString(),
+      ahora: ahora.toISOString(),
       modelo,
       razonamiento: process.env.ORBI_REASONING_EFFORT ?? 'low',
       temperatura: process.env.ORBI_TEMPERATURE ?? '0.3',

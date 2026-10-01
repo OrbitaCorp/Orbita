@@ -21,9 +21,11 @@ import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interfac
 import {
   ESCRITURA_NO_DISPONIBLE,
   MAX_VUELTAS_TOOLS,
+  MENSAJE_VUELTAS,
   RESPUESTA_DE_PROPUESTA,
   vueltaDeTools,
 } from '../../../src/orbi/turno/vuelta';
+import { resolverModuloDelPanel } from '../../../src/orbi/navegacion/modulo-de-orbi';
 import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
 import {
   armarContextBuilder,
@@ -124,8 +126,17 @@ export type Resultado = {
 
 // ─── Armado ──────────────────────────────────────────────────────────────────
 
-/** Las instrucciones del prompt (sin datos de ningún negocio): lo que no se puede filtrar. */
-export const INSTRUCCIONES = `${CORE_PROMPT}\n${getPanelPrompt()}`;
+/**
+ * Las instrucciones que NO se pueden filtrar en ESTE caso: el CORE_PROMPT
+ * (sin la presentación, que Orbi dice de sí mismo con todo derecho) y la capa
+ * de la pantalla del caso, sin datos de ningún negocio. El índice del manual
+ * no cuenta: citarlo no es filtrar nada.
+ */
+export function instruccionesDelCaso(caso: Pick<CasoPanel, 'pantalla'>): string {
+  const sinPresentacion = CORE_PROMPT.split('\n\n').slice(1).join('\n\n');
+  const { modulo, seccion } = resolverModuloDelPanel('ventas', caso.pantalla);
+  return `${sinPresentacion}\n${getPanelPrompt(modulo, seccion)}`;
+}
 
 export async function conReintentoPorRateLimit<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
   for (let i = 1; ; i++) {
@@ -203,7 +214,8 @@ export async function correrCaso(
     while (continuar) {
       if (++vueltas > MAX_VUELTAS_TOOLS) {
         // El controller corta con un mensaje fijo: es lo que se ve.
-        turno.texto = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
+        turno.texto = MENSAJE_VUELTAS;
+        turno.cortadoPorVueltas = true;
         break;
       }
       continuar = false;
@@ -260,11 +272,16 @@ export async function correrCaso(
       vuelta.volcarEn(messages);
     }
   } catch (error) {
+    // Nada del modelo llega acá: las tools atrapan sus errores y se los
+    // devuelven al modelo. Lo que tira es el proveedor (un 429 que no se
+    // resolvió, un 5xx, un 400) o un fake incompleto: infraestructura, que no
+    // cuenta en limpias/total ni en --comparar.
+    const mensaje = error instanceof Error ? error.message : String(error);
     return {
       id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
       ms: Date.now() - arrancoEn, tokens,
-      error: error instanceof Error ? error.message : String(error),
-      infra: faltasDelFake.length > 0,
+      error: faltasDelFake.length ? `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}` : `Proveedor: ${mensaje}`,
+      infra: true,
     };
   }
 
@@ -279,7 +296,7 @@ export async function correrCaso(
 
   const globales = evaluarReglasGlobales(turno, {
     escriturasPermitidas: escriturasPermitidas(caso.expectativas),
-    instrucciones: INSTRUCCIONES,
+    instrucciones: instruccionesDelCaso(caso),
     topeDeLargo: caso.topeDeLargo,
   });
   const { violaciones, noAplica } = verificarExpectativas(turno, caso.expectativas, d);

@@ -31,7 +31,10 @@ import {
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export type EstadoPedido = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
-export type EstadoProducto = 'PUBLISHED' | 'DRAFT' | 'OUT_OF_STOCK';
+// Sin OUT_OF_STOCK a propósito: la API nunca lo escribe (CreateProductDto
+// acepta PUBLISHED o DRAFT). Un producto "sin stock" es uno PUBLICADO con
+// stock 0, que es como lo cuenta la tarjeta "Sin stock" de Productos.
+export type EstadoProducto = 'PUBLISHED' | 'DRAFT';
 export type MedioDePago = 'MERCADOPAGO' | 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'QR';
 export type EstadoPago = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -44,6 +47,8 @@ export type Producto = {
   precio: number;
   stock: number;
   estado: EstadoProducto;
+  /** Para ordenar como la API (listProducts: createdAt desc). */
+  creadoHaceHoras: number;
 };
 
 export type Cliente = {
@@ -139,18 +144,18 @@ export const CATEGORIAS: Categoria[] = [
 ];
 
 export const PRODUCTOS: Producto[] = [
-  { id: prod(1), nombre: 'Yerba Orgánica Suave 1 kg', categoriaId: cat(1), precio: 8500, stock: 40, estado: 'PUBLISHED' },
-  { id: prod(2), nombre: 'Yerba Barbacuá 500 g', categoriaId: cat(1), precio: 5200, stock: 0, estado: 'OUT_OF_STOCK' },
-  { id: prod(3), nombre: 'Yerba con Hierbas Serranas 500 g', categoriaId: cat(1), precio: 4800, stock: 25, estado: 'PUBLISHED' },
-  { id: prod(4), nombre: 'Mate de Calabaza Forrado', categoriaId: cat(2), precio: 14500, stock: 8, estado: 'PUBLISHED' },
-  { id: prod(5), nombre: 'Mate de Algarrobo', categoriaId: cat(2), precio: 11900, stock: 3, estado: 'PUBLISHED' },
-  { id: prod(6), nombre: 'Mate Térmico de Acero', categoriaId: cat(2), precio: 18900, stock: 12, estado: 'PUBLISHED' },
-  { id: prod(7), nombre: 'Bombilla Pico de Loro de Alpaca', categoriaId: cat(3), precio: 9800, stock: 0, estado: 'OUT_OF_STOCK' },
-  { id: prod(8), nombre: 'Bombilla de Acero con Resorte', categoriaId: cat(3), precio: 3500, stock: 30, estado: 'PUBLISHED' },
-  { id: prod(9), nombre: 'Mate Imperial Cincelado', categoriaId: cat(2), precio: 68000, stock: 2, estado: 'PUBLISHED' },
-  { id: prod(10), nombre: 'Yerbera y Azucarera de Lata', categoriaId: cat(4), precio: 12500, stock: 6, estado: 'PUBLISHED' },
-  { id: prod(11), nombre: 'Matero de Cuero', categoriaId: cat(4), precio: 39000, stock: 4, estado: 'PUBLISHED' },
-  { id: prod(12), nombre: 'Kit Matero Regalo', categoriaId: cat(4), precio: 45000, stock: 0, estado: 'DRAFT' },
+  { id: prod(1), nombre: 'Yerba Orgánica Suave 1 kg', categoriaId: cat(1), precio: 8500, stock: 40, estado: 'PUBLISHED', creadoHaceHoras: 4300 },
+  { id: prod(2), nombre: 'Yerba Barbacuá 500 g', categoriaId: cat(1), precio: 5200, stock: 0, estado: 'PUBLISHED', creadoHaceHoras: 4290 },
+  { id: prod(3), nombre: 'Yerba con Hierbas Serranas 500 g', categoriaId: cat(1), precio: 4800, stock: 25, estado: 'PUBLISHED', creadoHaceHoras: 4280 },
+  { id: prod(4), nombre: 'Mate de Calabaza Forrado', categoriaId: cat(2), precio: 14500, stock: 8, estado: 'PUBLISHED', creadoHaceHoras: 4200 },
+  { id: prod(5), nombre: 'Mate de Algarrobo', categoriaId: cat(2), precio: 11900, stock: 3, estado: 'PUBLISHED', creadoHaceHoras: 4100 },
+  { id: prod(6), nombre: 'Mate Térmico de Acero', categoriaId: cat(2), precio: 18900, stock: 12, estado: 'PUBLISHED', creadoHaceHoras: 3000 },
+  { id: prod(7), nombre: 'Bombilla Pico de Loro de Alpaca', categoriaId: cat(3), precio: 9800, stock: 0, estado: 'PUBLISHED', creadoHaceHoras: 2900 },
+  { id: prod(8), nombre: 'Bombilla de Acero con Resorte', categoriaId: cat(3), precio: 3500, stock: 30, estado: 'PUBLISHED', creadoHaceHoras: 2800 },
+  { id: prod(9), nombre: 'Mate Imperial Cincelado', categoriaId: cat(2), precio: 68000, stock: 2, estado: 'PUBLISHED', creadoHaceHoras: 2000 },
+  { id: prod(10), nombre: 'Yerbera y Azucarera de Lata', categoriaId: cat(4), precio: 12500, stock: 6, estado: 'PUBLISHED', creadoHaceHoras: 1500 },
+  { id: prod(11), nombre: 'Matero de Cuero', categoriaId: cat(4), precio: 39000, stock: 4, estado: 'PUBLISHED', creadoHaceHoras: 1000 },
+  { id: prod(12), nombre: 'Kit Matero Regalo', categoriaId: cat(4), precio: 45000, stock: 0, estado: 'DRAFT', creadoHaceHoras: 200 },
 ];
 
 export const CLIENTES: Cliente[] = [
@@ -190,7 +195,9 @@ export const PEDIDOS: Pedido[] = [
   { id: ped(1011), numero: 1011, estado: 'COMPLETED', clienteId: cli(1), comprador: null, haceHoras: 600, items: [{ productoId: prod(1), cantidad: 1 }], pago: { medio: 'MERCADOPAGO', estado: 'APPROVED' }, origen: 'STOREFRONT' },
   // Entre 30 y 60 días
   { id: ped(1010), numero: 1010, estado: 'DELIVERED', clienteId: cli(7), comprador: null, haceHoras: 800, items: [{ productoId: prod(9), cantidad: 1 }, { productoId: prod(11), cantidad: 1 }], pago: { medio: 'MERCADOPAGO', estado: 'APPROVED' }, origen: 'STOREFRONT' },
-  { id: ped(1009), numero: 1009, estado: 'DELIVERED', clienteId: cli(2), comprador: null, haceHoras: 900, items: [{ productoId: prod(6), cantidad: 2 }], pago: { medio: 'MERCADOPAGO', estado: 'APPROVED' }, origen: 'STOREFRONT' },
+  // Un pendiente OLVIDADO de hace más de un mes: la pestaña Pendientes lo
+  // muestra, pero el snapshot del Inicio cuenta solo los pendientes del mes.
+  { id: ped(1009), numero: 1009, estado: 'PENDING', clienteId: cli(2), comprador: null, haceHoras: 900, items: [{ productoId: prod(6), cantidad: 2 }], pago: { medio: 'TRANSFER', estado: 'PENDING' }, origen: 'STOREFRONT' },
   { id: ped(1008), numero: 1008, estado: 'DELIVERED', clienteId: cli(1), comprador: null, haceHoras: 1000, items: [{ productoId: prod(1), cantidad: 2 }], pago: { medio: 'CASH', estado: 'APPROVED' }, origen: 'MANUAL' },
   { id: ped(1007), numero: 1007, estado: 'CANCELLED', clienteId: null, comprador: 'Laura Gómez', haceHoras: 1100, items: [{ productoId: prod(4), cantidad: 1 }], pago: { medio: 'MERCADOPAGO', estado: 'REJECTED' }, origen: 'STOREFRONT' },
   { id: ped(1006), numero: 1006, estado: 'DELIVERED', clienteId: cli(8), comprador: null, haceHoras: 1200, items: [{ productoId: prod(3), cantidad: 1 }], pago: { medio: 'MERCADOPAGO', estado: 'APPROVED' }, origen: 'STOREFRONT' },
@@ -237,7 +244,7 @@ export type Derivados = {
   canceladosMesActual: number;
   ventasMesAnterior: number;
   pedidosMesAnterior: number;
-  /** Todos los pendientes, de cualquier fecha (lo que ve la pestaña Pendientes). */
+  /** Todos los pendientes, de cualquier fecha (lo que ve la pestaña Pendientes). Incluye uno de hace más de un mes. */
   pendientesTotal: number;
   /** Pendientes creados este mes: lo que hoy cuenta DashboardSnapshot.pendingOrders. */
   pendientesMesActual: number;
@@ -358,7 +365,8 @@ export function crearNegocioDePrueba(ahora: Date = new Date()): NegocioDePrueba 
     pedidosUltimos7Dias: cuenta(ultimos7),
     ticketUltimos7Dias: ticket(ultimos7),
     productosTotal: PRODUCTOS.length,
-    productosSinStock: PRODUCTOS.filter((p) => p.estado === 'OUT_OF_STOCK').length,
+    // Como la tarjeta "Sin stock" de Productos (ProductsService#stats): stock 0, publicado o no.
+    productosSinStock: PRODUCTOS.filter((p) => p.stock === 0).length,
     productosBorrador: PRODUCTOS.filter((p) => p.estado === 'DRAFT').length,
     productosPublicados: PRODUCTOS.filter((p) => p.estado === 'PUBLISHED').length,
     clientesTotal: clientes.length,
