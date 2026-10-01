@@ -2059,15 +2059,30 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
                                         de dejar un botón que el servidor va a rechazar. */}
                                     {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
-                                        <div style={{ marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                                            Completar el producto con una foto es parte del paquete Avanzado.{' '}
+                                        <div
+                                            role="note"
+                                            style={{
+                                                marginTop: 14, padding: '11px 14px', borderRadius: 10,
+                                                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 260px', minWidth: 0 }}>
+                                                <Sparkles size={15} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Cargá tus productos más rápido</div>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, marginTop: 1 }}>
+                                                        Con el paquete Avanzado, Orbi completa el nombre, la categoría y la descripción a partir de una sola foto.
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <button
                                                 type="button"
                                                 onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
                                                 className="ds-link"
-                                                style={{ ...enlace, display: 'inline', fontSize: 12.5 }}
+                                                style={{ ...enlace, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
                                             >
-                                                Ver el paquete
+                                                Conocer el paquete <ChevronRight size={13} strokeWidth={2.2} />
                                             </button>
                                         </div>
                                     )}
