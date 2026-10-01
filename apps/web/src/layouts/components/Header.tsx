@@ -14,7 +14,7 @@ import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { esVisitanteDemo } from '@/lib/demo/modo'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
 import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
@@ -387,8 +387,8 @@ export default function Header({ onMenuClick }: Props) {
                         className="admin-orbi-btn ds-hover place-items-center rounded-lg"
                         style={{ width: 44, height: 44, background: 'transparent', border: '1px solid var(--color-border)', flexShrink: 0 }}
                     >
-                        {/* `disc` ya dibuja el logo sobre su disco navy (mismo uso que OrbiTrigger). */}
-                        <OrbiIcon size={30} disc />
+                        {/* El pet con la forma del módulo, sobre su disco navy (mismo uso que OrbiTrigger). */}
+                        <OrbiPet size={30} disc />
                     </button>
 
                     {/* Dark mode toggle */}

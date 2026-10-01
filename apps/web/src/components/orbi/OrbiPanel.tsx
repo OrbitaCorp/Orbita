@@ -4,6 +4,8 @@ import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
 import { useOrbiContext } from './useOrbiContext'
 import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
+import { usePetEstado } from './pet/usePetEstado'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
 import { OrbiBottomSheet } from './OrbiBottomSheet'
@@ -20,6 +22,7 @@ export function OrbiPanel() {
   const context = useOrbiContext()
   const isWizard = context.surface === 'wizard'
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const estadoPet = usePetEstado()
 
   useEffect(() => {
     if (!isOpen || !isWizard) return
@@ -78,7 +81,7 @@ export function OrbiPanel() {
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
-          <OrbiIcon size={30} disc />
+          {isWizard ? <OrbiIcon size={30} disc /> : <OrbiPet size={40} disc estado={estadoPet} />}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (
