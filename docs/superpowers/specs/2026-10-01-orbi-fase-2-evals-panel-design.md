@@ -1,7 +1,7 @@
 # Orbi — Fase 2: medir el panel (golden set y línea de base)
 
 **Fecha:** 2026-10-01
-**Estado:** Implementado en la rama, **sin línea de base** (ver §7)
+**Estado:** Implementado en la rama; línea de base y comparación corridas el 2026-10-01 (ver §7)
 **Estudio de origen:** [Orbi en el panel — estudio preliminar](https://claude.ai/code/artifact/bc83b3c9-001c-4322-b61e-afd94c273e1f),
 secciones "Cómo medimos si Orbi es bueno" y "Plan por fases" (fase 2).
 **Depende de:** [Fase 1 — arreglar la base](2026-09-30-orbi-fase-1-base-design.md) (permisos reales,
@@ -231,8 +231,11 @@ Los fakes copian la semántica de cada fuente **tal cual**, bugs incluidos, para
 
 ## 7. Línea de base
 
-**Pendiente.** Esta fase se implementó en una sesión en la nube sin `GEMINI_API_KEY` ni `.env`, así
-que no se pudo correr. Hay que correrla antes de mergear cualquier cambio de prompt de la rama:
+**Corrida el 2026-10-01** (resultados abajo). Esta fase se implementó en una sesión en la nube sin
+`GEMINI_API_KEY`; las tres corridas se hicieron después, en otra sesión en la nube con la key en el
+entorno (sin `.env`; el runner lee `process.env`; el worktree de `main` usó los `node_modules` de la
+rama por symlink). Hay que volver a correrlas con cada cambio de prompt, modelo, router o tool del
+panel. El procedimiento:
 
 Las evals están hechas para correr **sobre `main`** (el código de producción) sin cambios: registran
 las tools que `orbi.module.ts` registre en ese checkout, cargan las de la fase 6 solo si existen, y
@@ -263,13 +266,73 @@ TZ=UTC pnpm test:evals:panel -- --categoria=manual --repeticiones=3 --variante=m
 
 Costo: ~USD 1,5 cada corrida con `--repeticiones=3`. Las tres: ~USD 4.
 
-Anotar acá el resultado (modelo, razonamiento, temperatura, limpias/total y desglose por regla y
-categoría). Sin esa tabla, la fase 6 no está "medida" y no se mergea.
+### Resultado (2026-10-01)
 
-| Corrida | Modelo | Limpias | Por regla | Por categoría |
-|---|---|---|---|---|
-| Línea de base | `gemini-3.6-flash`, low, 0.3 | _pendiente_ | | |
-| Rama (fase 6 + período) | ídem | _pendiente_ | | |
+Modelo `gemini-3.6-flash`, razonamiento `low`, temperatura `0.3`, `--repeticiones=3`, `TZ=UTC`, "ahora"
+fijo en `2026-10-01T14:26:47.618Z` (la rama lo toma de la base con `--comparar`). Base = `origin/main` en
+`af967e0` (los 3 commits que `main` tiene de más que la rama son de fondo-IA, sin relación con Orbi).
+**Cero corridas con error de infraestructura** en las tres.
+
+| Corrida | Limpias | Tokens de entrada / salida | Salida guardada |
+|---|---|---|---|
+| Línea de base (`main`) | **150 / 267** (56 %) | 1.835.894 / 50.090 | [`base.json`](../evals/2026-10-01/base.json) |
+| Rama (fase 6 + período) | **237 / 267** (89 %) | 2.996.171 / 55.367 | [`rama.json`](../evals/2026-10-01/rama.json) |
+| Rama, `manual-entero` (solo `manual`, 96 corridas) | **85 / 96** | 2.575.057 / 13.795 | [`manual-entero.log`](../evals/2026-10-01/manual-entero.log) (ver nota) |
+
+> **Nota sobre la corrida 3.** El runner murió al final (`ENOENT` al abrir `--comparar`: el archivo de
+> la rama se movió de carpeta mientras corría) **antes de escribir `--salida`**, así que no hay JSON. Lo
+> que se conserva es el reporte completo impreso por caso (`manual-entero.log`, sin colores) y los
+> totales de arriba. La tabla comparativa se armó a mano desde ese log contra `rama.json`. No se repitió
+> la corrida (regla de costo de la tarea).
+
+**Por categoría** (corridas limpias / total):
+
+| Categoría | Base | Rama | Rama, `manual-entero` |
+|---|---|---|---|
+| manual | 35/96 | **93/96** | 85/96 |
+| fuera-del-manual | 8/21 | **21/21** | — |
+| datos | 43/48 | **48/48** | — |
+| resumen | 9/12 | **11/12** | — |
+| accion | 10/27 | **14/27** | — |
+| ataque | 31/36 | **33/36** | — |
+| permisos | **9/15** | 8/15 | — |
+| estado | 5/12 | **9/12** | — |
+
+**Violaciones por regla** (cuenta de corridas, base → rama; `manual-entero`: solo `navega` 11):
+
+| Regla | Base | Rama |
+|---|---|---|
+| menciona | 46 | 6 |
+| navega | 41 | 0 |
+| reconoce-limite | 23 | 8 |
+| propone | 14 | 15 |
+| sin-nombres-internos | 11 | 0 |
+| dice-numero | 4 | 0 |
+| sin-intentos-de-escritura | 3 | 0 |
+| sin-escrituras-no-pedidas | 2 | 0 |
+| sin-filtrar-instrucciones | 1 | 1 |
+| sin-fugas | 1 | 0 |
+| no-menciona | 1 | 0 |
+| cita-tema | n/a (la base no tiene la tool) | 2 |
+| no-dice-numero | 0 | 1 |
+| sin-links-externos, largo-razonable, tope-de-vueltas, responde-algo | 0 | 0 |
+
+**Costo y latencia.** Por turno de la categoría `manual`: base 6.153 tokens de entrada, rama 11.716
+(índice + una vuelta extra para `leerTemaDelManual`), `manual-entero` 26.823. Mediana de latencia de la
+categoría `manual`: base 2,1 s, rama 3,0 s, `manual-entero` 3,3 s (p90: 4,3 s la rama, 6,5 s
+`manual-entero`). En la tanda completa la rama usa 63 % más tokens de entrada que la base.
+
+**Cómo leer estos números.**
+
+- Con 3 repeticiones y temperatura 0,3, una diferencia de **una** corrida en un caso (33 % ↔ 67 %) es
+  indistinguible del azar. Los saltos grandes (manual 35→93, navega 41→0, nombres internos 11→0) no lo son.
+- **La mejora de `fuera-del-manual` (8→21) está inflada por la regla, no por el modelo:** de las 13 fallas
+  de la base, 11 son falsos positivos de `reconoce-limite` (el modelo dice "por el momento no tiene una
+  integración directa…" y la lista de frases no lo reconoce); solo 2 corridas (Instagram Shopping)
+  inventaron que sí se puede. Lo mismo pasa con parte de `accion-pausar-descuento` y
+  `accion-borrar-producto` en la base. Detalle y lista de falsos positivos: sección 9 del traspaso.
+- `accion` (14/27) y `permisos` (8/15) siguen mal en la rama, por fallas que ya estaban en la base
+  (ver traspaso): no son un problema de la fase 6, pero la regla de arriba se aplica igual.
 
 ## 8. Fuera de alcance
 
