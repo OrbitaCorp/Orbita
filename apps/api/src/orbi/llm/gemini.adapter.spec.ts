@@ -263,4 +263,49 @@ describe('GeminiAdapter', () => {
       { role: 'user', parts: [{ functionResponse: { name: 'listOrders', response: { output: { ok: 2 } } } }] },
     ]);
   });
+  // Tool calls paralelas de Gemini 3.x (bug de producción del 2026-09-30): un
+  // assistant con varias calls + un tool por call tiene que salir como UN
+  // content model con todos los functionCall (la firma solo en el primero,
+  // tal como llegó) y UN content user con los functionResponse en el mismo
+  // orden. Si no, Gemini rechaza el segundo functionCall por no tener firma.
+  it('calls paralelas: un content model con todos los functionCall y un content user con las respuestas en orden', async () => {
+    configService.get.mockReturnValue('test-key');
+    const generateContentStream = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'resumen de 7 días' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'c1', name: 'getSalesReport', arguments: { days: 7 }, thoughtSignature: 'sig-1' },
+            { id: 'c2', name: 'getProductReport', arguments: { days: 7 } },
+          ],
+        },
+        { role: 'tool', content: '{"total":100}', toolCallId: 'c1' },
+        { role: 'tool', content: '{"top":["Remera"]}', toolCallId: 'c2' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(generateContentStream.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'resumen de 7 días' }] },
+      {
+        role: 'model',
+        parts: [
+          { functionCall: { name: 'getSalesReport', args: { days: 7 } }, thoughtSignature: 'sig-1' },
+          { functionCall: { name: 'getProductReport', args: { days: 7 } } },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'getSalesReport', response: { output: { total: 100 } } } },
+          { functionResponse: { name: 'getProductReport', response: { output: { top: ['Remera'] } } } },
+        ],
+      },
+    ]);
+  });
 });
