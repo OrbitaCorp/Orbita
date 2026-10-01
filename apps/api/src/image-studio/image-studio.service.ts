@@ -229,6 +229,15 @@ export class ImageStudioService {
     // 1. Intenta Workers AI (1 solo intento rápido con timeout estricto de 7s).
     // 2. Si falla (error, flag de contenido NSFW, cuota o timeout),
     //    aplica inmediatamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
+    // Fondos lisos (blanco / negro) SIN descripción personalizada: directo al
+    // modelo local, sin pasar por Workers AI. Un fondo liso no necesita
+    // generación, y Flux (feedback 01/10/2026) redibuja el producto — texto de
+    // etiquetas y letreros deformado — y con "rim light" en el prompt dibuja un
+    // resplandor ("aurora") del color de la prenda alrededor de toda la
+    // silueta. La composición local deja el producto idéntico a la foto.
+    if (!descripcion && key === BLANCO_LISO_KEY) return await this.componerFondoBlanco(origen.buffer, businessId);
+    if (!descripcion && key === NEGRO_LISO_KEY) return await this.componerFondoNegro(origen.buffer, businessId);
+
     const prompt = key === BLANCO_LISO_KEY
       ? this.promptFondoBlancoLiso(descripcion)
       : key === NEGRO_LISO_KEY
@@ -493,7 +502,15 @@ export class ImageStudioService {
   // de alfil doble capa, pero aclarando en vez de oscureciendo) para dar la
   // misma sensación de apoyo/profundidad que el contact shadow le da al fondo
   // blanco.
-  private async componerFondoNegro(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
+    // Lienzo del fondo "Negro liso". Negro puro por ahora; se aísla acá para poder
+  // probar un oscuro más suave (con viñeta) sin tocar la composición.
+  protected async lienzoOscuro(width: number, height: number): Promise<Buffer> {
+    return sharp({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .png()
+      .toBuffer();
+  }
+
+private async componerFondoNegro(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
     const cutout = await this.backgroundRemoval.removeBackground(origenBuffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
     const cutoutWidth = meta.width ?? 1024;
@@ -564,16 +581,7 @@ export class ImageStudioService {
       const rimContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
       const rimAmbiente = await sharp(ambienteRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
 
-      const fondoNegro = await sharp({
-        create: {
-          width,
-          height,
-          channels: 3,
-          background: { r: 0, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const fondoNegro = await this.lienzoOscuro(width, height);
 
       composedBuffer = await sharp(fondoNegro)
         .composite([
@@ -586,14 +594,7 @@ export class ImageStudioService {
     } catch (error) {
       this.logger.warn(`Error en aro de luz para fondo negro, aplicando composición directa: ${error}`);
       try {
-        const fondoNegro = await sharp({
-          create: {
-            width,
-            height,
-            channels: 3,
-            background: { r: 0, g: 0, b: 0 },
-          },
-        })
+        const fondoNegro = await sharp(await this.lienzoOscuro(width, height))
           .composite([{ input: cutout, left, top }])
           .png()
           .toBuffer();
