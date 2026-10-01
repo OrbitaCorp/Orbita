@@ -939,7 +939,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               siguiente): encontrado renderizando la card a 240px de ancho,
               no leyendo el código. El precio es el dato más importante de
               la card, nunca tiene que ceder espacio. */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, flexShrink: 0 }}>
+          {/* flexWrap + rowGap: cada precio sigue siendo indivisible (nowrap), pero
+              el tachado puede bajar de línea. Sin esto, "$ 292.499,25 $ 389.999" era
+              un bloque de 226px que estiraba la columna de la grilla de 2 y ensanchaba
+              toda la página en el celular (reportado 29/09). flexShrink 1: el bloque
+              puede ceder al ancho de la tarjeta; lo que no cede son los precios. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 7, rowGap: 0, minWidth: 0, flexShrink: 1 }}>
             {producto.precioHasta != null && (
               <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>Desde</span>
             )}

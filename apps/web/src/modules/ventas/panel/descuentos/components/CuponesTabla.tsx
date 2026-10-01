@@ -13,6 +13,7 @@ import { useDuplicarCupon } from '../hooks/useDuplicarCupon'
 import { tipoCuponLabelKey, TIPO_CUPON_LABELS } from '../types'
 import type { Cupon, OrdenDireccion } from '../types'
 import { fmtRangoVigencia } from '../utils'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 const COLS = '1fr 1.4fr 0.9fr 0.65fr 1.1fr 0.75fr 0.65fr 1.1fr'
@@ -32,6 +33,8 @@ interface Props {
   onOrdenar: (col: string) => void
   onEditar: (id: string) => void
   onVerMetricas: () => void
+  /** Sin estado, tipo ni búsqueda: el vacío es que todavía no hay ninguno. */
+  sinFiltros?: boolean
 }
 
 function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
@@ -143,12 +146,16 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
   )
 }
 
-export function CuponesTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onEditar, onVerMetricas }: Props) {
+export function CuponesTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onEditar, onVerMetricas, sinFiltros = false }: Props) {
   if (isLoading) {
     return <SkeletonTablaCupones />
   }
 
-  const emptyState = (
+  // Sin filtros puestos, la tabla vacía es que todavía no hay ninguno: va el
+  // pet del módulo. Con filtros, el mensaje de siempre.
+  const emptyState = sinFiltros ? (
+    <OrbiPetVacio modulo="descuentos" titulo="Todavía no tenés cupones" descripcion="Creá el primero con «Crear cupón»." />
+  ) : (
     <div style={{ padding: '56px 16px', textAlign: 'center' }}>
       <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>
         <Ticket size={26} />

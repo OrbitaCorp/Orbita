@@ -55,6 +55,12 @@ export type Bloque =
 export interface Tema {
     id: string
     titulo: string
+    /** Solo para el índice de Orbi (la persona no la ve): cómo lo preguntaría
+     *  alguien cuando el título solo no alcanza. "Historial" no le dice a un
+     *  modelo que ahí están "los pedidos viejos que ya se cerraron". Una por
+     *  tema que lo necesite, no una por tema: cada una suma tokens a CADA
+     *  mensaje del chat. */
+    pista?: string
     bloques: Bloque[]
     /** Esquema de la pantalla. Solo en los temas donde la FORMA de la
      *  pantalla es parte de la explicación — no uno por tema, que convierte
@@ -299,6 +305,7 @@ export const CAPITULOS: Capitulo[] = [
         },
         {
             id: 'historial', titulo: 'Historial',
+            pista: 'los pedidos viejos: ya cerrados, entregados o cancelados',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista viva muestra lo que está en juego. El **Historial** es el archivo completo: todo lo que pasó, con su fecha y su estado final, para consultar hacia atrás sin que te estorbe en el día a día.' },
             ],
@@ -394,7 +401,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Categoría', texto: 'Dónde vive dentro de tu catálogo.' },
                     { titulo: 'Publicado o borrador', texto: 'Borrador lo deja invisible hasta que esté listo.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Generar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Redactar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
             ],
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
@@ -402,8 +409,8 @@ export const CAPITULOS: Capitulo[] = [
             id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
             bloques: [
                 { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
-                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[+ Agregar característica]], en el orden en que querés que aparezcan.' },
-                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link [[Ver más detalles →]] que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
+                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[Agregar especificación]], en el orden en que querés que aparezcan.' },
+                { tipo: 'parrafo', texto: 'En la tienda se ven en una sección propia, **"Características"**, debajo de los botones de compra y a todo el ancho: completas y en dos columnas, sin importar cuántas cargues.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Si no cargás ninguna, la sección de Características directamente no aparece en la tienda: no hay nada genérico que rellenar de más.' },
             ],
         },
@@ -760,9 +767,15 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'cfg-peligro', titulo: 'Zona peligrosa',
             bloques: [
-                { tipo: 'parrafo', texto: 'Las acciones que no tienen vuelta atrás, como dar de baja el negocio. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada.' },
-                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, leé el botón "¿Qué pasa si...?": te explica exactamente qué se pierde.' },
+                { tipo: 'parrafo', texto: 'Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso **Editar configuración**, pero las tres acciones las hace solo el propietario.' },
+                { tipo: 'lista', items: [
+                    '**Pausar tienda**: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice **Reactivar tienda**.',
+                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver.',
+                    '**Eliminar espacio**: la tienda se pausa al instante y tenés 60 días para arrepentirte con **Reactivar espacio**. Pasado ese plazo se borra todo y no hay vuelta atrás.',
+                ] },
+                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, abrí el "¿Qué pasa si…?" de cada opción: te explica exactamente qué cambia y qué se pierde.' },
             ],
+            ir: { label: 'Abrir Zona peligrosa', seccion: 'configuracion', query: { vista: 'peligro' } },
         },
     ],
 },

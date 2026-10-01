@@ -204,16 +204,17 @@ export class StorefrontController {
       // DEBIT_CARD/CREDIT_CARD son la única excepción: posnet físico sin
       // ningún toggle global (no existían como opción antes de esto), así
       // que siempre necesitan estar marcados en la lista para aparecer.
-      // TRANSFER (Coordinar por WhatsApp) queda a propósito FUERA de esta
-      // restricción — a pedido, siempre sigue el toggle general
-      // (acceptsTransfer), nunca se acota puntualmente para retiro.
+      // TRANSFER sigue el toggle general (acceptsTransfer, "Coordinar por
+      // WhatsApp") y no se acota por esta lista; además, al retirar, vale si
+      // el negocio marcó "Transferencia" en los medios del retiro (opción
+      // informativa, como Débito/Crédito: se paga al retirar).
       const esRetiro = dto.shippingMethod === 'PICKUP';
       const pickup = pago.pickupPaymentMethods ?? [];
       const sinRestriccion = pickup.length === 0;
       const habilitado: Record<string, boolean> = {
         MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago)
           && (!esRetiro || sinRestriccion || pickup.includes('MERCADOPAGO')),
-        TRANSFER: pago.acceptsTransfer,
+        TRANSFER: pago.acceptsTransfer || (esRetiro && pickup.includes('TRANSFER')),
         CASH: pago.acceptsCash && (!esRetiro || sinRestriccion || pickup.includes('CASH')),
         DEBIT_CARD: esRetiro && pickup.includes('DEBIT'),
         CREDIT_CARD: esRetiro && pickup.includes('CREDIT'),
@@ -243,7 +244,9 @@ export class StorefrontController {
     // TRANSFER ahora se llama "Coordinar por WhatsApp" en el checkout (ya no
     // pide CBU/alias) — la etiqueta acá es solo para las notas del pedido.
     const ETIQUETA_METODO: Record<string, string> = {
-      CASH: 'Efectivo', TRANSFER: 'Coordinar por WhatsApp', MERCADOPAGO: 'Mercado Pago',
+      CASH: 'Efectivo',
+      TRANSFER: esEnvioADomicilio || !(pago.pickupPaymentMethods ?? []).includes('TRANSFER') ? 'Coordinar por WhatsApp' : 'Transferencia al retirar',
+      MERCADOPAGO: 'Mercado Pago',
       COORDINATE_LATER: 'A coordinar con el vendedor',
       DEBIT_CARD: 'Débito al retirar', CREDIT_CARD: 'Crédito al retirar',
     };

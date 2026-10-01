@@ -10,6 +10,7 @@ import { SubscriptionsService, esPlanKey } from './subscriptions.service';
 import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
 import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
+import { ActivatePlanDto } from './dto/activate-plan.dto';
 import { ConfirmPlanActivationDto } from './dto/confirm-plan-activation.dto';
 
 // Entero positivo acotado para la paginación: `?limit=1e9` o `?page=abc`
@@ -97,9 +98,22 @@ export class SubscriptionsController {
   // dueño a `initPoint` para que autorice.
   @Post('activate-plan')
   @Roles('owner', 'admin')
-  activatePlan(@CurrentBusiness() ctx: AuthContext) {
+  activatePlan(@CurrentBusiness() ctx: AuthContext, @Body() dto?: ActivatePlanDto) {
     const member = assertMemberContext(ctx);
-    return this.subscriptionsService.activatePlan(member.businessId, member.memberId);
+    return this.subscriptionsService.activatePlan(member.businessId, member.memberId, dto?.discountCode);
+  }
+
+  // Previsualiza un código de descuento ANTES de mandar al dueño a Mercado
+  // Pago a activar su plan, contra el precio de lista del plan que le toca (el
+  // del alta usa el monto de bienvenida). Vale solo para el primer cobro — ver
+  // SubscriptionsService.activatePlan. Con sesión (a diferencia de /discount):
+  // el negocio ya existe, y el throttle frena el adivinar códigos.
+  @Get('activation-discount/:code')
+  @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 10, ttl: 600000 } })
+  previewActivationDiscount(@CurrentBusiness() ctx: AuthContext, @Param('code') code: string) {
+    const member = assertMemberContext(ctx);
+    return this.subscriptionsService.previewActivationDiscount(member.businessId, code.slice(0, 64));
   }
 
   // Cambia el plan elegido. Si todavía se está cursando el beneficio de

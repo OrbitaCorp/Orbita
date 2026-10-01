@@ -40,6 +40,9 @@ const MODELOS = [
   'auditLog',
   'notification',
   'orbiConversation',
+  'orbiPendingAction',
+  'orbiTurn',
+  'dailyQuota',
   'refreshToken',
   'passwordResetToken',
   'emailVerificationToken',
@@ -144,6 +147,19 @@ describe('Baja definitiva de un negocio: se borran los datos de las personas', (
     expect(prisma.auditLog.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
     expect(prisma.notification.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
     expect(prisma.orbiConversation.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+  });
+
+  it('borra lo que Orbi guardó del negocio: acciones pendientes, métricas de turnos y la cuota diaria', async () => {
+    const { svc, prisma } = armar();
+    await svc.processCancellationWindow();
+
+    // La baja pone `deletedAt` y no borra la fila de businesses, así que el
+    // onDelete: Cascade de estas tablas nunca se dispara: hay que borrarlas acá.
+    expect(prisma.orbiPendingAction.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+    expect(prisma.orbiTurn.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+    // daily_quota no tiene businessId ni relación: la clave es `<prefijo>:<negocio>`
+    // (orbi-panel:, ai-assist:, image-studio:), así que se borra por sufijo.
+    expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledWith({ where: { key: { endsWith: `:${BIZ}` } } });
   });
 
   it('borra las credenciales de Mercado Pago: son un secreto de alguien que ya se fue', async () => {

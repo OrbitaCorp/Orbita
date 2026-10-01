@@ -24,6 +24,7 @@ import {
 } from '@/lib/productUploadTracker'
 
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { EVENTO_ACCION_EJECUTADA, recargaProductos } from '@/components/orbi/confirmarAccion'
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -32,6 +33,7 @@ import type { EstadoProducto } from './types/catalogo.types'
 import { ResenasProducto } from './components/ResenasProducto'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 import { StockRapidoModal } from './components/StockRapido'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 10
@@ -861,6 +863,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         })()
     }, [edits, cargarSilencioso, onToast])
 
+    // Orbi creó un producto desde el chat (tarjeta de acción confirmada): se
+    // trae la lista de nuevo para que aparezca. createdProductIds solo marca
+    // filas que ya están cargadas; sin esto el producto nuevo no se veía
+    // hasta cambiar de filtro o recargar.
+    useEffect(() => {
+        const alEjecutar = (e: Event) => {
+            if (recargaProductos((e as CustomEvent).detail)) void cargarSilencioso()
+        }
+        window.addEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+        return () => window.removeEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+    }, [cargarSilencioso])
+
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
     }, [])
@@ -1007,6 +1021,15 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             ...categorias.filter(h => h.parentId === c.id).map(h => ({ ...h, nivel: 1 })),
         ])
     }, [categorias])
+
+    // Sin búsqueda ni filtros y sin filas: el negocio todavía no cargó productos.
+    // Ahí va el pet del módulo; con filtros queda el "sin productos para estos filtros".
+    const sinFiltros = !busqDebounced && fcat === 'todos' && fest === 'todos'
+    const vacioInicial = (
+        <OrbiPetVacio modulo="productos" titulo="Todavía no tenés productos" descripcion="Cargá el primero y lo vas a ver acá.">
+            <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+        </OrbiPetVacio>
+    )
 
     return (
         <div className="prod-page" style={pageWrap}>
@@ -1181,7 +1204,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         {Array.from({ length: 8 }).map((_, i) => <ProductoGridCardSkeleton key={i} />)}
                     </div>
                 ) : filas.length === 0 && uploads.length === 0 ? (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
+                    sinFiltros
+                        ? <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>{vacioInicial}</div>
+                        : <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
                 ) : (
                     <div className="prod-grid-wrap">
                         {/* Productos en vuelo primero (recién creados, ver
@@ -1342,7 +1367,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         </div>
                     )
                 })}
-                {!cargando && filas.length === 0 && uploads.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>}
+                {!cargando && filas.length === 0 && uploads.length === 0 && (sinFiltros ? vacioInicial : <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>)}
             </div>
 
             {/* ── MOBILE: cards ── */}
@@ -1350,7 +1375,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 {cargando && filas.length === 0 ? (
                     Array.from({ length: 5 }).map((_, i) => <ProductoMobileCardSkeleton key={i} />)
                 ) : filas.length === 0 && uploads.length === 0 ? (
-                    <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
+                    sinFiltros ? vacioInicial : <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
                 ) : (
                     <>
                         {uploads.map(u => (

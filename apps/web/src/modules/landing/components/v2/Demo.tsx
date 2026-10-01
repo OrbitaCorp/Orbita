@@ -25,7 +25,7 @@ const ROLES = [
         id: 'panel',
         rol: 'Como dueño',
         titulo: 'El panel',
-        texto: 'Dashboard, pedidos, productos, clientes, descuentos y reportes, con tres meses de ventas cargadas.',
+        texto: 'Inicio, pedidos, productos, clientes, descuentos y reportes, con tres meses de ventas cargadas.',
         cta: 'Ver el panel',
         path: '/panel',
     },

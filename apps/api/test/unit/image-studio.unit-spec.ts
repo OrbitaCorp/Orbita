@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
-import { ImageStudioService } from '../../src/image-studio/image-studio.service';
+import { ImageStudioService, intensidadAroSegunLuminosidad } from '../../src/image-studio/image-studio.service';
 
 // ImageStudioService (fondos de producto + "prenda en modelo", paquete
 // Avanzado, Cloudflare Workers AI). Cubre lo que la auditoría interna del
@@ -155,5 +155,58 @@ describe('ImageStudioService — gate de "Avanzado"', () => {
       expect(cloudflareImage.generateImage).toHaveBeenCalledTimes(1);
       expect(result.mimeType).toBe('image/png');
     });
+  });
+});
+
+describe('intensidadAroSegunLuminosidad — aro de luz sobre fondo negro', () => {
+  const pixeles = (r: number, g: number, b: number, a = 255) => Buffer.from([r, g, b, a, r, g, b, a]);
+
+  it('un producto claro (remera blanca) no lleva aro: ya contrasta con el negro', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(245, 245, 245))).toBe(0);
+  });
+
+  it('un producto negro lleva el aro completo para no fundirse con el fondo', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(10, 10, 10))).toBe(1);
+  });
+
+  it('un producto intermedio lleva un aro parcial', () => {
+    const v = intensidadAroSegunLuminosidad(pixeles(95, 95, 95));
+    expect(v).toBeGreaterThan(0.2);
+    expect(v).toBeLessThan(0.8);
+  });
+
+  it('los píxeles transparentes no cuentan (el lienzo vacío no aclara el promedio)', () => {
+    const buf = Buffer.concat([pixeles(10, 10, 10), pixeles(255, 255, 255, 0)]);
+    expect(intensidadAroSegunLuminosidad(buf)).toBe(1);
+  });
+
+  it('sin ningún píxel visible no rompe', () => {
+    expect(intensidadAroSegunLuminosidad(pixeles(0, 0, 0, 0))).toBe(1);
+  });
+});
+
+describe('ImageStudioService — fondos lisos (blanco / negro)', () => {
+  const original = process.env.FONDO_IA_MANTENIMIENTO;
+  beforeEach(() => { process.env.FONDO_IA_MANTENIMIENTO = 'false'; });
+  afterEach(() => {
+    if (original === undefined) delete process.env.FONDO_IA_MANTENIMIENTO;
+    else process.env.FONDO_IA_MANTENIMIENTO = original;
+  });
+
+  // Flux redibuja el producto (texto de etiquetas deformado) y con "rim light"
+  // dibuja un resplandor alrededor de la silueta (feedback 01/10/2026): un
+  // fondo liso se compone siempre en local.
+  it.each(['negro_liso', 'blanco_liso'])('%s sin descripción: compone en local y NO llama a Workers AI', async (estilo) => {
+    const { svc, backgroundRemoval, cloudflareImage } = makeService(true);
+    const result = await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, estilo);
+    expect(cloudflareImage.editImage).not.toHaveBeenCalled();
+    expect(backgroundRemoval.removeBackground).toHaveBeenCalledTimes(1);
+    expect(result.mimeType).toBe('image/png');
+  });
+
+  it('negro_liso con descripción personalizada: sí pasa por Workers AI (es un pedido que el local no cubre)', async () => {
+    const { svc, cloudflareImage } = makeService(true);
+    await svc.generateBackground('biz-1', { buffer: FAKE_JPEG, mimetype: 'image/jpeg' }, 'negro_liso', 'con humo suave');
+    expect(cloudflareImage.editImage).toHaveBeenCalledTimes(1);
   });
 });

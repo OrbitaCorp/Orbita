@@ -1,5 +1,5 @@
 import { useOrbiStore } from './useOrbiStore'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 
 interface Props {
   collapsed?: boolean
@@ -26,13 +26,9 @@ export function OrbiTrigger({ collapsed }: Props) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-        display: 'grid', placeItems: 'center', flexShrink: 0,
-      }}>
-        <OrbiIcon size={15} color="white" />
-      </div>
+      {/* Sin disco: el pet suelto sobre el menú, y vivo (flota, parpadea, el
+          satélite orbita) para que se sienta presente aunque no se lo toque. */}
+      <OrbiPet size={44} animated />
 
       {!collapsed && (
         <>

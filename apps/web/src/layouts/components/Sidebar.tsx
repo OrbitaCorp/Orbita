@@ -20,6 +20,8 @@ import { getUnreadConversationsCount, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiTrigger } from '@/components/orbi/OrbiTrigger'
+import { moduloDeSeccion } from './moduloActivo'
+import { PERMISOS_MODULO } from './permisosDelMenu'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { useSidebarMode, type SidebarMode } from '@/layouts/SidebarModeContext'
 
@@ -85,25 +87,9 @@ const MODULOS: Modulo[] = [
     },
 ]
 
-const SECCION_MODULO: Record<string, string> = {
-    dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
-    catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
-    mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
-    avanzado: 'avanzado', manual: 'manual',
-}
-
 const ROLES_MODULO: Record<string, string[]> = {}
 
-const PERMISOS_MODULO: Record<string, string[]> = {
-    dashboard: ['reports.dashboard'],
-    pedidos: ['orders.view'],
-    clientes: ['customers.view'],
-    productos: ['catalog.view', 'inventory.view'],
-    mensajes: ['messages.view'],
-    descuentos: ['discounts.view', 'discounts.manage'],
-    config: ['config.edit', 'config.team.view', 'config.team.manage', 'config.audit.view', 'config.domains.manage'],
-    avanzado: ['advanced.manage'],
-}
+// PERMISOS_MODULO vive en permisosDelMenu.ts: también lo lee el manual de Orbi.
 
 // Anchos en px — mismos valores que los antiguos w-16/w-60 de Tailwind.
 const W_NARROW = 64
@@ -127,9 +113,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     const seccion    = ((Array.isArray(partesSlug) ? partesSlug[partesSlug.length - 1] : undefined) ?? (router.query.seccion as string)) ?? 'dashboard'
     const vista      = (router.query.vista       as string) ?? ''
 
-    const moduloActivo = seccion === 'reportes'
-        ? (vista === 'clientes' ? 'clientes' : 'productos')
-        : SECCION_MODULO[seccion] ?? 'dashboard'
+    const moduloActivo = moduloDeSeccion(seccion, vista)
 
     // Módulos visibles según los permisos del rol.
     const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null

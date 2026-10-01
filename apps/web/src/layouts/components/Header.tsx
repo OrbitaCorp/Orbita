@@ -13,6 +13,9 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { esVisitanteDemo } from '@/lib/demo/modo'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -78,6 +81,12 @@ export default function Header({ onMenuClick }: Props) {
     // (nombre, rol, email, iniciales) salen de la sesión real en vez de estar
     // hardcodeados.
     const { logout, user } = useAuth()
+
+    // Orbi en el celular: el trigger del menú lateral queda dentro del drawer
+    // cerrado, así que la barra tiene su propio botón. Mismo store que el del
+    // sidebar, por eso abre y cierra el mismo panel.
+    const orbiAbierto = useOrbiStore(s => s.isOpen)
+    const alternarOrbi = useOrbiStore(s => s.toggle)
 
     // RBT-646: al entrar al panel, si el member tiene una preferencia de tema
     // guardada distinta a la de este navegador (por ejemplo, la cambió desde
@@ -250,6 +259,7 @@ export default function Header({ onMenuClick }: Props) {
         <>
             <style>{`
                 .admin-menu-btn    { display: none; }
+                .admin-orbi-btn    { display: none; }
                 .admin-search-wrap { display: flex; }
                 .admin-user-name   { display: block; }
                 .admin-bc-full     { display: flex; }
@@ -276,11 +286,18 @@ export default function Header({ onMenuClick }: Props) {
                     }
                     .admin-notif-list { max-height: calc(100vh - 140px) !important; }
                     .admin-menu-btn    { display: flex !important; }
+                    .admin-orbi-btn    { display: grid !important; }
                     .admin-search-wrap { display: none !important; }
                     .admin-user-name   { display: none !important; }
                     .admin-bc-full     { display: none !important; }
                     .admin-bc-mobile   { display: flex !important; }
                     .dcto-page-head    { display: none !important; }
+                }
+                /* Con el botón de Orbi (44px) la barra de 320px dejaba ~38px
+                   para el título de la pantalla: quedaba en "C…". Se baja el
+                   de tema, que también se cambia desde Mi perfil. */
+                @media (max-width: 360px) {
+                    .admin-theme-btn   { display: none !important; }
                 }
             `}</style>
 
@@ -358,12 +375,27 @@ export default function Header({ onMenuClick }: Props) {
                     {/* Buscador global (oculto en mobile) — Fase 4, Ale */}
                     <BusquedaGlobal />
 
+                    {/* Orbi — solo mobile (en escritorio vive en el menú lateral y con Ctrl+K).
+                        44px de área táctil: es la acción principal de la barra. */}
+                    <button
+                        onClick={alternarOrbi}
+                        aria-label="Abrir Orbi"
+                        aria-expanded={orbiAbierto}
+                        // Solo con el panel abierto: cerrado no está en el DOM y
+                        // un aria-controls a un id inexistente es inválido.
+                        aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
+                        className="admin-orbi-btn ds-hover place-items-center rounded-lg"
+                        style={{ width: 44, height: 44, background: 'transparent', border: '1px solid var(--color-border)', flexShrink: 0 }}
+                    >
+                        {/* El pet con la forma del módulo, sobre su disco navy (mismo uso que OrbiTrigger). */}
+                        <OrbiPet size={30} disc />
+                    </button>
 
                     {/* Dark mode toggle */}
                     <button
                         onClick={() => cambiarTema(isDark ? 'light' : 'dark')}
                         aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
-                        className="ds-hover grid place-items-center rounded-lg"
+                        className="admin-theme-btn ds-hover grid place-items-center rounded-lg"
                         style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0 }}
                     >
                         {isDark ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}

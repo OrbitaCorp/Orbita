@@ -19,6 +19,7 @@ import {
     type FormEvent, type ReactNode,
 } from 'react';
 import { ApiError, sendPublicSupportRequest, type SupportCategory } from '@/lib/api';
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { Card } from './Reveal';
 
 export const EMAIL_SOPORTE = 'soporte@orbita.site';
@@ -210,12 +211,7 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
             >
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <span
-                            className="inline-grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-                            style={{ background: 'var(--oc-accent-soft)', border: '1px solid var(--oc-accent-bd)' }}
-                        >
-                            <IconoAyuda size={19} />
-                        </span>
+                        <OrbitaLogo size={36} />
                         <h2 id={idTitulo} className="text-[19px] font-black tracking-[-0.02em] text-white sm:text-[21px]">
                             {estado === 'enviado' ? 'Recibimos tu consulta' : 'Escribinos'}
                         </h2>
@@ -288,7 +284,9 @@ function ModalContacto({ onClose }: { onClose: () => void }) {
                                         className={`${campo} h-11 cursor-pointer appearance-none pr-10`}
                                         style={{ ...estiloCampo(false), colorScheme: 'dark' }}
                                     >
-                                        {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                        {CATEGORIAS.map(c => (
+                                            <option key={c.value} value={c.value} style={{ background: 'var(--oc-bg, #000)', color: 'var(--oc-text, #fff)' }}>{c.label}</option>
+                                        ))}
                                     </select>
                                     <svg
                                         width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"

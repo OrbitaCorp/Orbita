@@ -5,7 +5,8 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { yaEsRecorteConAlfa } from './transparencia';
-import { endurecer, completarHuecos, guidedFilter, recuperarFinos } from './mask-refine';
+import { quitarMarco } from './quitar-marco';
+import { endurecer, completarHuecos, estimarPrimerPlano, guidedFilter, quitarIslas, recuperarFinos } from './mask-refine';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -20,6 +21,8 @@ const STD = [0.229, 0.224, 0.225];
 // Techo de resolución de entrada — acota memoria/CPU antes de correr el modelo;
 // la máscara se reescala de vuelta a la resolución ORIGINAL, no a este techo.
 const MAX_INPUT_EDGE = 2000;
+// Cuánto puede mover el guided filter el borde de la máscara de BiRefNet.
+const MAX_AJUSTE_GUIA_BIREFNET = 0.25;
 
 // Costo acotado (auditoría interna 10/09, ítem api.background-removal): cada
 // foto corre el modelo en la CPU de esta instancia y no había más límite que
@@ -137,6 +140,49 @@ export class BackgroundRemovalService {
     else this.enCurso--;
   }
 
+  // Arma el PNG RGBA final: alfa y color descontaminado (a resolución de
+  // trabajo) se reescalan a la resolución real; solo el anillo de alfa parcial
+  // toma el color descontaminado, el interior conserva los píxeles originales.
+  private async componerConPrimerPlano(
+    buffer: Buffer,
+    alfaT: Float32Array,
+    primerPlanoT: Uint8Array,
+    wT: number,
+    hT: number,
+    origWidth: number,
+    origHeight: number,
+  ): Promise<Buffer> {
+    const alfaBytesT = Buffer.alloc(wT * hT);
+    for (let i = 0; i < alfaBytesT.length; i++) alfaBytesT[i] = Math.round(alfaT[i] * 255);
+
+    const escalar = async (data: Uint8Array | Buffer, channels: 1 | 3, kernel: 'mitchell' | 'linear') => {
+      if (wT === origWidth && hT === origHeight) return Buffer.from(data);
+      const s = sharp(data, { raw: { width: wT, height: hT, channels } }).resize(origWidth, origHeight, { fit: 'fill', kernel });
+      // Trampa de sharp: sin toColourspace('b-w') un raw de 1 canal se promueve a 3.
+      return channels === 1 ? s.toColourspace('b-w').raw().toBuffer() : s.raw().toBuffer();
+    };
+    const maskResized = await escalar(alfaBytesT, 1, 'mitchell');
+    const primerPlano = await escalar(primerPlanoT, 3, 'linear');
+
+    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    for (let i = 0; i < maskResized.length; i++) {
+      if (maskResized[i] > 0 && maskResized[i] < 242) {
+        rgbRaw[i * 3] = primerPlano[i * 3];
+        rgbRaw[i * 3 + 1] = primerPlano[i * 3 + 1];
+        rgbRaw[i * 3 + 2] = primerPlano[i * 3 + 2];
+      }
+    }
+
+    return sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
+      .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
+      .png()
+      .toBuffer();
+  }
+
   private async procesar(buffer: Buffer): Promise<Buffer> {
     // Si la imagen de entrada tiene orientación EXIF (típica de fotos tomadas con
     // celular en vertical), auto-orientamos los píxeles antes de calcular dimensiones
@@ -145,6 +191,10 @@ export class BackgroundRemovalService {
     if (metaInicial.orientation && metaInicial.orientation > 1) {
       buffer = await sharp(buffer, ENTRADA_IMAGEN).rotate().toBuffer();
     }
+
+    // Foto "enmarcada" (borde liso alrededor de la foto real): se saca el marco
+    // antes del modelo, ver quitarMarco. Solo imágenes sin transparencia.
+    buffer = await quitarMarco(buffer);
 
     // Todas las lecturas del original con el tope de píxeles de las subidas
     // (ENTRADA_IMAGEN): un PNG chico puede declarar cientos de megapíxeles.
@@ -233,27 +283,50 @@ export class BackgroundRemovalService {
       }
     }
 
-    // Con BiRefNet-Lite (1024x1024), la máscara nativa ya tiene definición sub-píxel.
-    // Se compone directamente sin necesidad de guided-filter ni erosión agresiva.
+    // Con BiRefNet-Lite (1024x1024) la máscara ya es buena en el cuerpo del
+    // producto, pero el BORDE sigue siendo una transición blanda de 2-3 px cuyo
+    // color es mezcla del producto con el fondo original (confirmado a mano el
+    // 30/09/2026: remera blanca sobre madera, montada sobre negro quedaba con un
+    // contorno marrón/rosado). Tres pasos, todos solo sobre el borde:
+    // (1) guided filter con la foto como guía: el contorno pasa a seguir el
+    //     borde real de la prenda y no la grilla de 1024 px;
+    // (2) curva S angosta: borde firme de ~1 px en vez de una rampa de 3;
+    // (3) descontaminación de color de los píxeles de alfa parcial.
     if (modelConfig.isBiRefNet) {
-      const maskResized =
-        origWidth === modelSize && origHeight === modelSize
-          ? maskBytes
-          : await sharp(maskBytes, { raw: { width: modelSize, height: modelSize, channels: 1 } })
-              .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
-              .toColourspace('b-w')
-              .raw()
-              .toBuffer();
+      const escala = Math.min(1, MAX_INPUT_EDGE / Math.max(origWidth, origHeight));
+      const wT = Math.max(1, Math.round(origWidth * escala));
+      const hT = Math.max(1, Math.round(origHeight * escala));
 
-      const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
+      const maskSuaveT = await sharp(maskBytes, { raw: { width: modelSize, height: modelSize, channels: 1 } })
+        .resize(wT, hT, { fit: 'fill', kernel: 'mitchell' })
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+      const rgbT = await sharp(sourceForMask, ENTRADA_IMAGEN)
+        .flatten({ background: '#ffffff' })
+        .resize(wT, hT, { fit: 'fill' })
         .removeAlpha()
         .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
-        .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
-        .png()
         .toBuffer();
+
+      const alfaT = new Float32Array(wT * hT);
+      const guiaT = new Float32Array(wT * hT);
+      for (let i = 0; i < alfaT.length; i++) {
+        alfaT[i] = maskSuaveT[i] / 255;
+        guiaT[i] = (0.299 * rgbT[i * 3] + 0.587 * rgbT[i * 3 + 1] + 0.114 * rgbT[i * 3 + 2]) / 255;
+      }
+      const radioGuiaB = Math.max(2, Math.round(Math.min(wT, hT) * 0.003));
+      const guiada = guidedFilter(guiaT, alfaT, wT, hT, radioGuiaB, 1e-4);
+      // Mismo tope que en la rama de U2Netp: el filtro solo puede mover el borde
+      // un poco, nunca borrar zonas claras ni crear bloques.
+      for (let i = 0; i < guiada.length; i++) {
+        alfaT[i] += Math.max(-MAX_AJUSTE_GUIA_BIREFNET, Math.min(MAX_AJUSTE_GUIA_BIREFNET, guiada[i] - alfaT[i]));
+      }
+      endurecer(alfaT, 0.5, 0.45);
+
+      const primerPlanoT = estimarPrimerPlano(rgbT, alfaT, wT, hT);
+
+      const compuesta = await this.componerConPrimerPlano(buffer, alfaT, primerPlanoT, wT, hT, origWidth, origHeight);
 
       try {
         return await sharp(compuesta)
@@ -385,28 +458,23 @@ export class BackgroundRemovalService {
         maskFinalT[i] = Math.max(maskFinalT[i], Math.min(1, (finosSuaves[i] / 255) * 1.6));
       }
     }
-    const maskFinalBytes = Buffer.alloc(wT * hT);
-    for (let i = 0; i < maskFinalBytes.length; i++) maskFinalBytes[i] = Math.round(maskFinalT[i] * 255);
+    // Trocitos de fleco/hilo que a 320 px quedan flotando sueltos junto a la prenda:
+    // se borran las islas diminutas (ver quitarIslas). Solo en esta rama: BiRefNet
+    // sí ve los hilos enteros y no los fragmenta.
+    quitarIslas(maskFinalT, wT, hT);
 
-    const maskResized =
-      wT === origWidth && hT === origHeight
-        ? maskFinalBytes
-        : await sharp(maskFinalBytes, { raw: { width: wT, height: hT, channels: 1 } })
-            .resize(origWidth, origHeight, { fit: 'fill', kernel: 'mitchell' })
-            .toColourspace('b-w')
-            .raw()
-            .toBuffer();
+    // Solo el COLOR del anillo de alfa parcial (no su forma): ver
+    // estimarPrimerPlano. La NOTA de abajo (22/09/2026) descartó el unpremultiply;
+    // esto promedia colores del interior firme y no puede overshootear a negro.
+    const primerPlanoT = estimarPrimerPlano(rgbTrabajo, maskFinalT, wT, hT);
 
     // Compone: RGB original + la máscara como canal alfa. joinChannel() sobre
     // un sharp() todavía "encoded" (recién decodificado de PNG/JPEG, sin pasar
     // por .raw()) descarta el canal unido en silencio (channels:3,
     // hasAlpha:false en la salida, sin error) — hay que forzar la decodificación
-    // a píxeles crudos primero y recién ahí encadenar joinChannel.
-    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
+    // a píxeles crudos primero y recién ahí encadenar joinChannel (ver
+    // componerConPrimerPlano).
+    //
     // NOTA (22/09/2026): hubo acá una "descontaminación" de color por
     // unpremultiply (recuperar el color real del producto en píxeles de
     // alfa parcial, contra un fondo blanco asumido) — se sacó por inestable:
@@ -417,12 +485,8 @@ export class BackgroundRemovalService {
     // (bóxer + caja): quedó un contorno negro grueso rodeando todo el
     // producto. La erosión + el desenfoque de arriba ya sacan el halo del
     // caso real que motivó esto (sombra de contacto mal clasificada, ver
-    // comentario de RADIO_EROSION) sin este riesgo — no hacía falta la
-    // descontaminación además.
-    const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
-      .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
-      .png()
-      .toBuffer();
+    // comentario de RADIO_EROSION).
+    const compuesta = await this.componerConPrimerPlano(buffer, maskFinalT, primerPlanoT, wT, hT, origWidth, origHeight);
 
     // Recorta el margen transparente que queda alrededor del producto — SIN
     // esto, la foto conserva el tamaño de lienzo original completo (solo se

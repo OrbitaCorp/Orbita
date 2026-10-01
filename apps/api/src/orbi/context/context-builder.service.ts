@@ -6,6 +6,20 @@ import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../prompts/core';
 import { getWizardPrompt } from '../prompts/wizard';
 import { getPanelPrompt } from '../prompts/panel';
+import { capaDelManual } from '../prompts/manual';
+import { resolverModuloDelPanel } from '../navegacion/modulo-de-orbi';
+
+// Permiso que hace falta para meterle al prompt el snapshot de cada módulo. Es
+// el mismo que exige la pantalla equivalente por HTTP: el snapshot son números
+// del negocio (facturación, clientes, mensajes) y no tiene que salir de acá para
+// alguien que por el panel no los vería.
+const PERMISO_DEL_SNAPSHOT: Record<string, string> = {
+  dashboard: 'reports.dashboard',
+  pedidos: 'orders.view',
+  clientes: 'customers.view',
+  catalogo: 'catalog.view',
+  mensajes: 'messages.view',
+};
 
 @Injectable()
 export class ContextBuilderService {
@@ -14,7 +28,12 @@ export class ContextBuilderService {
     private readonly moduleData: ModuleDataService,
   ) {}
 
-  async buildSystemPrompt(dto: OrbiChatDto): Promise<string> {
+  /**
+   * `permisos`: los efectivos de quien pregunta (ver permisosDeOrbi). Sin
+   * permisos no hay snapshot, nunca "todo": el wizard y las evals llaman sin
+   * pasarlos y no reciben datos de ningún negocio.
+   */
+  async buildSystemPrompt(dto: OrbiChatDto, permisos: string[] = []): Promise<string> {
     const layers: string[] = [CORE_PROMPT];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {
@@ -39,13 +58,26 @@ export class ContextBuilderService {
         } catch { /* non-critical */ }
       }
 
-      const moduleSnapshot = dto.context.businessId && dto.context.module
-        ? await this.moduleData.getSnapshot(dto.context.businessId, dto.context.module)
+      // El panel manda module 'ventas' y la pantalla en section: sin esta
+      // traducción ninguna pantalla recibía su capa ni su snapshot. El permiso
+      // se busca con el módulo YA resuelto, así que llegar por section no
+      // saltea el gate.
+      const { modulo, seccion } = resolverModuloDelPanel(dto.context.module, dto.context.section);
+
+      const permisoNecesario = modulo && Object.prototype.hasOwnProperty.call(PERMISO_DEL_SNAPSHOT, modulo)
+        ? PERMISO_DEL_SNAPSHOT[modulo]
+        : undefined;
+      const moduleSnapshot = dto.context.businessId && modulo && permisoNecesario && permisos.includes(permisoNecesario)
+        ? await this.moduleData.getSnapshot(dto.context.businessId, modulo)
         : {};
 
+      // El índice del manual va antes de la capa del panel: hasta acá el
+      // prompt es igual para todos los negocios (caché de Gemini). Ver
+      // prompts/manual.ts.
+      layers.push(capaDelManual());
       layers.push(getPanelPrompt(
-        dto.context.module,
-        dto.context.section,
+        modulo,
+        seccion,
         businessInfo,
         moduleSnapshot,
       ));

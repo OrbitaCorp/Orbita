@@ -336,6 +336,7 @@ function pieReal({ base, cats, contacto }: {
     legales: [
       { label: 'Términos y condiciones', href: `${base}/legales/terminos` },
       { label: 'Política de privacidad', href: `${base}/legales/privacidad` },
+      { label: 'Política de cookies', href: `${base}/legales/cookies` },
     ],
   }
 }

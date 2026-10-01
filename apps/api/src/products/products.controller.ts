@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SUBIDA_VIDEO } from '../common/utils/subida-video';
 import { Throttle } from '@nestjs/throttler';
+import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -38,24 +39,19 @@ import { AiAssistDto } from './dto/ai-assist.dto';
 import { AiVariantsDto } from './dto/ai-variants.dto';
 import { SuggestedImagesDto } from './dto/suggested-images.dto';
 import { ProxyImageDto } from './dto/proxy-image.dto';
-import { CuotaDiaria } from '../orbi/cuota-diaria';
+import { CuotaService } from '../common/cuota/cuota.service';
+import { AI_ASSIST_DIA_NEGOCIO } from '../common/cuota/limites';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 import { PresignVideoUploadDto } from '../businesses/dto/presign-video-upload.dto';
 
-// Cada ayuda de IA es una llamada paga al modelo, y solo tenía el throttle de
-// 20 por minuto: sin tope por día (auditoría interna 10/09, ítem trans.gasto-ia).
-// Mismo criterio que los topes de Orbi: en memoria, por instancia.
-export const AI_ASSIST_DIA_NEGOCIO = 100;
-
 @Controller('products')
 export class ProductsController {
-  private readonly cuotaIa = new CuotaDiaria();
-
   constructor(
     private readonly productsService: ProductsService,
     private readonly productAiService: ProductAiService,
     private readonly businessesService: BusinessesService,
+    private readonly cuotaService: CuotaService,
     @Optional() private readonly productImageSearchService?: ProductImageSearchService,
   ) {}
 
@@ -90,9 +86,9 @@ export class ProductsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(DemoIaInterceptor)
-  aiAssist(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiAssistDto) {
+  async aiAssist(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiAssistDto) {
     const member = assertMemberContext(ctx);
-    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+    if (!(await this.cuotaService.consumir(`ai-assist:${member.businessId}`, AI_ASSIST_DIA_NEGOCIO))) {
       throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.productAiService.assist(member.businessId, dto);
@@ -105,26 +101,32 @@ export class ProductsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(DemoIaInterceptor)
-  aiVariants(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiVariantsDto) {
+  async aiVariants(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiVariantsDto) {
     const member = assertMemberContext(ctx);
-    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+    if (!(await this.cuotaService.consumir(`ai-assist:${member.businessId}`, AI_ASSIST_DIA_NEGOCIO))) {
       throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.productAiService.suggestVariants(member.businessId, dto);
   }
 
+  // Paquete "Avanzado" (decisión del 01/10): escanear una foto para completar
+  // nombre, categoría, descripción y variantes es exclusivo del add-on. Hasta
+  // entonces lo usaba cualquier plan. ai-assist y ai-variants (completar por
+  // NOMBRE, sin foto) siguen abiertos a todos. La demo pública no se ve
+  // afectada: su negocio tiene el add-on activo (ver seed-demo.ts).
   @Post('ai-scan')
   @RequirePermission('catalog.manage')
+  @RequiresAddon('ADVANCED')
   @Throttle({ default: { limit: 15, ttl: 60000 } })
   @DemoIa('orbi-producto') // prueba de la demo pública, ver demo/demo-ia.ts
   @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN), DemoIaInterceptor)
-  aiScan(
+  async aiScan(
     @CurrentBusiness() ctx: AuthContext,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta la imagen a escanear');
-    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+    if (!(await this.cuotaService.consumir(`ai-assist:${member.businessId}`, AI_ASSIST_DIA_NEGOCIO))) {
       throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.productAiService.scanProductImage(member.businessId, file);

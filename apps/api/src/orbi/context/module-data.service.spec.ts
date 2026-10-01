@@ -16,7 +16,9 @@ describe('ModuleDataService', () => {
         count: jest.fn().mockResolvedValue(0),
         groupBy: jest.fn().mockResolvedValue([]),
         aggregate: jest.fn().mockResolvedValue({ _avg: { basePrice: null } }),
+        findMany: jest.fn().mockResolvedValue([]),
       },
+      return: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }) },
       category: { count: jest.fn().mockResolvedValue(0) },
       customer: {
         count: jest.fn().mockResolvedValue(0),
@@ -53,13 +55,18 @@ describe('ModuleDataService', () => {
       .mockResolvedValueOnce([
         { status: 'COMPLETED', _count: 8, _sum: { total: 70000 } },
       ]);
-    mockPrisma.product.count
-      .mockResolvedValueOnce(25)
-      .mockResolvedValueOnce(2);
+    mockPrisma.product.count.mockResolvedValueOnce(25);
+    // Dos productos con stock 0 (sumando variantes) y uno con stock.
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { variants: [{ stock: [{ quantity: 0 }] }] },
+      { variants: [{ stock: [] }, { stock: [{ quantity: 0 }] }] },
+      { variants: [{ stock: [{ quantity: 3 }] }] },
+    ]);
     mockPrisma.customer.count
       .mockResolvedValueOnce(50)
       .mockResolvedValueOnce(8);
     mockPrisma.conversation.count.mockResolvedValue(4);
+    mockPrisma.order.count.mockResolvedValueOnce(3);
 
     const result = await service.getSnapshot('biz-1', 'dashboard');
 
@@ -80,9 +87,7 @@ describe('ModuleDataService', () => {
     mockPrisma.order.groupBy
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
-    mockPrisma.product.count
-      .mockResolvedValueOnce(0)
-      .mockResolvedValueOnce(0);
+    mockPrisma.product.count.mockResolvedValueOnce(0);
     mockPrisma.customer.count
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(0);
@@ -134,6 +139,20 @@ describe('ModuleDataService', () => {
     expect((result as any).oldestPendingHours).toBeGreaterThanOrEqual(47);
   });
 
+  it('el último pedido se fecha con el día de Argentina, no el de UTC', async () => {
+    mockPrisma.order.groupBy.mockResolvedValueOnce([]);
+    mockPrisma.order.findFirst
+      .mockResolvedValueOnce(null)
+      // 1/10 01:00 UTC = 30/09 22:00 en Argentina.
+      .mockResolvedValueOnce({ createdAt: new Date('2026-10-01T01:00:00.000Z') });
+    mockPrisma.order.aggregate.mockResolvedValueOnce({ _sum: { total: null }, _count: 0 });
+    mockPrisma.payment.groupBy.mockResolvedValueOnce([]);
+
+    const result = await service.getSnapshot('biz-1', 'pedidos');
+
+    expect(result).toMatchObject({ lastOrderDate: '2026-09-30' });
+  });
+
   it('handles zero orders in pedidos gracefully', async () => {
     mockPrisma.order.groupBy.mockResolvedValueOnce([]);
     mockPrisma.order.findFirst
@@ -183,10 +202,6 @@ describe('ModuleDataService', () => {
       { customerId: 'c9', _count: 1, _sum: { total: 5000 } },
       { customerId: 'c10', _count: 1, _sum: { total: 3000 } },
     ]);
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
-      firstName: 'María',
-      lastName: 'González',
-    });
 
     const result = await service.getSnapshot('biz-1', 'clientes');
 
@@ -194,8 +209,10 @@ describe('ModuleDataService', () => {
       totalCustomers: 50,
       newThisMonth: 8,
       segmentation: { vip: 1, recurrent: 6, new: 3, inactive: 5 },
-      topCustomerName: 'María González',
     });
+    // El nombre del cliente top es texto de terceros: no se busca ni se devuelve.
+    expect(result).not.toHaveProperty('topCustomerName');
+    expect(mockPrisma.customer.findUnique).not.toHaveBeenCalled();
   });
 
   it('handles zero customers gracefully', async () => {
@@ -211,7 +228,6 @@ describe('ModuleDataService', () => {
       totalCustomers: 0,
       newThisMonth: 0,
       segmentation: { vip: 0, recurrent: 0, new: 0, inactive: 0 },
-      topCustomerName: null,
     });
   });
 
@@ -225,9 +241,14 @@ describe('ModuleDataService', () => {
 
   it('returns CatalogoSnapshot with correct shape', async () => {
     mockPrisma.product.groupBy.mockResolvedValueOnce([
-      { status: 'PUBLISHED', _count: 15 },
+      { status: 'PUBLISHED', _count: 18 },
       { status: 'DRAFT', _count: 5 },
-      { status: 'OUT_OF_STOCK', _count: 3 },
+    ]);
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { variants: [{ stock: [{ quantity: 0 }] }] },
+      { variants: [{ stock: [{ quantity: 0 }] }] },
+      { variants: [{ stock: [] }] },
+      { variants: [{ stock: [{ quantity: 1 }] }] },
     ]);
     mockPrisma.product.aggregate.mockResolvedValueOnce({
       _avg: { basePrice: 8500.5 },
@@ -240,7 +261,7 @@ describe('ModuleDataService', () => {
 
     expect(result).toMatchObject({
       totalProducts: 23,
-      publishedProducts: 15,
+      publishedProducts: 18,
       draftProducts: 5,
       outOfStock: 3,
       totalCategories: 6,
@@ -313,5 +334,44 @@ describe('ModuleDataService', () => {
 
     const result = await service.getSnapshot('biz-1', 'mensajes');
     expect(result).toEqual({});
+  });
+  describe('los mismos números que el panel (evals del panel, 2026-10-01)', () => {
+    it('el mes es de Argentina, no del servidor (UTC)', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-01T01:00:00.000Z')); // 30/09 22:00 en Argentina
+      try {
+        await service.getSnapshot('biz-1', 'dashboard');
+        const desde = mockPrisma.order.groupBy.mock.calls[0][0].where.createdAt.gte as Date;
+        // El mes en curso en Argentina sigue siendo septiembre.
+        expect(desde.toISOString()).toBe('2026-09-01T03:00:00.000Z');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('las ventas restan las devoluciones aprobadas; el ticket queda bruto', async () => {
+      mockPrisma.order.groupBy
+        .mockResolvedValueOnce([{ status: 'COMPLETED', _count: 4, _sum: { total: 40000 } }])
+        .mockResolvedValueOnce([]);
+      mockPrisma.return.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: 5000 } })
+        .mockResolvedValueOnce({ _sum: { amount: null } });
+      const r = await service.getSnapshot('biz-1', 'dashboard') as { salesThisMonth: { total: number; avgTicket: number } };
+      expect(r.salesThisMonth).toEqual({ total: 35000, count: 4, avgTicket: 10000 });
+      expect(mockPrisma.return.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ businessId: 'biz-1', status: 'APPROVED' }) }));
+    });
+
+    it('los pendientes son todos, no solo los de este mes', async () => {
+      mockPrisma.order.count.mockResolvedValueOnce(7);
+      const r = await service.getSnapshot('biz-1', 'dashboard') as { pendingOrders: number };
+      expect(r.pendingOrders).toBe(7);
+      expect(mockPrisma.order.count).toHaveBeenCalledWith({ where: { businessId: 'biz-1', deletedAt: null, status: 'PENDING' } });
+    });
+
+    it('sin stock = stock 0 sumando variantes, acotado al negocio', async () => {
+      mockPrisma.product.findMany.mockResolvedValueOnce([{ variants: [{ stock: [{ quantity: 0 }] }] }]);
+      const r = await service.getSnapshot('biz-1', 'dashboard') as { outOfStockProducts: number };
+      expect(r.outOfStockProducts).toBe(1);
+      expect(mockPrisma.product.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: 'biz-1', deletedAt: null } }));
+    });
   });
 });

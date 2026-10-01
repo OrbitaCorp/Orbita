@@ -81,4 +81,36 @@ describe('FallbackLlmAdapter', () => {
     expect(eventos).toEqual([TEXTO]);
     expect(secondary.llamado).toBe(false);
   });
+
+  // Spec §3.7: si el cliente se fue, el error del primario (sea cual sea) es
+  // consecuencia del corte. Caer a Groq sería pagar una respuesta que nadie lee.
+  it('NO cae al secundario si la señal está abortada, aunque el error parezca de disponibilidad', async () => {
+    const corte = new AbortController();
+    const primary = adapterQue(new ApiError({ message: 'unavailable', status: 503 }));
+    const secondary = adapterQue(DONE);
+    const fb = new FallbackLlmAdapter(primary, secondary);
+    corte.abort();
+
+    await expect((async () => {
+      for await (const _ev of fb.streamChat({ messages: [{ role: 'user', content: 'x' }], signal: corte.signal })) { /* nada */ }
+    })()).rejects.toMatchObject({ status: 503 });
+    expect(secondary.llamado).toBe(false);
+  });
+
+  it('le pasa la señal al primario y al secundario', async () => {
+    const corte = new AbortController();
+    const vistas: (AbortSignal | undefined)[] = [];
+    const conSenal = (err?: Error): LlmAdapter => ({
+      async *streamChat(p: { signal?: AbortSignal }): AsyncGenerator<LlmEvent> {
+        vistas.push(p.signal);
+        if (err) throw err;
+        yield DONE;
+      },
+    });
+    const fb = new FallbackLlmAdapter(conSenal(new ApiError({ message: 'quota', status: 429 })), conSenal());
+
+    for await (const _ev of fb.streamChat({ messages: [{ role: 'user', content: 'x' }], signal: corte.signal })) { /* nada */ }
+
+    expect(vistas).toEqual([corte.signal, corte.signal]);
+  });
 });

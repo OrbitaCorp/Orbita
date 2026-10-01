@@ -815,7 +815,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
             setOrbiScanKey(key)
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            // El servidor responde 403 ADDON_REQUIRED:ADVANCED si el negocio no tiene el
+            // paquete (el botón ya no se ofrece sin él, pero el plan pudo vencer con la
+            // pantalla abierta).
+            if (err instanceof ApiError && err.message.startsWith('ADDON_REQUIRED')) {
+                onToast('Escanear productos con una foto es parte del paquete Avanzado.')
+            } else {
+                onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            }
         } finally {
             setOrbiScanGen(false)
             if (fileInputScanRef.current) {
@@ -1810,6 +1817,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         ...imagenes.filter(i => i.fondoIA).map(i => i.preview),
     ])
 
+    // Fotos que se están procesando ahora (la vista previa les dibuja un spinner
+    // encima): una pendiente con fondo aplicándose o con "Quitar fondo" corriendo,
+    // y una guardada con "Quitar fondo" corriendo. url -> texto del overlay.
+    const urlsEnProceso = new Map<string, string>([
+        ...imagenes
+            .filter(i => i.aplicandoFondo || fondoEnProceso.has(i.key))
+            .map((i): [string, string] => [i.preview, i.aplicandoFondo ? 'Aplicando fondo…' : 'Quitando fondo…']),
+        ...guardadas
+            .filter(g => fondoEnProceso.has(g.id))
+            .map((g): [string, string] => [g.url, 'Quitando fondo…']),
+    ])
+
     if (cargando) {
         return <ProductoNuevoSkeleton />
     }
@@ -2025,7 +2044,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
-                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                    {fotoParaOrbi && !orbiScanSuccess && avanzado && (
                                         <button
                                             type="button"
                                             onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
@@ -2036,6 +2055,36 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                             {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
                                         </button>
+                                    )}
+                                    {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
+                                        de dejar un botón que el servidor va a rechazar. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
+                                        <div
+                                            role="note"
+                                            style={{
+                                                marginTop: 14, padding: '11px 14px', borderRadius: 10,
+                                                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 260px', minWidth: 0 }}>
+                                                <Sparkles size={15} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Cargá tus productos más rápido</div>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, marginTop: 1 }}>
+                                                        Con el paquete Avanzado, Orbi completa el nombre, la categoría y la descripción a partir de una sola foto.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
+                                                className="ds-link"
+                                                style={{ ...enlace, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+                                            >
+                                                Conocer el paquete <ChevronRight size={13} strokeWidth={2.2} />
+                                            </button>
+                                        </div>
                                     )}
                                     {orbiScanSuccess && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
@@ -2780,6 +2829,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
                             stockTotal={stockTotal}
                             urlsConFondoIA={urlsConFondoIA}
+                            urlsEnProceso={urlsEnProceso}
                         />
                     </Card>
                 </div>
@@ -2827,7 +2877,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA, urlsEnProceso,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -2843,6 +2893,9 @@ function PreviewProducto({
     // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
     // comentario largo más abajo, sigue aplicando a las fotos comunes.
     urlsConFondoIA: Set<string>
+    // URL de foto -> texto, para las que se están procesando (fondo aplicándose o
+    // quitándose): se les dibuja un spinner encima mientras dura.
+    urlsEnProceso: Map<string, string>
 }) {
     const p = Number(precio) || 0
 
@@ -2896,6 +2949,20 @@ function PreviewProducto({
                             <div style={{ fontSize: 11, marginTop: 6 }}>Sin foto todavía</div>
                         </div>
                     </div>}
+                {imagenMostrada && urlsEnProceso.has(imagenMostrada) && (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(15, 23, 42, 0.6)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: 8, color: '#fff', backdropFilter: 'blur(2px)',
+                        }}
+                    >
+                        <Loader2 size={30} className="animate-spin" />
+                        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.02em' }}>{urlsEnProceso.get(imagenMostrada)}</span>
+                    </div>
+                )}
                 {estado === 'DRAFT' && (
                     <span style={{ position: 'absolute', top: 10, right: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                         BORRADOR
@@ -3399,14 +3466,15 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         {/* Controles de orden: número de posición y flechas táctiles */}
@@ -3575,14 +3643,15 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         <ControlOrdenFoto

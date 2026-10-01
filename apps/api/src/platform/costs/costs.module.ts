@@ -6,6 +6,7 @@ import { VercelCostAdapter } from './adapters/vercel.adapter';
 import { CloudflareCostAdapter } from './adapters/cloudflare.adapter';
 import { SupabaseCostAdapter } from './adapters/supabase.adapter';
 import { InternalCostAdapter } from './adapters/internal.adapter';
+import { GcloudCostAdapter } from './adapters/gcloud.adapter';
 
 import { COST_ADAPTERS } from './costs.constants';
 
@@ -18,11 +19,12 @@ import { COST_ADAPTERS } from './costs.constants';
     CloudflareCostAdapter,
     SupabaseCostAdapter,
     InternalCostAdapter,
+    GcloudCostAdapter,
     {
       provide: COST_ADAPTERS,
-      useFactory: (vercel: VercelCostAdapter, cloudflare: CloudflareCostAdapter, supabase: SupabaseCostAdapter) =>
-        [vercel, cloudflare, supabase],
-      inject: [VercelCostAdapter, CloudflareCostAdapter, SupabaseCostAdapter],
+      useFactory: (vercel: VercelCostAdapter, cloudflare: CloudflareCostAdapter, supabase: SupabaseCostAdapter, gcloud: GcloudCostAdapter) =>
+        [vercel, cloudflare, supabase, gcloud],
+      inject: [VercelCostAdapter, CloudflareCostAdapter, SupabaseCostAdapter, GcloudCostAdapter],
     },
   ],
   exports: [UsageMeteringService, CostsService],

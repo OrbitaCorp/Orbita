@@ -8,6 +8,7 @@ import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 import { SidebarModeProvider } from './SidebarModeContext'
 
@@ -54,6 +55,12 @@ function AdminShell({ children }: { children: ReactNode }) {
             document.body.classList.remove('admin-locked')
         }
     }, [])
+
+    // Salir del panel (a la tienda, al login, a la landing) desmonta Orbi pero
+    // la navegación de Next no cierra la conexión del stream: sin cortarla, la
+    // API sigue gastando modelo en una respuesta que nadie va a ver. Entre
+    // secciones del panel no se desmonta (es una sola ruta catch-all).
+    useEffect(() => () => useOrbiStore.getState().abortar(), [])
 
     return (
         <div

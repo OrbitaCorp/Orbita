@@ -64,6 +64,7 @@ export class GroqAdapter implements LlmAdapter {
     tools?: LlmToolDefinition[];
     /** Ignorado: es un ID de Gemini. Groq usa `this.modelo`. */
     model?: string;
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent> {
     const client = this.getClient();
 
@@ -109,6 +110,10 @@ export class GroqAdapter implements LlmAdapter {
       temperature: this.temperatura,
       reasoning_effort: this.razonamiento,
       max_completion_tokens: 4096,
+    }, {
+      // Spec §3.7: si el cliente se fue, el SDK corta el request y la lectura
+      // del stream (tira APIUserAbortError, que no es de disponibilidad).
+      signal: params.signal,
     });
 
     let currentToolCall: { id: string; name: string; argsJson: string } | null = null;
@@ -171,7 +176,7 @@ export class GroqAdapter implements LlmAdapter {
     }
 
     if (usage) {
-      yield { type: 'usage', usage: { model: this.modelo, ...usage } };
+      yield { type: 'usage', usage: { model: this.modelo, ...usage, provider: 'groq' } };
     }
 
     yield { type: 'done' };

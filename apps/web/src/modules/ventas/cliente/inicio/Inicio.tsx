@@ -15,6 +15,7 @@ import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
 import { DEMO_SLUG } from '@/lib/demo/modo'
 import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
 import { MenuDemoTienda } from '@/modules/demo/MenuDemoTienda'
+import { MenuPromociones } from '@/components/storefront/MenuPromociones'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -29,7 +30,7 @@ import {
 import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado, declinadoKey } from '@/modules/ventas/cliente/juegos/JuegoInline'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -276,6 +277,25 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
         setModalPromo(false)
     }
 
+    // Pestaña flotante (paquete Avanzado): los modales se abren UNA sola vez por
+    // navegador y cerrarlos los da por descartados, así que sin esto un visitante
+    // que cerró sin querer no tenía forma de volver a jugar ni de ver el anuncio.
+    // Ofrece lo que sigue disponible: los juegos que no ganó ni perdió (los
+    // declinados incluidos: son los que cerró con la X) y el anuncio activo. Ganar
+    // o perder una campaña sí la cierra, igual que antes. Recién cuando no hay un
+    // modal abierto, para no taparlo ni superponerse.
+    const jugables = slug && !enDemo ? juegosActivos.filter(g => !yaGano(slug, g.type, g.campaignVersion) && !yaPerdio(slug, g.type, g.campaignVersion)) : []
+    const hayModalAbierto = modalJuego || modalPromo || !!reclamo
+    function reabrirJuego(g: ActiveGame) {
+        // El juego, al montarse, mira si esta campaña está declinada y en ese caso
+        // muestra "no querés jugar": se revierte y, si se cierra de nuevo, se
+        // vuelve a declinar en cerrarModal().
+        try { if (slug) localStorage.removeItem(declinadoKey(slug, g.type, g.campaignVersion)) } catch { /* sin localStorage: abre igual */ }
+        setModalPromo(false)
+        setJuegoElegido(g.type)
+        setModalJuego(true)
+    }
+
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
     // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa
     // a cada ProductCard para el renglón "$X con transferencia" bajo el precio.
@@ -387,7 +407,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 <style>{`
                     .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
                     .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
-                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
+                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
@@ -627,7 +647,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 /* ── Tablet (≤1024px) ── */
                 @media(max-width:1024px){
                     .sf-w         { padding:0 24px }
-                    .sf-g4        { grid-template-columns:repeat(2,1fr); gap:12px }
+                    .sf-g4        { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
                     .sf-hero-grid { grid-template-columns:1fr; padding:0 32px }
                     .sf-hero-inner { min-height:max(520px, calc(100vh - 120px)); min-height:max(520px, calc(100svh - 120px)); padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
@@ -702,7 +722,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // navegan) y el contacto real (redes y horario).
                         baseUrl: base,
                         contacto: config?.contact,
-                        mostrarPie: config?.appearance?.showFooter ?? true,
+                        // El pie es obligatorio (lleva los legales): ya no se apaga desde Apariencia.
+                        mostrarPie: true,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
@@ -723,7 +744,8 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
-                        // la plantilla tiene que poder abrirlo igual.
+                        // la plantilla tiene que poder abrirlo igual, sin
+                        // depender del interruptor de devoluciones.
                         abrirDevolucion: () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
@@ -944,7 +966,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 PlantillaHome (es parte de su diseño: columnas, tipografía y
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
-                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
             )}
             {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
                 monta esta pagina: dentro de PlantillaHome no hay a donde. */}
@@ -986,6 +1008,14 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 </ModalJuego>
             )}
 
+            {!enDemo && !hayModalAbierto && (jugables.length > 0 || promoActivo) && (
+                <MenuPromociones
+                    juegos={jugables}
+                    anuncios={promoActivo ? [promoActivo] : []}
+                    onJugar={reabrirJuego}
+                    onAnuncio={() => setModalPromo(true)}
+                />
+            )}
             {enDemo && (
                 <MenuDemoTienda juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
             )}

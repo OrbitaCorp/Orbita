@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { armarPrivacidad, armarTerminos, datosLegalesDe, type DatosLegales } from '../legales'
+import { armarCookies, armarPrivacidad, armarTerminos, datosLegalesDe, type DatosLegales } from '../legales'
 import type { StorefrontConfigResponse } from '../api'
 
 // Los documentos legales del footer se arman con los datos de cada tienda.
@@ -110,5 +110,28 @@ describe('armarTerminos / armarPrivacidad', () => {
     const p = JSON.stringify(armarPrivacidad(completo))
     expect(p).toContain('Ley N.º 25.326')
     expect(p).toContain('Agencia de Acceso a la Información Pública (AAIP)')
+  })
+})
+
+describe('armarCookies', () => {
+  const completo: DatosLegales = {
+    nombreComercio: 'Zapatos Lorena', razonSocial: null, cuit: null, email: 'hola@lorena.com',
+    canalAlternativo: 'WhatsApp (+54 9 11 5555-0000)', mediosDePago: 'Mercado Pago', politicaEnvios: 'Envíos a todo el país.',
+  }
+
+  it('nombra al comercio y describe lo que la tienda guarda de verdad', () => {
+    const doc = armarCookies(completo)
+    const t = JSON.stringify(doc)
+    expect(doc.titulo).toBe('Política de Cookies de Zapatos Lorena')
+    expect(t).toContain('orbita_refresh_customer')
+    expect(t).toContain('Solo necesarias')
+    expect(t).not.toContain('null')
+  })
+
+  it('con CUIT lo incluye y sin datos de contacto el texto sigue cerrado', () => {
+    expect(JSON.stringify(armarCookies({ ...completo, cuit: '30-12345678-9' }))).toContain('CUIT 30-12345678-9')
+    const sin = JSON.stringify(armarCookies({ ...completo, email: null, canalAlternativo: null }))
+    expect(sin).not.toContain('null')
+    expect(sin).not.toContain(' a  ')
   })
 })

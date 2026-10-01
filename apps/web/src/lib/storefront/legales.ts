@@ -1,5 +1,5 @@
-// Documentos legales del storefront: Términos y Condiciones de Compra y
-// Política de Privacidad, de cada Comercio hacia sus clientes.
+// Documentos legales del storefront: Términos y Condiciones de Compra,
+// Política de Privacidad y Política de Cookies, de cada Comercio hacia sus clientes.
 //
 // El TEXTO es el de las plantillas que dejó Ale en docs/legales/ (08/09/2026),
 // tal cual — acá no se redacta nada: solo se completan las variables
@@ -25,7 +25,7 @@
 
 import type { StorefrontConfigResponse } from './api'
 
-export type TipoDocumentoLegal = 'terminos' | 'privacidad'
+export type TipoDocumentoLegal = 'terminos' | 'privacidad' | 'cookies'
 
 export type BloqueLegal =
   | { tipo: 'parrafo'; texto: string }
@@ -42,6 +42,12 @@ export type DocumentoLegal = {
 // Fecha de la versión del texto (no de la visita): cambia cuando cambia la
 // plantilla.
 export const FECHA_ACTUALIZACION_LEGALES = '8 de septiembre de 2026'
+
+// La Política de Cookies es posterior a las plantillas de docs/legales/: el texto lo
+// redactó el equipo de producto a partir de lo que la tienda realmente guarda en el
+// navegador (ver lib/cookies/consentimiento.ts). Si cambia qué se guarda, se cambia
+// acá y se corre esta fecha (y la versión del consentimiento, para volver a preguntar).
+export const FECHA_COOKIES = '30 de septiembre de 2026'
 
 // Lo que se completa en las plantillas. Se arma con `datosLegalesDe()` a
 // partir de la config pública de la tienda; se expone para poder probarlo.
@@ -261,7 +267,76 @@ export function armarPrivacidad(d: DatosLegales): DocumentoLegal {
   }
 }
 
+export function armarCookies(d: DatosLegales): DocumentoLegal {
+  return {
+    titulo: `Política de Cookies de ${d.nombreComercio}`,
+    actualizado: FECHA_COOKIES,
+    secciones: [
+      {
+        titulo: '1. Qué son las cookies',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Las cookies son pequeños archivos que un sitio web guarda en tu navegador. Junto con ellas, los sitios usan otras tecnologías parecidas (como el almacenamiento local del navegador) para recordar cosas: quién sos, qué tenés en el carrito o cómo preferís ver la página. En esta política las llamamos, en conjunto, "cookies".' },
+          { tipo: 'parrafo', texto: `Esta tienda, operada por ${conCuit(d)}, funciona sobre la plataforma Órbita, que es quien las guarda por nuestra cuenta.` },
+        ],
+      },
+      {
+        titulo: '2. Cookies necesarias',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Hacen que la tienda funcione y no se pueden desactivar, porque sin ellas no podrías comprar. No se usan para publicidad.' },
+          { tipo: 'lista', items: [
+            'Sesión de tu cuenta (orbita_refresh_customer): solo se crea si iniciás sesión. Te mantiene conectado por hasta 30 días y se borra al cerrar sesión. Es una cookie protegida: los scripts de la página no pueden leerla, solo viaja por conexiones seguras y no se envía desde otros sitios.',
+            'Carrito y cupón: qué productos agregaste y el código de descuento que aplicaste, para que no se pierdan si recargás o cerrás la página.',
+            'Datos del pedido en curso: lo que completaste en el checkout y el email con el que hiciste el pedido, mientras la pestaña sigue abierta.',
+            'Preferencias: si elegiste el modo claro u oscuro, si ya viste un anuncio o un juego con premio de la tienda y tu elección en el aviso de cookies.',
+          ] },
+        ],
+      },
+      {
+        titulo: '3. Cookies de estadísticas',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Contamos cuántas personas visitan la tienda y qué páginas miran, para que el Comercio sepa qué funciona. Es lo único opcional que usamos:' },
+          { tipo: 'lista', items: [
+            'En tu navegador se guarda una marca (orbita_v_…) que dura mientras la pestaña esté abierta, para contar una sola visita por sesión y no una por cada página.',
+            'En el servidor se registra la visita con estos datos: la tienda, el dominio y la página visitada, y la fecha y hora. No se guarda tu dirección IP ni ningún dato que te identifique.',
+          ] },
+          { tipo: 'parrafo', texto: 'Si en el aviso de cookies elegís "Solo necesarias", tu visita no se cuenta. Podés cambiar de idea cuando quieras desde "Preferencias de cookies", al pie de la tienda.' },
+        ],
+      },
+      {
+        titulo: '4. Lo que no usamos',
+        bloques: [{ tipo: 'parrafo', texto: 'Esta tienda no usa cookies de publicidad, no arma perfiles sobre lo que hacés y no te sigue por otros sitios.' }],
+      },
+      {
+        titulo: '5. Servicios de terceros',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Al usar ciertas funciones salís de esta tienda o se cargan contenidos de otras empresas, que pueden guardar sus propias cookies y las tratan según sus políticas:' },
+          { tipo: 'lista', items: [
+            'Mercado Pago: cuando elegís pagar con este medio, completás el pago en su sitio.',
+            'Google: si la tienda te permite ingresar con tu cuenta de Google, o si su diseño usa tipografías de Google Fonts (Google recibe tu dirección IP para entregarlas).',
+            'YouTube o Vimeo: si la tienda incluye videos de estos servicios, pueden guardar cookies al reproducirlos.',
+            'WhatsApp y redes sociales: al tocar sus enlaces salís de la tienda hacia esas aplicaciones.',
+          ] },
+        ],
+      },
+      {
+        titulo: '6. Cómo cambiar tu elección',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Podés modificar tus preferencias en cualquier momento desde "Preferencias de cookies", al pie de la tienda. También podés borrar o bloquear las cookies desde la configuración de tu navegador; si bloqueás las necesarias, partes de la tienda (iniciar sesión, el carrito) van a dejar de funcionar.' },
+        ],
+      },
+      {
+        titulo: '7. Cambios y contacto',
+        bloques: [
+          { tipo: 'parrafo', texto: 'Si cambia qué cookies usamos o para qué, actualizamos esta política y volvemos a preguntarte tu elección.' },
+          { tipo: 'parrafo', texto: contacto(d, 'Ante cualquier consulta sobre esta política, podés escribirnos') },
+        ],
+      },
+    ],
+  }
+}
+
 export function armarDocumentoLegal(tipo: TipoDocumentoLegal, config: StorefrontConfigResponse): DocumentoLegal {
   const d = datosLegalesDe(config)
-  return tipo === 'terminos' ? armarTerminos(d) : armarPrivacidad(d)
+  if (tipo === 'terminos') return armarTerminos(d)
+  return tipo === 'cookies' ? armarCookies(d) : armarPrivacidad(d)
 }

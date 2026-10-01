@@ -34,14 +34,15 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/member-profile/email-verification.service.ts': { max: 4, motivo: 'Verificar el email propio (memberId del token) y barrido nocturno de recordatorios para members activos sin verificar' },
   'src/platform/platform.service.ts': { max: 7, motivo: 'Super admin: es cross-tenant por diseño, detrás de PlatformAdminGuard' },
   'src/support/support.service.ts': { max: 3, motivo: 'Soporte del super admin (adminSummary y adminGet): cross-tenant por diseño, detrás de PlatformAdminGuard en support-admin.controller.ts; todo lo del panel filtra por el businessId del token. Más sendPublic (formulario público de la landing): busca el email entre los miembros de todos los negocios para marcar "con cuenta / sin cuenta", y lo único que hace con el resultado es guardar el businessId para que lo vea el superadmin' },
-  'src/subscriptions/subscriptions.service.ts': { max: 4, motivo: 'Crons de reconciliación y de avisos del ciclo de vida: recorren las suscripciones de todos los negocios' },
+  'src/subscriptions/subscriptions.service.ts': { max: 5, motivo: 'Crons de reconciliación y de avisos del ciclo de vida: recorren las suscripciones de todos los negocios (incluye el barrido de descuentos de activación a medias, que lista las filas de todos los negocios)' },
   'src/onboarding/onboarding.service.ts': { max: 2, motivo: 'Alta: todavía no hay negocio, y el email de dueño es único en toda la plataforma' },
   'src/domains/domain-purchase.service.ts': { max: 3, motivo: 'Webhook de pago: la orden se identifica por el id que mandó Mercado Pago; y el checkout mira si el dominio ya está vinculado en CUALQUIER negocio (custom_domains.domain es único global)' },
   'src/reviews/reviews.service.ts': { max: 2, motivo: 'Reseñas públicas de un producto: el producto es la unidad, no el negocio' },
   'src/games/games-play.service.ts': { max: 1, motivo: 'El juego se resuelve desde una sesión que el caller ya verificó' },
-  'src/internal-cron/retencion-logs.service.ts': { max: 2, motivo: 'Purga por antigüedad de audit_logs y email_logs (hallazgo logs-sin-retencion): borra por fecha de creación para todos los negocios a la vez, nunca por negocio, entidad ni acción' },
+  'src/internal-cron/retencion-logs.service.ts': { max: 4, motivo: 'Purga por antigüedad de audit_logs, email_logs (hallazgo logs-sin-retencion), orbi_pending_actions y orbi_turns (Orbi fase 1, spec §3.11; las dos últimas tienen businessId): borra por fecha de creación para todos los negocios a la vez, nunca por negocio, entidad ni acción' },
+  'src/products/product-image-search.service.ts': { max: 1, motivo: 'Anti-repetición del aviso a soporte@orbita.site cuando Serper/Tavily fallan: mira en email_logs si ya salió ese mail en las últimas 12 h. Es un aviso de plataforma, no de un negocio (la búsqueda de fotos no pasa por ninguno)' },
   'src/storefront/storefront.service.ts': { max: 1, motivo: 'Helper que recibe el where ya armado por quien lo llama' },
-  'src/platform/costs/costs.service.ts': { max: 2, motivo: 'Uso mensual de Groq y consumo de IA por función (getAiUsageByFeature) agregados desde usage_events para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
+  'src/platform/costs/costs.service.ts': { max: 4, motivo: 'Uso mensual de Groq, envíos de email (email_logs) y consumo de IA por función (getAiUsageByFeature) agregados desde usage_events para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
   'src/platform/costs/adapters/internal.adapter.ts': { max: 1, motivo: 'Agrega usage_events por proveedor para el Super Admin: cross-tenant por diseño, detrás de PlatformAdminGuard en costs.controller' },
 };
 

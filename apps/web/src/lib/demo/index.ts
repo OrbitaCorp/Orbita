@@ -9,6 +9,7 @@ import './recursos/tienda'
 import './recursos/juegos'
 import './recursos/checkout'
 import './recursos/pedidos'
+import './recursos/mensajes'
 
 export function iniciarDemo(queryClient: QueryClient): void {
   if (typeof window === 'undefined' || !esTiendaDemo()) return

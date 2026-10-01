@@ -254,6 +254,18 @@ export default function Dashboard() {
                     .dash-alerts { grid-template-columns: repeat(2, 1fr) !important; }
                     .dash-act-hide { display: none !important; }
                     .dash-act-row  { grid-template-columns: 90px 1fr auto !important; gap: 8px !important; }
+                    /* Los desplegables del encabezado van pegados a la derecha de su
+                       botón, pero en el celular los botones bajan a la izquierda y
+                       se salían de la pantalla (reportado con captura 29/09). El
+                       menú de la tienda se ancla a la izquierda del botón; el
+                       calendario, de 700px, pasa a una hoja centrada que ocupa el
+                       ancho de la pantalla y se desplaza si no entra en alto. */
+                    .dash-pop-tienda { right: auto !important; left: 0 !important; }
+                    .dash-pop-cal {
+                        position: fixed !important; left: 12px !important; right: 12px !important; top: 76px !important;
+                        max-height: calc(100vh - 92px); max-height: calc(100dvh - 92px);
+                        overflow-y: auto; border-radius: 16px;
+                    }
                 }
                 @media (max-width: 560px) {
                     /* Dos alertas por fila a ~170px partían el título en cuatro
@@ -322,7 +334,7 @@ export default function Dashboard() {
                         </button>
 
                         {calendarOpen && (
-                            <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 500 }}>
+                            <div className="dash-pop-cal" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 500 }}>
                                 <DateRangePicker
                                     onApply={(start, end) => {
                                         setCustomRange({ start, end })
@@ -343,7 +355,7 @@ export default function Dashboard() {
                                 ✓ Tienda online
                             </Button>
                             {tiendaMenuOpen && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 200, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                                <div className="dash-pop-tienda" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 200, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
                                     <div style={{ padding: '9px 12px', borderBottom: '1px solid var(--color-border)', fontSize: 11.5, color: 'var(--color-muted)' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{k?.visitasTotal ?? k?.visitas ?? 0} visitas a la tienda</div>
                                         {(k?.visitasTotalDominio ?? 0) > 0 ? (

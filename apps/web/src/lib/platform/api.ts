@@ -606,6 +606,12 @@ export interface CostBusinessRow {
   totalEstimatedUsd: number
   byCategory: Record<string, number>
   pctOfTotal: number
+  aiRequests?: number
+  aiTokens?: number
+  emails?: number
+  productos?: number
+  clientes?: number
+  pedidos?: number
 }
 
 export interface CostAiUsageRow {
@@ -670,6 +676,7 @@ export interface CostUsageItem {
 
 export interface CostUsageResponse {
   providers: Record<string, { slug: string; items: CostUsageItem[] }>
+  updatedAt?: string
 }
 
 // Arma "?a=1&b=2" salteando lo vacío, para no mandar `status=` cuando el

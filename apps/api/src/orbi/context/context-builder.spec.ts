@@ -1,5 +1,6 @@
 import { ContextBuilderService } from './context-builder.service';
 import { OrbiSurface, OrbiWizardFormStateDto } from '../dto/orbi-chat.dto';
+import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -194,7 +195,7 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Pedidos');
-    expect(prompt).toContain('PENDING');
+    expect(prompt).toContain('Pendiente');
     expect(prompt).toContain('updateOrderStatus');
   });
 
@@ -246,7 +247,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
-    } as any);
+    } as any, ['reports.dashboard']);
 
     expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', 'dashboard');
   });
@@ -313,7 +314,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
-    } as any);
+    } as any, ['reports.dashboard']);
 
     expect(prompt).toContain('$150.000');
     expect(prompt).toContain('25 pedidos');
@@ -321,6 +322,39 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('3 productos sin stock');
     expect(prompt).toContain('7 mensajes sin leer');
     expect(prompt).toContain('12 nuevos este mes');
+  });
+
+  it('dashboard: el mes en curso no se compara en % contra un mes anterior completo', async () => {
+    // El 1° del mes eso daba "-100% vs. mes anterior" y Orbi lo repetía.
+    mockModuleData.getSnapshot.mockResolvedValue({
+      salesThisMonth: { total: 1000, count: 1, avgTicket: 1000 },
+      salesLastMonth: { total: 120000, count: 20 },
+      pendingOrders: 0, cancelledThisMonth: 0, totalProducts: 1, outOfStockProducts: 0,
+      totalCustomers: 1, newCustomersThisMonth: 0, unreadMessages: 0,
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any, ['reports.dashboard']);
+
+    expect(prompt).toContain('mes en curso');
+    expect(prompt).toContain('Mes anterior completo: $120.000 en 20 pedidos');
+    expect(prompt).not.toContain('% vs. mes anterior');
+  });
+
+  it('dashboard: pide cifras exactas, una conclusión y tools para otros períodos', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('cifras exactas');
+    expect(prompt).toContain('conclusión');
+    // Otros períodos: la tool de período, con los números del Inicio.
+    expect(prompt).toMatch(/otro período[^\n]*getResumenDelPeriodo/);
+    // listOrders trae como mucho 20 pedidos: sumarlos no es "las ventas de la semana".
+    expect(prompt).toContain('No sumes pedidos de listOrders');
   });
 
   it('dashboard prompt works without dynamic data (graceful degradation)', async () => {
@@ -343,9 +377,12 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Lo que sabés sobre pedidos');
-    expect(prompt).toContain('PENDING');
-    expect(prompt).toContain('CANCELLED');
-    expect(prompt).toContain('irreversible');
+    expect(prompt).toContain('Pendiente');
+    expect(prompt).toContain('Cancelado');
+    expect(prompt).toContain('no tiene vuelta atrás');
+    // Las palabras de la pantalla, no los valores de la base: lo que está en
+    // el prompt es lo que Orbi le repite a la persona.
+    expect(prompt).not.toMatch(/\b(PENDING|CONFIRMED|PREPARING|SHIPPED|DELIVERED|COMPLETED|CANCELLED)\b/);
   });
 
   it('pedidos prompt interpolates dynamic data when snapshot is available', async () => {
@@ -360,9 +397,12 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
-    } as any);
+    } as any, ['orders.view']);
 
-    expect(prompt).toContain('PENDING: 5');
+    expect(prompt).toContain('pendientes: 5');
+    // COMPLETED se ve como "Entregado" en la pantalla.
+    expect(prompt).toContain('entregados: 20');
+    expect(prompt).not.toContain('PENDING');
     expect(prompt).toContain('36h sin confirmar');
     expect(prompt).toContain('$8.500');
     expect(prompt).toContain('2026-09-07');
@@ -399,19 +439,18 @@ describe('ContextBuilderService', () => {
       totalCustomers: 120,
       newThisMonth: 15,
       segmentation: { vip: 12, recurrent: 40, new: 30, inactive: 18 },
-      topCustomerName: 'María González',
     });
 
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'clientes', businessId: 'biz-1' },
-    } as any);
+    } as any, ['customers.view']);
 
     expect(prompt).toContain('120 clientes');
     expect(prompt).toContain('Nuevos este mes: 15');
     expect(prompt).toContain('12 VIP');
     expect(prompt).toContain('18 inactivos');
-    expect(prompt).toContain('María González');
+    expect(prompt).not.toContain('Cliente top');
   });
 
   it('clientes prompt works without dynamic data (graceful degradation)', async () => {
@@ -434,9 +473,10 @@ describe('ContextBuilderService', () => {
     } as any);
 
     expect(prompt).toContain('Lo que sabés sobre productos');
-    expect(prompt).toContain('PUBLISHED');
-    expect(prompt).toContain('DRAFT');
+    expect(prompt).toContain('Publicado');
+    expect(prompt).toContain('Borrador');
     expect(prompt).toContain('Precio psicológico');
+    expect(prompt).not.toMatch(/\b(PUBLISHED|DRAFT|OUT_OF_STOCK)\b|comparePrice/);
   });
 
   it('catalogo prompt interpolates dynamic data when snapshot is available', async () => {
@@ -453,7 +493,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'catalogo', businessId: 'biz-1' },
-    } as any);
+    } as any, ['catalog.view']);
 
     expect(prompt).toContain('30 productos');
     expect(prompt).toContain('20 publicados');
@@ -496,7 +536,7 @@ describe('ContextBuilderService', () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: { surface: OrbiSurface.PANEL, module: 'mensajes', businessId: 'biz-1' },
-    } as any);
+    } as any, ['messages.view']);
 
     expect(prompt).toContain('Conversaciones totales: 30');
     expect(prompt).toContain('Sin leer: 5');
@@ -514,5 +554,205 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('Lo que sabés sobre mensajería');
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
+  });
+
+  // El snapshot del prompt son números del negocio (facturación, clientes,
+  // mensajes). Sin chequear permisos, un empleado con solo orders.view veía la
+  // caja del mes en cuanto abría el dashboard. Ahora cada módulo pide el permiso
+  // que la pantalla equivalente exige por HTTP, y sin permisos no hay nada.
+  describe('snapshot del módulo según los permisos', () => {
+    const casos: Array<[string, string]> = [
+      ['dashboard', 'reports.dashboard'],
+      ['pedidos', 'orders.view'],
+      ['clientes', 'customers.view'],
+      ['catalogo', 'catalog.view'],
+      ['mensajes', 'messages.view'],
+    ];
+    const dtoDe = (module: string) => ({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module, businessId: 'biz-1' },
+    }) as any;
+
+    it('sin permisos no hay snapshot de ningún módulo (nunca "todo")', async () => {
+      for (const [module] of casos) {
+        await service.buildSystemPrompt(dtoDe(module));
+        await service.buildSystemPrompt(dtoDe(module), []);
+      }
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it.each(casos)('el módulo %s trae el snapshot con el permiso %s', async (module, permiso) => {
+      await service.buildSystemPrompt(dtoDe(module), [permiso]);
+      expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', module);
+    });
+
+    it.each(casos)('el módulo %s NO trae el snapshot con un permiso ajeno', async (module) => {
+      // discounts.view no le da a nadie ningún snapshot; y los de los otros
+      // módulos tampoco se filtran entre sí.
+      const ajenos = ['discounts.view', ...casos.filter(([m]) => m !== module).map(([, p]) => p)];
+      await service.buildSystemPrompt(dtoDe(module), ajenos);
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('sin permiso el prompt del módulo sigue armándose (solo faltan los números)', async () => {
+      const prompt = await service.buildSystemPrompt(dtoDe('dashboard'), []);
+      expect(prompt).toContain('Lo que sabés sobre métricas');
+    });
+
+    it('el wizard sigue sin snapshot aunque le pasen permisos', async () => {
+      await service.buildSystemPrompt(
+        { message: 'hola', context: { surface: OrbiSurface.WIZARD, stepName: 'elegir-rubro' } } as any,
+        ['reports.dashboard'],
+      );
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+  });
+
+  // El panel real manda module: 'ventas' (penúltimo segmento de
+  // /admin/ventas/<seccion>) y la pantalla en `section`. Antes el builder solo
+  // miraba `module`, así que ninguna pantalla del panel recibía su capa ni su
+  // snapshot: todo caía al prompt genérico y "hacé un resumen de mi tienda"
+  // salía sin un solo número del dashboard.
+  describe('pantalla real del panel (module "ventas" + section)', () => {
+    const SNAPSHOT_DASHBOARD = {
+      salesThisMonth: { total: 150000, count: 25, avgTicket: 6000 },
+      salesLastMonth: { total: 120000, count: 20 },
+      pendingOrders: 5,
+      cancelledThisMonth: 2,
+      totalProducts: 40,
+      outOfStockProducts: 3,
+      totalCustomers: 80,
+      newCustomersThisMonth: 12,
+      unreadMessages: 7,
+    };
+    const dtoDeSeccion = (section: string) => ({
+      message: 'hacé un resumen de mi tienda',
+      context: { surface: OrbiSurface.PANEL, module: 'ventas', section, businessId: 'biz-1' },
+    }) as any;
+
+    it('el dueño en el dashboard recibe la capa y el snapshot del dashboard', async () => {
+      mockModuleData.getSnapshot.mockResolvedValue(SNAPSHOT_DASHBOARD);
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion('dashboard'), CODIGOS_DEL_CATALOGO);
+
+      expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', 'dashboard');
+      expect(prompt).toContain('Lo que sabés sobre métricas');
+      expect(prompt).toContain('$150.000');
+      expect(prompt).toContain('25 pedidos');
+      expect(prompt).not.toContain(TEXTO_DEL_FALLBACK_PANEL);
+    });
+
+    it('un empleado sin reports.dashboard ve la capa del dashboard pero no los números', async () => {
+      mockModuleData.getSnapshot.mockResolvedValue(SNAPSHOT_DASHBOARD);
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion('dashboard'), ['orders.view', 'catalog.view', 'reports.view']);
+
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+      expect(prompt).toContain('Lo que sabés sobre métricas');
+      expect(prompt).not.toContain('$150.000');
+    });
+
+    it.each([
+      ['pedidos', 'pedidos', 'orders.view'],
+      ['clientes', 'clientes', 'customers.view'],
+      ['catalogo', 'catalogo', 'catalog.view'],
+      ['categorias', 'catalogo', 'catalog.view'],
+      ['mensajes', 'mensajes', 'messages.view'],
+    ])('la sección %s trae el snapshot de %s con %s', async (section, modulo, permiso) => {
+      await service.buildSystemPrompt(dtoDeSeccion(section), [permiso]);
+      expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', modulo);
+    });
+
+    it.each(['descuentos', 'cupones', 'configuracion'])('la sección %s tiene capa propia (sin snapshot)', async (section) => {
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion(section), CODIGOS_DEL_CATALOGO);
+      expect(prompt).not.toContain(TEXTO_DEL_FALLBACK_PANEL);
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('configuración desde la URL no dice que está en la sección "configuracion"', async () => {
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion('configuracion'), CODIGOS_DEL_CATALOGO);
+      expect(prompt).toContain('Está en la configuración general.');
+    });
+
+    it('una sección desconocida no trae snapshot, no rompe y cae al prompt genérico', async () => {
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion('inventario'), CODIGOS_DEL_CATALOGO);
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+      expect(prompt).toContain(TEXTO_DEL_FALLBACK_PANEL);
+      // Texto libre del cliente: no entra al system prompt.
+      expect(prompt).not.toContain('inventario');
+    });
+
+    it('una sección real sin capa propia (perfil) sigue en el genérico, con la sección', async () => {
+      const prompt = await service.buildSystemPrompt(dtoDeSeccion('perfil'), CODIGOS_DEL_CATALOGO);
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+      expect(prompt).toContain('sección "perfil"');
+    });
+
+    it('el wizard no se entera de section aunque venga', async () => {
+      await service.buildSystemPrompt(
+        { message: 'hola', context: { surface: OrbiSurface.WIZARD, stepName: 'elegir-rubro', section: 'dashboard' } } as any,
+        CODIGOS_DEL_CATALOGO,
+      );
+      expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+    });
+  });
+  describe('capa del manual (fase 6)', () => {
+    it('el panel lleva el índice del manual, antes de cualquier dato del negocio', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
+      } as any, CODIGOS_DEL_CATALOGO);
+
+      expect(prompt).toContain('## Manual de uso del panel');
+      expect(prompt).toContain('- cfg-envios · Envíos');
+      expect(prompt).toContain('leerTemaDelManual');
+      // El prefijo compartido (core + índice) termina antes del nombre del
+      // negocio: es lo que deja que la caché de Gemini lo reuse.
+      expect(prompt.indexOf('## Manual de uso del panel')).toBeLessThan(prompt.indexOf('Rama'));
+      expect(prompt.indexOf('Sos Orbi')).toBeLessThan(prompt.indexOf('## Manual de uso del panel'));
+    });
+
+    it('el prefijo hasta el índice es idéntico para dos negocios distintos', async () => {
+      const armar = async (nombre: string) => {
+        mockPrisma.business.findUnique.mockResolvedValueOnce({ name: nombre, industry: 'Tienda', mode: 'FULL' });
+        return service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos', businessId: 'biz-1' },
+        } as any, CODIGOS_DEL_CATALOGO);
+      };
+      const a = await armar('Negocio A');
+      const b = await armar('Negocio B');
+      const fin = (p: string) => p.indexOf('Configuración → Soporte');
+      expect(fin(a)).toBeGreaterThan(0);
+      expect(a.slice(0, fin(a))).toBe(b.slice(0, fin(b)));
+    });
+
+    it('el wizard no lleva el manual del panel', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.WIZARD, stepName: 'ubicacion' },
+      } as any);
+      expect(prompt).not.toContain('## Manual de uso del panel');
+    });
+
+    it('ninguna capa del panel manda a inventar pasos', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: 'inventario', businessId: 'biz-1' },
+      } as any);
+      expect(prompt).not.toContain('explicá los pasos para hacerlo manualmente');
+      expect(prompt).toContain('buscá en el manual');
+    });
+  });
+  it('ninguna capa del panel le enseña al modelo valores internos de la base', async () => {
+    // Valores de enum (PENDING, OUT_OF_STOCK, PERCENT_TICKET…): si están en el
+    // prompt, Orbi se los repite a la persona. Los nombres de las tools sí
+    // aparecen a propósito (las instrucciones las nombran): son camelCase.
+    const ENUM = /\b[A-Z]{3,}(?:_[A-Z]+)+\b|\b(?:PENDING|CONFIRMED|PREPARING|SHIPPED|DELIVERED|COMPLETED|CANCELLED|PUBLISHED|DRAFT|PRODUCT|CATEGORY|TICKET)\b/;
+    for (const mod of ['dashboard', 'pedidos', 'catalogo', 'clientes', 'descuentos', 'configuracion', 'mensajes', 'otro']) {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: mod, businessId: 'biz-1' },
+      } as any);
+      expect({ mod, enum: ENUM.exec(prompt)?.[0] ?? null }).toEqual({ mod, enum: null });
+    }
   });
 });

@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { currentSlug, authChannel } from '@/lib/tenant'
 import { AuthError, bffFetch, tokenStore, tryRefresh } from './authClient'
 import { esTiendaDemo, esVisitanteDemo, marcarVisitanteDemo } from '@/lib/demo/modo'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { cambiaDeIdentidad } from './identidad'
 
 // ─── Tipos del usuario autenticado ──────────────────────────────────────────
 // El shape lo define el backend (login / GET /auth/me). Ver CONTRATO_API.md.
@@ -91,6 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<AuthUser | null>(null)
+  // Quién está logueado AHORA, legible desde login() (que es un useCallback
+  // sin dependencias y vería el `user` del primer render). Solo lo usa login()
+  // para saber si entró otra persona; no cambia nada del flujo de auth.
+  const usuarioActual = useRef<AuthUser | null>(null)
+  useEffect(() => {
+    usuarioActual.current = user
+  }, [user])
 
   // Bootstrap: en cada carga completa intentamos recuperar la sesión desde la
   // cookie httpOnly de refresh. Esto también resuelve el handoff entre
@@ -156,6 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { token, ...rest } = data as AuthUser & { token: string }
+    // Otra persona u otro negocio en la misma pestaña (POS compartido entre
+    // empleados): el chat de Orbi en memoria es de quien estaba antes. Se
+    // corta su respuesta en curso y se vacía antes de dar paso al nuevo.
+    if (cambiaDeIdentidad(usuarioActual.current, rest as AuthUser)) {
+      useOrbiStore.getState().reset()
+    }
     tokenStore.set(token)
     setUser(rest as AuthUser)
     setStatus('authenticated')
@@ -204,6 +219,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async (): Promise<void> => {
+    // El chat de Orbi (y su stream en curso) es de quien se va. Hoy el logout
+    // del panel recarga la página, pero el POS comparte terminal entre
+    // empleados y no hay que depender de eso. reset() también aborta.
+    // En try/catch: si limpiar Orbi fallara, el logout igual tiene que
+    // terminar; quedarse con la sesión abierta es peor que un chat sin vaciar.
+    try {
+      useOrbiStore.getState().reset()
+    } catch {
+      // Nada que hacer: lo importante es seguir con el cierre de sesión.
+    }
     // Visitante de la demo: su sesión no tiene cookie propia, y el logout del
     // BFF borraría la cookie de panel de un dueño real que esté mirando la
     // demo (ver lib/demo/modo.ts). Alcanza con olvidar el token.

@@ -197,11 +197,6 @@ export const AYUDA_OPCIONES: Partial<Record<keyof Apariencia, Ayuda>> = {
         donde: 'En la misma franja finita de arriba del header.',
         afecta: 'Moviéndose llama más la atención y entra un texto más largo sin cortarse; quieto y centrado se lee más tranquilo. Solo tiene efecto si la franja está prendida.',
     },
-    mostrarFooter: {
-        que: 'El pie de página completo: logo, descripción, datos de contacto, links y redes.',
-        donde: 'Abajo de todo, en todas las páginas de la tienda.',
-        afecta: 'Apagado se va TODO el bloque, incluidos los datos de contacto y el acceso a devoluciones. La tienda termina directo donde termina el contenido de cada página.',
-    },
     mostrarRedesFooter: {
         que: 'Los iconitos que llevan a tus redes (Instagram, Facebook, TikTok).',
         donde: 'Dentro del pie de página, debajo de la descripción.',

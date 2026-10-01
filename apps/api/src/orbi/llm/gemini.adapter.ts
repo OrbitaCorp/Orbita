@@ -46,6 +46,7 @@ export class GeminiAdapter implements LlmAdapter {
     messages: LlmMessage[];
     tools?: LlmToolDefinition[];
     model?: string;
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent> {
     const client = this.getClient();
     const modeloEfectivo = params.model ?? this.modelo;
@@ -65,25 +66,44 @@ export class GeminiAdapter implements LlmAdapter {
       .map(m => m.content)
       .join('\n\n') || undefined;
 
+    // Historial bien formado (spec §3.3): un turno fallido o cortado deja dos
+    // `user` seguidos en la conversación guardada, y una respuesta vacía queda
+    // como `assistant` vacío. Gemini espera turnos que alternan y sin partes
+    // vacías, así que los mensajes vacíos se descartan y los consecutivos del
+    // MISMO rol de Gemini se unen en un solo content, con sus parts en orden.
+    // El rol de Gemini y no el nuestro: un resultado de tool y un mensaje del
+    // usuario son los dos 'user' para Gemini, y seguidos también rompen la
+    // alternancia.
     const contents: Content[] = [];
+    const agregar = (content: Content) => {
+      const ultimo = contents[contents.length - 1];
+      if (ultimo && ultimo.role === content.role) {
+        ultimo.parts = [...(ultimo.parts ?? []), ...(content.parts ?? [])];
+      } else {
+        contents.push(content);
+      }
+    };
+
     for (const m of params.messages) {
       if (m.role === 'system') continue;
 
       if (m.role === 'user') {
-        contents.push({ role: 'user', parts: [{ text: m.content }] });
+        if (!m.content?.trim()) continue;
+        agregar({ role: 'user', parts: [{ text: m.content }] });
         continue;
       }
 
       if (m.role === 'assistant') {
         const parts: Part[] = [];
-        if (m.content) parts.push({ text: m.content });
+        if (m.content?.trim()) parts.push({ text: m.content });
         for (const tc of m.toolCalls ?? []) {
           parts.push({
             functionCall: { name: tc.name, args: tc.arguments },
             ...(tc.thoughtSignature ? { thoughtSignature: tc.thoughtSignature } : {}),
           });
         }
-        contents.push({ role: 'model', parts: parts.length ? parts : [{ text: '' }] });
+        if (!parts.length) continue;
+        agregar({ role: 'model', parts });
         continue;
       }
 
@@ -94,7 +114,7 @@ export class GeminiAdapter implements LlmAdapter {
       } catch {
         parsed = m.content;
       }
-      contents.push({
+      agregar({
         role: 'user',
         parts: [{
           functionResponse: {
@@ -124,6 +144,11 @@ export class GeminiAdapter implements LlmAdapter {
         maxOutputTokens: 4096,
         thinkingConfig: { thinkingLevel: thinkingLevelFor(this.razonamiento) },
         ...(functionDeclarations?.length ? { tools: [{ functionDeclarations }] } : {}),
+        // Spec §3.7: el cliente se fue. En @google/genai el corte es solo del
+        // lado nuestro (deja de leer y cierra la conexión): Google no cancela
+        // la generación, así que lo ya generado se factura igual. Sirve para
+        // no seguir esperando ni pedir la vuelta siguiente.
+        abortSignal: params.signal,
       },
     });
 
@@ -166,7 +191,7 @@ export class GeminiAdapter implements LlmAdapter {
     }
 
     if (usage) {
-      yield { type: 'usage', usage: { model: modeloEfectivo, ...usage } };
+      yield { type: 'usage', usage: { model: modeloEfectivo, ...usage, provider: 'gemini' } };
     }
 
     yield { type: 'done' };

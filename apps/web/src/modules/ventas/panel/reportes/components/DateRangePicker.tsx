@@ -171,7 +171,7 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
     const canApply = !!selStart
 
     return (
-        <div style={{
+        <div className="drp-raiz" style={{
             background:    'var(--color-bg)',
             border:        '1px solid var(--color-border)',
             borderRadius:  16,
@@ -180,9 +180,24 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
             width:         700,
             maxWidth:      'calc(100vw - 32px)',
         }}>
+            {/* En el celular, los accesos rápidos pasan arriba (en fila, con
+                salto de línea) y los dos meses se apilan: en 350px de ancho no
+                entran 156 de accesos + dos calendarios, y se cortaban. */}
+            <style>{`
+                @media (max-width: 640px) {
+                    .drp-raiz { width: 100% !important; max-width: none !important; border-radius: 16px; }
+                    .drp-cabeza { padding: 12px 16px !important; }
+                    .drp-cuerpo { flex-direction: column !important; min-height: 0 !important; }
+                    .drp-accesos { width: auto !important; border-right: none !important; border-bottom: 1px solid var(--color-border); padding: 12px !important; display: flex; flex-wrap: wrap; gap: 6px; }
+                    .drp-accesos-titulo { display: none !important; }
+                    .drp-acceso { width: auto !important; border: 1px solid var(--color-border) !important; padding: 6px 12px !important; }
+                    .drp-meses { padding: 12px 14px 16px !important; }
+                    .drp-meses-grilla { grid-template-columns: minmax(0, 1fr) !important; gap: 18px !important; }
+                }
+            `}</style>
 
             {/* ── Header: fecha desde/hasta ── */}
-            <div style={{ padding: '14px 22px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div className="drp-cabeza" style={{ padding: '14px 22px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 120 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.1em', marginBottom: 3 }}>DESDE</div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: selStart ? 'var(--color-text)' : 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
@@ -202,13 +217,13 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
             </div>
 
             {/* ── Body: presets + meses ── */}
-            <div style={{ display: 'flex', minHeight: 300 }}>
+            <div className="drp-cuerpo" style={{ display: 'flex', minHeight: 300 }}>
 
                 {/* Presets */}
-                <div style={{ width: 156, borderRight: '1px solid var(--color-border)', padding: '14px 10px', flexShrink: 0 }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.12em', marginBottom: 8, paddingLeft: 6 }}>ACCESOS RÁPIDOS</div>
+                <div className="drp-accesos" style={{ width: 156, borderRight: '1px solid var(--color-border)', padding: '14px 10px', flexShrink: 0 }}>
+                    <div className="drp-accesos-titulo" style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.12em', marginBottom: 8, paddingLeft: 6 }}>ACCESOS RÁPIDOS</div>
                     {presets.map(p => (
-                        <button key={p.label} className="ds-hover" onClick={p.fn} style={{
+                        <button key={p.label} className="ds-hover drp-acceso" onClick={p.fn} style={{
                             width: '100%', padding: '7px 10px', borderRadius: 7, border: 'none',
                             textAlign: 'left', background: 'transparent', color: 'var(--color-body)',
                             fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
@@ -220,8 +235,8 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
                 </div>
 
                 {/* Calendarios */}
-                <div style={{ flex: 1, padding: '16px 18px', overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <div className="drp-meses" style={{ flex: 1, padding: '16px 18px', overflow: 'hidden' }}>
+                    <div className="drp-meses-grilla" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
 
                         {/* Mes izquierdo */}
                         <div>

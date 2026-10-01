@@ -24,6 +24,7 @@ export class FallbackLlmAdapter implements LlmAdapter {
     messages: LlmMessage[];
     tools?: LlmToolDefinition[];
     model?: string;
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent> {
     let emitioAlgo = false;
     try {
@@ -33,7 +34,11 @@ export class FallbackLlmAdapter implements LlmAdapter {
       }
       return;
     } catch (err) {
-      if (emitioAlgo || !esErrorDeDisponibilidad(err)) throw err;
+      // Con la señal abortada, el error del primario (el que sea: un aborto,
+      // un "fetch failed", un 503 que llegó justo) es consecuencia de que el
+      // cliente se fue. Caer a Groq sería pagar una respuesta que nadie lee
+      // (spec §3.7).
+      if (emitioAlgo || params.signal?.aborted || !esErrorDeDisponibilidad(err)) throw err;
       this.logger.warn(
         `Proveedor primario no disponible antes del primer token (${describir(err)}); ` +
         `cayendo al fallback`,

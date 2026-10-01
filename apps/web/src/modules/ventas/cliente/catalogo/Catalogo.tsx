@@ -375,7 +375,7 @@ export default function Catalogo() {
           .sf-cat-layout      { grid-template-columns: minmax(0,1fr) !important; }
           .sf-cat-sidebar     { position: static !important; max-height: none !important; display: none; }
           .sf-cat-sidebar.open{ display: block !important; }
-          .sf-cat-grid        { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .sf-cat-grid        { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
           .sf-cat-filter-btn  { display: inline-flex !important; }
         }
         .sf-cat-filter-btn { display: none; }
@@ -620,7 +620,7 @@ export default function Catalogo() {
           </div>
         </div>
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
   )

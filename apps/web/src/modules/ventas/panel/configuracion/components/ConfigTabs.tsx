@@ -14,7 +14,8 @@
 // mantiene en el tipo solo por compatibilidad de URLs viejas sin `?vista=`
 // (ver ConfigGeneral.tsx: sin vista, cae a 'negocio').
 
-export type VistaConfig =
-    | 'general' | 'negocio' | 'contacto' | 'pagos' | 'envios' | 'redes' | 'postventa' | 'peligro'
-    | 'apariencia' | 'equipo' | 'notificaciones' | 'suscripcion' | 'dominios' | 'soporte'
-    | 'actividad'
+// Sale de VISTAS_DE_CONFIGURACION (panel/secciones.ts), que también copia la API
+// para que Orbi arme links con ?vista= válidos: una sola lista para las tres.
+import type { VistaDeConfiguracion } from '@/modules/ventas/panel/secciones'
+
+export type VistaConfig = VistaDeConfiguracion

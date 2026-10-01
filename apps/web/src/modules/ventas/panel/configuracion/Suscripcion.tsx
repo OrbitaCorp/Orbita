@@ -20,20 +20,32 @@
 //      renovación (ver SubscriptionsService.changePlan).
 
 import { useEffect, useState } from 'react'
-import { Crown, Check, Gamepad2, LayoutTemplate, MessageSquareText, Timer, Gift, ArrowRight } from 'lucide-react'
+import { Crown, Check, Gift, ArrowRight } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { SkeletonText } from '@/design-system/components/Skeleton'
+import { Modal } from '@/design-system/components/Modal'
+import { useAuth } from '@/hooks/useAuth'
 import {
-    ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan,
+    ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan, panelPreviewActivationDiscount,
+    panelGetBusiness, panelCancelBusiness, panelReactivateFromCancellation,
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
 
+// Todo lo que el add-on ADVANCED habilita de verdad en el backend (cada una de
+// estas funciones está detrás de AddonGuard / hasActiveAddon). Si se suma o se
+// saca una función del paquete, hay que cambiarla acá y en DETALLE_AVANZADO de
+// pages/onboarding/plan.tsx.
 const INCLUYE = [
-    { label: 'Juegos con premio', Icon: Gamepad2 },
-    { label: 'Modales de anuncios', Icon: MessageSquareText },
-    { label: 'Plantillas de Home', Icon: LayoutTemplate },
-    { label: 'Oferta relámpago y prueba social', Icon: Timer },
+    'Plantillas de Home',
+    'Modales de anuncios',
+    'Juegos con premio',
+    'Prueba social',
+    '2x1 y 3x2',
+    'Oferta relámpago',
+    'Fotos sin fondo automáticas',
+    'Fondo con IA para tus productos',
+    'Escaneo de productos con IA (cargá un producto desde su foto)',
 ]
 
 // SUSPENDED y CANCELLED sumados (RBT — ciclo de vida de suscripciones,
@@ -55,13 +67,16 @@ const ESTADO_META: Record<string, { label: string; color: string; bg: string }> 
 // plan que YA NO se ofrece en el alta (ver StartPendingCheckoutDto) pero sigue
 // disponible acá — es el que arma "Activar Avanzado" más abajo, y cualquier
 // cliente puede pasarse a él (o salir) como cualquier otro cambio de plan.
-const PLANES: Record<PlanKey, { nombre: string; precioMes: number; total: number | null; periodo: string }> = {
-    mensual:           { nombre: 'Mensual',             precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
-    semestral:         { nombre: 'Semestral',           precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
-    anual:             { nombre: 'Anual',               precioMes: 13000, total: 156000, periodo: 'por año' },
-    mensualAvanzado:   { nombre: 'Mensual + Avanzado',   precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
-    semestralAvanzado: { nombre: 'Semestral + Avanzado', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
-    anualAvanzado:     { nombre: 'Anual + Avanzado',     precioMes: 17083, total: 205000, periodo: 'por año' },
+// `nombre` es el nombre completo (paquete · período), el que se usa en las frases;
+// `corto` es solo el período, para las filas del selector, que ya están agrupadas
+// por paquete (Base / Base + Avanzado, como en el wizard de alta).
+const PLANES: Record<PlanKey, { nombre: string; corto: string; precioMes: number; total: number | null; periodo: string }> = {
+    mensual:           { nombre: 'Base · mensual',               corto: 'Mensual',   precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
+    semestral:         { nombre: 'Base · semestral',             corto: 'Semestral', precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
+    anual:             { nombre: 'Base · anual',                 corto: 'Anual',     precioMes: 13000, total: 156000, periodo: 'por año' },
+    mensualAvanzado:   { nombre: 'Base + Avanzado · mensual',    corto: 'Mensual',   precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
+    semestralAvanzado: { nombre: 'Base + Avanzado · semestral',  corto: 'Semestral', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
+    anualAvanzado:     { nombre: 'Base + Avanzado · anual',      corto: 'Anual',     precioMes: 17083, total: 205000, periodo: 'por año' },
 }
 const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
 
@@ -97,35 +112,133 @@ function formatFecha(iso: string | null): string {
 // Selector compacto de plan — mismo uso en dos lugares (elegir el próximo
 // plan durante el beneficio, y pedir un cambio con un plan ya activo), así
 // que queda de una vez como pieza chica en vez de duplicar el markup.
-function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey; onElegir: (p: PlanKey) => void; disabled?: boolean }) {
+function SelectorPlan({ valor, onElegir, disabled }: { valor: PlanKey | null; onElegir: (p: PlanKey) => void; disabled?: boolean }) {
+    // Dos grupos, para que se entienda qué cambia entre uno y otro: Base, o Base
+    // más el paquete Avanzado. Cada grupo arranca con su título.
+    const TITULOS: Partial<Record<PlanKey, string>> = {
+        mensual: 'Base',
+        mensualAvanzado: 'Base + Avanzado — suma juegos, modales, 2x1, fondo con IA y más',
+    }
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div role="radiogroup" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {PLAN_KEYS.map(key => {
                 const p = PLANES[key]
                 const activo = key === valor
+                const titulo = TITULOS[key]
                 return (
-                    <button
-                        key={key}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onElegir(key)}
-                        className="ds-hover"
-                        style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                            width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
-                            padding: '9px 12px', borderRadius: 10,
-                            border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                            background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                            opacity: disabled && !activo ? 0.55 : 1,
-                        }}
-                    >
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.nombre}</span>
-                        <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                            {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
-                        </span>
-                    </button>
+                    <div key={key} style={{ display: 'contents' }}>
+                        {titulo && (
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body)', margin: key === 'mensual' ? '0 0 0' : '8px 0 0' }}>{titulo}</div>
+                        )}
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked={activo}
+                            disabled={disabled}
+                            onClick={() => onElegir(key)}
+                            className="ds-hover"
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                                width: '100%', textAlign: 'left', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                                padding: '9px 12px', borderRadius: 10,
+                                border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                opacity: disabled && !activo ? 0.55 : 1,
+                            }}
+                        >
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{p.corto}</span>
+                            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                {fmtPesos(p.precioMes)}{p.total ? '/mes' : ''} {!p.total && `· ${p.periodo}`}
+                            </span>
+                        </button>
+                    </div>
                 )
             })}
+        </div>
+    )
+}
+
+// Código ya validado por el backend. `amountFinal` es lo que se paga en el
+// PRIMER cobro; desde el segundo la suscripción vuelve al precio de lista.
+type DescuentoActivacion = { code: string; percentOff: number; amountBase: number; amountFinal: number }
+
+// Campo opcional de código de descuento para activar el plan. Mismo patrón que
+// el del alta (pages/onboarding/plan.tsx), pero contra el precio de lista del
+// plan: el descuento vale solo para el primer cobro y eso se dice explícito
+// para que nadie crea que queda rebajado para siempre.
+function CodigoDescuento({ descuento, onAplicado, onQuitar, disabled }: {
+    descuento: DescuentoActivacion | null
+    onAplicado: (d: DescuentoActivacion) => void
+    onQuitar: () => void
+    disabled?: boolean
+}) {
+    const [code, setCode] = useState('')
+    const [error, setError] = useState<string | null>(null)
+    const [validando, setValidando] = useState(false)
+
+    async function aplicar() {
+        const limpio = code.trim()
+        if (!limpio) return
+        setValidando(true)
+        setError(null)
+        try {
+            onAplicado(await panelPreviewActivationDiscount(limpio))
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : 'No pudimos validar el código.')
+        } finally {
+            setValidando(false)
+        }
+    }
+
+    if (descuento) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 12px' }}>
+                <Check size={15} strokeWidth={2.4} color="var(--color-success)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <p style={{ flex: 1, margin: 0, fontSize: 12.5, lineHeight: 1.5, color: 'var(--color-body)' }}>
+                    Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado:{' '}
+                    pagás <strong style={{ color: 'var(--color-text)' }}>{fmtPesos(descuento.amountFinal)}</strong> el primer cobro
+                    y desde el segundo vuelve a {fmtPesos(descuento.amountBase)}.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => { onQuitar(); setCode('') }}
+                    disabled={disabled}
+                    className="ds-link"
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-muted)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                >
+                    Quitar
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ margin: '0 0 12px' }}>
+            <label htmlFor="codigo-descuento-activacion" style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 6 }}>
+                ¿Tenés un código de descuento? <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>(vale para el primer cobro)</span>
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                    id="codigo-descuento-activacion"
+                    value={code}
+                    onChange={e => { setCode(e.target.value.toUpperCase()); setError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void aplicar() } }}
+                    placeholder="Tu código"
+                    disabled={disabled || validando}
+                    autoComplete="off"
+                    className="ds-field"
+                    style={{
+                        flex: 1, minWidth: 0, height: 40, padding: '0 12px', borderRadius: 10,
+                        border: `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`, background: 'var(--color-bg)',
+                        color: 'var(--color-text)', fontSize: 13.5, fontFamily: '"Geist Mono", monospace',
+                        letterSpacing: '0.05em', outline: 'none',
+                    }}
+                />
+                <Button variant="outline" size="sm" onClick={() => void aplicar()} disabled={disabled || validando || !code.trim()}>
+                    {validando ? 'Validando…' : 'Aplicar'}
+                </Button>
+            </div>
+            {error && <p role="alert" style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
         </div>
     )
 }
@@ -139,6 +252,19 @@ export default function Suscripcion() {
 
     const [activando, setActivando] = useState(false)
     const [errorActivar, setErrorActivar] = useState<string | null>(null)
+    // Código de descuento ya validado contra el backend (vale para el primer cobro).
+    const [descuento, setDescuento] = useState<DescuentoActivacion | null>(null)
+    // Aviso de "listo" cuando se elige el plan con Avanzado y todavía no hay nada que pagar.
+    const [avisoPlan, setAvisoPlan] = useState<string | null>(null)
+
+    // Cancelación: la ventana de 60 días vive en el negocio, no en la suscripción.
+    const { user } = useAuth()
+    const esOwner = user?.type === 'member' && user.role === 'owner'
+    const [cancelledAt, setCancelledAt] = useState<string | null>(null)
+    const [scheduledDeletionAt, setScheduledDeletionAt] = useState<string | null>(null)
+    const [modalCancelar, setModalCancelar] = useState(false)
+    const [cancelando, setCancelando] = useState(false)
+    const [errorCancelar, setErrorCancelar] = useState<string | null>(null)
 
     const [editandoPlan, setEditandoPlan] = useState(false)
     const [guardandoPlan, setGuardandoPlan] = useState(false)
@@ -146,38 +272,100 @@ export default function Suscripcion() {
 
     useEffect(() => {
         let cancelado = false
-        Promise.all([panelGetSubscription(), panelGetAddons()])
-            .then(([s, a]) => {
+        Promise.all([panelGetSubscription(), panelGetAddons(), panelGetBusiness().catch(() => null)])
+            .then(([s, a, b]) => {
                 if (cancelado) return
                 setSub(s)
                 setAdvanced(a.advanced)
                 setAdvancedExpiresAt(a.advancedExpiresAt)
+                setCancelledAt(b?.cancelledAt ?? null)
+                setScheduledDeletionAt(b?.scheduledDeletionAt ?? null)
             })
             .catch(e => { if (!cancelado) setError(e instanceof ApiError ? e.message : 'No se pudo cargar tu suscripción') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
     }, [])
 
-    function activarPlan() {
+    // Si el usuario vuelve con "atrás" desde Mercado Pago, el navegador restaura
+    // la página tal cual quedó — con el botón en "Abriendo Mercado Pago…" para
+    // siempre. Al volver desde la caché se rehabilita.
+    useEffect(() => {
+        function alVolver(e: PageTransitionEvent) { if (e.persisted) setActivando(false) }
+        window.addEventListener('pageshow', alVolver)
+        return () => window.removeEventListener('pageshow', alVolver)
+    }, [])
+
+    function activarPlan(codigo?: string) {
         setActivando(true)
         setErrorActivar(null)
-        panelActivatePlan()
-            .then(({ initPoint }) => { window.location.href = initPoint })
+        panelActivatePlan(codigo)
+            .then(({ initPoint }) => {
+                window.location.href = initPoint
+                // Si la redirección no llega a ocurrir (bloqueada, sin red), no dejar el botón muerto.
+                window.setTimeout(() => setActivando(false), 15000)
+            })
             .catch(e => {
                 setErrorActivar(e instanceof ApiError ? e.message : 'No se pudo iniciar la activación')
                 setActivando(false)
             })
     }
 
-    function elegirPlan(p: PlanKey) {
+    // `activar`: además de guardar el plan, seguir derecho a Mercado Pago cuando
+    // el período ya venció (lo que espera quien aprieta "Activar Avanzado").
+    async function elegirPlan(p: PlanKey, activar = false) {
         if (!sub) return
         setGuardandoPlan(true)
         setErrorPlan(null)
-        panelChangePlan(p)
-            .then(() => panelGetSubscription())
-            .then(s => { setSub(s); setEditandoPlan(false) })
-            .catch(e => setErrorPlan(e instanceof ApiError ? e.message : 'No se pudo guardar el cambio de plan'))
-            .finally(() => setGuardandoPlan(false))
+        setAvisoPlan(null)
+        try {
+            await panelChangePlan(p)
+            const s = await panelGetSubscription()
+            setSub(s)
+            setEditandoPlan(false)
+
+            // Un código aplicado se calculó contra el precio del plan anterior:
+            // se vuelve a calcular contra el nuevo, o se descarta si ya no sirve.
+            let codigo = descuento?.code
+            if (descuento) {
+                try { setDescuento(await panelPreviewActivationDiscount(descuento.code)) }
+                catch { setDescuento(null); codigo = undefined }
+            }
+
+            const vencido = s.origin !== 'COMP' && new Date(s.currentPeriodEnd ?? 0) <= new Date()
+            if (activar && vencido) {
+                setGuardandoPlan(false)
+                activarPlan(codigo)
+                return
+            }
+            if (activar) setAvisoPlan('Listo: cuando termine tu beneficio de bienvenida pasás al plan con Avanzado.')
+        } catch (e) {
+            setErrorPlan(e instanceof ApiError ? e.message : 'No se pudo guardar el cambio de plan')
+        } finally {
+            setGuardandoPlan(false)
+        }
+    }
+
+    async function confirmarCancelacion() {
+        setModalCancelar(false)
+        setCancelando(true)
+        setErrorCancelar(null)
+        try {
+            if (cancelledAt) {
+                await panelReactivateFromCancellation()
+                setCancelledAt(null)
+                setScheduledDeletionAt(null)
+            } else {
+                const r = await panelCancelBusiness()
+                setCancelledAt(new Date().toISOString())
+                setScheduledDeletionAt(r.scheduledDeletionAt)
+                setDescuento(null)
+            }
+            setSub(await panelGetSubscription())
+        } catch (e) {
+            setErrorCancelar(e instanceof ApiError ? e.message : 'No se pudo completar la operación')
+        } finally {
+            setCancelando(false)
+        }
     }
 
     const venciendo = sub ? new Date(sub.currentPeriodEnd ?? 0) <= new Date() : false
@@ -189,10 +377,15 @@ export default function Suscripcion() {
         ? Math.max(Math.ceil((new Date(sub.currentPeriodEnd).getTime() + sub.gracePeriodDays * 86_400_000 - new Date().getTime()) / 86_400_000), 0)
         : null
     const suspendida = sub?.status === 'SUSPENDED'
+    const cancelada = !!cancelledAt
     // Cortesías (COMP) no pasan por nada de esto: no tienen preapproval real
     // ni un plan que activar, se renuevan a mano desde la ficha del negocio.
     const esCortesia = sub?.origin === 'COMP'
     const planMostrado = sub && esPlanKey(sub.nextPlan ?? sub.plan) ? (sub.nextPlan ?? sub.plan) as PlanKey : null
+    // El bloque de activación ya trae el selector con "Base + Avanzado": mientras se
+    // ve, la tarjeta del paquete de más abajo NO ofrece activarlo (era la misma
+    // acción dos veces) y queda solo como explicación de qué suma.
+    const activacionVisible = !esCortesia && !cancelada && venciendo
 
     return (
         <div className="panel-page panel-page--form">
@@ -240,7 +433,26 @@ export default function Suscripcion() {
                             entero está en modo solo-lectura en ese momento; estilo
                             de aviso (azul) mientras todavía está en gracia, con la
                             cuenta regresiva de días. */}
-                        {!esCortesia && venciendo && (
+                        {/* Cancelada: la tienda está pausada y dentro de la ventana de 60 días
+                            antes del borrado. Reactivar la deja como estaba; si el plan ya
+                            había vencido, abajo vuelve a aparecer "Activar mi plan". */}
+                        {cancelada && (
+                            <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)' }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>Tu suscripción está cancelada</div>
+                                <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px', lineHeight: 1.5 }}>
+                                    Tu tienda está pausada y se elimina de forma definitiva el <strong style={{ color: 'var(--color-text)' }}>{formatFecha(scheduledDeletionAt)}</strong>.
+                                    {esOwner ? ' Si la reactivás antes, vuelve a estar como la dejaste.' : ' El dueño de la cuenta puede reactivarla antes de esa fecha.'}
+                                </p>
+                                {errorCancelar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorCancelar}</p>}
+                                {esOwner && (
+                                    <Button variant="primary" size="sm" onClick={() => setModalCancelar(true)} disabled={cancelando}>
+                                        {cancelando ? 'Reactivando…' : 'Reactivar mi suscripción'}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+
+                        {!esCortesia && !cancelada && venciendo && (
                             <div style={{
                                 marginTop: 16, padding: 14, borderRadius: 12,
                                 background: suspendida ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
@@ -259,22 +471,33 @@ export default function Suscripcion() {
                                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px' }}>
                                     {suspendida
                                         ? 'Tu panel sigue funcionando en modo solo lectura — podés ver todo, pero para volver a editar y que tu tienda sea visible de nuevo hay que activar tu plan.'
-                                        : planMostrado
-                                            ? `Activá el plan ${PLANES[planMostrado].nombre} (${fmtPesos(PLANES[planMostrado].precioMes)}${PLANES[planMostrado].total ? '/mes' : ` · ${PLANES[planMostrado].periodo}`}) para seguir usando Órbita sin cortes.`
-                                            : 'Activá tu plan para seguir usando Órbita sin cortes.'}
+                                        : 'Para seguir usando Órbita sin cortes, elegí tu plan y activalo.'}
                                     {diasDeGracia !== null && (
                                         <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> de plazo para regularizar antes de que se pause.</>
                                     )}
                                 </p>
+                                {/* Elegir el plan acá mismo: antes solo se podía con el período
+                                    vigente, y quien llegaba con el Avanzado guardado no tenía
+                                    cómo volver a Base. */}
+                                <div style={{ margin: '0 0 14px' }}>
+                                    <SelectorPlan valor={planMostrado} onElegir={p => void elegirPlan(p)} disabled={guardandoPlan || activando} />
+                                    {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '8px 0 0' }}>{errorPlan}</p>}
+                                </div>
+                                <CodigoDescuento
+                                    descuento={descuento}
+                                    onAplicado={setDescuento}
+                                    onQuitar={() => setDescuento(null)}
+                                    disabled={activando}
+                                />
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
-                                <Button variant="primary" size="sm" onClick={activarPlan} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
-                                    {activando ? 'Abriendo Mercado Pago…' : `Activar mi plan${planMostrado ? ` ${PLANES[planMostrado].nombre}` : ''}`}
+                                <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando || guardandoPlan || !planMostrado} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
+                                    {activando ? 'Abriendo Mercado Pago…' : planMostrado ? `Activar ${PLANES[planMostrado].nombre}` : 'Activar mi plan'}
                                 </Button>
                             </div>
                         )}
 
                         {/* ── Caso 1 y 3: elegir/cambiar el plan (todavía sin vencer) ── */}
-                        {!esCortesia && !venciendo && (
+                        {!esCortesia && !cancelada && !venciendo && (
                             <div style={{ marginTop: 16 }}>
                                 {!editandoPlan ? (
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -344,31 +567,84 @@ export default function Suscripcion() {
                             <Crown size={19} strokeWidth={1.8} color="var(--color-primary)" />
                         </div>
                         <div>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Paquete Avanzado</div>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{activacionVisible ? 'Qué suma el paquete Avanzado' : 'Paquete Avanzado'}</div>
                             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
-                                {/* El precio del plan que le tocaría a ESTE negocio, no el
-                                    mensual fijo: quien está en semestral/anual pasa al
-                                    combinado de su mismo período (ver conAvanzado). */}
-                                {fmtPesos(PLANES[conAvanzado(sub?.plan)].precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                                {activacionVisible
+                                    ? 'Para activarlo, elegí un plan "Base + Avanzado" más arriba.'
+                                    : <>
+                                        {/* El precio del plan que le tocaría a ESTE negocio, no el
+                                            mensual fijo: quien está en semestral/anual pasa al
+                                            combinado de su mismo período (ver conAvanzado). */}
+                                        {fmtPesos(PLANES[conAvanzado(sub?.plan)].precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                                    </>}
                             </div>
                         </div>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0' }}>
-                        {INCLUYE.map(i => (
-                            <div key={i.label} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'var(--color-body)' }}>
+                        {INCLUYE.map(label => (
+                            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'var(--color-body)' }}>
                                 <Check size={14} strokeWidth={2.2} color="var(--color-success)" style={{ flexShrink: 0 }} />
-                                {i.label}
+                                {label}
                             </div>
                         ))}
                     </div>
 
-                    {errorPlan && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
-                    <Button variant="primary" onClick={() => elegirPlan(conAvanzado(sub?.plan))} disabled={guardandoPlan}>
-                        {guardandoPlan ? 'Guardando…' : 'Activar Avanzado'}
-                    </Button>
+                    {!activacionVisible && (
+                        <>
+                            {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
+                            {avisoPlan && <p role="status" style={{ fontSize: 12.5, color: 'var(--color-success)', margin: '0 0 10px' }}>{avisoPlan}</p>}
+                            <Button variant="primary" onClick={() => void elegirPlan(conAvanzado(sub?.plan), true)} disabled={guardandoPlan || activando || cancelada}>
+                                {guardandoPlan || activando ? 'Un momento…' : 'Activar Avanzado'}
+                            </Button>
+                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 0' }}>
+                                Se activa cuando termine tu beneficio de bienvenida.
+                            </p>
+                        </>
+                    )}
                 </Card>
             )}
+
+            {/* Cancelar suscripción — solo el dueño, y solo si no está ya cancelada
+                (cancelada se reactiva desde el aviso de arriba). Es la MISMA baja
+                que "Eliminar espacio" de Configuración general. */}
+            {!cargando && esOwner && !cancelada && sub && (
+                <Card padding="md" style={{ maxWidth: 820, marginTop: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 220 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Cancelar suscripción</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.5 }}>
+                                Se corta el cobro y tu tienda se pausa al instante. Tenés 60 días para reactivarla y recuperar todo.
+                            </div>
+                            {errorCancelar && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '8px 0 0' }}>{errorCancelar}</p>}
+                        </div>
+                        <Button variant="outline" onClick={() => setModalCancelar(true)} disabled={cancelando}>
+                            {cancelando ? 'Cancelando…' : 'Cancelar suscripción'}
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
+            <Modal
+                isOpen={modalCancelar}
+                onClose={() => setModalCancelar(false)}
+                title={cancelada ? '¿Reactivar tu suscripción?' : '¿Cancelar tu suscripción?'}
+                variant={cancelada ? 'default' : 'danger'}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setModalCancelar(false)}>Volver</Button>
+                        <Button variant={cancelada ? 'primary' : 'danger'} onClick={() => void confirmarCancelacion()}>
+                            {cancelada ? 'Sí, reactivar' : 'Sí, cancelar'}
+                        </Button>
+                    </>
+                }
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    {cancelada
+                        ? 'Tu tienda vuelve a estar visible para tus clientes, tal cual la dejaste. Si tu plan ya había vencido, vas a poder activarlo de nuevo desde esta misma pantalla.'
+                        : 'Se corta el cobro de tu suscripción y tu tienda se pausa al instante: tus clientes dejan de verla. Vas a poder reactivarla y recuperar todo durante los próximos 60 días; pasado ese plazo, se elimina de forma definitiva.'}
+                </div>
+            </Modal>
         </div>
     )
 }

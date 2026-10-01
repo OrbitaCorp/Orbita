@@ -231,11 +231,11 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
     {
         id: 'producto', titulo: 'Creá tu primer producto',
         detalle: 'Fotos, precio, stock y su categoría.',
-        tip: 'Escribí el nombre y tocá «Generar con Orbi»: te escribe la descripción y te sugiere categoría y etiquetas al toque.',
+        tip: 'Escribí el nombre y tocá «Redactar con Orbi»: te escribe la descripción y te sugiere categoría y etiquetas al toque.',
         destino: ['ventas', 'catalogo', { vista: 'nuevo' }], destinoLabel: 'Crear producto',
         seccionDestino: 'catalogo',
         // Dos pasos (pedido de Ale): primero el nombre, recién después Orbi.
-        // Si no, la guía manda directo a "Generar con Orbi" y no se entiende
+        // Si no, la guía manda directo a "Redactar con Orbi" y no se entiende
         // que Orbi necesita el nombre para escribir la descripción.
         pasos: [
             {
@@ -243,7 +243,7 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
                 label: 'Escribí acá el nombre del producto',
                 avanzarAlEscribir: true,
             },
-            { ancla: 'boton:Generar con Orbi', label: 'Ahora tocá acá: Orbi te escribe la descripción' },
+            { ancla: 'boton:Redactar con Orbi', label: 'Ahora tocá acá: Orbi te escribe la descripción' },
         ],
     },
     {

@@ -31,6 +31,14 @@ export interface LlmUsage {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  /**
+   * Quién respondió de verdad esta llamada. Lo pone cada adapter (mismo
+   * criterio que generarTexto en text-generation.ts): el nombre del modelo no
+   * alcanza para saberlo (openai/gpt-oss-120b corre en Groq y no dice "groq"),
+   * y como el fallback se decide por llamada, un mismo turno puede mezclar los
+   * dos. El metering se separa por esto (spec §3.6).
+   */
+  provider: 'gemini' | 'groq';
 }
 
 export type LlmEvent =
@@ -52,6 +60,12 @@ export interface LlmAdapter {
      * modelo distinto por superficie (panel vs wizard).
      */
     model?: string;
+    /**
+     * Se aborta cuando el cliente cierra la conexión (spec §3.7). El adapter
+     * se la pasa al SDK para dejar de leer la respuesta; lo que el proveedor ya
+     * generó se factura igual.
+     */
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent>;
 }
 

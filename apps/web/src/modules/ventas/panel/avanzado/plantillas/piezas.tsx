@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
 import { User, ShoppingBag } from 'lucide-react'
+import { CreditoOrbita } from '@/components/storefront/CreditoOrbita'
+import { abrirPreferenciasDeCookies } from '@/lib/cookies/consentimiento'
 import type { AccionesHome, ItemPie, Producto, Slide, Tema } from './tipos'
 
 // ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -627,7 +629,11 @@ export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales
         ))}
       </div>
       <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '14px 18px' : '14px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 12, color: t.muted }}>
-        <span>© 2026 {marca}{cierre ? ` · ${cierre}` : ''}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span>© 2026 {marca}{cierre ? ` · ${cierre}` : ''}</span>
+          {/* Con `legales` es una tienda real: enlaces de verdad. Sin ellos es la maqueta del panel. */}
+          <CreditoOrbita color={t.text} colorSuave={t.muted} sinEnlaces={!legales} />
+        </div>
         {/* Términos, Privacidad y Arrepentimiento: no son decoración, son lo
             que el footer normal muestra por obligación legal. Si la plantilla
             dibuja SU pie, tiene que llevarlos igual. */}
@@ -635,13 +641,19 @@ export function Pie({ t, marca, tagline, columnas, cierre, movil, redes, legales
           {(legales ?? []).map((l) => (
             <a key={l.label} href={l.href} style={{ color: t.muted, textDecoration: 'none' }}>{l.label}</a>
           ))}
+          {/* Solo en una tienda real (con `legales`): en la maqueta del panel no hay aviso que reabrir. */}
+          {legales && (
+            <button
+              type="button" onClick={abrirPreferenciasDeCookies}
+              style={{ padding: 0, border: 'none', background: 'none', color: t.muted, fontSize: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
+            >Preferencias de cookies</button>
+          )}
           {onDevolucion && (
             <button
               type="button" onClick={onDevolucion}
-              style={{ height: 30, padding: '0 13px', borderRadius: t.radio === 0 ? 0 : 999, background: 'transparent', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ padding: 0, border: 'none', background: 'none', color: t.muted, fontSize: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
             >Arrepentimiento / Devolución</button>
           )}
-          <span>Hecho con Órbita</span>
         </div>
       </div>
     </div>
