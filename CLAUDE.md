@@ -160,6 +160,14 @@ este orden exacto, sin saltear pasos:
    quedó en verde, y (si aplica) la revisión de Cloud Run y si la migración quedó aplicada en
    **producción** (y en dev).
 
+## El manual del panel es lo que sabe Orbi
+
+Si tocás una pantalla del panel, actualizá su tema en
+`apps/web/src/modules/ventas/panel/manual/contenido.ts` y regenerá lo que lee Orbi con
+`cd apps/web && pnpm manual:generar` (commiteando `apps/api/src/orbi/manual/manual.generated.ts`).
+`pnpm test` de `apps/web` falla si el manual nombra un botón que no existe o si el artefacto quedó
+viejo. Detalle en `.claude/rules/manual.md`.
+
 ## Skill de UI/UX: ui-ux-pro-max
 
 Para **cualquier** tarea de diseño o UI/UX en `apps/web/` — crear, mejorar, revisar o
