@@ -10,24 +10,37 @@ import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 //
 // Conservador a propósito: una remera blanca sobre fondo blanco liso NO tiene
 // marco, y recortar "lo blanco" se comería la prenda. Por eso solo se recorta
-// si el rectángulo que queda tiene un borde que es claramente OTRA cosa que el
-// color del marco (una foto), no más blanco o prenda.
+// si el rectángulo que queda tiene un borde que NO es la continuación plana del
+// marco: es una foto (con textura o con otro color).
+//
+// El marco se distingue por PLANITUD, no por color (corregido el 01/10/2026): el
+// normalizador del navegador (imageStandardizer.ts) toma una alfombra marrón por
+// "fondo uniforme" y pega la foto sobre un lienzo del marrón PROMEDIO. La foto
+// de adentro es del mismo marrón que el marco, solo que con textura. Con una
+// tolerancia de color holgada no se veía la diferencia, el marco liso quedaba, y
+// el relleno de huecos (completarHuecos, que asume un fondo liso) metía la
+// alfombra dentro del producto.
 
 const LADO_ANALISIS = 400;
 // Distancia RGB máxima entre las 4 esquinas para considerar que hay un color de marco.
 const TOLERANCIA_ESQUINAS = 25;
-// Distancia RGB al color del marco para contar un píxel como "marco".
-const TOLERANCIA_MARCO = 30;
+// Distancia RGB al color del marco para contar un píxel como "marco plano". Chica a
+// propósito: ruido de JPEG sí, textura de una alfombra no.
+const TOLERANCIA_MARCO = 6;
 // Una fila/columna es marco si al menos esta fracción de sus píxeles lo es.
 const FRACCION_FILA_MARCO = 0.99;
-// Del borde recortado, qué fracción tiene que NO ser color de marco.
-const FRACCION_BORDE_FOTO = 0.85;
-// Cuántos píxeles hacia adentro del rectángulo se mide ese borde.
-const ADENTRO_BORDE = 2;
+// Del borde recortado, hasta qué fracción puede ser plana (color de marco) y aun así
+// considerarse un marco: por encima, es el mismo fondo que sigue adentro.
+const MAX_FRACCION_BORDE_PLANA = 0.6;
 // Mínimo de margen (fracción del lado) en algún costado para que valga la pena recortar.
 const MARGEN_MINIMO = 0.02;
 // Mínimo del área original que tiene que quedar.
 const AREA_MINIMA = 0.35;
+
+/** Cuánto se mete el recorte hacia adentro del marco (px de la imagen analizada): el borde está antialiasado/comprimido y arrastra una mezcla. */
+export function insetMarco(w: number, h: number): number {
+  return Math.max(2, Math.round(Math.max(w, h) * 0.01));
+}
 
 export interface RectanguloMarco {
   left: number;
@@ -78,32 +91,30 @@ export function detectarMarco(rgb: Uint8Array | Buffer, w: number, h: number): R
   if (!hayMargen) return null;
   if ((rect.width * rect.height) / (w * h) < AREA_MINIMA) return null;
 
-  // El borde del rectángulo interior tiene que ser una foto, no más color de marco.
-  // Se mide unos píxeles hacia ADENTRO: la primera fila/columna del rectángulo
-  // es la transición antialiasada entre marco y foto, casi del color del marco
-  // (confirmado el 01/10/2026: pollera negra sobre alfombra, enmarcada por el
-  // estandarizador del panel — esa columna daba 83% "marco" y el borde entero
-  // no llegaba a FRACCION_BORDE_FOTO, así que no se recortaba nada).
-  const x0 = rect.left + ADENTRO_BORDE;
-  const x1 = rect.left + rect.width - 1 - ADENTRO_BORDE;
-  const y0 = rect.top + ADENTRO_BORDE;
-  const y1 = rect.top + rect.height - 1 - ADENTRO_BORDE;
-  if (x0 >= x1 || y0 >= y1) return null;
+  // El borde del rectángulo interior no puede ser la continuación plana del marco.
+  // Se mide unos píxeles HACIA ADENTRO (lo mismo que se va a recortar después): la
+  // fila/columna justo en el límite es una mezcla marco/foto por la compresión.
+  const k = insetMarco(w, h);
+  const iL = rect.left + k;
+  const iT = rect.top + k;
+  const iR = rect.left + rect.width - 1 - k;
+  const iB = rect.top + rect.height - 1 - k;
+  if (iR - iL < 8 || iB - iT < 8) return null;
   let total = 0;
-  let foto = 0;
+  let planos = 0;
   const visitar = (x: number, y: number) => {
     total++;
-    if (!esMarco(x, y)) foto++;
+    if (esMarco(x, y)) planos++;
   };
-  for (let x = x0; x <= x1; x++) {
-    visitar(x, y0);
-    visitar(x, y1);
+  for (let x = iL; x <= iR; x++) {
+    visitar(x, iT);
+    visitar(x, iB);
   }
-  for (let y = y0 + 1; y < y1; y++) {
-    visitar(x0, y);
-    visitar(x1, y);
+  for (let y = iT + 1; y < iB; y++) {
+    visitar(iL, y);
+    visitar(iR, y);
   }
-  if (foto / total < FRACCION_BORDE_FOTO) return null;
+  if (planos / total >= MAX_FRACCION_BORDE_PLANA) return null;
   return rect;
 }
 
@@ -128,7 +139,7 @@ export async function quitarMarco(buffer: Buffer): Promise<Buffer> {
 
     // Se mete un poco hacia adentro: el borde del marco está antialiasado y
     // arrastra una línea clara.
-    const inset = Math.max(2, Math.round(Math.max(w, h) * 0.01));
+    const inset = insetMarco(w, h);
     const sx = W / w;
     const sy = H / h;
     const left = Math.round((rect.left + inset) * sx);

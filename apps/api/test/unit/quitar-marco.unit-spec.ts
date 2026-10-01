@@ -43,6 +43,34 @@ describe('quitar-marco — fotos enmarcadas', () => {
     expect(detectarMarco(rgb, w, h)).not.toBeNull();
   });
 
+  // Caso real (01/10/2026): el normalizador del navegador toma una alfombra marrón por
+  // "fondo uniforme" y pega la foto sobre un lienzo del marrón PROMEDIO. La foto de
+  // adentro es del mismo marrón que el marco, solo con textura: se distingue por
+  // planitud, no por color.
+  it('marco marrón liso con una foto del mismo marrón pero con textura: es un marco', () => {
+    const w = 120;
+    const h = 100;
+    const MARRON: [number, number, number] = [147, 127, 103];
+    const textura = (x: number, y: number): [number, number, number] => [
+      MARRON[0] + ((x * 7 + y * 13) % 31) - 15,
+      MARRON[1] + ((x * 11 + y * 5) % 29) - 14,
+      MARRON[2] + ((x * 3 + y * 17) % 23) - 11,
+    ];
+    const rgb = rgbDe(w, h, (x, y) => (x >= 20 && x < 100 && y >= 10 && y < 90 ? textura(x, y) : MARRON));
+    expect(detectarMarco(rgb, w, h)).toEqual({ left: 20, top: 10, width: 80, height: 80 });
+  });
+
+  it('fondo blanco con ruido de cámara (no es un lienzo plano): no se toma por marco', () => {
+    const w = 120;
+    const h = 100;
+    const ruido = (x: number, y: number): [number, number, number] => {
+      const v = 249 + ((x * 7 + y * 13) % 7); // 249..255
+      return [v, v, v];
+    };
+    const rgb = rgbDe(w, h, (x, y) => (x >= 30 && x < 90 && y >= 20 && y < 80 ? [238, 238, 238] : ruido(x, y)));
+    expect(detectarMarco(rgb, w, h)).toBeNull();
+  });
+
   it('remera blanca sobre fondo blanco liso: NO hay marco, no se recorta nada', () => {
     const w = 120;
     const h = 100;
