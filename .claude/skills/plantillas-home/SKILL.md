@@ -72,7 +72,7 @@ Está anotado en `PENDIENTES`. Sigue sin entrar al estándar la oferta con
 cuenta regresiva de la portada (paquete Avanzado) y la cantidad de productos
 de "Nuevos ingresos": en una plantilla cada fila es de un renglón.
 
-## Las cinco reglas que no se negocian
+## Las seis reglas que no se negocian
 
 1. **La ESTRUCTURA de catálogo, ficha, carrito, checkout y perfil no cambia.**
    Una plantilla cambia la portada, y hereda su paleta, su tipografía y su
@@ -89,6 +89,10 @@ de "Nuevos ingresos": en una plantilla cada fila es de un renglón.
    color (ver § Que no se parezca a otra).
 5. **Comprar y entrar a la cuenta es igual en todas.** Cuenta con "Mis
    pedidos" adentro y carrito con contador. Cambia cómo se ve, no qué hace.
+
+6. **En celular tiene que quedar tan bien como en computadora.** La mayoría de
+   los clientes de una tienda entra desde el teléfono: la versión de celular no
+   es la de escritorio achicada, se diseña. Ver § Celular.
 
 ## Dónde vive todo
 
@@ -232,6 +236,42 @@ API a mano** (`./deploy/deploy.sh`, ver CLAUDE.md): un push a `main` no alcanza.
 
 Ver § El modo check. Después, actualizar el conteo de plantillas en esta skill
 y en el comentario de arriba de `PlantillasConfig.tsx`.
+
+## Celular
+
+Cada bloque se escribe dos veces, una por pantalla. `Home()` recibe `movil` y
+el corte es a 768px; en la tienda sale de `useMovilPlantilla()`.
+
+**Lo que tiene que cumplir toda plantilla en celular:**
+
+- **Nada desborda a lo ancho.** Ni una barra de scroll horizontal en la página.
+  Lo que no entra se apila o va en una tira que scrollea adentro de su bloque.
+- **Toda estructura de dos columnas se apila**: `flexDirection: movil ?
+  'column' : 'row'`, o `gridTemplateColumns: movil ? '1fr' : '1fr 1fr'`.
+- **Las grillas bajan a dos columnas** (`cols(d, 2)`), o a una si la tarjeta
+  es horizontal. Las tiras se quedan como tiras.
+- **Se puede navegar.** Si los enlaces del header no entran, va `MenuMovil`.
+  Nunca un `☰` dibujado.
+- **Se puede buscar, entrar a la cuenta y ver el carrito**, igual que en
+  computadora. El buscador va en un renglón propio debajo de la barra si no
+  entra al lado de la marca.
+- **El hero se lee.** El título no desborda (frase corta; lo largo va en la
+  bajada) y el velo sobre la foto se piensa para el formato parado, que deja
+  el texto sobre otra parte de la imagen.
+- **Tipografía y aire propios**: los títulos de 60px de escritorio bajan a
+  30–38, y los márgenes de 40px a 16.
+- **Lo que se toca, se puede tocar**: botones y enlaces de 40px de alto o más,
+  sin depender del hover (la segunda foto de la tarjeta y los subrayados no
+  existen en un teléfono).
+- **El parallax se apaga solo** (`.pl-parallax`): en celular la foto fija se
+  ve mal y varios navegadores no la soportan.
+
+**Qué revisa el check y qué no.** Corre todo en las dos pantallas, así que ve
+si en celular falta el menú, el buscador, la cuenta, un estante o un legal. No
+mide tamaños: el desborde, un título cortado o un botón chico solo se ven
+mirando. Por eso cada plantilla nueva o modificada se mira en **Celular** en la
+vitrina (Avanzado → Plantillas → Ver cómo queda) y aplicada en una tienda desde
+un teléfono de verdad, no solo achicando la ventana.
 
 ## Modificar una plantilla
 
