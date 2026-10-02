@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer, ChevronDown } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { getUnreadConversationsCount, ApiError } from '@/lib/api'
@@ -118,6 +118,10 @@ const ROLES_MODULO: Record<string, string[]> = {}
 // Anchos en px — mismos valores que los antiguos w-16/w-60 de Tailwind.
 const W_NARROW = 64
 const W_WIDE = 240
+// Línea de conexión de las sub-secciones: su x (bajo el centro del ícono del
+// módulo) y dónde arranca el ítem, ambos desde el borde izquierdo del módulo.
+const LINEA_X = 17
+const SUB_X = 28
 
 // Opciones del selector de modo
 const MODOS: { key: SidebarMode; label: string; Icon: IconType }[] = [
@@ -150,7 +154,9 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         return !req || req.some(p => permisos.includes(p))
     })
 
-    const [abierto,   setAbierto]   = useState(moduloActivo)
+    // Módulo desplegado (uno a la vez). Arranca en el de la pantalla actual y lo
+    // sigue al navegar; tocar un módulo lo despliega o lo pliega sin navegar.
+    const [abierto,   setAbierto]   = useState<string | null>(moduloActivo)
 
     useEffect(() => { setAbierto(moduloActivo) }, [moduloActivo])
 
@@ -253,23 +259,53 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
     // La lista de sub-secciones de un módulo: la misma en el menú expandido y
     // en el panel flotante del menú colapsado.
-    const listaDeSubs = (m: Modulo, subs: Sub[]) => subs.map((s, i) => {
-        const sa = subActiva(m, s)
-        const color = s.peligro && sa ? 'var(--color-error)' : sa ? 'var(--color-primary)' : 'var(--color-muted)'
-        return (
-            <div key={s.label} className="flex flex-col">
-                {s.separador && i > 0 && <div aria-hidden="true" style={{ height: 1, margin: '5px 8px', background: 'var(--color-border)' }} />}
-                <button
-                    onClick={() => { ir(s.seccion, s.vista); setFlotante(null) }}
-                    aria-current={sa ? 'page' : undefined}
-                    className="ds-hover min-h-[30px] px-2 py-1.5 rounded-md text-left text-xs"
-                    style={{ border: 'none', lineHeight: 1.3, fontWeight: sa ? 600 : 500, color, background: sa ? (s.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)') : 'transparent' }}
-                >
-                    {s.label}
-                </button>
-            </div>
-        )
-    })
+    //
+    // `conLinea` (solo en el menú expandido): una línea de conexión baja desde
+    // el módulo y une todas las sub-secciones, con un ramal a cada una. Queda
+    // apagada, y se enciende desde arriba HASTA la sub-sección en la que estás
+    // — lo que está más abajo sigue apagado. Se dibuja por tramos (medio ítem
+    // cada uno) para no tener que medir nada: cada tramo sabe si está antes o
+    // después de la activa.
+    const listaDeSubs = (m: Modulo, subs: Sub[], conLinea = false) => {
+        const iActiva = subs.findIndex(s => subActiva(m, s))
+        const tramo = (encendido: boolean): React.CSSProperties => ({
+            position: 'absolute', left: LINEA_X, width: 1.5,
+            background: encendido ? 'var(--color-primary)' : 'var(--color-border)',
+            transition: 'background-color 200ms ease',
+        })
+        return subs.map((s, i) => {
+            const sa = i === iActiva
+            const color = s.peligro && sa ? 'var(--color-error)' : sa ? 'var(--color-primary)' : 'var(--color-muted)'
+            return (
+                <div key={s.label} className="flex flex-col">
+                    {s.separador && i > 0 && (
+                        <div aria-hidden="true" style={{ position: 'relative', height: 11 }}>
+                            {conLinea && <span style={{ ...tramo(i <= iActiva), top: 0, bottom: 0 }} />}
+                            <div style={{ position: 'absolute', left: conLinea ? SUB_X + 8 : 8, right: 8, top: 5, height: 1, background: 'var(--color-border)' }} />
+                        </div>
+                    )}
+                    <div style={{ position: 'relative', display: 'flex', paddingLeft: conLinea ? SUB_X : 0, paddingBlock: conLinea ? 0.5 : 0 }}>
+                        {conLinea && (
+                            <>
+                                <span aria-hidden="true" style={{ ...tramo(i <= iActiva), top: 0, height: '50%' }} />
+                                {i < subs.length - 1 && <span aria-hidden="true" style={{ ...tramo(i < iActiva), top: '50%', bottom: 0 }} />}
+                                {/* Ramal hacia el ítem */}
+                                <span aria-hidden="true" style={{ position: 'absolute', left: LINEA_X, top: '50%', marginTop: -0.75, width: SUB_X - LINEA_X - 3, height: 1.5, borderRadius: 1, background: sa ? 'var(--color-primary)' : 'var(--color-border)', transition: 'background-color 200ms ease' }} />
+                            </>
+                        )}
+                        <button
+                            onClick={() => { ir(s.seccion, s.vista); setFlotante(null) }}
+                            aria-current={sa ? 'page' : undefined}
+                            className="ds-hover flex-1 min-w-0 min-h-[30px] px-2 py-1.5 rounded-md text-left text-xs"
+                            style={{ border: 'none', lineHeight: 1.3, fontWeight: sa ? 600 : 500, color, background: sa ? (s.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)') : 'transparent' }}
+                        >
+                            {s.label}
+                        </button>
+                    </div>
+                </div>
+            )
+        })
+    }
 
     // Ancho actual del sidebar
     const anchoActual = esAngosto ? W_NARROW : W_WIDE
@@ -315,18 +351,24 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     const open   = abierto === m.id
                     const subs   = (m.subs ?? []).filter(s => !permisos || !s.permisos || s.permisos.some(p => permisos.includes(p)))
                     const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.badge
-                    // Tocar el módulo lleva a su pantalla por defecto (la sub sin
-                    // `vista`); si el rol no la ve, a la primera que sí.
-                    const destino = subs.find(s => s.seccion === m.seccion && !s.vista) ?? subs[0] ?? { seccion: m.seccion, vista: undefined }
-                    const conFlotante = usaFlotante && subs.length > 0
+                    const conSubs = subs.length > 0
+                    const conFlotante = usaFlotante && conSubs
                     return (
                         <div key={m.id} onMouseLeave={conFlotante ? cerrarFlotante : undefined}>
                             <button
-                                onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
+                                // Un módulo con sub-secciones NO navega al tocarlo:
+                                // solo se despliega (o se pliega). Recién al elegir
+                                // una sub-sección se cambia de pantalla. Los que no
+                                // tienen (Inicio, Avanzado, Manual) navegan directo.
+                                onClick={e => {
+                                    if (!conSubs) { ir(m.seccion); setAbierto(m.id) }
+                                    else if (conFlotante) abrirFlotante(m.id, e.currentTarget)
+                                    else setAbierto(open ? null : m.id)
+                                }}
                                 onMouseEnter={conFlotante ? e => abrirFlotante(m.id, e.currentTarget) : undefined}
                                 onFocus={conFlotante ? e => abrirFlotante(m.id, e.currentTarget) : undefined}
                                 onBlur={conFlotante ? cerrarFlotante : undefined}
-                                aria-expanded={conFlotante ? flotante?.id === m.id : undefined}
+                                aria-expanded={conSubs ? (conFlotante ? flotante?.id === m.id : open) : undefined}
                                 title={esAngosto ? m.label : undefined}
                                 className={`ds-hover flex items-center h-9 rounded-md${esAngosto ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                                 style={{ border: 'none', fontSize: 14, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
@@ -335,14 +377,25 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                 {!esAngosto && <span className="flex-1 text-left">{m.label}</span>}
                                 {!esAngosto && m.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-error)' }} />}
                                 {!esAngosto && badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? 'var(--color-on-primary)' : 'var(--color-muted)' }}>{badge}</span>}
+                                {!esAngosto && conSubs && (
+                                    <ChevronDown size={14} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 220ms ease' }} />
+                                )}
                                 {esAngosto && (m.alert || badge) && (
                                     <span style={{ position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-error)' }} />
                                 )}
                             </button>
 
-                            {open && subs.length > 0 && !esAngosto && (
-                                <div className="flex flex-col gap-px mt-0.5" style={{ paddingLeft: 20 }}>
-                                    {listaDeSubs(m, subs)}
+                            {/* Siempre montadas (plegadas en 0fr) para que abrir y
+                                cerrar se animen: ver .sb-subs en el <style> de abajo.
+                                Plegadas quedan con visibility:hidden, así no se
+                                llega a ellas con el teclado. */}
+                            {conSubs && !esAngosto && (
+                                <div className="sb-subs" style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', visibility: open ? 'visible' : 'hidden' }}>
+                                    <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                                        <div className="flex flex-col pt-0.5">
+                                            {listaDeSubs(m, subs, true)}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -444,6 +497,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     return (
         <>
             <style>{`
+                /* Despliegue suave de las sub-secciones: la fila del grid pasa
+                   de 0fr a 1fr (anima el alto sin tener que medirlo). */
+                .sb-subs { transition: grid-template-rows 240ms cubic-bezier(0.4, 0, 0.2, 1), visibility 240ms; }
+                @media (prefers-reduced-motion: reduce) { .sb-subs { transition: none; } }
                 @media (max-width: 768px) {
                     .admin-sidebar {
                         position: fixed !important;
