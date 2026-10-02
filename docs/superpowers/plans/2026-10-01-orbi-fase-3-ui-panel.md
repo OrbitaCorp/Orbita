@@ -10,7 +10,9 @@
   (servicio y endpoints de sesiones) y la retención de archivadas (180 días). **Esperan créditos de Gemini:**
   T6 (etiquetas de actividad), T7 (stream v2 con narración) y T8 (evals de la narración).
 - **R3 hecho detrás del interruptor** (`apps/web/src/modules/orbi/`), con el diseño de Claude Design ("Orbi Chat
-  Tablero"): las cuatro vistas, encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
+  Tablero"): vistas (por pedido de Alan, 2026-10-02, **sin superpuesto**: desde 768 px Orbi queda acoplado
+  como una columna más, al estilo del panel de IA de Cloudflare, y empuja la sección del medio, hasta media
+  pantalla; en el celular, hoja a pantalla), encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
   plegado, tarjeta con sus estados y vencimiento, respuesta con formato), caja que deja escribir mientras Orbi
   responde, borrador por sesión, página dedicada con sesiones agrupadas y menú por fila. Usa el stream de hoy
   (`POST /orbi/chat`): el **pensamiento** y el **detalle de la tarjeta en filas** esperan T6/T7. Se prende con

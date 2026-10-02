@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-export type Vista = 'lateral' | 'superpuesto' | 'hoja' | 'pagina'
+export type Vista = 'lateral' | 'hoja' | 'pagina'
 
 export interface ContextoOrbiV2 {
   vista: Vista

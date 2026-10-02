@@ -35,7 +35,7 @@ export function useRutasDeOrbi() {
   }), [negocioId, moduloPadre])
 }
 
-/** El foco no sale del diálogo con Tab (superpuesto y hoja: son modales). */
+/** El foco no sale de la hoja con Tab (en el celular es modal). */
 function atraparFoco(e: KeyboardEventReact<HTMLElement>) {
   if (e.key !== 'Tab') return
   const enfocables = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
@@ -47,11 +47,10 @@ function atraparFoco(e: KeyboardEventReact<HTMLElement>) {
 }
 
 /**
- * El Orbi nuevo, flotante (diseño A1): lateral que empuja (≥ 1280 px),
- * superpuesto (768–1279) o hoja desde abajo (< 768). Va como último hijo del
- * shell del panel (un flex en fila): el lateral ocupa su ancho y el contenido
- * se corre en vez de quedar tapado. En la página de Orbi no se muestra: ahí el
- * chat es la página.
+ * El Orbi nuevo fuera de su página: acoplado al costado desde 768 px, o hoja
+ * desde abajo en el celular. Va como último hijo del shell del panel (un flex
+ * en fila): ocupa su ancho y la sección del medio se achica, nunca queda
+ * tapada. En la página de Orbi no se muestra: ahí el chat es la página.
  */
 export default function OrbiV2() {
   const router = useRouter()
@@ -61,9 +60,10 @@ export default function OrbiV2() {
   const setAncho = useOrbiV2(st => st.setAncho)
   const hoja = useOrbiV2(st => st.hoja)
   const setHoja = useOrbiV2(st => st.setHoja)
-  const ancha = useMediaQuery('(min-width: 1280px)')
+  // Acoplado (empuja la sección del medio, nunca la tapa) en cualquier ancho
+  // donde entre; en el celular no hay lugar para empujar: hoja a pantalla.
   const celular = useMediaQuery('(max-width: 767px)')
-  const vista: Vista = ancha ? 'lateral' : celular ? 'hoja' : 'superpuesto'
+  const vista: Vista = celular ? 'hoja' : 'lateral'
   const rutas = useRutasDeOrbi()
   const { anunciar, region } = useAnunciador()
   const partes = Array.isArray(router.query.slug) ? router.query.slug : []
@@ -80,13 +80,15 @@ export default function OrbiV2() {
     else abrioDesde.current?.focus?.()
   }, [isOpen])
 
-  // Esc cierra (el selector de sesiones, si está abierto, se lo come antes).
+  // Esc cierra la hoja desde cualquier lado. El lateral acoplado no es modal:
+  // Esc lo cierra solo con el foco adentro, para no pisar el Esc de las
+  // pantallas del panel (cerrar un modal de Pedidos no tiene que cerrar Orbi).
   useEffect(() => {
-    if (!isOpen || enLaPagina) return
+    if (!isOpen || enLaPagina || vista !== 'hoja') return
     const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
-  }, [isOpen, enLaPagina, close])
+  }, [isOpen, enLaPagina, vista, close])
 
   const modal = vista !== 'lateral'
   const navegar = useCallback((ruta: string) => {
@@ -131,7 +133,14 @@ export default function OrbiV2() {
     <OrbiV2Contexto.Provider value={contexto}>
       {region}
       {vista === 'lateral' && (
-        <aside id={ID_PANEL_ORBI} className={`${s.raiz} ${s.lateral}`} style={{ width: ancho }} aria-label="Orbi">
+        <aside
+          id={ID_PANEL_ORBI}
+          className={`${s.raiz} ${s.lateral}`}
+          // Nunca más de la mitad de la pantalla: en 1024 px la sección del medio sigue siendo usable.
+          style={{ width: `min(${ancho}px, 50vw)` }}
+          aria-label="Orbi"
+          onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) close() }}
+        >
           <button
             type="button"
             className={s.tirador}
@@ -153,14 +162,6 @@ export default function OrbiV2() {
           />
           {chat}
         </aside>
-      )}
-      {vista === 'superpuesto' && (
-        <>
-          <div className={s.scrim} onClick={close} aria-hidden />
-          <div id={ID_PANEL_ORBI} role="dialog" aria-modal="true" aria-label="Orbi" className={`${s.raiz} ${s.superpuesto}`} onKeyDown={atraparFoco}>
-            {chat}
-          </div>
-        </>
       )}
       {vista === 'hoja' && (
         <>

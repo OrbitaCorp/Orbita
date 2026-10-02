@@ -31,6 +31,22 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
     el.style.height = `${el.scrollHeight}px`
   }, [texto])
 
+  // El alto depende del ancho: al abrirse el panel acoplado crece desde 0 (o se
+  // le cambia el ancho con el tirador), y el alto medido angosto queda enorme.
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let ancho = el.clientWidth
+    const observador = new ResizeObserver(() => {
+      if (el.clientWidth === ancho) return
+      ancho = el.clientWidth
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    })
+    observador.observe(el)
+    return () => observador.disconnect()
+  }, [])
+
   useEffect(() => {
     if (!enfocar) return
     if (window.matchMedia?.('(hover: none)').matches) return
