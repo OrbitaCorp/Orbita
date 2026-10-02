@@ -51,17 +51,34 @@ export function primarioParaOscuro(hex: string): string {
 
 // `!important` a propósito: pisa las variables de globals.css (mismo selector,
 // misma especificidad) sin depender del orden en que Next inyecte las hojas.
+/**
+ * Color de texto legible sobre un fondo a color (WCAG 2.1).
+ * Devuelve '#0F172A' (oscuro) para fondos claros (luminancia > 0.42: amarillos,
+ * limas, pasteles, blanco) y '#FFFFFF' (blanco) para fondos oscuros, garantizando
+ * contraste accesible (>= 4.5:1).
+ */
+export function onColorPara(hex: string): '#0F172A' | '#FFFFFF' {
+  const rgb = aRgb(hex)
+  if (!rgb) return '#FFFFFF'
+  return luminancia(rgb) > 0.42 ? '#0F172A' : '#FFFFFF'
+}
+
 export function cssPrimarioTienda(primario: string): string {
   const oscuro = primarioParaOscuro(primario)
+  const onClaro = onColorPara(primario)
+  const onOscuro = onColorPara(oscuro)
   return `
     :root {
       --color-primary: ${primario} !important;
       --color-primary-bg: color-mix(in srgb, ${primario} 15%, transparent) !important;
       --color-primary-h: color-mix(in srgb, ${primario} 82%, black) !important;
+      --color-on-primary: ${onClaro} !important;
     }
     .dark {
       --color-primary: ${oscuro} !important;
       --color-primary-bg: color-mix(in srgb, ${oscuro} 15%, transparent) !important;
       --color-primary-h: color-mix(in srgb, ${oscuro} 75%, white) !important;
+      --color-on-primary: ${onOscuro} !important;
     }`
 }
+

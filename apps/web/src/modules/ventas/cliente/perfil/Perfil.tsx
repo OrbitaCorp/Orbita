@@ -571,7 +571,7 @@ export default function Perfil() {
                   <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)', marginBottom: 16 }}>{errorDatos}</div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button type="submit" className="ds-hover" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
                     {guardandoDatos ? 'Guardando…' : 'Guardar cambios'}
                   </button>
                   {guardado && (
@@ -610,7 +610,7 @@ export default function Perfil() {
                   {passMsg && (
                     <div style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: passMsg.tipo === 'ok' ? '#16A34A' : 'var(--color-error)' }}>{passMsg.texto}</div>
                   )}
-                  <button type="submit" className="ds-hover" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
                     {cambiandoPass ? 'Actualizando…' : 'Actualizar contraseña'}
                   </button>
                 </form>

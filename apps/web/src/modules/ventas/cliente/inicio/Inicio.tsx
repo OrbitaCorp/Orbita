@@ -884,7 +884,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             <button
                                 className="ds-hover"
                                 onClick={() => irACtaParallax(config.appearance?.parallaxCtaLink)}
-                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: '#fff', color: '#0F172A', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background 150ms, color 150ms' }}
                             >
                                 {config.appearance.parallaxCtaText || 'Ver más'}
                             </button>
@@ -1304,11 +1304,9 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                             {s.cta || 'Ver catálogo'}
                                         </span>
                                     ) : (
-                                        // Botón sólido blanco con texto oscuro de siempre —
-                                        // se invierte con 'blanco' (fondo claro): sin esto
-                                        // quedaría un botón blanco encima de un velo blanco,
-                                        // invisible.
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: textoOscuro ? '#0F172A' : '#fff', color: textoOscuro ? '#fff' : '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        // Botón sólido que toma el color primario de Apariencia
+                                        // adaptando inteligentemente el texto con var(--color-on-primary)
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
