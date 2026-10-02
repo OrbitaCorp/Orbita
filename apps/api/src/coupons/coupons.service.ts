@@ -261,7 +261,14 @@ export class CouponsService {
   }
 
   // ── Alta ───────────────────────────────────────────────────────────────────
-  async create(businessId: string, memberId: string, dto: UpsertCouponDto) {
+
+  /**
+   * Todo lo que create() chequea antes de escribir, sin escribir. Orbi lo
+   * corre antes de mostrar la tarjeta: un alta que iba a fallar no llega a
+   * confirmarse. create() lo vuelve a correr igual (entre la tarjeta y el
+   * clic alguien pudo cargar el mismo código).
+   */
+  async validarAlta(businessId: string, dto: UpsertCouponDto): Promise<void> {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
 
@@ -279,6 +286,10 @@ export class CouponsService {
       where: { businessId, code: { equals: codigoDe(dto.code), mode: 'insensitive' } },
     });
     if (dupCodigo) throw new BadRequestException('Ya existe un cupón con ese código.');
+  }
+
+  async create(businessId: string, memberId: string, dto: UpsertCouponDto) {
+    await this.validarAlta(businessId, dto);
 
     const creado = await this.prisma.$transaction(async (tx) => {
       const cupon = await tx.discount.create({
