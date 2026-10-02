@@ -10,7 +10,7 @@
 // el primer pintado ven el alta vacía, y recién después aparece lo guardado.
 import { useSyncExternalStore } from 'react'
 import { JORNADA_INICIAL } from '@/modules/turnos/horario'
-import { DATOS_INICIALES, type DatosAlta, type ServicioAlta } from './modelo'
+import { DATOS_INICIALES, moduloHabilitado, type DatosAlta, type ServicioAlta } from './modelo'
 
 export interface EstadoAlta {
   /** Índice en los pasos del módulo elegido; igual a la cantidad de pasos = alta terminada. */
@@ -43,6 +43,8 @@ function leer(): EstadoAlta {
       const modalidades = datos.modalidades?.filter(m => m === 'local' || m === 'domicilio') ?? null
       const jornada = datos.jornada?.manana && datos.jornada?.tarde ? datos.jornada : JORNADA_INICIAL
       cache = { ...INICIAL, ...g, datos: { ...datos, modalidades, jornada } }
+      // Un alta empezada con un módulo que hoy está en "Próximamente" vuelve al primer paso.
+      if (cache.datos.modulo && !moduloHabilitado(cache.datos.modulo)) cache = { ...cache, paso: 0, alcanzado: 0, datos: { ...cache.datos, modulo: null } }
     }
   } catch { /* sin acceso al almacenamiento o JSON roto: se arranca de cero */ }
   return cache
@@ -78,4 +80,13 @@ export function useAlta() {
     cambiar: (cambio: (e: EstadoAlta) => EstadoAlta) => escribir(cambio(leer())),
     reiniciar: () => escribir(INICIAL),
   }
+}
+
+/** Alta real terminada (pago aprobado): se borra lo cargado para que la próxima arranque de cero. */
+export function borrarAlta() {
+  window.clearTimeout(pendiente)
+  cache = INICIAL
+  leido = true
+  try { window.sessionStorage.removeItem(CLAVE) } catch { /* sin acceso al almacenamiento */ }
+  oyentes.forEach(f => f())
 }

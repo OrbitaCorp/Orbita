@@ -4,6 +4,9 @@ import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, 
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
+import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
+import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
 import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
@@ -910,7 +913,7 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
 
 // ─── Página principal ────────────────────────────────────────────────────────
 
-export default function PlanPage() {
+function PlanContenido() {
   const router = useRouter()
   const next   = (router.query.next as string) ?? '/admin'
   const wizard      = useOnboardingStore(s => s.wizard)
@@ -1080,7 +1083,7 @@ export default function PlanPage() {
     setEstado('procesando')
     activarNegocio()
       .then(() => publishBusiness())
-      .then(() => { saliendoRef.current = true; resetWizard(); setEstado('exito') })
+      .then(() => { saliendoRef.current = true; resetWizard(); borrarAlta(); setEstado('exito') })
       .catch(manejarError)
   }
 
@@ -1089,12 +1092,9 @@ export default function PlanPage() {
   // vino (tienda o turnos); si no lo dice, al selector de rubro, que reconstruye
   // el camino sin perder lo ya cargado.
   function volverAPoner() {
-    const destino = next.includes('/turnos/')
-      ? '/onboarding/turnos/setup?paso=cuenta'
-      : next.includes('/tienda/')
-        ? '/onboarding/tienda/setup?paso=cuenta'
-        : '/onboarding/rubro'
-    void router.push(destino)
+    // El alta es una sola pantalla (modules/turnos/onboarding/Alta.tsx) y
+    // retoma sola en "Tu cuenta" con lo que ya estaba cargado.
+    void router.push('/onboarding/rubro?paso=cuenta')
   }
 
   function irAlPanel() {
@@ -1116,5 +1116,29 @@ export default function PlanPage() {
       plan={plan}
       onCambiarPlan={cambiarPlan}
     />
+  )
+}
+
+// El fondo del alta (modules/turnos/onboarding/Alta.tsx) también acá, para que
+// el pago no parezca otra página: negro, con el mismo cielo de estrellas y
+// cometas. La pantalla en sí no cambia: `.tuo-espacio` le redefine los tokens
+// de color a la paleta oscura y las tres pantallas (plan, procesando, éxito)
+// dejan ver el cielo porque su fondo de página pasa a transparente.
+const CSS_FONDO = `
+  .ob-espacio.tuo-espacio { overflow: clip; min-height: 100vh; background: #000; }
+  .ob-espacio-cielo { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .ob-espacio > div:not(.ob-espacio-cielo) { background: transparent !important; }
+`
+
+export default function PlanPage() {
+  return (
+    <div className="tuo-espacio ob-espacio">
+      <EstiloTurnos />
+      <style>{CSS_FONDO}</style>
+      <div className="ob-espacio-cielo" aria-hidden>
+        <EscenaEspacial planeta={false} />
+      </div>
+      <PlanContenido />
+    </div>
   )
 }

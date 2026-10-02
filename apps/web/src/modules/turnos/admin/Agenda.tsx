@@ -2,8 +2,9 @@
 //
 // Día: una columna por profesional o espacio (en celular, uno a la vez, elegido
 // con la tira de chips del estándar .ds-tira). Semana: los días que abre el
-// negocio para quien se elija en esa misma tira. Mes: el calendario entero con
-// cuántos turnos tiene cada día y de quién son; tocar un día lo abre.
+// negocio para quien se elija en esa misma tira. Mes: el calendario con los
+// primeros turnos de cada día a la vista; tocar un día lo elige y al lado se ven
+// todos sus turnos (doble clic o "Ver el día" abre la grilla de ese día).
 //
 // La grilla sigue el horario del negocio: va de la primera apertura al último
 // cierre, y lo que queda fuera de la atención (antes de abrir, el corte del
@@ -17,9 +18,9 @@
 // la demo. Tocar un espacio libre de una columna abre "Nuevo turno" con esa
 // hora y esa agenda ya elegidas.
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Coins, MoonStar } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Coins, MoonStar } from 'lucide-react'
 import { ESTADO_TURNO, DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { AHORA_DEMO, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
 import { fechaCorta, fechaDe, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, rangoSemana, type NuevoTurnoPre, type TurnoAgenda } from './agendaDemo'
 
@@ -77,6 +78,9 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
   const celdas = vista === 'mes' ? grillaDelMes(dia) : []
   const recursosMes = filtroMes === 'todos' ? recursos : recursos.filter(r => r.id === filtroMes)
   const delMes = (d: number) => turnosDelDia(d).filter(t => filtroMes === 'todos' || t.recursoId === filtroMes)
+  const colorDe = (recursoId: string) => recursos.find(x => x.id === recursoId)?.color ?? '#3B82F6'
+  // El día elegido en el mes, con sus turnos en orden: es lo que muestra el panel de al lado.
+  const delDiaSel = vista === 'mes' ? delMes(dia).sort((a, b) => a.inicio - b.inicio) : []
 
   const cols = vista === 'dia'
     ? recursos.map(r => ({ key: r.id, titulo: r.nombre, sub: r.rol, color: r.color, lista: turnos.filter(t => t.recursoId === r.id), recursoId: r.id, dia, esDia: false, tramos: jornada(r.id, dia) }))
@@ -143,32 +147,59 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
         .tu-ag-movil { display: none; }
         .tu-ag-resumen { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
-        /* Mes */
+        /* Mes: el calendario a la izquierda y, a la derecha, el día elegido con sus turnos. */
+        .tu-ag-mes-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 16px; align-items: start; }
         .tu-ag-mes-cab, .tu-ag-mes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-        .tu-ag-mes-cab { background: var(--color-surface); border-bottom: 1px solid var(--color-border); border-radius: 16px 16px 0 0; }
-        .tu-ag-mes-cab > span { padding: 10px 12px; }
-        .tu-ag-celda { position: relative; min-height: 116px; padding: 9px 10px 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; border: none; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); background: var(--color-bg); font-family: inherit; color: inherit; cursor: pointer; transition: background 160ms ease; }
-        .tu-ag-celda:nth-child(7n) { border-right: none; }
-        .tu-ag-mes > .tu-ag-celda:nth-last-child(-n+7) { border-bottom: none; }
-        .tu-ag-mes > .tu-ag-celda:nth-last-child(7) { border-bottom-left-radius: 16px; }
-        .tu-ag-mes > .tu-ag-celda:last-child { border-bottom-right-radius: 16px; }
+        .tu-ag-mes-cab { border-bottom: 1px solid var(--color-border); }
+        .tu-ag-mes-cab > span { padding: 12px 12px 10px; text-align: right; }
+        .tu-ag-mes { gap: 1px; background: var(--color-border); border-radius: 0 0 16px 16px; overflow: hidden; }
+        .tu-ag-celda { position: relative; min-height: 128px; min-width: 0; padding: 8px 8px 12px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left; border: none; background: var(--color-bg); font-family: inherit; color: inherit; cursor: pointer; transition: background 160ms ease, box-shadow 160ms ease; }
         .tu-ag-celda[data-fuera='true'] { background: var(--color-surface); }
-        .tu-ag-celda[data-fuera='true'] > * { opacity: 0.5; }
-        .tu-ag-celda[data-cerrado='true'] { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-border-strong) 34%, transparent) 0 1px, transparent 1px 9px), color-mix(in srgb, var(--color-surface-alt) 45%, var(--color-bg)); }
-        .tu-ag-celda[data-pasado='true'] .tu-ag-celda-total, .tu-ag-celda[data-pasado='true'] .tu-ag-celda-quien { opacity: 0.62; }
-        .tu-ag-celda-num { min-width: 26px; height: 26px; padding: 0 6px; border-radius: 8px; display: grid; place-items: center; font-family: var(--tuo-mono); font-size: 13px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
-        .tu-ag-celda[data-hoy='true'] { box-shadow: inset 0 0 0 2px var(--color-primary); }
+        .tu-ag-celda[data-fuera='true'] > * { opacity: 0.45; }
+        .tu-ag-celda[data-cerrado='true'] { background: color-mix(in srgb, var(--color-surface-alt) 55%, var(--color-bg)); }
+        .tu-ag-celda[data-pasado='true'] .tu-ag-pill { opacity: 0.6; }
+        .tu-ag-celda-cab { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px; }
+        .tu-ag-celda-num { min-width: 26px; height: 26px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font-family: var(--tuo-mono); font-size: 13px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; margin-left: auto; order: 2; }
         .tu-ag-celda[data-hoy='true'] .tu-ag-celda-num { background: var(--tuo-grad); color: #fff; box-shadow: 0 4px 12px rgba(37,99,235,0.35); }
-        .tu-ag-celda-total { font-size: 12.5px; color: var(--color-body); }
-        .tu-ag-celda-total > b { font-family: var(--tuo-mono); font-weight: 600; color: var(--color-text); }
-        .tu-ag-celda-quien { display: flex; flex-wrap: wrap; gap: 3px 9px; font-family: var(--tuo-mono); font-size: 11.5px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
-        .tu-ag-celda-quien > span { display: inline-flex; align-items: center; gap: 4px; }
-        .tu-ag-celda-quien i { width: 7px; height: 7px; border-radius: 50%; }
-        .tu-ag-celda-nota { font-size: 11.5px; color: var(--color-muted); }
-        .tu-ag-celda-ocup { position: absolute; left: 10px; right: 10px; bottom: 7px; height: 3px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
-        .tu-ag-celda-ocup > i { display: block; height: 100%; border-radius: 999px; background: var(--tuo-grad); }
-        @media (hover: hover) { .tu-ag-celda:hover { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg)); } }
-        .tu-ag-celda:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; z-index: 1; }
+        .tu-ag-celda[data-sel='true'] { box-shadow: inset 0 0 0 2px var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg)); z-index: 1; }
+        .tu-ag-celda-total { font-size: 11px; font-weight: 500; color: var(--color-muted); white-space: nowrap; }
+        .tu-ag-pill { display: flex; align-items: center; gap: 5px; min-width: 0; height: 21px; padding: 0 6px 0 0; border-radius: 6px; overflow: hidden; font-size: 11.5px; color: var(--color-text); background: color-mix(in srgb, var(--c) 13%, var(--color-bg)); }
+        .tu-ag-pill::before { content: ''; align-self: stretch; width: 3px; flex-shrink: 0; background: var(--c); }
+        .tu-ag-pill > b { font-family: var(--tuo-mono); font-size: 10.5px; font-weight: 500; color: var(--color-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+        .tu-ag-pill > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .tu-ag-pill[data-pendiente='true'] { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, var(--color-border)); }
+        .tu-ag-celda-mas { font-size: 11px; font-weight: 600; color: var(--color-primary); padding-left: 8px; }
+        .tu-ag-celda-nota { font-size: 11.5px; color: var(--color-subtle); }
+        .tu-ag-celda-puntos { display: none; }
+        .tu-ag-celda-ocup { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: transparent; overflow: hidden; }
+        .tu-ag-celda-ocup > i { display: block; height: 100%; background: var(--tuo-grad); opacity: 0.85; }
+        @media (hover: hover) { .tu-ag-celda:not([data-sel='true']):hover { background: color-mix(in srgb, var(--color-primary) 4%, var(--color-bg)); } }
+        .tu-ag-celda:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; z-index: 2; }
+
+        /* El día elegido */
+        .tu-ag-diasel { position: sticky; top: 16px; display: flex; flex-direction: column; max-height: calc(100vh - 140px); overflow: hidden; }
+        .tu-ag-diasel-cab { padding: 16px 16px 14px; border-bottom: 1px solid var(--color-border); }
+        .tu-ag-diasel-fecha { font-family: var(--tuo-fh); font-size: 17px; font-weight: 600; letter-spacing: -0.015em; color: var(--color-text); }
+        .tu-ag-diasel-sub { margin-top: 3px; font-size: 12.5px; color: var(--color-muted); }
+        .tu-ag-diasel-acc { display: flex; gap: 8px; margin-top: 12px; }
+        .tu-ag-diasel-acc > .tuo-btn { flex: 1; }
+        .tu-ag-diasel-lista { list-style: none; margin: 0; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .tu-ag-fila { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 7px 10px 7px 0; border: none; border-radius: 10px; background: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer; overflow: hidden; transition: background 150ms ease; }
+        .tu-ag-fila::before { content: ''; align-self: stretch; width: 3px; border-radius: 3px; flex-shrink: 0; background: var(--c); }
+        .tu-ag-fila-hora { width: 44px; flex-shrink: 0; font-family: var(--tuo-mono); font-size: 12.5px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
+        .tu-ag-fila-txt { flex: 1; min-width: 0; }
+        .tu-ag-fila-txt > b { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tu-ag-fila-txt > span { display: block; font-size: 12px; color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tu-ag-fila-est { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .tu-ag-fila[data-apagado='true'] { opacity: 0.55; }
+        @media (hover: hover) { .tu-ag-fila:hover { background: var(--color-surface); } }
+        .tu-ag-fila:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+        .tu-ag-diasel-vacio { padding: 30px 20px; text-align: center; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
+        .tu-ag-diasel-vacio > svg { display: block; margin: 0 auto 10px; color: var(--color-subtle); }
+        @media (max-width: 1180px) {
+          .tu-ag-mes-wrap { grid-template-columns: minmax(0, 1fr); }
+          .tu-ag-diasel { position: static; max-height: none; }
+        }
 
         @media (max-width: 768px) {
           .tu-ag-movil { display: flex; }
@@ -181,12 +212,15 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
           .tu-ag-seg > button { height: 44px; flex: 1; }
           .tu-ag-nuevo { height: 44px; }
           .tu-ag-mes-cab > span { padding: 8px 0; text-align: center; font-size: 9.5px; }
-          .tu-ag-celda { min-height: 66px; padding: 6px 2px 12px; align-items: center; gap: 2px; }
-          .tu-ag-celda-total > span, .tu-ag-celda-quien { display: none; }
-          .tu-ag-celda-nota { font-size: 9.5px; }
-          .tu-ag-celda-ocup { left: 6px; right: 6px; bottom: 5px; }
+          .tu-ag-celda { min-height: 62px; padding: 6px 2px 9px; align-items: center; gap: 4px; }
+          .tu-ag-celda-cab { margin: 0; }
+          .tu-ag-celda-num { margin: 0; }
+          .tu-ag-pill, .tu-ag-celda-mas, .tu-ag-celda-total, .tu-ag-celda-nota { display: none; }
+          .tu-ag-celda-puntos { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; max-width: 34px; }
+          .tu-ag-celda-puntos > i { width: 6px; height: 6px; border-radius: 50%; }
+          .tu-ag-diasel-acc > .tuo-btn { height: 44px; }
         }
-        @media (prefers-reduced-motion: reduce) { .tu-ag-bloque, .tu-ag-bloque:hover { transition: none; transform: none; animation: none; } .tu-ag-celda { transition: none; } }
+        @media (prefers-reduced-motion: reduce) { .tu-ag-bloque, .tu-ag-bloque:hover { transition: none; transform: none; animation: none; } .tu-ag-celda, .tu-ag-fila { transition: none; } }
       `}</style>
 
       <Cabecera
@@ -233,39 +267,78 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
       )}
 
       {vista === 'mes' ? (
-        <div className="tuo-card tuo-entra" style={{ ['--i' as string]: 2 }}>
-          <div className="tu-ag-mes-cab tuo-rotulo" aria-hidden>
-            {DIAS_CORTOS.map(d => <span key={d}>{d}</span>)}
+        <div className="tu-ag-mes-wrap tuo-entra" style={{ ['--i' as string]: 2 }}>
+          <div className="tuo-card" style={{ overflow: 'hidden' }}>
+            <div className="tu-ag-mes-cab tuo-rotulo" aria-hidden>
+              {DIAS_CORTOS.map(d => <span key={d}>{d}</span>)}
+            </div>
+            <div className="tu-ag-mes">
+              {celdas.map(d => {
+                const abierto = abre(d)
+                const noAtiende = abierto && filtroMes !== 'todos' && jornada(filtroMes, d).length === 0
+                const lista = delMes(d).filter(t => t.estado !== 'cancelado').sort((x, z) => x.inicio - z.inicio)
+                const minutos = recursosMes.reduce((s, r) => s + minutosAbiertos(jornada(r.id, d)), 0)
+                const ocupacion = minutos ? Math.min(1, lista.reduce((s, t) => s + t.duracion, 0) / minutos) : 0
+                const motivo = !abierto ? 'Cerrado' : noAtiende ? 'No atiende' : ''
+                const muestra = lista.length > 3 ? lista.slice(0, 2) : lista
+                return (
+                  <button key={d} type="button" className="tu-ag-celda" data-hoy={d === 0} data-sel={d === dia} data-fuera={!mismoMes(d, dia)} data-cerrado={!abierto || noAtiende} data-pasado={d < 0}
+                    aria-pressed={d === dia} onClick={() => setDia(d)} onDoubleClick={() => { setDia(d); setVista('dia') }}
+                    aria-label={`${fechaLarga(d)}: ${motivo || `${lista.length} turno${lista.length === 1 ? '' : 's'}`}`}>
+                    <span className="tu-ag-celda-cab">
+                      <span className="tu-ag-celda-num">{fechaDe(d).getDate()}</span>
+                      {lista.length > 0 && <span className="tu-ag-celda-total">{lista.length} turno{lista.length === 1 ? '' : 's'}</span>}
+                    </span>
+                    {lista.length === 0 && motivo && <span className="tu-ag-celda-nota">{motivo}</span>}
+                    {muestra.map(t => (
+                      <span key={t.id} className="tu-ag-pill" data-pendiente={t.estado === 'pendiente'} style={{ ['--c' as string]: colorDe(t.recursoId) }}>
+                        <b>{horaTxt(t.inicio)}</b><span>{nombreCliente(t.clienteId).split(' ')[0]}</span>
+                      </span>
+                    ))}
+                    {lista.length > muestra.length && <span className="tu-ag-celda-mas">+{lista.length - muestra.length} más</span>}
+                    <span className="tu-ag-celda-puntos" aria-hidden>
+                      {lista.slice(0, 4).map(t => <i key={t.id} style={{ background: colorDe(t.recursoId) }} />)}
+                    </span>
+                    {ocupacion > 0 && <span className="tu-ag-celda-ocup" aria-hidden><i style={{ width: `${ocupacion * 100}%` }} /></span>}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          <div className="tu-ag-mes">
-            {celdas.map(d => {
-              const abierto = abre(d)
-              const noAtiende = abierto && filtroMes !== 'todos' && jornada(filtroMes, d).length === 0
-              const lista = delMes(d).filter(t => t.estado !== 'cancelado')
-              const porQuien = recursosMes.map(r => ({ r, n: lista.filter(t => t.recursoId === r.id).length })).filter(x => x.n > 0)
-              const minutos = recursosMes.reduce((s, r) => s + minutosAbiertos(jornada(r.id, d)), 0)
-              const ocupacion = minutos ? Math.min(1, lista.reduce((s, t) => s + t.duracion, 0) / minutos) : 0
-              const motivo = !abierto ? 'Cerrado' : noAtiende ? 'No atiende' : ''
-              return (
-                <button key={d} type="button" className="tu-ag-celda" data-hoy={d === 0} data-fuera={!mismoMes(d, dia)} data-cerrado={!abierto || noAtiende} data-pasado={d < 0}
-                  onClick={() => { setDia(d); setVista('dia') }}
-                  aria-label={`${fechaLarga(d)}: ${motivo || `${lista.length} turno${lista.length === 1 ? '' : 's'}`}. Ver el día`}>
-                  <span className="tu-ag-celda-num">{fechaDe(d).getDate()}</span>
-                  {motivo ? <span className="tu-ag-celda-nota">{motivo}</span> : lista.length === 0 ? <span className="tu-ag-celda-nota">Sin turnos</span> : (
-                    <>
-                      <span className="tu-ag-celda-total"><b>{lista.length}</b><span> turno{lista.length === 1 ? '' : 's'}</span></span>
-                      {filtroMes === 'todos' && recursos.length > 1 && (
-                        <span className="tu-ag-celda-quien" aria-hidden>
-                          {porQuien.map(({ r, n }) => <span key={r.id} title={r.nombre}><i style={{ background: r.color }} />{n}</span>)}
-                        </span>
-                      )}
-                      <span className="tu-ag-celda-ocup" aria-hidden><i style={{ width: `${ocupacion * 100}%` }} /></span>
-                    </>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+
+          <aside className="tuo-card tu-ag-diasel" aria-label={`Turnos del ${fechaLarga(dia)}`}>
+            <div className="tu-ag-diasel-cab">
+              <div className="tu-ag-diasel-fecha">{fechaLarga(dia)}{dia === 0 ? ' · hoy' : ''}</div>
+              <div className="tu-ag-diasel-sub">
+                {!abre(dia) ? 'El negocio está cerrado' : `${delDiaSel.length} turno${delDiaSel.length === 1 ? '' : 's'}${filtroMes !== 'todos' ? ` de ${recursosMes[0]?.nombre ?? ''}` : ''} · abre ${tramosFrase(tramosDelDia(semana, indiceDia(dia)))}`}
+              </div>
+              <div className="tu-ag-diasel-acc">
+                <button type="button" className="tuo-btn tuo-btn--sm" onClick={() => setVista('dia')}><CalendarDays size={14} /> Ver el día</button>
+                {puedeAgendar && dia >= 0 && abre(dia) && <button type="button" className="tuo-btn tuo-btn--sm tuo-btn--primario" onClick={() => onNuevo({ dia, recursoId: filtroMes !== 'todos' ? filtroMes : undefined })}><Plus size={14} /> Nuevo turno</button>}
+              </div>
+            </div>
+            {delDiaSel.length === 0 ? (
+              <div className="tu-ag-diasel-vacio">
+                {abre(dia) ? <CalendarDays size={26} strokeWidth={1.5} aria-hidden /> : <MoonStar size={26} strokeWidth={1.5} aria-hidden />}
+                {!abre(dia) ? `Los ${DIAS[indiceDia(dia)].toLowerCase()} no se atiende.` : dia < 0 ? 'Ese día no hubo turnos.' : 'Todavía no hay turnos para este día.'}
+              </div>
+            ) : (
+              <ul className="tu-ag-diasel-lista">
+                {delDiaSel.map(t => (
+                  <li key={t.id}>
+                    <button type="button" className="tu-ag-fila" data-apagado={t.estado === 'cancelado' || t.estado === 'completado'} style={{ ['--c' as string]: colorDe(t.recursoId) }} onClick={() => onAbrir(t)}>
+                      <span className="tu-ag-fila-hora">{horaTxt(t.inicio)}</span>
+                      <span className="tu-ag-fila-txt">
+                        <b style={{ textDecoration: t.estado === 'cancelado' ? 'line-through' : undefined }}>{nombreCliente(t.clienteId)}</b>
+                        <span>{t.servicio}{recursos.length > 1 && filtroMes === 'todos' ? ` · ${recursos.find(x => x.id === t.recursoId)?.nombre.split(' ')[0] ?? ''}` : ''}</span>
+                      </span>
+                      <span className="tu-ag-fila-est" title={ESTADO_TURNO[t.estado].label} aria-label={ESTADO_TURNO[t.estado].label} role="img" style={{ background: ESTADO_TURNO[t.estado].dot }} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
         </div>
       ) : (
         <div ref={grilla} className="tuo-card tuo-entra" style={{ ['--i' as string]: 2, overflow: 'auto', maxHeight: 'calc(100vh - 300px)', minHeight: 440 }}>

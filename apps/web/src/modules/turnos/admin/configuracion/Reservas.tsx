@@ -4,34 +4,37 @@
 // cada elección a lo que va a leer el que reserva: es la mejor forma de que el
 // dueño entienda qué está configurando sin leer ayudas.
 //
-// Casi todo acá es una demo (se "guarda" en memoria). La excepción es la
-// cuenta de clientes y sus beneficios: eso vive en el negocio de la demo
-// (demo/negocioDemo.ts) y el sitio, la reserva y "Mis turnos" lo leen de ahí,
-// así que al guardar se ve de verdad del otro lado.
+// Casi todo acá es una demo (se "guarda" en memoria). Las excepciones son la
+// cuenta de clientes con sus beneficios y la política de cancelación y
+// llegadas tarde: eso vive en el negocio de la demo (demo/negocioDemo.ts) y el
+// sitio, la reserva, "Mis turnos" y los Términos lo leen de ahí, así que al
+// guardar se ve de verdad del otro lado.
 import { useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   CalendarClock, BadgeCheck, Wallet, RotateCcw, Repeat, Users, Hourglass, IdCard, UserX, CalendarRange,
-  Timer, ShieldCheck, Eye, Clock, CircleCheck, Gift, UserRound, UserRoundCheck, BellRing,
+  Timer, ShieldCheck, Eye, Clock, CircleCheck, Gift, UserRound, UserRoundCheck, BellRing, AlarmClock, ScrollText, Copy,
 } from 'lucide-react'
 import { esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
-import { beneficiosTxt, useNegocioDemo, type BeneficiosCuenta } from '@/modules/turnos/demo/negocioDemo'
+import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/demo/negocioDemo'
 import { temaDe } from '@/modules/turnos/storefront/tema'
-import { useBorrador, Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BarraGuardar, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
+import { useBorrador, Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BarraGuardar, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
 import { vozDe, cap } from './datos'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
 const ANT_MAX = [{ id: 7, label: '1 semana' }, { id: 14, label: '2 semanas' }, { id: 30, label: '30 días' }, { id: 60, label: '2 meses' }, { id: 90, label: '3 meses' }]
 const CANCEL_H = [{ id: 2, label: '2 horas antes' }, { id: 6, label: '6 horas antes' }, { id: 12, label: '12 horas antes' }, { id: 24, label: '24 horas antes' }, { id: 48, label: '48 horas antes' }]
+// Hasta cuándo se cancela sin cargo, en horas antes del turno (0 = hasta último momento).
+const PLAZOS = [0, 2, 6, 12, 24, 48, 72].map(h => ({ id: h, label: h === 0 ? 'Hasta último momento' : h < 48 ? `${h} horas antes` : `${h / 24} días antes` }))
+const FUERA: { id: PoliticaReserva['senaFueraDePlazo']; label: string }[] = [{ id: 'se-pierde', label: 'No se devuelve' }, { id: 'queda-a-favor', label: 'Queda a favor para otro turno' }]
+const TOLERANCIAS = [0, 5, 10, 15, 20, 30].map(m => ({ id: m, label: m ? `${m} min` : 'Sin tolerancia' }))
 const LIMITE = [{ id: 0, label: 'Sin límite' }, { id: 1, label: '1 a la vez' }, { id: 2, label: '2 a la vez' }, { id: 3, label: '3 a la vez' }, { id: 5, label: '5 a la vez' }]
 const BIENVENIDA = [0, 5, 10, 15, 20].map(p => ({ id: p, label: p ? `${p}% de descuento` : 'No ofrecer' }))
 const SELLOS = [0, 5, 6, 8, 10].map(n => ({ id: n, label: n ? `Premio a los ${n} sellos` : 'No ofrecer' }))
 
-type SenaCancel = 'devolver' | 'credito' | 'pierde'
-
 interface Reglas {
   minAnt: number; maxAnt: number; buffer: number; grilla: number; confirmacion: 'auto' | 'manual'; elegirRecurso: boolean; cualquiera: boolean
-  sena: boolean; senaTipo: 'pct' | 'fijo'; senaPct: number; senaFijo: string; cancelHoras: number; senaCancel: SenaCancel
+  sena: boolean; senaTipo: 'pct' | 'fijo'; senaPct: number; senaFijo: string
   reprogramar: boolean; reproHoras: number; reproMax: number; limite: number; espera: boolean; esperaMin: number; ausentes: boolean
   cupoDef: string; abrirDias: number; minAnotados: string; obraSocial: boolean; dni: boolean; motivo: boolean
 }
@@ -45,7 +48,7 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
     confirmacion: (rubro.sena > 0 ? 'auto' : salud ? 'manual' : 'auto') as 'auto' | 'manual',
     elegirRecurso: true, cualquiera: true,
     sena: rubro.sena > 0, senaTipo: 'pct' as 'pct' | 'fijo', senaPct: rubro.sena || 30, senaFijo: '5000',
-    cancelHoras: 24, senaCancel: 'credito' as SenaCancel, reprogramar: true, reproHoras: 12, reproMax: 2,
+    reprogramar: true, reproHoras: 12, reproMax: 2,
     limite: cupo ? 0 : 2, espera: cupo || rubro.modo === 'cancha', esperaMin: 30, ausentes: true,
     cupoDef: '15', abrirDias: 7, minAnotados: '3',
     obraSocial: salud, dni: salud, motivo: salud && rubro.key !== 'psico',
@@ -64,13 +67,25 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   const cuentasDirty = cuentasBorrador !== null && JSON.stringify(cuentasBorrador) !== JSON.stringify(demo.cuentas)
   const ponerCuenta = (cambio: Partial<BeneficiosCuenta>) => setCuentasBorrador({ ...cuentas, ...cambio })
 
+  // La política de cancelación y llegadas tarde: mismo patrón que la cuenta.
+  const [politicaBorrador, setPoliticaBorrador] = useState<PoliticaReserva | null>(null)
+  const politica = politicaBorrador ?? demo.politica
+  const politicaDirty = politicaBorrador !== null && JSON.stringify(politicaBorrador) !== JSON.stringify(demo.politica)
+  const ponerPolitica = (cambio: Partial<PoliticaReserva>) => setPoliticaBorrador({ ...politica, ...cambio })
+  const textos = politicaTxt(politica)
+  const copiarPolitica = () => {
+    const texto = `Cambios y cancelaciones\n${textos.cambios}\n\nLlegadas tarde\n${textos.tarde}`
+    navigator.clipboard?.writeText(texto).then(() => avisar('Política copiada', 'Pegala donde quieras: WhatsApp, Instagram o un cartel.'), () => avisar('No se pudo copiar', 'Seleccioná el texto y copialo a mano.'))
+  }
+
+  const seAplica = cuentasDirty || politicaDirty
   const guardar = () => {
     b.guardar()
-    if (cuentasDirty) guardarDemo({ cuentas })
-    setCuentasBorrador(null)
-    avisar('Reglas guardadas', cuentasDirty ? 'La cuenta y sus beneficios ya se ven en tu página. El resto es una demo.' : `Es una demo: tus ${voz.clientes} no ven ningún cambio.`)
+    if (seAplica) guardarDemo({ cuentas, politica })
+    setCuentasBorrador(null); setPoliticaBorrador(null)
+    avisar('Reglas guardadas', seAplica ? 'Lo que cambiaste de la política y de la cuenta ya se ve en tu página. El resto es una demo.' : `Es una demo: tus ${voz.clientes} no ven ningún cambio.`)
   }
-  const descartar = () => { b.descartar(); setCuentasBorrador(null) }
+  const descartar = () => { b.descartar(); setCuentasBorrador(null); setPoliticaBorrador(null) }
 
   return (
     <div className="panel-page">
@@ -163,8 +178,8 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
 
           <SecCard titulo="Cancelaciones y cambios" Icon={RotateCcw} bajada="Hasta cuándo se puede cancelar o mover, y qué pasa con la seña.">
             <Dos>
-              <Selector label="Se puede cancelar hasta" valor={v.cancelHoras} opciones={CANCEL_H} onChange={x => b.set('cancelHoras', x)} />
-              <Selector<SenaCancel> label="Si cancela a tiempo, la seña…" valor={v.senaCancel} onChange={x => b.set('senaCancel', x)} opciones={[{ id: 'devolver', label: 'Se devuelve' }, { id: 'credito', label: 'Queda como crédito' }, { id: 'pierde', label: 'No se devuelve' }]} />
+              <Selector label="Se cancela sin cargo" ayuda="A tiempo, la seña se devuelve al mismo medio de pago." valor={politica.cancelaHasta} opciones={PLAZOS} onChange={x => ponerPolitica({ cancelaHasta: x })} />
+              <Selector label={politica.cancelaHasta > 0 ? 'Fuera de plazo o si falta, la seña…' : 'Si falta, la seña…'} ayuda="Lo lee antes de pagar y en los Términos." valor={politica.senaFueraDePlazo} opciones={FUERA} onChange={x => ponerPolitica({ senaFueraDePlazo: x })} />
             </Dos>
             <FilaSwitch Icon={Repeat} titulo="Permitir reprogramar" ayuda={`Desde el link del recordatorio, sin escribirte. La seña pasa al nuevo ${voz.turno}.`} on={v.reprogramar} onChange={x => b.set('reprogramar', x)}>
               <Dos>
@@ -172,6 +187,21 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
                 <Selector label="Cuántas veces" valor={v.reproMax} opciones={[1, 2, 3].map(n => ({ id: n, label: n === 1 ? '1 vez' : `${n} veces` }))} onChange={x => b.set('reproMax', x)} />
               </Dos>
             </FilaSwitch>
+          </SecCard>
+
+          <SecCard titulo="Llegadas tarde" Icon={AlarmClock} bajada={`Cuánto esperás a quien se demora antes de dar el ${voz.turno} por perdido.`}>
+            <Rotulo ayuda={politica.tolerancia > 0 ? `Pasados ${politica.tolerancia} minutos podés marcarlo como ausente y liberar el horario.` : `El ${voz.turno} empieza a la hora reservada.`}>Tolerancia</Rotulo>
+            <Segmentado label="Tolerancia" valor={politica.tolerancia} onChange={x => ponerPolitica({ tolerancia: x })} opciones={TOLERANCIAS} />
+          </SecCard>
+
+          <SecCard titulo="Tu política, en palabras" Icon={ScrollText} bajada={`Se arma sola con lo que elegís arriba. Es lo que tus ${voz.clientes} leen en los Términos de tu página.`}>
+            <div className="tuc-politica">
+              <h3>Cambios y cancelaciones</h3>
+              <p>{textos.cambios}</p>
+              <h3>Llegadas tarde</h3>
+              <p>{textos.tarde}</p>
+            </div>
+            <BotonBorde Icon={Copy} style={{ marginTop: 12 }} onClick={copiarPolitica}>Copiar el texto</BotonBorde>
           </SecCard>
 
           <SecCard titulo="Límites y lista de espera" Icon={ShieldCheck} bajada="Para repartir mejor los horarios más pedidos.">
@@ -193,11 +223,11 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
         </div>
 
         <aside className="tuc-res-resumen" aria-label="Así lo ve tu cliente">
-          <Resumen v={v} rubro={rubro} senaMonto={senaMonto} cuentas={cuentas} />
+          <Resumen v={v} rubro={rubro} senaMonto={senaMonto} cuentas={cuentas} politica={politica} />
         </aside>
       </div>
 
-      <BarraGuardar dirty={b.dirty || cuentasDirty} onDescartar={descartar} onGuardar={guardar} />
+      <BarraGuardar dirty={b.dirty || seAplica} onDescartar={descartar} onGuardar={guardar} />
     </div>
   )
 }
@@ -207,7 +237,7 @@ const AHORA = 10 * 60 // la demo "está" a las 10:00
 // Tarjeta que imita el paso de elegir horario del sitio público, con los
 // textos que genera cada regla. Pinta con los colores del sitio del negocio
 // (tema.ts) para que se sienta "del otro lado del mostrador".
-function Resumen({ v, rubro, senaMonto, cuentas }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta }) {
+function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta; politica: PoliticaReserva }) {
   const voz = vozDe(rubro)
   const t = temaDe(rubro)
   const cupo = rubro.modo === 'cupo'
@@ -217,8 +247,7 @@ function Resumen({ v, rubro, senaMonto, cuentas }: { v: Reglas; rubro: PropsTab[
   const primero = AHORA + v.minAnt
   const antTxt = v.minAnt === 0 ? 'hasta último momento' : `con al menos ${v.minAnt >= 1440 ? '1 día' : `${v.minAnt / 60} h`} de anticipación`
   const maxTxt = ANT_MAX.find(x => x.id === v.maxAnt)?.label ?? `${v.maxAnt} días`
-  const cancelTxt = CANCEL_H.find(x => x.id === v.cancelHoras)?.label.replace(' antes', '') ?? ''
-  const senaDestino = { devolver: 'se te devuelve la seña', credito: 'la seña te queda como crédito', pierde: 'la seña no se devuelve' }[v.senaCancel]
+  const fuera = politica.senaFueraDePlazo === 'se-pierde' ? 'la seña no se devuelve' : 'la seña te queda a favor'
   const dias = ['Hoy', 'Mañana', 'Lun 28', 'Mar 29', 'Mié 30']
   const beneficios = beneficiosTxt(cuentas, rubro)
 
@@ -228,7 +257,8 @@ function Resumen({ v, rubro, senaMonto, cuentas }: { v: Reglas; rubro: PropsTab[
     [v.confirmacion === 'auto' ? CircleCheck : Clock, v.confirmacion === 'auto' ? <>Tu {voz.turno} queda <b>confirmado al instante</b>.</> : <>El negocio <b>confirma tu {voz.turno}</b> por WhatsApp.</>],
   ]
   if (v.sena) lineas.push([Wallet, <>Para reservar pagás una <b>seña de {pesos(senaMonto)}</b> con Mercado Pago.</>])
-  lineas.push([RotateCcw, <>Podés cancelar hasta <b>{cancelTxt}</b> antes{v.sena ? <>; {senaDestino}</> : ''}.</>])
+  lineas.push([RotateCcw, <>Cancelás sin cargo <b>{plazoTxt(politica.cancelaHasta)}</b>{v.sena ? <>; {politica.cancelaHasta > 0 ? 'después' : 'si faltás'}, {fuera}</> : ''}.</>])
+  if (politica.tolerancia > 0) lineas.push([AlarmClock, <>Te esperamos <b>{politica.tolerancia} minutos</b>.</>])
   if (v.reprogramar) lineas.push([Repeat, <>Podés cambiar el horario hasta {v.reproMax === 1 ? '1 vez' : `${v.reproMax} veces`}.</>])
   if (!cupo && rubro.modo !== 'recurso' && v.elegirRecurso) lineas.push([Users, <>Elegís {rubro.modo === 'cancha' ? 'la cancha' : `con quién atenderte`}{v.cualquiera ? <> o “Cualquiera”</> : ''}.</>])
   if (v.espera) lineas.push([Hourglass, <>Si está lleno, te anotás en la lista de espera y tenés <b>{duracionTxt(v.esperaMin)}</b> para aceptar el lugar.</>])
@@ -298,6 +328,10 @@ function Resumen({ v, rubro, senaMonto, cuentas }: { v: Reglas; rubro: PropsTab[
 }
 
 export const CSS_RESERVAS = `
+  .tuc-politica { padding: 16px 18px; border-radius: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); }
+  .tuc-politica h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
+  .tuc-politica p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-body); text-wrap: pretty; }
+  .tuc-politica p + h3 { margin-top: 14px; }
   .tuc-sinreg { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 4px; border-radius: 12px; background: var(--color-success-bg); border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent); }
   .tuc-sinreg > svg { flex-shrink: 0; margin-top: 2px; color: var(--color-success); }
   .tuc-sinreg strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); }

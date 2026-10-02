@@ -957,4 +957,67 @@ export const CSS_SIMPLE = `
     .tusp-tarjeta { --tusp-fondo: var(--color-bg); width: 100%; border: none; border-radius: 0 !important; box-shadow: none; }
     .tusp-portada { aspect-ratio: 16 / 11; }
   }
+
+  /* ── Los otros cuatro diseños. "tarjeta" es el de arriba, sin nada más. ── */
+  .tusp-arriba { padding-bottom: 0; }
+
+  /* Portada: la foto ocupa la pantalla y el texto va encima, en blanco. */
+  .tusp[data-diseno="portada"] { display: block; padding: 0; }
+  .tusp[data-diseno="portada"] .tusp-fondo { display: none; }
+  .tusp[data-diseno="portada"] .tusp-tarjeta { --tusp-fondo: var(--color-bg); width: 100%; border: none; border-radius: 0; box-shadow: none; }
+  .tusp[data-diseno="portada"] .tusp-heroe { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-height: min(84vh, 760px); }
+  .tusp[data-diseno="portada"] .tusp-portada { position: absolute; inset: 0; aspect-ratio: auto; }
+  .tusp[data-diseno="portada"] .tusp-portada::after { background: linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.5) 46%, rgba(0,0,0,.28) 100%); }
+  .tusp[data-diseno="portada"] .tusp-arriba { --color-text: #FFFFFF; --color-body: rgba(255,255,255,.9); --color-muted: rgba(255,255,255,.78); width: min(100%, 560px); margin: 0 auto; box-sizing: border-box; padding-top: 96px; padding-bottom: 34px; color: #FFFFFF; }
+  .tusp[data-diseno="portada"] .tusp-lugar { color: rgba(255,255,255,.82); }
+  .tusp[data-diseno="portada"] .tusp-logo.tu-mono { margin-top: 0; box-shadow: 0 0 0 4px rgba(255,255,255,.22), 0 18px 36px -14px rgba(0,0,0,.7); }
+  .tusp[data-diseno="portada"] .tusp-abajo { width: min(100%, 560px); margin: 0 auto; box-sizing: border-box; }
+  .tusp[data-diseno="portada"] .tusp-datos { margin-top: 8px; border-top: none; }
+
+  /* Partida: texto a un lado y foto al otro; en el celular, apilados. */
+  .tusp[data-diseno="partida"] .tusp-tarjeta { width: min(100%, 940px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .tusp[data-diseno="partida"] .tusp-heroe { display: contents; }
+  .tusp[data-diseno="partida"] .tusp-portada { grid-column: 2; grid-row: 1 / span 2; aspect-ratio: auto; min-height: 100%; }
+  .tusp[data-diseno="partida"] .tusp-portada::after { background: linear-gradient(to bottom, rgba(0,0,0,.3), transparent 30%); }
+  .tusp[data-diseno="partida"] .tusp-cuerpo { grid-column: 1; align-items: flex-start; text-align: left; }
+  .tusp[data-diseno="partida"] .tusp-arriba { padding-top: 34px; }
+  .tusp[data-diseno="partida"] .tusp-logo.tu-mono { width: 72px; height: 72px; margin-top: 0; font-size: 26px; box-shadow: 0 14px 30px -14px rgba(0,0,0,.5); }
+  .tusp[data-diseno="partida"] .tusp-nota { justify-content: flex-start; }
+
+  /* Editorial: el nombre bien grande y la foto como una lámina. */
+  .tusp[data-diseno="editorial"] .tusp-heroe { display: flex; flex-direction: column; align-items: flex-start; padding: 32px clamp(20px, 6vw, 34px) 0; text-align: left; }
+  .tusp[data-diseno="editorial"] .tusp-arriba { display: contents; }
+  .tusp[data-diseno="editorial"] .tusp-logo.tu-mono { order: 1; width: 52px; height: 52px; margin-top: 0; font-size: 19px; box-shadow: none; }
+  .tusp[data-diseno="editorial"] .tusp-lugar { order: 2; margin-top: 18px; }
+  .tusp[data-diseno="editorial"] .tusp-nombre { order: 3; margin-top: 8px; font-size: clamp(44px, 13vw, 66px); line-height: .98; text-wrap: balance; }
+  .tusp[data-diseno="editorial"] .tusp-portada { order: 4; width: 100%; margin-top: 22px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--tu-r2); }
+  .tu-sitio[data-tarjeta="corte"] .tusp[data-diseno="editorial"] .tusp-portada { border-radius: 0; }
+  .tusp[data-diseno="editorial"] .tusp-portada::after { background: linear-gradient(to bottom, rgba(0,0,0,.3), transparent 32%); }
+  .tusp[data-diseno="editorial"] .tusp-desc { order: 5; margin-top: 20px; max-width: none; font-size: 17.5px; }
+  .tusp[data-diseno="editorial"] .tusp-cta { order: 6; }
+  .tusp[data-diseno="editorial"] .tusp-nota { order: 7; justify-content: flex-start; }
+
+  /* Enlaces: logo al centro y botones uno debajo del otro, como un link de bio. */
+  .tusp[data-diseno="enlaces"] .tusp-portada { display: none; }
+  .tusp[data-diseno="enlaces"] .tusp-arriba { padding-top: 38px; }
+  .tusp[data-diseno="enlaces"] .tusp-logo.tu-mono { width: 108px; height: 108px; margin-top: 0; font-size: 38px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-primary) 24%, transparent), 0 18px 36px -14px rgba(0,0,0,.5); }
+  .tusp[data-diseno="enlaces"] .tusp-abajo { display: flex; flex-direction: column; }
+  .tusp[data-diseno="enlaces"] .tusp-links { order: 1; flex-direction: column; margin-top: 12px; }
+  .tusp[data-diseno="enlaces"] .tusp-links > * { flex: none; width: 100%; height: 56px; box-sizing: border-box; font-size: 15.5px; }
+  .tusp[data-diseno="enlaces"] .tusp-datos { order: 2; }
+  .tusp[data-diseno="enlaces"] .tusp-cuenta { order: 3; }
+
+  @media (max-width: 760px) {
+    .tusp[data-diseno="partida"] .tusp-tarjeta { display: block; width: min(100%, 468px); }
+    .tusp[data-diseno="partida"] .tusp-portada { aspect-ratio: 16 / 10; min-height: 0; }
+    .tusp[data-diseno="partida"] .tusp-arriba { padding-top: 24px; }
+  }
+  @media (max-width: 560px) {
+    .tusp[data-diseno="partida"] .tusp-tarjeta { width: 100%; }
+    .tusp[data-diseno="portada"] .tusp-heroe { min-height: 78vh; }
+    /* Sin foto de portada, el fondo desenfocado es lo que le da cara a la página. */
+    .tusp[data-diseno="enlaces"] { position: relative; min-height: calc(100vh - 124px); }
+    .tusp[data-diseno="enlaces"] .tusp-fondo { display: block; }
+    .tusp[data-diseno="enlaces"] .tusp-tarjeta { background: transparent; }
+  }
 `

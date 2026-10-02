@@ -16,6 +16,7 @@ import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 import { buscarSucursalPrincipal } from '../common/utils/sucursal-principal';
 import { fmtPesos } from '../common/utils/pesos';
+import { desgloseDePedido } from './order-mail-breakdown';
 
 // (Fase 2 — Alex) El corazón de los pedidos: acá viven las reglas de cómo nace
 // un pedido y cómo va cambiando de estado hasta entregarse o cancelarse.
@@ -1082,6 +1083,7 @@ export class OrdersService {
                 quantity: r.quantity,
                 price: fmtPesos(Number(r.unitPrice)),
               })),
+              ...(await desgloseDePedido(this.prisma, creado.id)),
               orderUrl,
             };
             const meta = { businessId, customerId: customer?.id };
@@ -1433,6 +1435,7 @@ export class OrdersService {
               quantity: it.quantity,
               price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
             })),
+            ...(await desgloseDePedido(this.prisma, order.id)),
             orderUrl,
           }, meta);
         }
@@ -1689,6 +1692,7 @@ export class OrdersService {
           quantity: it.quantity,
           price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
         })),
+        ...(await desgloseDePedido(this.prisma, order.id)),
         orderUrl: order.customerId ? url.replace(/\/comprobante$/, '') : undefined,
       }, { businessId, customerId: order.customerId ?? undefined });
     } catch (e) {

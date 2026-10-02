@@ -1,16 +1,19 @@
 // Apariencia del sitio de reservas: el editor de la identidad del negocio.
 //
-// Arriba de todo, el riel de plantillas (cada una es una identidad completa,
-// con miniatura fiel). Abajo, el editor a la izquierda y la vista previa en
+// Arriba de todo, el riel con las cinco plantillas del rubro (cada una es una
+// identidad completa, con miniatura fiel). Abajo, el editor a la izquierda y la vista previa en
 // vivo a la derecha. Elegir una plantilla trae sus valores de fábrica (paleta,
 // par tipográfico, bordes, botón y tipo de portada) y después cada cosa se
 // ajusta por separado. La plantilla puede venir elegida desde Avanzado →
 // Plantillas por ?plantilla=.
 //
-// Antes que todo eso va el tipo de página: sitio web completo o página simple.
-// A diferencia del resto (que es una demo y se "guarda" en memoria), eso SÍ se
-// aplica: vive en el negocio de la demo (demo/negocioDemo.ts) y es lo que abre
-// el link del negocio.
+// Antes que todo eso va el tipo de página: sitio web completo o página simple
+// (y, si es simple, cuál de sus cinco diseños).
+//
+// Qué se guarda de verdad (demo/negocioDemo.ts) y se ve en el sitio: el tipo de
+// página, el diseño de la página simple y la plantilla con sus ajustes (acento,
+// letra, bordes y foto). El botón, el logo, las secciones y los textos siguen
+// siendo una demo en memoria.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import {
@@ -18,28 +21,35 @@ import {
   Check, Upload, GripVertical, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, Eye, X, Trash2, Info, RotateCcw, ArrowUpRight,
   MonitorSmartphone, Smartphone, type LucideIcon,
 } from 'lucide-react'
-import { useNegocioDemo, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
-import { cargarFuentes } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
+import { useNegocioDemo, type DisenoSimple, type FormaSitio } from '@/modules/turnos/demo/negocioDemo'
+import { achicarFoto } from '@/modules/turnos/onboarding/imagen'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import {
-  PLANTILLAS, PLANTILLA_DE_FAMILIA, plantillaPorId, plantillasPara, plantillaRecomendada, temaConPlantilla, paletaCon,
+  cargarFuentesTurnos, plantillaEnUso, plantillasPara, temaConPlantilla, paletaCon,
   TIPOGRAFIAS, tipografiaPorId, RADIOS, radioDeTema, ESTILOS_BOTON, seccionesIniciales, fotosPara,
-  botonesSugeridos, esHex, iniciales, subdominioDe, vozDe, type Radio, type EstiloBoton, type PlantillaSitio,
+  botonesSugeridos, esHex, iniciales, subdominioDe, vozDe, type EstiloBoton, type Paleta, type PlantillaSitio,
 } from './datos'
 import { useBorrador, Encabezado, SecCard, Rotulo, Switch, Campo, Chip, BarraGuardar, Boton, type PropsTab } from './ui'
 import VistaPrevia, { armarPisar } from './VistaPrevia'
 import { MiniSitio, TarjetaPlantilla, datosMini } from './MiniSitio'
 
-interface Ap {
+/** Lo que SÍ se guarda de la apariencia: la plantilla y sus cuatro ajustes (demo/negocioDemo.ts → AparienciaDemo). */
+interface Vestido {
   plantilla: string
   color: string
   tipo: string
-  radio: Radio
-  estiloBoton: EstiloBoton
+  /** Radio de los bordes, en px. */
+  radio: number
+  /** '' = la foto con la que viene la plantilla. */
+  foto: string
+}
+
+/** El resto del editor: demo en memoria. null en botón y portada = lo que trae la plantilla. */
+interface Ap {
+  estiloBoton: EstiloBoton | null
+  hero: 'sangre' | 'partido' | null
   logo: string | null
   monograma: boolean
-  foto: string
-  hero: 'sangre' | 'partido'
   secciones: { id: string; on: boolean }[]
   nombre: string
   frase: string
@@ -53,41 +63,65 @@ const FORMAS: { id: FormaSitio; Icon: LucideIcon; titulo: string; texto: string 
 // Lo que muestra la página simple, que no tiene secciones para ordenar.
 const EN_SIMPLE = ['Foto de portada', 'Logo y nombre', 'Descripción corta', 'Botón de reservar', 'Dónde y cuándo atendés', 'Beneficios de la cuenta, si los ofrecés']
 
-/** Los valores de fábrica que trae una plantilla: lo que se pisa al elegirla. */
-const deFabrica = (p: PlantillaSitio) => ({ plantilla: p.id, color: p.c.primary, tipo: p.tipo, radio: radioDeTema(p.radio), estiloBoton: p.boton, hero: p.hero })
+// Los cinco diseños de la página simple: mismo contenido, otra composición.
+const DISENOS: { id: DisenoSimple; titulo: string; texto: string }[] = [
+  { id: 'tarjeta', titulo: 'Tarjeta', texto: 'La foto arriba y una tarjeta con todo lo demás.' },
+  { id: 'portada', titulo: 'Portada', texto: 'La foto ocupa la pantalla y el texto va encima.' },
+  { id: 'partida', titulo: 'Partida', texto: 'Foto a un lado y texto al otro; en el celular, apilados.' },
+  { id: 'editorial', titulo: 'Editorial', texto: 'El nombre bien grande y la foto como una lámina.' },
+  { id: 'enlaces', titulo: 'Enlaces', texto: 'Logo al centro y botones uno debajo del otro.' },
+]
+
+/** Los valores de fábrica de una plantilla: lo que se pisa al elegirla. */
+const deFabrica = (p: PlantillaSitio): Vestido => ({ plantilla: p.id, color: p.c.primary, tipo: p.tipo, radio: p.radio, foto: '' })
 
 export default function Apariencia({ rubro, avisar }: PropsTab) {
   const router = useRouter()
-  const pedida = plantillaPorId(typeof router.query.plantilla === 'string' ? router.query.plantilla : undefined)
   const voz = vozDe(rubro)
+  const orden = useMemo(() => plantillasPara(rubro), [rubro])
+  const pedida = orden.find(p => p.id === router.query.plantilla)
 
-  // El tipo de página. null = sin tocar: vale lo guardado en el negocio de la
-  // demo (que llega del navegador recién después de hidratar, por eso no se copia
-  // a un estado al montar).
+  // Lo que se guarda en el negocio de la demo: el tipo de página, el diseño de la
+  // página simple y la plantilla con sus ajustes. null = sin tocar: vale lo guardado
+  // (que llega del navegador recién después de hidratar, por eso no se copia a un
+  // estado al montar).
   const { demo, guardar: guardarDemo } = useNegocioDemo()
   const [formaBorrador, setFormaBorrador] = useState<FormaSitio | null>(null)
   const forma = formaBorrador ?? demo.forma
   const formaDirty = formaBorrador !== null && formaBorrador !== demo.forma
   const simple = forma === 'simple'
-  const metaSecciones = useMemo(() => seccionesIniciales(rubro), [rubro])
-  const orden = useMemo(() => plantillasPara(rubro), [rubro])
+  const [disenoBorrador, setDisenoBorrador] = useState<DisenoSimple | null>(null)
+  const diseno = disenoBorrador ?? demo.simple
+  const disenoDirty = disenoBorrador !== null && disenoBorrador !== demo.simple
 
-  // Lo "publicado" es la plantilla de la familia; si se llegó con una plantilla
-  // pedida, el borrador arranca con esa y ya queda como cambio sin guardar.
+  const guardado = useMemo<Vestido>(() => {
+    const p = plantillaEnUso(rubro, demo.apariencia)
+    const g = demo.apariencia?.rubro === rubro.key && demo.apariencia.plantilla === p.id ? demo.apariencia : null
+    return g ? { plantilla: p.id, color: esHex(g.color) ? g.color : p.c.primary, tipo: g.tipo || p.tipo, radio: g.radio > 0 ? g.radio : p.radio, foto: g.foto } : deFabrica(p)
+  }, [rubro, demo.apariencia])
+  // Si se llegó con una plantilla pedida (desde la galería), el borrador arranca con esa: ya es un cambio sin guardar.
+  const [vestidoBorrador, setVestidoBorrador] = useState<Vestido | null>(() => (pedida ? deFabrica(pedida) : null))
+  const vestido = vestidoBorrador ?? guardado
+  const vestidoDirty = vestidoBorrador !== null && JSON.stringify(vestidoBorrador) !== JSON.stringify(guardado)
+  const vestir = (cambio: Partial<Vestido>) => setVestidoBorrador({ ...vestido, ...cambio })
+
+  const metaSecciones = useMemo(() => seccionesIniciales(rubro), [rubro])
   const b = useBorrador<Ap>(() => {
     const t = temaDe(rubro)
-    const base = plantillaPorId(PLANTILLA_DE_FAMILIA[rubro.familia]) ?? PLANTILLAS[0]
     return {
-      ...deFabrica(base), logo: null, monograma: true, foto: t.fotoHero,
+      estiloBoton: null, hero: null, logo: null, monograma: true,
       secciones: metaSecciones.map(s => ({ id: s.id, on: s.on })),
       nombre: t.nombre, frase: t.tagline, boton: botonesSugeridos(rubro)[0],
     }
-  }, pedida ? g => ({ ...g, ...deFabrica(pedida) }) : undefined)
+  })
   const ap = b.valor
-  const plantilla = plantillaPorId(ap.plantilla) ?? PLANTILLAS[0]
-  const tipo = tipografiaPorId(ap.tipo)
-  const radioPx = RADIOS.find(r => r.id === ap.radio)?.px ?? 8
-  const color = esHex(ap.color) ? ap.color : plantilla.c.primary
+  const plantilla = orden.find(p => p.id === vestido.plantilla) ?? orden[0]
+  const estiloBoton = ap.estiloBoton ?? plantilla.boton
+  const hero = ap.hero ?? plantilla.hero
+  const tipo = tipografiaPorId(vestido.tipo)
+  const radioPx = vestido.radio
+  const color = esHex(vestido.color) ? vestido.color : plantilla.c.primary
+  const foto = vestido.foto || plantilla.foto
   const paleta = useMemo(() => paletaCon(plantilla.c, color), [plantilla, color])
   const [previewAbierta, setPreviewAbierta] = useState(false)
   const [fotosSubidas, setFotosSubidas] = useState<string[]>([])
@@ -104,29 +138,40 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
     b.set('secciones', lista)
   }
 
-  // Las fuentes de las plantillas (Cormorant, Oswald, Outfit…) para las
-  // muestras de tipografía y las miniaturas.
-  useEffect(() => { cargarFuentes() }, [])
+  // Las letras de las plantillas para las muestras de tipografía y las miniaturas.
+  useEffect(() => { cargarFuentesTurnos() }, [])
 
-  const tocada = ap.color !== plantilla.c.primary || ap.tipo !== plantilla.tipo || ap.radio !== radioDeTema(plantilla.radio) || ap.estiloBoton !== plantilla.boton || ap.hero !== plantilla.hero
-  const elegir = (p: PlantillaSitio) => b.setValor(v => ({ ...v, ...deFabrica(p) }))
+  const tocada = color.toLowerCase() !== plantilla.c.primary.toLowerCase() || tipo.id !== plantilla.tipo || radioPx !== plantilla.radio || estiloBoton !== plantilla.boton || hero !== plantilla.hero || vestido.foto !== ''
+  // Elegir una plantilla trae todo lo suyo: también el botón y la portada.
+  const elegir = (p: PlantillaSitio) => { setVestidoBorrador(deFabrica(p)); b.setValor(v => ({ ...v, estiloBoton: null, hero: null })) }
 
-  const pisar = useMemo(() => armarPisar(rubro, plantilla, { color, tipo: tipo.id, radio: radioPx, foto: ap.foto }), [rubro, plantilla, color, tipo.id, radioPx, ap.foto])
+  const ajustes = useMemo(() => ({ color, tipo: tipo.id, radio: radioPx, foto: vestido.foto }), [color, tipo.id, radioPx, vestido.foto])
+  const pisar = useMemo(() => armarPisar(rubro, plantilla, ajustes), [rubro, plantilla, ajustes])
 
   // Lo que ve la miniatura de la plantilla en uso: el negocio con todos los ajustes del editor.
-  const temaActual = useMemo(() => ({ ...temaConPlantilla(rubro, plantilla), c: paleta, fh: tipo.fh, fb: tipo.fb, mayus: tipo.mayus, radio: radioPx, hero: ap.hero }), [rubro, plantilla, paleta, tipo, radioPx, ap.hero])
-  const datos = useMemo(() => datosMini(rubro, temaDe(rubro), { nombre: ap.nombre || 'Tu negocio', frase: ap.frase || 'Tu frase principal', boton: ap.boton || 'Reservar', foto: ap.foto, logo: ap.logo }), [rubro, ap.nombre, ap.frase, ap.boton, ap.foto, ap.logo])
+  const temaActual = useMemo(() => ({ ...temaConPlantilla(rubro, plantilla, ajustes), hero }), [rubro, plantilla, ajustes, hero])
+  const datos = useMemo(() => datosMini(rubro, temaDe(rubro), { nombre: ap.nombre || 'Tu negocio', frase: ap.frase || 'Tu frase principal', boton: ap.boton || 'Reservar', foto, logo: ap.logo }), [rubro, ap.nombre, ap.frase, ap.boton, foto, ap.logo])
 
   const subdominio = subdominioDe(ap.nombre)
-  const dirty = b.dirty || formaDirty
+  const seAplica = formaDirty || disenoDirty || vestidoDirty
+  const dirty = b.dirty || seAplica
   const guardar = () => {
+    if (!esHex(vestido.color)) { avisar('Revisá el color de acento', 'Escribilo como #RRGGBB, por ejemplo #C9A36A.'); return }
     b.guardar()
-    if (formaDirty) guardarDemo({ forma })
-    setFormaBorrador(null)
-    avisar('Apariencia guardada', formaDirty ? `Tu link ahora abre ${simple ? 'la página simple' : 'el sitio web completo'}. El resto es una demo.` : 'Es una demo: tu sitio no cambia de verdad.')
+    if (seAplica) guardarDemo({ forma, simple: diseno, apariencia: { rubro: rubro.key, ...vestido } })
+    setFormaBorrador(null); setDisenoBorrador(null); setVestidoBorrador(null)
+    avisar('Apariencia guardada', seAplica
+      ? `Tu ${simple ? 'página' : 'sitio'} ya se ve con ${plantilla.nombre}. El botón, el logo, los textos y las secciones son una demo.`
+      : 'Es una demo: el botón, el logo, los textos y las secciones no cambian tu sitio de verdad.')
   }
-  const descartar = () => { b.descartar(); setFormaBorrador(null) }
-  const fotos = [...fotosSubidas, ...fotosPara(temaDe(rubro))]
+  const descartar = () => { b.descartar(); setFormaBorrador(null); setDisenoBorrador(null); setVestidoBorrador(null) }
+  const fotos = [...new Set([...fotosSubidas, ...(vestido.foto ? [vestido.foto] : []), plantilla.foto, ...fotosPara(temaDe(rubro))])]
+  const subirFoto = (archivo: File | undefined) => {
+    if (!archivo) return
+    // Achicada y como data URL: así entra en el navegador y la ve también el sitio.
+    achicarFoto(archivo).then(url => { setFotosSubidas(s => [url, ...s]); vestir({ foto: url }) })
+      .catch(() => avisar('No pudimos leer esa foto', 'Probá con un JPG o un PNG.'))
+  }
   const correr = (d: -1 | 1) => {
     const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     riel.current?.scrollBy({ left: d * Math.max(280, riel.current.clientWidth * 0.8), behavior: quieto ? 'auto' : 'smooth' })
@@ -139,7 +184,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
 
   const preview = (alto: string, celular?: boolean) => (
     // key = forma: la página simple está pensada para el celular, así que al elegirla la vista previa arranca en celular.
-    <VistaPrevia key={forma} rubroKey={rubro.key} pisar={pisar} alto={alto} subdominio={subdominio} forma={forma} dispositivoInicial={celular || simple ? 'celular' : 'escritorio'} />
+    <VistaPrevia key={forma} rubroKey={rubro.key} probar={plantilla.id} diseno={diseno} pisar={pisar} alto={alto} subdominio={subdominio} forma={forma} dispositivoInicial={celular || simple ? 'celular' : 'escritorio'} />
   )
   const muestraBoton = (estilo: EstiloBoton, texto: string) => (
     <span style={{
@@ -188,7 +233,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
         <div className="tuc-riel-cab">
           <div style={{ minWidth: 0, flex: '1 1 260px' }}>
             <h2 className="tuo-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Sparkles size={16} aria-hidden style={{ color: 'var(--color-primary)' }} />Plantilla</h2>
-            <p className="tuc-card-bajada">El punto de partida: {PLANTILLAS.length} identidades completas. Las que mejor le quedan a {rubro.label.toLowerCase()} van primero.</p>
+            <p className="tuc-card-bajada">El punto de partida: {orden.length} identidades completas, pensadas para {rubro.label.toLowerCase()}. Elegí una y ajustala abajo.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {tocada && <button type="button" className="tuc-link" onClick={() => elegir(plantilla)}><RotateCcw size={13} aria-hidden />Volver a los valores de {plantilla.nombre}</button>}
@@ -201,11 +246,11 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
         </div>
         <div ref={riel} role="radiogroup" aria-label="Plantilla del sitio" className="tuc-riel">
           {orden.map((p, i) => {
-            const activa = p.id === ap.plantilla
+            const activa = p.id === plantilla.id
             return (
               <div key={p.id} className="tuc-riel-item">
-                <TarjetaPlantilla p={p} i={i} activa={activa} recomendada={plantillaRecomendada(p, rubro)} onClick={() => elegir(p)}
-                  tema={activa ? temaActual : temaConPlantilla(rubro, p)} datos={datos} boton={activa ? ap.estiloBoton : p.boton} />
+                <TarjetaPlantilla p={p} i={i} activa={activa} onClick={() => elegir(p)}
+                  tema={activa ? temaActual : temaConPlantilla(rubro, p)} datos={activa ? datos : { ...datos, foto: p.foto }} boton={activa ? estiloBoton : p.boton} />
               </div>
             )
           })}
@@ -215,13 +260,31 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
       <div className="tuc-ap-split">
         <div className="tuc-pila">
 
+          {/* El diseño de la página simple va acá, al lado de la vista previa: se elige viendo cómo queda. */}
+          {simple && (
+            <SecCard titulo="Diseño de la página simple" Icon={LayoutTemplate} bajada="El mismo contenido, compuesto de cinco formas. Tocá uno y miralo en la vista previa de al lado."
+              badge={<Chip tono="primario">{DISENOS.find(d => d.id === diseno)?.titulo}</Chip>}>
+              <div role="radiogroup" aria-label="Diseño de la página simple" className="tuc-disenos">
+                {DISENOS.map(d => (
+                  <button key={d.id} type="button" role="radio" aria-checked={diseno === d.id} onClick={() => setDisenoBorrador(d.id)} className="tuc-opcion tuc-diseno">
+                    <span className="tuc-opcion-tilde" aria-hidden><Check size={12} strokeWidth={3} /></span>
+                    <BocetoSimple diseno={d.id} c={paleta} radio={radioPx} />
+                    <span className="tuc-forma-tit" style={{ marginTop: 10 }}>{d.titulo}</span>
+                    <span className="tuc-forma-txt">{d.texto}</span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="tuc-link tuc-solo-angosto" style={{ marginTop: 10 }} onClick={() => setPreviewAbierta(true)}><Eye size={13} aria-hidden /> Ver cómo queda</button>
+            </SecCard>
+          )}
+
           <SecCard titulo="Colores" Icon={Droplets} bajada={`La paleta de ${plantilla.nombre}, con el acento que elijas para botones, links y detalles.`}>
             <div role="radiogroup" aria-label="Paleta de colores" className="tuc-paletas">
               {plantilla.acentos.map((c, i) => {
-                const a = c.toLowerCase() === ap.color.toLowerCase()
+                const a = c.toLowerCase() === vestido.color.toLowerCase()
                 const pl = paletaCon(plantilla.c, c)
                 return (
-                  <button key={c} type="button" role="radio" aria-checked={a} aria-label={`Paleta con acento ${c}${i === 0 ? ', la de fábrica' : ''}`} title={c} onClick={() => b.set('color', c)} className="tuc-paleta">
+                  <button key={c} type="button" role="radio" aria-checked={a} aria-label={`Paleta con acento ${c}${i === 0 ? ', la de fábrica' : ''}`} title={c} onClick={() => vestir({ color: c })} className="tuc-paleta">
                     <span aria-hidden className="tuc-paleta-muestra" style={{ background: pl.bg, borderColor: pl.border }}>
                       <span style={{ height: 5, width: '58%', borderRadius: 3, background: pl.text }} />
                       <span style={{ height: 4, width: '80%', borderRadius: 3, background: pl.muted, opacity: 0.7 }} />
@@ -239,25 +302,25 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
               <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                 <Rotulo htmlFor="tuc-hex">Acento personalizado</Rotulo>
                 <div className="tuc-field tuc-field--fila tuc-field--mono" style={{ paddingLeft: 7 }}>
-                  <input type="color" aria-label="Elegir el color con el selector" value={color} onChange={e => b.set('color', e.target.value.toUpperCase())} className="tuc-color-pozo" />
-                  <input id="tuc-hex" value={ap.color} maxLength={7} spellCheck={false} onChange={e => b.set('color', e.target.value.toUpperCase())} aria-invalid={!esHex(ap.color)} aria-describedby={esHex(ap.color) ? undefined : 'tuc-hex-error'} />
+                  <input type="color" aria-label="Elegir el color con el selector" value={color} onChange={e => vestir({ color: e.target.value.toUpperCase() })} className="tuc-color-pozo" />
+                  <input id="tuc-hex" value={vestido.color} maxLength={7} spellCheck={false} onChange={e => vestir({ color: e.target.value.toUpperCase() })} aria-invalid={!esHex(vestido.color)} aria-describedby={esHex(vestido.color) ? undefined : 'tuc-hex-error'} />
                 </div>
               </div>
               <div role="img" aria-label="Muestra del botón con este color" style={{ flex: '1 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 66, borderRadius: 12, background: paleta.bg, border: `1px solid ${paleta.border}`, padding: '0 12px', transition: 'background 240ms ease' }}>
-                {muestraBoton(ap.estiloBoton, ap.boton || 'Reservar')}
+                {muestraBoton(estiloBoton, ap.boton || 'Reservar')}
               </div>
             </div>
-            {!esHex(ap.color) && <div id="tuc-hex-error" role="alert" style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>Escribilo como #RRGGBB, por ejemplo #C9A36A. Mientras tanto se usa el color de la plantilla.</div>}
+            {!esHex(vestido.color) && <div id="tuc-hex-error" role="alert" style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>Escribilo como #RRGGBB, por ejemplo #C9A36A. Mientras tanto se usa el color de la plantilla.</div>}
           </SecCard>
 
           <SecCard titulo="Tipografía" Icon={Type} bajada="Un par de letras: una para títulos y otra para textos. Cada muestra está escrita con su propia letra.">
             <div role="radiogroup" aria-label="Tipografía" className="tuc-grid-2">
               {TIPOGRAFIAS.map(t => {
-                const a = t.id === ap.tipo
+                const a = t.id === tipo.id
                 return (
-                  <button key={t.id} type="button" role="radio" aria-checked={a} onClick={() => b.set('tipo', t.id)} className="tuc-opcion" aria-label={`${t.nombre}: ${t.titulo} para títulos y ${t.texto} para textos`}>
+                  <button key={t.id} type="button" role="radio" aria-checked={a} onClick={() => vestir({ tipo: t.id })} className="tuc-opcion" aria-label={`${t.nombre}: ${t.titulo} para títulos y ${t.texto} para textos`}>
                     <span className="tuc-opcion-tilde" aria-hidden><Check size={12} strokeWidth={3} /></span>
-                    <span style={{ display: 'block', fontFamily: t.fh, fontSize: 23, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.1, textTransform: t.mayus ? 'uppercase' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 24 }}>{ap.nombre || 'Tu negocio'}</span>
+                    <span style={{ display: 'block', fontFamily: t.fh, fontSize: 23, fontWeight: t.peso, color: 'var(--color-text)', lineHeight: 1.1, textTransform: t.mayus ? 'uppercase' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: 24 }}>{ap.nombre || 'Tu negocio'}</span>
                     <span style={{ display: 'block', fontFamily: t.fb, fontSize: 12.5, color: 'var(--color-body)', marginTop: 7, lineHeight: 1.45 }}>Elegí día y horario en segundos, desde el celular.</span>
                     <span style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{t.nombre}</span>
@@ -273,9 +336,9 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             <Rotulo>Bordes</Rotulo>
             <div role="radiogroup" aria-label="Bordes" className="tuc-grid-4">
               {RADIOS.map(r => {
-                const a = r.id === ap.radio
+                const a = r.id === radioDeTema(radioPx)
                 return (
-                  <button key={r.id} type="button" role="radio" aria-checked={a} onClick={() => b.set('radio', r.id)} className="tuc-opcion tuc-opcion--centro">
+                  <button key={r.id} type="button" role="radio" aria-checked={a} onClick={() => vestir({ radio: r.px })} className="tuc-opcion tuc-opcion--centro">
                     <span aria-hidden className="tuc-borde-muestra" style={{ borderRadius: Math.min(r.px * 0.9, 20), background: paleta.surface, borderColor: paleta.border }}>
                       <span style={{ height: 22, borderRadius: Math.min(r.px * 0.6, 12), background: paleta.surfaceAlt }} />
                       <span style={{ height: 12, width: '64%', borderRadius: Math.min(r.px, 6), background: paleta.primary }} />
@@ -289,7 +352,7 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             <Rotulo>Estilo del botón</Rotulo>
             <div role="radiogroup" aria-label="Estilo del botón" className="tuc-grid-3">
               {ESTILOS_BOTON.map(e => {
-                const a = e.id === ap.estiloBoton
+                const a = e.id === estiloBoton
                 return (
                   <button key={e.id} type="button" role="radio" aria-checked={a} onClick={() => b.set('estiloBoton', e.id)} className="tuc-opcion tuc-opcion--centro">
                     <span aria-hidden style={{ display: 'grid', placeItems: 'center', width: '100%', minHeight: 62, borderRadius: 10, background: paleta.bg, border: `1px solid ${paleta.border}`, padding: '0 8px', boxSizing: 'border-box' }}>{muestraBoton(e.id, 'Reservar')}</span>
@@ -312,11 +375,11 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             {!simple && <Rotulo>Diseño de la portada</Rotulo>}
             <div role="radiogroup" aria-label="Diseño de la portada" className="tuc-grid-2" style={{ marginBottom: 18, ...(simple ? { display: 'none' } : null) }}>
               {([['sangre', 'A sangre', 'Foto de fondo, texto encima'], ['partido', 'Partida', 'Texto a un lado, foto al otro']] as const).map(([id, titulo, ayuda]) => {
-                const a = ap.hero === id
+                const a = hero === id
                 return (
                   <button key={id} type="button" role="radio" aria-checked={a} onClick={() => b.set('hero', id)} className="tuc-opcion tuc-opcion--mini">
                     <span className="tuc-opcion-tilde" aria-hidden><Check size={12} strokeWidth={3} /></span>
-                    <span className="tuc-opcion-marco"><MiniSitio tema={{ ...temaActual, hero: id }} datos={datos} boton={ap.estiloBoton} /></span>
+                    <span className="tuc-opcion-marco"><MiniSitio tema={{ ...temaActual, hero: id }} datos={datos} boton={estiloBoton} /></span>
                     <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: a ? 'var(--color-primary)' : 'var(--color-text)', marginTop: 10 }}>{titulo}</span>
                     <span style={{ display: 'block', fontSize: 11.5, color: 'var(--color-muted)' }}>{ayuda}</span>
                   </button>
@@ -327,18 +390,12 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
             <div role="radiogroup" aria-label="Foto de portada" className="tuc-fotos">
               <label className="tuc-subir">
                 <Upload size={17} aria-hidden />Subir foto
-                <input type="file" accept="image/*" className="tuc-sr" onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (!f) return
-                  const url = URL.createObjectURL(f)
-                  setFotosSubidas(s => [url, ...s])
-                  b.set('foto', url)
-                }} />
+                <input type="file" accept="image/*" className="tuc-sr" onChange={e => { subirFoto(e.target.files?.[0]); e.target.value = '' }} />
               </label>
               {fotos.map((f, i) => {
-                const a = f === ap.foto
+                const a = f === foto
                 return (
-                  <button key={f} type="button" role="radio" aria-checked={a} aria-label={`Foto ${i + 1}`} onClick={() => b.set('foto', f)} className="tuc-foto">
+                  <button key={f} type="button" role="radio" aria-checked={a} aria-label={`Foto ${i + 1}`} onClick={() => vestir({ foto: f === plantilla.foto ? '' : f })} className="tuc-foto">
                     <img src={f} alt="" loading="lazy" />
                     <span className="tuc-foto-tilde" aria-hidden><Check size={12} strokeWidth={3} /></span>
                   </button>
@@ -435,11 +492,52 @@ export default function Apariencia({ rubro, avisar }: PropsTab) {
   )
 }
 
+/** Boceto de un diseño de la página simple, con los colores de la plantilla: se entiende la composición de un vistazo. */
+function BocetoSimple({ diseno, c, radio }: { diseno: DisenoSimple; c: Paleta; radio: number }) {
+  const r = Math.min(radio, 10)
+  const foto = { background: `linear-gradient(135deg, ${c.surfaceAlt}, ${c.border})` }
+  const linea = (w: string, color = c.muted, h = 4) => <span style={{ display: 'block', height: h, width: w, borderRadius: 3, background: color }} />
+  const boton = (w = '70%') => <span style={{ display: 'block', height: 9, width: w, borderRadius: Math.min(r, 5), background: c.primary }} />
+  const logo = <span style={{ display: 'block', width: 14, height: 14, borderRadius: '50%', background: c.primary, flexShrink: 0 }} />
+  const texto = (centro?: boolean) => (
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: centro ? 'center' : 'flex-start', width: '100%' }}>
+      {linea('62%', c.text, 5)}{linea('84%')}{boton()}
+    </span>
+  )
+  const cuerpo = {
+    tarjeta: <>
+      <span style={{ ...foto, position: 'absolute', inset: '0 0 52% 0' }} />
+      <span style={{ position: 'absolute', inset: '34% 10% 8% 10%', borderRadius: r, background: c.surface, border: `1px solid ${c.border}`, padding: 7, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>{logo}{texto(true)}</span>
+    </>,
+    portada: <>
+      <span style={{ ...foto, position: 'absolute', inset: 0 }} />
+      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.72), transparent 70%)' }} />
+      <span style={{ position: 'absolute', inset: 'auto 10% 9% 10%', display: 'flex', flexDirection: 'column', gap: 4 }}>{linea('62%', '#fff', 5)}{linea('84%', 'rgba(255,255,255,.7)')}{boton()}</span>
+    </>,
+    partida: <>
+      <span style={{ ...foto, position: 'absolute', inset: '0 0 0 52%' }} />
+      <span style={{ position: 'absolute', inset: '0 52% 0 0', padding: '0 7px', display: 'flex', flexDirection: 'column', gap: 5, justifyContent: 'center' }}>{logo}{texto()}</span>
+    </>,
+    editorial: <>
+      <span style={{ position: 'absolute', inset: '9% 10% auto 10%', display: 'flex', flexDirection: 'column', gap: 4 }}>{linea('90%', c.text, 9)}{linea('56%', c.text, 9)}</span>
+      <span style={{ ...foto, position: 'absolute', inset: '42% 10% 24% 10%', borderRadius: r }} />
+      <span style={{ position: 'absolute', inset: 'auto 10% 8% 10%' }}>{boton('100%')}</span>
+    </>,
+    enlaces: <span style={{ position: 'absolute', inset: '9% 14%', display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center' }}>
+      <span style={{ ...foto, display: 'block', width: 22, height: 22, borderRadius: '50%', flexShrink: 0 }} />
+      {linea('54%', c.text, 5)}
+      {boton('100%')}
+      {[0, 1, 2].map(i => <span key={i} style={{ display: 'block', height: 9, width: '100%', borderRadius: Math.min(r, 5), background: c.surface, border: `1px solid ${c.border}` }} />)}
+    </span>,
+  }[diseno]
+  return <span aria-hidden className="tuc-boceto" style={{ background: c.bg, borderColor: c.border }}>{cuerpo}</span>
+}
+
 function NotaAproximada() {
   return (
     <p style={{ display: 'flex', gap: 7, alignItems: 'flex-start', fontSize: 12, color: 'var(--color-muted)', margin: '12px 2px 0', lineHeight: 1.5 }}>
       <Info size={13} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
-      <span>Vista previa aproximada: refleja la plantilla, los colores, la tipografía, los bordes y la foto de portada. El diseño de la portada, el estilo del botón, los textos, el logo y el orden de las secciones se ven en las miniaturas y al publicar.</span>
+      <span>La vista previa muestra tu sitio con la plantilla, el acento, la letra, los bordes y la foto que elegiste: es lo que se guarda. El diseño de la portada, el estilo del botón, los textos, el logo y el orden de las secciones se ven en las miniaturas.</span>
     </p>
   )
 }
@@ -492,6 +590,10 @@ export const CSS_APARIENCIA = `
   .tuc-forma-tit { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); transition: color 160ms ease; }
   .tuc-forma[aria-checked='true'] .tuc-forma-tit { color: var(--color-primary); }
   .tuc-forma-txt { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
+  .tuc-disenos { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .tuc-diseno { display: flex; flex-direction: column; text-align: left; padding: 10px 10px 12px; }
+  .tuc-diseno .tuc-opcion-tilde { z-index: 2; top: 16px; right: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .tuc-boceto { position: relative; display: block; width: 100%; aspect-ratio: 9 / 13; border-radius: 10px; border: 1px solid; overflow: hidden; }
   .tuc-simple-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px; color: var(--color-body); }
   .tuc-simple-lista li { display: flex; align-items: flex-start; gap: 8px; line-height: 1.45; }
   .tuc-simple-lista svg { flex-shrink: 0; margin-top: 3px; color: var(--color-success); }
@@ -561,6 +663,7 @@ export const CSS_APARIENCIA = `
   @media (max-width: 768px) {
     .tuc-solo-ancho { display: none; }
     .tuc-riel-flechas { display: none; }
+    .tuc-disenos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .tuc-seccion-ayuda { display: none; }
     .tuc-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }

@@ -10,6 +10,8 @@ import { DESCRIPCION_MODO, DURACIONES, type Errores, type ServicioAlta } from '.
 
 // Lo que tarda la animación de salida (tuobServSale): recién ahí se saca la fila.
 const MS_SALIDA = 240
+// Los porcentajes de seña a un toque; "Otro" deja escribir cualquiera.
+const SENAS = [20, 30, 50]
 
 interface Props {
   rubro: RubroTurnos
@@ -50,6 +52,8 @@ export function PasoServicios({ rubro, servicios, onCambio, sena, onSena, errore
   }
 
   const senaBase = rubro.sena || 20
+  // "Otro" abre un campo para escribir el porcentaje. Si la seña guardada no es una de las tres, ya arranca abierto.
+  const [otra, setOtra] = useState(sena > 0 && !SENAS.includes(sena))
 
   return (
     <div className="tuob-ancho tuob-ancho--form" style={{ maxWidth: 860 }}>
@@ -111,10 +115,22 @@ export function PasoServicios({ rubro, servicios, onCambio, sena, onSena, errore
           <strong>{sena > 0 ? `Pedir ${sena}% por adelantado` : 'Sin seña'}</strong>
           <p>Baja las ausencias. Se cobra con Mercado Pago al confirmar el turno.</p>
           {sena > 0 && (
-            <div className="tuo-seg tuo-entra" role="group" aria-label="Porcentaje de la seña" style={{ marginTop: 12 }}>
-              {[20, 30, 50].map(p => <button key={p} type="button" aria-pressed={sena === p} onClick={() => onSena(p)} className="tuo-num">{p}%</button>)}
+            <div className="tuo-entra" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+              <div className="tuo-seg" role="group" aria-label="Porcentaje de la seña">
+                {SENAS.map(p => <button key={p} type="button" aria-pressed={!otra && sena === p} onClick={() => { setOtra(false); onSena(p) }} className="tuo-num">{p}%</button>)}
+                <button type="button" aria-pressed={otra} onClick={() => { setOtra(true); requestAnimationFrame(() => document.getElementById('tuob-sena-otra')?.focus()) }}>Otro</button>
+              </div>
+              {otra && (
+                <label htmlFor="tuob-sena-otra" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--color-muted)' }}>
+                  <span className="tuc-sr" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Otro porcentaje de seña</span>
+                  <input id="tuob-sena-otra" className="tuob-input tuob-input--mono" inputMode="numeric" autoComplete="off" maxLength={3} style={{ width: 76, textAlign: 'right' }}
+                    value={String(sena)} onChange={e => onSena(Math.min(100, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1)))} />
+                  %
+                </label>
+              )}
             </div>
           )}
+          {sena > 0 && otra && <p style={{ marginTop: 8 }}>Entre 1% y 100% del precio de cada servicio.</p>}
         </div>
       </div>
     </div>

@@ -12,7 +12,12 @@
 export const CSS_ONBOARDING = `
   /* overflow: clip y no hidden (el del kit): hidden convierte al bloque en
      contenedor de scroll y los paneles "así queda" dejarían de ser sticky. */
-  .tuob.tuo-espacio { overflow: clip; min-height: calc(100vh - 40px); display: flex; flex-direction: column; padding-bottom: 116px; font-size: 14px; }
+  .tuob.tuo-espacio { overflow: clip; min-height: calc(100vh - 40px); display: flex; flex-direction: column; padding-bottom: 116px; font-size: 14px;
+    /* El fondo del home: negro liso, y arriba el cielo (estrellas y cometas). Las
+       superficies son vidrio: apenas un velo, para que el cielo se siga viendo. */
+    background: #000;
+    --tuob-vidrio: rgba(255,255,255,0.03); --tuob-vidrio-alto: rgba(255,255,255,0.055); --tuob-hueco: rgba(255,255,255,0.025);
+    --tuob-panel: rgba(8,11,19,0.62); --tuob-desenfoque: blur(14px) saturate(130%); }
   /* La botonera es fija: lo que el navegador trae a la vista (un campo que toma el foco, un ancla) frena antes de quedar debajo. */
   html:has(.tuob) { scroll-padding-bottom: 112px; }
   .tuob-cielo { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
@@ -32,7 +37,7 @@ export const CSS_ONBOARDING = `
   .tuob-pasos li { position: absolute; transform: translate(-50%, -50%); transition: left 620ms var(--tuo-ease), top 620ms var(--tuo-ease); animation: tuobEstacion 520ms var(--tuo-ease) both; }
   @keyframes tuobEstacion { from { opacity: 0; transform: translate(-50%, -50%) scale(0.4) } to { opacity: 1; transform: translate(-50%, -50%) } }
   .tuob-punto { position: relative; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: none; background: none; color: inherit; font-family: inherit; cursor: default; border-radius: 50%; }
-  .tuob-punto > i { width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center; background: #0B101D; border: 1.5px solid rgba(147,197,253,0.34); color: #fff; transition: transform 240ms var(--tuo-ease), background 240ms ease, border-color 240ms ease, box-shadow 240ms ease, width 240ms var(--tuo-ease), height 240ms var(--tuo-ease); }
+  .tuob-punto > i { width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center; background: #05070C; border: 1.5px solid rgba(147,197,253,0.34); color: #fff; transition: transform 240ms var(--tuo-ease), background 240ms ease, border-color 240ms ease, box-shadow 240ms ease, width 240ms var(--tuo-ease), height 240ms var(--tuo-ease); }
   .tuob-punto > i svg { width: 10px; height: 10px; opacity: 0; transition: opacity 200ms ease; }
   .tuob-punto > span { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--color-muted); transition: color 200ms ease; }
   .tuob-punto[data-tocable='true'] { cursor: pointer; }
@@ -62,56 +67,53 @@ export const CSS_ONBOARDING = `
   .tuob-gira { transform-box: view-box; }
   .tuob-girando { animation: tuoGira 900ms linear infinite; }
 
-  /* ── Paso "Módulo": dos tarjetas grandes ── */
-  .tuob-modulos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-  .tuob-modulo { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 22px; border: 1px solid var(--color-border); background: linear-gradient(180deg, rgba(21,29,49,0.72), rgba(11,16,29,0.72)); transition: transform 260ms var(--tuo-ease), border-color 200ms ease, box-shadow 260ms ease; }
+  /* ── Paso "Módulo": dos tarjetas grandes ──
+     Solo texto, sin dibujos: vidrio sobre el cielo, y lo elegido se enciende en
+     el azul de la marca. */
+  .tuob-modulos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .tuob-modulo { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-vidrio); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); transition: transform 260ms var(--tuo-ease), border-color 200ms ease, background 200ms ease, box-shadow 260ms ease; }
+  /* Filo de luz arriba, que se enciende al elegir. */
+  .tuob-modulo::before { content: ''; position: absolute; left: 24px; right: 24px; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.9), transparent); opacity: 0; transition: opacity 240ms ease; pointer-events: none; }
+  .tuob-modulo[data-elegido='true']::before { opacity: 1; }
   /* El radio ocupa toda la tarjeta, invisible y por encima: se elige tocando en cualquier lado. */
   .tuob-modulo > input { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
   .tuob-modulo:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 3px; }
-  .tuob-modulo[data-elegido='true'] { border-color: #60A5FA; box-shadow: 0 0 0 3px rgba(96,165,250,0.22), 0 26px 64px rgba(37,99,235,0.3); }
-  .tuob-modulo-ilu { display: grid; place-items: center; height: 190px; border-bottom: 1px solid var(--color-border); background: radial-gradient(360px 150px at 50% 0%, rgba(59,130,246,0.22), transparent 72%), rgba(5,8,15,0.45); transition: background 260ms ease; }
-  .tuob-modulo[data-elegido='true'] .tuob-modulo-ilu { background: radial-gradient(380px 170px at 50% 0%, rgba(59,130,246,0.42), transparent 72%), rgba(5,8,15,0.45); }
-  .tuob-modulo-cuerpo { display: flex; flex-direction: column; gap: 16px; flex: 1; padding: 20px 22px; }
-  .tuob-modulo-cab { display: flex; align-items: flex-start; gap: 14px; }
-  .tuob-modulo-icono { width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.18); transition: background 220ms ease, color 220ms ease, box-shadow 240ms ease; }
-  .tuob-modulo[data-elegido='true'] .tuob-modulo-icono { background: var(--tuo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
-  .tuob-modulo h2 { margin: 0; font-family: var(--tuo-fh); font-size: 19px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: var(--color-text); }
-  .tuob-modulo-cab p { margin: 5px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--color-body); }
-  .tuob-modulo-lista { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--color-body); }
-  .tuob-modulo-lista li { display: flex; align-items: flex-start; gap: 9px; line-height: 1.45; }
-  .tuob-modulo-lista svg { flex-shrink: 0; margin-top: 2px; color: var(--color-success); }
-  .tuob-modulo-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
+  .tuob-modulo[data-elegido='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.20), rgba(30,58,138,0.07)); box-shadow: 0 0 0 3px rgba(96,165,250,0.16), 0 24px 60px rgba(37,99,235,0.20); }
+  .tuob-modulo-cuerpo { display: flex; flex-direction: column; gap: 20px; flex: 1; padding: 26px; }
+  .tuob-modulo-cab { display: flex; align-items: flex-start; gap: 16px; }
+  .tuob-modulo-icono { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.10); border: 1px solid rgba(147,197,253,0.18); transition: background 220ms ease, color 220ms ease, box-shadow 240ms ease; }
+  .tuob-modulo[data-elegido='true'] .tuob-modulo-icono { background: var(--tuo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.45); }
+  .tuob-modulo h2 { margin: 0; font-family: var(--tuo-fh); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: var(--color-text); }
+  .tuob-modulo-cab p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--color-body); }
+  .tuob-modulo-lista { display: grid; gap: 12px; margin: 0; padding: 18px 0 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.08); font-size: 14px; color: var(--color-body); }
+  .tuob-modulo-lista li { display: flex; align-items: flex-start; gap: 10px; line-height: 1.45; }
+  .tuob-modulo-lista svg { flex-shrink: 0; margin-top: 2px; color: var(--color-primary); }
+  .tuob-modulo-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; line-height: 1.45; color: var(--color-muted); }
   .tuob-modulo-pie b { color: var(--color-body); font-weight: 600; }
-  .tuob-modulo-pie > .tuo-chip { flex-shrink: 0; }
+  .tuob-modulo-pasos { flex-shrink: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chip-primary-fg); }
+  /* Módulo todavía no habilitado: se lee entero pero no se elige ni reacciona al mouse. */
+  .tuob-modulo[data-proximamente='true'] { border-style: dashed; border-color: rgba(255,255,255,0.14); }
+  .tuob-modulo[data-proximamente='true'] > input { cursor: not-allowed; }
+  .tuob-modulo[data-proximamente='true'] .tuob-modulo-cab, .tuob-modulo[data-proximamente='true'] .tuob-modulo-lista, .tuob-modulo[data-proximamente='true'] .tuob-modulo-pie { opacity: 0.62; }
+  .tuob-modulo[data-proximamente='true'] .tuob-modulo-lista svg { color: var(--color-muted); }
+  .tuob-modulo-pronto { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--chip-primary-fg); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.28); }
+  .tuob-modulo-aviso { margin: 0; font-size: 13px; line-height: 1.5; color: var(--color-body); }
+  .tuob-ya-cuenta { margin: 22px 0 0; text-align: center; font-size: 14px; color: var(--color-muted); }
+  .tuob-ya-cuenta a { display: inline-block; padding: 10px 4px; color: var(--color-primary-h); font-weight: 600; text-decoration: underline; text-decoration-color: rgba(147,197,253,0.4); text-underline-offset: 3px; border-radius: 6px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+  .tuob-ya-cuenta a:hover { color: #fff; text-decoration-color: #fff; }
+  .tuob-ya-cuenta a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   /* El tilde de las tarjetas elegibles: círculo (una sola) o cuadrado (varias). */
   .tuob-marca-opcion { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; border: 1.5px solid var(--color-border-strong); color: transparent; transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 260ms var(--tuo-ease); }
   .tuob-marca-opcion--casilla { border-radius: 7px; }
   [data-elegido='true'] > .tuob-marca-opcion, [data-elegido='true'] .tuob-modulo-cab > .tuob-marca-opcion { background: #fff; border-color: #fff; color: #1D4ED8; transform: scale(1.06); }
 
-  /* Las dos miniaturas: una vidriera y el día en órbita. */
-  .tuob-ilu { pointer-events: none; }
-  .tuob-ilu--tienda { width: min(82%, 300px); overflow: hidden; border-radius: 14px; border: 1px solid rgba(147,197,253,0.22); background: rgba(5,8,15,0.74); box-shadow: 0 18px 40px rgba(3,6,14,0.55); }
-  .tuob-ilu-barra { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-bottom: 1px solid rgba(147,197,253,0.14); }
-  .tuob-ilu-barra i { width: 6px; height: 6px; border-radius: 50%; background: rgba(147,197,253,0.3); }
-  .tuob-ilu-barra span { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9.5px; color: #8794B2; }
-  .tuob-ilu-barra b { display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 6px; border-radius: 999px; background: var(--tuo-grad); color: #fff; font-size: 9.5px; font-weight: 600; }
-  .tuob-ilu-prods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
-  .tuob-ilu-prods > div { display: grid; gap: 3px; min-width: 0; }
-  .tuob-ilu-prods span { display: block; aspect-ratio: 5 / 4; border-radius: 9px; }
-  .tuob-ilu-prods em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; font-size: 9.5px; color: #B6C2DA; }
-  .tuob-ilu-prods strong { font-size: 10px; font-weight: 600; color: #F1F5FD; }
-  .tuob-ilu--turnos { display: flex; align-items: center; gap: 20px; }
-  .tuob-ilu-horas { display: grid; gap: 6px; justify-items: start; }
-  .tuob-ilu-horas span { display: inline-grid; place-items: center; height: 24px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(147,197,253,0.22); background: rgba(5,8,15,0.6); font-size: 11px; color: #B6C2DA; }
-  .tuob-ilu-horas span[data-sel='true'] { border-color: transparent; background: var(--tuo-grad); color: #fff; }
-  .tuob-ilu-horas b { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 10.5px; font-weight: 600; color: #34D399; }
-
   /* ── Rubros (Turnos) y qué vendés (Tienda) ── */
   .tuob-rubro-grid { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 28px; align-items: start; }
   .tuob-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
   .tuob-filtros .tuo-buscar { max-width: 300px; }
-  .tuob .tuo-buscar > input { height: 44px; background: rgba(11,16,29,0.7); }
-  .tuob-contador { margin-left: auto; font-size: 12.5px; color: var(--color-muted); }
+  .tuob .tuo-buscar > input { height: 44px; background: var(--tuob-panel); }
+  .tuob .tuo-seg { background: var(--tuob-panel); }
+  .tuob-contador { margin: -12px 0 20px; text-align: center; font-size: 12.5px; color: var(--color-muted); }
   .tuob-seg-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .tuob-seg-scroll::-webkit-scrollbar { display: none; }
   .tuob .tuo-seg > button { height: 36px; display: inline-flex; align-items: center; gap: 6px; }
@@ -119,21 +121,21 @@ export const CSS_ONBOARDING = `
   .tuob-familia::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border), transparent); }
   .tuob-grupo + .tuob-grupo { margin-top: 24px; }
   .tuob-rubros { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 10px; }
-  .tuob-rubro { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; min-height: 128px; padding: 14px; text-align: left; font-family: inherit; color: inherit; cursor: pointer; border-radius: 16px; border: 1px solid var(--color-border); background: linear-gradient(180deg, rgba(21,29,49,0.62), rgba(11,16,29,0.62)); transition: transform 240ms var(--tuo-ease), border-color 180ms ease, box-shadow 240ms ease, background 200ms ease; }
+  .tuob-rubro { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; min-height: 128px; padding: 14px; text-align: left; font-family: inherit; color: inherit; cursor: pointer; border-radius: 16px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-vidrio); transition: transform 240ms var(--tuo-ease), border-color 180ms ease, box-shadow 240ms ease, background 200ms ease; }
   .tuob-rubro-icono { width: 40px; height: 40px; border-radius: 12px; margin-bottom: 12px; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.18); transition: background 220ms ease, color 220ms ease, box-shadow 240ms ease, transform 260ms var(--tuo-ease); }
   .tuob-rubro b { font-family: var(--tuo-fh); font-size: 14px; font-weight: 600; letter-spacing: -0.015em; color: var(--color-text); }
   .tuob-rubro small { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
   .tuob-rubro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .tuob-rubro[aria-pressed='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.30), rgba(30,58,138,0.16)); box-shadow: 0 0 0 3px rgba(96,165,250,0.22), 0 16px 40px rgba(37,99,235,0.30); }
+  .tuob-rubro[aria-pressed='true'] { border-color: #60A5FA; background: linear-gradient(180deg, rgba(37,99,235,0.26), rgba(30,58,138,0.12)); box-shadow: 0 0 0 3px rgba(96,165,250,0.18), 0 16px 40px rgba(37,99,235,0.22); }
   .tuob-rubro[aria-pressed='true'] .tuob-rubro-icono { background: var(--tuo-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(37,99,235,0.5); }
   .tuob-rubro[aria-pressed='true'] small { color: var(--color-body); }
   .tuob-etiqueta { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(96,165,250,0.12); font-size: 10.5px; font-weight: 600; color: var(--chip-primary-fg); }
   .tuob-tilde { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #1D4ED8; animation: tuobTilde 320ms var(--tuo-ease) both; }
   @keyframes tuobTilde { from { transform: scale(0.3) rotate(-40deg); opacity: 0 } to { transform: none; opacity: 1 } }
-  .tuob-vacio { display: grid; justify-items: center; gap: 10px; padding: 44px 20px; text-align: center; border: 1px dashed var(--color-border-strong); border-radius: 16px; color: var(--color-muted); }
+  .tuob-vacio { background: var(--tuob-vidrio); display: grid; justify-items: center; gap: 10px; padding: 44px 20px; text-align: center; border: 1px dashed var(--color-border-strong); border-radius: 16px; color: var(--color-muted); }
 
   /* Panel "así va a quedar" */
-  .tuob-previa { position: sticky; top: 56px; border-radius: 20px; border: 1px solid var(--color-border); background: linear-gradient(180deg, rgba(21,29,49,0.78), rgba(11,16,29,0.78)); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 24px 70px rgba(3,6,14,0.55), 0 0 80px rgba(59,130,246,0.14); padding: 18px; scroll-margin-top: 56px;
+  .tuob-previa { position: sticky; top: 56px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 70px rgba(0,0,0,0.5); padding: 18px; scroll-margin-top: 56px;
     /* Entra entero entre la tira de arriba y la botonera; si no, se desliza adentro. */
     max-height: calc(100vh - 56px - 108px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(147,197,253,0.3) transparent; }
   .tuob-previa::before { content: ""; position: sticky; display: block; margin: -18px 6px 17px; top: -18px; height: 1px; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.8), transparent); pointer-events: none; }
@@ -148,22 +150,10 @@ export const CSS_ONBOARDING = `
   .tuob-mini-serv li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tuob-previa-hueco { display: grid; justify-items: center; gap: 12px; padding: 26px 12px 18px; text-align: center; }
   .tuob-previa-hueco svg { animation: tuoGira 40s linear infinite; }
-  /* El producto de ejemplo del panel de Tienda. */
-  .tuob-prod { display: flex; align-items: center; gap: 14px; margin: 12px 0 6px; padding: 14px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); }
-  .tuob-prod-foto { width: 76px; height: 76px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; color: #fff; background: var(--tuo-grad); }
-  .tuob-prod strong { display: block; margin-top: 2px; font-size: 14.5px; color: var(--color-text); }
-  .tuob-prod-precio { display: block; margin-top: 2px; font-size: 15px; font-weight: 600; color: var(--color-primary-h); }
-  .tuob-prod-fila { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-  .tuob-prod-talle { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 5px; border-radius: 6px; border: 1px solid var(--color-border); font-size: 10.5px; color: var(--color-muted); }
-  .tuob-prod-talle[data-sel='true'] { border-color: #60A5FA; background: rgba(59,130,246,0.3); color: #fff; }
-  .tuob-prod-fila > i { width: 14px; height: 14px; margin-left: 3px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.3); }
-  .tuob-prod-serie, .tuob-prod-carrito, .tuob-prod-cant { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--color-border); font-size: 11px; color: var(--color-body); }
-  .tuob-prod-carrito { border-color: transparent; background: var(--tuo-grad); color: #fff; font-weight: 600; }
-  .tuob-elegidos { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 12px 0 0; list-style: none; border-top: 1px solid var(--color-border); }
 
   /* ── Servicios ── */
   .tuob-serv-lista { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-  .tuob-serv { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px 44px; gap: 10px; align-items: start; padding: 14px; border-radius: 16px; border: 1px solid var(--color-border); background: rgba(11,16,29,0.66); transform-origin: 50% 0; animation: tuobServEntra 320ms var(--tuo-ease) both; transition: border-color 180ms ease, box-shadow 220ms ease, background 180ms ease; }
+  .tuob-serv { display: grid; grid-template-columns: minmax(0, 1fr) 132px 148px 44px; gap: 10px; align-items: start; padding: 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); transform-origin: 50% 0; animation: tuobServEntra 320ms var(--tuo-ease) both; transition: border-color 180ms ease, box-shadow 220ms ease, background 180ms ease; }
   .tuob-serv[data-saliendo='true'] { animation: tuobServSale 240ms ease both; pointer-events: none; }
   .tuob-serv:focus-within { border-color: var(--color-border-strong); box-shadow: 0 10px 30px rgba(3,6,14,0.45); }
   @keyframes tuobServEntra { from { opacity: 0; transform: translateY(-8px) scale(0.98) } to { opacity: 1; transform: none } }
@@ -175,14 +165,14 @@ export const CSS_ONBOARDING = `
   .tuob-agregar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-agregar svg { transition: transform 260ms var(--tuo-ease); }
   .tuob-dupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
-  .tuob-caja { border-radius: 16px; border: 1px solid var(--color-border); background: rgba(11,16,29,0.66); padding: 16px; transition: border-color 180ms ease; }
+  .tuob-caja { border-radius: 16px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); padding: 16px; transition: border-color 180ms ease; }
   .tuob-caja strong { display: block; margin-top: 8px; font-family: var(--tuo-fh); font-size: 15px; font-weight: 600; color: var(--color-text); }
   .tuob-caja p { margin: 5px 0 0; font-size: 13px; line-height: 1.55; color: var(--color-muted); }
 
   .tuob .tuo-switch::before { content: ''; position: absolute; inset: -10px -4px; }
 
   /* ── Formularios ── */
-  .tuob-form { display: grid; gap: 18px; border-radius: 20px; border: 1px solid var(--color-border); background: linear-gradient(180deg, rgba(21,29,49,0.62), rgba(11,16,29,0.62)); padding: 26px; }
+  .tuob-form { display: grid; gap: 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 70px rgba(0,0,0,0.45); padding: 26px; }
   .tuob-fila2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
   .tuob-bloque { display: grid; gap: 14px; }
   .tuob-campo { display: grid; gap: 7px; min-width: 0; align-content: start; }
@@ -191,12 +181,12 @@ export const CSS_ONBOARDING = `
   .tuob-control { position: relative; display: flex; align-items: center; }
   .tuob-control > .tuob-prefijo { position: absolute; left: 13px; color: var(--color-muted); pointer-events: none; font-size: 14px; display: inline-flex; }
   .tuob-control > .tuob-sufijo { position: absolute; right: 13px; color: var(--color-muted); pointer-events: none; font-size: 13px; }
-  .tuob-input { width: 100%; box-sizing: border-box; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.6); color: var(--color-text); font-family: inherit; font-size: 15px; outline: none; transition: border-color 160ms ease, box-shadow 200ms ease, background 160ms ease; }
+  .tuob-input { width: 100%; box-sizing: border-box; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(255,255,255,0.035); color: var(--color-text); font-family: inherit; font-size: 15px; outline: none; transition: border-color 160ms ease, box-shadow 200ms ease, background 160ms ease; }
   textarea.tuob-input { height: auto; min-height: 84px; padding: 12px 14px 22px; line-height: 1.5; resize: vertical; }
   select.tuob-input { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238794B2' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
   select.tuob-input option { background: #0B101D; color: #F1F5FD; }
   .tuob-input::placeholder { color: var(--color-muted); opacity: 0.85; }
-  .tuob-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(96,165,250,0.22); background: rgba(5,8,15,0.85); }
+  .tuob-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(96,165,250,0.22); background: rgba(255,255,255,0.05); }
   .tuob-input[aria-invalid='true'] { border-color: var(--color-error); box-shadow: 0 0 0 3px rgba(248,113,113,0.16); }
   .tuob-input:disabled { opacity: 0.6; cursor: progress; }
   .tuob-input--prefijo { padding-left: 36px; }
@@ -220,19 +210,19 @@ export const CSS_ONBOARDING = `
 
   /* Logo */
   .tuob-logo { display: flex; align-items: center; gap: 18px; }
-  .tuob-logo-marco { position: relative; width: 92px; height: 92px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; padding: 0; border: 1.5px dashed var(--color-border-strong); background: rgba(5,8,15,0.5); color: var(--color-muted); cursor: pointer; transition: border-color 180ms ease, box-shadow 220ms ease, transform 260ms var(--tuo-ease); }
+  .tuob-logo-marco { position: relative; width: 92px; height: 92px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; padding: 0; border: 1.5px dashed var(--color-border-strong); background: var(--tuob-hueco); color: var(--color-muted); cursor: pointer; transition: border-color 180ms ease, box-shadow 220ms ease, transform 260ms var(--tuo-ease); }
   .tuob-logo-marco:has(img) { border-style: solid; border-color: rgba(147,197,253,0.5); }
   .tuob-logo-marco img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
   .tuob-logo-marco:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .tuob-logo-sigla { font-family: var(--tuo-fh); font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--color-text); }
-  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: #fff; border: 2px solid #0B101D; }
+  .tuob-logo-marco > i { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--tuo-grad); color: #fff; border: 2px solid #05070C; }
   .tuob-logo-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
   /* Opciones tipo tarjeta: radio (una) o casilla (varias) */
   .tuob-opciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .tuob-opciones[data-n='1'], .tuob-opciones--pila { grid-template-columns: minmax(0, 1fr); }
   .tuob-opciones[data-n='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tuob-opcion { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms ease, transform 220ms var(--tuo-ease); }
+  .tuob-opcion { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms ease, transform 220ms var(--tuo-ease); }
   .tuob-opcion input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
   .tuob-opcion > svg { flex-shrink: 0; margin-top: 1px; color: var(--color-muted); transition: color 180ms ease; }
   .tuob-opcion > span { flex: 1; min-width: 0; }
@@ -246,13 +236,13 @@ export const CSS_ONBOARDING = `
   .tuob-plan-chip { height: 20px; margin-left: 8px; padding: 0 8px; font-size: 10.5px; vertical-align: 2px; }
   .tuob-plan-precio { font-size: 15px; font-weight: 600; color: var(--color-text); }
   .tuob-dias { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tuob-dia { min-width: 50px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); color: var(--color-muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 200ms ease; }
+  .tuob-dia { min-width: 50px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--tuob-hueco); color: var(--color-muted); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 200ms ease; }
   .tuob-dia[aria-pressed='true'] { border-color: transparent; background: var(--tuo-grad); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
   .tuob-dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   /* Horarios: un renglón por turno de atención (mañana y tarde), cada uno con su llave y su "de… a…". */
   .tuob-turnos { display: grid; gap: 10px; }
-  .tuob-turno { display: grid; grid-template-columns: 38px 76px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); transition: border-color 180ms ease, background 180ms ease; }
+  .tuob-turno { display: grid; grid-template-columns: 38px 76px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 46px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); transition: border-color 180ms ease, background 180ms ease; }
   .tuob-turno[data-on='true'] { border-color: rgba(147,197,253,0.34); background: rgba(37,99,235,0.08); }
   .tuob-turno-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: var(--color-muted); background: rgba(96,165,250,0.08); transition: color 180ms ease, background 180ms ease; }
   .tuob-turno[data-on='true'] .tuob-turno-ico { color: var(--color-primary-h); background: rgba(96,165,250,0.16); }
@@ -275,7 +265,7 @@ export const CSS_ONBOARDING = `
   .tuob-aviso[data-tono='ok'] > svg { color: #34D399; }
 
   /* Mapa. isolation: Leaflet usa z-index de hasta 1000 y sin esto tapa la botonera fija. */
-  .tuob-mapa { isolation: isolate; overflow: hidden; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); }
+  .tuob-mapa { isolation: isolate; overflow: hidden; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); }
   .tuob-mapa-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px; border-bottom: 1px solid var(--color-border); }
   .tuob-mapa-estado { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 200px; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--color-muted); }
   .tuob-mapa-estado > svg { flex-shrink: 0; }
@@ -291,7 +281,7 @@ export const CSS_ONBOARDING = `
   .tuob-sinreg p, .tuob-llave-fila p, .tuob-benef p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); }
   .tuob-llave-fila { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 18px; border-top: 1px solid var(--color-border); }
   .tuob-benef { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-  .tuob-benef li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.5); }
+  .tuob-benef li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); }
   .tuob-benef-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.12); }
   .tuob-benef select.tuob-input { width: 140px; height: 44px; }
 
@@ -418,13 +408,13 @@ export const CSS_ONBOARDING = `
   .tuob-codigo-ok { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 12px; border: 1px solid rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); font-size: 13px; line-height: 1.5; color: #A7F3D0; animation: tuoEntra 260ms ease both; }
   .tuob-codigo-ok b { color: #fff; }
   .tuob-codigo-ico { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: #34D399; color: #052E1B; }
-  .tuob-total { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--color-border-strong); background: rgba(5,8,15,0.55); }
+  .tuob-total { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--color-border-strong); background: var(--tuob-vidrio-alto); }
   .tuob-total p { margin: 4px 0 0; font-size: 13px; color: var(--color-body); }
   .tuob-total-monto { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; }
   .tuob-total-monto s { font-size: 14px; color: var(--color-muted); }
   .tuob-total-monto b { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; color: var(--color-text); }
   /* El "pago" tapa todo mientras dura: no se puede tocar nada. */
-  .tuob-procesando { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(3,6,14,0.84); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); animation: tuobVelo 220ms ease both; }
+  .tuob-procesando { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,0.84); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); animation: tuobVelo 220ms ease both; }
   @keyframes tuobVelo { from { opacity: 0 } to { opacity: 1 } }
   .tuob-procesando-caja { display: grid; justify-items: center; gap: 12px; text-align: center; }
   .tuob-procesando-caja strong { font-family: var(--tuo-fh); font-size: 19px; font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); }
@@ -438,17 +428,17 @@ export const CSS_ONBOARDING = `
   .tuob-planeta svg { position: relative; animation: tuobDespega 900ms var(--tuo-ease) both; }
   @keyframes tuobDespega { from { opacity: 0; transform: translateY(26px) scale(0.8) } to { opacity: 1; transform: none } }
   .tuob-armado { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
-  .tuob-armado li { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-border); background: rgba(11,16,29,0.6); font-size: 12.5px; color: var(--color-body); }
+  .tuob-armado li { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-vidrio); font-size: 12.5px; color: var(--color-body); }
   .tuob-armado svg { flex-shrink: 0; color: var(--color-primary-h); }
-  .tuob-pase { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: center; width: 100%; max-width: 620px; box-sizing: border-box; margin-top: 26px; padding: 20px; text-align: left; border-radius: 22px; border: 1px solid var(--color-border-strong); background: linear-gradient(180deg, rgba(21,29,49,0.8), rgba(11,16,29,0.8)); box-shadow: 0 24px 70px rgba(3,6,14,0.55), 0 0 90px rgba(59,130,246,0.18); }
+  .tuob-pase { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: center; width: 100%; max-width: 620px; box-sizing: border-box; margin-top: 26px; padding: 20px; text-align: left; border-radius: 22px; border: 1px solid rgba(255,255,255,0.14); background: var(--tuob-panel); -webkit-backdrop-filter: var(--tuob-desenfoque); backdrop-filter: var(--tuob-desenfoque); box-shadow: 0 24px 70px rgba(0,0,0,0.5); }
   .tuob-qr { padding: 10px; border-radius: 16px; background: #fff; line-height: 0; box-shadow: 0 10px 30px rgba(3,6,14,0.5); transition: transform 260ms var(--tuo-ease), box-shadow 260ms ease; }
-  .tuob-link { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 6px 0 14px; height: 48px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(5,8,15,0.6); }
+  .tuob-link { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 6px 0 14px; height: 48px; border-radius: 12px; border: 1px solid var(--color-border); background: rgba(255,255,255,0.035); }
   .tuob-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--tuo-mono); font-size: 14px; color: var(--color-primary-h); }
   .tuob-listo-acciones { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 26px; }
 
   /* ── Botonera fija ── */
-  .tuob-pie { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; border-top: 1px solid var(--color-border); background: rgba(5,8,15,0.84); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -18px 50px rgba(3,6,14,0.55); }
-  .tuob-pie::before { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(96,165,250,0.7), rgba(129,140,248,0.7), transparent); }
+  .tuob-pie { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.72); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -18px 50px rgba(0,0,0,0.6); }
+  .tuob-pie::before { content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(147,197,253,0.45), transparent); }
   .tuob-pie-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .tuob-pie-resumen { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .tuob-pie-resumen > span:first-child { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; background: rgba(96,165,250,0.14); border: 1px solid rgba(147,197,253,0.2); color: var(--color-primary-h); }
@@ -462,9 +452,11 @@ export const CSS_ONBOARDING = `
   @media (hover: hover) {
     .tuob-punto[data-tocable='true']:hover > i { transform: scale(1.25); box-shadow: 0 0 20px rgba(96,165,250,0.9); }
     .tuob-punto[data-tocable='true']:hover > span { color: var(--color-text); }
-    .tuob-modulo:hover { transform: translateY(-4px); border-color: rgba(147,197,253,0.55); box-shadow: 0 0 0 1px rgba(96,165,250,0.22), 0 26px 60px rgba(37,99,235,0.28); }
-    .tuob-modulo[data-elegido='true']:hover { border-color: #60A5FA; box-shadow: 0 0 0 3px rgba(96,165,250,0.3), 0 30px 70px rgba(37,99,235,0.4); }
-    .tuob-rubro:hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.55); box-shadow: 0 0 0 1px rgba(96,165,250,0.22), 0 18px 40px rgba(37,99,235,0.28); }
+    .tuob-modulo:not([data-elegido='true']):not([data-proximamente='true']):hover { background: var(--tuob-vidrio-alto); }
+    .tuob-modulo:not([data-proximamente='true']):hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); box-shadow: 0 22px 50px rgba(0,0,0,0.45); }
+    .tuob-modulo[data-elegido='true']:hover { border-color: #60A5FA; box-shadow: 0 0 0 3px rgba(96,165,250,0.24), 0 26px 64px rgba(37,99,235,0.28); }
+    .tuob-rubro:not([aria-pressed='true']):hover { background: var(--tuob-vidrio-alto); }
+    .tuob-rubro:hover { transform: translateY(-3px); border-color: rgba(147,197,253,0.5); box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
     .tuob-rubro[aria-pressed='true']:hover { box-shadow: 0 0 0 3px rgba(96,165,250,0.3), 0 20px 46px rgba(37,99,235,0.4); }
     .tuob-rubro:hover .tuob-rubro-icono { transform: scale(1.08) rotate(-5deg); box-shadow: 0 0 22px rgba(96,165,250,0.45); }
     .tuob-serv:hover { border-color: var(--color-border-strong); }
@@ -485,10 +477,6 @@ export const CSS_ONBOARDING = `
     .tuo-btn:hover .tuob-flecha--atras { transform: translateX(-4px); }
   }
 
-  @media (max-width: 1280px) {
-    /* Con menos ancho el planeta de fondo queda detrás del final del arco: se lo baja para que los rótulos se lean. */
-    .tuob-cielo { opacity: 0.4; }
-  }
   @media (max-width: 1100px) {
     /* Con menos ancho el logo se pisa con el primer punto de la órbita. */
     .tuob-cab { flex-direction: column; align-items: center; gap: 6px; }
@@ -503,23 +491,21 @@ export const CSS_ONBOARDING = `
   @media (max-width: 720px) {
     .tuob-cab { align-items: stretch; padding: 16px 16px 0; gap: 14px; }
     .tuob-pasos { display: none; }
-    .tuob-pasos-mini { display: flex; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--color-border); background: rgba(11,16,29,0.6); }
+    .tuob-pasos-mini { display: flex; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.10); background: var(--tuob-panel); }
     .tuob-ancho { padding: 0 16px; }
     .tuob.tuo-espacio { padding-bottom: 150px; }
     .tuob-titulo { text-align: left; margin-bottom: 22px; }
     html:has(.tuob) { scroll-padding-bottom: 168px; }
-    /* El planeta cae justo detrás del título: en celular queda apenas insinuado. */
-    .tuob-cielo { opacity: 0.3; }
-    /* Los dos módulos tienen que verse sin deslizar: sin la miniatura, y con el
-       detalle de cada uno recién cuando se lo elige. */
+    /* Los dos módulos tienen que verse sin deslizar: el detalle de cada uno aparece recién cuando se lo elige. */
     .tuob-modulos { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    .tuob-modulo-ilu { display: none; }
     .tuob-modulo-cuerpo { padding: 16px; gap: 12px; }
+    .tuob-modulo-icono { width: 44px; height: 44px; border-radius: 13px; }
+    .tuob-modulo-lista { padding-top: 12px; gap: 9px; }
     .tuob-modulo:not([data-elegido='true']) .tuob-modulo-lista { display: none; }
     .tuob-modulo[data-elegido='true'] .tuob-modulo-lista { animation: tuoEntra 280ms var(--tuo-ease) both; }
     .tuob-modulo-pie { padding-top: 12px; }
     .tuob-filtros .tuo-buscar { max-width: none; }
-    .tuob-contador { margin-left: 0; }
+    .tuob-contador { margin-top: -8px; text-align: left; }
     .tuob .tuo-buscar > input, .tuob-input { font-size: 16px; height: 48px; }
     .tuob .tuo-seg > button { height: 44px; }
     .tuob-rubros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -577,4 +563,5 @@ export const CSS_ONBOARDING = `
     .tuob-satelite, .tuob-recorrido, .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-punto > i, .tuob-pasos li, .tuob-logo-marco, .tuob-marca-opcion { transition: none !important; }
     .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-logo-marco { transform: none !important; }
   }
+  @media (max-width: 640px) { .tuob .tuo-btn--sm { min-height: 44px; } }
 `

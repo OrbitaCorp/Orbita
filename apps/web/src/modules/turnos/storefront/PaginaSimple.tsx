@@ -4,14 +4,18 @@
 //
 // Es la que se pega en la bio de Instagram o se manda por WhatsApp: todo lo que
 // hay debajo del botón (dónde atiende, horarios, mis turnos) es apoyo y no
-// compite con él. La reserva y "mis turnos" se abren con el encabezado mínimo
+// compite con él. Tiene cinco diseños (DisenoSimple): el contenido es el mismo y
+// lo que cambia es la composición, que resuelve el CSS con data-diseno; el
+// dueño lo elige en Apariencia. ?diseno= lo prueba sin guardarlo (lo usa la
+// vista previa del panel). La reserva y "mis turnos" se abren con el encabezado mínimo
 // (forma 'simple' en SitioNegocio) para no salirse de esta página.
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { CalendarCheck, ChevronDown, ChevronRight, Clock, Gift, Home, MapPin, MessageCircle } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import { tramosDelDia, tramosFrase } from '@/modules/turnos/horario'
-import { beneficiosTxt, useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
+import { DISENOS_SIMPLE, beneficiosTxt, useNegocioDemo, type DisenoSimple } from '@/modules/turnos/demo/negocioDemo'
 import SitioNegocio from './SitioNegocio'
 import { CSS_SIMPLE } from './estilos'
 import { Abierto, HOY, HorasDia, Marca, proximoLibre, ruta } from './piezas'
@@ -33,6 +37,9 @@ export default function PaginaSimple({ rubro }: { rubro: RubroTurnos }) {
 function Contenido({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   const contactar = useContacto()
   const { demo } = useNegocioDemo()
+  const router = useRouter()
+  const pedido = router.query.diseno as DisenoSimple
+  const diseno = DISENOS_SIMPLE.includes(pedido) ? pedido : demo.simple
   const [verHorarios, setVerHorarios] = useState(false)
   const prox = proximoLibre(rubro)
   const beneficios = beneficiosTxt(demo.cuentas, rubro)
@@ -41,17 +48,18 @@ function Contenido({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   return (
     <>
       <style>{CSS_SIMPLE}</style>
-      <div className="tusp">
+      <div className="tusp" data-diseno={diseno}>
         {/* eslint-disable-next-line @next/next/no-img-element -- demo local */}
         <div aria-hidden className="tusp-fondo"><img src={t.fotoHero} alt="" /></div>
         <article className="tusp-tarjeta tu-entra" aria-labelledby="tusp-nombre">
+          <div className="tusp-heroe">
           <div className="tusp-portada">
             {/* eslint-disable-next-line @next/next/no-img-element -- demo local */}
             <img src={t.fotoHero} alt={altFoto(t.fotoHero)} fetchPriority="high" />
             <div className="tusp-estado"><Abierto t={t} corto /></div>
           </div>
 
-          <div className="tusp-cuerpo">
+          <div className="tusp-cuerpo tusp-arriba">
             <Marca t={t} className="tu-mono tusp-logo" />
             <h1 id="tusp-nombre" className="tu-h tusp-nombre">{t.nombre}</h1>
             <div className="tu-rotulo tusp-lugar">{[rubro.label, t.barrio].filter(Boolean).join(' · ')}</div>
@@ -63,7 +71,10 @@ function Contenido({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
               <span className="tusp-nota-punto" aria-hidden />
               <span>{prox.rotulo}: <b>{prox.cuando.toLowerCase()} {prox.hora}</b></span>
             </p>
+          </div>
+          </div>
 
+          <div className="tusp-cuerpo tusp-abajo">
             <ul className="tusp-datos">
               {conLocal && (
                 <li>

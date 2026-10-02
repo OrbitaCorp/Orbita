@@ -11,11 +11,11 @@ import { useState, type ComponentType, type CSSProperties } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, Sparkles, Search, SearchX, Images } from 'lucide-react'
 import { MODO_LABEL, type RubroTurnos } from '@/modules/turnos/datos'
+import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { pluralCliente } from '../Clientes'
-import { PLANTILLAS } from '../configuracion/datos'
 import {
   FUNCIONES, GRUPOS, ACTIVAS_INICIALES, funcionPorId, grupoPorId, type Funcion, type FuncionId,
 } from './datosAvanzado'
@@ -25,19 +25,14 @@ import Paquetes from './Paquetes'
 import Membresias from './Membresias'
 import GiftCards from './GiftCards'
 import Fidelidad from './Fidelidad'
-import ListaEspera from './ListaEspera'
 import TurnoFijo from './TurnoFijo'
-import Formularios from './Formularios'
 import Recuperar from './Recuperar'
-import BotonReserva from './BotonReserva'
 import PreciosHorario from './PreciosHorario'
-import Resenas from './Resenas'
 import Plantillas from './Plantillas'
 
 const PANTALLAS: Record<FuncionId, ComponentType<PropsFuncion>> = {
   paquetes: Paquetes, membresias: Membresias, 'gift-cards': GiftCards, fidelidad: Fidelidad,
-  'lista-espera': ListaEspera, 'turno-fijo': TurnoFijo, formularios: Formularios, recuperar: Recuperar,
-  'boton-reserva': BotonReserva, 'precios-horario': PreciosHorario, resenas: Resenas, plantillas: Plantillas,
+  'turno-fijo': TurnoFijo, recuperar: Recuperar, 'precios-horario': PreciosHorario, plantillas: Plantillas,
 }
 
 type Filtro = 'todas' | 'recomendadas' | 'activas'
@@ -89,9 +84,11 @@ const CSS_HUB = `
 
 export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
   const router = useRouter()
-  // El estado on/off vive acá y no en cada pantalla: así el hub refleja lo
-  // que se prendió adentro al volver.
-  const [activas, setActivas] = useState<Record<FuncionId, boolean>>(ACTIVAS_INICIALES)
+  // El estado on/off vive en el negocio de la demo y no en cada pantalla: así
+  // el hub refleja lo que se prendió adentro, y sigue prendido al ir a la agenda
+  // y volver o al recargar.
+  const { demo, guardar } = useNegocioDemo()
+  const activas: Record<FuncionId, boolean> = { ...ACTIVAS_INICIALES, ...demo.avanzado }
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [busca, setBusca] = useState('')
 
@@ -103,7 +100,7 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
     void _f
     void router.replace({ pathname: router.pathname, query: id ? { ...resto, funcion: id } : resto }, undefined, { shallow: true, scroll: true })
   }
-  const setActiva = (id: FuncionId) => (v: boolean) => setActivas(a => ({ ...a, [id]: v }))
+  const setActiva = (id: FuncionId) => (v: boolean) => guardar({ avanzado: { ...demo.avanzado, [id]: v } })
 
   if (abierta) {
     const Pantalla = PANTALLAS[abierta.id]
@@ -113,7 +110,7 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
 
   const conLlave = FUNCIONES.filter(f => !f.externa)
   const recomendadas = FUNCIONES.filter(f => f.recomendada(rubro))
-  const nActivas = conLlave.filter(f => activas[f.id]).length
+  const nActivas = conLlave.filter(f => activas[f.id]).length // lo guardado de funciones que ya no existen no cuenta
   const q = busca.trim().toLowerCase()
   const visibles = (f: Funcion) =>
     (filtro === 'todas' || (filtro === 'recomendadas' ? f.recomendada(rubro) : !f.externa && activas[f.id]))
@@ -140,7 +137,7 @@ export default function AvanzadoTurnos({ rubro }: { rubro: RubroTurnos }) {
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
             <Boton variant="primary" icon={<Sparkles size={15} aria-hidden />} onClick={() => setFiltro('recomendadas')}>Ver las {recomendadas.length} recomendadas</Boton>
-            <Boton variant="outline" icon={<Images size={15} aria-hidden />} onClick={() => irA('plantillas')}>Las {PLANTILLAS.length} plantillas</Boton>
+            <Boton variant="outline" icon={<Images size={15} aria-hidden />} onClick={() => irA('plantillas')}>Las 5 plantillas de tu rubro</Boton>
           </div>
         </div>
         <div className="tua-vidriera-panel">
@@ -225,7 +222,7 @@ function TarjetaFuncion({ f, rubro, activa, onAbrir, i }: { f: Funcion; rubro: R
           <span className="tua-funcion-ico" aria-hidden><f.Icon size={22} strokeWidth={1.7} /></span>
           <span style={{ flex: 1 }} />
           {f.externa
-            ? <span className="tuo-chip tuo-chip--borde" style={{ height: 24, fontSize: 11.5 }}><Images size={11} aria-hidden />{PLANTILLAS.length} diseños</span>
+            ? <span className="tuo-chip tuo-chip--borde" style={{ height: 24, fontSize: 11.5 }}><Images size={11} aria-hidden />5 diseños para tu rubro</span>
             : <BadgeEstado on={activa} />}
         </span>
         <span className="tuo-h2" style={{ display: 'block', marginTop: 16, fontSize: 16.5 }}>{f.label}</span>

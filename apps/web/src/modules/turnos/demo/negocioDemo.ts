@@ -100,13 +100,15 @@ export interface NegocioDemo {
   horarios: { rubro: string; dias: Semana } | null
   apariencia: AparienciaDemo | null
   politica: PoliticaReserva
+  /** Las funciones de Avanzado que el dueño prendió o apagó (id → on). Lo que no está acá vale lo de fábrica. */
+  avanzado: Record<string, boolean>
 }
 
 export const BENEFICIOS_INICIALES: BeneficiosCuenta = { activo: true, bienvenida: 10, sellos: 6, promos: true }
 export const POLITICA_INICIAL: PoliticaReserva = { cancelaHasta: 24, senaFueraDePlazo: 'se-pierde', tolerancia: 10 }
 
 const INICIAL: NegocioDemo = {
-  identidad: null, forma: 'web', simple: 'tarjeta', cuentas: BENEFICIOS_INICIALES, horarios: null, apariencia: null, politica: POLITICA_INICIAL,
+  identidad: null, forma: 'web', simple: 'tarjeta', cuentas: BENEFICIOS_INICIALES, horarios: null, apariencia: null, politica: POLITICA_INICIAL, avanzado: {},
 }
 const CLAVE = 'orbita_turnos_demo_negocio'
 
@@ -130,6 +132,7 @@ function sanear(g: Partial<NegocioDemo>): NegocioDemo {
     politica: { ...POLITICA_INICIAL, ...g.politica },
     horarios: g.horarios?.dias?.length === 7 ? g.horarios : null,
     apariencia: g.apariencia?.plantilla ? g.apariencia : null,
+    avanzado: g.avanzado && typeof g.avanzado === 'object' ? g.avanzado : {},
   }
 }
 
@@ -202,6 +205,21 @@ export function plazoTxt(horas: number): string {
 
 /** La regla de cancelación tal como la lee el cliente al reservar. */
 export const cancelacionTxt = (p: PoliticaReserva) => `Cancelación sin cargo ${plazoTxt(p.cancelaHasta)}`
+
+/**
+ * La política completa, como va en los Términos del sitio: cambios y
+ * cancelaciones, y llegadas tarde. La misma que el dueño ve armarse en
+ * Configuración → Reglas de reserva.
+ */
+export function politicaTxt(p: PoliticaReserva): { cambios: string; tarde: string } {
+  const fuera = p.senaFueraDePlazo === 'se-pierde' ? 'no se devuelve' : 'te queda a favor para otro turno'
+  return {
+    cambios: `Podés cancelar o reprogramar sin cargo ${plazoTxt(p.cancelaHasta)}, desde Mis turnos o desde el link del recordatorio. Si pagaste una seña y cancelás a tiempo, se devuelve al mismo medio de pago.${p.cancelaHasta > 0 ? ` Pasado ese plazo, o si no venís, la seña ${fuera}.` : ` Si no venís, la seña ${fuera}.`}`,
+    tarde: p.tolerancia > 0
+      ? `Guardamos tu lugar ${p.tolerancia} minutos. Después de ese tiempo el turno puede darse a otra persona o acortarse para no demorar al siguiente.`
+      : 'Los turnos empiezan a la hora reservada: si llegás tarde, puede acortarse para no demorar al siguiente.',
+  }
+}
 
 // ─── Beneficios, en palabras ─────────────────────────────────────────────────
 

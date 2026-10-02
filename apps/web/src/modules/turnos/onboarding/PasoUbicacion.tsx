@@ -1,7 +1,8 @@
 // "Ubicación": dónde atiende el negocio. Igual que el alta real de Tienda, se
 // puede marcar más de una opción y, si hay un local, se ubica en el mapa
 // (búsqueda con Nominatim y marcador que se arrastra). Turnos suma lo suyo:
-// a domicilio pide las zonas, y abajo van los días y los horarios de atención,
+// la ciudad (hoy se atiende por ciudad: a domicilio es dentro de ella, sin
+// zonas aparte), y abajo van los días y los horarios de atención,
 // partidos en mañana y tarde (cada turno se prende, se apaga y se ajusta).
 import { useRef, useState } from 'react'
 import { Check, CircleAlert, Globe, Home, LoaderCircle, LocateFixed, MapPin, Search, Sun, Sunset, type LucideIcon } from 'lucide-react'
@@ -36,7 +37,7 @@ const MENSAJE: Record<Busqueda, string> = {
 }
 
 /** Dirección del local + mapa. La dirección se guarda corta (calle y número) y el barrio aparte: así sale en la página. */
-function Direccion({ d, poner, error, tocar }: PropsPaso) {
+function Direccion({ d, poner, error, tocar, ciudadObligatoria }: PropsPaso & { ciudadObligatoria: boolean }) {
   const [estado, setEstado] = useState<Busqueda>('quieto')
   // Última consulta resuelta: salir del campo sin cambiar nada no vuelve a buscar.
   const ultima = useRef('')
@@ -78,10 +79,10 @@ function Direccion({ d, poner, error, tocar }: PropsPaso) {
       <div className="tuob-fila2">
         <Entrada id="tuob-direccion" label="Dirección" valor={d.direccion} onCambio={v => poner('direccion', v)} onTocar={() => { tocar('direccion'); buscar() }}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscar() } }}
-          error={error('direccion')} placeholder="Av. Corrientes 1234" autoComplete="street-address" required />
-        <Entrada id="tuob-ciudad" label="Barrio o ciudad" opcional valor={d.ciudad} onCambio={v => poner('ciudad', v)} onTocar={buscar}
+          error={error('direccion')} placeholder="Av. Victoria Aguirre 240" autoComplete="street-address" required />
+        <Entrada id="tuob-ciudad" label="Ciudad" opcional={!ciudadObligatoria} valor={d.ciudad} onCambio={v => poner('ciudad', v)} onTocar={() => { tocar('ciudad'); buscar() }}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscar() } }}
-          placeholder="Palermo, CABA" autoComplete="address-level2" />
+          error={ciudadObligatoria ? error('ciudad') : undefined} placeholder="Puerto Iguazú" autoComplete="address-level2" required={ciudadObligatoria} />
       </div>
       <div className="tuob-mapa">
         <div className="tuob-mapa-barra">
@@ -141,6 +142,7 @@ export function PasoUbicacion({ d, poner, error, tocar, rubro }: PropsPaso & { r
   const local = marcadas.includes('local')
   const remoto = marcadas.includes('domicilio')
   const corte = corteDe(tramosDeJornada(d.jornada))
+  const ciudad = d.ciudad.trim()
 
   return (
     <div className="tuob-ancho tuob-ancho--form">
@@ -160,17 +162,22 @@ export function PasoUbicacion({ d, poner, error, tocar, rubro }: PropsPaso & { r
             {errorModalidades && <MensajeError id="tuob-modalidades-error">{errorModalidades}</MensajeError>}
           </fieldset>
 
-          {local && <Direccion d={d} poner={poner} error={error} tocar={tocar} />}
+          {local && <Direccion d={d} poner={poner} error={error} tocar={tocar} ciudadObligatoria={turnos} />}
 
-          {turnos && marcadas.includes('domicilio') && (
+          {/* Sin local no hay dirección que pedir: alcanza con la ciudad. */}
+          {turnos && !local && remoto && (
             <div className="tuo-entra">
-              <Entrada id="tuob-zonas" label="Zonas donde atendés a domicilio" valor={d.zonas} onCambio={v => poner('zonas', v)} onTocar={() => tocar('zonas')}
-                error={error('zonas')} ayuda="Barrios o localidades, separados por coma. Es lo que ve tu cliente antes de reservar." placeholder="Palermo, Belgrano, Colegiales" maxLength={120} required />
+              <Entrada id="tuob-ciudad" label="¿En qué ciudad atendés?" valor={d.ciudad} onCambio={v => poner('ciudad', v)} onTocar={() => tocar('ciudad')}
+                error={error('ciudad')} placeholder="Puerto Iguazú" autoComplete="address-level2" maxLength={60} required />
             </div>
           )}
 
-          {turnos && !local && remoto && (
-            <Aviso Icon={MapPin}>Sin local, tu página no muestra una dirección: muestra las zonas donde atendés.</Aviso>
+          {turnos && remoto && (
+            <Aviso Icon={Home}>
+              <strong>A domicilio atendés dentro de {ciudad || 'tu ciudad'}.</strong>{' '}
+              Tus clientes lo ven antes de reservar y te dejan su dirección al sacar el turno.
+              {!local && ' Como no tenés local, tu página no muestra una dirección.'}
+            </Aviso>
           )}
           {!turnos && remoto && (
             <Aviso tono="ok" Icon={Check}>

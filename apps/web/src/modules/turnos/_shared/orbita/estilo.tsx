@@ -110,6 +110,8 @@ export const CSS_TURNOS = `
 
   /* ── Llavecita ─────────────────────────────────────────────────────────── */
   .tuo-switch { position: relative; width: 42px; height: 24px; border-radius: 999px; border: none; padding: 0; flex-shrink: 0; cursor: pointer; background: var(--color-border-strong); transition: background 180ms ease, box-shadow 180ms ease; }
+  /* Área táctil de 44 px de alto sin mover nada: la llave se ve igual y el dedo la encuentra. */
+  .tuo-switch::before { content: ''; position: absolute; inset: -10px -6px; }
   .tuo-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.3); transition: transform 200ms var(--tuo-ease); }
   .tuo-switch[aria-checked='true'] { background: var(--tuo-grad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent); }
   .tuo-switch[aria-checked='true']::after { transform: translateX(18px); }

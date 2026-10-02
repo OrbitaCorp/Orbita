@@ -1,9 +1,11 @@
 // Los tres legales del pie del sitio: términos, privacidad y botón de
 // arrepentimiento. Se abren en una ventana, sin salir de la página. Los textos
-// son de ejemplo (cada negocio carga los suyos) y el pedido de arrepentimiento
+// son de ejemplo (cada negocio carga los suyos), salvo la política de cambios,
+// cancelaciones y llegadas tarde, que sale de Configuración → Reglas de reserva, y el pedido de arrepentimiento
 // se simula: queda en memoria, no se envía a ningún lado.
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Info } from 'lucide-react'
+import { politicaTxt, useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
 import { Dialogo } from './piezas'
 import { CODIGO_DEMO } from './reserva/acciones'
 import type { TemaNegocio } from './tema'
@@ -34,15 +36,16 @@ function Nota() {
 }
 
 function Terminos({ t }: { t: TemaNegocio }) {
+  const politica = politicaTxt(useNegocioDemo().demo.politica)
   return (
     <>
       <p>Estas condiciones valen para las reservas que hacés online en {t.nombre}, {t.direccion}, {t.barrio}.</p>
       <h3>Reservas</h3>
       <p>El turno queda confirmado cuando ves la pantalla de confirmación y te llega el mensaje por WhatsApp. Los precios publicados son finales.</p>
       <h3>Cambios y cancelaciones</h3>
-      <p>Podés cancelar o reprogramar sin cargo hasta 24 h antes, desde Mis turnos o desde el link del recordatorio. Pasado ese plazo, si pagaste una seña, no se devuelve.</p>
+      <p>{politica.cambios}</p>
       <h3>Llegadas tarde</h3>
-      <p>Guardamos tu lugar 10 minutos. Después de ese tiempo el turno puede darse a otra persona o acortarse para no demorar al siguiente.</p>
+      <p>{politica.tarde}</p>
       <Nota />
     </>
   )

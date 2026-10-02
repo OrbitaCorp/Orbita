@@ -4,16 +4,16 @@
 // que cada rubro vea precios coherentes con lo que cobra.
 import type { LucideIcon } from 'lucide-react'
 import {
-  Package, Crown, Gift, Stamp, Hourglass, CalendarSync, ClipboardCheck, HeartHandshake,
-  QrCode, BadgePercent, Star, LayoutTemplate, CalendarPlus, Repeat2, Wallet, Palette,
+  Package, Crown, Gift, Stamp, CalendarSync, HeartHandshake,
+  BadgePercent, LayoutTemplate, CalendarPlus, Repeat2, Wallet, Palette,
 } from 'lucide-react'
 import { CLIENTES, type RubroTurnos, type ServicioTipo } from '@/modules/turnos/datos'
 
 // ─── Catálogo de funciones ────────────────────────────────────────────────────
 
 export type FuncionId =
-  | 'paquetes' | 'membresias' | 'gift-cards' | 'fidelidad' | 'lista-espera' | 'turno-fijo'
-  | 'formularios' | 'recuperar' | 'boton-reserva' | 'precios-horario' | 'resenas' | 'plantillas'
+  | 'paquetes' | 'membresias' | 'gift-cards' | 'fidelidad' | 'turno-fijo'
+  | 'recuperar' | 'precios-horario' | 'plantillas'
 
 export type GrupoId = 'llenar' | 'vuelvan' | 'cobrar' | 'imagen'
 
@@ -21,10 +21,10 @@ export type GrupoId = 'llenar' | 'vuelvan' | 'cobrar' | 'imagen'
 // color del grupo tiñe el ícono de cada función, así se lee de qué familia es
 // sin leer el título.
 export const GRUPOS: { id: GrupoId; label: string; corto: string; desc: string; Icon: LucideIcon; tono: string }[] = [
-  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los huecos libres se ocupen solos y te encuentren más fácil.', Icon: CalendarPlus, tono: 'var(--color-primary)' },
+  { id: 'llenar', label: 'Llenar la agenda', corto: 'Llenar', desc: 'Que los horarios flojos se ocupen y los clientes de siempre tengan su lugar.', Icon: CalendarPlus, tono: 'var(--color-primary)' },
   { id: 'vuelvan', label: 'Fidelizar', corto: 'Fidelizar', desc: 'Convertir un turno suelto en un cliente de todos los meses.', Icon: Repeat2, tono: '#DB2777' },
-  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado y cada turno llega con todo resuelto.', Icon: Wallet, tono: 'var(--color-success)' },
-  { id: 'imagen', label: 'Tu imagen', corto: 'Imagen', desc: 'Cómo te ven antes de conocerte: tu sitio y lo que dicen de vos.', Icon: Palette, tono: '#8B5CF6' },
+  { id: 'cobrar', label: 'Cobrar mejor', corto: 'Cobrar', desc: 'Plata por adelantado: packs, abonos y regalos.', Icon: Wallet, tono: 'var(--color-success)' },
+  { id: 'imagen', label: 'Tu imagen', corto: 'Imagen', desc: 'Cómo te ven antes de conocerte: el diseño de tu sitio de reservas.', Icon: Palette, tono: '#8B5CF6' },
 ]
 
 export const grupoPorId = (id: GrupoId) => GRUPOS.find(g => g.id === id) ?? GRUPOS[0]
@@ -45,15 +45,9 @@ const en = (...keys: string[]) => (r: RubroTurnos) => keys.includes(r.key)
 
 export const FUNCIONES: Funcion[] = [
   // Llenar la agenda
-  { id: 'lista-espera', grupo: 'llenar', label: 'Lista de espera inteligente', Icon: Hourglass,
-    desc: 'Si alguien cancela, le avisamos por WhatsApp a la lista y el primero que confirma se queda el turno.',
-    recomendada: r => r.modo === 'cupo' || r.modo === 'cancha' || ['barberia', 'odonto', 'pestanas', 'tatuajes'].includes(r.key) },
   { id: 'turno-fijo', grupo: 'llenar', label: 'Turno fijo', Icon: CalendarSync,
     desc: 'Tu cliente reserva el mismo horario cada semana o cada quince días, sin volver a pedirlo.',
     recomendada: en('psico', 'kinesio', 'fono', 'nutricion', 'clases', 'canchas', 'medicina-alternativa', 'podologia') },
-  { id: 'boton-reserva', grupo: 'llenar', label: 'Botón de reserva para Instagram y Google', Icon: QrCode,
-    desc: 'Un link, un QR y un botón para tu web: que te reserven desde donde te encuentran.',
-    recomendada: r => r.familia === 'belleza' || r.key === 'canchas' },
   { id: 'precios-horario', grupo: 'llenar', label: 'Precios por horario', Icon: BadgePercent,
     desc: 'Descuento en los horarios flojos (o recargo en los picos) para repartir mejor la demanda.',
     recomendada: en('canchas', 'electro', 'spa', 'depilacion', 'estetica') },
@@ -76,25 +70,19 @@ export const FUNCIONES: Funcion[] = [
   { id: 'gift-cards', grupo: 'cobrar', label: 'Gift cards', Icon: Gift,
     desc: 'Regalá un turno: tarjetas de regalo por monto o por servicio, listas para mandar.',
     recomendada: r => r.familia === 'belleza' || r.key === 'talleres' },
-  { id: 'formularios', grupo: 'cobrar', label: 'Formularios y consentimientos', Icon: ClipboardCheck,
-    desc: 'Preguntas antes del turno y consentimiento con firma: llegan resueltos a la sesión.',
-    recomendada: r => r.familia === 'salud' || ['tatuajes', 'estetica', 'depilacion', 'pestanas'].includes(r.key) },
 
   // Tu imagen
   { id: 'plantillas', grupo: 'imagen', label: 'Plantillas del sitio', Icon: LayoutTemplate, externa: true,
-    desc: 'Diez identidades completas para tu sitio de reservas: mirá cómo queda el tuyo con cada una y aplicala.',
+    desc: 'Cinco identidades completas pensadas para tu rubro: mirá cómo queda tu sitio con cada una y aplicala.',
     recomendada: () => false },
-  { id: 'resenas', grupo: 'imagen', label: 'Reseñas después del turno', Icon: Star,
-    desc: 'Un mensaje unas horas después del turno pidiendo una opinión, con link a Google.',
-    recomendada: r => r.familia === 'belleza' || r.familia === 'salud' },
 ]
 
 export const funcionPorId = (id: string) => FUNCIONES.find(f => f.id === id)
 
 /** Arranque de la demo: algunas prendidas para que el hub no se vea vacío. */
 export const ACTIVAS_INICIALES: Record<FuncionId, boolean> = {
-  paquetes: false, membresias: false, 'gift-cards': true, fidelidad: false, 'lista-espera': true, 'turno-fijo': false,
-  formularios: false, recuperar: false, 'boton-reserva': true, 'precios-horario': false, resenas: false, plantillas: false,
+  paquetes: false, membresias: false, 'gift-cards': true, fidelidad: false, 'turno-fijo': true,
+  recuperar: false, 'precios-horario': false, plantillas: false,
 }
 
 // ─── Formato ──────────────────────────────────────────────────────────────────

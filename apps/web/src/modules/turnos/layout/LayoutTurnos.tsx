@@ -259,6 +259,7 @@ export default function LayoutTurnos({ negocio, rubro, fecha, items, activo, onI
           .tu-sidebar[data-abierto="true"] { transform: translateX(0); visibility: visible; transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1); box-shadow: 12px 0 48px rgba(0,0,0,0.4); }
           .tu-backdrop[data-abierto="true"] { display: block; position: fixed; inset: 0; z-index: 130; background: rgba(3,6,14,0.6); backdrop-filter: blur(3px); animation: tuoVelo 200ms ease; }
           .tu-menu-btn, .tu-cerrar-btn { display: inline-flex !important; }
+          .tu-cerrar-btn { width: 44px; min-width: 44px; height: 44px; }
           .tu-header-ext { display: none !important; }
           .tu-nav-item { height: 44px; font-size: 14.5px; }
         }

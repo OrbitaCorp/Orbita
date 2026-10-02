@@ -24,3 +24,25 @@ export function achicarLogo(archivo: File, lado = 256): Promise<string> {
     img.src = url
   })
 }
+
+// Una foto de portada subida desde el panel: se achica a 1280 px de ancho para
+// que entre en el almacenamiento del navegador y la vea también el sitio.
+export function achicarFoto(archivo: File, ancho = 1280): Promise<string> {
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(archivo)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const k = Math.min(1, ancho / Math.max(1, img.naturalWidth))
+      const lienzo = document.createElement('canvas')
+      lienzo.width = Math.max(1, Math.round(img.naturalWidth * k))
+      lienzo.height = Math.max(1, Math.round(img.naturalHeight * k))
+      const ctx = lienzo.getContext('2d')
+      if (!ctx) { mal(new Error('sin canvas')); return }
+      ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height)
+      ok(lienzo.toDataURL('image/jpeg', 0.82))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('no es una imagen')) }
+    img.src = url
+  })
+}

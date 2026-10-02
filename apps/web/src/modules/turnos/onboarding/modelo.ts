@@ -31,6 +31,12 @@ const PASOS: Record<Modulo | 'ninguno', readonly Paso[]> = {
 }
 export const pasosDe = (m: Modulo | null) => PASOS[m ?? 'ninguno']
 
+// Módulos que el alta muestra pero todavía no deja elegir: la tarjeta sale
+// como "Próximamente". Turnos se está terminando; para habilitarlo alcanza con
+// sacarlo de acá (su recorrido sigue armado).
+export const MODULOS_PROXIMAMENTE: Modulo[] = ['turnos']
+export const moduloHabilitado = (m: Modulo | null): m is Modulo => m !== null && !MODULOS_PROXIMAMENTE.includes(m)
+
 // ─── Datos ───────────────────────────────────────────────────────────────────
 
 export interface ServicioAlta { id: string; nombre: string; duracion: number; precio: number }
@@ -73,12 +79,13 @@ export interface DatosAlta {
 }
 
 // Obelisco: donde arranca el mapa hasta que se busca una dirección.
-const BUENOS_AIRES: [number, number] = [-34.6037, -58.3816]
+// Donde arranca el mapa: Puerto Iguazú, la ciudad donde hoy funciona Órbita.
+const PUERTO_IGUAZU: [number, number] = [-25.5972, -54.5786]
 
 export const DATOS_INICIALES: DatosAlta = {
   modulo: null, tipos: [], modoVenta: 'ecommerce',
   logo: null, negocio: '', descripcion: '', telefono: '', slug: '',
-  modalidades: null, direccion: '', ciudad: '', latLng: BUENOS_AIRES, zonas: '',
+  modalidades: null, direccion: '', ciudad: '', latLng: PUERTO_IGUAZU, zonas: '',
   dias: [0, 1, 2, 3, 4, 5], jornada: JORNADA_INICIAL,
   forma: 'web', cuentas: BENEFICIOS_INICIALES,
   nombre: '', email: '', clave: '', clave2: '', acepta: false,
@@ -145,7 +152,8 @@ export function identidadDe(d: DatosAlta, rubro: RubroTurnos, servicios: Servici
     modalidades,
     direccion: modalidades.includes('local') ? d.direccion.trim() : '',
     ciudad: modalidades.includes('local') ? d.ciudad.trim() : '',
-    zonas: modalidades.includes('domicilio') ? d.zonas.trim() : '',
+    // A domicilio se atiende dentro de la ciudad del negocio: no se piden zonas aparte.
+    zonas: modalidades.includes('domicilio') ? d.ciudad.trim() : '',
     horarios: DIAS.map((dia, i) => [dia, d.dias.includes(i) ? horarioTxt(d) : '']),
     servicios: validos.length ? validos : rubro.servicios,
     sena,
@@ -206,7 +214,7 @@ export function validar(id: PasoId, d: DatosAlta, c: ContextoAlta): Errores {
     if (m.length === 0) e.modalidades = 'Marcá al menos una opción.'
     if (m.includes('local') && d.direccion.trim().length < 4) e.direccion = 'Escribí la dirección del local.'
     if (d.modulo === 'turnos') {
-      if (m.includes('domicilio') && d.zonas.trim().length < 3) e.zonas = 'Contanos por qué zonas atendés.'
+      if (d.ciudad.trim().length < 3) e.ciudad = 'Escribí la ciudad donde atendés.'
       if (d.dias.length === 0) e.dias = 'Marcá al menos un día de atención.'
       const horario = errorJornada(d.jornada)
       if (horario) e.horario = horario

@@ -228,6 +228,8 @@ export const CSS_RESERVA = `
   .tur-ayuda[data-error="true"] { color: var(--tur-error); font-weight: 600; }
   .tur-ayuda > svg { flex-shrink: 0; margin-top: 2px; }
   .tur-aviso { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--tur-r); border: 1px solid var(--color-border); background: var(--color-surface); }
+  /* El área táctil se agranda sin mover nada: 52 x 32 a la vista, 44 de alto para el dedo. */
+  .tur-switch::before { content: ''; position: absolute; inset: -6px -4px; }
   .tur-switch { position: relative; width: 52px; height: 32px; flex-shrink: 0; border-radius: 999px; border: none; padding: 0; cursor: pointer; background: var(--color-muted); transition: background 200ms ease, box-shadow 200ms ease; }
   /* Área táctil de 44 px sin agrandar el dibujo. */
   .tur-switch::before { content: ''; position: absolute; inset: -6px; }
@@ -335,6 +337,23 @@ export const CSS_RESERVA = `
       box-shadow: 0 -18px 40px -24px rgba(0, 0, 0, 0.45); padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
   }
   @media (max-width: 860px) { .tur-cont { padding: 0 16px; } }
+
+  /* ── Reserva de la página simple: una columna angosta, barrita de avance y el resumen pegado abajo ── */
+  .tur-pasitos { display: flex; gap: 6px; }
+  .tur-pasitos > i { flex: 1; height: 4px; border-radius: 999px; background: var(--color-border); transition: background 280ms var(--tur-ease); }
+  .tur-pasitos > i[data-on="true"] { background: var(--color-primary); }
+  .tur[data-simple="true"] .tur-cont { max-width: 600px; }
+  .tur[data-simple="true"] .tur-flujo { padding-top: 20px; padding-bottom: 32px; min-height: calc(100vh - 240px); }
+  .tur[data-simple="true"] .tur-grilla { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 14px; }
+  .tur[data-simple="true"] .tur-lateral { display: none; }
+  .tur[data-simple="true"] .tur-titulo { font-size: clamp(26px, 6vw, 32px); }
+  .tur[data-simple="true"] .tur-hoja { display: block; position: sticky; bottom: 0; z-index: 60; box-sizing: border-box; border-top: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg) 94%, transparent); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    box-shadow: 0 -18px 40px -24px rgba(0, 0, 0, 0.45); padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
+  @media (min-width: 981px) {
+    .tur[data-simple="true"] .tur-hoja { max-width: 600px; margin: 0 auto; bottom: 16px; border: 1px solid var(--color-border); border-radius: calc(var(--tu-r2) + 4px); padding-bottom: 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .tur-pasitos > i { transition: none; } }
   .tur-hoja-asa { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 0 4px; border: none; background: none; color: var(--color-text); font-family: inherit; text-align: left; cursor: pointer; border-radius: 10px; }
   .tur-hoja-asa:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .tur-hoja-asa > svg { flex-shrink: 0; transition: transform 260ms var(--tur-ease); }

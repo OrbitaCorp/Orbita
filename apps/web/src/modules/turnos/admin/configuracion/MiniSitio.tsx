@@ -1,7 +1,7 @@
 // Miniatura del sitio de reservas: un mini-render de la portada con la paleta,
 // la tipografía, los bordes y el tipo de portada REALES de una plantilla, y con
 // el nombre, la foto y los servicios del negocio. No es una captura ni un
-// iframe: son cajas livianas, así se pueden mostrar diez juntas en el selector
+// iframe: son cajas livianas, así se pueden mostrar varias juntas en el selector
 // de plantillas sin cargar diez sitios.
 //
 // Todo se mide en `em` y el tamaño de letra base sale del ancho de la caja
@@ -201,22 +201,22 @@ export const CSS_PLANTILLA = `
   }
 `
 
-export function TarjetaPlantilla({ p, tema, datos, boton, activa, recomendada, onClick, extra, i = 0 }: {
-  p: PlantillaSitio; tema: Props['tema']; datos: DatosMini; boton?: EstiloBoton; activa: boolean; recomendada?: boolean; onClick: () => void
+export function TarjetaPlantilla({ p, tema, datos, boton, activa, onClick, extra, i = 0 }: {
+  p: PlantillaSitio; tema: Props['tema']; datos: DatosMini; boton?: EstiloBoton; activa: boolean; onClick: () => void
   /** Pie opcional de la tarjeta (por ejemplo, un rótulo). */
   extra?: ReactNode; i?: number
 }) {
   const tipo = tipografiaPorId(p.tipo)
   return (
     <button type="button" role="radio" aria-checked={activa} onClick={onClick} className="tuc-plantilla tuc-entra" style={{ ['--i' as string]: i }}
-      aria-label={`Plantilla ${p.nombre}, ${p.caracter.toLowerCase()}. ${p.para}${recomendada ? ' Recomendada para tu rubro.' : ''}`}>
+      aria-label={`Plantilla ${p.nombre}, ${p.caracter.toLowerCase()}. ${p.para}${p.fabrica ? ' Es la de fábrica de tu rubro.' : ''}`}>
       <span className="tuc-plantilla-sello" aria-hidden><Check size={13} strokeWidth={3} />En uso</span>
       <span className="tuc-plantilla-marco"><MiniSitio tema={tema} datos={datos} boton={boton ?? p.boton} /></span>
       <span className="tuc-plantilla-cuerpo">
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className="tuc-plantilla-nombre">{p.nombre}</span>
           <span className="tuo-chip tuo-chip--borde" style={{ height: 22, fontSize: 11, padding: '0 8px' }}>{p.caracter}</span>
-          {recomendada && <span className="tuo-chip tuo-chip--primario" style={{ height: 22, fontSize: 11, padding: '0 8px' }}><Sparkles size={11} aria-hidden />Para tu rubro</span>}
+          {p.fabrica && <span className="tuo-chip tuo-chip--primario" style={{ height: 22, fontSize: 11, padding: '0 8px' }}><Sparkles size={11} aria-hidden />De fábrica</span>}
         </span>
         <span className="tuc-plantilla-para">{p.para}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'auto', paddingTop: 4, minWidth: 0 }}>

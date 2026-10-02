@@ -5,20 +5,22 @@
 // Sin backend el sitio no puede leer lo que se está editando, así que el
 // iframe carga el sitio del rubro y, como es del mismo origen, se lo "viste"
 // desde afuera con la plantilla elegida:
+//   0. la plantilla va en la dirección (?probar=): el sitio se dibuja con su
+//      composición, sus tarjetas y su textura de verdad, sin guardar nada;
 //   1. una hoja de estilos que pisa las variables del tema (las que devuelve
 //      variablesTema: colores, tipografías y radios);
 //   2. un repintado de los colores que el sitio trae escritos en estilos
 //      inline (se reemplaza cada color del tema original por el de la
 //      plantilla, propiedad por propiedad);
 //   3. la foto de la portada y las fuentes del par tipográfico.
-// Es una aproximación —el tipo de portada y el orden de las secciones no se
-// pueden cambiar desde afuera— y así se avisa abajo del marco.
+// Lo que no se puede cambiar desde afuera (el estilo del botón, los textos y el
+// orden de las secciones) se avisa abajo del marco.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone, ExternalLink, Lock, RotateCw } from 'lucide-react'
 import type { RubroTurnos } from '@/modules/turnos/datos'
 import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
 import { temaDe, variablesTema } from '@/modules/turnos/storefront/tema'
-import { paletaCon, tipografiaPorId, type Paleta, type PlantillaSitio } from './datos'
+import type { AjustesPlantilla, Paleta, PlantillaSitio } from './datos'
 
 const DESIGN_W = 1280
 const MOVIL_W = 390
@@ -41,17 +43,16 @@ export interface Pisar {
   foto: string
 }
 
-/** Arma lo que hay que pisar en el iframe a partir de la plantilla y los ajustes del editor. */
-export function armarPisar(rubro: RubroTurnos, p: PlantillaSitio, ajustes?: { color?: string; tipo?: string; radio?: number; foto?: string }): Pisar {
-  const real = temaDe(rubro)
-  const tipo = tipografiaPorId(ajustes?.tipo ?? p.tipo)
-  const paleta = paletaCon(p.c, ajustes?.color ?? p.c.primary)
-  const radio = ajustes?.radio ?? p.radio
-  return {
-    paleta, base: real.c, mayus: !!tipo.mayus, google: tipo.google,
-    vars: variablesTema({ ...real, c: paleta, fh: tipo.fh, fb: tipo.fb, radio, mayus: tipo.mayus, oscuro: p.oscuro }),
-    fotoOriginal: real.fotoHero, foto: ajustes?.foto ?? real.fotoHero,
-  }
+/**
+ * Arma lo que hay que pisar en el iframe. El iframe ya carga el sitio con la
+ * plantilla puesta (?probar=), así que lo que se reemplaza es esa plantilla de
+ * fábrica por la misma con los ajustes del editor (acento, letra, bordes y foto).
+ */
+export function armarPisar(rubro: RubroTurnos, p: PlantillaSitio, ajustes?: AjustesPlantilla): Pisar {
+  const con = (a?: AjustesPlantilla) => temaDe({ ...rubro, apariencia: { rubro: rubro.key, plantilla: p.id, color: a?.color ?? '', tipo: a?.tipo ?? '', radio: a?.radio ?? 0, foto: a?.foto ?? '' } })
+  const base = con()
+  const fin = con(ajustes)
+  return { paleta: fin.c, base: base.c, mayus: !!fin.mayus, google: fin.fuentes, vars: variablesTema(fin), fotoOriginal: base.fotoHero, foto: fin.fotoHero }
 }
 
 // ─── Repintado de colores inline ─────────────────────────────────────────────
@@ -215,8 +216,13 @@ export const CSS_VISTA_PREVIA = `
   @media (prefers-reduced-motion: reduce) { .tuc-spin { animation-duration: 2.4s; } }
 `
 
-export default function VistaPrevia({ rubroKey, pisar, alto, dispositivoInicial = 'escritorio', subdominio, forma = 'web' }: {
-  rubroKey: string; pisar: Pisar; alto: string; dispositivoInicial?: Dispositivo; subdominio: string
+export default function VistaPrevia({ rubroKey, probar, diseno, pisar, alto, dispositivoInicial = 'escritorio', subdominio, forma = 'web' }: {
+  rubroKey: string
+  /** id de la plantilla con la que se dibuja el sitio (sin guardarla). */
+  probar?: string
+  /** Diseño de la página simple que se muestra (sin guardarlo). */
+  diseno?: string
+  pisar: Pisar; alto: string; dispositivoInicial?: Dispositivo; subdominio: string
   /** Sitio web completo o página simple: cambia qué página se carga como "portada". */
   forma?: FormaSitio
 }) {
@@ -225,9 +231,8 @@ export default function VistaPrevia({ rubroKey, pisar, alto, dispositivoInicial 
   const [vuelta, setVuelta] = useState(0)
   const esMovil = dispositivo === 'celular'
   const simple = forma === 'simple'
-  const src = pagina === 'negocio'
-    ? `/turnos-demo/${simple ? 'simple' : 'negocio'}?rubro=${encodeURIComponent(rubroKey)}`
-    : `/turnos-demo/reserva?rubro=${encodeURIComponent(rubroKey)}${simple ? '&forma=simple' : ''}`
+  const q = `?rubro=${encodeURIComponent(rubroKey)}${probar ? `&probar=${encodeURIComponent(probar)}` : ''}`
+  const src = pagina === 'negocio' ? `/turnos-demo/${simple ? `simple${q}${diseno ? `&diseno=${diseno}` : ''}` : `negocio${q}`}` : `/turnos-demo/reserva${q}${simple ? '&forma=simple' : ''}`
   // Cambiar de página o de dispositivo (o recargar) remonta el iframe: vuelve a cargar.
   const clave = `${src}|${dispositivo}|${vuelta}`
   const [cargado, setCargado] = useState('')

@@ -33,7 +33,7 @@ export function VistaPagina({ forma, rubro, d, servicios }: Props) {
   const marcadas = modalidadesAlta(d, rubro)
   const local = marcadas.includes('local')
   const lugar = local ? [d.direccion.trim(), d.ciudad.trim()].filter(Boolean).join(', ') || 'Tu dirección'
-    : `A domicilio${d.zonas.trim() ? ` · ${d.zonas.trim()}` : ''}`
+    : `A domicilio${d.ciudad.trim() ? ` en ${d.ciudad.trim()}` : ''}`
   const horario = `${diasTxt(d.dias)} · ${horarioTxt(d) || 'Sin horario'}`
   const beneficio = beneficiosTxt(d.cuentas, rubro)[0]
   const avatar = d.logo

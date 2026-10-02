@@ -7,10 +7,13 @@
 // atiende tiene su propia columna en la agenda: sus días y su horario se editan
 // acá mismo. "Ver su panel" muestra el panel tal como lo ve esa persona.
 //
-// Sumar y editar abren un modal; todo vive en PanelTurnos, así quien se suma
-// acá aparece en la agenda, al dar un turno y en Ganancias.
+// Invitar abre el mismo modal que Tienda (InvitarPersona); editar abre la ficha
+// con su agenda y su pago. Todo vive en PanelTurnos, así quien se suma acá
+// aparece en la agenda, al dar un turno y en Ganancias.
+//
+// En cada tarjeta se ve cuánto se le paga: comisión, sueldo fijo o lo que sea.
 import { useState } from 'react'
-import { Check, Eye, Mail, MapPin, Pencil, Plus, UserPlus, Wallet } from 'lucide-react'
+import { Check, Eye, Mail, MapPin, Pencil, Plus, UserPlus } from 'lucide-react'
 import { type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
 import type { Semana, Tramo } from '@/modules/turnos/horario'
 import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
@@ -20,12 +23,20 @@ import { Modal, ErrorCampo, Borrar, CamposAgenda, agendaDeForm, agendaFormDe, er
 import { ResumenAgenda, ocupacionDe } from './Espacios'
 import RolesPermisos from './Roles'
 import { CamposPago } from './PagoPersona'
-import { CADA_TXT, COLORES_EQUIPO, pagoInicialDe, pagoTxt, type Persona, type Rol, type VerComo } from './equipoDemo'
+import InvitarPersona from './InvitarPersona'
+import { CADA_TXT, COLORES_EQUIPO, lugarAlquiler, pagoInicialDe, plata, type Pago, type Persona, type Rol, type VerComo } from './equipoDemo'
 
 export const CSS_EQUIPO = `
   .tu-per-pie { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); }
   .tu-per-pie > .tuo-btn { flex: 1; }
   .tu-per-nota { font-size: 13px; line-height: 1.5; color: var(--color-muted); margin: 0 0 12px; }
+  .tu-per-pago { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 14px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface); font-family: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
+  .tu-per-pago-txt { flex: 1; min-width: 0; }
+  .tu-per-pago-tipo { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); }
+  .tu-per-pago-det { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.4; color: var(--color-body); }
+  .tu-per-pago-valor { flex-shrink: 0; font-family: var(--tuo-mono); font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tu-per-pago:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  @media (hover: hover) { .tu-per-pago:hover { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); background: var(--color-primary-bg); } }
   .tu-per-tabs { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
   @media (max-width: 768px) {
     .tu-per-pie > .tuo-btn { height: 44px; }
@@ -35,6 +46,17 @@ export const CSS_EQUIPO = `
 `
 
 type Agenda = { atiende: number[]; horario: string; dias: string }
+
+/** Cuánto se le paga a alguien, para la tarjeta: el tipo, el número grande y el detalle. */
+function pagoTarjeta(p: Pago, r: RubroTurnos): { tipo: string; valor: string; detalle: string } {
+  const turno = r.modo === 'cupo' ? 'clase' : r.modo === 'cancha' ? 'reserva' : 'turno'
+  const liquida = `se liquida ${CADA_TXT[p.cada]}`
+  if (p.forma === 'comision') return { tipo: 'Comisión', valor: `${p.comision}%`, detalle: `De cada ${turno} que atiende · ${liquida}` }
+  if (p.forma === 'sueldo') return { tipo: 'Sueldo fijo', valor: plata(p.sueldo), detalle: `Por mes · ${liquida}` }
+  if (p.forma === 'mixto') return { tipo: 'Sueldo + comisión', valor: `${plata(p.sueldo)} + ${p.comision}%`, detalle: `Fijo por mes más su parte de cada ${turno} · ${liquida}` }
+  if (p.forma === 'alquiler') return { tipo: 'Alquila', valor: plata(p.alquiler), detalle: `Te paga por usar ${lugarAlquiler(r)} · ${CADA_TXT[p.cada]}` }
+  return { tipo: 'Por clase', valor: plata(p.porClase), detalle: `Por cada clase que da · ${liquida}` }
+}
 
 interface Props {
   rubro: RubroTurnos
@@ -59,13 +81,21 @@ interface Props {
 export default function Equipo({ rubro, semana, personas, roles, recursos, turnos, jornada, rango, onGuardar, onBorrar, onGuardarRol, onBorrarRol, onVerComo }: Props) {
   const [tab, setTab] = useState<'personas' | 'roles'>('personas')
   const [editando, setEditando] = useState<Persona | null>(null)
+  const [invitando, setInvitando] = useState(false)
+  // La última persona invitada: desde la pantalla de éxito se puede seguir a su ficha.
+  const [invitadaId, setInvitadaId] = useState('')
   const porPersona = rubro.modo === 'profesional'
   const rolDe = (id: string) => roles.find(r => r.id === id)
-  const nueva = () => setEditando({
-    id: '', nombre: '', email: '', telefono: '', pago: pagoInicialDe(rubro),
-    rolId: roles.find(r => r.atiende && !r.fijo)?.id ?? roles.find(r => !r.fijo)?.id ?? '',
-    color: COLORES_EQUIPO.find(c => !personas.some(p => p.color === c)) ?? COLORES_EQUIPO[personas.length % COLORES_EQUIPO.length],
-  })
+  const invitar = ({ nombre, email, rolId }: { nombre: string; email: string; rolId: string }) => {
+    const id = `p${Date.now()}`
+    const persona: Persona = {
+      id, nombre, email, telefono: '', rolId, pago: pagoInicialDe(rubro), pendiente: true,
+      color: COLORES_EQUIPO.find(c => !personas.some(p => p.color === c)) ?? COLORES_EQUIPO[personas.length % COLORES_EQUIPO.length],
+    }
+    // Si su rol atiende, entra con la agenda del negocio: todos los días que abre, en su horario.
+    onGuardar(persona, porPersona && rolDe(rolId)?.atiende ? agendaDeForm(agendaFormDe(null, semana)) : null)
+    setInvitadaId(id)
+  }
 
   return (
     <div className="panel-page">
@@ -73,7 +103,7 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
         rotulo={`${personas.length} ${personas.length === 1 ? 'persona' : 'personas'} · ${roles.length} roles`}
         titulo="Equipo"
         bajada="Quién trabaja en el negocio, con qué rol entra al panel y cómo cobra. Cada uno ve solo lo que su rol le permite."
-        acciones={<button type="button" onClick={nueva} className="tuo-btn tuo-btn--primario"><UserPlus size={16} /> Sumar persona</button>}
+        acciones={<button type="button" onClick={() => setInvitando(true)} className="tuo-btn tuo-btn--primario"><UserPlus size={16} /> Invitar miembro</button>}
       />
 
       <div className="tu-per-tabs tuo-entra" style={{ ['--i' as string]: 1 }}>
@@ -111,11 +141,30 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
                   ? <ResumenAgenda recurso={rec} semana={semana} turnos={turnos} tramos={tramos} rango={rango} verbo="atiende" />
                   : <p className="tu-per-nota">{rol?.descripcion}</p>}
 
-                <div className="tu-eq-datos" style={{ marginTop: porPersona && rec ? 7 : 0, marginBottom: 16 }}>
+                <div className="tu-eq-datos" style={{ marginTop: porPersona && rec ? 7 : 0, marginBottom: 14 }}>
                   {!porPersona && rec && <span><MapPin size={14} /> Atiende en {rec.nombre}</span>}
                   {p.email && <span><Mail size={14} /> <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</span></span>}
-                  <span><Wallet size={14} /> {pagoTxt(p.pago, rubro)}{p.pago ? ` · ${CADA_TXT[p.pago.cada]}` : ''}</span>
                 </div>
+
+                {p.pago ? (() => {
+                  const pg = pagoTarjeta(p.pago, rubro)
+                  return (
+                    <button type="button" className="tu-per-pago" onClick={() => setEditando(p)} aria-label={`Cómo cobra ${p.nombre}: ${pg.tipo}, ${pg.valor}. ${pg.detalle}. Cambiar`}>
+                      <span className="tu-per-pago-txt">
+                        <span className="tu-per-pago-tipo">{pg.tipo}</span>
+                        <span className="tu-per-pago-det">{pg.detalle}</span>
+                      </span>
+                      <span className="tu-per-pago-valor">{pg.valor}</span>
+                    </button>
+                  )
+                })() : (
+                  <div className="tu-per-pago" style={{ cursor: 'default' }}>
+                    <span className="tu-per-pago-txt">
+                      <span className="tu-per-pago-tipo">Dueño</span>
+                      <span className="tu-per-pago-det">No se liquida: lo que factura queda para el negocio.</span>
+                    </span>
+                  </div>
+                )}
 
                 <div className="tu-per-pie">
                   {!rol?.fijo && <button type="button" className="tuo-btn tuo-btn--sm" onClick={() => onVerComo({ rolId: p.rolId, personaId: p.id })} aria-label={`Ver el panel como ${p.nombre}`}><Eye size={14} /> Ver su panel</button>}
@@ -125,11 +174,20 @@ export default function Equipo({ rubro, semana, personas, roles, recursos, turno
             )
           })}
 
-          <button type="button" onClick={nueva} className="tu-eq-nuevo tuo-entra" style={{ ['--i' as string]: personas.length + 2 }}>
+          <button type="button" onClick={() => setInvitando(true)} className="tu-eq-nuevo tuo-entra" style={{ ['--i' as string]: personas.length + 2 }}>
             <Plus size={22} strokeWidth={1.6} />
-            Sumar persona
+            Invitar miembro
           </button>
         </div>
+      )}
+
+      {invitando && (
+        <InvitarPersona
+          rubro={rubro} roles={roles} personas={personas} pago={pagoInicialDe(rubro)}
+          onCerrar={() => setInvitando(false)}
+          onInvitar={invitar}
+          onConfigurar={() => { setInvitando(false); setEditando(personas.find(p => p.id === invitadaId) ?? null) }}
+        />
       )}
 
       {editando && (

@@ -4,7 +4,7 @@
 // que reemplaza las variables por datos de ejemplo del rubro.
 import { useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Mail, CalendarCheck, BellRing, Bell, CalendarX2, Star, HeartHandshake, Hourglass, ChevronDown, CheckCheck, RotateCcw } from 'lucide-react'
+import { MessageCircle, Mail, CalendarCheck, BellRing, Bell, CalendarX2, HeartHandshake, Hourglass, ChevronDown, CheckCheck, RotateCcw } from 'lucide-react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { recursosDe, CLIENTES } from '@/modules/turnos/datos'
 import { useBorrador, Encabezado, SecCard, Switch, Selector, BarraGuardar, Chip, FilaSwitch, Campo, type PropsTab } from './ui'
@@ -23,7 +23,6 @@ function metas(voz: Voz): Meta[] {
     { id: 'recordatorio2', titulo: 'Último aviso', ayuda: 'Un recordatorio corto el mismo día.', Icon: Bell, cuando: [{ id: '2', label: '2 h antes' }, { id: '1', label: '1 h antes' }, { id: '3', label: '3 h antes' }] },
     { id: 'cancelacion', titulo: 'Aviso de cancelación', ayuda: `Cuando se cancela un ${voz.turno}, de cualquiera de los dos lados.`, Icon: CalendarX2 },
     { id: 'espera', titulo: 'Se liberó un lugar', ayuda: 'Para el primero de la lista de espera.', Icon: Hourglass },
-    { id: 'resena', titulo: 'Pedido de reseña', ayuda: 'Lo que te contestan lo ves solo vos: no se publica.', Icon: Star, cuando: [{ id: '2h', label: '2 h después' }, { id: '1d', label: 'Al día siguiente' }, { id: '3d', label: '3 días después' }] },
     { id: 'extranamos', titulo: 'Te extrañamos', ayuda: `Para ${voz.clientes} que hace mucho no vuelven.`, Icon: HeartHandshake, cuando: [{ id: '30', label: 'A los 30 días' }, { id: '45', label: 'A los 45 días' }, { id: '60', label: 'A los 60 días' }, { id: '90', label: 'A los 90 días' }] },
   ]
 }
@@ -35,7 +34,6 @@ function textos(voz: Voz): Record<string, string> {
     recordatorio2: `{nombre}, te esperamos hoy a las {hora} para {servicio}. ¡Nos vemos!`,
     cancelacion: `Hola {nombre}, tu ${voz.turno} del {fecha} a las {hora} quedó cancelado. Cuando quieras, reservá de nuevo: {link}`,
     espera: `¡{nombre}, se liberó un lugar! {servicio}, {fecha} a las {hora}. Tenés 30 min para tomarlo: {link}`,
-    resena: `Gracias por venir, {nombre}. ¿Nos contás cómo te fue con {servicio}? Te lleva un minuto: {link}`,
     extranamos: `¡Hola {nombre}! Hace rato que no te vemos por {negocio}. Tenemos horarios libres esta semana: {link}`,
   }
 }
@@ -49,7 +47,7 @@ export default function Mensajes({ rubro, avisar }: PropsTab) {
     return {
       wa: true, email: true, numero: t.telefono, firma: true,
       mensajes: lista.map((m): Mensaje => ({
-        id: m.id, on: m.id !== 'extranamos', canales: m.id === 'resena' || m.id === 'extranamos' ? ['wa'] : ['wa', 'email'],
+        id: m.id, on: m.id !== 'extranamos', canales: m.id === 'extranamos' ? ['wa'] : ['wa', 'email'],
         cuando: m.cuando?.[0].id ?? '', texto: tx[m.id],
       })),
     }

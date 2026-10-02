@@ -8,6 +8,11 @@
 // beneficios, en "Tus datos" se puede crear la cuenta (o entrar a la que ya se
 // tiene) y el descuento de bienvenida se ve en el ticket antes de confirmar.
 //
+// Desde la página simple (?forma=simple) el flujo es más corto y más liviano:
+// no se pregunta con quién (se da el primero libre), elegir un servicio o un
+// horario ya pasa al paso siguiente, y todo va en una columna angosta con una
+// barrita de avance en vez de la órbita y el ticket al costado.
+//
 // Acá vive solo el estado y el orden de los pasos; cada paso y cada pieza está
 // en ./reserva. Manda la marca del negocio (tema) y Órbita aparece como motivo:
 // el progreso es una órbita, el resumen es un ticket y la confirmación cierra
@@ -40,7 +45,7 @@ export default function Reserva({ rubro }: { rubro: RubroTurnos }) {
       {t => (
         <>
           <EstiloReserva />
-          <Flujo rubro={rubro} t={t} />
+          <Flujo rubro={rubro} t={t} simple={forma === 'simple'} />
         </>
       )}
     </SitioNegocio>
@@ -74,7 +79,7 @@ function preseleccion(q: ParsedUrlQuery, rubro: RubroTurnos, recursos: { id: str
   return out
 }
 
-function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
+function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simple: boolean }) {
   const router = useRouter()
   const vacio = router.query.estado === 'vacio'
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
@@ -85,7 +90,8 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   // así que lo preseleccionado entra como estado inicial y no hace falta un effect.
   const [inicial] = useState(() => preseleccion(router.query, rubro, recursos, clases))
   const [servicioIdx, setServicioIdx] = useState<number | null>(inicial.servicio)
-  const [recursoId, setRecursoId] = useState<string | null>(inicial.recursoId)
+  // En la reserva simple no se elige con quién: salvo que venga pedido por la URL, es el primero libre.
+  const [recursoId, setRecursoId] = useState<string | null>(inicial.recursoId ?? (simple ? 'cualquiera' : null))
   const [claseId, setClaseId] = useState<string | null>(inicial.claseId)
   const [fecha, setFecha] = useState<Fecha | null>(null)
   const [hora, setHora] = useState<number | null>(null)
@@ -122,7 +128,7 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
 
   const pasos: Paso[] = conCupo
     ? ['clase', 'datos', ...(pideSena ? ['pago' as Paso] : [])]
-    : ['servicio', 'recurso', 'fecha', 'datos', ...(pideSena ? ['pago' as Paso] : [])]
+    : ['servicio', ...(simple ? [] : ['recurso' as Paso]), 'fecha', 'datos', ...(pideSena ? ['pago' as Paso] : [])]
   const rotuloRecurso = rubro.modo === 'profesional' ? rubro.profesional : rubro.modo === 'cancha' ? 'Cancha' : 'Espacio'
   const NOMBRE: Record<Paso, string> = { servicio: 'Servicio', recurso: rotuloRecurso, fecha: 'Día y hora', clase: 'Clase', datos: 'Tus datos', pago: 'Seña' }
 
@@ -180,6 +186,9 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
     else setEnviando(true)
   }
 
+  // Reserva simple: elegir ya avanza, sin pasar por "Continuar".
+  const avanzar = () => { if (simple && !ultimo) ir(paso + 1) }
+
   if (vacio) return <SinAgenda rubro={rubro} t={t} />
 
   if (listo && fechaTurno && inicioTurno !== null) {
@@ -230,10 +239,12 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   const resumen = [conCupo ? clase?.nombre : servicio?.nombre, cuando].filter(Boolean).join(' · ') || falta[actual] || 'Tu reserva'
 
   return (
-    <div ref={raiz} className="tur" data-oscuro={t.oscuro} data-mayus={!!t.mayus}>
+    <div ref={raiz} className="tur" data-oscuro={t.oscuro} data-mayus={!!t.mayus} data-simple={simple}>
       <Fondo t={t} />
       <div className="tur-cont tur-flujo">
-        <OrbitaPasos pasos={pasos.map(p => NOMBRE[p])} actual={paso} onIr={i => i < paso && ir(i)} />
+        {simple
+          ? <div className="tur-pasitos" aria-hidden>{pasos.map((p, i) => <i key={p} data-on={i <= paso} />)}</div>
+          : <OrbitaPasos pasos={pasos.map(p => NOMBRE[p])} actual={paso} onIr={i => i < paso && ir(i)} />}
         <p className="tur-sr" aria-live="polite">{`Paso ${paso + 1} de ${pasos.length}: ${NOMBRE[actual]}`}</p>
 
         <div className="tur-grilla">
@@ -244,13 +255,13 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
                   <ChevronLeft size={18} aria-hidden /> Volver
                 </button>
               )}
-              <span className="tur-rotulo">Paso <span className="tur-num">{paso + 1}</span> de <span className="tur-num">{pasos.length}</span></span>
+              <span className="tur-rotulo">Paso <span className="tur-num">{paso + 1}</span> de <span className="tur-num">{pasos.length}</span>{simple ? ` · ${NOMBRE[actual]}` : ''}</span>
             </div>
 
             {actual === 'servicio' && (
               <Bloque refTitulo={titulo} titulo={rubro.familia === 'salud' ? '¿Qué turno necesitás?' : rubro.modo === 'cancha' ? '¿Qué querés jugar?' : '¿Qué te querés hacer?'}
                 sub={rubro.sena ? `Para reservar se pide una seña del ${rubro.sena}%, que se descuenta del total.` : 'Elegí un servicio. El precio que ves es el final.'}>
-                <PasoServicio rubro={rubro} t={t} elegido={servicioIdx} onElegir={i => { setServicioIdx(i); setFecha(null); setHora(null) }} />
+                <PasoServicio rubro={rubro} t={t} elegido={servicioIdx} onElegir={i => { setServicioIdx(i); setFecha(null); setHora(null); avanzar() }} />
               </Bloque>
             )}
 
@@ -264,13 +275,13 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
             {actual === 'fecha' && servicio && (
               <Bloque refTitulo={titulo} titulo="Elegí día y horario"
                 sub={`${servicio.nombre} · ${duracionTxt(servicio.duracion)}${nombreRecurso ? ` · ${rubro.modo === 'profesional' && recurso ? `con ${recurso.nombre.split(' ')[0]}` : nombreRecurso.toLowerCase()}` : ''}${recurso?.horario ? `, que atiende ${tramosFrase(tramosDe(recurso.horario))}` : ''}`}>
-                <PasoFecha horarios={agenda} duracion={servicio.duracion} fecha={fechaVista} hora={hora} onFecha={f => { setFecha(f); setHora(null) }} onHora={(f, m) => { setFecha(f); setHora(m) }} />
+                <PasoFecha horarios={agenda} duracion={servicio.duracion} fecha={fechaVista} hora={hora} onFecha={f => { setFecha(f); setHora(null) }} onHora={(f, m) => { setFecha(f); setHora(m); avanzar() }} />
               </Bloque>
             )}
 
             {actual === 'clase' && (
               <Bloque refTitulo={titulo} titulo="Reservá tu lugar" sub="Cada clase muestra cuántos lugares quedan. Si está completa, te podés anotar en la lista de espera.">
-                <PasoClase clases={clases} elegida={clase} onElegir={c => setClaseId(c.id)} />
+                <PasoClase clases={clases} elegida={clase} onElegir={c => { setClaseId(c.id); avanzar() }} />
               </Bloque>
             )}
 
@@ -303,7 +314,8 @@ function Flujo({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
         </div>
       </div>
 
-      <HojaResumen filas={filas} total={total} precio={aPagar} sena={sena} rebaja={rebaja} resumen={resumen} boton={boton(true)} />
+      {/* En la reserva simple elegir ya avanza: la hoja con el botón aparece recién para confirmar o pagar. */}
+      {(!simple || actual === 'datos' || actual === 'pago') && <HojaResumen filas={filas} total={total} precio={aPagar} sena={sena} rebaja={rebaja} resumen={resumen} boton={boton(true)} />}
     </div>
   )
 }

@@ -150,6 +150,7 @@ export const CSS_UI_CONFIG = `
     .tuc-barra-txt { display: none; }
     .tuc-barra-corto { display: inline; }
     .tuc-barra-in { width: 100%; }
+    .tuc-barra-in > .tuo-btn { height: 44px; }
     /* 16px: por debajo de eso iOS hace zoom al enfocar el campo. */
     .tuc-field, .tuc-input { font-size: 16px; }
     .tuc-field--fila, select.tuc-field, input.tuc-field, .tuc-input { height: 46px; }

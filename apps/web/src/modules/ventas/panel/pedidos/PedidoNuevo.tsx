@@ -265,7 +265,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             panelEvaluateCart(carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })), clienteIdEval)
                 .then(r => {
                     if (cancelado) return
-                    const nombres = [...new Set(r.itemDiscounts.map(d => d.discountName))]
+                    // Los de producto y el que va sobre el total de la compra: sin este
+                    // último el ticket restaba plata sin decir de qué descuento era.
+                    const delTicket = r.ticketDiscount
+                        ? [`${r.ticketDiscount.discountName}${r.ticketDiscount.type === 'PERCENT_TICKET' ? ` (${r.ticketDiscount.value}%)` : ''}`]
+                        : []
+                    const nombres = [...new Set([...r.itemDiscounts.map(d => d.discountName), ...delTicket])]
                     setDescuentoAuto({ total: r.discountTotal, nombres })
                 })
                 .catch(() => { if (!cancelado) setDescuentoAuto({ total: 0, nombres: [] }) })

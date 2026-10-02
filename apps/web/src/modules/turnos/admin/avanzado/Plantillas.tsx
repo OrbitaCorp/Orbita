@@ -1,4 +1,5 @@
-// Plantillas del sitio: la galería. Muestra las identidades disponibles con el
+// Plantillas del sitio: la galería. Muestra las cinco identidades del rubro (y
+// solo las del rubro: una barbería elige entre cinco barberías) con el
 // negocio ya puesto adentro (su nombre, su foto, sus servicios), así se elige
 // viendo cómo queda el sitio propio y no un ejemplo genérico.
 //
@@ -9,14 +10,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, Palette } from 'lucide-react'
 import { Volver } from '@/modules/ventas/panel/_shared/Volver'
-import { cargarFuentes } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
+import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
-import { PLANTILLAS, PLANTILLA_DE_FAMILIA, plantillasPara, plantillaRecomendada, temaConPlantilla } from '../configuracion/datos'
+import { cargarFuentesTurnos, plantillaEnUso, plantillasPara, temaConPlantilla } from '../configuracion/datos'
 import { CSS_MINI, CSS_PLANTILLA, TarjetaPlantilla, datosMini } from '../configuracion/MiniSitio'
 import { CSS_AVANZADO, BadgePlan, IconoOrbita, Vacio, Boton } from './ui'
 import type { PropsFuncion } from './tipos'
 
-type Filtro = 'todas' | 'recomendadas' | 'claras' | 'oscuras'
+type Filtro = 'todas' | 'claras' | 'oscuras'
 
 const CSS_GALERIA = `
   .tua-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 18px; }
@@ -39,12 +40,12 @@ const CSS_GALERIA = `
 export default function Plantillas({ rubro, funcion, onVolver }: PropsFuncion) {
   const router = useRouter()
   const [filtro, setFiltro] = useState<Filtro>('todas')
-  useEffect(() => { cargarFuentes() }, [])
+  useEffect(() => { cargarFuentesTurnos() }, [])
 
-  const enUso = PLANTILLA_DE_FAMILIA[rubro.familia]
-  const lista = plantillasPara(rubro).filter(p =>
-    filtro === 'todas' || (filtro === 'recomendadas' ? plantillaRecomendada(p, rubro) : filtro === 'oscuras' ? p.oscuro : !p.oscuro))
-  const nRec = PLANTILLAS.filter(p => plantillaRecomendada(p, rubro)).length
+  const { demo } = useNegocioDemo()
+  const todas = plantillasPara(rubro)
+  const enUso = plantillaEnUso(rubro, demo.apariencia).id
+  const lista = todas.filter(p => filtro === 'todas' || (filtro === 'oscuras' ? p.oscuro : !p.oscuro))
 
   const abrir = (id: string) => {
     const { funcion: _f, ...resto } = router.query
@@ -53,8 +54,7 @@ export default function Plantillas({ rubro, funcion, onVolver }: PropsFuncion) {
   }
 
   const filtros: [Filtro, string, number][] = [
-    ['todas', 'Todas', PLANTILLAS.length], ['recomendadas', 'Para tu rubro', nRec],
-    ['claras', 'Claras', PLANTILLAS.filter(p => !p.oscuro).length], ['oscuras', 'Oscuras', PLANTILLAS.filter(p => p.oscuro).length],
+    ['todas', 'Todas', todas.length], ['claras', 'Claras', todas.filter(p => !p.oscuro).length], ['oscuras', 'Oscuras', todas.filter(p => p.oscuro).length],
   ]
 
   return (
@@ -71,7 +71,7 @@ export default function Plantillas({ rubro, funcion, onVolver }: PropsFuncion) {
             <BadgePlan />
           </div>
           <p className="tuo-bajada">
-            {PLANTILLAS.length} identidades completas para tu sitio de reservas, mostradas con tu negocio adentro.
+            {todas.length} identidades completas pensadas para {rubro.label.toLowerCase()}, mostradas con tu negocio adentro.
             Elegí una y seguí en Apariencia para ajustar colores, letra y fotos.
           </p>
         </div>
@@ -101,7 +101,7 @@ export default function Plantillas({ rubro, funcion, onVolver }: PropsFuncion) {
               <div key={p.id}>
                 <TarjetaPlantilla
                   p={p} i={Math.min(i, 10)} tema={tema} datos={datosMini(rubro, tema)} activa={p.id === enUso}
-                  recomendada={plantillaRecomendada(p, rubro)} onClick={() => abrir(p.id)}
+                  onClick={() => abrir(p.id)}
                   extra={<span className="tua-gal-ir">{p.id === enUso ? 'Ajustarla en Apariencia' : 'Probarla en mi sitio'}<ArrowRight size={14} aria-hidden /></span>}
                 />
               </div>

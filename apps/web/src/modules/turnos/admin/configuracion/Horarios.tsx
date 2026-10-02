@@ -1,18 +1,27 @@
 // Horario de atención del negocio: el marco dentro del cual cada profesional o
-// sala tiene su propio horario (eso se edita en Equipo). Días con corte al
-// mediodía, feriados y vacaciones, que son lo que más se olvida y más turnos
-// mal dados genera.
+// sala tiene su propio horario (eso se edita en Equipo). Se carga de dos formas:
+// el mismo horario para todos los días que abre, o día por día (para quien un
+// día atiende distinto). Cada día tiene su mañana y su tarde, con el corte del mediodía en el medio; más abajo, feriados
+// y vacaciones, que son lo que más se olvida y más turnos mal dados genera.
 //
 // Al lado de cada día va una franja de 6 a 24 h con lo que está abierto
 // pintado: la semana se lee de un vistazo, sin sumar horas de cabeza.
-import { Clock, CalendarX, Plane, Plus, Trash2, Copy, Scissors } from 'lucide-react'
-import { temaDe } from '@/modules/turnos/storefront/tema'
-import { DIAS } from '@/modules/turnos/datos'
+//
+// El horario semanal se guarda en el negocio de la demo (demo/negocioDemo.ts):
+// el sitio, la reserva y la agenda lo leen de ahí. Los días especiales y las
+// vacaciones siguen siendo demo en memoria.
+import { useState } from 'react'
+import { Clock, CalendarX, Plane, Plus, Trash2, Copy, TriangleAlert } from 'lucide-react'
+import { DIAS, semanaDe } from '@/modules/turnos/datos'
+import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
+import { JORNADA_INICIAL, errorJornada, jornadaDe, jornadaTxt, minutosAbiertos, tramosDe, tramosDeJornada, tramosFrase, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { BloquesJornada, DiasSemana } from '@/modules/turnos/admin/piezasPanel'
 import { useBorrador, Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BarraGuardar, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'
 import { vozDe } from './datos'
 
 type Rango = [string, string]
-interface Dia { abierto: boolean; rangos: Rango[] }
+/** Un día en el formulario: si abre, y su mañana y su tarde. */
+interface Dia { abierto: boolean; jornada: Jornada }
 interface Especial { id: string; fecha: string; motivo: string; tipo: 'cerrado' | 'especial'; rango: Rango }
 
 // La franja dibuja de 6:00 a 24:00: antes de las 6 no abre casi nadie y así
@@ -20,78 +29,139 @@ interface Especial { id: string; fecha: string; motivo: string; tipo: 'cerrado' 
 const DESDE = 6 * 60
 const HASTA = 24 * 60
 
+const copia = (j: Jornada): Jornada => ({ manana: { ...j.manana }, tarde: { ...j.tarde } })
+/** Un día cerrado guarda la jornada de fábrica: al abrirlo ya propone mañana y tarde. */
+const diasDe = (semana: Semana): Dia[] => semana.map(([, h]) => {
+  const tramos = tramosDe(h)
+  return { abierto: tramos.length > 0, jornada: tramos.length ? jornadaDe(tramos) : copia(JORNADA_INICIAL) }
+})
+const semanaDeDias = (dias: Dia[]): Semana => dias.map((d, i) => [DIAS[i], d.abierto ? jornadaTxt(d.jornada) : ''])
+const tramosDia = (d: Dia): Tramo[] => (d.abierto ? tramosDeJornada(d.jornada) : [])
+
 export default function Horarios({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
+  // null = sin tocar: vale lo guardado (que llega del navegador recién después
+  // de hidratar, por eso no se copia a un estado al montar).
+  const { guardar: guardarDemo } = useNegocioDemo()
+  const guardada = semanaDe(rubro)
+  const [borrador, setBorrador] = useState<Dia[] | null>(null)
+  const dias = borrador ?? diasDe(guardada)
+  const semanaDirty = borrador !== null && JSON.stringify(semanaDeDias(borrador)) !== JSON.stringify(semanaDeDias(diasDe(guardada)))
+  const errores = dias.map(d => (d.abierto ? errorJornada(d.jornada) : null))
+
+  // Cómo se carga: un horario para todos los días o uno por día. Sin elegir, sale
+  // de lo guardado: si todos los días que abre tienen el mismo horario, "igual".
+  const primero = dias.find(d => d.abierto)
+  const iguales = dias.every(d => !d.abierto || jornadaTxt(d.jornada) === jornadaTxt(primero!.jornada))
+  const [modoElegido, setModo] = useState<'igual' | 'dia' | null>(null)
+  const modo = modoElegido ?? (iguales ? 'igual' : 'dia')
+  const comun = primero?.jornada ?? JORNADA_INICIAL
+  const ponerComun = (jornada: Jornada) => setBorrador(dias.map(d => ({ ...d, jornada: copia(jornada) })))
+  const ponerAbiertos = (indices: number[]) => setBorrador(dias.map((d, i) => ({ abierto: indices.includes(i), jornada: copia(comun) })))
+  const cambiarModo = (m: 'igual' | 'dia') => {
+    // Al pasar a "igual" con días distintos, todos toman el horario del primer día que abre.
+    if (m === 'igual' && !iguales) ponerComun(comun)
+    setModo(m)
+  }
+  const conError = errores.findIndex(Boolean)
+
   const b = useBorrador(() => {
-    const t = temaDe(rubro)
-    const dias: Dia[] = t.horarios.map(([, h], i) => {
-      if (!h) return { abierto: false, rangos: [['09:00', '18:00']] }
-      const [desde, hasta] = h.split('–').map(s => s.trim()) as Rango
-      // Salud y belleza suelen cortar al mediodía de lunes a viernes.
-      const corte = (rubro.familia === 'salud' || rubro.key === 'peluqueria') && i < 5
-      return { abierto: true, rangos: corte ? [[desde, '13:00'], ['15:00', hasta]] : [[desde, hasta]] }
-    })
     const especiales: Especial[] = [
       { id: 'e1', fecha: '2026-10-12', motivo: 'Día de la Diversidad Cultural', tipo: 'cerrado', rango: ['09:00', '13:00'] },
       { id: 'e2', fecha: '2026-11-20', motivo: 'Día de la Soberanía', tipo: 'especial', rango: ['10:00', '14:00'] },
       { id: 'e3', fecha: '2026-12-24', motivo: 'Nochebuena', tipo: 'especial', rango: ['09:00', '14:00'] },
       { id: 'e4', fecha: '2026-12-25', motivo: 'Navidad', tipo: 'cerrado', rango: ['09:00', '13:00'] },
     ]
-    return { dias, especiales, vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
+    return { especiales, vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
   })
   const v = b.valor
 
-  const setDia = (i: number, d: Partial<Dia>) => b.set('dias', v.dias.map((x, k) => k === i ? { ...x, ...d } : x))
-  const setRango = (i: number, r: number, pos: 0 | 1, val: string) =>
-    setDia(i, { rangos: v.dias[i].rangos.map((x, k) => k === r ? (pos === 0 ? [val, x[1]] : [x[0], val]) as Rango : x) })
-  const copiarLunes = () => b.set('dias', v.dias.map((d, i) => i > 0 && i < 5 ? { ...v.dias[0], rangos: v.dias[0].rangos.map(r => [...r] as Rango) } : d))
+  const setDia = (i: number, d: Partial<Dia>) => setBorrador(dias.map((x, k) => (k === i ? { ...x, ...d } : x)))
+  // Copia el horario de un día a todos los demás días que abren.
+  const copiarA = (i: number) => {
+    setBorrador(dias.map((d, k) => (k !== i && d.abierto ? { ...d, jornada: copia(dias[i].jornada) } : d)))
+    avisar(`Horario del ${DIAS[i].toLowerCase()} copiado`, 'Quedó igual en todos los días que abrís. Falta guardar.')
+  }
   const setEsp = (id: string, e: Partial<Especial>) => b.set('especiales', v.especiales.map(x => x.id === id ? { ...x, ...e } : x))
   const agregarDia = () => b.set('especiales', [...v.especiales, { id: `n${Date.now()}`, fecha: '', motivo: '', tipo: 'cerrado', rango: ['09:00', '13:00'] }])
 
-  const horasSemana = v.dias.reduce((s, d) => s + (d.abierto ? d.rangos.reduce((a, [x, y]) => a + Math.max(0, min(y) - min(x)), 0) : 0), 0) / 60
-  const abiertos = v.dias.filter(d => d.abierto).length
+  const horasSemana = dias.reduce((s, d) => s + minutosAbiertos(tramosDia(d)), 0) / 60
+  const abiertos = dias.filter(d => d.abierto).length
+
+  const guardar = () => {
+    if (conError >= 0) { avisar(`Revisá el ${DIAS[conError].toLowerCase()}`, errores[conError] ?? undefined); return }
+    if (abiertos === 0) { avisar('Dejá al menos un día abierto', 'Para cerrar unos días sin tocar el horario están las vacaciones, más abajo.'); return }
+    b.guardar()
+    if (semanaDirty) guardarDemo({ horarios: { rubro: rubro.key, dias: semanaDeDias(dias) } })
+    setBorrador(null); setModo(null)
+    avisar('Horarios guardados', semanaDirty ? 'Tu página, la reserva y la agenda ya muestran el horario nuevo.' : 'Los días especiales y las vacaciones son una demo: la agenda no cambia.')
+  }
+  const descartar = () => { b.descartar(); setBorrador(null); setModo(null) }
 
   return (
     <div className="panel-page panel-page--form">
-      <Encabezado rotulo="Tu negocio" titulo="Horarios" bajada={`Cuándo está abierto el negocio. Fuera de este horario no se pueden reservar ${voz.turnos}.`} />
+      <Encabezado rotulo="Tu negocio" titulo="Horarios" bajada={`Cuándo está abierto el negocio, a la mañana y a la tarde. Fuera de este horario no se pueden reservar ${voz.turnos}.`} />
 
       <div className="tuc-pila">
         <SecCard titulo="Horario semanal" Icon={Clock}
-          badge={<Chip tono="primario"><span className="tuo-num">{Math.round(horasSemana)} h</span> · {abiertos} días</Chip>}
+          badge={<Chip tono="primario"><span className="tuo-num">{Math.round(horasSemana)} h</span> · {abiertos} {abiertos === 1 ? 'día' : 'días'}</Chip>}
           bajada={rubro.modo === 'profesional' ? `Cada ${voz.recurso} puede tener un horario propio dentro de este, desde Equipo.` : 'Cada espacio puede tener un horario propio dentro de este.'}>
-          {v.dias[0].abierto && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-              <BotonBorde Icon={Copy} onClick={copiarLunes}>Copiar el lunes a mar–vie</BotonBorde>
+          <div style={{ marginBottom: 16 }}>
+            <Segmentado label="Cómo cargás el horario" lleno valor={modo} onChange={cambiarModo}
+              opciones={[{ id: 'igual', label: 'El mismo todos los días' }, { id: 'dia', label: 'Un horario por día' }]} />
+            <p className="tuc-ayuda" style={{ marginTop: 8 }}>
+              {modo === 'igual' ? 'Elegís qué días abrís y un solo horario para todos. Si algún día atendés distinto, pasá a “Un horario por día”.' : 'Cada día tiene su mañana y su tarde: sirve si, por ejemplo, el sábado atendés solo a la mañana.'}
+            </p>
+          </div>
+
+          {modo === 'igual' ? (
+            <div className="tuc-igual">
+              <div>
+                <div className="tuc-rotulo" style={{ marginBottom: 8 }}>Días que abrís</div>
+                <DiasSemana dias={dias.map((d, i) => (d.abierto ? i : -1)).filter(i => i >= 0)} onChange={ponerAbiertos} etiqueta="Días que abrís" />
+              </div>
+              <div>
+                <div className="tuc-rotulo" style={{ marginBottom: 8 }}>Horario</div>
+                <BloquesJornada id="tuc-h-comun" jornada={comun} onChange={ponerComun} />
+                {errorJornada(comun) ? (
+                  <p role="alert" className="tuc-dia-error" style={{ marginTop: 8 }}><TriangleAlert size={14} aria-hidden /> {errorJornada(comun)}</p>
+                ) : (
+                  <p className="tuc-ayuda" style={{ marginTop: 8 }}>{abiertos === 0 ? 'Marcá al menos un día.' : `Abrís ${abiertos === 7 ? 'todos los días' : `${abiertos} día${abiertos === 1 ? '' : 's'} por semana`}, ${tramosFrase(tramosDeJornada(comun))}.`}</p>
+                )}
+              </div>
+              <Franja tramos={errorJornada(comun) ? [] : tramosDeJornada(comun)} />
             </div>
-          )}
+          ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {v.dias.map((d, i) => (
+            {dias.map((d, i) => (
               <div key={DIAS[i]} className="tuc-dia" data-abierto={d.abierto}>
                 <div className="tuc-dia-nombre">
                   <Switch on={d.abierto} onChange={x => setDia(i, { abierto: x })} label={`${DIAS[i]} abierto`} />
                   <span>{DIAS[i]}</span>
                 </div>
-                <div style={{ flex: '1 1 250px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="tuc-dia-cuerpo">
                   {!d.abierto ? (
-                    <span style={{ display: 'flex', alignItems: 'center', minHeight: 40, fontSize: 13.5, color: 'var(--color-muted)' }}>Cerrado</span>
-                  ) : d.rangos.map((r, k) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Hora value={r[0]} onChange={x => setRango(i, k, 0, x)} label={`${DIAS[i]}, turno ${k + 1}, desde`} />
-                      <span aria-hidden style={{ color: 'var(--color-subtle)' }}>–</span>
-                      <Hora value={r[1]} onChange={x => setRango(i, k, 1, x)} label={`${DIAS[i]}, turno ${k + 1}, hasta`} />
-                      {k === 1 ? (
-                        <button type="button" className="tuc-icono tuc-icono--peligro" aria-label={`Quitar el corte del ${DIAS[i].toLowerCase()}`} title="Quitar el corte" onClick={() => setDia(i, { rangos: [d.rangos[0]] })}><Trash2 size={15} aria-hidden /></button>
-                      ) : d.rangos.length === 1 ? (
-                        <button type="button" onClick={() => setDia(i, { rangos: [[r[0], '13:00'], ['15:00', r[1]]] })} className="tuc-link"><Scissors size={13} aria-hidden /> Agregar corte</button>
-                      ) : null}
-                    </div>
-                  ))}
-                  <Franja dia={d} />
+                    <span className="tuc-dia-cerrado">Cerrado</span>
+                  ) : (
+                    <>
+                      <BloquesJornada id={`tuc-h-${i}`} jornada={d.jornada} onChange={jornada => setDia(i, { jornada })} />
+                      {errores[i] ? (
+                        <p role="alert" className="tuc-dia-error"><TriangleAlert size={14} aria-hidden /> {errores[i]}</p>
+                      ) : (
+                        <div className="tuc-dia-pie">
+                          <span>Abre {tramosFrase(tramosDia(d))}</span>
+                          {abiertos > 1 && <button type="button" className="tuc-link" onClick={() => copiarA(i)}><Copy size={13} aria-hidden /> Copiar a los demás días</button>}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <Franja tramos={errores[i] ? [] : tramosDia(d)} />
                 </div>
               </div>
             ))}
           </div>
-          <div aria-hidden className="tuc-franja-escala"><span>6</span><span>9</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span></div>
+          )}
+          <div aria-hidden className="tuc-franja-escala" data-modo={modo}><span>6</span><span>9</span><span>12</span><span>15</span><span>18</span><span>21</span><span>24</span></div>
         </SecCard>
 
         <SecCard titulo="Días especiales y feriados" Icon={CalendarX} badge={v.especiales.length > 0 ? <Chip><span className="tuo-num">{v.especiales.length}</span> cargados</Chip> : undefined}
@@ -132,25 +202,21 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
         </SecCard>
       </div>
 
-      <BarraGuardar dirty={b.dirty} onDescartar={b.descartar} onGuardar={() => { b.guardar(); avisar('Horarios guardados', 'Es una demo: la agenda no cambia de verdad.') }} />
+      <BarraGuardar dirty={b.dirty || semanaDirty} onDescartar={descartar} onGuardar={guardar} />
     </div>
   )
 }
-
-const min = (h: string) => { const [a, c] = h.split(':').map(Number); return (a || 0) * 60 + (c || 0) }
 
 function Hora({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   return <input type="time" step={900} aria-label={label} value={value} onChange={e => onChange(e.target.value)} className="tuc-input tuc-mono" style={{ width: 118 }} />
 }
 
 /** El día de 6 a 24 h con lo abierto pintado. Es un apoyo visual: los horarios exactos están en los campos. */
-function Franja({ dia }: { dia: Dia }) {
+function Franja({ tramos }: { tramos: Tramo[] }) {
   const pct = (m: number) => `${((Math.min(HASTA, Math.max(DESDE, m)) - DESDE) / (HASTA - DESDE)) * 100}%`
   return (
     <div aria-hidden className="tuc-franja">
-      {dia.abierto && dia.rangos.map(([x, y], k) => min(y) > min(x) && (
-        <span key={k} style={{ left: pct(min(x)), width: `calc(${pct(min(y))} - ${pct(min(x))})` }} />
-      ))}
+      {tramos.map(([x, y]) => <span key={x} style={{ left: pct(x), width: `calc(${pct(y)} - ${pct(x)})` }} />)}
     </div>
   )
 }
@@ -158,14 +224,20 @@ function Franja({ dia }: { dia: Dia }) {
 export const CSS_HORARIOS = `
   .tuc-dia { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; flex-wrap: wrap; border-top: 1px solid var(--color-border); }
   .tuc-dia:first-child { border-top: none; padding-top: 0; }
-  .tuc-dia-nombre { display: flex; align-items: center; gap: 12px; width: 150px; flex-shrink: 0; min-height: 40px; font-size: 14px; font-weight: 600; color: var(--color-text); transition: color 200ms ease; }
-  .tuc-dia[data-abierto='false'] .tuc-dia-nombre { color: var(--color-muted); }
+  .tuc-dia-nombre { display: flex; align-items: center; gap: 12px; width: 150px; flex-shrink: 0; min-height: 54px; font-size: 14px; font-weight: 600; color: var(--color-text); transition: color 200ms ease; }
+  .tuc-dia[data-abierto='false'] .tuc-dia-nombre { color: var(--color-muted); min-height: 40px; }
+  .tuc-igual { display: flex; flex-direction: column; gap: 16px; }
+  .tuc-dia-cuerpo { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .tuc-dia-cerrado { display: flex; align-items: center; min-height: 40px; font-size: 13.5px; color: var(--color-muted); }
+  .tuc-dia-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--color-muted); }
+  .tuc-dia-error { display: flex; align-items: center; gap: 6px; margin: 0; min-height: 32px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
   .tuc-franja { position: relative; height: 6px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
   .tuc-franja > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--tuo-grad); transition: left 320ms var(--tuo-ease, ease), width 320ms var(--tuo-ease, ease); }
   .tuc-franja-escala { display: flex; justify-content: space-between; margin: 4px 0 0 162px; font-family: var(--tuo-mono, monospace); font-size: 10.5px; color: var(--color-subtle); font-variant-numeric: tabular-nums; }
+  .tuc-franja-escala[data-modo='igual'] { margin-left: 0; }
   .tuc-especial { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; }
   @media (max-width: 768px) {
-    .tuc-dia-nombre { width: 100%; }
+    .tuc-dia-nombre, .tuc-dia[data-abierto='false'] .tuc-dia-nombre { width: 100%; min-height: 40px; }
     .tuc-franja-escala { margin-left: 0; }
   }
   @media (prefers-reduced-motion: reduce) { .tuc-franja > span { transition: none; } }

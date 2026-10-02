@@ -1,4 +1,15 @@
-// DEMO INTERNA — el alta única de Órbita: un solo recorrido para los dos
+// El alta única de Órbita: un solo recorrido para los dos módulos. Tiene dos
+// usos, según la prop `real`:
+//
+//   - real (pages/onboarding/rubro.tsx): es el alta de producción. El subdominio
+//     y el email se chequean contra la API y, al terminar "Tu cuenta", lo
+//     cargado pasa al wizard de siempre (modules/onboarding/useOnboardingStore)
+//     y sigue en /onboarding/plan, que es donde se elige el plan, se paga y
+//     recién ahí se crea la cuenta. Acá no se crea nada. Los módulos de
+//     MODULOS_PROXIMAMENTE (hoy Turnos) se muestran pero no se pueden elegir.
+//   - demo (pages/turnos-demo/onboarding.tsx): lo que sigue, todo local.
+//
+// DEMO INTERNA — un solo recorrido para los dos
 // módulos. Arranca eligiendo con qué se quiere empezar (Tienda o Turnos) y el
 // arco de arriba suma las estaciones de ese módulo. Los dos caminos andan de
 // punta a punta:
@@ -21,6 +32,7 @@
 // aparte): si se cambia desde la tira de arriba, el alta lo sigue, y lo que se
 // edita de cada rubro (servicios, seña) se guarda por rubro.
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ArrowRight, CalendarClock, ChevronLeft, Eye, Lock, ShoppingBag } from 'lucide-react'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -29,7 +41,10 @@ import { MODO_LABEL } from '@/modules/turnos/datos'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { useNegocioDemo } from '@/modules/turnos/demo/negocioDemo'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
-import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
+import { checkEmail, checkSubdomain } from '@/lib/api'
+import { flush as flushAnalitica, track, trackDisponibilidad, trackPaso, trackVolverAtras } from '@/lib/analytics/wizardTracker'
+import { useOnboardingHidratado, useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
 import { CSS_ONBOARDING } from './estilo'
 import { useAlta } from './estadoAlta'
 import { OrbitaPasos } from './OrbitaPasos'
@@ -44,8 +59,8 @@ import { PasoCuenta } from './PasoCuenta'
 import { PasoPago, importeDe } from './PasoPago'
 import { Listo } from './Listo'
 import {
-  EMAIL_OK, aSlug, chequeoEmail, chequeoSubdominio, identidadDe, pasosDe, serviciosIniciales, validar,
-  type ContextoAlta, type DatosAlta, type Modulo, type PasoId, type ServicioAlta,
+  EMAIL_OK, aSlug, chequeoEmail, chequeoSubdominio, identidadDe, modalidadesAlta, pasosDe, serviciosIniciales, validar,
+  type Chequeo, type ContextoAlta, type DatosAlta, type Modulo, type PasoId, type ServicioAlta,
 } from './modelo'
 
 interface Titulo { titulo: string; resalte: string; bajada: string }
@@ -68,9 +83,19 @@ const MODULO_TXT: Record<Modulo, string> = { tienda: 'Tienda online', turnos: 'T
 // Cómo se nombra al negocio en la botonera mientras todavía no tiene nombre.
 const SIN_NOMBRE: Record<Modulo, string> = { tienda: 'Tu tienda en Órbita', turnos: 'Tu agenda en Órbita' }
 // Pasos que en celular tienen una vista previa más abajo: la botonera ofrece un atajo.
-const CON_PREVIA: PasoId[] = ['tipo', 'rubro', 'pagina']
+const CON_PREVIA: PasoId[] = ['rubro', 'pagina']
 
-export default function Alta() {
+// Cómo se llama cada paso en el embudo (analytics): los mismos nombres que usaba
+// el alta anterior, para que los gráficos sigan comparando lo mismo.
+const NOMBRE_EMBUDO: Partial<Record<PasoId, string>> = { modulo: 'rubro', tipo: 'subrubros', negocio: 'tu-negocio', ubicacion: 'ubicacion', cuenta: 'cuenta' }
+// El pago es el de siempre: la pantalla de plan de Tienda.
+const PANTALLA_DE_PAGO = '/onboarding/plan?next=/onboarding/tienda/success'
+
+/** Lo último que contestó la API sobre un subdominio o un email. */
+interface Visto { valor: string; estado: Chequeo }
+const SIN_VER: Visto = { valor: '', estado: 'vacio' }
+
+export default function Alta({ real = false }: { real?: boolean }) {
   const router = useRouter()
   const [rubroDemo, setRubroDemo] = useRubroDemo()
   // Sin ?rubro= en la URL no hay nada elegido: el default de la demo (barbería)
@@ -93,30 +118,106 @@ export default function Alta() {
   const n = pasos.length
   // En Turnos, sin rubro en la URL no se puede estar más allá del paso "Rubro".
   const iRubro = pasos.findIndex(p => p.id === 'rubro')
-  const paso = datos.modulo === 'turnos' && !rubro && estado.paso > iRubro ? iRubro : Math.min(estado.paso, n)
+  // En el alta real el último paso que se recorre acá es "Tu cuenta": el pago es otra pantalla.
+  const iCuenta = pasos.findIndex(p => p.id === 'cuenta')
+  const paso = real ? Math.min(estado.paso, iCuenta)
+    : datos.modulo === 'turnos' && !rubro && estado.paso > iRubro ? iRubro : Math.min(estado.paso, n)
   const terminado = paso >= n
   const id = pasos[Math.min(paso, n - 1)].id
   const ultimo = paso === n - 1
 
-  // ── Chequeos simulados (el alta real le pregunta a la API) ──
+  // ── Chequeos: la demo los simula, el alta real le pregunta a la API ──
   const [slugVisto, setSlugVisto] = useState('')
   const [mailVisto, setMailVisto] = useState('')
+  const [subReal, setSubReal] = useState<Visto>(SIN_VER)
+  const [mailReal, setMailReal] = useState<Visto>(SIN_VER)
   const email = datos.email.trim().toLowerCase()
+  const subdominio = aSlug(datos.slug)
   useEffect(() => {
-    if (aSlug(datos.slug).length < 3 || slugVisto === datos.slug) return
+    if (real || aSlug(datos.slug).length < 3 || slugVisto === datos.slug) return
     const x = window.setTimeout(() => setSlugVisto(datos.slug), 700)
     return () => window.clearTimeout(x)
-  }, [datos.slug, slugVisto])
+  }, [real, datos.slug, slugVisto])
   useEffect(() => {
-    if (!EMAIL_OK.test(email) || mailVisto === email) return
+    if (real || !EMAIL_OK.test(email) || mailVisto === email) return
     const x = window.setTimeout(() => setMailVisto(email), 700)
     return () => window.clearTimeout(x)
-  }, [email, mailVisto])
+  }, [real, email, mailVisto])
+  // Si la API no contesta no se traba el alta (queda sin veredicto, como en el
+  // alta anterior): el registro lo vuelve a validar del lado del servidor.
+  useEffect(() => {
+    if (!real || subdominio.length < 3 || subReal.valor === subdominio) return
+    let vigente = true
+    const x = window.setTimeout(() => {
+      checkSubdomain(subdominio)
+        .then(r => {
+          if (!vigente) return
+          setSubReal({ valor: subdominio, estado: r.available ? 'libre' : 'ocupado' })
+          trackDisponibilidad('subdominio', 'tu-negocio', r.available ? 'disponible' : 'ocupado')
+        })
+        .catch(() => { if (vigente) setSubReal({ valor: subdominio, estado: 'vacio' }) })
+    }, 700)
+    return () => { vigente = false; window.clearTimeout(x) }
+  }, [real, subdominio, subReal.valor])
+  useEffect(() => {
+    if (!real || !EMAIL_OK.test(email) || mailReal.valor === email) return
+    let vigente = true
+    const x = window.setTimeout(() => {
+      checkEmail(email)
+        .then(r => {
+          if (!vigente) return
+          setMailReal({ valor: email, estado: r.available ? 'libre' : 'ocupado' })
+          trackDisponibilidad('email', 'cuenta', r.available ? 'disponible' : 'ocupado')
+        })
+        .catch(() => { if (vigente) setMailReal({ valor: email, estado: 'vacio' }) })
+    }, 700)
+    return () => { vigente = false; window.clearTimeout(x) }
+  }, [real, email, mailReal.valor])
+  const chequeoSub: Chequeo = !real ? chequeoSubdominio(datos.slug, slugVisto)
+    : subdominio.length < 3 ? 'vacio' : subReal.valor !== subdominio ? 'verificando' : subReal.estado
+  const chequeoMail: Chequeo = !real ? chequeoEmail(datos.email, mailVisto)
+    : !EMAIL_OK.test(email) ? 'vacio' : mailReal.valor !== email ? 'verificando' : mailReal.estado
+
+  // ── Alta real: el wizard de siempre, que es de donde lee /onboarding/plan ──
+  const wizard = useOnboardingStore(st => st.wizard)
+  const setWizard = useOnboardingStore(st => st.setWizard)
+  const wizardListo = useOnboardingHidratado()
+  // Quien vuelve desde el pago (?paso=cuenta, ver volverAPoner en
+  // pages/onboarding/plan.tsx) en otra pestaña retoma en "Tu cuenta" con lo que
+  // ya había cargado: lo de esta alta vive por pestaña y el wizard, en
+  // localStorage. La contraseña se vuelve a pedir. Solo con ese parámetro: un
+  // wizard viejo que quedó guardado no tiene que saltearle los pasos a quien
+  // entra de cero.
+  const retomado = useRef(false)
+  useEffect(() => {
+    if (!real || !wizardListo || !router.isReady || retomado.current) return
+    retomado.current = true
+    if (router.query.paso !== 'cuenta' || datos.modulo || wizard.rubro !== 'tienda' || !wizard.nombre) return
+    const cuenta = pasosDe('tienda').findIndex(p => p.id === 'cuenta')
+    cambiar(e => ({
+      ...e, paso: cuenta, alcanzado: cuenta,
+      datos: {
+        ...e.datos, modulo: 'tienda', tipos: wizard.subrubros, modoVenta: wizard.modoVenta || 'ecommerce',
+        negocio: wizard.nombre, descripcion: wizard.descripcion, telefono: wizard.telefono, slug: wizard.subdominio,
+        modalidades: [...(wizard.operatesPhysical ? ['local' as const] : []), ...(wizard.operatesOnline ? ['domicilio' as const] : [])],
+        direccion: wizard.direccion, latLng: wizard.latLng, nombre: wizard.ownerName, email: wizard.ownerEmail, acepta: true,
+      },
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [real, wizardListo, router.isReady])
+
+  // Embudo: mismos eventos que el alta anterior (entrada, paso visto, volver atrás).
+  useEffect(() => { if (real) track('session_start') }, [real])
+  useEffect(() => {
+    const nombrePaso = NOMBRE_EMBUDO[id]
+    if (real && nombrePaso) trackPaso(paso, nombrePaso, datos.modulo ?? undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [real, paso])
 
   // ── Datos y validación ──
   const servicios: ServicioAlta[] = rubro ? (editados[rubro.key] ?? serviciosIniciales(rubro)) : []
   const sena = rubro ? (senas[rubro.key] ?? rubro.sena) : 0
-  const ctx: ContextoAlta = { rubro, servicios, sub: chequeoSubdominio(datos.slug, slugVisto), mail: chequeoEmail(datos.email, mailVisto) }
+  const ctx: ContextoAlta = { rubro, servicios, sub: chequeoSub, mail: chequeoMail }
   const errores = validar(id, datos, ctx)
   const cantErrores = Object.keys(errores).length
   const intentado = intentados.includes(id)
@@ -150,10 +251,39 @@ export default function Alta() {
     ]
   }
 
+  /**
+   * Alta real, fin de "Tu cuenta": lo cargado pasa al wizard y se sigue en la
+   * pantalla de plan y pago de siempre. La cuenta y el negocio se crean recién
+   * ahí, con el pago aprobado (ver pages/onboarding/plan.tsx). La contraseña y
+   * el logo quedan solo en memoria: el store no los persiste.
+   */
+  const pasarAlPago = () => {
+    const modalidades = modalidadesAlta(datos, null)
+    const conLocal = modalidades.includes('local')
+    setWizard({
+      rubro: 'tienda', subrubros: datos.tipos,
+      nombre: datos.negocio.trim(), descripcion: datos.descripcion.trim(), telefono: datos.telefono.trim(),
+      subdominio, modoVenta: datos.modoVenta, logoDataUrl: datos.logo ?? '',
+      direccion: conLocal ? [datos.direccion.trim(), datos.ciudad.trim()].filter(Boolean).join(', ') : '',
+      latLng: datos.latLng, operatesPhysical: conLocal, operatesOnline: modalidades.includes('domicilio'),
+      ownerName: datos.nombre.trim(), ownerEmail: email, ownerPassword: datos.clave,
+    })
+    track('wizard_complete', { step: paso, stepName: 'cuenta', rubro: 'tienda' })
+    flushAnalitica()
+    void router.push(PANTALLA_DE_PAGO)
+  }
+
+  const volver = () => {
+    const nombrePaso = NOMBRE_EMBUDO[id]
+    if (real && nombrePaso) trackVolverAtras(paso, nombrePaso)
+    ir(paso - 1)
+  }
+
   const continuar = () => {
     if (pago !== 'no') return
     if (cantErrores) { marcar(id); alError(); return }
-    if (ultimo) pagar()
+    if (real && id === 'cuenta') pasarAlPago()
+    else if (ultimo) pagar()
     else ir(paso + 1)
   }
 
@@ -198,16 +328,17 @@ export default function Alta() {
     ? (cantErrores === 1 ? Object.values(errores)[0] : `Faltan completar ${cantErrores} datos`)
     : pista[id] ?? `Paso ${paso + 1} de ${n} · ${pasos[paso]?.label}`
   const IconoPie = turnos ? (rubro?.Icon ?? CalendarClock) : datos.modulo === 'tienda' ? ShoppingBag : null
-  const verPrevia = CON_PREVIA.includes(id) && (id !== 'rubro' || !!rubro) && (id !== 'tipo' || datos.tipos.length > 0)
+  const verPrevia = CON_PREVIA.includes(id) && (id !== 'rubro' || !!rubro)
 
   return (
     <div ref={raiz} className="tuo tuo-espacio tuob">
       <EstiloTurnos />
       <style>{CSS_ONBOARDING}</style>
-      <Estrellas cantidad={70} />
+      {/* El mismo cielo del home (estrellas que titilan y cometas), sin el
+          planeta ni los anillos. La escena es una capa fija; el envoltorio la
+          deja por detrás de todo el contenido. */}
       <div className="tuob-cielo" aria-hidden>
-        <Anillos size={760} lado="derecha" opacidad={0.5} />
-        <Anillos size={520} lado="izquierda" opacidad={0.28} style={{ position: 'fixed' }} />
+        <EscenaEspacial planeta={false} />
       </div>
 
       <header className="tuob-cab">
@@ -227,6 +358,9 @@ export default function Alta() {
               </div>
             </div>
             {id === 'modulo' && <PasoModulo elegido={datos.modulo} onElegir={elegirModulo} />}
+            {id === 'modulo' && real && (
+              <p className="tuob-ya-cuenta">¿Ya tenés cuenta? <Link href="/login">Iniciá sesión</Link></p>
+            )}
             {id === 'tipo' && <PasoTipo elegidos={datos.tipos} onCambio={v => poner('tipos', v)} />}
             {id === 'rubro' && <PasoRubro elegido={rubro} onElegir={r => setRubroDemo(r.key)} />}
             {id === 'servicios' && rubro && (
@@ -255,7 +389,7 @@ export default function Alta() {
             </div>
             <div className="tuob-pie-botones">
               {paso > 0 && (
-                <button type="button" className="tuo-btn tuo-btn--lg tuob-volver" onClick={() => ir(paso - 1)} disabled={pago !== 'no'} aria-label="Volver al paso anterior">
+                <button type="button" className="tuo-btn tuo-btn--lg tuob-volver" onClick={volver} disabled={pago !== 'no'} aria-label="Volver al paso anterior">
                   <ChevronLeft size={18} className="tuob-flecha tuob-flecha--atras" aria-hidden /> <span>Volver</span>
                 </button>
               )}
