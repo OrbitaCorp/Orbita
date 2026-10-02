@@ -64,6 +64,7 @@ interface OrbiState {
   reset: () => void
   setMantenimiento: (aviso: string | null) => void
   quitarMensaje: (msgId: string) => void
+  cargarConversacion: (conversationId: string, mensajes: OrbiMessage[]) => void
 }
 
 export const useOrbiStore = create<OrbiState>((set, get) => ({
@@ -217,4 +218,17 @@ export const useOrbiStore = create<OrbiState>((set, get) => ({
   setMantenimiento: (aviso) => set({ mantenimiento: aviso }),
 
   quitarMensaje: (msgId) => set(s => ({ messages: s.messages.filter(m => m.id !== msgId) })),
+
+  // Abrir una sesión guardada (Orbi nuevo): igual que un reset (corta lo que
+  // esté en curso y sube la sesión, así ningún stream viejo escribe acá), pero
+  // con sus mensajes y su id: el próximo envío sigue esa conversación.
+  cargarConversacion: (conversationId, mensajes) => {
+    get().abortar()
+    set(s => ({
+      messages: mensajes,
+      conversationId,
+      isStreaming: false,
+      sesion: s.sesion + 1,
+    }))
+  },
 }))

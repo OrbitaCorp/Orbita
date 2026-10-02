@@ -103,3 +103,20 @@ export function muestraNoLlegueAResponder(msg: OrbiMessage): boolean {
   if (!msg.detenido || msg.content.trim()) return false
   return !(msg.actions ?? []).some(a => esTarjetaDeAccion(a) || esNavegacion(a) || esSeleccionDelWizard(a))
 }
+
+// El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
+// además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
+// Lo limpiamos en el render para que el usuario no vea código.
+export function cleanToolLeaks(text: string): string {
+  return text
+    .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
+    .replace(/```(?:json)?\s*\{[^`]*\}\s*```/g, '')
+    .replace(/\{\{[a-zA-Z]+[^}]*\}\}/g, '')
+    .replace(/<[a-z][a-zA-Z]*\s[^>]*>[\s\S]*?<\/[a-z][a-zA-Z]*>/gi, '')
+    .replace(/<\/?[a-z][a-zA-Z]*(?:[:\s][^>]*)?\/?>/gi, '')
+    .replace(/\n?\s*\{[^{}]*"?(?:key|label|field|value|rubro|keywords|businessName)"?[^{}]*\}/g, '')
+    .replace(/\[(?:Seleccionar|Elegir|Select)[^\]]*\]/gi, '')
+    .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}

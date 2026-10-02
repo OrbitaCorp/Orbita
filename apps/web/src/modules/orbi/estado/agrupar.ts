@@ -44,3 +44,17 @@ export function agruparSesiones(
 
 /** Lo que se muestra cuando una sesión todavía no tiene título. */
 export const TITULO_POR_DEFECTO = 'Conversación sin título'
+
+const formatoHora = new Intl.DateTimeFormat('es-AR', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hour12: false })
+const formatoDiaSemana = new Intl.DateTimeFormat('es-AR', { timeZone: ZONA, weekday: 'short' })
+const formatoFecha = new Intl.DateTimeFormat('es-AR', { timeZone: ZONA, day: 'numeric', month: 'numeric' })
+
+/** Cuándo, corto, para la fila de una sesión: "14:28", "ayer", "mar", "12/9". */
+export function horaCorta(iso: string, ahora: Date): string {
+  const fecha = new Date(iso)
+  const dias = diasArgentinos(fecha, ahora)
+  if (dias <= 0) return formatoHora.format(fecha)
+  if (dias === 1) return 'ayer'
+  if (dias < 7) return formatoDiaSemana.format(fecha).replace('.', '')
+  return formatoFecha.format(fecha)
+}

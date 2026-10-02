@@ -60,6 +60,10 @@ export interface OrbiAction {
    * pudo") es ambiguo: "No se pudo cancelar", "No se aplicó".
    */
   titulo?: string
+  /** Cuándo arrancó (consulta) o se propuso (tarjeta), en ms: el tiempo de la fila y el vencimiento de la tarjeta. */
+  inicio?: number
+  /** Cuándo terminó la consulta o se resolvió la tarjeta. */
+  fin?: number
 }
 
 export interface OrbiMessage {

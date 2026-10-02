@@ -224,6 +224,7 @@ export function useOrbiChat() {
             label: data.label,
             tool: data.tool,
             status: 'active',
+            inicio: Date.now(),
           })
         } else if (eventType === 'action_pending') {
           // Orbi propuso algo que escribe en la base. No pasó nada
@@ -236,12 +237,14 @@ export function useOrbiChat() {
             status: 'pending',
             actionId: data.actionId,
             resumen: data.resumen,
+            inicio: Date.now(),
           })
         } else if (eventType === 'action_complete') {
           store.updateAction(assistantMsg.id, data.id, {
             status: 'complete',
             result: data.result,
             data: data.data,
+            fin: Date.now(),
           })
           if (data.data?.productId) {
             store.markProductCreated(data.data.productId)
@@ -313,6 +316,7 @@ export function useOrbiChat() {
     const data = esRegistro(final.data) ? final.data : undefined
 
     useOrbiStore.getState().updateAction(mensajeId, accionId, {
+      fin: Date.now(),
       status: final.estado,
       result: final.mensaje,
       titulo: final.titulo,
@@ -342,6 +346,7 @@ export function useOrbiChat() {
     const paso = siguienteEstadoAlCancelar(respuesta, tool)
     const data = esRegistro(paso.data) ? paso.data : undefined
     useOrbiStore.getState().updateAction(mensajeId, accionId, {
+      fin: Date.now(),
       status: paso.estado,
       result: paso.mensaje,
       nota: paso.nota,

@@ -48,3 +48,13 @@ describe('agruparSesiones', () => {
     expect(agruparSesiones([], [], AHORA)).toEqual([])
   })
 })
+
+describe('horaCorta', () => {
+  it('hoy la hora, ayer "ayer", esta semana el día y antes la fecha (hora argentina)', async () => {
+    const { horaCorta } = await import('./agrupar')
+    expect(horaCorta('2026-10-02T17:28:00Z', AHORA)).toBe('14:28')
+    expect(horaCorta('2026-10-01T17:28:00Z', AHORA)).toBe('ayer')
+    expect(horaCorta('2026-09-29T17:28:00Z', AHORA)).toBe('mar')
+    expect(horaCorta('2026-09-12T17:28:00Z', AHORA)).toBe('12/9')
+  })
+})

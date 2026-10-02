@@ -9,7 +9,18 @@
 - **R2 en parte:** T3 (migración `20261002120000_orbi_sesiones`, **sin aplicar en ningún lado**), T4 y T5
   (servicio y endpoints de sesiones) y la retención de archivadas (180 días). **Esperan créditos de Gemini:**
   T6 (etiquetas de actividad), T7 (stream v2 con narración) y T8 (evals de la narración).
-- **R3 espera el diseño** de Claude Design (`docs/superpowers/design/2026-10-02-orbi-panel-prompt-claude-design.md`).
+- **R3 hecho detrás del interruptor** (`apps/web/src/modules/orbi/`), con el diseño de Claude Design ("Orbi Chat
+  Tablero"): las cuatro vistas, encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
+  plegado, tarjeta con sus estados y vencimiento, respuesta con formato), caja que deja escribir mientras Orbi
+  responde, borrador por sesión, página dedicada con sesiones agrupadas y menú por fila. Usa el stream de hoy
+  (`POST /orbi/chat`): el **pensamiento** y el **detalle de la tarjeta en filas** esperan T6/T7. Se prende con
+  `NEXT_PUBLIC_ORBI_PANEL_V2=1` o, en un solo navegador, con `?orbiV2=1` en cualquier URL del panel
+  (`?orbiV2=0` lo apaga). Verificado con Playwright sobre una página de prueba temporal: 19 capturas (claro,
+  oscuro, 1440/1024/390 px) y 23 interacciones; **no** contra la API real (sin base en la sesión).
+  Decisiones propias: tokens del panel y no los nuevos de Claude Design para los chips en oscuro; números con
+  Geist y cifras tabulares (Geist Mono no se carga en la app); markdown con un parser propio del subconjunto que
+  usa Gemini, sin librería ni HTML; solo los links al panel son links; la página va aparte de
+  `SECCIONES_DEL_PANEL` (así `navigateTo` no ofrece "ir a Orbi").
 
 **Fecha:** 2026-10-01
 
