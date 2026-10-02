@@ -2137,7 +2137,7 @@ function SelectorCategorias({ candidatas, seleccionadas, tope, necesitaFoto, onC
 
     return (
         <div style={{ marginBottom: 18 }}>
-            <FieldLabel help={necesitaFoto ? 'Solo se pueden elegir categorías con foto cargada — es lo que se ve en este estilo.' : 'Podés elegir qué categorías mostrar y ordenarlas con las flechas (1, 2, 3...). En el estilo Índice se muestran numeradas (01, 02...). Sin elegir ninguna, se muestran todas automáticamente.'}>
+            <FieldLabel help={necesitaFoto ? 'Solo se pueden elegir categorías con foto cargada — es lo que se ve en este estilo.' : 'Podés elegir qué categorías mostrar y ordenarlas con las flechas (1, 2, 3...) para determinar quién va primero. Sin elegir ninguna, se muestran todas automáticamente.'}>
                 Qué categorías mostrar y su orden{tope !== undefined && <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}> · hasta {tope}</span>}
             </FieldLabel>
 
