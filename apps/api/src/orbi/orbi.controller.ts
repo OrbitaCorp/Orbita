@@ -1,14 +1,13 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { randomUUID } from 'crypto';
 import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
-import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
+import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { OrbiSaludService } from './salud/orbi-salud.service';
-import { codigoParaElFront, MENSAJE_FALLA_PASAJERA } from './salud/clasificar-error';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -23,7 +22,10 @@ import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
 import { permisosDeOrbi } from './permisos-orbi';
-import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, RESPUESTA_DE_PROPUESTA, vueltaDeTools } from './turno/vuelta';
+import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
+import { tituloAutomatico } from './sesiones/titulo';
+import { ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, vueltaDeTools } from './turno/vuelta';
+import { correrTurno, nuevoProgresoDelTurno, sumarConsumo, type ConsumoPorProveedor, type EmisorDelTurno } from './turno/motor-de-turno';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -67,23 +69,6 @@ function historialParaElModelo(guardados: ConversationMessage[]): LlmMessage[] {
     .map(m => ({ role: m.role, content: m.content }));
 }
 
-/** Tokens de un turno, separados por quién respondió cada llamada. */
-type ConsumoPorProveedor = Map<LlmUsage['provider'], { model: string; promptTokens: number; completionTokens: number }>;
-
-/**
- * Suma el `usage` de una llamada al proveedor que la contestó. El fallback se
- * decide por llamada, así que un turno puede tener vueltas de Gemini y de Groq
- * (spec §3.6). El modelo que queda es el de la última llamada de ese proveedor.
- */
-function sumarConsumo(consumo: ConsumoPorProveedor, u: LlmUsage): void {
-  const previo = consumo.get(u.provider);
-  consumo.set(u.provider, {
-    model: u.model,
-    promptTokens: (previo?.promptTokens ?? 0) + u.promptTokens,
-    completionTokens: (previo?.completionTokens ?? 0) + u.completionTokens,
-  });
-}
-
 /**
  * Los 409 de /orbi/confirm y /orbi/reject. Llevan su contrato (`estado`, y
  * `mensaje` o `result`, spec §3.4) y además `error` y `message`, que es lo que
@@ -95,6 +80,22 @@ function conflicto(
 ): ConflictException {
   const message = 'mensaje' in cuerpo ? cuerpo.mensaje : MENSAJE_YA_APLICADA;
   return new ConflictException({ error: 'Conflict', message, ...cuerpo });
+}
+
+/**
+ * Los eventos del stream v1 (`POST /orbi/chat`), los que entiende el front de
+ * hoy (useOrbiChat).
+ */
+function emisorSse(res: Response): EmisorDelTurno {
+  const evento = (nombre: string, datos: unknown) => res.write(`event: ${nombre}\ndata: ${JSON.stringify(datos)}\n\n`);
+  return {
+    texto: (chunk) => evento('text', { chunk }),
+    reiniciarTexto: () => res.write(`event: text_reset\ndata: {}\n\n`),
+    propuesta: ({ id, actionId, call, resumen }) => evento('action_pending', { id, actionId, tool: call.name, resumen }),
+    lecturaInicio: ({ id, call }) => evento('action_start', { id, label: call.name, tool: call.name }),
+    lecturaFin: ({ id, resultado }) => evento('action_complete', { id, result: resultado.label, data: resultado.data }),
+    fin: () => res.write(`event: done\ndata: {}\n\n`),
+  };
 }
 
 /**
@@ -167,6 +168,19 @@ export class OrbiController {
     }
   }
 
+  /**
+   * Si Orbi atiende ahora (mantenimiento automático). El chat lo pregunta al
+   * abrirse para mostrar el aviso antes de que la persona escriba, en vez de
+   * dejarla tipear y responderle con un 503. Público porque el alta de
+   * negocios no tiene sesión; no dice la causa.
+   */
+  @Get('estado')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async estado(@Query('surface') surface?: string) {
+    return this.salud.disponibilidad(surface === 'wizard' ? 'wizard' : 'panel');
+  }
+
   @Post('chat')
   @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
@@ -230,13 +244,10 @@ export class OrbiController {
     // llamada al modelo, cada tool y cada propuesta.
     const corte = corteAlCerrar(res);
 
-    // Telemetría del turno (orbi_turns, spec §3.6). Sin texto.
+    // Telemetría del turno (orbi_turns, spec §3.6). Sin texto. El motor la
+    // va llenando: si el turno tira, lo avanzado queda para el finally.
     const arrancoEn = Date.now();
-    const consumo: ConsumoPorProveedor = new Map();
-    let modeloReportado: string | undefined;
-    let llamadasAlModelo = 0;
-    const toolsPedidas: string[] = [];
-    let propuestas = 0;
+    const progreso = nuevoProgresoDelTurno();
     let estado: EstadoDelTurno = 'ok';
 
     // Visitante de la demo: todos comparten el mismo miembro readOnly, así que
@@ -269,7 +280,10 @@ export class OrbiController {
           conversacionVerificada = dto.conversationId;
           history = historialParaElModelo(guardados);
         } else {
-          const conv = await this.conversationService.crear(user.businessId, user.memberId, 'panel');
+          const conv = await this.conversationService.crear(user.businessId, user.memberId, 'panel', {
+            titulo: tituloAutomatico(dto.message),
+            pantalla: dto.context.section,
+          });
           conversacionVerificada = conv.id;
         }
 
@@ -317,152 +331,28 @@ export class OrbiController {
         roleName: user.roleName,
       };
 
-      let fullResponse = '';
-
-      // Ver la nota en chatWizard: con herramientas en juego el texto de la
-      // vuelta se BUFEREA en vez de streamearse, para que el preámbulo que
-      // Gemini dice antes de llamar la tool nunca llegue a la pantalla.
-      const hayTools = tools.length > 0;
-
-      let continueLoop = true;
-      let vueltas = 0;
-      while (continueLoop) {
-        if (++vueltas > MAX_VUELTAS_TOOLS) {
-          fullResponse += this.cortarPorVueltas(res);
-          estado = 'max_rounds';
-          break;
-        }
-        // Cada vuelta es una llamada paga: si el cliente ya se fue, no se pide.
-        corte.signal.throwIfAborted();
-        llamadasAlModelo++;
-        continueLoop = false;
-        let textoVuelta = '';
-        let resetEnviado = false;
-        // Las calls de esta vuelta vuelven al historial juntas, al terminar
-        // el stream (ver vueltaDeTools: tool calls paralelas de Gemini).
-        const vuelta = vueltaDeTools();
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo, signal: corte.signal })) {
-          if (event.type === 'text') {
-            textoVuelta += event.chunk;
-            if (!hayTools && !resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
-          } else if (event.type === 'tool_call') {
-            // Con el cliente ido, ni se propone ni se ejecuta nada.
-            corte.signal.throwIfAborted();
-            toolsPedidas.push(event.call.name);
-            // Si se bufereó, no hay nada que resetear: el preámbulo se descarta
-            // acá sin que el usuario lo haya visto nunca.
-            if (hayTools) {
-              textoVuelta = '';
-            } else if (textoVuelta.trim() && !resetEnviado) {
-              res.write(`event: text_reset\ndata: {}\n\n`);
-              resetEnviado = true;
-            }
-            // UUID y no `step-${Date.now()}`: dos pasos en el mismo milisegundo
-            // repetían id y el front pisaba una tarjeta con la otra (spec §3.8).
-            const stepId = randomUUID();
-
-            // Las herramientas que ESCRIBEN no se ejecutan acá: se proponen.
-            // El usuario ve un botón con lo que va a pasar y la escritura
-            // ocurre recién si hace clic (ver POST /orbi/confirm).
-            //
-            // Es la defensa contra la inyección indirecta de RBT-695: el texto
-            // que escribe un cliente de la tienda vuelve al contexto del modelo
-            // como resultado de listOrders o getOrderDetail, y puede
-            // convencerlo de PEDIR un cupón del 100% — pero no puede hacer clic
-            // por el dueño del negocio.
-            //
-            // En la demo no se propone nada (soloLectura): el visitante tiene
-            // rol owner, así que los permisos no lo frenan.
-            const propuesta = await this.toolRegistry.proponer(
-              event.call.name,
-              event.call.arguments,
-              toolCtx,
-              dto.context.stepName,
-              { soloLectura: esDemo },
-            );
-
-            // Los argumentos no pasan el DTO del endpoint (o el pedido no
-            // existe): no hay tarjeta ni acción pendiente. El modelo recibe el
-            // motivo como resultado fallido de la tool, para corregir los
-            // argumentos o contarle a la persona qué faltó.
-            if (propuesta && 'error' in propuesta) {
-              vuelta.responder(event.call, JSON.stringify({ success: false, error: propuesta.error }));
-              continueLoop = true;
-              continue;
-            }
-
-            // Una escritura que no se pudo proponer (demo, sin permiso, otra
-            // surface) NO se ejecuta directo: solo /orbi/confirm escribe. El
-            // modelo recibe el fallo, igual que con un { error }.
-            if (!propuesta && this.toolRegistry.requiereConfirmacion(event.call.name)) {
-              vuelta.responder(event.call, JSON.stringify({ success: false, error: esDemo ? ESCRITURA_EN_DEMO : ESCRITURA_NO_DISPONIBLE }));
-              continueLoop = true;
-              continue;
-            }
-
-            if (propuesta) {
-              // proponer() es async (lee la base para armar la tarjeta): el
-              // cliente pudo irse mientras. Una propuesta que nadie va a ver
-              // quedaría pendiente hasta vencer.
-              corte.signal.throwIfAborted();
-              const actionId = await this.pendingActions.crear({
-                tool: event.call.name,
-                args: event.call.arguments,
-                businessId: user.businessId,
-                memberId: user.memberId,
-                conversationId: conversacionVerificada,
-                resumen: propuesta.resumen,
-              });
-              propuestas++;
-
-              res.write(`event: action_pending\ndata: ${JSON.stringify({
-                id: stepId,
-                actionId,
-                tool: event.call.name,
-                resumen: propuesta.resumen,
-              })}\n\n`);
-
-              // Lo que ve el modelo. Importa que diga que quedó PENDIENTE y no
-              // que falló: si le decimos que falló, reintenta en loop; si le
-              // decimos que salió bien, le cuenta al usuario que ya está hecho
-              // cuando todavía no apretó nada.
-              vuelta.responder(event.call, JSON.stringify(RESPUESTA_DE_PROPUESTA));
-              continueLoop = true;
-              continue;
-            }
-
-            // Mismo motivo que antes de crear(): proponer() fue async.
-            corte.signal.throwIfAborted();
-            res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
-
-            // Acá solo llegan lecturas. soloLectura igual, como segunda barrera
-            // de la demo (ver ToolRegistryService#execute).
-            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName, { soloLectura: esDemo });
-
-            res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
-
-            vuelta.responder(event.call, JSON.stringify(result));
-            continueLoop = true;
-          } else if (event.type === 'usage') {
-            // Se suma aunque el cliente ya se haya ido: la llamada se factura.
-            sumarConsumo(consumo, event.usage);
-            modeloReportado = event.usage.model;
-          } else if (event.type === 'done') {
-            if (!continueLoop) {
-              // Vuelta final: si se bufereó, recién acá sale el texto — de una,
-              // y solo el de la respuesta de verdad.
-              if (hayTools && textoVuelta) {
-                res.write(`event: text\ndata: ${JSON.stringify({ chunk: textoVuelta })}\n\n`);
-              }
-              fullResponse += textoVuelta;
-              res.write(`event: done\ndata: {}\n\n`);
-            }
-          }
-        }
-        // Terminó el stream de la vuelta: recién ahora sus calls y resultados
-        // entran al historial, todos en un solo turno del modelo.
-        vuelta.volcarEn(messages);
-      }
+      await correrTurno({
+        llm: this.llm,
+        registry: this.toolRegistry,
+        messages,
+        tools,
+        modelo,
+        toolCtx,
+        stepName: dto.context.stepName,
+        soloLectura: esDemo,
+        signal: corte.signal,
+        crearPendiente: ({ call, resumen }) => this.pendingActions.crear({
+          tool: call.name,
+          args: call.arguments,
+          businessId: user.businessId,
+          memberId: user.memberId,
+          conversationId: conversacionVerificada,
+          resumen,
+        }),
+        emisor: emisorSse(res),
+        progreso,
+      });
+      if (progreso.estado === 'max_rounds') estado = 'max_rounds';
 
       // El proveedor contestó: corta la racha de fallas que podría apagar Orbi.
       void this.salud.registrarOk();
@@ -473,7 +363,7 @@ export class OrbiController {
       if (conversacionVerificada) {
         await this.conversationService.appendMessage(conversacionVerificada, user.businessId, user.memberId, {
           role: 'assistant',
-          content: fullResponse,
+          content: progreso.texto,
           timestamp: new Date().toISOString(),
         });
       }
@@ -488,11 +378,11 @@ export class OrbiController {
         // de las que no se arreglan solas, o se repite, Orbi pasa a
         // mantenimiento y se avisa a los admins. A la persona NUNCA le llega el
         // error crudo del proveedor.
-        const falla = await this.salud.registrarFalla({ error, surface: 'panel', actor: user.businessId });
-        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
+        const aviso = await this.salud.avisoDeFalla({ error, surface: 'panel', actor: user.businessId });
+        res.write(`event: error\ndata: ${JSON.stringify(aviso)}\n\n`);
       }
     } finally {
-      this.medirConsumo(consumo, {
+      this.medirConsumo(progreso.consumo, {
         feature: 'orbi-panel',
         businessId: user.businessId,
         memberId: user.memberId,
@@ -509,7 +399,7 @@ export class OrbiController {
         // un piso: la llamada cortada se factura igual y su `usage` no llegó.
         let promptTokens = 0;
         let completionTokens = 0;
-        for (const c of consumo.values()) {
+        for (const c of progreso.consumo.values()) {
           promptTokens += c.promptTokens;
           completionTokens += c.completionTokens;
         }
@@ -517,15 +407,18 @@ export class OrbiController {
           businessId: user.businessId,
           memberId: user.memberId,
           conversationId: conversacionVerificada,
-          module: dto.context.module,
-          model: modeloReportado ?? this.modeloPara(dto.context.surface),
+          // El front del panel manda siempre module 'ventas' y la pantalla en
+          // section: se guarda el módulo ya resuelto (el mismo que eligió el
+          // prompt), si no todos los turnos quedaban como 'ventas'.
+          module: resolverModuloDelPanel(dto.context.module, dto.context.section).modulo ?? dto.context.module,
+          model: progreso.modeloReportado ?? this.modeloPara(dto.context.surface),
           // undefined y no 0 si el proveedor no informó consumo.
           promptTokens: promptTokens || undefined,
           completionTokens: completionTokens || undefined,
           latencyMs: Date.now() - arrancoEn,
-          rounds: llamadasAlModelo,
-          toolsUsed: toolsPedidas,
-          actionsProposed: propuestas,
+          rounds: progreso.llamadasAlModelo,
+          toolsUsed: progreso.toolsPedidas,
+          actionsProposed: progreso.propuestas,
           status: estado,
         });
       }
@@ -885,8 +778,8 @@ export class OrbiController {
       if (!corte.signal.aborted) {
         fallo = true;
         this.logger.error(`Orbi wizard chat error: ${error}`);
-        const falla = await this.salud.registrarFalla({ error, surface: 'wizard', actor: `wizard:${hmacIp('orbi-wizard', ip)}` });
-        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
+        const aviso = await this.salud.avisoDeFalla({ error, surface: 'wizard', actor: `wizard:${hmacIp('orbi-wizard', ip)}` });
+        res.write(`event: error\ndata: ${JSON.stringify(aviso)}\n\n`);
       }
     } finally {
       // Un turno cortado no se registra: sería una respuesta vacía que

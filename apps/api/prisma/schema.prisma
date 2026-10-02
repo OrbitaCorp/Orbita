@@ -2480,14 +2480,47 @@ model OrbiConversation {
   businessId String   @map("business_id")
   userId     String   @map("user_id")
   surface    String
+  // Sesiones v1: los mensajes van en este Json (texto solo). Las v2 (stream
+  // nuevo de la fase 3) los guardan en orbi_messages, por partes.
   messages   Json     @default("[]")
   context    Json?
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Sesiones (fase 3, spec 2026-10-01-orbi-fase-3-ui-panel §3.2). Todo con
+  // default: las conversaciones que ya existen quedan como sesiones v1.
+  title          String? // null = todavía sin título
+  titleAuto      Boolean   @default(true) @map("title_auto") // false = la persona lo renombró
+  pinnedAt       DateTime? @map("pinned_at")
+  archivedAt     DateTime? @map("archived_at") // archivadas sin actividad en 180 días se borran
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+  screen         String? // la pantalla desde donde se abrió
+  version        Int       @default(1) // 1 = mensajes en el Json, 2 = en orbi_messages
 
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orbiMessages OrbiMessage[]
+
+  @@index([businessId, userId, archivedAt, lastActivityAt(sort: Desc)])
   @@map("orbi_conversations")
+}
+
+// Mensajes de las sesiones v2, uno por fila y con sus partes (pensamiento,
+// actividad, aprobación, texto, aviso): al volver a una sesión se ve todo lo
+// que pasó, no solo el texto. Al modelo vuelven solo las partes de texto.
+model OrbiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  role           String // user | assistant
+  parts          Json
+  turnId         String?  @map("turn_id") // orbi_turns.id, sin FK (la telemetría se purga antes)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation OrbiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("orbi_messages")
 }
 
 // ─── Corridas de los jobs de Cloud Scheduler ─────────────────────────────────

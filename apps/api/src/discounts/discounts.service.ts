@@ -276,7 +276,14 @@ export class DiscountsService {
   }
 
   // ── Alta ───────────────────────────────────────────────────────────────────
-  async create(businessId: string, memberId: string, dto: UpsertDiscountDto) {
+
+  /**
+   * Todo lo que create() chequea antes de escribir, sin escribir. Orbi lo
+   * corre antes de mostrar la tarjeta: un alta que iba a fallar no llega a
+   * confirmarse. create() lo vuelve a correr igual (entre la tarjeta y el
+   * clic alguien pudo cargar el mismo nombre).
+   */
+  async validarAlta(businessId: string, dto: UpsertDiscountDto): Promise<void> {
     this.validarReglas(dto);
     await this.exigirAvanzadoSi2x1(businessId, dto);
     await this.validarPertenencia(businessId, dto);
@@ -286,6 +293,10 @@ export class DiscountsService {
       where: { businessId, code: null, name: dto.name, deletedAt: null },
     });
     if (duplicado) throw new BadRequestException('Ya existe un descuento con ese nombre.');
+  }
+
+  async create(businessId: string, memberId: string, dto: UpsertDiscountDto) {
+    await this.validarAlta(businessId, dto);
 
     const creado = await this.prisma.$transaction(async (tx) => {
       const discount = await tx.discount.create({

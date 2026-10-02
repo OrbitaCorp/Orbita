@@ -18,6 +18,8 @@ import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
 // execute(), así que no hace falta implementar los métodos reales de cada
 // servicio.
 const stub = {} as any;
+// Descuentos y cupones le preguntan al service si el alta pasaría antes de proponerla.
+const altaValida = { validarAlta: async () => undefined } as any;
 
 // Las tools que resuelven datos para la tarjeta (el pedido, la categoría) leen
 // la base. Este falso devuelve nombres que LLEVAN el id buscado: así, en la
@@ -49,8 +51,8 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new CreateProductTool(stub, prismaFalso));
     registry.register(new GenerateDescriptionTool(stub, stub));
     registry.register(new ListDiscountsTool(stub));
-    registry.register(new CreateDiscountTool(stub));
-    registry.register(new CreateCouponTool(stub));
+    registry.register(new CreateDiscountTool(altaValida));
+    registry.register(new CreateCouponTool(altaValida));
     registry.register(new ListOrdersTool(stub));
     registry.register(new GetOrderDetailTool(stub));
     registry.register(new UpdateOrderStatusTool(stub, prismaFalso));

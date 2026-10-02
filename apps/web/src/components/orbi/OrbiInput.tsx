@@ -9,11 +9,12 @@ interface Props {
   streaming?: boolean
   /** Corta la respuesta en curso (aborta el stream). */
   onStop?: () => void
+  placeholder?: string
 }
 
 const MAX_H = 96 // ~4 líneas
 
-export function OrbiInput({ onSend, disabled, quickChips, streaming, onStop }: Props) {
+export function OrbiInput({ onSend, disabled, quickChips, streaming, onStop, placeholder = 'Escribí un mensaje...' }: Props) {
   // Mientras Orbi escribe no hay nada que enviar (el texto está bloqueado),
   // así que ese mismo lugar se usa para poder cortarlo: sin esto, la única
   // forma de frenar una respuesta larga era cerrar el panel.
@@ -89,7 +90,7 @@ export function OrbiInput({ onSend, disabled, quickChips, streaming, onStop }: P
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
           }}
-          placeholder="Escribí un mensaje..."
+          placeholder={placeholder}
           disabled={disabled}
           aria-label="Mensaje para Orbi"
           style={{

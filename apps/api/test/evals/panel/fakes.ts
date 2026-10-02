@@ -513,7 +513,25 @@ export function armarFakes(d: NegocioDePrueba) {
     },
   });
 
+  // validarAlta: lo del service que depende de la base (ids del negocio,
+  // nombre libre), con los mismos mensajes. Las reglas cruzadas puras no se
+  // copian: las cubren los tests del service.
+  const validarAltaContraElDataset = (dto: { name: string; code?: string; productIds?: string[]; categoryIds?: string[] }, cupon: boolean) => {
+    if (dto.categoryIds?.some((id) => !d.categorias.some((c) => c.id === id))) {
+      throw new BadRequestException('Alguna de las categorías elegidas no existe en tu negocio.');
+    }
+    if (dto.productIds?.some((id) => !d.productos.some((p) => p.id === id))) {
+      throw new BadRequestException('Alguno de los productos elegidos no existe en tu negocio.');
+    }
+    if (!cupon && d.descuentos.some((x) => x.nombre === dto.name)) {
+      throw new BadRequestException('Ya existe un descuento con ese nombre.');
+    }
+  };
+
   const discounts = estricto('DiscountsService', {
+    async validarAlta(_businessId: string, dto: { name: string; productIds?: string[]; categoryIds?: string[] }) {
+      validarAltaContraElDataset(dto, false);
+    },
     async findAll(_businessId: string, q: { search?: string; page?: number; limit?: number }) {
       const filtrados = d.descuentos.filter((x) => !q.search || contiene(x.nombre, q.search));
       return {
@@ -561,7 +579,11 @@ export function armarFakes(d: NegocioDePrueba) {
       return null;
     },
   });
-  const coupons = estricto('CouponsService', {});
+  const coupons = estricto('CouponsService', {
+    async validarAlta(_businessId: string, dto: { name: string; code: string; productIds?: string[]; categoryIds?: string[] }) {
+      validarAltaContraElDataset(dto, true);
+    },
+  });
 
   return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, ahora: d.ahora };
 }

@@ -225,8 +225,10 @@ async function main(): Promise<void> {
 
   imprimir(resultados, new Map(CASOS_PANEL.map((c) => [c.id, c])));
   resumen(resultados, nombreVariante);
-  if (contra) comparar(resultados, contra);
 
+  // Se guarda ANTES de comparar: comparar relee el archivo de la base al final
+  // y, si se movió mientras corría (2026-10-01), tiraba y la corrida pagada se
+  // perdía sin escribirse.
   if (salida) {
     const corrida: CorridaGuardada = {
       fecha: new Date().toISOString(),
@@ -240,6 +242,8 @@ async function main(): Promise<void> {
     writeFileSync(salida, JSON.stringify(corrida, null, 2));
     console.log(`Guardado en ${salida}`);
   }
+
+  if (contra) comparar(resultados, contra);
 
   process.exit(resultados.some((r) => !r.ok) ? 1 : 0);
 }

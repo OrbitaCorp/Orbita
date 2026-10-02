@@ -1,7 +1,29 @@
 # Plan — Orbi fase 3: el nuevo Orbi del panel
 
 **Spec:** [2026-10-01-orbi-fase-3-ui-panel-design.md](../specs/2026-10-01-orbi-fase-3-ui-panel-design.md)
-**Estado:** borrador para revisión de Alan. **No ejecutar sin el spec aprobado.**
+**Estado (2026-10-02):** spec aprobado en lo decidido (§11). Rama `claude/nifty-ritchie-rahtf0`, sin mergear:
+- **R1 hecho** (T1). La red no fueron evals pagas sino **turnos grabados**
+  (`apps/api/test/unit/orbi-turno-grabado.unit-spec.ts`): los 534 turnos reales del 2026-10-01 reproducidos
+  con un modelo guionado por el controller y por las evals, comparados contra una huella grabada antes del
+  refactor. T2 (wizard) sin hacer.
+- **R2 en parte:** T3 (migración `20261002120000_orbi_sesiones`, **sin aplicar en ningún lado**), T4 y T5
+  (servicio y endpoints de sesiones) y la retención de archivadas (180 días). **Esperan créditos de Gemini:**
+  T6 (etiquetas de actividad), T7 (stream v2 con narración) y T8 (evals de la narración).
+- **R3 hecho detrás del interruptor** (`apps/web/src/modules/orbi/`), con el diseño de Claude Design ("Orbi Chat
+  Tablero"): vistas (decisión de Alan, 2026-10-02: desde 1280 px Orbi queda acoplado como una columna más, al
+  estilo del panel de IA de Cloudflare, y empuja la sección del medio; entre 768 y 1279 px va **encima**, con
+  fondo tenue, porque empujar ahí deja a Pedidos y Productos sin lugar para sus tablas; en el celular, hoja), encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
+  plegado, tarjeta con sus estados y vencimiento, respuesta con formato), caja que deja escribir mientras Orbi
+  responde, borrador por sesión, página dedicada con sesiones agrupadas y menú por fila. Usa el stream de hoy
+  (`POST /orbi/chat`): el **pensamiento** y el **detalle de la tarjeta en filas** esperan T6/T7. Se prende con
+  `NEXT_PUBLIC_ORBI_PANEL_V2=1` o, en un solo navegador, con `?orbiV2=1` en cualquier URL del panel
+  (`?orbiV2=0` lo apaga). Verificado con Playwright sobre una página de prueba temporal: 19 capturas (claro,
+  oscuro, 1440/1024/390 px) y 23 interacciones; **no** contra la API real (sin base en la sesión).
+  Decisiones propias: tokens del panel y no los nuevos de Claude Design para los chips en oscuro; números con
+  Geist y cifras tabulares (Geist Mono no se carga en la app); markdown con un parser propio del subconjunto que
+  usa Gemini, sin librería ni HTML; solo los links al panel son links; la página va aparte de
+  `SECCIONES_DEL_PANEL` (así `navigateTo` no ofrece "ir a Orbi").
+
 **Fecha:** 2026-10-01
 
 ## Cómo se despliega (orden obligatorio)

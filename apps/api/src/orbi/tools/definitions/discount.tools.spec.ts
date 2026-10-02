@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { CreateDiscountTool, CreateCouponTool } from './discount.tools';
 import { ToolRegistryService } from '../tool-registry.service';
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
@@ -80,7 +81,8 @@ describe('CreateCouponTool — la tarjeta muestra cada valor', () => {
 });
 
 describe('createDiscount y createCoupon — validan con el DTO de su endpoint', () => {
-  const registry = registryCon(new CreateDiscountTool({} as any), new CreateCouponTool({} as any));
+  const pasa = { validarAlta: jest.fn().mockResolvedValue(undefined) };
+  const registry = registryCon(new CreateDiscountTool(pasa as any), new CreateCouponTool(pasa as any));
   const descuento = { name: 'Promo', type: 'PERCENT_PRODUCT', value: 10, scope: 'PRODUCT', productIds: [P1] };
   const cupon = { ...descuento, code: 'VERANO20' };
 
@@ -111,5 +113,68 @@ describe('createDiscount y createCoupon — validan con el DTO de su endpoint', 
 
   it('un parámetro que la tool no declara: error', async () => {
     expect(await registry.proponer('createCoupon', { ...cupon, maxUsesTotal: 1 }, ctx)).toEqual({ error: expect.stringContaining('maxUsesTotal') });
+  });
+});
+
+
+describe('createDiscount y createCoupon — lo que iba a fallar al confirmar se rechaza ANTES de la tarjeta', () => {
+  const nuevoRegistro = () => {
+    const discounts = { validarAlta: jest.fn().mockResolvedValue(undefined), create: jest.fn().mockResolvedValue({ id: 'd1', name: 'Promo' }) };
+    const coupons = { validarAlta: jest.fn().mockResolvedValue(undefined), create: jest.fn().mockResolvedValue({ id: 'c1', code: 'VERANO20', name: 'Promo' }) };
+    const registry = registryCon(new CreateDiscountTool(discounts as any), new CreateCouponTool(coupons as any));
+    return { discounts, coupons, registry };
+  };
+  const porProducto = { name: 'Promo', type: 'PERCENT_PRODUCT', value: 10, scope: 'PRODUCT', productIds: [P1, P2] };
+  const porCategoria = { name: 'Promo', type: 'PERCENT_PRODUCT', value: 10, scope: 'CATEGORY', categoryIds: [P3] };
+
+  it('por producto: el service valida con productLevel "padre" y el negocio de la sesión (antes fallaba al confirmar)', async () => {
+    const { discounts, coupons, registry } = nuevoRegistro();
+    expect(await registry.proponer('createDiscount', porProducto, ctx)).toEqual({ resumen: expect.any(String) });
+    expect(discounts.validarAlta).toHaveBeenCalledWith('biz-1', expect.objectContaining({ scope: 'PRODUCT', productIds: [P1, P2], productLevel: 'padre' }));
+    expect(await registry.proponer('createCoupon', { ...porProducto, code: 'VERANO20' }, ctx)).toEqual({ resumen: expect.any(String) });
+    expect(coupons.validarAlta).toHaveBeenCalledWith('biz-1', expect.objectContaining({ code: 'VERANO20', productLevel: 'padre' }));
+  });
+
+  it('lo que se escribe al confirmar lleva el mismo productLevel que se validó', async () => {
+    const { discounts } = nuevoRegistro();
+    await new CreateDiscountTool(discounts as any).execute(porProducto, ctx);
+    expect(discounts.create).toHaveBeenCalledWith('biz-1', 'user-1', expect.objectContaining({ productLevel: 'padre' }));
+  });
+
+  it('por categoría o sobre el total: sin productLevel', async () => {
+    const { discounts, registry } = nuevoRegistro();
+    await registry.proponer('createDiscount', porCategoria, ctx);
+    await registry.proponer('createDiscount', { name: 'T', type: 'PERCENT_TICKET', value: 10, scope: 'TICKET' }, ctx);
+    for (const [, dto] of discounts.validarAlta.mock.calls) expect(dto.productLevel).toBeUndefined();
+  });
+
+  it('el service rechaza (ids de otro negocio, nombre tomado, 100 %): error con su mensaje y sin tarjeta', async () => {
+    const { discounts, coupons, registry } = nuevoRegistro();
+    discounts.validarAlta.mockRejectedValueOnce(new BadRequestException('Alguna de las categorías elegidas no existe en tu negocio.'));
+    expect(await registry.proponer('createDiscount', porCategoria, ctx)).toEqual({ error: 'Alguna de las categorías elegidas no existe en tu negocio.' });
+    coupons.validarAlta.mockRejectedValueOnce(new BadRequestException('Ya existe un cupón con ese código.'));
+    expect(await registry.proponer('createCoupon', { ...porProducto, code: 'VERANO20' }, ctx)).toEqual({ error: 'Ya existe un cupón con ese código.' });
+  });
+
+  it('scope PRODUCT con categoryIds (o CATEGORY con productIds): error sin preguntarle al service', async () => {
+    const { discounts, registry } = nuevoRegistro();
+    expect(await registry.proponer('createDiscount', { ...porCategoria, scope: 'PRODUCT' }, ctx)).toEqual({ error: expect.stringContaining('scope PRODUCT') });
+    expect(await registry.proponer('createDiscount', { ...porProducto, categoryIds: [P3] }, ctx)).toEqual({ error: expect.stringContaining('scope PRODUCT') });
+    expect(await registry.proponer('createDiscount', { ...porProducto, scope: 'CATEGORY' }, ctx)).toEqual({ error: expect.stringContaining('scope CATEGORY') });
+    expect(discounts.validarAlta).not.toHaveBeenCalled();
+  });
+
+  it('la base no responde: "no pude preparar esa acción", sin tarjeta y sin tumbar el chat', async () => {
+    const { discounts, registry } = nuevoRegistro();
+    discounts.validarAlta.mockRejectedValueOnce(new Error('connection refused'));
+    expect(await registry.proponer('createDiscount', porProducto, ctx)).toEqual({ error: expect.stringContaining('No pude preparar esa acción') });
+  });
+
+  it('al modelo se le dice que el porcentaje va de 1 a 99 (el service no acepta 100)', () => {
+    const { registry } = nuevoRegistro();
+    void registry;
+    const valor = (t: { parameters: { properties: { value: { description: string } } } }) => t.parameters.properties.value.description;
+    expect(valor(new CreateDiscountTool({} as any) as any)).toContain('1-99');
+    expect(valor(new CreateCouponTool({} as any) as any)).toContain('1-99');
   });
 });
