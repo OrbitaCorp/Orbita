@@ -84,7 +84,7 @@ export function TiendaPausada({ status, nombre, logo }: Props) {
             className="ds-hover"
             style={{
               height: 44, padding: '0 20px', borderRadius: 8,
-              background: 'var(--color-primary)', color: '#fff', border: 'none',
+              background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', border: 'none',
               fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', textDecoration: 'none',
             }}
           >

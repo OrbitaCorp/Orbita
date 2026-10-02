@@ -18,6 +18,8 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelPresignStorefrontVideo, panelSetHomeTemplate, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { ROOT_DOMAIN, adminPath, currentSlug } from '@/lib/tenant'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
+import { onColorPara } from '@/lib/storefront/primarioTema'
+
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
@@ -1750,7 +1752,7 @@ function ColorBlock({ label, help, value, onChange }: { label: string; help: str
                     <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<ColorSwatchInput value={value} onChange={onChange} />} />
                 </div>
             )}
-            <button style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: value, color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Botón de ejemplo</button>
+            <button style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: value, color: onColorPara(value), fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'background 150ms, color 150ms' }}>Botón de ejemplo</button>
         </div>
     )
 }
