@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from 'react'
 import { useRouter } from 'next/router'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useMediaQuery } from '@/components/orbi/useMediaQuery'
@@ -7,7 +7,7 @@ import { useOrbiViewport } from '@/components/orbi/useOrbiViewport'
 import { ID_PANEL_ORBI } from '@/components/orbi/types'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { OrbiV2Contexto, type Vista } from '../piezas/contexto'
-import { ANCHO_MAXIMO, ANCHO_MINIMO, useOrbiV2 } from '../estado/useOrbiV2'
+import { ANCHO_MAXIMO, ANCHO_MINIMO, topeDeAncho, useOrbiV2 } from '../estado/useOrbiV2'
 import { OrbiChat } from './OrbiChat'
 import s from '../orbi.module.css'
 
@@ -91,6 +91,23 @@ export default function OrbiV2() {
     return () => window.removeEventListener('keydown', tecla)
   }, [isOpen, enLaPagina, vista, close])
 
+  // El lateral nunca le deja menos de 720 px a la sección del medio: el tope
+  // se recalcula con la ventana y con el menú (abierto o angosto). Se mide
+  // `main` + Orbi, que suman lo mismo sea cual sea el ancho de Orbi.
+  const refLateral = useRef<HTMLElement>(null)
+  const [tope, setTope] = useState(ANCHO_MAXIMO)
+  useLayoutEffect(() => {
+    const lateral = refLateral.current
+    const medio = lateral?.parentElement?.querySelector('main')
+    if (!lateral || !medio) return
+    // ResizeObserver avisa una vez al empezar a observar: no hace falta medir a mano.
+    const ro = new ResizeObserver(() => setTope(topeDeAncho(medio.getBoundingClientRect().width + lateral.getBoundingClientRect().width)))
+    ro.observe(medio)
+    return () => ro.disconnect()
+  }, [vista, isOpen, enLaPagina])
+  const anchoEfectivo = Math.min(ancho, tope)
+  const ajustarAncho = (px: number) => setAncho(Math.min(tope, px))
+
   const modal = vista !== 'lateral'
   const navegar = useCallback((ruta: string) => {
     void router.push(ruta)
@@ -101,12 +118,12 @@ export default function OrbiV2() {
   // Tirador del lateral: arrastrar o flechas de a 16 px.
   const arrastre = useRef<{ x: number; ancho: number } | null>(null)
   const alBajar = (e: PointerEventReact<HTMLButtonElement>) => {
-    arrastre.current = { x: e.clientX, ancho }
+    arrastre.current = { x: e.clientX, ancho: anchoEfectivo }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const alMover = (e: PointerEventReact<HTMLButtonElement>) => {
     if (!arrastre.current) return
-    setAncho(arrastre.current.ancho + (arrastre.current.x - e.clientX))
+    ajustarAncho(arrastre.current.ancho + (arrastre.current.x - e.clientX))
   }
   const alSoltar = () => { arrastre.current = null }
 
@@ -135,9 +152,10 @@ export default function OrbiV2() {
       {region}
       {vista === 'lateral' && (
         <aside
+          ref={refLateral}
           id={ID_PANEL_ORBI}
           className={`${s.raiz} ${s.lateral}`}
-          style={{ width: ancho }}
+          style={{ width: anchoEfectivo }}
           aria-label="Orbi"
           onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) close() }}
         >
@@ -148,16 +166,16 @@ export default function OrbiV2() {
             aria-orientation="vertical"
             aria-label="Ancho de Orbi"
             aria-valuemin={ANCHO_MINIMO}
-            aria-valuemax={ANCHO_MAXIMO}
-            aria-valuenow={ancho}
+            aria-valuemax={Math.max(ANCHO_MINIMO, tope)}
+            aria-valuenow={anchoEfectivo}
             title="Arrastrá para cambiar el ancho"
             onPointerDown={alBajar}
             onPointerMove={alMover}
             onPointerUp={alSoltar}
             onPointerCancel={alSoltar}
             onKeyDown={e => {
-              if (e.key === 'ArrowLeft') { e.preventDefault(); setAncho(ancho + PASO_TECLADO_PX) }
-              if (e.key === 'ArrowRight') { e.preventDefault(); setAncho(ancho - PASO_TECLADO_PX) }
+              if (e.key === 'ArrowLeft') { e.preventDefault(); ajustarAncho(anchoEfectivo + PASO_TECLADO_PX) }
+              if (e.key === 'ArrowRight') { e.preventDefault(); ajustarAncho(anchoEfectivo - PASO_TECLADO_PX) }
             }}
           />
           {chat}

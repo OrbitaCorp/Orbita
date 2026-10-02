@@ -14,6 +14,22 @@ export function anchoValido(valor: unknown): number {
   return Math.min(ANCHO_MAXIMO, Math.max(ANCHO_MINIMO, Math.round(n)))
 }
 
+/**
+ * Lo que la sección del medio conserva siempre con el lateral abierto: debajo
+ * de esto las tablas de Pedidos o Productos se aprietan o piden scroll de costado.
+ */
+export const CONTENIDO_MINIMO = 720
+
+/**
+ * El ancho máximo del lateral para el lugar que hay entre el menú y el borde
+ * (`disponible` = sección del medio + Orbi). Nunca menos que el mínimo de Orbi:
+ * si no entran los dos, cede la sección del medio, no el chat.
+ */
+export function topeDeAncho(disponible: number): number {
+  if (!Number.isFinite(disponible)) return ANCHO_MAXIMO
+  return Math.min(ANCHO_MAXIMO, Math.max(ANCHO_MINIMO, Math.floor(disponible - CONTENIDO_MINIMO)))
+}
+
 function leer(clave: string): string | null {
   try { return window.localStorage.getItem(clave) } catch { return null }
 }
