@@ -368,7 +368,7 @@ recorridos, sin entrada de Orbi en el menú lateral.
 | `d25a3310` | `orbi_turns.module` con el módulo real; las evals guardan antes de comparar; la demo dice "Redactar con Orbi" |
 | `da5a5fba` | Turnos grabados (la red del refactor) |
 | `287883d4` | Fase 3 R1: el motor de turno compartido por el chat y las evals |
-| (siguiente) | Fase 3 R2 sin narración: sesiones (migración, servicio, endpoints) y su retención |
+| `f315b764` | Fase 3 R2 sin narración: sesiones (migración, servicio, endpoints) y su retención |
 
 **Rulings:**
 1. **Push de la rama de trabajo** (el entorno lo exige; contenedor efímero). Mergear con `--no-ff` o PR con merge commit, nunca fast-forward.
