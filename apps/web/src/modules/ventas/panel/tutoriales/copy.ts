@@ -209,14 +209,14 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
         id: 'negocio', titulo: 'Completá los datos del negocio',
         detalle: 'Nombre, rubro y dirección del local. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.',
         destino: ['ventas', 'configuracion', { vista: 'negocio' }], destinoLabel: 'Ir a Configuración',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Negocio"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus datos se cargan acá',
     },
     {
         id: 'mp', titulo: 'Conectá Mercado Pago (opcional)',
         detalle: 'Es una sugerencia, no un requisito: con Mercado Pago tus clientes pagan con tarjeta o dinero en cuenta sin salir de la tienda. Si preferís, podés arrancar cobrando por transferencia o en efectivo y conectarlo más adelante. Está en Configuración → Pagos, botón "Conectar cuenta". Lleva dos minutos.',
         destino: ['ventas', 'configuracion', { vista: 'pagos' }], destinoLabel: 'Ir a Pagos',
-        seccionDestino: 'configuracion', anclaDestino: 'boton:Conectar cuenta || .cfg-sidebar-item[title="Pagos"]',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Conectar cuenta || .cfg-contenido h1',
         guiaLabel: 'Conectá tu cuenta desde acá',
     },
     // Categorías ANTES que el primer producto (pedido de Ale): así el producto
@@ -250,7 +250,7 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
         id: 'envios', titulo: 'Definí cómo entregás',
         detalle: 'Envío a domicilio, retiro en el local, o los dos. Configurá costos y zonas en Configuración → Envíos.',
         destino: ['ventas', 'configuracion', { vista: 'envios' }], destinoLabel: 'Ir a Envíos',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Envíos"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus envíos se definen acá',
     },
     {
@@ -276,7 +276,7 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
 //
 // Rutas, vistas y anclas verificadas contra el código real (15/09):
 // Sidebar.tsx (subs con `vista`), AdminSeccionShell.tsx (secciones válidas),
-// ConfigSidebar.tsx (title = label exacto de cada ítem), PedidoLista.tsx
+// ConfigGeneral.tsx (.cfg-contenido: el título de cada pantalla de Configuración), PedidoLista.tsx
 // (.ped-tabs-row), ReporteTabs.tsx (.mod-tabs), anclas.ts (header:*).
 // Los ids también los conoce la API (businesses.service.ts#getTutorial) para
 // el tildado automático; `herramientas`, `reportes` y `plan` son las únicas
@@ -344,21 +344,21 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         detalle: 'Logo, colores, tipografía, banner y los textos de la portada. Cambiá algo y tocá "Guardar cambios": la tienda se actualiza al instante.',
         tip: 'Con el paquete Avanzado tenés Plantillas de Home: veinte portadas distintas para tu tienda, en Avanzado → Plantillas de Home.',
         destino: ['ventas', 'configuracion', { vista: 'apariencia' }], destinoLabel: 'Ir a Apariencia',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Apariencia"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Logo, colores y textos se cambian acá',
     },
     {
         id: 'contacto', grupo: GRUPO_TIENDA, titulo: 'Cargá tus datos de contacto',
         detalle: 'WhatsApp, email y tus horarios de atención. Es por donde te escriben los que están por comprar y todavía tienen una duda.',
         destino: ['ventas', 'configuracion', { vista: 'contacto' }], destinoLabel: 'Ir a Contacto',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Contacto"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'WhatsApp, email y horarios, acá',
     },
     {
         id: 'redes', grupo: GRUPO_TIENDA, titulo: 'Sumá tus redes sociales',
         detalle: 'Instagram, TikTok y Facebook. Se muestran en tu tienda: el que te compró una vez te sigue, y el que te sigue vuelve.',
         destino: ['ventas', 'configuracion', { vista: 'redes' }], destinoLabel: 'Ir a Redes sociales',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Redes sociales"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus perfiles se cargan acá',
     },
     {
@@ -372,28 +372,28 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         id: 'dominio', grupo: GRUPO_TIENDA, titulo: 'Poné tu dirección propia',
         detalle: 'Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya (tunegocio.com), en Dominios la comprás desde el panel o conectás una que ya tengas.',
         destino: ['ventas', 'configuracion', { vista: 'dominios' }], destinoLabel: 'Ir a Dominios',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Dominios"] || .cfg-sidebar',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Comprá o conectá tu dominio acá',
     },
     {
         id: 'equipo', grupo: GRUPO_NEGOCIO, titulo: 'Invitá a alguien de tu equipo',
         detalle: 'Cada persona entra con su usuario y ve solo lo que su rol permite. Le llega un mail con la invitación.',
         destino: ['ventas', 'configuracion', { vista: 'equipo' }], destinoLabel: 'Ir a Equipo',
-        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-sidebar-item[title="Equipo"]',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-contenido h1',
         guiaLabel: 'Invitá desde acá: elegís el rol y le llega un mail',
     },
     {
         id: 'notificaciones', grupo: GRUPO_NEGOCIO, titulo: 'Elegí qué avisos recibís',
         detalle: 'Pedido nuevo, pago confirmado, stock crítico, cancelaciones: cada uno por el panel, por mail, o los dos. Ajustá la grilla y guardá.',
         destino: ['ventas', 'configuracion', { vista: 'notificaciones' }], destinoLabel: 'Ir a Notificaciones',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Notificaciones"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Cada aviso, por panel o por mail: se define acá',
     },
     {
         id: 'postventa', grupo: GRUPO_NEGOCIO, titulo: 'Definí cambios y devoluciones',
         detalle: 'Si aceptás devoluciones y cancelaciones, y con qué reembolso: nota de crédito, plata de vuelta por Mercado Pago, o los dos. Lo que elijas es lo que tu cliente puede pedir — aprobar cada caso sigue siendo tuyo.',
         destino: ['ventas', 'configuracion', { vista: 'postventa' }], destinoLabel: 'Ir a Cancelaciones',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Cancelaciones y devoluciones"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus reglas de postventa, acá',
     },
     {
@@ -407,7 +407,7 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         id: 'plan', grupo: GRUPO_NEGOCIO, titulo: 'Conocé tu plan',
         detalle: 'En Suscripción ves qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Justo abajo, en Soporte, está cómo escribirnos si algo no cierra.',
         destino: ['ventas', 'configuracion', { vista: 'suscripcion' }], destinoLabel: 'Ir a Suscripción',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Suscripción"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tu plan y tu facturación, acá',
     },
 ]
@@ -461,7 +461,7 @@ export const TIPS_POR_SECCION: Partial<Record<string, TipSeccion[]>> = {
         { ancla: '.dl-actions', titulo: 'Cupones', texto: 'Códigos que el cliente escribe en el checkout. Se pueden limitar por usos totales o por cliente.' },
     ],
     configuracion: [
-        { ancla: '.cfg-sidebar', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. La clave de la primera semana es Negocio (tus datos). En Pagos elegís cómo cobrás; conectar Mercado Pago es opcional, pero conviene si querés aceptar tarjeta.' },
+        { ancla: 'sidebar:Configuración', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. La clave de la primera semana es Negocio (tus datos). En Pagos elegís cómo cobrás; conectar Mercado Pago es opcional, pero conviene si querés aceptar tarjeta.' },
     ],
     avanzado: [
         { ancla: 'centro', titulo: 'El paquete Avanzado', texto: 'Extras pagos aparte de tu suscripción: juegos con premio, modales de anuncios, plantillas de Home y countdown. Si no lo tenés, "Ver qué incluye" te muestra el detalle.' },

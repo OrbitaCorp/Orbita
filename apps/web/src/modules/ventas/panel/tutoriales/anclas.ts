@@ -17,7 +17,7 @@
 export function resolverAncla(ancla: string): HTMLElement | null {
     if (typeof document === 'undefined' || ancla === 'centro') return null
 
-    // Cadena de fallbacks: 'boton:Conectar cuenta || .cfg-sidebar-item[title="Pagos"]'
+    // Cadena de fallbacks: 'boton:Conectar cuenta || .cfg-contenido h1'
     // prueba cada ancla en orden y devuelve la primera que exista.
     if (ancla.includes(' || ')) {
         for (const parte of ancla.split(' || ')) {

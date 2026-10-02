@@ -10,10 +10,13 @@
 // pantalla con 6 tarjetas apiladas de a dos columnas, y Apariencia/Equipo/
 // Notificaciones vivían como pantallas sueltas elegidas desde el sidebar
 // PRINCIPAL del panel. Ahora las 9 son secciones independientes ("raíces",
-// no tabs ni cards agrupadas) de un menú guía propio (ConfigSidebar.tsx) que
-// vive DENTRO de esta pantalla — el sidebar principal se colapsa solo a la
-// franja de íconos apenas se entra a Configuración (ver Sidebar.tsx) para
-// hacerle lugar, mismo patrón que un módulo de configuración típico.
+// no tabs ni cards agrupadas).
+//
+// (2026-10-02) La navegación entre esas secciones volvió al menú principal:
+// son las sub-secciones del módulo Configuración (ver MODULOS en
+// layouts/components/Sidebar.tsx). El menú propio que vivía DENTRO de esta
+// pantalla se sacó; lo único que queda adentro es el índice de una pantalla
+// que tenga secciones propias, como Apariencia (components/IndiceDeVista.tsx).
 //
 // Cada sección trae sus propios datos y tiene su propio botón de guardar
 // (así si falla una no se pierde lo del resto — sin cambios ahí). Usa la
@@ -35,7 +38,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { toastEsError } from '@/lib/utils'
 
 import type { VistaConfig } from './components/ConfigTabs'
-import { ConfigSidebar } from './components/ConfigSidebar'
+import { IndiceDeVista } from './components/IndiceDeVista'
 import { GeneralViewSkeleton } from './components/general/GeneralViewSkeleton'
 import { SeccionContacto, SeccionRedes } from './components/general/SeccionContacto'
 import { SeccionEnvios } from './components/general/SeccionEnvios'
@@ -111,8 +114,8 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             <h1 style={h1Style}>{TITULOS_SECCION[vista] ?? 'Negocio'}</h1>
 
             {/* Ya no es un grid de varias tarjetas — cada sección de
-                Configuración es su propia raíz en el menú guía (ver
-                ConfigSidebar.tsx) y ocupa la pantalla entera, una tarjeta
+                Configuración es su propia sub-sección del menú principal (ver
+                Sidebar.tsx) y ocupa la pantalla entera, una tarjeta
                 enfocada a la vez. */}
             <div>
 
@@ -150,7 +153,7 @@ export default function ConfigGeneral() {
     const ir = (v: VistaConfig) => {
         const { vista: _v, ...rest } = router.query
         const q: Record<string, string | string[] | undefined> = { ...rest }
-        // 'negocio' es el default (primera raíz del menú guía) — sin ?vista=
+        // 'negocio' es el default (la pantalla de entrada) — sin ?vista=
         // en la URL cae ahí, mismo criterio que 'general' antes.
         if (v !== 'negocio' && v !== 'general') q.vista = v
         router.push({ query: q })
@@ -169,11 +172,8 @@ export default function ConfigGeneral() {
 
     return (
         <>
-            {/* Mobile: el sidebar pasa a ser una franja horizontal arriba
-                (ConfigSidebar.tsx ya se encarga de su propio layout) — acá
-                solo hace falta apilar en vez de poner uno al lado del otro,
-                y sacar el padding-left fijo que era "aire" para la card
-                flotante de escritorio. */}
+            {/* Mobile: el índice interno (IndiceDeVista) no se muestra — acá
+                solo hace falta el aire de 12px alrededor del contenido. */}
             <style>{`
                 @media (max-width: 768px) {
                     .cfg-hub-layout { flex-direction: column !important; padding: 12px !important; gap: 12px !important; }
@@ -192,8 +192,10 @@ export default function ConfigGeneral() {
                 }
             `}</style>
             <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'stretch', gap: 0, padding: 0 }}>
-                <ConfigSidebar activa={sub} onNavigate={ir} />
-                <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+                <IndiceDeVista vista={sub} />
+                {/* `cfg-contenido`: ancla de los tutoriales guiados (apuntan al
+                    título de la pantalla, ver tutoriales/copy.ts). */}
+                <div className="cfg-contenido" style={{ flex: 1, minWidth: 0, width: '100%' }}>
                     {content}
                 </div>
             </div>

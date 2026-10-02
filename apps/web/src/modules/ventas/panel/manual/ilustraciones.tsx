@@ -185,7 +185,8 @@ const MODULOS: { id: ModuloId; label: string; subs?: string[] }[] = [
     { id: 'productos', label: 'Productos', subs: ['Lista de productos', 'Crear producto', 'Categorías', 'Rep. productos'] },
     { id: 'mensajes', label: 'Mensajes', subs: ['Bandeja', 'Plantillas'] },
     { id: 'descuentos', label: 'Descuentos', subs: ['Descuentos', 'Cupones', 'Rendimiento'] },
-    { id: 'config', label: 'Configuración' },
+    // Son catorce: en el dibujo entran las primeras y el resto se resume.
+    { id: 'config', label: 'Configuración', subs: ['Suscripción', 'Negocio', 'Contacto', 'Pagos', 'Envíos', 'y 9 más…'] },
     { id: 'avanzado', label: 'Avanzado' },
     { id: 'manual', label: 'Manual' },
 ]
@@ -205,7 +206,7 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
     sub?: string
     /** Miga de la barra, después de "Ventas". */
     miga: string[]
-    /** Menú principal reducido a íconos (pasa solo al entrar a Configuración). */
+    /** Menú principal reducido a íconos. */
     colapsado?: boolean
     /** Puntito rojo en Mensajes. */
     noLeidos?: boolean
@@ -967,42 +968,13 @@ function Reportes() {
     )
 }
 
-/** Configuración: el menú principal colapsado, el menú propio, la sección Negocio y Guardar cambios. */
+/** Configuración: el módulo desplegado en el menú principal, la sección Negocio y Guardar cambios. */
 function Config() {
-    // Grupos del menú propio (ConfigSidebar.tsx). El separador va entre grupos.
-    const grupos: string[][] = [
-        ['Suscripción'],
-        ['Negocio', 'Contacto', 'Pagos', 'Envíos', 'Redes sociales', 'Dominios', 'Canc. y devol.'],
-        ['Apariencia', 'Equipo', 'Notificaciones', 'Registro de actividad'],
-        ['Soporte'],
-        ['Zona peligrosa'],
-    ]
-    const items: ReactElement[] = []
-    let y = 27
-    grupos.forEach((g, gi) => {
-        if (gi > 0) {
-            items.push(<line key={`sep-${gi}`} x1={30.5} y1={y - 1.5} x2={92.5} y2={y - 1.5} stroke={LINEA} />)
-            y += 2
-        }
-        for (const label of g) {
-            const activo = label === 'Negocio'
-            const peligro = label === 'Zona peligrosa'
-            items.push(
-                <g key={label}>
-                    {activo && <rect x={28.5} y={y - 6.5} width={64} height={9.5} rx={2} fill={ACENTO_BG} />}
-                    <Icono x={31} y={y - 4.5} s={3.5} color={activo ? ACENTO : peligro ? TONOS.error.fg : TENUE} opacity={activo || peligro ? 1 : 0.55} />
-                    <Rotulo x={37} y={y} size={5} fuerte={activo} color={activo ? ACENTO : peligro ? TONOS.error.fg : TEXTO}>{label}</Rotulo>
-                </g>,
-            )
-            y += 10.5
-        }
-    })
     return (
-        <Panel colapsado activo="config" miga={['Configuración', 'Negocio']}>
-            {/* El menú propio de Configuración */}
-            <rect x={21} y={17} width={76} height={166.5} fill={SUPERFICIE} />
-            <line x1={96.5} y1={17} x2={96.5} y2={183.5} stroke={LINEA} />
-            {items}
+        <Panel activo="config" abierto="config" sub="Negocio" miga={['Configuración', 'Negocio']}>
+            {/* El dibujo de la sección está pensado para arrancar en x=104:
+                se corre a la izquierda para pegarlo al menú (60 de ancho). */}
+            <g transform="translate(-32 0)">
             {/* La sección Negocio */}
             <Rotulo x={104} y={32} size={7} fuerte>Negocio</Rotulo>
             <Rotulo x={104} y={39.5} size={4.4}>Lo que ven tus clientes y lo que usa el envío para calcular distancias.</Rotulo>
@@ -1020,11 +992,11 @@ function Config() {
             <path d="M 282 88 c -4 -5 -6 -8 -6 -11 a 6 6 0 0 1 12 0 c 0 3 -2 6 -6 11 z" fill={ACENTO} />
             <circle cx={282} cy={77} r={2} fill={SOBRE_ACENTO} />
             <Boton x={104} y={118} w={60} label="Guardar cambios" primario size={5.2} />
-            <Callout n={1} x={13} y={52} />
-            <Callout n={2} x={93} y={25} />
-            <Callout n={3} x={313} y={22} />
-            <Callout n={4} x={171} y={124} />
-            <Callout n={5} x={88} y={171} />
+            </g>
+            <Callout n={1} x={63} y={100} />
+            <Callout n={2} x={63} y={121} />
+            <Callout n={3} x={285} y={27} />
+            <Callout n={4} x={139} y={124} />
         </Panel>
     )
 }
@@ -1348,13 +1320,12 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <Reportes />,
     },
     config: {
-        titulo: 'Configuración: el menú principal colapsado a íconos, el menú propio de Configuración y la sección Negocio con su botón Guardar cambios.',
+        titulo: 'Configuración: el módulo desplegado en el menú principal con sus pantallas y la sección Negocio con su botón Guardar cambios.',
         leyenda: [
-            'El menú principal se colapsa solo a una franja de íconos al entrar.',
-            'El menú propio de Configuración: cada ítem es una pantalla distinta.',
-            'La pantalla de la sección elegida (acá, Negocio).',
+            'Configuración, en el menú de la izquierda: al entrar se despliegan sus pantallas.',
+            'Cada ítem es una pantalla distinta (acá, Negocio). Al final de la lista está la Zona peligrosa.',
+            'La pantalla de la sección elegida.',
             '"Guardar cambios": cada sección se guarda por separado.',
-            'Zona peligrosa: lo que no tiene vuelta atrás, separado del resto.',
         ],
         dibujo: <Config />,
     },
