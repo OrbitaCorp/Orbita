@@ -30,14 +30,34 @@ async function subirVideo(file: File, onProgress?: (pct: number) => void): Promi
   return panelPresignProductVideo(file, onProgress)
 }
 
-export function ContenidoFichaModal({ productId, onClose, onGuardado }: { productId: string; onClose: () => void; onGuardado?: () => void }) {
-  const [nombre, setNombre] = useState('')
-  const [bloques, setBloques] = useState<Bloque[]>([])
-  const [cargando, setCargando] = useState(true)
+export function ContenidoFichaModal({
+  productId,
+  productName,
+  initialBlocks,
+  onClose,
+  onGuardado,
+  onSaveBlocks,
+}: {
+  productId?: string
+  productName?: string
+  initialBlocks?: ApiProductContentBlock[]
+  onClose: () => void
+  onGuardado?: () => void
+  onSaveBlocks?: (blocks: ApiProductContentBlock[]) => void
+}) {
+  const [nombre, setNombre] = useState(productName ?? '')
+  const [bloques, setBloques] = useState<Bloque[]>(() => {
+    if (initialBlocks) {
+      return initialBlocks.length > 0 ? initialBlocks.map(desdeApi) : [vacio()]
+    }
+    return []
+  })
+  const [cargando, setCargando] = useState(!initialBlocks && !!productId)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (initialBlocks || !productId) return
     let cancelado = false
     panelGetProductFull(productId)
       .then(p => {
@@ -51,7 +71,7 @@ export function ContenidoFichaModal({ productId, onClose, onGuardado }: { produc
       .catch(e => { if (!cancelado) setError(e instanceof ApiError ? e.message : 'No se pudo cargar el producto') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [productId])
+  }, [productId, initialBlocks])
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !guardando) onClose() }
@@ -75,22 +95,33 @@ export function ContenidoFichaModal({ productId, onClose, onGuardado }: { produc
 
   const guardar = async () => {
     if (invalidos.length > 0) { setError('Hay un video con un link que no reconocemos. Corregilo o quitalo para guardar.'); return }
-    setGuardando(true); setError('')
-    try {
-      await panelUpdateProductContent(productId, conLink.map(b => ({
-        id: b.id,
-        url: b.url.trim(),
-        ...(b.eyebrow.trim() ? { eyebrow: b.eyebrow.trim() } : {}),
-        ...(b.title.trim() ? { title: b.title.trim() } : {}),
-        ...(b.text.trim() ? { text: b.text.trim() } : {}),
-        ...(b.ctaText.trim() ? { ctaText: b.ctaText.trim() } : {}),
-      })))
+    const payloadBloques: ApiProductContentBlock[] = conLink.map(b => ({
+      id: b.id,
+      url: b.url.trim(),
+      ...(b.eyebrow.trim() ? { eyebrow: b.eyebrow.trim() } : {}),
+      ...(b.title.trim() ? { title: b.title.trim() } : {}),
+      ...(b.text.trim() ? { text: b.text.trim() } : {}),
+      ...(b.ctaText.trim() ? { ctaText: b.ctaText.trim() } : {}),
+    }))
+
+    if (onSaveBlocks) {
+      onSaveBlocks(payloadBloques)
+    }
+
+    if (productId) {
+      setGuardando(true); setError('')
+      try {
+        await panelUpdateProductContent(productId, payloadBloques)
+        onGuardado?.()
+        onClose()
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : 'No se pudo guardar el contenido')
+      } finally {
+        setGuardando(false)
+      }
+    } else {
       onGuardado?.()
       onClose()
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'No se pudo guardar el contenido')
-    } finally {
-      setGuardando(false)
     }
   }
 
