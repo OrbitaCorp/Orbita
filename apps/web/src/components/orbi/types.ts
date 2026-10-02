@@ -5,6 +5,9 @@ export type OrbiSurface = 'wizard' | 'panel'
 /** Id del panel de Orbi en escritorio/celular: lo apunta el `aria-controls` del botón de la barra. */
 export const ID_PANEL_ORBI = 'orbi-panel'
 
+/** Lo que dice la caja de texto mientras Orbi está en mantenimiento (deshabilitada). */
+export const PLACEHOLDER_EN_MANTENIMIENTO = 'Orbi no está disponible por ahora'
+
 export interface OrbiContext {
   surface: OrbiSurface
   module?: string

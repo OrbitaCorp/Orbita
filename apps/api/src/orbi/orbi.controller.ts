@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
@@ -8,7 +8,6 @@ import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './d
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { OrbiSaludService } from './salud/orbi-salud.service';
-import { codigoParaElFront, MENSAJE_FALLA_PASAJERA } from './salud/clasificar-error';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -165,6 +164,19 @@ export class OrbiController {
       void this.usageMetering.track({ ...comun, category: 'prompt_tokens', quantity: c.promptTokens });
       void this.usageMetering.track({ ...comun, category: 'completion_tokens', quantity: c.completionTokens });
     }
+  }
+
+  /**
+   * Si Orbi atiende ahora (mantenimiento automático). El chat lo pregunta al
+   * abrirse para mostrar el aviso antes de que la persona escriba, en vez de
+   * dejarla tipear y responderle con un 503. Público porque el alta de
+   * negocios no tiene sesión; no dice la causa.
+   */
+  @Get('estado')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async estado(@Query('surface') surface?: string) {
+    return this.salud.disponibilidad(surface === 'wizard' ? 'wizard' : 'panel');
   }
 
   @Post('chat')
@@ -488,8 +500,8 @@ export class OrbiController {
         // de las que no se arreglan solas, o se repite, Orbi pasa a
         // mantenimiento y se avisa a los admins. A la persona NUNCA le llega el
         // error crudo del proveedor.
-        const falla = await this.salud.registrarFalla({ error, surface: 'panel', actor: user.businessId });
-        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
+        const aviso = await this.salud.avisoDeFalla({ error, surface: 'panel', actor: user.businessId });
+        res.write(`event: error\ndata: ${JSON.stringify(aviso)}\n\n`);
       }
     } finally {
       this.medirConsumo(consumo, {
@@ -885,8 +897,8 @@ export class OrbiController {
       if (!corte.signal.aborted) {
         fallo = true;
         this.logger.error(`Orbi wizard chat error: ${error}`);
-        const falla = await this.salud.registrarFalla({ error, surface: 'wizard', actor: `wizard:${hmacIp('orbi-wizard', ip)}` });
-        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
+        const aviso = await this.salud.avisoDeFalla({ error, surface: 'wizard', actor: `wizard:${hmacIp('orbi-wizard', ip)}` });
+        res.write(`event: error\ndata: ${JSON.stringify(aviso)}\n\n`);
       }
     } finally {
       // Un turno cortado no se registra: sería una respuesta vacía que

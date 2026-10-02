@@ -4,7 +4,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../mail/mail.service';
 import { LLM_ADAPTER, type LlmAdapter } from '../llm/llm-adapter.interface';
 import { esErrorDeAborto } from '../llm/llm-errors';
-import { clasificarError, MENSAJE_MANTENIMIENTO_PANEL, MENSAJE_MANTENIMIENTO_WIZARD, sanitizarDetalle, type CategoriaDeFalla, type FallaClasificada } from './clasificar-error';
+import {
+  clasificarError,
+  codigoParaElFront,
+  MENSAJE_FALLA_PASAJERA,
+  MENSAJE_MANTENIMIENTO_PANEL,
+  MENSAJE_MANTENIMIENTO_WIZARD,
+  sanitizarDetalle,
+  type CategoriaDeFalla,
+  type FallaClasificada,
+} from './clasificar-error';
 
 /** Cuánto hacia atrás se miran las fallas para decidir si son "sostenidas". */
 export const VENTANA_MIN = 10;
@@ -21,6 +30,12 @@ const REINTENTO_DE_AVISO_MS = 15 * 60 * 1000;
 const SONDA_TIMEOUT_MS = 20_000;
 
 export type SuperficieDeOrbi = 'panel' | 'wizard';
+
+export type CodigoDeErrorDeOrbi = 'ORBI_MAINTENANCE' | 'ORBI_PROVIDER_DOWN' | 'ORBI_ERROR';
+
+function mensajeDeMantenimiento(surface: SuperficieDeOrbi): string {
+  return surface === 'wizard' ? MENSAJE_MANTENIMIENTO_WIZARD : MENSAJE_MANTENIMIENTO_PANEL;
+}
 
 export interface EstadoDeOrbi {
   status: 'ACTIVE' | 'MAINTENANCE';
@@ -115,7 +130,31 @@ export class OrbiSaludService {
     if (estado.status !== 'MAINTENANCE') return;
     void this.recordatorioSiCorresponde();
     // `error` y no `code`: el filtro global da forma { error, statusCode, message } y descartaría otros campos.
-    throw new ServiceUnavailableException({ error: 'ORBI_MAINTENANCE', message: surface === 'wizard' ? MENSAJE_MANTENIMIENTO_WIZARD : MENSAJE_MANTENIMIENTO_PANEL });
+    throw new ServiceUnavailableException({ error: 'ORBI_MAINTENANCE', message: mensajeDeMantenimiento(surface) });
+  }
+
+  /**
+   * Para que el chat sepa al abrirse si Orbi atiende, sin mandar un mensaje.
+   * Es público (lo usa el alta de negocios): dice si está disponible y nada
+   * de la causa.
+   */
+  async disponibilidad(surface: SuperficieDeOrbi): Promise<{ disponible: true } | { disponible: false; mensaje: string }> {
+    const estado = await this.estado();
+    if (estado.status !== 'MAINTENANCE') return { disponible: true };
+    return { disponible: false, mensaje: mensajeDeMantenimiento(surface) };
+  }
+
+  /**
+   * Registra la falla y arma el evento `error` del stream. Si ESTA falla (u
+   * otra instancia en paralelo) dejó a Orbi en mantenimiento, la persona ve el
+   * aviso de mantenimiento y no "probá en unos minutos", que sería falso.
+   */
+  async avisoDeFalla(e: { error: unknown; surface: SuperficieDeOrbi; actor: string }): Promise<{ code: CodigoDeErrorDeOrbi; message: string }> {
+    const falla = await this.registrarFalla(e);
+    if (!esErrorDeAborto(e.error) && (await this.estado()).status === 'MAINTENANCE') {
+      return { code: 'ORBI_MAINTENANCE', message: mensajeDeMantenimiento(e.surface) };
+    }
+    return { code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA };
   }
 
   // ── Resultados de cada llamada ───────────────────────────────────────────

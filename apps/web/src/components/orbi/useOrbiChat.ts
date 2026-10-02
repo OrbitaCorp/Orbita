@@ -6,6 +6,7 @@ import { authedFetch } from '@/lib/auth/authClient'
 import { track, wizardIds } from '@/lib/analytics/wizardTracker'
 import { getWizardFormState } from './useOrbiContext'
 import { leerStreamSse } from './sseParser'
+import { mantenimientoDeLaRespuesta, mantenimientoDelEvento } from './mantenimiento'
 import {
   conversationIdParaEnviar,
   debeDescartar,
@@ -183,6 +184,14 @@ export function useOrbiChat() {
         }
         // Reemplazado por otro envío: la última burbuja ya es la del nuevo.
         if (!sigueVigente()) return
+        // Orbi en mantenimiento: el aviso va fijo arriba del input (y lo
+        // deshabilita), no como respuesta. La burbuja vacía de Orbi se saca.
+        const aviso = mantenimientoDeLaRespuesta(res.status, cuerpo)
+        if (aviso) {
+          store.setMantenimiento(aviso)
+          store.quitarMensaje(assistantMsg.id)
+          return
+        }
         store.appendToLastAssistant(
           typeof cuerpo?.message === 'string' ? cuerpo.message : 'No pude responder ahora. Probá de nuevo en un rato.',
         )
@@ -240,7 +249,16 @@ export function useOrbiChat() {
         } else if (eventType === 'turn') {
           store.setTurnIdOnLastAssistant(data.turnId)
         } else if (eventType === 'error') {
-          store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
+          // La falla de este turno apagó Orbi: mismo aviso fijo que el 503. Si
+          // la burbuja quedó vacía se saca; si ya tenía algo, queda lo que llegó.
+          const aviso = mantenimientoDelEvento(crudo)
+          if (aviso) {
+            store.setMantenimiento(aviso)
+            const burbuja = useOrbiStore.getState().messages.find(m => m.id === assistantMsg.id)
+            if (burbuja && !burbuja.content.trim() && !burbuja.actions?.length) store.quitarMensaje(assistantMsg.id)
+          } else {
+            store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
+          }
         } else if (eventType === 'done') {
           // Señal de que la respuesta terminó. El estado de "escribiendo" lo
           // baja el `finally` al cerrarse el stream, y todavía puede llegar
