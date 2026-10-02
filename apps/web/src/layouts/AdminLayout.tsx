@@ -11,6 +11,7 @@ import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortc
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 import { SidebarModeProvider } from './SidebarModeContext'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
 // y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
@@ -81,7 +82,16 @@ function AdminShell({ children }: { children: ReactNode }) {
                 @media (min-width: 769px) {
                     .admin-backdrop { display: none !important; }
                 }
+                /* El cielo del alta, detrás del contenido. Solo en oscuro: en
+                   claro el panel sigue con su fondo plano de siempre. */
+                .admin-cielo { display: none; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #05080F; }
+                .dark .admin-cielo { display: block; }
+                .dark .admin-main { background: transparent !important; }
             `}</style>
+
+            <div className="admin-cielo" aria-hidden>
+                <EscenaEspacial planeta={false} />
+            </div>
 
             {/* Overlay mobile */}
             <div
