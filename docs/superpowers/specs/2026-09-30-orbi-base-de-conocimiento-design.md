@@ -136,6 +136,8 @@ los 61 temas, portando la que ya usa el front (`Manual.tsx:89`). Sin base vector
 
 ### 3.4 Tools de estado
 
+> Implementado con desvíos de permisos y de causas de pausa: ver §8.
+
 **`estadoPrimerosPasos()`**, solo lectura, sin permiso (devuelve booleanos y títulos, nada
 sensible):
 
@@ -277,3 +279,22 @@ migraciones. Mismo orden que el resto: `main` con CI verde y después `deploy.sh
 | Sin búsqueda vectorial | 61 temas; se suma búsqueda por palabras solo si las evals lo piden |
 | Quiénes somos y planes, pendiente | Depende de qué puede contar Orbi sobre Órbita |
 | Mantenimiento con barreras en CI, no solo reglas | Una regla en CLAUDE.md sola no se cumple (el caso de Graphify) |
+
+## 8. Desvíos de la implementación (2026-10-01, rama `claude/awesome-cannon-s749lf`)
+
+Lo que se implementó distinto de este spec, con el porqué y lo que cuesta si está mal.
+
+| Desvío | Por qué | Costo si está mal |
+|---|---|---|
+| El artefacto es `apps/api/src/orbi/manual/manual.generated.ts`, no un `.json` | `nest build` no copia `.json` sin configurar assets; el `.ts` se tipa contra `manual.types.ts` y lo escribe `toMatchFileSnapshot` (`pnpm manual:generar`), así que `paraOrbi.test.ts` falla si quedó viejo | Ninguno funcional; cambiarlo es cambiar el generador |
+| No se separaron los íconos de `contenido.ts` | El generador corre en vitest, que resuelve los imports de íconos; la API nunca importa `contenido.ts` | Si algún día la API tiene que leer el manual en runtime desde `apps/web`, hay que separarlos |
+| `estadoPrimerosPasos` pide `reports.dashboard` (el spec decía "sin permiso") | Invariante 3 de `tool-catalog.spec.ts`: toda tool que lee datos del negocio pide un permiso. Es el permiso del Inicio, donde vive el checklist | Un Empleado por defecto no la tiene: "¿qué me falta para publicar?" se contesta con el manual en general. Configurar y publicar es del dueño |
+| `accesoDelEquipo` pide `config.team.view` también sin `persona` | La tool lee la base cuando hay `persona`, y el permiso se chequea por tool, no por argumento | Un rol personalizado sin "Ver equipo" no puede preguntar por sí mismo; Orbi le explica con el tema `permisos` |
+| `estadoPrimerosPasos` distingue las causas de `isPaused` | `isPaused` lo ponen cuatro cosas: el dueño, la plataforma, la mora y la baja del espacio (que además deja la suscripción en CANCELLED). Decir "debés un pago" a quien pausó o se dio de baja es mentirle | — |
+| A quien no es propietario/admin, el bloqueante de la cuenta se le dice sin detalle ni botón | La suscripción y publicar son `@Roles('owner','admin')` por HTTP | — |
+| `leerTemaDelManual` sin permiso, con la excepción verificada | El invariante 3 comprueba que su constructor no recibe servicios y que `execute` tiene un solo parámetro, sin `arguments` ni defaults: no puede leer el negocio | Si alguien le inyecta un servicio, el test falla y tiene que pedir permiso |
+| Tool extra `getResumenDelPeriodo` (`reports.dashboard`) | Pedido del traspaso (resumen de tienda flojo): mismo cálculo que el Inicio | — |
+| El contrato lee los textos con el AST de TypeScript y exige el texto completo | Con `includes` sobre el código, "Generar con Orbi" pasaba por un ancla de los tutoriales y un comentario podía probar un botón borrado | Un botón armado con template y `${}` no se reconoce: hay que escribir su texto completo en el manual o cambiar la pantalla |
+| Sin hook `PostToolUse` | En su lugar, `.claude/rules/manual.md` y la sección del `CLAUDE.md` raíz; las barreras reales son los tests de contrato y de artefacto | Se depende de CI: el hook avisaría antes |
+| Sin capítulo "Qué no hace Órbita" | Es una decisión de producto (qué se promete) | Orbi responde "no está en el manual" en vez de "Órbita no hace eso" |
+

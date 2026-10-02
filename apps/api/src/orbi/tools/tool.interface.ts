@@ -7,6 +7,12 @@ export interface ToolExecutionContext {
   surface: OrbiSurface;
   permissions: string[];
   /**
+   * El rol de quien pregunta (del JWT). Lo usan las tools que muestran algo
+   * que por HTTP es solo de propietario/admin (`@Roles('owner','admin')`),
+   * como el estado de la suscripción. Opcional: el wizard no tiene rol.
+   */
+  roleName?: string;
+  /**
    * Las opciones reales del paso actual del wizard. Van acá para que
    * selectWizardOption pueda RECHAZAR un key que no exista, en vez de confiar
    * en que el modelo no invente uno.

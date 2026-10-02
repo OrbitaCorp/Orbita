@@ -9,12 +9,15 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 import { PendingActionService } from './tools/pending-action.service';
 import { OrbiTurnService } from './orbi-turn.service';
 import { NavigationTool } from './tools/definitions/navigation.tool';
+import { LeerTemaDelManualTool } from './tools/definitions/manual.tools';
+import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './tools/definitions/estado.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './tools/definitions/order.tools';
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './tools/definitions/report.tools';
+import { GetResumenDelPeriodoTool } from './tools/definitions/periodo.tools';
 import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
@@ -35,6 +38,7 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
+import { OrbiSaludModule } from './salud/orbi-salud.module';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -50,6 +54,7 @@ import { PrismaService } from '../prisma/prisma.service';
     WizardAnalyticsModule,
     OnboardingModule,
     CostsModule,
+    OrbiSaludModule,
   ],
   controllers: [OrbiController],
   providers: [
@@ -85,6 +90,7 @@ export class OrbiModule {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
     this.toolRegistry.register(new NavigationTool());
+    this.toolRegistry.register(new LeerTemaDelManualTool());
 
     this.toolRegistry.register(new ListProductsTool(this.productsService));
     this.toolRegistry.register(new CreateProductTool(this.productsService, this.prisma));
@@ -108,6 +114,11 @@ export class OrbiModule {
     this.toolRegistry.register(new GetSalesReportTool(this.reportsService));
     this.toolRegistry.register(new GetProductReportTool(this.reportsService));
     this.toolRegistry.register(new GetCustomerReportTool(this.reportsService));
+    this.toolRegistry.register(new GetResumenDelPeriodoTool(this.reportsService));
+
+    // El estado real del negocio para las dudas del manual (fase 6).
+    this.toolRegistry.register(new EstadoPrimerosPasosTool(this.businessesService, this.prisma));
+    this.toolRegistry.register(new AccesoDelEquipoTool(this.prisma));
 
     this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService));
     this.toolRegistry.register(new SuggestDescriptionTool(this.config));

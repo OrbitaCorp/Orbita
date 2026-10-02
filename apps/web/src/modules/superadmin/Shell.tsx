@@ -19,6 +19,8 @@ export interface ItemNav<T extends string> {
   // Contador pendiente (hoy: consultas de soporte abiertas). Solo se dibuja
   // si es mayor a cero: un "0" al lado del label sería ruido permanente.
   badge?: number
+  // Cómo se lee la pastilla con lector de pantalla. Por defecto "N abiertas" (Soporte).
+  badgeLabel?: string
 }
 
 interface Props<T extends string> {
@@ -129,7 +131,7 @@ export function SuperAdminShell<T extends string>({
                           abiertas" en vez de "Soporte 3". */}
                       {it.badge !== undefined && it.badge > 0 && (
                         <span
-                          aria-label={`${it.badge} abiertas`}
+                          aria-label={it.badgeLabel ?? `${it.badge} abiertas`}
                           style={{
                             display: 'inline-grid', placeItems: 'center',
                             minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,

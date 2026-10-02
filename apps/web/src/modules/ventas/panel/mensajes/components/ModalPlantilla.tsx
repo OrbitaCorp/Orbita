@@ -96,8 +96,8 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
               ))}
             </div>
             <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-              {'{nombre}'} y {'{tienda}'} se completan solos al usar la plantilla. {'{id}'} y {'{tracking}'} quedan
-              para que los completes a mano antes de enviar (dependen del pedido puntual).
+              {'{nombre}'} y {'{tienda}'} se completan solos al usar la plantilla. {'{id}'} y {'{tracking}'} se completan
+              con el último pedido del cliente: revisá que sea el pedido del que hablan. Si no hay dato, quedan para completar a mano.
             </p>
           </div>
 

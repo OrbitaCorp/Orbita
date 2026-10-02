@@ -6,6 +6,7 @@ import {
   VISTAS_DE_CONFIGURACION,
   type SeccionDelPanel,
 } from '../../navegacion/secciones';
+import { rutaDelPanel } from '../../navegacion/ruta';
 
 // Qué es cada sección, para que el modelo elija bien. Tipado con la lista
 // completa: si se agrega una sección al panel y acá falta, no compila.
@@ -103,14 +104,14 @@ export class NavigationTool implements OrbiTool {
       return {
         success: true,
         label: `Navegando a ${seccion} → ${vista}`,
-        data: { path: `/admin/ventas/${seccion}?vista=${vista}`, seccion, vista },
+        data: { path: rutaDelPanel(seccion, vista), seccion, vista },
       };
     }
 
     return {
       success: true,
       label: `Navegando a ${seccion}`,
-      data: { path: `/admin/ventas/${seccion}`, seccion },
+      data: { path: rutaDelPanel(seccion), seccion },
     };
   }
 }

@@ -16,6 +16,7 @@ import { CuotaService } from '../common/cuota/cuota.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
 import { OrbiTurnService } from './orbi-turn.service';
+import { OrbiSaludService } from './salud/orbi-salud.service';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
 
 interface MockResponse {
@@ -128,6 +129,14 @@ describe('OrbiController', () => {
         // La cuota diaria vive en Postgres: acá siempre hay cupo.
         { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true) } },
         { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: OrbiSaludService,
+          useValue: {
+            exigirDisponible: jest.fn().mockResolvedValue(undefined),
+            registrarOk: jest.fn().mockResolvedValue(undefined),
+            registrarFalla: jest.fn().mockResolvedValue({ categoria: 'INTERNAL', inmediata: false, detalle: 'x' }),
+          },
+        },
       ],
     }).compile();
 

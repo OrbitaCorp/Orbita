@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign,
+  Search, Plus, DollarSign, Bot,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -19,6 +19,7 @@ import { TabWizard } from './Wizard'
 import { TabAuditoria } from './Auditoria'
 import { TabSoporte } from './Soporte'
 import { TabCostos } from './Costos'
+import { TabOrbi } from './Orbi'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -61,7 +62,13 @@ export function SuperAdminDashboard() {
     [esAdmin, tickSoporte],
   )
   const abiertas = resumenSoporte?.open ?? 0
-  const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n))
+  // Orbi apagado: pastilla "1" en su ítem. Se pide con el mismo ritmo que Soporte.
+  const { data: estadoOrbi } = useFetch(
+    () => (esAdmin ? platformApi.orbiEstado().catch(() => null) : Promise.resolve(null)),
+    [esAdmin, tickSoporte],
+  )
+  const orbiApagado = estadoOrbi?.estado.status === 'MAINTENANCE' ? 1 : 0
+  const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' } : n))
 
   if (!user || user.type !== 'platform_admin') return null
 
@@ -83,6 +90,7 @@ export function SuperAdminDashboard() {
       {tab === 'duenos' && <TabDuenos />}
       {tab === 'descuentos' && <TabDescuentos />}
       {tab === 'costos' && <TabCostos />}
+      {tab === 'orbi' && <TabOrbi />}
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
@@ -91,7 +99,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -111,6 +119,9 @@ export const NAV: ItemNav<Tab>[] = [
   // Primero de "Interno": es el tablero de trabajo del equipo, lo que más se
   // abre; admins y actividad son de consulta.
   { id: 'costos', label: 'Costos', Icono: DollarSign, grupo: 'Interno' },
+  // Con una pastilla roja cuando Orbi está apagado (la pone el dashboard): un
+  // apagón de la IA tiene que verse desde cualquier sección, no solo acá.
+  { id: 'orbi', label: 'Orbi', Icono: Bot, grupo: 'Interno' },
   { id: 'auditoria', label: 'Auditoría', Icono: ClipboardCheck, grupo: 'Interno' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
   { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },

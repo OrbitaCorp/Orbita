@@ -1,0 +1,624 @@
+
+> @orbita/api@0.1.0 test:evals:panel /home/user/Orbita/apps/api
+> ts-node -P tsconfig.json test/evals/panel/run.ts -- --categoria=manual --repeticiones=3 --variante=manual-entero --comparar=../../evals-rama.json --salida=../../evals-manual-entero.json
+
+◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
+Corriendo 32 caso(s) x 3 con gemini-3.6-flash, variante manual-entero, ahora 2026-10-01T14:26:47.618Z…
+
+✓ manual-envio-gratis 5556ms
+  Duda del manual: cfg-envios
+  dijo: Te llevé a la sección de **Envíos**. Para ofrecer envío gratis a partir de un monto, seguí estos pasos: 1. Buscá el campo **Envío gratis des…
+  llamó: navigateTo({"seccion":"configuracion","vista":"envios"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-crear-cupon 1692ms
+  Duda del manual: cupones
+  dijo: Para crear un cupón de descuento con código: 1. Andá a **Descuentos** en el menú de la izquierda y entra a la pestaña **Cupones**. 2. Tocá e…
+  llamó: nada
+  ✗ [navega] El botón no lleva a cupones (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-descuento-vs-cupon 1565ms
+  Duda del manual: diferencia
+  dijo: El descuento se aplica solo en la tienda sin que el cliente tenga que hacer nada. Es la promo de vidriera, como un 20% en camperas o un 2x1.…
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-mercado-pago 5658ms
+  Duda del manual: cfg-pagos
+  dijo: Para conectar Mercado Pago y empezar a cobrar con tarjeta desde la tienda, tenés que seguir estos pasos: 1. Entrá a **Configuración** → **Pa…
+  llamó: navigateTo({"vista":"pagos","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-invitar-equipo 5423ms
+  Duda del manual: cfg-equipo
+  dijo: Para invitar a un colaborador, tenés que ir a **Configuración → Equipo**. Ahí ingresás su correo electrónico y le asignás un rol: * **Propie…
+  llamó: navigateTo({"seccion":"configuracion","vista":"equipo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-logo 2456ms
+  Duda del manual: cfg-apariencia
+  dijo: Te acabo de llevar a la sección de **Apariencia**. Ahí mismo vas a encontrar: - **Identidad de marca:** para subir tu logo y favicon. - **Pa…
+  llamó: navigateTo({"vista":"apariencia","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-publicar 6917ms
+  Duda del manual: publicar / siete-pasos
+  dijo: Para poner tu tienda online y empezar a vender, tenés que publicar la tienda desde el Inicio del panel. Arriba a la derecha vas a ver un bot…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-venta-whatsapp 4398ms
+  Duda del manual: nuevo-pedido
+  dijo: Para cargar una venta de WhatsApp, usá el botón **Nuevo pedido** arriba a la derecha en la sección de Pedidos. El proceso tiene tres pasos s…
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-exportar-clientes 2668ms
+  Duda del manual: exportar-clientes
+  dijo: Para bajarte la lista de clientes a Excel o CSV: 1. Entrá a la sección **Clientes** desde el menú de la izquierda. 2. Arriba a la derecha de…
+  llamó: navigateTo({"seccion":"clientes"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-stock-rapido 2119ms
+  Duda del manual: stock-rapido
+  dijo: Sí, podés editar el stock de forma rápida directamente desde la lista de productos. En la tabla del catálogo, el número de stock tiene un su…
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dos-por-uno 3708ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: Las promociones **2x1** ("Llevá X, pagá Y") se configuran desde el módulo de **Descuentos**. Para crearlo: 1. Andá a **Descuentos** y tocá e…
+  llamó: navigateTo({"seccion":"configuracion","vista":"descuentos"}) + navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-descuento-martes 1576ms
+  Duda del manual: alcance-condiciones
+  dijo: Sí, se puede hacer perfectamente. Al crear un descuento o cupón, podés configurar su vigencia para afinar los días de la semana y la franja …
+  llamó: nada
+  ✗ [navega] El botón no lleva a descuentos (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-cupon-por-mail 2035ms
+  Duda del manual: compartir
+  dijo: Para mandarle un cupón por mail a un cliente, seguí estos pasos: 1. Entrá a la sección **Cupones** dentro de **Descuentos**. 2. En la lista …
+  llamó: nada
+  ✗ [navega] El botón no lleva a cupones (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-rendimiento 4294ms
+  Duda del manual: rendimiento
+  dijo: Eso lo podés ver en la pestaña Rendimiento, dentro de Descuentos. Ahí vas a encontrar cuántas veces se usó cada promo, cuánta plata movió y …
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-notificaciones 6872ms
+  Duda del manual: cfg-notificaciones
+  dijo: Te llevé a Configuración → Notificaciones. Ahí vas a ver una lista de eventos. Buscá **"Nuevo pedido"** en la sección Ventas y tildá la colu…
+  llamó: navigateTo({"vista":"notificaciones","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dominio 2658ms
+  Duda del manual: cfg-dominios
+  dijo: ¡Sí, totalmente! De entrada tu tienda ya funciona con una dirección gratuita de Órbita, pero podés sumarle tu propio dominio `.com` o `.com.…
+  llamó: navigateTo({"seccion":"configuracion","vista":"dominios"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-politica-devoluciones 4477ms
+  Duda del manual: cfg-postventa
+  dijo: Las políticas de devoluciones y cancelaciones se definen en **Configuración → Cancelaciones y devoluciones**. Ahí podés elegir si aceptás de…
+  llamó: navigateTo({"vista":"postventa","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-confirmar-email 4197ms
+  Duda del manual: mi-perfil / siete-pasos
+  dijo: Para confirmar tu email, tenés que ir a **Mi perfil** (te estoy llevando ahí ahora). Una vez en esa pantalla, tocá el botón **"Enviarme el c…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-contrasena 2253ms
+  Duda del manual: mi-perfil
+  dijo: Para cambiar tu contraseña, podés hacerlo desde tu perfil. Ya te llevé a la pantalla de **Mi perfil**. Vas a encontrar la opción para actual…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-comision-mp 4067ms
+  Duda del manual: kpis
+  dijo: La **Comisión MP** es una de las tarjetas del Inicio que muestra cuánta plata se llevó Mercado Pago por los cobros de tus ventas en el perío…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ticket-promedio 2745ms
+  Duda del manual: kpis / lista-clientes
+  dijo: El **ticket promedio** es cuánto gasta, en promedio, un cliente en cada compra que hace en tu tienda. Se calcula dividiendo el total de tus …
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-quien-cambio 4550ms
+  Duda del manual: cfg-actividad
+  dijo: Sí, podés ver exactamente quién cambió un precio, cuándo lo hizo y qué valor modificó desde el **Registro de actividad**. Ahí queda guardado…
+  llamó: navigateTo({"seccion":"configuracion","vista":"actividad"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-avanzado 3619ms
+  Duda del manual: que-es-avanzado / funciones-avanzado
+  dijo: El paquete Avanzado es un conjunto de herramientas adicionales para potenciar las ventas de tu tienda: * **Juegos con premio:** Mini-juegos …
+  llamó: navigateTo({"seccion":"avanzado"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-categoria 6354ms
+  Duda del manual: categorias
+  dijo: Para crear una categoría nueva: 1. Vas a **Productos** → **Categorías** en el menú de la izquierda. 2. Tocás el botón **"Nueva categoría"** …
+  llamó: navigateTo({"seccion":"categorias"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-plantillas-mensajes 8623ms
+  Duda del manual: plantillas
+  dijo: ¡Sí, totalmente! Podés usar las **plantillas de respuesta** para dejar guardadas las frases que más usás (como información de envíos, horari…
+  llamó: navigateTo({"seccion":"mensajes"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-historial 2957ms
+  Duda del manual: historial
+  dijo: Los pedidos cerrados o pasados los podés ver desde el menú de la izquierda en **Pedidos** → **Historial**. Ahí tenés el archivo completo de …
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-devolucion-cliente 6912ms
+  Duda del manual: postventa / cfg-postventa
+  dijo: Para gestionar una devolución, tenés dos opciones según cómo prefieras resolverlo: Podés indicarle a la clienta que inicie la solicitud dire…
+  llamó: navigateTo({"seccion":"configuracion","vista":"postventa"})
+  ✗ [navega] El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ficha-tecnica 5460ms
+  Duda del manual: ficha-tecnica
+  dijo: Para agregar especificaciones o características técnicas a un producto (como medidas, material, RAM, etc.): 1. Entrá a la sección **Producto…
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-cuenta-regresiva 7040ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: Sí, podés crear una **Oferta relámpago**. Muestra un descuento por tiempo limitado con un reloj en cuenta regresiva directamente en tu porta…
+  llamó: navigateTo({"seccion":"avanzado"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ver-tienda 3264ms
+  Duda del manual: ver-tienda / panel-y-tienda
+  dijo: Para ver tu tienda tal cual la ven tus compradores, podés hacer clic en tu avatar arriba a la derecha del panel y seleccionar la opción "Ir …
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-soporte 3959ms
+  Duda del manual: escribinos / cfg-soporte
+  dijo: Podés escribirme directamente desde la sección **Soporte** dentro de Configuración. Te acabo de llevar hasta ahí. Allí podés detallar qué es…
+  llamó: navigateTo({"seccion":"configuracion","vista":"soporte"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-retiro-efectivo 7266ms
+  Duda del manual: cfg-pagos
+  dijo: Te llevé a la sección de **Pagos** para que puedas configurarlo. Para cobrar en efectivo al retirar por el local: 1. Activá la opción **Reti…
+  llamó: navigateTo({"seccion":"configuracion","vista":"pagos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-envio-gratis (intento 2) 2940ms
+  Duda del manual: cfg-envios
+  dijo: Para ofrecer envío gratis a partir de un monto determinado, tenés que hacerlo desde la configuración de envíos. Te llevé directo a esa secci…
+  llamó: navigateTo({"seccion":"configuracion","vista":"envios"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-crear-cupon (intento 2) 3814ms
+  Duda del manual: cupones
+  dijo: Te llevé a la sección de **Cupones**. Para crear uno, hacé clic en el botón **"Nuevo cupón"** arriba a la derecha y completá estos datos: - …
+  llamó: navigateTo({"seccion":"cupones"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-descuento-vs-cupon (intento 2) 1591ms
+  Duda del manual: diferencia
+  dijo: Un **descuento** se aplica solo en la tienda sin que el cliente tenga que hacer nada cuando cumple las condiciones que pusiste (por ejemplo,…
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-mercado-pago (intento 2) 4731ms
+  Duda del manual: cfg-pagos
+  dijo: Para conectar Mercado Pago y cobrar con tarjeta desde tu tienda, tenés que ir a **Configuración → Pagos**. Ahí vas a ver la opción de Mercad…
+  llamó: navigateTo({"vista":"pagos","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-invitar-equipo (intento 2) 1653ms
+  Duda del manual: cfg-equipo
+  dijo: Para invitar a alguien a tu equipo, tenés que ir a la sección de Equipo dentro de la configuración del negocio. Ahí vas a poder ingresar su …
+  llamó: nada
+  ✗ [navega] El botón no lleva a configuracion?vista=equipo (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-logo (intento 2) 2520ms
+  Duda del manual: cfg-apariencia
+  dijo: El logo y los colores de la tienda se cambian desde **Configuración → Apariencia**. Te acabo de llevar directamente a esa sección. Vas a enc…
+  llamó: navigateTo({"seccion":"configuracion","vista":"apariencia"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-publicar (intento 2) 2477ms
+  Duda del manual: publicar / siete-pasos
+  dijo: Para poner tu tienda online, tenés que hacer clic en el botón **"Publicar tienda"** que se encuentra arriba a la derecha en el Inicio del pa…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-venta-whatsapp (intento 2) 2935ms
+  Duda del manual: nuevo-pedido
+  dijo: Podés cargar ventas de WhatsApp o mostrador desde el botón **"Nuevo pedido"** en la sección de Pedidos. Ahí podés: - Buscar y agregar los pr…
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-exportar-clientes (intento 2) 2760ms
+  Duda del manual: exportar-clientes
+  dijo: Para bajarte la lista de clientes a Excel o CSV: 1. Vas a la sección **Clientes** desde el menú lateral. 2. Arriba a la derecha vas a ver el…
+  llamó: navigateTo({"seccion":"clientes"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-stock-rapido (intento 2) 2349ms
+  Duda del manual: stock-rapido
+  dijo: Sí, podés editar el stock de forma rápida directamente desde la lista de productos. En la lista de Productos (en la grilla, tabla o tarjetas…
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dos-por-uno (intento 2) 3190ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: Las promos **2x1 y 3x2** ("Llevá X, pagá Y") forman parte de las herramientas del **Paquete Avanzado**. Para configurarla: * Andá a la secci…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-descuento-martes (intento 2) 3907ms
+  Duda del manual: alcance-condiciones
+  dijo: Sí, re se puede. Cuando creás un descuento automático o un cupón, podés definir su vigencia y afinar los días de la semana y la franja horar…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-cupon-por-mail (intento 2) 2404ms
+  Duda del manual: compartir
+  dijo: Para mandarle un cupón por mail a una clienta, podés hacerlo directamente desde la sección de **Cupones**: 1. En la lista de cupones, buscá …
+  llamó: nada
+  ✗ [navega] El botón no lleva a cupones (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-rendimiento (intento 2) 2575ms
+  Duda del manual: rendimiento
+  dijo: Eso lo podés ver en la pestaña Rendimiento, dentro de la sección Descuentos. Ahí vas a encontrar cuántas veces se usó cada descuento o cupón…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-notificaciones (intento 2) 2503ms
+  Duda del manual: cfg-notificaciones
+  dijo: Eso lo configurás desde **Configuración → Notificaciones**. En la sección **Ventas**, buscá la opción **Nuevo pedido** y marcá la casilla de…
+  llamó: navigateTo({"seccion":"configuracion","vista":"notificaciones"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dominio (intento 2) 5127ms
+  Duda del manual: cfg-dominios
+  dijo: Sí, podés tener tu propio dominio (.com o .com.ar). Tu tienda ya viene con una dirección gratuita de Órbita, pero si querés una propia para …
+  llamó: navigateTo({"seccion":"configuracion","vista":"dominios"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-politica-devoluciones (intento 2) 3658ms
+  Duda del manual: cfg-postventa
+  dijo: Las políticas de devoluciones las definís en **Configuración → Cancelaciones y devoluciones**. Ahí podés habilitar si aceptás devoluciones y…
+  llamó: navigateTo({"seccion":"configuracion","vista":"postventa"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-confirmar-email (intento 2) 3154ms
+  Duda del manual: mi-perfil / siete-pasos
+  dijo: Para confirmar tu email: 1. Anda a tu avatar (arriba a la derecha) y tocá en **Mi perfil**. 2. Tocá en **"Enviarme el código"**. 3. Revisá t…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-contrasena (intento 2) 5984ms
+  Duda del manual: mi-perfil
+  dijo: Para cambiar tu contraseña, tenés que ir a la sección de tu perfil. Podés hacerlo ingresando a tu avatar arriba a la derecha y seleccionando…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-comision-mp (intento 2) 3927ms
+  Duda del manual: kpis
+  dijo: La **Comisión MP** es la cantidad de plata que se llevó Mercado Pago por cobrar tus ventas a través de su plataforma durante el período sele…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ticket-promedio (intento 2) 2243ms
+  Duda del manual: kpis / lista-clientes
+  dijo: El ticket promedio es la cantidad de plata que te deja, en promedio, cada compra que hacen en tu negocio. Se calcula dividiendo las **ventas…
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-quien-cambio (intento 2) 2237ms
+  Duda del manual: cfg-actividad
+  dijo: Sí, podés ver exactamente qué integrante de tu equipo modificó un precio y cuándo lo hizo desde el **Registro de actividad**. Ahí queda guar…
+  llamó: navigateTo({"vista":"actividad","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-avanzado (intento 2) 3172ms
+  Duda del manual: que-es-avanzado / funciones-avanzado
+  dijo: El **paquete Avanzado** incluye varias herramientas adicionales para potenciar tus ventas y la imagen de tu tienda: * **Juegos con premio:**…
+  llamó: navigateTo({"seccion":"avanzado"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-categoria (intento 2) 4436ms
+  Duda del manual: categorias
+  dijo: Para crear una categoría nueva: 1. Vas a **Productos** → **Categorías** en el menú de la izquierda. 2. Tocás el botón **"Nueva categoría"**.…
+  llamó: navigateTo({"seccion":"categorias"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-plantillas-mensajes (intento 2) 3099ms
+  Duda del manual: plantillas
+  dijo: Sí, totalmente. Para eso sirven las plantillas de respuesta. Podés dejar redactadas las respuestas a las preguntas más frecuentes (como enví…
+  llamó: navigateTo({"seccion":"mensajes"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-historial (intento 2) 5073ms
+  Duda del manual: historial
+  dijo: Los pedidos cerrados o pasados los podés ver en la sección de **Pedidos**: - **Pestaña Entregados**: para ver los pedidos que se completaron…
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-devolucion-cliente (intento 2) 5360ms
+  Duda del manual: postventa / cfg-postventa
+  dijo: Tenés dos formas de resolverlo según la etapa de la compra: **1. Si la clienta inició la solicitud desde la tienda:** Podés revisar y aproba…
+  llamó: navigateTo({"seccion":"configuracion","vista":"postventa"})
+  ✗ [navega] El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ficha-tecnica (intento 2) 4245ms
+  Duda del manual: ficha-tecnica
+  dijo: Para agregar especificaciones o características técnicas (como medidas, material, peso, etc.) a un producto, tenés que ir a su pantalla de e…
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-cuenta-regresiva (intento 2) 4854ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: ¡Sí, podés! Se llama **Oferta relámpago**. Muestra un descuento con un reloj en cuenta regresiva en la portada de tu tienda. Para usarla nec…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ver-tienda (intento 2) 2895ms
+  Duda del manual: ver-tienda / panel-y-tienda
+  dijo: Para ver tu tienda como la ve un comprador, abrí el menú de tu avatar (arriba a la derecha) y tocá "Ir a la tienda". Se va a abrir la portad…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-soporte (intento 2) 7004ms
+  Duda del manual: escribinos / cfg-soporte
+  dijo: Podés escribirnos directamente desde el panel entrando a **Configuración → Soporte**. Te acabo de llevar a esa pantalla. Ahí vas a encontrar…
+  llamó: navigateTo({"seccion":"configuracion","vista":"soporte"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-retiro-efectivo (intento 2) 5943ms
+  Duda del manual: cfg-pagos
+  dijo: Para cobrar en efectivo cuando tus clientes retiran por el local, tenés que activar la opción desde la configuración de pagos. Ahí mismo ten…
+  llamó: navigateTo({"vista":"pagos","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-envio-gratis (intento 3) 3933ms
+  Duda del manual: cfg-envios
+  dijo: Para ofrecer envío gratis a partir de un monto determinado: 1. Andá a **Configuración** → **Envíos**. 2. En la sección de configuración, bus…
+  llamó: navigateTo({"seccion":"configuracion","vista":"envios"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-crear-cupon (intento 3) 1896ms
+  Duda del manual: cupones
+  dijo: Para crear un cupón con código que tus clientes ingresen en el checkout, podés hacerlo desde esta misma pantalla: 1. Tocá el botón para crea…
+  llamó: nada
+  ✗ [navega] El botón no lleva a cupones (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-descuento-vs-cupon (intento 3) 1897ms
+  Duda del manual: diferencia
+  dijo: La diferencia principal es cómo se aplican en la tienda: • Descuento automático: Se aplica solo en el carrito cuando el cliente cumple la co…
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-mercado-pago (intento 3) 5088ms
+  Duda del manual: cfg-pagos
+  dijo: Te llevé a **Configuración → Pagos**, que es donde se gestionan los medios de pago de tu tienda. Para conectar Mercado Pago y cobrar con tar…
+  llamó: navigateTo({"vista":"pagos","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-invitar-equipo (intento 3) 4610ms
+  Duda del manual: cfg-equipo
+  dijo: Para sumar a alguien de tu equipo, podés invitarlo desde la sección **Equipo**. Te acabo de llevar a esa pantalla. Vas a ver el botón **"Inv…
+  llamó: navigateTo({"seccion":"configuracion","vista":"equipo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-logo (intento 3) 3168ms
+  Duda del manual: cfg-apariencia
+  dijo: Podés cambiar el logo, los colores y toda la identidad visual de tu tienda desde **Configuración → Apariencia**. Ahí vas a encontrar las sec…
+  llamó: navigateTo({"vista":"apariencia","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-publicar (intento 3) 2904ms
+  Duda del manual: publicar / siete-pasos
+  dijo: Para publicar tu tienda y que quede online para todos tus clientes, tenés que ir al **Inicio** y tocar el botón **"Publicar tienda"** que es…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-venta-whatsapp (intento 3) 3050ms
+  Duda del manual: nuevo-pedido
+  dijo: Para cargar una venta de WhatsApp en tu negocio, tenés que hacerlo desde la sección **Pedidos** usando el botón **Nuevo pedido**. Te dejé en…
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-exportar-clientes (intento 3) 3665ms
+  Duda del manual: exportar-clientes
+  dijo: Para bajar tu lista de clientes a Excel o CSV: 1. Vas a la sección **Clientes** en el menú de la izquierda. 2. Si querés descargar un grupo …
+  llamó: navigateTo({"seccion":"clientes"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-stock-rapido (intento 3) 2457ms
+  Duda del manual: stock-rapido
+  dijo: Sí, podés editar el stock de forma rápida desde la misma lista de productos sin necesidad de abrir el editor completo. En la lista de Produc…
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dos-por-uno (intento 3) 3203ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: Para armar una promo 2x1 podés hacerlo desde la sección Avanzado, usando la herramienta de **"Llevá X, pagá Y"**. Se aplica sola en el carri…
+  llamó: navigateTo({"seccion":"avanzado"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-descuento-martes (intento 3) 3616ms
+  Duda del manual: alcance-condiciones
+  dijo: Sí, ¡se re puede! Podés definir un descuento que se active únicamente en ciertos días de la semana y en una franja horaria específica. Al cr…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-cupon-por-mail (intento 3) 1885ms
+  Duda del manual: compartir
+  dijo: Para mandarle un cupón por mail a una clienta puntual: 1. Andá a la pestaña **Cupones** dentro de **Descuentos**. 2. Buscá el cupón que quer…
+  llamó: nada
+  ✗ [navega] El botón no lleva a cupones (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-rendimiento (intento 3) 2529ms
+  Duda del manual: rendimiento
+  dijo: Eso lo podés consultar en la pestaña **Rendimiento**, dentro de la sección Descuentos. Ahí vas a ver cuántas veces se usó cada promo o cupón…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-notificaciones (intento 3) 2675ms
+  Duda del manual: cfg-notificaciones
+  dijo: Te llevé a Configuración → Notificaciones. Ahí vas a ver la grilla de eventos. En la fila "Nuevo pedido", marcá la casilla de la columna de …
+  llamó: navigateTo({"seccion":"configuracion","vista":"notificaciones"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-dominio (intento 3) 2425ms
+  Duda del manual: cfg-dominios
+  dijo: ¡Sí, totalmente! De entrada tu tienda ya funciona con una dirección de Órbita, pero podés conectar o comprar tu propio dominio (por ejemplo,…
+  llamó: navigateTo({"vista":"dominios","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-politica-devoluciones (intento 3) 3319ms
+  Duda del manual: cfg-postventa
+  dijo: Eso lo definís en **Configuración → Cancelaciones y devoluciones**. Ahí podés establecer si aceptás devoluciones y cancelaciones, y qué tipo…
+  llamó: navigateTo({"seccion":"configuracion","vista":"postventa"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-confirmar-email (intento 3) 2923ms
+  Duda del manual: mi-perfil / siete-pasos
+  dijo: Te acabo de llevar a tu perfil. Para confirmar tu email, tocá el botón "Enviarme el código". Te va a llegar un mail con un código de 6 númer…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-contrasena (intento 3) 3280ms
+  Duda del manual: mi-perfil
+  dijo: Para cambiar tu contraseña, podés hacerlo directo desde tu perfil: 1. Tocá tu avatar o nombre arriba a la derecha y elegí **Mi perfil** (te …
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-comision-mp (intento 3) 2538ms
+  Duda del manual: kpis
+  dijo: Es el total acumulado que se llevó Mercado Pago por las comisiones de cobro en el período que tenés seleccionado. No es un porcentaje fijo —…
+  llamó: navigateTo({"seccion":"dashboard"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ticket-promedio (intento 3) 2030ms
+  Duda del manual: kpis / lista-clientes
+  dijo: El ticket promedio es el monto medio que gasta un cliente en cada compra que hace en tu tienda. Se calcula dividiendo la facturación total s…
+  llamó: nada
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-quien-cambio (intento 3) 2669ms
+  Duda del manual: cfg-actividad
+  dijo: Sí, podés verlo desde el **Registro de actividad** del negocio. Ahí queda registrado quién hizo cada cambio, qué modificó y en qué fecha. Te…
+  llamó: navigateTo({"seccion":"configuracion","vista":"actividad"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-avanzado (intento 3) 8612ms
+  Duda del manual: que-es-avanzado / funciones-avanzado
+  dijo: El paquete Avanzado es un conjunto de herramientas extra para potenciar tu tienda. Incluye: - **Juegos con premio:** mini-juegos de habilida…
+  llamó: navigateTo({"seccion":"avanzado"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-categoria (intento 3) 7459ms
+  Duda del manual: categorias
+  dijo: Para crear una categoría nueva: 1. Andá a **Productos → Categorías** en el menú de la izquierda. 2. Tocá el botón **"Nueva categoría"**, arr…
+  llamó: navigateTo({"seccion":"categorias"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-plantillas-mensajes (intento 3) 1579ms
+  Duda del manual: plantillas
+  dijo: ¡Sí, re contra! Para eso están las **Plantillas de respuesta** dentro del módulo de Mensajes. Podés dejar escritas las respuestas a las preg…
+  llamó: nada
+  ✗ [navega] El botón no lleva a mensajes (botón: ninguno)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-historial (intento 3) 5287ms
+  Duda del manual: historial
+  dijo: Los pedidos que ya pasaron por todo el circuito (los que están en estado **Entregado** o **Cancelado**) los encontrás en la pestaña **Histor…
+  llamó: navigateTo({"seccion":"pedidos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✗ manual-devolucion-cliente (intento 3) 6534ms
+  Duda del manual: postventa / cfg-postventa
+  dijo: Para gestionar una devolución, tenés dos opciones según cómo prefieras resolverlo: Podés autorizar a la clienta a iniciar el pedido de devol…
+  llamó: navigateTo({"seccion":"configuracion","vista":"postventa"})
+  ✗ [navega] El botón no lleva a pedidos (botón: /admin/ventas/configuracion?vista=postventa)
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ficha-tecnica (intento 3) 3491ms
+  Duda del manual: ficha-tecnica
+  dijo: Para agregar especificaciones técnicas como medidas o materiales: 1. Entrá a **Productos** y abrí el producto que querés editar (o creá uno …
+  llamó: navigateTo({"seccion":"catalogo"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-cuenta-regresiva (intento 3) 2317ms
+  Duda del manual: tipos-descuento / funciones-avanzado
+  dijo: Sí, podés crear una Oferta relámpago con un reloj en cuenta regresiva que aparece directamente en la portada de tu tienda. Esta función form…
+  llamó: navigateTo({"seccion":"descuentos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-ver-tienda (intento 3) 4150ms
+  Duda del manual: ver-tienda / panel-y-tienda
+  dijo: Para ver tu tienda como si fueras un cliente, abrí el menú de tu avatar (arriba a la derecha) y tocá la opción "Ir a la tienda". Se va a abr…
+  llamó: navigateTo({"seccion":"perfil"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-soporte (intento 3) 2376ms
+  Duda del manual: escribinos / cfg-soporte
+  dijo: Para escribirnos, podés hacerlo desde **Configuración → Soporte**. Te acabo de llevar a esa pantalla. Ahí podés contarnos qué problema estás…
+  llamó: navigateTo({"vista":"soporte","seccion":"configuracion"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+✓ manual-retiro-efectivo (intento 3) 6381ms
+  Duda del manual: cfg-pagos
+  dijo: Para cobrar en efectivo al retirar por el local, tenés que activar el retiro en el local desde la configuración de pagos. Ahí mismo vas a po…
+  llamó: navigateTo({"seccion":"configuracion","vista":"pagos"})
+  · no aplica [cita-tema]: la variante no tiene leerTemaDelManual
+
+────────────────────────────────────────────────────────────────────────
+Modelo: gemini-3.6-flash | Razonamiento: low | Temperatura: 0.3 | Variante: manual-entero
+
+Violaciones por regla:
+  navega                       11
+
+Por categoría (corridas limpias / total):
+  manual               85/96
+
+Inestables: manual-crear-cupon (1/3), manual-invitar-equipo (2/3), manual-descuento-martes (2/3), manual-plantillas-mensajes (2/3)
+
+Expectativas que no aplican en esta variante: 96
+
+Latencia mediana: 3280ms
+Tokens: 2.575.057 de entrada, 13.795 de salida
+
+85/96 corridas limpias
+
+Error: ENOENT: no such file or directory, open '../../evals-rama.json'
+    at readFileSync (node:fs:440:20)
+    at comparar (/home/user/Orbita/apps/api/test/evals/panel/run.ts:137:41)
+    at main (/home/user/Orbita/apps/api/test/evals/panel/run.ts:228:15)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '../../evals-rama.json'
+}
+ ELIFECYCLE  Command failed with exit code 1.
+exit 1

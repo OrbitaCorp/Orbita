@@ -193,6 +193,8 @@ export class MailService {
     // Dominio comprado por vencer: lo avisa Órbita, que es quien lo gestiona.
     'domain-expiring-soon',
     'platform-admin-login-code',
+    // Aviso a los admins de plataforma: Orbi pasó a mantenimiento.
+    'orbi-mantenimiento',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
     'platform-discount-offer',
     // Formulario de Soporte (Configuración → Soporte) — lo manda un negocio
@@ -244,6 +246,10 @@ export class MailService {
     // ShieldCheck — segundo factor del login de platform admin.
     'platform-admin-login-code': this.svgIcon(
       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    ),
+    // AlertTriangle — Orbi pasó a mantenimiento (aviso a admins).
+    'orbi-mantenimiento': this.svgIcon(
+      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     ),
     // Lock — la contraseña ya se cambió (seguridad).
     'password-changed': this.svgIcon(
@@ -1259,6 +1265,15 @@ export class MailService {
   }
 
   // ── Platform admin (segundo factor del login, RBT-647) ────────────────
+
+  /** Aviso a un admin de plataforma: Orbi (IA) pasó a mantenimiento, o sigue ahí (recordatorio cada 24 h). */
+  async sendOrbiMantenimiento(
+    to: string,
+    data: { motivo: string; detalle: string; desde: string; recordatorio: boolean; panelUrl: string },
+  ): Promise<boolean> {
+    const asunto = data.recordatorio ? 'Recordatorio: Orbi sigue en mantenimiento' : 'Orbi pasó a mantenimiento';
+    return this.sendOrLog(to, asunto, 'orbi-mantenimiento', data);
+  }
 
   async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
     await this.sendOrLog(to, 'Tu código de acceso a Órbita', 'platform-admin-login-code', data);

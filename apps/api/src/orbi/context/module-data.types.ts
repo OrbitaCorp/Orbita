@@ -22,7 +22,7 @@ export interface ClientesSnapshot {
   totalCustomers:    number;
   newThisMonth:      number;
   segmentation:      { vip: number; recurrent: number; new: number; inactive: number };
-  topCustomerName:   string | null;
+  // Sin nombres de clientes: el snapshot va al prompt de sistema (ver ModuleDataService).
 }
 
 export interface CatalogoSnapshot {

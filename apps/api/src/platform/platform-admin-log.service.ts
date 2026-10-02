@@ -52,6 +52,7 @@ export const ACCION_LOG_ADMIN = {
     bloqueado: 'mfa_code_blocked',
   },
   mailPrueba: 'send_mail_test',
+  orbiMantenimiento: 'orbi_maintenance',
   contrasenaRestablecida: 'password_reset',
 } as const;
 
@@ -152,6 +153,18 @@ export class PlatformAdminLogService {
       targetType: 'mail_template',
       targetId: e.template,
       details: { to: e.to.trim().toLowerCase(), sent: e.sent, error: e.error },
+    });
+  }
+
+  // Orbi (IA) puesto en mantenimiento a mano, rehabilitado, o un intento de
+  // rehabilitarlo que la llamada de prueba al proveedor rechazó.
+  async orbiMantenimiento(e: { adminId: string; accion: 'activado' | 'rehabilitado' | 'rehabilitacion_rechazada'; detalle?: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiMantenimiento,
+      targetType: 'orbi',
+      targetId: 'global',
+      details: { accion: e.accion, detalle: e.detalle },
     });
   }
 

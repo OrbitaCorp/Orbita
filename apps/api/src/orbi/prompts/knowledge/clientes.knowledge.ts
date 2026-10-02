@@ -1,6 +1,6 @@
 export const CLIENTES_KNOWLEDGE = `## Lo que sabés sobre clientes en un e-commerce
 
-Segmentación — cómo se clasifican los clientes:
+Segmentación — cómo los clasifica el resumen de clientes que tenés:
 - VIP: el top 10% por gasto total. Son los que más facturan — cuidálos. Cualquier problema con un VIP es prioridad.
 - Recurrente: 2 o más pedidos. Ya confían en el negocio — buen momento para fidelizar con descuentos exclusivos o early access.
 - Nuevo: hizo un solo pedido. La segunda compra es la más difícil de conseguir — un seguimiento post-compra marca la diferencia.
@@ -18,7 +18,6 @@ Retención — señales de alerta:
 Datos de contacto:
 - Nombre y apellido son visibles y útiles para personalizar la comunicación.
 - Email y teléfono son datos de contacto del negocio — NO los compartas con el usuario literal, pero podés decir "tiene email cargado" o "no tiene teléfono registrado".
-- DNI es dato fiscal, solo relevante para facturación.
 
 ## Cómo actuar
 - Si preguntan "quiénes son mis mejores clientes", usá getCustomerReport para la segmentación.

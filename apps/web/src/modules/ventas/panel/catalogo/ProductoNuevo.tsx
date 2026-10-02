@@ -815,7 +815,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
             setOrbiScanKey(key)
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            // El servidor responde 403 ADDON_REQUIRED:ADVANCED si el negocio no tiene el
+            // paquete (el botón ya no se ofrece sin él, pero el plan pudo vencer con la
+            // pantalla abierta).
+            if (err instanceof ApiError && err.message.startsWith('ADDON_REQUIRED')) {
+                onToast('Escanear productos con una foto es parte del paquete Avanzado.')
+            } else {
+                onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            }
         } finally {
             setOrbiScanGen(false)
             if (fileInputScanRef.current) {
@@ -2037,7 +2044,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
-                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                    {fotoParaOrbi && !orbiScanSuccess && avanzado && (
                                         <button
                                             type="button"
                                             onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
@@ -2048,6 +2055,36 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                             {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
                                         </button>
+                                    )}
+                                    {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
+                                        de dejar un botón que el servidor va a rechazar. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
+                                        <div
+                                            role="note"
+                                            style={{
+                                                marginTop: 14, padding: '11px 14px', borderRadius: 10,
+                                                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 260px', minWidth: 0 }}>
+                                                <Sparkles size={15} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Cargá tus productos más rápido</div>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, marginTop: 1 }}>
+                                                        Con el paquete Avanzado, Orbi completa el nombre, la categoría y la descripción a partir de una sola foto.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
+                                                className="ds-link"
+                                                style={{ ...enlace, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+                                            >
+                                                Conocer el paquete <ChevronRight size={13} strokeWidth={2.2} />
+                                            </button>
+                                        </div>
                                     )}
                                     {orbiScanSuccess && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
@@ -2743,9 +2780,51 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     Falta {faltasVisibles.map(f => f.texto).join(', ')}.
                                 </span>
                             )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
                                 {editando ? (
-                                    <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                    <>
+                                        {/* Selector de estado siempre visible al lado de los botones de guardado */}
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'var(--color-bg)', padding: '3px 4px', borderRadius: 8, border: '1px solid var(--color-border)', marginRight: 4 }}>
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)', padding: '0 6px', fontWeight: 500 }}>Estado:</span>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'PUBLISHED')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'PUBLISHED' ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                    background: prod.estado === 'PUBLISHED' ? 'var(--color-primary-bg)' : 'transparent',
+                                                    color: prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'PUBLISHED' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Publicado
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'DRAFT')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'DRAFT' ? '1px solid var(--color-border)' : '1px solid transparent',
+                                                    background: prod.estado === 'DRAFT' ? 'var(--color-surface)' : 'transparent',
+                                                    color: prod.estado === 'DRAFT' ? 'var(--color-text)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'DRAFT' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Borrador
+                                            </button>
+                                        </div>
+
+                                        {prod.estado === 'DRAFT' ? (
+                                            <>
+                                                <Button variant="ghost" size="lg" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>
+                                                <Button variant="primary" size="lg" onClick={() => intentarGuardar('PUBLISHED')}>Publicar</Button>
+                                            </>
+                                        ) : (
+                                            <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                        )}
+                                    </>
                                 ) : (
                                     <>
                                         <Button variant="ghost" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>

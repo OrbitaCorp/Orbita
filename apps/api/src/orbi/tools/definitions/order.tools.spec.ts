@@ -1,4 +1,4 @@
-import { UpdateOrderStatusTool } from './order.tools';
+import { GetOrderDetailTool, UpdateOrderStatusTool } from './order.tools';
 import { ToolRegistryService } from '../tool-registry.service';
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { ToolExecutionContext } from '../tool.interface';
@@ -194,5 +194,25 @@ describe('updateOrderStatus — validación', () => {
     const { registry } = armar(pedido());
     expect(await registry.proponer('updateOrderStatus', { orderId: PEDIDO, status: 'CONFIRMED' }, ctx))
       .toEqual({ resumen: expect.stringContaining('#1042') });
+  });
+});
+
+describe('GetOrderDetailTool — nombre del cliente', () => {
+  const pedido = (customer: { firstName: string; lastName: string | null } | null) => ({
+    id: 'o-1', orderNumber: 7, status: 'PENDING', channel: 'ONLINE', customer, total: 100, createdAt: new Date(),
+    items: [], payments: [], returns: [], cancellationRequests: [],
+  });
+  const ctxDetalle = { businessId: 'biz-1', userId: 'm', surface: OrbiSurface.PANEL, permissions: ['orders.view'] };
+
+  it('un cliente sin apellido no le llega al modelo como "Ana null"', async () => {
+    const tool = new GetOrderDetailTool({ findOne: jest.fn().mockResolvedValue(pedido({ firstName: 'Ana', lastName: null })) } as never);
+    const r = await tool.execute({ orderId: 'o-1' }, ctxDetalle);
+    expect((r.data as { customerName: string }).customerName).toBe('Ana');
+  });
+
+  it('con apellido, nombre y apellido', async () => {
+    const tool = new GetOrderDetailTool({ findOne: jest.fn().mockResolvedValue(pedido({ firstName: 'Ana', lastName: 'Gómez' })) } as never);
+    const r = await tool.execute({ orderId: 'o-1' }, ctxDetalle);
+    expect((r.data as { customerName: string }).customerName).toBe('Ana Gómez');
   });
 });
