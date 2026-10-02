@@ -34,6 +34,7 @@ import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { SetImageBackgroundDto } from './dto/set-image-background.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
 import { AiVariantsDto } from './dto/ai-variants.dto';
@@ -286,6 +287,14 @@ export class ProductsController {
   toggleFeatured(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ToggleFeaturedDto) {
     const member = assertMemberContext(ctx);
     return this.productsService.toggleFeatured(member.businessId, id, dto);
+  }
+
+  // Cambio rápido de estado (Borrador / Publicado) desde el catálogo
+  @Patch(':id/status')
+  @RequirePermission('catalog.manage')
+  updateStatus(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpdateProductStatusDto) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.updateStatus(member.businessId, id, dto);
   }
 
   // Contenido de la ficha (videos alternados con texto) — separado de PUT :id

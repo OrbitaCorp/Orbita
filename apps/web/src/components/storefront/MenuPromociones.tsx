@@ -137,7 +137,7 @@ export function MenuPromociones({ juegos, anuncios, onJugar, onAnuncio, etiqueta
 // Debajo del modal de juegos (z-index 1000) y por encima del contenido. La
 // pestaña va pegada al borde izquierdo: el WhatsApp flotante ocupa el derecho.
 const CSS = `
-.sf-menu-promo-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 9px;border:none;border-radius:0 10px 10px 0;background:var(--color-primary);color:#fff;font-size:12.5px;font-weight:600;line-height:1;font-family:inherit;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);transition:padding .2s ease}
+.sf-menu-promo-tab{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 9px;border:none;border-radius:0 10px 10px 0;background:var(--color-primary);color:var(--color-on-primary,#fff);font-size:12.5px;font-weight:600;line-height:1;font-family:inherit;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18);transition:padding .2s ease}
 .sf-menu-promo-tab span{writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.01em}
 .sf-menu-promo-tab:hover{padding-left:13px}
 /* Entra con un retraso: al cargar el home el modal se abre en el mismo instante y la

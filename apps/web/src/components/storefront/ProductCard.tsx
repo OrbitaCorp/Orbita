@@ -423,7 +423,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             title="Agregar al carrito"
             aria-label="Agregar al carrito"
             className="ds-hover"
-            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', border: 'none', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
+            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: agregado ? '#fff' : 'var(--color-on-primary, #fff)', border: 'none', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
           >
             {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
           </button>
@@ -864,7 +864,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
                 // lado (bug real, ver el comentario en globals.css).
                 transition: 'transform 260ms ease, box-shadow 200ms ease, background 150ms, color 150ms',
               }}
-              onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
+              onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-on-primary, #fff)' } }}
               onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#0F172A' } }}
             >
               {agregado ? <Check size={17} strokeWidth={2.4} /> : <ShoppingCart size={17} strokeWidth={2} />}

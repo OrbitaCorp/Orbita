@@ -246,7 +246,7 @@ export function DireccionesTab() {
             </label>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-            <button type="submit" className="ds-hover" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 8, background: guardando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer' }}>
+            <button type="submit" className="ds-hover" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 8, background: guardando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 13, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer' }}>
               {guardando ? 'Guardando…' : 'Guardar dirección'}
             </button>
             <button type="button" className="ds-hover" disabled={guardando} onClick={() => setShowDirForm(false)} style={{ height: 40, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, border: '1px solid var(--color-border)', cursor: guardando ? 'default' : 'pointer' }}>Cancelar</button>

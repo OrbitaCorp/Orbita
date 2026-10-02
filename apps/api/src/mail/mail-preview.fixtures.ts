@@ -315,6 +315,21 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { code: '773102', expiresIn: '10 minutos' },
   },
   {
+    id: 'orbi-mantenimiento',
+    label: 'Orbi en mantenimiento (aviso a admins)',
+    group: 'Plataforma',
+    template: 'orbi-mantenimiento',
+    isPlatform: true,
+    subject: 'Orbi pasó a mantenimiento',
+    data: {
+      motivo: 'Se agotó el saldo de la cuenta del proveedor de IA (Gemini)',
+      detalle: 'Your prepayment credits are depleted.',
+      desde: '01/10/2026 14:05',
+      recordatorio: false,
+      panelUrl: 'https://orbita.site/superadmin?seccion=orbi',
+    },
+  },
+  {
     id: 'subscription-payment-failed',
     label: 'Pago de suscripción fallido',
     group: 'Plataforma',

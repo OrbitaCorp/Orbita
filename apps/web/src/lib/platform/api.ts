@@ -214,6 +214,23 @@ export interface OwnerRow {
   business: { id: string; name: string; subdomain: string; status: BusinessStatus } | null
 }
 
+// Estado de Orbi (IA): si el proveedor falla de forma sostenida, se apaga para
+// todos los negocios hasta que un admin lo rehabilita (ver Orbi.tsx).
+export interface OrbiEstadoResponse {
+  estado: {
+    status: 'ACTIVE' | 'MAINTENANCE'
+    reason: string | null
+    detail: string | null
+    trippedAt: string | null
+    /** 'auto' o el id del admin que lo puso. */
+    trippedBy: string | null
+    lastOkAt: string | null
+  }
+  fallasUltimaHora: number
+  ultimasFallas: { surface: string; category: string; httpStatus: number | null; detail: string; createdAt: string }[]
+}
+export type OrbiRehabilitarResultado = { ok: true } | { ok: false; categoria: string; detalle: string }
+
 export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR'
 
 export interface AdminRow {
@@ -764,6 +781,9 @@ export const platformApi = {
   supportReply: (id: string, message: string) => sendJSON<AdminSupportDetail>(`/platform/support/${id}/reply`, 'POST', { message }),
   supportStatus: (id: string, status: 'OPEN' | 'CLOSED') => sendJSON<AdminSupportDetail>(`/platform/support/${id}/status`, 'PUT', { status }),
 
+  orbiEstado: () => getJSON<OrbiEstadoResponse>('/platform/orbi/estado'),
+  orbiRehabilitar: () => sendJSON<OrbiRehabilitarResultado>('/platform/orbi/rehabilitar', 'POST'),
+  orbiMantenimiento: (motivo?: string) => sendJSON<{ ok: true; yaEstabaEnMantenimiento: boolean }>('/platform/orbi/mantenimiento', 'POST', motivo ? { motivo } : {}),
   costsUsage: () => getJSON<CostUsageResponse>('/platform/costs/usage'),
   costsOverview: (months = 3) => getJSON<CostOverviewResponse>(`/platform/costs/overview?months=${months}`),
   costsHistory: (months = 6) => getJSON<CostHistoryResponse>(`/platform/costs/history?months=${months}`),

@@ -7,6 +7,8 @@ import { IpDelCliente } from '../common/decorators/ip-del-cliente.decorator';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage, type LlmUsage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
+import { OrbiSaludService } from './salud/orbi-salud.service';
+import { codigoParaElFront, MENSAJE_FALLA_PASAJERA } from './salud/clasificar-error';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -138,6 +140,7 @@ export class OrbiController {
     private readonly usageMetering: UsageMeteringService,
     private readonly cuota: CuotaService,
     private readonly orbiTurns: OrbiTurnService,
+    private readonly salud: OrbiSaludService,
   ) {}
 
   /**
@@ -206,6 +209,11 @@ export class OrbiController {
     // rol común tiene los suyos del JWT. Alimentan las tools, la ejecución y el
     // snapshot del prompt: los tres tienen que ver lo mismo.
     const permisos = permisosDeOrbi(user);
+
+    // Mantenimiento (proveedor caído o sin saldo): antes de la cuota, para que
+    // un mensaje que no se va a atender no gaste el cupo del día. Llega como un
+    // 503 con error ORBI_MAINTENANCE.
+    await this.salud.exigirDisponible('panel');
 
     // Antes de abrir el stream, para que llegue como un 429 normal.
     if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
@@ -456,6 +464,9 @@ export class OrbiController {
         vuelta.volcarEn(messages);
       }
 
+      // El proveedor contestó: corta la racha de fallas que podría apagar Orbi.
+      void this.salud.registrarOk();
+
       // Una respuesta cortada no se guarda: queda el `user` sin respuesta, que
       // el historial ya sabe manejar (spec §3.3).
       corte.signal.throwIfAborted();
@@ -473,7 +484,12 @@ export class OrbiController {
       } else {
         estado = 'error';
         this.logger.error(`Orbi chat error: ${error}`);
-        res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
+        // Se clasifica (saldo, key, caída, bug nuestro) y se cuenta: si es una
+        // de las que no se arreglan solas, o se repite, Orbi pasa a
+        // mantenimiento y se avisa a los admins. A la persona NUNCA le llega el
+        // error crudo del proveedor.
+        const falla = await this.salud.registrarFalla({ error, surface: 'panel', actor: user.businessId });
+        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
       }
     } finally {
       this.medirConsumo(consumo, {
@@ -702,6 +718,9 @@ export class OrbiController {
   async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response, @IpDelCliente() ip?: string) {
     dto.context.surface = OrbiSurface.WIZARD;
 
+    // Mantenimiento: mismo criterio que el panel (503 con error ORBI_MAINTENANCE).
+    await this.salud.exigirDisponible('wizard');
+
     // Público: cuota por IP y por día, antes de abrir el stream (429 normal).
     // La IP sale de @IpDelCliente (no de @Ip): misma fuente que el throttler
     // global, por si algún día este pedido pasa por el BFF (hallazgo
@@ -859,12 +878,15 @@ export class OrbiController {
         // vuelven al historial en un solo turno del modelo.
         vuelta.volcarEn(messages);
       }
+      // El proveedor contestó: corta la racha de fallas que podría apagar Orbi.
+      void this.salud.registrarOk();
     } catch (error) {
       // Cortado por el cliente: ni log de error ni evento (no hay a quién).
       if (!corte.signal.aborted) {
         fallo = true;
         this.logger.error(`Orbi wizard chat error: ${error}`);
-        res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
+        const falla = await this.salud.registrarFalla({ error, surface: 'wizard', actor: `wizard:${hmacIp('orbi-wizard', ip)}` });
+        res.write(`event: error\ndata: ${JSON.stringify({ code: codigoParaElFront(falla.categoria), message: MENSAJE_FALLA_PASAJERA })}\n\n`);
       }
     } finally {
       // Un turno cortado no se registra: sería una respuesta vacía que

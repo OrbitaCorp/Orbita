@@ -51,7 +51,7 @@ const STATS_DEFAULT: StorefrontStatsItem[] = [
     { id: 'st4', value: '3 cuotas', label: 'sin interés' },
 ]
 
-type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null; imageUrl: string | null }
+export type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null; imageUrl: string | null }
 
 // Huella del conjunto de juegos activos en este momento (tipo + campaña de
 // cada uno) — si cambia (se activó/desactivó otro juego, o se reactivó
@@ -507,8 +507,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
                 /* Índice: dos columnas de nombres grandes con filete. */
                 .sf-cat-indice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:40px; }
-                .sf-cat-indice-row { display:flex; align-items:baseline; gap:12px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
+                .sf-cat-indice-row { display:flex; align-items:baseline; gap:14px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
                 .sf-cat-indice-row:hover { border-bottom-color:var(--color-text); }
+                .sf-cat-indice-num { font-size:13px; font-weight:600; font-family:"Geist Mono",monospace; color:var(--color-muted); transition:color 150ms; flex-shrink:0; }
+                .sf-cat-indice-row:hover .sf-cat-indice-num { color:var(--color-primary); }
                 .sf-cat-indice-nombre { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--color-text); transition:color 150ms; }
                 .sf-cat-indice-row:hover .sf-cat-indice-nombre { color:var(--color-primary); }
                 .sf-cat-indice-count { font-size:11.5px; color:var(--color-subtle); font-family:"Geist Mono",monospace; flex-shrink:0; }
@@ -884,7 +886,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             <button
                                 className="ds-hover"
                                 onClick={() => irACtaParallax(config.appearance?.parallaxCtaLink)}
-                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: '#fff', color: '#0F172A', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background 150ms, color 150ms' }}
                             >
                                 {config.appearance.parallaxCtaText || 'Ver más'}
                             </button>
@@ -1304,11 +1306,9 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                             {s.cta || 'Ver catálogo'}
                                         </span>
                                     ) : (
-                                        // Botón sólido blanco con texto oscuro de siempre —
-                                        // se invierte con 'blanco' (fondo claro): sin esto
-                                        // quedaría un botón blanco encima de un velo blanco,
-                                        // invisible.
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: textoOscuro ? '#0F172A' : '#fff', color: textoOscuro ? '#fff' : '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        // Botón sólido que toma el color primario de Apariencia
+                                        // adaptando inteligentemente el texto con var(--color-on-primary)
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
@@ -1508,13 +1508,20 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
 // todas para índice; las primeras N (por orden del catálogo) CON FOTO para
 // mosaico/tarjetas — nunca cae a un color de relleno ahí, la foto no es
 // opcional en esos dos estilos.
-function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryIds: string[] | null | undefined): CatVisual[] {
+export function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryIds: string[] | null | undefined): CatVisual[] {
     if (estilo !== 'indice' && estilo !== 'mosaico' && estilo !== 'tarjetas') return cats
 
-    // El filter sobre `cats` ya preserva el orden del catálogo (no el de
-    // selección) — no hace falta reordenar aparte.
-    const elegidas = categoryIds && categoryIds.length > 0 ? cats.filter(c => categoryIds.includes(c.id)) : cats
-    const candidatas = elegidas.length > 0 ? elegidas : cats
+    // Si se definieron categorías específicas, se respeta el orden explícito
+    // indicado por el usuario (categoryIds), no el orden por defecto del catálogo.
+    let candidatas: CatVisual[]
+    if (categoryIds && categoryIds.length > 0) {
+        const mapa = new Map(cats.map(c => [c.id, c]))
+        const elegidas = categoryIds.map(id => mapa.get(id)).filter((c): c is CatVisual => Boolean(c))
+        candidatas = elegidas.length > 0 ? elegidas : cats
+    } else {
+        candidatas = cats
+    }
+
     const base = estilo === 'indice' ? candidatas : candidatas.filter(c => !!c.imageUrl)
     const tope = CATEGORY_LAYOUT_MAX[estilo]
     return tope ? base.slice(0, tope) : base
@@ -1577,8 +1584,9 @@ function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void })
     return (
         <div className="sf-w">
             <div className="sf-cat-indice">
-                {cats.map(c => (
+                {cats.map((c, i) => (
                     <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
+                        <span className="sf-cat-indice-num">{String(i + 1).padStart(2, '0')}</span>
                         <span className="sf-cat-indice-nombre">{c.nombre}</span>
                     </button>
                 ))}

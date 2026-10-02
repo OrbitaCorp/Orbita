@@ -335,7 +335,7 @@ export default function InicioDevolucion() {
               'Se emite tu nota de crédito.',
             ].map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 12, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5, paddingTop: 3 }}>{p}</div>
               </div>
             ))}
@@ -389,7 +389,7 @@ export default function InicioDevolucion() {
           style={{
             width: '100%', height: 52, borderRadius: 10,
             background: seleccionados.length === 0 || enviando ? 'var(--color-border)' : 'var(--color-primary)',
-            color: seleccionados.length === 0 || enviando ? 'var(--color-muted)' : '#fff',
+            color: seleccionados.length === 0 || enviando ? 'var(--color-muted)' : 'var(--color-on-primary, #fff)',
             fontSize: 15, fontWeight: 700, border: 'none',
             cursor: seleccionados.length === 0 || enviando ? 'not-allowed' : 'pointer',
             transition: 'all 200ms',

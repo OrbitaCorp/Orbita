@@ -185,7 +185,8 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
               className="ds-hover"
               style={{
                 flex: 1, height: 42, borderRadius: 8,
-                background: feedback === 'ok' ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
+                background: feedback === 'ok' ? 'var(--color-success)' : 'var(--color-primary)',
+                color: feedback === 'ok' ? '#fff' : 'var(--color-on-primary, #fff)',
                 fontSize: 13, fontWeight: 700, border: 'none',
                 cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer',
                 opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1,

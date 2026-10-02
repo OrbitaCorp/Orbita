@@ -2780,9 +2780,51 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     Falta {faltasVisibles.map(f => f.texto).join(', ')}.
                                 </span>
                             )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
                                 {editando ? (
-                                    <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                    <>
+                                        {/* Selector de estado siempre visible al lado de los botones de guardado */}
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'var(--color-bg)', padding: '3px 4px', borderRadius: 8, border: '1px solid var(--color-border)', marginRight: 4 }}>
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)', padding: '0 6px', fontWeight: 500 }}>Estado:</span>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'PUBLISHED')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'PUBLISHED' ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                    background: prod.estado === 'PUBLISHED' ? 'var(--color-primary-bg)' : 'transparent',
+                                                    color: prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'PUBLISHED' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Publicado
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'DRAFT')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'DRAFT' ? '1px solid var(--color-border)' : '1px solid transparent',
+                                                    background: prod.estado === 'DRAFT' ? 'var(--color-surface)' : 'transparent',
+                                                    color: prod.estado === 'DRAFT' ? 'var(--color-text)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'DRAFT' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Borrador
+                                            </button>
+                                        </div>
+
+                                        {prod.estado === 'DRAFT' ? (
+                                            <>
+                                                <Button variant="ghost" size="lg" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>
+                                                <Button variant="primary" size="lg" onClick={() => intentarGuardar('PUBLISHED')}>Publicar</Button>
+                                            </>
+                                        ) : (
+                                            <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                        )}
+                                    </>
                                 ) : (
                                     <>
                                         <Button variant="ghost" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>

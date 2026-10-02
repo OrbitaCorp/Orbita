@@ -26,6 +26,7 @@ import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
 
 const PRODUCT_IMAGES_BUCKET = 'product-images';
@@ -963,6 +964,40 @@ export class ProductsService {
     });
     if (count === 0) throw new NotFoundException('Producto no encontrado');
     return { ok: true };
+  }
+
+  // Cambio rápido de estado (Borrador <-> Publicado) desde la card/fila del catálogo
+  async updateStatus(businessId: string, id: string, dto: UpdateProductStatusDto) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, businessId, deletedAt: null },
+      include: {
+        variants: {
+          select: {
+            stock: { select: { quantity: true } },
+          },
+        },
+      },
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
+    if (dto.status === 'PUBLISHED') {
+      const totalStock = product.variants.reduce(
+        (sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0),
+        0,
+      );
+      if (totalStock <= 0) {
+        throw new BadRequestException(
+          'No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.',
+        );
+      }
+    }
+
+    await this.prisma.product.update({
+      where: { id: product.id },
+      data: { status: dto.status },
+    });
+
+    return { ok: true, status: dto.status };
   }
 
   // Contenido de la ficha — separado de PUT :id por el mismo motivo que

@@ -2102,6 +2102,14 @@ export function panelToggleProductFeatured(id: string, isFeatured: boolean) {
   })
 }
 
+// Cambio rápido de estado (Borrador <-> Publicado) desde la card/fila del catálogo
+export function panelUpdateProductStatus(id: string, status: 'PUBLISHED' | 'DRAFT') {
+  return panelRequest<{ ok: boolean; status: 'PUBLISHED' | 'DRAFT' }>(`/products/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
 // ── Imágenes ────────────────────────────────────────────────────────────────
 // Multipart: no puede pasar por panelRequest() porque el navegador tiene que
 // poner el Content-Type con su boundary. Mismo patrón que uploadLogo().

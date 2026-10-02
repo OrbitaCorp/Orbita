@@ -909,7 +909,7 @@ export default function ProductoDetalle() {
                     className="ds-hover"
                     disabled={!varianteSeleccionada || !enStock || restante === 0}
                     onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
-                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
+                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: agregado ? '#fff' : 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
                   >
                     {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
                   </button>
@@ -1042,7 +1042,7 @@ export default function ProductoDetalle() {
                 disabled={!textoResenia.trim() || enviandoResenia}
                 style={{
                   marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8,
-                  background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none',
+                  background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 13, fontWeight: 600, border: 'none',
                   cursor: (!textoResenia.trim() || enviandoResenia) ? 'not-allowed' : 'pointer',
                   opacity: (!textoResenia.trim() || enviandoResenia) ? 0.6 : 1,
                 }}
@@ -1055,7 +1055,7 @@ export default function ProductoDetalle() {
               <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
                 <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
-                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
+                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
               </div>
               {/* El velo que tapa el formulario. Antes era
                   `rgba(var(--color-bg-raw, 255,255,255), 0.72)`, pero

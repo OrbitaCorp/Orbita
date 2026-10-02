@@ -2960,3 +2960,48 @@ model OrbiTurn {
   @@index([memberId, createdAt])
   @@map("orbi_turns")
 }
+
+// Estado GLOBAL de Orbi (panel y wizard): una sola fila, id = 'global'. Cuando
+// el proveedor de IA falla de forma sostenida (o se agotó el saldo), Orbi pasa
+// a MAINTENANCE para todos los negocios hasta que un admin de plataforma lo
+// rehabilite. No hay "id de negocio": es un interruptor de toda la plataforma.
+// Spec: docs/superpowers/specs/2026-10-01-orbi-mantenimiento-automatico-design.md
+model OrbiServiceState {
+  id             String    @id @default("global")
+  // 'ACTIVE' | 'MAINTENANCE' (texto, como el resto de las tablas de Orbi).
+  status         String    @default("ACTIVE")
+  // Categoría que lo disparó (PROVIDER_CREDITS, PROVIDER_AUTH, PROVIDER_DOWN…)
+  // o MANUAL si lo puso un admin.
+  reason         String?
+  // Texto corto del error del proveedor, sin datos de personas.
+  detail         String?
+  trippedAt      DateTime? @map("tripped_at")
+  // 'auto' o el id del PlatformAdmin que lo puso / lo sacó.
+  trippedBy      String?   @map("tripped_by")
+  // Último turno que el proveedor contestó bien. Los fallos se cuentan DESPUÉS
+  // de esta marca: una respuesta buena en el medio corta la racha.
+  lastOkAt       DateTime? @map("last_ok_at")
+  lastNotifiedAt DateTime? @map("last_notified_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("orbi_service_state")
+}
+
+// Cada llamada a Orbi que terminó en falla DEL PROVEEDOR (no las del usuario:
+// validación, cuota diaria, cancelaciones). Alimenta el umbral que activa el
+// mantenimiento y el detalle del mail a los admins. Sin texto de la persona.
+model OrbiProviderFailure {
+  id         String   @id @default(uuid())
+  // 'panel' | 'wizard'
+  surface    String
+  category   String
+  httpStatus Int?     @map("http_status")
+  // businessId (panel) o IP hasheada (wizard): para contar quiénes fallan, no
+  // quién es. Una sola persona reintentando no apaga Orbi para todos.
+  actor      String
+  detail     String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("orbi_provider_failures")
+}

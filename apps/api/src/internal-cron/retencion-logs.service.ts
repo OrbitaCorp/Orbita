@@ -14,6 +14,7 @@ export type TablaConRetencion =
   | 'email_logs'
   | 'orbi_pending_actions'
   | 'orbi_turns'
+  | 'orbi_provider_failures'
   | 'daily_quota';
 
 /** Por tabla: cuántas filas se borraron, o por qué no se borró nada. */
@@ -149,6 +150,14 @@ export class RetencionLogsService {
         variable: 'ORBI_TURNS_RETENTION_DAYS',
         porDefecto: 400,
         borrar: (corte) => this.prisma.orbiTurn.deleteMany({ where: { createdAt: { lt: corte } } }),
+      },
+      {
+        // Fallas del proveedor de IA (sin texto de personas): alimentan el umbral de
+        // mantenimiento (ventana de minutos) y el detalle del mail. 30 días alcanzan.
+        tabla: 'orbi_provider_failures',
+        variable: 'ORBI_PROVIDER_FAILURES_RETENTION_DAYS',
+        porDefecto: 30,
+        borrar: (corte) => this.prisma.orbiProviderFailure.deleteMany({ where: { createdAt: { lt: corte } } }),
       },
       {
         tabla: 'daily_quota',
