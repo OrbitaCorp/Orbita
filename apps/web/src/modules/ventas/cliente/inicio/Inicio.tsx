@@ -505,16 +505,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                    target, y el hover moviendo color o la foto DENTRO de un
                    overflow:hidden — nunca la caja, para no correr el layout. */
 
-                /* Índice: dos columnas de nombres grandes con filete. */
+                /* Índice: dos columnas de nombres grandes con filete y botón de acceso. */
                 .sf-cat-indice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:40px; }
-                .sf-cat-indice-row { display:flex; align-items:baseline; gap:14px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
+                .sf-cat-indice-row { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:54px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
                 .sf-cat-indice-row:hover { border-bottom-color:var(--color-text); }
-                .sf-cat-indice-num { font-size:13px; font-weight:600; font-family:"Geist Mono",monospace; color:var(--color-muted); transition:color 150ms; flex-shrink:0; }
-                .sf-cat-indice-row:hover .sf-cat-indice-num { color:var(--color-primary); }
                 .sf-cat-indice-nombre { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--color-text); transition:color 150ms; }
                 .sf-cat-indice-row:hover .sf-cat-indice-nombre { color:var(--color-primary); }
-                .sf-cat-indice-count { font-size:11.5px; color:var(--color-subtle); font-family:"Geist Mono",monospace; flex-shrink:0; }
-                @media(max-width:760px){ .sf-cat-indice { grid-template-columns:minmax(0,1fr); } .sf-cat-indice-nombre { font-size:18px } }
+                .sf-cat-indice-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-muted); display:grid; place-items:center; flex-shrink:0; transition:background 180ms cubic-bezier(0.16,1,0.3,1), border-color 180ms, color 180ms, transform 180ms; }
+                .sf-cat-indice-row:hover .sf-cat-indice-btn { background:var(--color-primary); border-color:var(--color-primary); color:var(--color-on-primary,#fff); transform:translateX(3px); }
+                @media(max-width:760px){
+                    .sf-cat-indice { grid-template-columns:minmax(0,1fr); }
+                    .sf-cat-indice-nombre { font-size:18px; }
+                    .sf-cat-indice-btn { width:28px; height:28px; }
+                }
 
                 /* Etiquetas: una línea con scroll, solo el nombre. */
                 .sf-cat-chips-wrap { overflow-x:auto; scrollbar-width:none; }
@@ -1577,17 +1580,18 @@ function CatMedallon({ c, size }: { c: CatVisual; size: number }) {
 }
 
 // ── Índice ── Editorial: solo los nombres, en tipografía grande a dos
-// columnas, separados por filete. Cero dependencia de fotos e íconos — es el
-// estilo para una marca que quiere que la sección se lea sobria y no compita
-// con las fotos de producto.
+// columnas, separados por filete y con botón flecha para acceder directamente
+// a cada categoría. Cero dependencia de fotos e íconos — sobrio y directo.
 function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
     return (
         <div className="sf-w">
             <div className="sf-cat-indice">
-                {cats.map((c, i) => (
+                {cats.map(c => (
                     <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
-                        <span className="sf-cat-indice-num">{String(i + 1).padStart(2, '0')}</span>
                         <span className="sf-cat-indice-nombre">{c.nombre}</span>
+                        <span className="sf-cat-indice-btn" aria-hidden="true">
+                            <ArrowRight size={15} strokeWidth={2.2} />
+                        </span>
                     </button>
                 ))}
             </div>
