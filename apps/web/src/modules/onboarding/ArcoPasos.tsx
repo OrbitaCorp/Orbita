@@ -7,13 +7,88 @@
 //
 // Solo presentación: recibe la lista de pasos y cuál es el actual, nada más.
 // Los colores salen de los tokens del tema (--color-*), así que el mismo
-// componente sirve en claro y en oscuro; las reglas viven en globals.css
-// (.ob-arco*), junto al resto del responsive del onboarding.
+// componente sirve en claro y en oscuro. Las reglas (.ob-arco*) viajan con el
+// componente, en CSS_ARCO, y no en globals.css: el primer deploy que las llevó
+// en globals.css salió a producción con la hoja de estilos anterior y el arco
+// quedó sin estilo, tapando la pantalla de pago (02/10/2026).
 //
 // En celular el arco no entra con sus seis rótulos: de 640px para abajo va la
 // versión compacta, un anillo con "2/6", el nombre del paso y el que sigue.
 
 import { useEffect, useState } from 'react'
+
+const CSS_ARCO = `
+/* ─── Onboarding · arco de pasos (modules/onboarding/ArcoPasos.tsx) ─────────
+   La barra única del alta, dibujada como una órbita: una estación por paso y
+   un satélite en el actual. Todo pinta con los tokens del tema, así que sale
+   bien en claro y en oscuro sin reglas aparte.
+
+   Los estados no dependen solo del color: lo hecho lleva tilde, el paso actual
+   es el satélite (más grande, con halo y rótulo en negrita) y lo que falta es
+   un punto hueco y chico. */
+.ob-arco {
+  --ob-arco-fondo: var(--color-surface);
+  --ob-arco-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 10px 28px 6px;
+  border-bottom: 1px solid var(--color-border);
+  /* Una luz suave del color de la marca cayendo desde arriba, sobre la franja. */
+  background:
+    radial-gradient(560px 150px at 50% 0%, color-mix(in srgb, var(--color-primary) 11%, transparent), transparent 72%),
+    var(--ob-arco-fondo);
+}
+.ob-arco-pista { position: relative; width: 100%; max-width: 720px; aspect-ratio: 720 / 112; margin: 0 auto; }
+.ob-arco-pista > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ob-arco-linea { fill: none; stroke: color-mix(in srgb, var(--color-subtle) 80%, transparent); stroke-width: 1.3; stroke-dasharray: 2 7; stroke-linecap: round; }
+.ob-arco-recorrido { fill: none; stroke: url(#obArcoRecorrido); stroke-width: 2.2; stroke-linecap: round; transition: stroke-dasharray 700ms var(--ob-arco-ease); }
+
+/* Estaciones: el punto hueco de "falta" y, encima, el disco con tilde de "hecho"
+   (con su resplandor, que es un degradé radial del SVG y no un filtro). */
+.ob-arco-falta { fill: var(--ob-arco-fondo); stroke: var(--color-subtle); stroke-width: 1.5; transition: opacity 200ms ease; }
+.ob-arco-est:not([data-estado='falta']) .ob-arco-falta { opacity: 0; }
+.ob-arco-hecho { transform-box: fill-box; transform-origin: center; transform: scale(0.3); opacity: 0;
+  transition: transform 380ms var(--ob-arco-ease), opacity 200ms ease; }
+.ob-arco-est[data-estado='hecho'] .ob-arco-hecho { transform: none; opacity: 1; }
+.ob-arco-brillo { fill: url(#obArcoBrillo); }
+.ob-arco-disco { fill: url(#obArcoHecho); }
+.ob-arco-hecho path { fill: none; stroke: var(--color-on-primary); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* El satélite: está dibujado en la cima y gira alrededor del centro del círculo. */
+.ob-arco-satelite { transition: transform 700ms var(--ob-arco-ease); }
+.ob-arco-halo { fill: var(--color-primary); opacity: 0.2; transform-box: fill-box; transform-origin: center; animation: obArcoLate 1.8s ease-in-out infinite; }
+.ob-arco-nucleo { fill: var(--color-bg); stroke: var(--color-primary); stroke-width: 3; }
+.ob-arco-centro { fill: var(--color-primary); }
+@keyframes obArcoLate { 0%, 100% { opacity: 0.2; transform: scale(1); } 50% { opacity: 0.1; transform: scale(1.3); } }
+
+/* Rótulos: texto de verdad (no SVG), para que no se achiquen con el dibujo. */
+.ob-arco-pista ol { list-style: none; margin: 0; padding: 0; }
+.ob-arco-pista li { position: absolute; transform: translateX(-50%); margin-top: 15px; white-space: nowrap;
+  font-size: 12px; font-weight: 500; line-height: 16px; color: var(--color-muted); transition: color 240ms ease; }
+.ob-arco-pista li[data-estado='hecho'] { color: var(--color-body); }
+.ob-arco-pista li[data-estado='actual'] { color: var(--color-text); font-weight: 600; }
+/* Solo para lectores de pantalla: el estado de cada paso, dicho en palabras. */
+.ob-arco-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Versión compacta (celular). */
+.ob-arco-mini { display: none; align-items: center; gap: 12px; }
+.ob-arco-anillo { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; }
+.ob-arco-anillo svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ob-arco-anillo-pista { fill: none; stroke: var(--color-border-strong); stroke-width: 4; }
+.ob-arco-anillo-avance { fill: none; stroke: var(--color-primary); stroke-width: 4; stroke-linecap: round; transition: stroke-dasharray 700ms var(--ob-arco-ease); }
+.ob-arco-anillo b { position: relative; font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-text); }
+.ob-arco-mini-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.ob-arco-mini-txt strong { font-size: 15px; font-weight: 700; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-arco-mini-txt > span:last-child { font-size: 12.5px; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .ob-arco { padding: 10px 16px; }
+  .ob-arco-pista { display: none; }
+  .ob-arco-mini  { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-arco-recorrido, .ob-arco-satelite, .ob-arco-hecho, .ob-arco-falta, .ob-arco-anillo-avance, .ob-arco-pista li { transition: none; }
+  .ob-arco-halo { animation: none; }
+}
+`
 
 // El arco es un pedazo de un círculo enorme con el centro muy por debajo: así
 // queda una curva suave y no una semicircunferencia que se coma media pantalla.
@@ -92,6 +167,7 @@ export function ArcoPasos({ pasos, actual }: Props) {
 
   return (
     <nav className="ob-arco" aria-label="Pasos del alta">
+      <style>{CSS_ARCO}</style>
       {/* ── Escritorio: el arco con todas las estaciones ── */}
       <div className="ob-arco-pista">
         <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} aria-hidden focusable="false">

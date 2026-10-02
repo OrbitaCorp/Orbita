@@ -7,7 +7,8 @@ import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding
 import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
-import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from '@/modules/onboarding/BarraPasos'
+import { BarraPasos } from '@/modules/onboarding/BarraPasos'
+import { pasosDe } from '@/modules/turnos/onboarding/modelo'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -84,12 +85,6 @@ const CARDS: CardPlan[] = [
   },
 ]
 
-// Resumen de alto nivel, NO una re-lista de los pasos granulares del wizard
-// (esos ya se mostraron en SetupUnificado.tsx, incluyendo "Pago" como último
-// ítem desde el principio — ver PENDIENTES.md). Acá solo queda un paso real:
-// confirmar el pago.
-const PASOS = ['Configuración', 'Pago']
-
 const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
   day: '2-digit', month: 'long', year: 'numeric',
 })
@@ -109,6 +104,10 @@ function MercadoPagoLogo({ size = 22 }: { size?: number }) {
 
 // ─── Header con stepper (compartido) ────────────────────────────────────────
 
+// Los mismos pasos, con los mismos nombres, que acaba de recorrer en el alta
+// (modules/turnos/onboarding/Alta.tsx): el pago es la última estación.
+const PASOS_ALTA = pasosDe('tienda').map(x => x.label)
+
 function Header() {
   return (
     <div className="ob-hd" style={{
@@ -119,22 +118,15 @@ function Header() {
       {/* Responsive de esta pantalla, todo junto acá (el resto del archivo son
           estilos inline, que no admiten media queries).
 
-          El stepper estaba centrado con position:absolute, o sea FUERA de
-          flujo: en celular no había forma de que empujara al logo, así que se
-          le montaba encima y tapaba la "a" de Órbita (reportado con captura).
-          De 560px para abajo deja de estar centrado, pasa a flujo normal
-          contra la derecha, y el paso ya terminado se queda solo con su
-          tilde — el nombre del paso actual alcanza para ubicarse, y justo
-          abajo el wizard repite "Pago · 6 de 6". */}
+          Arriba va solo la marca: el recorrido es el arco de abajo, el mismo
+          del alta. Antes había además un mini stepper "Configuración · Pago"
+          que hacía parecer que eran dos wizards distintos. */}
       <style>{`
         .ob-hd { padding: 0 28px; }
-        .ob-hd-pasos { position: absolute; left: 50%; transform: translateX(-50%); }
         .ob-caja { padding: 24px 28px 20px; }
         .ob-pagina { padding: 52px 24px 80px; }
         @media (max-width: 560px) {
           .ob-hd { padding: 0 14px; }
-          .ob-hd-pasos { position: static; transform: none; margin-left: auto; }
-          .ob-hd-hecho { display: none; }
           .ob-caja { padding: 18px 18px 16px; }
           .ob-pagina { padding: 32px 16px 64px; }
         }
@@ -143,39 +135,6 @@ function Header() {
         <OrbitaLogo size={24} />
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
       </a>
-      <div className="ob-hd-pasos" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {PASOS.map((paso, i) => {
-          const done    = i < 1
-          const current = i === 1
-          return (
-            <div key={paso} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                  background: done ? '#10B981' : current ? '#2563EB' : 'var(--color-surface-alt)',
-                  color: (done || current) ? 'white' : 'var(--color-subtle)',
-                }}>
-                  {done ? <Check size={11} strokeWidth={3} /> : i + 1}
-                </div>
-                <span
-                  className={done ? 'ob-hd-hecho' : undefined}
-                  style={{
-                    fontSize: 13, fontWeight: 600,
-                    color: current ? 'var(--color-text)' : done ? '#10B981' : 'var(--color-subtle)',
-                  }}
-                >
-                  {paso}
-                </span>
-              </div>
-              {i < PASOS.length - 1 && (
-                <div style={{ width: 24, height: 1, background: done ? '#10B981' : 'var(--color-border)' }} />
-              )}
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -320,7 +279,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
       <Header />
       {/* La barra única del onboarding, con todo tildado menos el pago: el
           mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
-      <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={5} />
+      <BarraPasos pasos={PASOS_ALTA} actual={PASOS_ALTA.length - 1} />
       <div className="ob-pagina" style={{
         maxWidth: 520, margin: '0 auto',
         display: 'flex', flexDirection: 'column', alignItems: 'center',

@@ -9,8 +9,7 @@
 // El dibujo es el arco de ArcoPasos.tsx (una órbita con una estación por paso
 // y, en celular, un anillo compacto): reemplazó a la franja plana de bolitas
 // numeradas. Acá queda lo que define el recorrido —qué pasos son y cómo se
-// llaman—; cómo se ve vive en ArcoPasos y en las reglas .ob-arco* de
-// globals.css.
+// llaman—; cómo se ve vive en ArcoPasos (dibujo y reglas .ob-arco*).
 
 import { ArcoPasos } from './ArcoPasos'
 
