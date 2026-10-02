@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { Check, ChevronLeft, Shield, ShoppingBag, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
@@ -135,7 +136,7 @@ function Header({ terminado = false }: { terminado?: boolean }) {
         }
         @media (prefers-reduced-motion: reduce) { .ob-pagina { animation: none; } }
       `}</style>
-      <span className="tuob-marca"><OrbitaLogo size={26} /> Órbita</span>
+      <Link href="/" className="tuob-marca" aria-label="Órbita: volver al inicio"><OrbitaLogo size={26} /> Órbita</Link>
       <OrbitaPasos pasos={PASOS_ALTA} actual={actual} alcanzado={actual} onIr={volverAlPaso} />
     </header>
   )

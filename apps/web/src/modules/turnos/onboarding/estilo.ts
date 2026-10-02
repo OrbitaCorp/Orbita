@@ -27,7 +27,11 @@ export const CSS_ONBOARDING = `
 
   /* ── Cabecera con la órbita de pasos ── */
   .tuob-cab { position: relative; display: flex; align-items: flex-start; justify-content: center; padding: 22px 24px 0; }
-  .tuob-marca { position: absolute; left: 24px; top: 22px; display: inline-flex; align-items: center; gap: 9px; color: var(--color-text); font-family: var(--tuo-fh); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .tuob-marca { position: absolute; left: 24px; top: 22px; display: inline-flex; align-items: center; gap: 9px; color: var(--color-text); font-family: var(--tuo-fh); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; border-radius: 8px; }
+  a.tuob-marca { cursor: pointer; transition: opacity 160ms ease; }
+  a.tuob-marca:hover { opacity: 0.8; }
+  a.tuob-marca:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
+  a.tuob-volver { text-decoration: none; }
   /* El dibujo es siempre el mismo (viewBox 720×126); el marco es más ancho para que entren los ocho rótulos de Turnos. */
   .tuob-pasos { position: relative; width: 100%; max-width: 880px; aspect-ratio: 720 / 126; margin: 0 auto; }
   .tuob-pasos > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }

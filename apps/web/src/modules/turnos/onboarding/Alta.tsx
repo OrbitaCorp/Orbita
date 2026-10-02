@@ -342,7 +342,10 @@ export default function Alta({ real = false }: { real?: boolean }) {
       </div>
 
       <header className="tuob-cab">
-        <span className="tuob-marca"><OrbitaLogo size={26} /> Órbita</span>
+        {/* En el alta real la marca vuelve al home; en la demo no lleva a ningún lado. */}
+        {real
+          ? <Link href="/" className="tuob-marca" aria-label="Órbita: volver al inicio"><OrbitaLogo size={26} /> Órbita</Link>
+          : <span className="tuob-marca"><OrbitaLogo size={26} /> Órbita</span>}
         <OrbitaPasos pasos={pasos} actual={paso} alcanzado={alcanzado} onIr={irDesdeArco} />
       </header>
 
@@ -388,6 +391,12 @@ export default function Alta({ real = false }: { real?: boolean }) {
               {verPrevia && <a href="#tuob-previa" className="tuo-btn tuo-btn--sm tuob-ver-previa"><Eye size={15} aria-hidden /> Ver cómo queda</a>}
             </div>
             <div className="tuob-pie-botones">
+              {/* En el primer paso no hay paso anterior: se vuelve al home. */}
+              {paso === 0 && real && (
+                <Link href="/" className="tuo-btn tuo-btn--lg tuob-volver" aria-label="Volver al inicio">
+                  <ChevronLeft size={18} className="tuob-flecha tuob-flecha--atras" aria-hidden /> <span>Volver al inicio</span>
+                </Link>
+              )}
               {paso > 0 && (
                 <button type="button" className="tuo-btn tuo-btn--lg tuob-volver" onClick={volver} disabled={pago !== 'no'} aria-label="Volver al paso anterior">
                   <ChevronLeft size={18} className="tuob-flecha tuob-flecha--atras" aria-hidden /> <span>Volver</span>
