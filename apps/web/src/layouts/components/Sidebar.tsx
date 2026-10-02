@@ -2,6 +2,11 @@
 // logo orbital, selector de espacio, buscador con resultados en vivo y
 // módulos expandibles con badges, dots de alerta y sub-secciones.
 //
+// Toda la navegación entre pantallas vive acá, incluidas las de Configuración
+// (antes tenían un menú propio adentro de la pantalla). Lo que queda adentro
+// de una pantalla es solo su índice de secciones, si lo tiene (ver
+// configuracion/components/IndiceDeVista.tsx).
+//
 // Tres modos (SidebarModeContext):
 //   expanded  — ancho completo con etiquetas, buscador y selector
 //   collapsed — riel de íconos fijo
@@ -29,7 +34,9 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: Rea
 // `permisos`: con tener ALGUNO de la lista el ítem se muestra; sin lista se
 // muestra siempre (dentro de un módulo ya filtrado). La regla de todo el
 // menú: nada visible que el rol no pueda usar.
-interface Sub { label: string; seccion: string; vista?: string; permisos?: string[] }
+// `separador`: abre un grupo nuevo (una línea fina antes del ítem). `peligro`:
+// se pinta en rojo cuando está activo (Zona peligrosa).
+interface Sub { label: string; seccion: string; vista?: string; permisos?: string[]; separador?: boolean; peligro?: boolean }
 interface Modulo { id: string; label: string; Icon: IconType; seccion: string; badge?: number; alert?: boolean; subs?: Sub[] }
 
 const MODULOS: Modulo[] = [
@@ -75,9 +82,26 @@ const MODULOS: Modulo[] = [
         ],
     },
     {
-        // Sin `subs`: la navegación fina pasó a vivir en su propio menú guía
-        // (ConfigSidebar.tsx), columna fija a la derecha de este riel.
+        // Cada sub es una pantalla de Configuración (`?vista=`, ver
+        // VISTAS_DE_CONFIGURACION en panel/secciones.ts). "Negocio" no lleva
+        // vista: es la pantalla por defecto, y adonde lleva tocar el módulo.
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
+        subs: [
+            { label: 'Suscripción', seccion: 'configuracion', vista: 'suscripcion', permisos: ['config.edit'] },
+            { label: 'Negocio', seccion: 'configuracion', permisos: ['config.edit'], separador: true },
+            { label: 'Contacto', seccion: 'configuracion', vista: 'contacto', permisos: ['config.edit'] },
+            { label: 'Pagos', seccion: 'configuracion', vista: 'pagos', permisos: ['config.edit'] },
+            { label: 'Envíos', seccion: 'configuracion', vista: 'envios', permisos: ['config.edit'] },
+            { label: 'Redes sociales', seccion: 'configuracion', vista: 'redes', permisos: ['config.edit'] },
+            { label: 'Dominios', seccion: 'configuracion', vista: 'dominios', permisos: ['config.domains.manage'] },
+            { label: 'Cancelaciones y devoluciones', seccion: 'configuracion', vista: 'postventa', permisos: ['config.edit'] },
+            { label: 'Apariencia', seccion: 'configuracion', vista: 'apariencia', permisos: ['config.edit'], separador: true },
+            { label: 'Equipo', seccion: 'configuracion', vista: 'equipo', permisos: ['config.team.view', 'config.team.manage'] },
+            { label: 'Notificaciones', seccion: 'configuracion', vista: 'notificaciones', permisos: ['config.edit'] },
+            { label: 'Registro de actividad', seccion: 'configuracion', vista: 'actividad', permisos: ['config.audit.view'] },
+            { label: 'Soporte', seccion: 'configuracion', vista: 'soporte', separador: true },
+            { label: 'Zona peligrosa', seccion: 'configuracion', vista: 'peligro', permisos: ['config.edit'], separador: true, peligro: true },
+        ],
     },
     {
         id: 'avanzado', label: 'Avanzado', Icon: Sparkles, seccion: 'avanzado',
@@ -209,6 +233,44 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         return () => document.removeEventListener('mousedown', afuera)
     }, [selectorAbierto])
 
+    // Menú colapsado fijo: las sub-secciones no entran en el riel de íconos, así
+    // que salen en un panel flotante al lado del ícono (con el mouse o con el
+    // foco del teclado). En modo "al pasar el mouse" no hace falta: el menú
+    // entero se expande y las muestra en su lugar.
+    const [flotante, setFlotante] = useState<{ id: string; top: number } | null>(null)
+    const flotanteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    useEffect(() => () => { if (flotanteTimer.current) clearTimeout(flotanteTimer.current) }, [])
+    const usaFlotante = isDesktop && mode === 'collapsed'
+    const abrirFlotante = (id: string, el: HTMLElement) => {
+        if (flotanteTimer.current) clearTimeout(flotanteTimer.current)
+        setFlotante({ id, top: el.getBoundingClientRect().top })
+    }
+    const cerrarFlotante = () => {
+        if (flotanteTimer.current) clearTimeout(flotanteTimer.current)
+        flotanteTimer.current = setTimeout(() => setFlotante(null), 200)
+    }
+    const mantenerFlotante = () => { if (flotanteTimer.current) clearTimeout(flotanteTimer.current) }
+
+    // La lista de sub-secciones de un módulo: la misma en el menú expandido y
+    // en el panel flotante del menú colapsado.
+    const listaDeSubs = (m: Modulo, subs: Sub[]) => subs.map((s, i) => {
+        const sa = subActiva(m, s)
+        const color = s.peligro && sa ? 'var(--color-error)' : sa ? 'var(--color-primary)' : 'var(--color-muted)'
+        return (
+            <div key={s.label} className="flex flex-col">
+                {s.separador && i > 0 && <div aria-hidden="true" style={{ height: 1, margin: '5px 8px', background: 'var(--color-border)' }} />}
+                <button
+                    onClick={() => { ir(s.seccion, s.vista); setFlotante(null) }}
+                    aria-current={sa ? 'page' : undefined}
+                    className="ds-hover min-h-[30px] px-2 py-1.5 rounded-md text-left text-xs"
+                    style={{ border: 'none', lineHeight: 1.3, fontWeight: sa ? 600 : 500, color, background: sa ? (s.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)') : 'transparent' }}
+                >
+                    {s.label}
+                </button>
+            </div>
+        )
+    })
+
     // Ancho actual del sidebar
     const anchoActual = esAngosto ? W_NARROW : W_WIDE
     // En modo hover, el sidebar es position:fixed y el spacer ocupa lugar en flex
@@ -253,11 +315,18 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     const open   = abierto === m.id
                     const subs   = (m.subs ?? []).filter(s => !permisos || !s.permisos || s.permisos.some(p => permisos.includes(p)))
                     const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.badge
-                    const destino = subs[0] ?? { seccion: m.seccion, vista: undefined }
+                    // Tocar el módulo lleva a su pantalla por defecto (la sub sin
+                    // `vista`); si el rol no la ve, a la primera que sí.
+                    const destino = subs.find(s => s.seccion === m.seccion && !s.vista) ?? subs[0] ?? { seccion: m.seccion, vista: undefined }
+                    const conFlotante = usaFlotante && subs.length > 0
                     return (
-                        <div key={m.id}>
+                        <div key={m.id} onMouseLeave={conFlotante ? cerrarFlotante : undefined}>
                             <button
                                 onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
+                                onMouseEnter={conFlotante ? e => abrirFlotante(m.id, e.currentTarget) : undefined}
+                                onFocus={conFlotante ? e => abrirFlotante(m.id, e.currentTarget) : undefined}
+                                onBlur={conFlotante ? cerrarFlotante : undefined}
+                                aria-expanded={conFlotante ? flotante?.id === m.id : undefined}
                                 title={esAngosto ? m.label : undefined}
                                 className={`ds-hover flex items-center h-9 rounded-md${esAngosto ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                                 style={{ border: 'none', fontSize: 14, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
@@ -273,19 +342,34 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
                             {open && subs.length > 0 && !esAngosto && (
                                 <div className="flex flex-col gap-px mt-0.5" style={{ paddingLeft: 20 }}>
-                                    {subs.map(s => {
-                                        const sa = subActiva(m, s)
-                                        return (
-                                            <button
-                                                key={s.label}
-                                                onClick={() => ir(s.seccion, s.vista)}
-                                                className="ds-hover h-[30px] px-2 rounded-md text-left text-xs"
-                                                style={{ border: 'none', fontWeight: sa ? 600 : 500, color: sa ? 'var(--color-primary)' : 'var(--color-muted)', background: sa ? 'var(--color-primary-bg)' : 'transparent' }}
-                                            >
-                                                {s.label}
-                                            </button>
-                                        )
-                                    })}
+                                    {listaDeSubs(m, subs)}
+                                </div>
+                            )}
+
+                            {conFlotante && flotante?.id === m.id && (
+                                <div
+                                    role="group"
+                                    aria-label={`Secciones de ${m.label}`}
+                                    onMouseEnter={mantenerFlotante}
+                                    onFocus={mantenerFlotante}
+                                    onBlur={cerrarFlotante}
+                                    className="flex flex-col gap-px"
+                                    style={{
+                                        // `fixed` para escapar el overflow:hidden del aside
+                                        // (mismo recurso que el selector de modo de abajo).
+                                        // Si no entra hacia abajo, sube hasta que entre.
+                                        position: 'fixed', left: W_NARROW - 4, zIndex: 80,
+                                        top: Math.max(8, Math.min(flotante.top, window.innerHeight - 8 - (44 + subs.length * 36))),
+                                        maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
+                                        width: 220, padding: 6, borderRadius: 10,
+                                        background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                                        boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
+                                    }}
+                                >
+                                    <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        {m.label}
+                                    </div>
+                                    {listaDeSubs(m, subs)}
                                 </div>
                             )}
                         </div>

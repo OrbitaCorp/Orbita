@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "ae31a1cc75befcf4",
+  "version": "931b473605d4ad6d",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -41,7 +41,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "menu-lateral",
       "capitulo": "Moverte por el panel",
       "titulo": "El menú de la izquierda",
-      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla. En Configuración se colapsa solo, porque esa sección trae su propio menú adentro.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
+      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
     },
     {
       "id": "barra-superior",
@@ -401,7 +401,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "como-se-navega",
       "capitulo": "Configuración",
       "titulo": "Cómo se navega",
-      "texto": "Configuración tiene su propio menú adentro, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\".",
+      "texto": "Las pantallas de Configuración están en el menú de la izquierda, debajo de Configuración: al entrar se despliegan Suscripción, Negocio, Contacto, Pagos, Envíos y el resto. Cada una es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\". Apariencia, que es la más larga, trae además un índice propio al costado para saltar de una sección a otra.",
       "destino": {
         "seccion": "configuracion",
         "label": "Ir a Configuración"

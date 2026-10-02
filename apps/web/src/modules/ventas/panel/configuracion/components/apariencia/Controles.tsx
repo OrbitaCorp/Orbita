@@ -13,7 +13,7 @@ export function SecCard({ id, title, icon: I, badge, ayuda, children }: { id?: s
     const panelAyudaId = useId()
     return (
         // `id` + `scrollMarginTop`: ancla para el índice de secciones del
-        // ConfigSidebar (ver GRUPOS_APARIENCIA ahí) — sin el margen, el
+        // IndiceDeVista (ver INDICES ahí) — sin el margen, el
         // scroll-into-view deja el título de la tarjeta pegado contra el
         // borde de arriba de la ventana.
         <div id={id} className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 24 }}>
