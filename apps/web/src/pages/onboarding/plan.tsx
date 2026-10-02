@@ -4,11 +4,12 @@ import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, 
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
-import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
+import { borrarAlta, useAlta } from '@/modules/turnos/onboarding/estadoAlta'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
-import { BarraPasos } from '@/modules/onboarding/BarraPasos'
 import { pasosDe } from '@/modules/turnos/onboarding/modelo'
+import { OrbitaPasos } from '@/modules/turnos/onboarding/OrbitaPasos'
+import { CSS_ONBOARDING } from '@/modules/turnos/onboarding/estilo'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -104,38 +105,39 @@ function MercadoPagoLogo({ size = 22 }: { size?: number }) {
 
 // ─── Header con stepper (compartido) ────────────────────────────────────────
 
-// Los mismos pasos, con los mismos nombres, que acaba de recorrer en el alta
-// (modules/turnos/onboarding/Alta.tsx): el pago es la última estación.
-const PASOS_ALTA = pasosDe('tienda').map(x => x.label)
+// La cabecera es LA MISMA del alta (modules/turnos/onboarding/Alta.tsx): la
+// marca a la izquierda y el arco de pasos, con el pago como última estación.
+// Antes esta pantalla tenía su propia barra pegada arriba y otro dibujo del
+// arco dentro de una franja, y al llegar parecía que la página se rediseñaba.
+// Tocar una estación ya hecha vuelve al alta en ese paso.
+const PASOS_ALTA = pasosDe('tienda')
+const PASO_PAGO = PASOS_ALTA.findIndex(x => x.id === 'pago')
 
-function Header() {
+function Header({ terminado = false }: { terminado?: boolean }) {
+  const router = useRouter()
+  const { cambiar } = useAlta()
+  const actual = terminado ? PASOS_ALTA.length : PASO_PAGO
+  const volverAlPaso = (paso: number) => {
+    if (terminado || paso >= PASO_PAGO) return
+    cambiar(e => ({ ...e, paso, alcanzado: Math.max(e.alcanzado, PASO_PAGO - 1) }))
+    void router.push('/onboarding/rubro?paso=cuenta')
+  }
   return (
-    <div className="ob-hd" style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', height: 56,
-      background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
-    }}>
+    <header className="tuob-cab">
       {/* Responsive de esta pantalla, todo junto acá (el resto del archivo son
-          estilos inline, que no admiten media queries).
-
-          Arriba va solo la marca: el recorrido es el arco de abajo, el mismo
-          del alta. Antes había además un mini stepper "Configuración · Pago"
-          que hacía parecer que eran dos wizards distintos. */}
+          estilos inline, que no admiten media queries). */}
       <style>{`
-        .ob-hd { padding: 0 28px; }
         .ob-caja { padding: 24px 28px 20px; }
-        .ob-pagina { padding: 52px 24px 80px; }
+        .ob-pagina { padding: 18px 24px 80px; animation: tuobDesdeDerecha 300ms var(--tuo-ease) both; }
         @media (max-width: 560px) {
-          .ob-hd { padding: 0 14px; }
           .ob-caja { padding: 18px 18px 16px; }
-          .ob-pagina { padding: 32px 16px 64px; }
+          .ob-pagina { padding: 18px 16px 64px; }
         }
+        @media (prefers-reduced-motion: reduce) { .ob-pagina { animation: none; } }
       `}</style>
-      <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8, flexShrink: 0 }}>
-        <OrbitaLogo size={24} />
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
-      </a>
-    </div>
+      <span className="tuob-marca"><OrbitaLogo size={26} /> Órbita</span>
+      <OrbitaPasos pasos={PASOS_ALTA} actual={actual} alcanzado={actual} onIr={volverAlPaso} />
+    </header>
   )
 }
 
@@ -277,28 +279,15 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
-      {/* La barra única del onboarding, con todo tildado menos el pago: el
-          mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
-      <BarraPasos pasos={PASOS_ALTA} actual={PASOS_ALTA.length - 1} />
       <div className="ob-pagina" style={{
         maxWidth: 520, margin: '0 auto',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%', marginBottom: 20,
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #2563EB 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
-        }}>
-          <OrbitaLogo size={36} />
+        {/* Mismo título que los demás pasos del alta. */}
+        <div className="tuob-titulo">
+          <h1 className="tuob-h1">Último paso: <em>tu plan.</em></h1>
+          <p>Tu negocio está configurado. Elegí el plan de inicio para publicar tu espacio en Órbita.</p>
         </div>
-
-        <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 8px', textAlign: 'center' }}>
-          Activá tu cuenta
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 36px', textAlign: 'center', lineHeight: 1.5 }}>
-          Tu negocio está configurado. Elegí el plan de inicio para publicar tu espacio en Órbita.
-        </p>
 
         {error && (
           <div style={{
@@ -735,7 +724,7 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
         @keyframes exitoFade  { from { opacity:0;transform:translateY(16px) } to { opacity:1;transform:translateY(0) } }
       `}</style>
 
-      <Header />
+      <Header terminado />
 
       <div className="ob-pagina" style={{
         maxWidth: 480, margin: '0 auto',
@@ -1078,23 +1067,24 @@ function PlanContenido() {
   )
 }
 
-// El fondo del alta (modules/turnos/onboarding/Alta.tsx) también acá, para que
-// el pago no parezca otra página: negro, con el mismo cielo de estrellas y
-// cometas. La pantalla en sí no cambia: `.tuo-espacio` le redefine los tokens
-// de color a la paleta oscura y las tres pantallas (plan, procesando, éxito)
-// dejan ver el cielo porque su fondo de página pasa a transparente.
+// El mismo lienzo del alta (modules/turnos/onboarding/Alta.tsx): fondo negro
+// con el cielo de estrellas, sus tipografías y sus tokens de color, para que el
+// pago sea un paso más del mismo wizard y no otra página. `.tuo-espacio`
+// redefine los tokens a la paleta oscura; las tres pantallas (plan, procesando,
+// éxito) dejan ver el cielo porque su fondo de página pasa a transparente.
+// Lo que el alta reserva abajo para su botonera fija acá no hace falta.
 const CSS_FONDO = `
-  .ob-espacio.tuo-espacio { overflow: clip; min-height: 100vh; background: #000; }
-  .ob-espacio-cielo { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
-  .ob-espacio > div:not(.ob-espacio-cielo) { background: transparent !important; }
+  .ob-espacio.tuob.tuo-espacio { min-height: 100vh; padding-bottom: 0; }
+  .ob-espacio > div:not(.tuob-cielo) { background: transparent !important; }
 `
 
 export default function PlanPage() {
   return (
-    <div className="tuo-espacio ob-espacio">
+    <div className="tuo tuo-espacio tuob ob-espacio">
       <EstiloTurnos />
+      <style>{CSS_ONBOARDING}</style>
       <style>{CSS_FONDO}</style>
-      <div className="ob-espacio-cielo" aria-hidden>
+      <div className="tuob-cielo" aria-hidden>
         <EscenaEspacial planeta={false} />
       </div>
       <PlanContenido />
