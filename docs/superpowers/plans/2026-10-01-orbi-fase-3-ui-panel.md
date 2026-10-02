@@ -12,7 +12,9 @@
 - **R3 hecho detrás del interruptor** (`apps/web/src/modules/orbi/`), con el diseño de Claude Design ("Orbi Chat
   Tablero"): vistas (decisión de Alan, 2026-10-02: desde 1280 px Orbi queda acoplado como una columna más, al
   estilo del panel de IA de Cloudflare, y empuja la sección del medio; entre 768 y 1279 px va **encima**, con
-  fondo tenue, porque empujar ahí deja a Pedidos y Productos sin lugar para sus tablas; en el celular, hoja), encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
+  fondo tenue, porque empujar ahí deja a Pedidos y Productos sin lugar para sus tablas; en el celular, hoja.
+  El lateral nunca le deja menos de 720 px a la sección del medio (`topeDeAncho`): en 1280 con el menú abierto
+  queda en su mínimo de 320, en 1440 llega a 480, y vuelve solo a lo elegido cuando hay lugar), encabezado con selector de sesiones, mensaje por partes (actividad con tiempos,
   plegado, tarjeta con sus estados y vencimiento, respuesta con formato), caja que deja escribir mientras Orbi
   responde, borrador por sesión, página dedicada con sesiones agrupadas y menú por fila. Usa el stream de hoy
   (`POST /orbi/chat`): el **pensamiento** y el **detalle de la tarjeta en filas** esperan T6/T7. Se prende con
