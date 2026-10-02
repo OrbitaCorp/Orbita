@@ -18,17 +18,82 @@ const ESTADO: Record<EstadoProducto, { label: string; bg: string; fg: string; do
 // el contador "1/3" del carrusel: chip oscuro sólido + texto blanco, siempre
 // legible sin importar la foto de fondo. El color de estado no se pierde: un
 // puntito lo conserva.
-export function ProductoEstadoBadge({ estado, sobreImagen }: { estado: EstadoProducto; sobreImagen?: boolean }) {
+export function ProductoEstadoBadge({
+    estado,
+    sobreImagen,
+    onClick,
+    title,
+    cargando,
+}: {
+    estado: EstadoProducto
+    sobreImagen?: boolean
+    onClick?: (e: React.MouseEvent) => void
+    title?: string
+    cargando?: boolean
+}) {
     const c = ESTADO[estado]
+    const Component = onClick ? 'button' : 'span'
+    const buttonProps = onClick
+        ? {
+              type: 'button' as const,
+              onClick: (e: React.MouseEvent) => {
+                  e.stopPropagation()
+                  if (!cargando) onClick(e)
+              },
+              title: title ?? (estado === 'borrador' ? 'Hacé clic para publicar este producto' : undefined),
+          }
+        : {}
+
     if (sobreImagen) {
         return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px 0 7px', borderRadius: 9999, background: 'rgba(15,23,42,0.72)', color: '#fff', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>
+            <Component
+                {...buttonProps}
+                className={onClick ? 'ds-hover' : undefined}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    height: 22,
+                    padding: '0 9px 0 7px',
+                    borderRadius: 9999,
+                    background: 'rgba(15,23,42,0.72)',
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    width: 'fit-content',
+                    border: 'none',
+                    fontFamily: 'inherit',
+                    cursor: onClick ? 'pointer' : 'default',
+                    opacity: cargando ? 0.7 : 1,
+                }}
+            >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                {c.label}
-            </span>
+                {cargando ? 'Publicando…' : c.label}
+            </Component>
         )
     }
     return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: c.bg, color: c.fg, fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{c.label}</span>
+        <Component
+            {...buttonProps}
+            className={onClick ? 'ds-hover' : undefined}
+            style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                height: 22,
+                padding: '0 10px',
+                borderRadius: 9999,
+                background: c.bg,
+                color: c.fg,
+                fontSize: 11,
+                fontWeight: 600,
+                width: 'fit-content',
+                border: 'none',
+                fontFamily: 'inherit',
+                cursor: onClick ? 'pointer' : 'default',
+                opacity: cargando ? 0.7 : 1,
+            }}
+        >
+            {cargando ? 'Publicando…' : c.label}
+        </Component>
     )
 }
