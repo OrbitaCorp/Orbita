@@ -22,6 +22,7 @@ import type { AuthContext } from '../common/types/auth-context.type';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
 import { permisosDeOrbi } from './permisos-orbi';
+import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
 import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, RESPUESTA_DE_PROPUESTA, vueltaDeTools } from './turno/vuelta';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
@@ -529,7 +530,10 @@ export class OrbiController {
           businessId: user.businessId,
           memberId: user.memberId,
           conversationId: conversacionVerificada,
-          module: dto.context.module,
+          // El front del panel manda siempre module 'ventas' y la pantalla en
+          // section: se guarda el módulo ya resuelto (el mismo que eligió el
+          // prompt), si no todos los turnos quedaban como 'ventas'.
+          module: resolverModuloDelPanel(dto.context.module, dto.context.section).modulo ?? dto.context.module,
           model: modeloReportado ?? this.modeloPara(dto.context.surface),
           // undefined y no 0 si el proveedor no informó consumo.
           promptTokens: promptTokens || undefined,
