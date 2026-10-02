@@ -35,7 +35,7 @@ export function useRutasDeOrbi() {
   }), [negocioId, moduloPadre])
 }
 
-/** El foco no sale de la hoja con Tab (en el celular es modal). */
+/** El foco no sale del diálogo con Tab (superpuesto y hoja: son modales). */
 function atraparFoco(e: KeyboardEventReact<HTMLElement>) {
   if (e.key !== 'Tab') return
   const enfocables = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'))
@@ -47,10 +47,12 @@ function atraparFoco(e: KeyboardEventReact<HTMLElement>) {
 }
 
 /**
- * El Orbi nuevo fuera de su página: acoplado al costado desde 768 px, o hoja
- * desde abajo en el celular. Va como último hijo del shell del panel (un flex
- * en fila): ocupa su ancho y la sección del medio se achica, nunca queda
- * tapada. En la página de Orbi no se muestra: ahí el chat es la página.
+ * El Orbi nuevo fuera de su página. Desde 1280 px, acoplado al costado: va
+ * como último hijo del shell del panel (un flex en fila), ocupa su ancho y la
+ * sección del medio se achica, nunca queda tapada. Entre 768 y 1279 px, encima
+ * del contenido: empujar ahí deja a Pedidos o Productos con ~600 px, poco para
+ * sus tablas. En el celular, hoja desde abajo. En la página de Orbi no se
+ * muestra: ahí el chat es la página.
  */
 export default function OrbiV2() {
   const router = useRouter()
@@ -60,10 +62,9 @@ export default function OrbiV2() {
   const setAncho = useOrbiV2(st => st.setAncho)
   const hoja = useOrbiV2(st => st.hoja)
   const setHoja = useOrbiV2(st => st.setHoja)
-  // Acoplado (empuja la sección del medio, nunca la tapa) en cualquier ancho
-  // donde entre; en el celular no hay lugar para empujar: hoja a pantalla.
+  const ancha = useMediaQuery('(min-width: 1280px)')
   const celular = useMediaQuery('(max-width: 767px)')
-  const vista: Vista = celular ? 'hoja' : 'lateral'
+  const vista: Vista = ancha ? 'lateral' : celular ? 'hoja' : 'superpuesto'
   const rutas = useRutasDeOrbi()
   const { anunciar, region } = useAnunciador()
   const partes = Array.isArray(router.query.slug) ? router.query.slug : []
@@ -80,11 +81,11 @@ export default function OrbiV2() {
     else abrioDesde.current?.focus?.()
   }, [isOpen])
 
-  // Esc cierra la hoja desde cualquier lado. El lateral acoplado no es modal:
+  // Esc cierra el superpuesto y la hoja (modales) desde cualquier lado. El lateral acoplado no es modal:
   // Esc lo cierra solo con el foco adentro, para no pisar el Esc de las
   // pantallas del panel (cerrar un modal de Pedidos no tiene que cerrar Orbi).
   useEffect(() => {
-    if (!isOpen || enLaPagina || vista !== 'hoja') return
+    if (!isOpen || enLaPagina || vista === 'lateral') return
     const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
@@ -136,8 +137,7 @@ export default function OrbiV2() {
         <aside
           id={ID_PANEL_ORBI}
           className={`${s.raiz} ${s.lateral}`}
-          // Nunca más de la mitad de la pantalla: en 1024 px la sección del medio sigue siendo usable.
-          style={{ width: `min(${ancho}px, 50vw)` }}
+          style={{ width: ancho }}
           aria-label="Orbi"
           onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) close() }}
         >
@@ -162,6 +162,14 @@ export default function OrbiV2() {
           />
           {chat}
         </aside>
+      )}
+      {vista === 'superpuesto' && (
+        <>
+          <div className={s.scrim} onClick={close} aria-hidden />
+          <div id={ID_PANEL_ORBI} role="dialog" aria-modal="true" aria-label="Orbi" className={`${s.raiz} ${s.superpuesto}`} onKeyDown={atraparFoco}>
+            {chat}
+          </div>
+        </>
       )}
       {vista === 'hoja' && (
         <>
