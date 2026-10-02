@@ -1083,7 +1083,7 @@ export class OrdersService {
                 quantity: r.quantity,
                 price: fmtPesos(Number(r.unitPrice)),
               })),
-              ...(await desgloseDePedido(this.prisma, creado.id)),
+              ...(await desgloseDePedido(this.prisma, businessId, creado.id)),
               orderUrl,
             };
             const meta = { businessId, customerId: customer?.id };
@@ -1435,7 +1435,7 @@ export class OrdersService {
               quantity: it.quantity,
               price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
             })),
-            ...(await desgloseDePedido(this.prisma, order.id)),
+            ...(await desgloseDePedido(this.prisma, businessId, order.id)),
             orderUrl,
           }, meta);
         }
@@ -1692,7 +1692,7 @@ export class OrdersService {
           quantity: it.quantity,
           price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
         })),
-        ...(await desgloseDePedido(this.prisma, order.id)),
+        ...(await desgloseDePedido(this.prisma, businessId, order.id)),
         orderUrl: order.customerId ? url.replace(/\/comprobante$/, '') : undefined,
       }, { businessId, customerId: order.customerId ?? undefined });
     } catch (e) {

@@ -202,7 +202,7 @@ export class NotificationsService {
         orderNumber: p.orderNumber,
         total: fmtPesos(p.total),
         items: p.items.map((it) => ({ name: it.name, quantity: it.quantity, price: fmtPesos(it.price) })),
-        ...(await desgloseDePedido(this.prisma, p.orderId)),
+        ...(await desgloseDePedido(this.prisma, p.businessId, p.orderId)),
         orderUrl: link,
       },
       resourceType: 'order',

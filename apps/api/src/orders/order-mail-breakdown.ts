@@ -21,10 +21,10 @@ export type DesglosePedidoMail = {
 // ese día, aunque el descuento ya haya vencido o cambiado.
 //
 // Nunca rompe el envío: si algo falla devuelve {} y el mail sale como antes.
-export async function desgloseDePedido(prisma: PrismaService, orderId: string): Promise<DesglosePedidoMail> {
+export async function desgloseDePedido(prisma: PrismaService, businessId: string, orderId: string): Promise<DesglosePedidoMail> {
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, businessId },
       select: {
         subtotal: true,
         discountTotal: true,
