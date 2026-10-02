@@ -333,9 +333,18 @@ const CSS_FONDO = `
   .lg-tarjeta input:-webkit-autofill:hover,
   .lg-tarjeta input:-webkit-autofill:focus {
     -webkit-text-fill-color: var(--color-text); caret-color: var(--color-text);
-    -webkit-box-shadow: 0 0 0 1000px #0B101D inset; box-shadow: 0 0 0 1000px #0B101D inset;
+    -webkit-box-shadow: 0 0 0 1000px #0B101D inset !important; box-shadow: 0 0 0 1000px #0B101D inset !important;
     transition: background-color 9999s ease-out 0s;
   }
+  /* Con foco, .ds-field pone su anillo con !important y pisaba el tapado de
+     arriba: quedaba el celeste claro de Chrome con el texto claro encima y no
+     se leía nada. Acá van los dos juntos: el tapado y el anillo. */
+  .lg-tarjeta input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #0B101D inset, 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+    box-shadow: 0 0 0 1000px #0B101D inset, 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+  }
+  /* Y sin autocompletar, el campo enfocado mantiene fondo oscuro y texto claro. */
+  .lg-tarjeta input, .lg-tarjeta input:focus { background-color: #0B101D !important; color: var(--color-text) !important; color-scheme: dark; }
   @media (max-width: 480px) {
     .lg-pagina { padding: 64px 14px 28px; place-items: start center !important; }
     .lg-atras { left: 10px; top: 10px; }
