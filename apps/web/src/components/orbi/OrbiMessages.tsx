@@ -9,24 +9,8 @@ import { useEsPanel, useModuloPet } from './pet/useModuloPet'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import { useOrbiChat } from './useOrbiChat'
 import type { OrbiAction, OrbiMessage } from './types'
-import { esNavegacion, esSeleccionDelWizard, esTarjetaDeAccion, muestraNoLlegueAResponder } from './sesionOrbi'
+import { cleanToolLeaks, esNavegacion, esSeleccionDelWizard, esTarjetaDeAccion, muestraNoLlegueAResponder } from './sesionOrbi'
 
-// El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
-// además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
-// Lo limpiamos en el render para que el usuario no vea código.
-function cleanToolLeaks(text: string): string {
-  return text
-    .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
-    .replace(/```(?:json)?\s*\{[^`]*\}\s*```/g, '')
-    .replace(/\{\{[a-zA-Z]+[^}]*\}\}/g, '')
-    .replace(/<[a-z][a-zA-Z]*\s[^>]*>[\s\S]*?<\/[a-z][a-zA-Z]*>/gi, '')
-    .replace(/<\/?[a-z][a-zA-Z]*(?:[:\s][^>]*)?\/?>/gi, '')
-    .replace(/\n?\s*\{[^{}]*"?(?:key|label|field|value|rubro|keywords|businessName)"?[^{}]*\}/g, '')
-    .replace(/\[(?:Seleccionar|Elegir|Select)[^\]]*\]/gi, '')
-    .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
 
 // Orbi escribe **negrita** en markdown para destacar (nombre sugerido,
 // próximo paso, etc.). No sumamos una librería de markdown entera por esto:

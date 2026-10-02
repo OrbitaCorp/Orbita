@@ -43,7 +43,7 @@ export interface AiAssistResult {
   // técnica, etc.); vacío si no aplica. Va siempre en la misma respuesta que
   // descripción/categoría/tags para no duplicar el llamado a Gemini — el
   // wizard del panel decide qué campos aplicar según desde qué botón se
-  // llamó ("Generar con Orbi" de la info general, o el de especificaciones).
+  // llamó ("Redactar con Orbi" de la info general, o el de especificaciones).
   suggestedSpecs: { label: string; value: string }[];
 }
 

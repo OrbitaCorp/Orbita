@@ -300,6 +300,47 @@ describe('OrbiSaludService', () => {
     await svc.registrarOk();
     expect(spy).toHaveBeenCalledTimes(2);
   });
+
+  it('disponibilidad: activo → disponible; en mantenimiento → el mensaje de su superficie y nada de la causa', async () => {
+    const { svc } = armar();
+    expect(await svc.disponibilidad('panel')).toEqual({ disponible: true });
+    await svc.registrarFalla({ error: fallaSaldo(), surface: 'panel', actor: 'neg-1' });
+    const panel = await svc.disponibilidad('panel');
+    const wizard = await svc.disponibilidad('wizard');
+    expect(panel).toEqual({ disponible: false, mensaje: expect.stringContaining('Manual del panel') });
+    expect(wizard).toEqual({ disponible: false, mensaje: expect.stringContaining('completando los pasos') });
+    expect(JSON.stringify([panel, wizard])).not.toMatch(/saldo|credits|402|Gemini/i);
+  });
+
+  it('disponibilidad con la base caída: disponible (fail-open)', async () => {
+    const { svc } = armar({ dbRota: true });
+    expect(await svc.disponibilidad('panel')).toEqual({ disponible: true });
+  });
+
+  it('avisoDeFalla: la falla que apaga Orbi le avisa a la persona que está en mantenimiento, no "probá en unos minutos"', async () => {
+    const { svc } = armar();
+    expect(await svc.avisoDeFalla({ error: fallaSaldo(), surface: 'panel', actor: 'neg-1' })).toEqual({
+      code: 'ORBI_MAINTENANCE',
+      message: expect.stringContaining('mantenimiento'),
+    });
+  });
+
+  it('avisoDeFalla: una falla suelta que no apaga Orbi es una falla pasajera', async () => {
+    const { svc, fila } = armar();
+    const aviso = await svc.avisoDeFalla({ error: falla5xx(), surface: 'wizard', actor: 'w-1' });
+    expect(fila()?.status ?? 'ACTIVE').toBe('ACTIVE');
+    expect(aviso).toEqual({ code: 'ORBI_PROVIDER_DOWN', message: expect.stringContaining('Probá de nuevo') });
+  });
+
+  it('avisoDeFalla: un error nuestro (no del proveedor) sale como ORBI_ERROR', async () => {
+    const { svc } = armar();
+    expect((await svc.avisoDeFalla({ error: new TypeError('x is undefined'), surface: 'panel', actor: 'neg-1' })).code).toBe('ORBI_ERROR');
+  });
+
+  it('avisoDeFalla con la base caída: aviso de falla pasajera, nunca tira', async () => {
+    const { svc } = armar({ dbRota: true });
+    expect((await svc.avisoDeFalla({ error: fallaSaldo(), surface: 'panel', actor: 'neg-1' })).code).toBe('ORBI_PROVIDER_DOWN');
+  });
 });
 
 // ─── Cableado de Nest ────────────────────────────────────────────────────────

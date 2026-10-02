@@ -15,6 +15,7 @@ export type TablaConRetencion =
   | 'orbi_pending_actions'
   | 'orbi_turns'
   | 'orbi_provider_failures'
+  | 'orbi_conversations'
   | 'daily_quota';
 
 /** Por tabla: cuántas filas se borraron, o por qué no se borró nada. */
@@ -158,6 +159,15 @@ export class RetencionLogsService {
         variable: 'ORBI_PROVIDER_FAILURES_RETENTION_DAYS',
         porDefecto: 30,
         borrar: (corte) => this.prisma.orbiProviderFailure.deleteMany({ where: { createdAt: { lt: corte } } }),
+      },
+      {
+        // Sesiones de Orbi ARCHIVADAS sin actividad en 180 días (decisión de
+        // Alan, 2026-10-02). Las que no están archivadas no se tocan. Sus
+        // mensajes v2 (orbi_messages) se van por el ON DELETE CASCADE.
+        tabla: 'orbi_conversations',
+        variable: 'ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS',
+        porDefecto: 180,
+        borrar: (corte) => this.prisma.orbiConversation.deleteMany({ where: { archivedAt: { not: null }, lastActivityAt: { lt: corte } } }),
       },
       {
         tabla: 'daily_quota',
