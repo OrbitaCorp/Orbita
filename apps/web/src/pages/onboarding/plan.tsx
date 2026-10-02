@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
-import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
+import { Check, ChevronLeft, Shield, ShoppingBag, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
@@ -128,10 +128,10 @@ function Header({ terminado = false }: { terminado?: boolean }) {
           estilos inline, que no admiten media queries). */}
       <style>{`
         .ob-caja { padding: 24px 28px 20px; }
-        .ob-pagina { padding: 18px 24px 80px; animation: tuobDesdeDerecha 300ms var(--tuo-ease) both; }
+        .ob-pagina { padding: 18px 24px 24px; animation: tuobDesdeDerecha 300ms var(--tuo-ease) both; }
         @media (max-width: 560px) {
           .ob-caja { padding: 18px 18px 16px; }
-          .ob-pagina { padding: 18px 16px 64px; }
+          .ob-pagina { padding: 18px 16px 16px; }
         }
         @media (prefers-reduced-motion: reduce) { .ob-pagina { animation: none; } }
       `}</style>
@@ -276,9 +276,28 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   const precioBienvenidaMostrado = esGratis ? 0 : descuento ? descuento.amountFinal : cardActual.precioBienvenida
   const precioPorMesDurante3 = Math.round(precioBienvenidaMostrado / 3)
   const [detalle, setDetalle] = useState<PlanKey | null>(null)
+  const nombreNegocio = useOnboardingStore(st => st.wizard.nombre)
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
+      {/* La misma botonera fija del alta, para poder volver al paso anterior. El
+          botón de pagar se queda en la tarjeta del plan. */}
+      <div className="tuob-pie" role="region" aria-label="Volver en el alta">
+        <div className="tuob-ancho tuob-pie-in">
+          <div className="tuob-pie-resumen">
+            <span aria-hidden><ShoppingBag size={19} strokeWidth={1.75} /></span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <b>{nombreNegocio || 'Tu tienda en Órbita'}</b>
+              <small>Paso {PASO_PAGO + 1} de {PASOS_ALTA.length} · Pago</small>
+            </div>
+          </div>
+          <div className="tuob-pie-botones">
+            <button type="button" className="tuo-btn tuo-btn--lg tuob-volver" onClick={onVolver} aria-label="Volver al paso anterior">
+              <ChevronLeft size={18} className="tuob-flecha tuob-flecha--atras" aria-hidden /> <span>Volver</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div className="ob-pagina" style={{
         maxWidth: 520, margin: '0 auto',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -1072,9 +1091,8 @@ function PlanContenido() {
 // pago sea un paso más del mismo wizard y no otra página. `.tuo-espacio`
 // redefine los tokens a la paleta oscura; las tres pantallas (plan, procesando,
 // éxito) dejan ver el cielo porque su fondo de página pasa a transparente.
-// Lo que el alta reserva abajo para su botonera fija acá no hace falta.
 const CSS_FONDO = `
-  .ob-espacio.tuob.tuo-espacio { min-height: 100vh; padding-bottom: 0; }
+  .ob-espacio.tuob.tuo-espacio { min-height: 100vh; }
   .ob-espacio > div:not(.tuob-cielo) { background: transparent !important; }
 `
 
