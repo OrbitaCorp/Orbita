@@ -37,7 +37,6 @@ export const CAT_ICONS = [
 
 export type CatIconKey = typeof CAT_ICONS[number]
 
-export const CAT_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']
 
 // ─── Mapa de íconos (movido de Categorias.tsx 2026-08-25) ──────────────────
 

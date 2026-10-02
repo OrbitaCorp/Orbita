@@ -1,6 +1,6 @@
 import {
   recuperarFinos,
-  completarHuecos, boxFilter, endurecer, estimarPrimerPlano, guidedFilter } from '../../src/background-removal/mask-refine';
+  completarHuecos, boxFilter, endurecer, estimarPrimerPlano, guidedFilter, quitarIslas } from '../../src/background-removal/mask-refine';
 
 // Fase 3 de "Fondo con IA": refinamiento de la máscara de recorte (bordes
 // pixelados al agrandar la máscara de 320x320 de U2Netp).
@@ -165,6 +165,50 @@ describe('completarHuecos', () => {
       const out = estimarPrimerPlano(rgb, new Float32Array([1, 1]), 2, 1);
       expect(Array.from(out)).toEqual(Array.from(rgb));
       expect(out).not.toBe(rgb);
+    });
+  });
+
+  describe('quitarIslas', () => {
+    const w = 100;
+    const h = 100;
+    const bloque = (m: Float32Array, x0: number, y0: number, x1: number, y1: number) => {
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) m[y * w + x] = 1;
+    };
+
+    it('borra una mota diminuta desconectada del producto y deja el producto', () => {
+      const m = new Float32Array(w * h);
+      bloque(m, 20, 20, 80, 80); // producto: 3600 px
+      bloque(m, 90, 90, 93, 93); // mota: 9 px
+      expect(quitarIslas(m, w, h)).toBe(1);
+      expect(m[91 * w + 91]).toBe(0);
+      expect(m[50 * w + 50]).toBe(1);
+    });
+
+    it('conserva una pieza separada que sí es parte del producto (la otra mitad de un conjunto)', () => {
+      const m = new Float32Array(w * h);
+      bloque(m, 5, 5, 45, 45); // 1600 px
+      bloque(m, 55, 55, 95, 95); // 1600 px
+      expect(quitarIslas(m, w, h)).toBe(0);
+      expect(m[70 * w + 70]).toBe(1);
+    });
+
+    it('una sola componente: no toca nada', () => {
+      const m = new Float32Array(w * h);
+      bloque(m, 10, 10, 60, 60);
+      expect(quitarIslas(m, w, h)).toBe(0);
+    });
+
+    it('cuenta el borde suave: la mota se borra completa, sin dejar un fantasma tenue', () => {
+      const m = new Float32Array(w * h);
+      bloque(m, 20, 20, 80, 80);
+      bloque(m, 90, 90, 93, 93);
+      m[91 * w + 94] = 0.2; // borde suave de la mota
+      quitarIslas(m, w, h);
+      expect(m[91 * w + 94]).toBe(0);
+    });
+
+    it('una máscara vacía no rompe', () => {
+      expect(quitarIslas(new Float32Array(w * h), w, h)).toBe(0);
     });
   });
 });

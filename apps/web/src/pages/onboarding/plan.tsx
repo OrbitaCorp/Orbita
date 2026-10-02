@@ -32,8 +32,8 @@ const DETALLE_BASE: DetalleItem[] = [
   { titulo: 'Descuentos y cupones', texto: 'Con sus límites y vencimientos, aplicados solos en el carrito.' },
 ]
 
-// Las 6 features del paquete Avanzado + fotos sin fondo (gateada por el mismo
-// addon aunque no es una de las 6 de marketing) — mismos textos que
+// Las 6 features del paquete Avanzado + fotos sin fondo y Fondo con IA (gateadas
+// por el mismo addon aunque no son de las 6 de marketing) — mismos textos que
 // Avanzado.tsx en la home. El "Aviso de salida" (viejo exit-intent) se
 // eliminó del producto el 2026-09-09.
 const DETALLE_AVANZADO: DetalleItem[] = [
@@ -45,6 +45,8 @@ const DETALLE_AVANZADO: DetalleItem[] = [
   { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código.' },
   { titulo: 'Oferta relámpago', texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta.' },
   { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic.' },
+  { titulo: 'Fondo con IA', texto: 'Generá un fondo profesional para la foto de tu producto, sin sesión de fotos.' },
+  { titulo: 'Escaneo de productos con IA', texto: 'Sacale una foto a tu producto y Orbi completa el nombre, la categoría y la descripción.' },
 ]
 
 interface CardPlan {
