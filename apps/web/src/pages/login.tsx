@@ -326,6 +326,16 @@ const CSS_FONDO = `
     border: 1px solid var(--color-border); background: rgba(8,11,19,0.72);
     -webkit-backdrop-filter: blur(14px) saturate(130%); backdrop-filter: blur(14px) saturate(130%);
     box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+  /* Autocompletado del navegador: Chrome pinta el campo de celeste claro y
+     desentona con el fondo. No se puede cambiar el background, pero sí taparlo
+     con una sombra interior del color del campo. */
+  .lg-tarjeta input:-webkit-autofill,
+  .lg-tarjeta input:-webkit-autofill:hover,
+  .lg-tarjeta input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text); caret-color: var(--color-text);
+    -webkit-box-shadow: 0 0 0 1000px #0B101D inset; box-shadow: 0 0 0 1000px #0B101D inset;
+    transition: background-color 9999s ease-out 0s;
+  }
   @media (max-width: 480px) {
     .lg-pagina { padding: 64px 14px 28px; place-items: start center !important; }
     .lg-atras { left: 10px; top: 10px; }
