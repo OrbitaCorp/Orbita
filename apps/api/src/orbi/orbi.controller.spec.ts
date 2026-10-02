@@ -571,7 +571,7 @@ describe('OrbiController', () => {
       const res = createMockResponse();
       await controller.chat(chatPanel(id), res as any, duenio as any);
 
-      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel');
+      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel', expect.objectContaining({ titulo: expect.any(String) }));
       const todo = res.chunks.join('');
       expect(res.chunks[0]).toBe('event: conversation\ndata: {"id":"conv-1"}\n\n');
       expect(todo).not.toContain(id);

@@ -23,6 +23,7 @@ import { CuotaService } from '../common/cuota/cuota.service';
 import { hmacIp } from '../common/utils/hash-ip';
 import { permisosDeOrbi } from './permisos-orbi';
 import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
+import { tituloAutomatico } from './sesiones/titulo';
 import { ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, vueltaDeTools } from './turno/vuelta';
 import { correrTurno, nuevoProgresoDelTurno, sumarConsumo, type ConsumoPorProveedor, type EmisorDelTurno } from './turno/motor-de-turno';
 import { DemoIa } from '../demo/demo-ia';
@@ -279,7 +280,10 @@ export class OrbiController {
           conversacionVerificada = dto.conversationId;
           history = historialParaElModelo(guardados);
         } else {
-          const conv = await this.conversationService.crear(user.businessId, user.memberId, 'panel');
+          const conv = await this.conversationService.crear(user.businessId, user.memberId, 'panel', {
+            titulo: tituloAutomatico(dto.message),
+            pantalla: dto.context.section,
+          });
           conversacionVerificada = conv.id;
         }
 

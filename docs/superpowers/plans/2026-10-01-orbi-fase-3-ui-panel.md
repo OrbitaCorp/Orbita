@@ -1,7 +1,16 @@
 # Plan — Orbi fase 3: el nuevo Orbi del panel
 
 **Spec:** [2026-10-01-orbi-fase-3-ui-panel-design.md](../specs/2026-10-01-orbi-fase-3-ui-panel-design.md)
-**Estado:** borrador para revisión de Alan. **No ejecutar sin el spec aprobado.**
+**Estado (2026-10-02):** spec aprobado en lo decidido (§11). Rama `claude/nifty-ritchie-rahtf0`, sin mergear:
+- **R1 hecho** (T1). La red no fueron evals pagas sino **turnos grabados**
+  (`apps/api/test/unit/orbi-turno-grabado.unit-spec.ts`): los 534 turnos reales del 2026-10-01 reproducidos
+  con un modelo guionado por el controller y por las evals, comparados contra una huella grabada antes del
+  refactor. T2 (wizard) sin hacer.
+- **R2 en parte:** T3 (migración `20261002120000_orbi_sesiones`, **sin aplicar en ningún lado**), T4 y T5
+  (servicio y endpoints de sesiones) y la retención de archivadas (180 días). **Esperan créditos de Gemini:**
+  T6 (etiquetas de actividad), T7 (stream v2 con narración) y T8 (evals de la narración).
+- **R3 espera el diseño** de Claude Design (`docs/superpowers/design/2026-10-02-orbi-panel-prompt-claude-design.md`).
+
 **Fecha:** 2026-10-01
 
 ## Cómo se despliega (orden obligatorio)
