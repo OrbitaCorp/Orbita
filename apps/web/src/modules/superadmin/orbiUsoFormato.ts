@@ -20,6 +20,14 @@ export function porcentajeDe(parte: number, total: number): number | null {
   return total > 0 ? (parte / total) * 100 : null
 }
 
+/**
+ * Si el formulario de "Abrir conversación" ya tiene algo cargado: mientras lo
+ * tenga, un clic afuera no cierra el modal (se perdería lo escrito).
+ */
+export function lecturaEmpezada(f: { motivo: string | null; detalle: string; ticket: string }): boolean {
+  return f.motivo !== null || f.detalle.trim() !== '' || f.ticket.trim() !== ''
+}
+
 /** El cupo se marca en rojo desde el 100 %: ahí, con el bloqueo prendido, Orbi deja de contestar. */
 export const excedido = (porcentaje: number) => porcentaje >= 100
 

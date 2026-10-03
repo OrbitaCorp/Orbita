@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   usd, usdEje, tokens, ms, etiquetaDeTools, mesesRecientes, etiquetaDeMes, mesActualArgentina, pct, porcentajeDe,
-  leerCreditos, pasosDe, contextoDe, puntosDeSerie, estadoDelTurno, excedido,
+  leerCreditos, pasosDe, contextoDe, puntosDeSerie, estadoDelTurno, excedido, lecturaEmpezada,
 } from './orbiUsoFormato'
 
 describe('formato', () => {
@@ -105,6 +105,16 @@ describe('ficha del turno', () => {
     expect(estadoDelTurno('ok')).toEqual({ label: 'Respondió', tone: 'green' })
     expect(estadoDelTurno('quota')).toEqual({ label: 'Frenado por cupo', tone: 'amber' })
     expect(estadoDelTurno('raro')).toEqual({ label: 'raro', tone: 'gray' })
+  })
+})
+
+describe('abrir una conversación', () => {
+  it('el formulario cuenta como empezado apenas hay motivo, detalle o ticket (espacios solos no)', () => {
+    expect(lecturaEmpezada({ motivo: null, detalle: '', ticket: '' })).toBe(false)
+    expect(lecturaEmpezada({ motivo: null, detalle: '   ', ticket: ' ' })).toBe(false)
+    expect(lecturaEmpezada({ motivo: 'soporte', detalle: '', ticket: '' })).toBe(true)
+    expect(lecturaEmpezada({ motivo: null, detalle: 'x', ticket: '' })).toBe(true)
+    expect(lecturaEmpezada({ motivo: null, detalle: '', ticket: 'RBT-1' })).toBe(true)
   })
 })
 

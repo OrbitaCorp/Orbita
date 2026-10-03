@@ -10,7 +10,7 @@ import {
 import { LineSeriesChart } from './charts'
 import {
   usd, usdEje, tokens, ms, pct, etiquetaDeTools, mesesRecientes, mesActualArgentina, etiquetaDeMes, porcentajeDe,
-  excedido, leerCreditos, pasosDe, contextoDe, estadoDelTurno, puntosDeSerie,
+  excedido, leerCreditos, pasosDe, contextoDe, estadoDelTurno, puntosDeSerie, lecturaEmpezada,
 } from './orbiUsoFormato'
 
 // Orbi → Uso (apex orbita.site/superadmin?seccion=orbi, pestaña Uso). Cuánto
@@ -707,9 +707,12 @@ function AbrirConversacion({ conversationId, onCerrar }: { conversationId: strin
     }
   }
 
+  // Un clic afuera no cierra ni con la conversación a la vista (reabrirla
+  // dejaría un segundo registro de lectura) ni con el formulario empezado (se
+  // perdería lo escrito). La cruz y los botones sí.
   if (conversacion) {
     return (
-      <ModalShell title={conversacion.titulo ?? 'Conversación con Orbi'} onClose={onCerrar}>
+      <ModalShell title={conversacion.titulo ?? 'Conversación con Orbi'} onClose={onCerrar} cerrarAlClickAfuera={false}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <span style={ayudaTexto}>El texto sale redactado: emails, teléfonos, documentos y tarjetas aparecen tapados. Tu lectura ya quedó registrada.</span>
           {conversacion.mensajes.length === 0 ? <Empty text="La conversación no tiene mensajes de texto." /> : (
@@ -741,7 +744,7 @@ function AbrirConversacion({ conversationId, onCerrar }: { conversationId: strin
   }
 
   return (
-    <ModalShell title="Abrir conversación" onClose={onCerrar}>
+    <ModalShell title="Abrir conversación" onClose={onCerrar} cerrarAlClickAfuera={!enviando && !lecturaEmpezada({ motivo, detalle, ticket })}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <fieldset style={{ border: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <legend style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8, padding: 0 }}>Motivo</legend>
