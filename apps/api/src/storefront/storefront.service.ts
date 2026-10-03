@@ -349,6 +349,9 @@ export class StorefrontService {
         name: business.name,
         subdomain: business.subdomain,
         mode: business.mode,
+        // STORE | APPOINTMENTS: con APPOINTMENTS el sitio es el de turnos y su
+        // configuración sale de GET /storefront/:slug/appointments/site.
+        vertical: business.vertical,
         isActive: business.isActive,
         isPaused: business.isPaused,
       },

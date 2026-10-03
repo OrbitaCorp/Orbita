@@ -2230,6 +2230,29 @@ export class SubscriptionsService {
       p.discount.updateMany({ ...delNegocio, data: { customerId: null } }),
       p.gameSession.updateMany({ ...delNegocio, data: { customerId: null } }),
 
+      // Turnos & Agenda. Mismo criterio que los pedidos: el turno, su pago y
+      // lo que se vendió por adelantado (packs, membresías, gift cards) son el
+      // comprobante y se quedan con su snapshot (nombre, teléfono, DNI); dejan
+      // de apuntar a la ficha del cliente y a quien los cargó. Lo que el
+      // turno guarda de la persona y no respalda ningún cobro (la nota, la
+      // obra social, el motivo de la consulta) se vacía.
+      p.appointment.updateMany({
+        ...delNegocio,
+        data: {
+          customerId: null, createdByMemberId: null,
+          customerNote: null, internalNote: null, insuranceName: null, insuranceNumber: null, reason: null,
+        },
+      }),
+      p.appointmentClassEnrollment.updateMany({ ...delNegocio, data: { customerId: null, createdByMemberId: null, customerNote: null } }),
+      p.appointmentPayment.updateMany({ ...delNegocio, data: { registeredByMemberId: null } }),
+      p.appointmentPackagePurchase.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.appointmentMembership.updateMany({ ...delNegocio, data: { customerId: null } }),
+      p.appointmentGiftCard.updateMany({ ...delNegocio, data: { customerId: null } }),
+      // La agenda queda como ancla de los turnos que se conservan (igual que
+      // la sucursal de un pedido), sin el vínculo con la cuenta de la persona
+      // ni sus datos de contacto.
+      p.appointmentResource.updateMany({ ...delNegocio, data: { memberId: null, email: null, phone: null, photoUrl: null, bio: null } }),
+
       // 3. Lo que es rastro de la persona y no respalda ninguna factura.
       //    `messages` y `email_verification_tokens` caerían solos por cascada,
       //    pero se borran explícitamente para no depender de que nadie le
@@ -2241,6 +2264,19 @@ export class SubscriptionsService {
       p.auditLog.deleteMany(delNegocio),
       p.notification.deleteMany(delNegocio),
       p.orbiConversation.deleteMany(delNegocio),
+      // Turnos: la ficha del cliente (nota y obra social), su tarjeta de
+      // sellos, la lista de espera, los turnos fijos, a quién se le mandó cada
+      // campaña y lo que se le pagó a cada persona del equipo. Nada de esto
+      // respalda un cobro a un cliente. Varias caerían por cascada al borrar
+      // al cliente; se borran explícitamente por el mismo motivo que `messages`.
+      p.appointmentCustomerProfile.deleteMany(delNegocio),
+      p.appointmentLoyaltyCard.deleteMany(delNegocio),
+      p.appointmentWaitlistEntry.deleteMany(delNegocio),
+      p.appointmentWinbackSend.deleteMany(delNegocio),
+      p.appointmentRecurringSeries.deleteMany(delNegocio),
+      p.appointmentStaffPayout.deleteMany(delNegocio),
+      // El registro de mensajes guarda el mail o el teléfono de cada destinatario.
+      p.appointmentMessageLog.deleteMany(delNegocio),
       // Lo que Orbi guardó además de la conversación (Orbi fase 1, spec §3.11):
       // las acciones propuestas (guardan los argumentos, con nombres y montos
       // de la tienda) y las métricas de cada turno. La baja solo pone

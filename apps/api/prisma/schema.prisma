@@ -19,6 +19,12 @@ model Business {
   description String?
   subdomain   String       @unique // "zapatoslorena" → zapatoslorena.orbita.site. ÚNICO GLOBAL (excepción a multi-tenant)
   mode        BusinessMode @default(FULL) // full = venta online | showcase = vidriera digital
+  // Qué producto de Órbita es este negocio: Tienda (lo de siempre) o Turnos &
+  // Agenda (módulo `appointments`). Arranca en STORE: todo negocio anterior a
+  // Turnos es una tienda. Con APPOINTMENTS, `industry` guarda la key del rubro
+  // (src/appointments/catalogo/rubros.ts, ej. "barberia") y la configuración
+  // vive en `appointment_settings`.
+  vertical    BusinessVertical @default(STORE)
   isActive    Boolean      @default(true)
   isPaused    Boolean      @default(false) // zona peligrosa: tienda pausada
   createdAt   DateTime     @default(now())
@@ -117,8 +123,37 @@ model Business {
   // Orbi fase 1: acciones pendientes de confirmar y telemetría por turno.
   orbiPendingActions   OrbiPendingAction[]
   orbiTurns            OrbiTurn[]
+  // Turnos & Agenda (módulo appointments).
+  appointmentSettings          AppointmentSettings?
+  appointmentServices          AppointmentService[]
+  appointmentResources         AppointmentResource[]
+  appointmentSpecialDays       AppointmentSpecialDay[]
+  appointments                 Appointment[]
+  appointmentPayments          AppointmentPayment[]
+  appointmentClassTemplates    AppointmentClassTemplate[]
+  appointmentClassSessions     AppointmentClassSession[]
+  appointmentClassEnrollments  AppointmentClassEnrollment[]
+  appointmentCustomerProfiles  AppointmentCustomerProfile[]
+  appointmentStaffPayouts      AppointmentStaffPayout[]
+  appointmentPackages          AppointmentPackage[]
+  appointmentPackagePurchases  AppointmentPackagePurchase[]
+  appointmentMembershipPlans   AppointmentMembershipPlan[]
+  appointmentMemberships       AppointmentMembership[]
+  appointmentGiftCards         AppointmentGiftCard[]
+  appointmentPriceRules        AppointmentPriceRule[]
+  appointmentLoyaltyCards      AppointmentLoyaltyCard[]
+  appointmentRecurringSeries   AppointmentRecurringSeries[]
+  appointmentWinbackCampaigns  AppointmentWinbackCampaign[]
+  appointmentWinbackSends      AppointmentWinbackSend[]
+  appointmentWaitlistEntries   AppointmentWaitlistEntry[]
+  appointmentMessageLogs       AppointmentMessageLog[]
 
   @@map("businesses")
+}
+
+enum BusinessVertical {
+  STORE // Tienda online / vidriera (todo lo anterior a Turnos)
+  APPOINTMENTS // Turnos & Agenda
 }
 
 enum BusinessMode {
@@ -535,6 +570,12 @@ model Member {
   supportRequests    SupportRequest[]
   supportMessages    SupportMessage[]
   manualFeedback     ManualFeedback[]
+  // Turnos: la agenda de esta persona (si atiende o cobra) y lo que registró.
+  appointmentResource           AppointmentResource?
+  appointmentsCreated           Appointment[]                @relation("AppointmentCreatedBy")
+  appointmentPaymentsRegistered AppointmentPayment[]         @relation("AppointmentPaymentRegisteredBy")
+  appointmentPayoutsRegistered  AppointmentStaffPayout[]     @relation("AppointmentPayoutRegisteredBy")
+  appointmentEnrollmentsCreated AppointmentClassEnrollment[] @relation("AppointmentEnrollmentCreatedBy")
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -566,6 +607,14 @@ model Role {
   // rol de propietario recibe todo siempre, sin mirar esto. La campanita del
   // panel es del negocio entero, no depende del rol.
   notificationEvents Json?   @map("notification_events")
+  // Turnos: de qué rol de fábrica del rubro salió este rol ("recepcion",
+  // "profesional", "aprendiz"…, ver src/appointments/catalogo/roles.ts). Sirve
+  // para "volver a como venía". null = lo creó el dueño, o es un rol de Tienda.
+  appointmentsRoleKey String? @map("appointments_role_key")
+  // Turnos: quien tiene este rol atiende turnos (o da clases) y por eso tiene
+  // agenda propia. Solo es el valor por defecto al sumar a alguien: la agenda
+  // real es su fila en appointment_resources.
+  takesAppointments   Boolean @default(false) @map("takes_appointments")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -627,6 +676,18 @@ model Customer {
   emailLogs         EmailLog[]
   personalDiscounts Discount[]
   gameSessions      GameSession[]
+  // Turnos & Agenda.
+  appointments                Appointment[]
+  appointmentEnrollments      AppointmentClassEnrollment[]
+  appointmentProfile          AppointmentCustomerProfile?
+  appointmentPackagePurchases AppointmentPackagePurchase[]
+  appointmentMemberships      AppointmentMembership[]
+  appointmentGiftCards        AppointmentGiftCard[]
+  appointmentLoyaltyCard      AppointmentLoyaltyCard?
+  appointmentRecurringSeries  AppointmentRecurringSeries[]
+  appointmentWinbackSends     AppointmentWinbackSend[]
+  appointmentWaitlistEntries  AppointmentWaitlistEntry[]
+  appointmentMessageLogs      AppointmentMessageLog[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -3037,4 +3098,982 @@ model OrbiProviderFailure {
 
   @@index([createdAt])
   @@map("orbi_provider_failures")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TURNOS & AGENDA — módulo `appointments` (src/appointments)
+// ═══════════════════════════════════════════════════════════════════════════
+// El segundo vertical de Órbita (Business.vertical = APPOINTMENTS). En el
+// backend "turno" ya es el turno de conversación de Orbi (OrbiTurn), así que
+// acá todo se llama Appointment*. Contrato de la API: src/appointments/CONTRATO.md.
+//
+// Convenciones propias del módulo:
+// - Hora: Argentina fija (-03:00), sin zona por negocio. Los instantes
+//   (`startsAt`, `endsAt`) van en UTC; los días sueltos, como texto
+//   "YYYY-MM-DD" del día argentino (VarChar(10)); las horas del día, en
+//   minutos desde las 00:00 de Argentina.
+// - Día de la semana: 0 = lunes … 6 = domingo (igual que la demo; OJO, es
+//   distinto de `Discount.activeDays`, que arranca en domingo).
+// - Horario semanal (Json): 7 días, cada uno una lista de tramos
+//   [desdeMin, hastaMin] (máximo 2: mañana y tarde). [] = cerrado.
+// - Plata: Decimal(12,2) en pesos.
+// - Quien reserva no necesita cuenta: cada fila guarda un snapshot (nombre,
+//   teléfono…) y `customerId` es opcional.
+
+enum AppointmentAgendaMode {
+  PROFESSIONAL // cada turno es con una persona (barbero, médico)
+  RESOURCE // una sala, cabina o box, sin importar quién atiende
+  COURT // alquiler de un espacio por hora (fútbol, pádel)
+  CLASS // clase grupal con cupo máximo
+}
+
+enum AppointmentResourceKind {
+  PERSON
+  SPACE
+}
+
+enum AppointmentModality {
+  ON_SITE // en el local del negocio
+  HOME // a domicilio
+}
+
+enum AppointmentSpecialDayKind {
+  CLOSED // ese día no se atiende
+  SPECIAL // se atiende en otro horario (`ranges`)
+}
+
+// "En curso" NO se persiste: es un turno CONFIRMED cuyo horario contiene al
+// reloj. Lo calcula quien responde (ver appointments.types.ts → estadoVisible).
+enum AppointmentStatus {
+  PENDING // reservado, falta que el negocio lo confirme (o que se pague la seña)
+  CONFIRMED
+  COMPLETED // atendido
+  NO_SHOW // ausente
+  CANCELLED
+}
+
+enum AppointmentOrigin {
+  PANEL
+  STOREFRONT
+}
+
+enum AppointmentCancelledBy {
+  CUSTOMER
+  BUSINESS
+  SYSTEM // venció la seña sin pagar, se suspendió la clase, etc.
+}
+
+enum AppointmentPaymentKind {
+  DEPOSIT // seña
+  FULL // el turno completo, pagado online
+  BALANCE // el resto, cobrado en el local
+  PACKAGE // compra de un paquete de sesiones
+  GIFT_CARD // compra de una gift card
+  MEMBERSHIP // cuota de una membresía
+}
+
+enum AppointmentEnrollmentStatus {
+  ENROLLED
+  WAITLIST
+  CANCELLED
+}
+
+enum AppointmentPayForm {
+  COMMISSION // % de cada turno que atiende
+  SALARY // fijo por mes
+  MIXED // fijo + %
+  RENT // alquila el sillón/consultorio: se queda con lo que factura y paga un fijo
+  PER_CLASS // monto por clase dada
+}
+
+enum AppointmentPayEvery {
+  WEEK
+  FORTNIGHT
+  MONTH
+}
+
+enum AppointmentPayoutDirection {
+  BUSINESS_TO_PERSON // comisión, sueldo, clases
+  PERSON_TO_BUSINESS // alquiler
+}
+
+enum AppointmentMembershipStatus {
+  ACTIVE
+  PAUSED
+  PAST_DUE // no se pudo cobrar la cuota
+  CANCELLED
+}
+
+enum AppointmentGiftCardKind {
+  AMOUNT // saldo en pesos que se va descontando
+  SERVICE // vale por un servicio puntual
+}
+
+enum AppointmentRecurrence {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum AppointmentWaitlistStatus {
+  WAITING
+  OFFERED // se le ofreció un lugar y corre el plazo para aceptarlo
+  ACCEPTED
+  EXPIRED // no contestó a tiempo
+  CANCELLED
+}
+
+enum AppointmentMessageChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum AppointmentMessageStatus {
+  SENT
+  FAILED
+  SIMULATED // salió por un proveedor STUB: se armó y se registró, no se envió
+}
+
+// Configuración del negocio de turnos, 1:1 con Business. Todo lo que el dueño
+// toca en Configuración (salvo lo que ya existe en otras tablas y se reutiliza:
+// nombre y descripción → businesses; logo → storefront_config.logo_url;
+// dirección y mapa → la sucursal principal de branches; WhatsApp, email,
+// Instagram, alias/CBU/titular → business_config; Mercado Pago → mp_credentials).
+model AppointmentSettings {
+  id         String @id @default(uuid())
+  businessId String @unique @map("business_id")
+
+  // Rubro (key de src/appointments/catalogo/rubros.ts) y cómo se ocupa la agenda.
+  rubroKey   String                @map("rubro_key")
+  agendaMode AppointmentAgendaMode @map("agenda_mode")
+
+  // ── Sitio público ──
+  // "web" (sitio completo con plantilla) | "simple" (una página con el botón de reservar).
+  siteForm     String @default("web") @map("site_form")
+  // Diseño de la página simple: tarjeta | portada | partida | editorial | enlaces.
+  simpleDesign String @default("tarjeta") @map("simple_design")
+  // { plantilla, color, tipo, radio, foto, estiloBoton, hero, monograma,
+  //   secciones: [{ id, on }], nombre, frase, boton } — ver AparienciaTurnos
+  // en appointments.types.ts. null = la plantilla de fábrica del rubro.
+  appearance   Json?
+
+  // ── Horarios ──
+  // Semana de atención: 7 días (0 = lunes), cada uno Tramo[] ([] = cerrado).
+  weekSchedule    Json    @map("week_schedule")
+  vacationEnabled Boolean @default(false) @map("vacation_enabled")
+  vacationFrom    String? @map("vacation_from") @db.VarChar(10) // YYYY-MM-DD, inclusive
+  vacationTo      String? @map("vacation_to") @db.VarChar(10) // YYYY-MM-DD, inclusive
+  vacationMessage String? @map("vacation_message") @db.VarChar(400)
+
+  // ── Dónde atiende ──
+  modalities   AppointmentModality[] @default([ON_SITE])
+  city         String?               @db.VarChar(120)
+  neighborhood String?               @db.VarChar(120)
+  floor        String?               @db.VarChar(60) // piso / depto / local
+  directions   String?               @db.VarChar(400) // "Timbre 2B. A media cuadra del subte."
+  homeZones    String?               @map("home_zones") @db.VarChar(400) // zonas de atención a domicilio, texto libre
+  // Teléfono de línea/consultas. El WhatsApp vive en business_config.whatsapp.
+  phone        String?               @db.VarChar(40)
+
+  // ── Reglas de reserva (Configuración → Reglas de reserva) ──
+  minAdvanceMin        Int     @default(120) @map("min_advance_min") // anticipación mínima, en minutos (0 = sin mínimo)
+  maxAdvanceDays       Int     @default(30) @map("max_advance_days") // hasta cuántos días adelante se ve la agenda
+  slotMin              Int     @default(30) @map("slot_min") // grilla: cada cuánto arranca un turno
+  bufferMin            Int     @default(0) @map("buffer_min") // margen libre entre un turno y el siguiente
+  confirmation         String  @default("auto") // "auto" | "manual"
+  letChooseResource    Boolean @default(true) @map("let_choose_resource")
+  offerAnyResource     Boolean @default(true) @map("offer_any_resource") // opción "Cualquiera"
+  maxActivePerCustomer Int     @default(2) @map("max_active_per_customer") // 0 = sin límite
+  waitlistEnabled      Boolean @default(false) @map("waitlist_enabled")
+  waitlistAcceptMin    Int     @default(30) @map("waitlist_accept_min") // minutos para aceptar el lugar ofrecido
+  // Clases con cupo: valores por defecto de cada clase nueva.
+  classDefaultCapacity Int     @default(15) @map("class_default_capacity")
+  classOpenDays        Int     @default(7) @map("class_open_days") // la reserva se abre N días antes
+  classMinEnrolled     Int     @default(0) @map("class_min_enrolled") // se suspende con menos anotados 2 h antes (0 = nunca)
+  // Datos que se piden al reservar (rubros de salud).
+  askInsurance         Boolean @default(false) @map("ask_insurance")
+  askDni               Boolean @default(false) @map("ask_dni")
+  askReason            Boolean @default(false) @map("ask_reason")
+  // Reprogramar desde el link del cliente.
+  rescheduleEnabled    Boolean @default(true) @map("reschedule_enabled")
+  rescheduleUntilHours Int     @default(12) @map("reschedule_until_hours")
+  rescheduleMax        Int     @default(2) @map("reschedule_max")
+  // Seña.
+  depositEnabled       Boolean @default(false) @map("deposit_enabled")
+  depositType          String  @default("percent") @map("deposit_type") // "percent" | "fixed"
+  depositPercent       Int     @default(30) @map("deposit_percent") // 10..100
+  depositFixed         Decimal @default(0) @map("deposit_fixed") @db.Decimal(12, 2)
+  depositForNoShows    Boolean @default(true) @map("deposit_for_no_shows") // quien faltó sin avisar paga seña en el próximo
+
+  // ── Política (lo que lee el cliente en los Términos) ──
+  cancelUntilHours   Int    @default(24) @map("cancel_until_hours") // 0 = hasta último momento
+  depositOutOfWindow String @default("forfeit") @map("deposit_out_of_window") // "forfeit" (no se devuelve) | "credit" (queda a favor)
+  toleranceMin       Int    @default(10) @map("tolerance_min")
+
+  // ── Cobro ──
+  onlineCharge     String          @default("deposit") @map("online_charge") // "deposit" | "total" | "customer_choice"
+  onSiteMethods    PaymentMethod[] @default([CASH, TRANSFER, DEBIT_CARD, CREDIT_CARD, QR]) @map("on_site_methods")
+  showTransferData Boolean         @default(true) @map("show_transfer_data") // manda alias/CBU en la confirmación
+
+  // ── Cuenta opcional del cliente y beneficios ──
+  accountEnabled         Boolean @default(true) @map("account_enabled")
+  welcomeDiscountPercent Int     @default(0) @map("welcome_discount_percent") // 0 = no ofrecer
+  loyaltyStamps          Int     @default(0) @map("loyalty_stamps") // turnos para completar la tarjeta; 0 = sin tarjeta
+  promosEnabled          Boolean @default(false) @map("promos_enabled")
+
+  // ── Mensajes automáticos ──
+  // { wa, email, numero, firma, mensajes: [{ id, on, canales, cuando, texto }] }
+  // — ver MensajesTurnos en appointments.types.ts. null = los textos de fábrica.
+  messages Json?
+  // ── Conexión de WhatsApp del negocio ──
+  // Todavía no hay proveedor real (probablemente WhatsApp Cloud API de Meta):
+  // mientras tanto los mensajes por WhatsApp salen por el proveedor STUB y se
+  // registran como SIMULATED. `whatsappProviderData` queda para los ids del
+  // proveedor (phone_number_id, waba_id…). Si algún día guarda TOKENS, tienen
+  // que ir cifrados como mp_credentials (pgp_sym_encrypt), no en claro acá.
+  whatsappConnected    Boolean @default(false) @map("whatsapp_connected")
+  whatsappNumber       String? @map("whatsapp_number") @db.VarChar(40)
+  whatsappProviderData Json?   @map("whatsapp_provider_data")
+  // ── Avanzado ──
+  // { [funcionId]: { on: boolean, config?: object } } — ver AvanzadoTurnos en
+  // appointments.types.ts. Lo que no está vale lo de fábrica (apagado).
+  advanced Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_settings")
+}
+
+// Lo que se reserva. En modo CLASS es la "actividad" (Spinning, WOD).
+model AppointmentService {
+  id             String    @id @default(uuid())
+  businessId     String    @map("business_id")
+  name           String    @db.VarChar(120)
+  description    String?   @db.VarChar(500)
+  durationMin    Int       @map("duration_min")
+  price          Decimal   @default(0) @db.Decimal(12, 2) // 0 = "Incluido"
+  bookableOnline Boolean   @default(true) @map("bookable_online") // se ofrece en el sitio público
+  isActive       Boolean   @default(true) @map("is_active")
+  sortOrder      Int       @default(0) @map("sort_order")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at") // soft-delete: los turnos viejos lo siguen referenciando
+
+  business        Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  classTemplates  AppointmentClassTemplate[]
+  packages        AppointmentPackage[]
+  giftCards       AppointmentGiftCard[]
+  recurringSeries AppointmentRecurringSeries[]
+  waitlistEntries AppointmentWaitlistEntry[]
+
+  @@index([businessId, deletedAt])
+  @@map("appointment_services")
+}
+
+// Una "agenda": la persona que atiende o el espacio que se ocupa (cabina,
+// consultorio, cancha, sala). También es la ficha de pago de cada persona del
+// equipo, atienda o no: una recepcionista es un PERSON con isBookable = false.
+model AppointmentResource {
+  id         String                  @id @default(uuid())
+  businessId String                  @map("business_id")
+  kind       AppointmentResourceKind
+  name       String                  @db.VarChar(120)
+  roleLabel  String?                 @map("role_label") @db.VarChar(80) // "Barbero", "Cancha", "Consultorio"
+  color      String?                 @db.VarChar(9) // #RRGGBB de su columna en la agenda
+  photoUrl   String?                 @map("photo_url")
+  bio        String?                 @db.VarChar(400) // especialidad, para la sección Equipo del sitio
+  // Persona del equipo con login en el panel. null = espacio, o persona sin cuenta.
+  memberId   String?                 @unique @map("member_id")
+  // Contacto de una persona sin login (con login manda el del member).
+  email      String?                 @db.VarChar(254)
+  phone      String?                 @db.VarChar(40)
+
+  // Tiene agenda propia: se le pueden dar turnos. false = solo figura en el
+  // equipo (recepción, administración) para liquidarle el sueldo.
+  isBookable      Boolean @default(true) @map("is_bookable")
+  // En modo RESOURCE una persona trabaja en un espacio: sus turnos son los de ese espacio.
+  assignedSpaceId String? @map("assigned_space_id")
+  // Días que atiende (0 = lunes). Fuera de estos días no tiene turnos aunque el negocio abra.
+  workDays        Int[]   @default([0, 1, 2, 3, 4, 5, 6]) @map("work_days")
+  // Horario propio: misma forma que weekSchedule. null = sigue al del negocio.
+  // Siempre se cruza con el del negocio: nadie atiende cuando el local está cerrado.
+  ownSchedule     Json?   @map("own_schedule")
+
+  // Cómo cobra la persona. payForm null = es el dueño (o un espacio): no se liquida.
+  payForm           AppointmentPayForm?  @map("pay_form")
+  commissionPercent Decimal?             @map("commission_percent") @db.Decimal(5, 2)
+  salary            Decimal?             @db.Decimal(12, 2) // fijo por mes
+  rent              Decimal?             @db.Decimal(12, 2) // lo que le paga al negocio por mes
+  perClass          Decimal?             @map("per_class") @db.Decimal(12, 2)
+  payEvery          AppointmentPayEvery? @map("pay_every")
+
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  business        Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  member          Member?                      @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  assignedSpace   AppointmentResource?         @relation("AppointmentResourceSpace", fields: [assignedSpaceId], references: [id], onDelete: SetNull)
+  occupants       AppointmentResource[]        @relation("AppointmentResourceSpace")
+  appointments    Appointment[]
+  classesTaught   AppointmentClassTemplate[]   @relation("AppointmentClassInstructor")
+  classesHosted   AppointmentClassTemplate[]   @relation("AppointmentClassRoom")
+  payouts         AppointmentStaffPayout[]
+  recurringSeries AppointmentRecurringSeries[]
+  waitlistEntries AppointmentWaitlistEntry[]
+
+  @@index([businessId, deletedAt])
+  @@map("appointment_resources")
+}
+
+// Feriados y días con horario distinto (Configuración → Horarios).
+model AppointmentSpecialDay {
+  id         String                    @id @default(uuid())
+  businessId String                    @map("business_id")
+  date       String                    @db.VarChar(10) // YYYY-MM-DD (día argentino)
+  kind       AppointmentSpecialDayKind
+  ranges     Json                      @default("[]") // Tramo[]; solo con kind = SPECIAL
+  reason     String?                   @db.VarChar(120)
+  createdAt  DateTime                  @default(now()) @map("created_at")
+  updatedAt  DateTime                  @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, date])
+  @@map("appointment_special_days")
+}
+
+// Un turno. Además de los índices de abajo, la migración le pone a mano una
+// constraint de exclusión (appointments_no_overlap): dos turnos no cancelados
+// del mismo recurso no pueden pisarse en [starts_at, ends_at). Prisma no la
+// modela; está en 20261003120000_appointments/migration.sql. La regla completa
+// (margen entre turnos, horario, anticipación) la aplica el service en una
+// transacción; la constraint es la red de abajo para dos reservas simultáneas.
+model Appointment {
+  id         String @id @default(uuid())
+  businessId String @map("business_id")
+  // Código corto ("4F7K2Q"): referencia VISIBLE para que el cliente se la diga
+  // al negocio. Único por negocio. NO autentica: es corto y adivinable.
+  code        String @db.VarChar(12)
+  // Enlace personal del turno (<sitio>/mi-turno/<accessToken>): secreto
+  // aleatorio de 32 bytes o más, url-safe, generado en el servidor al crear la
+  // reserva. Es lo único que deja ver, cancelar o reprogramar el turno sin
+  // cuenta. Único global. No se loguea ni se devuelve en listados del panel.
+  accessToken String @unique @map("access_token") @db.VarChar(64)
+
+  resourceId String  @map("resource_id")
+  serviceId  String  @map("service_id")
+  customerId String? @map("customer_id")
+
+  // Snapshot de quien reserva y de lo reservado: el turno se sigue leyendo
+  // igual aunque cambien la ficha del cliente o el servicio.
+  customerName    String  @map("customer_name") @db.VarChar(120)
+  customerPhone   String  @map("customer_phone") @db.VarChar(40) // solo dígitos (ver normalizarTelefono)
+  customerEmail   String? @map("customer_email") @db.VarChar(254)
+  customerNote    String? @map("customer_note") @db.VarChar(500) // lo que escribió al reservar
+  customerAddress String? @map("customer_address") @db.VarChar(300) // modalidad HOME
+  customerDni     String? @map("customer_dni") @db.VarChar(20)
+  insuranceName   String? @map("insurance_name") @db.VarChar(120) // obra social o prepaga
+  insuranceNumber String? @map("insurance_number") @db.VarChar(60)
+  reason          String? @db.VarChar(500) // motivo de la consulta
+  serviceName     String  @map("service_name") @db.VarChar(120)
+  // Nota interna del negocio (no la ve el cliente).
+  internalNote    String? @map("internal_note") @db.VarChar(500)
+
+  startsAt    DateTime @map("starts_at") // UTC
+  endsAt      DateTime @map("ends_at") // UTC; startsAt + durationMin
+  durationMin Int      @map("duration_min")
+
+  price          Decimal @db.Decimal(12, 2) // precio de lista al reservar (ya con el ajuste por horario)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(12, 2)
+
+  status   AppointmentStatus   @default(PENDING)
+  origin   AppointmentOrigin
+  modality AppointmentModality @default(ON_SITE)
+
+  // Seña: cuánto se pidió y cómo/cuándo se cobró. El detalle de cada pago va
+  // en appointment_payments; estos campos son el resumen que lee la agenda.
+  depositAmount Decimal        @default(0) @map("deposit_amount") @db.Decimal(12, 2)
+  depositPaidAt DateTime?      @map("deposit_paid_at")
+  depositMethod PaymentMethod? @map("deposit_method")
+
+  rescheduleCount Int                     @default(0) @map("reschedule_count")
+  confirmedAt     DateTime?               @map("confirmed_at")
+  completedAt     DateTime?               @map("completed_at")
+  cancelledAt     DateTime?               @map("cancelled_at")
+  cancelledBy     AppointmentCancelledBy? @map("cancelled_by")
+  cancelReason    String?                 @map("cancel_reason") @db.VarChar(300)
+
+  wantsReminder        Boolean   @default(true) @map("wants_reminder")
+  reminderSentAt       DateTime? @map("reminder_sent_at") // el recordatorio del día anterior
+  secondReminderSentAt DateTime? @map("second_reminder_sent_at") // "último aviso" del mismo día
+
+  // Con qué se pagó, si no fue plata: un pack, una gift card o la membresía.
+  recurringSeriesId String? @map("recurring_series_id")
+  packagePurchaseId String? @map("package_purchase_id")
+  giftCardId        String? @map("gift_card_id")
+  membershipId      String? @map("membership_id")
+  createdByMemberId String? @map("created_by_member_id") // origin = PANEL
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business        Business                    @relation(fields: [businessId], references: [id])
+  resource        AppointmentResource         @relation(fields: [resourceId], references: [id])
+  service         AppointmentService          @relation(fields: [serviceId], references: [id])
+  customer        Customer?                   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  recurringSeries AppointmentRecurringSeries? @relation(fields: [recurringSeriesId], references: [id], onDelete: SetNull)
+  packagePurchase AppointmentPackagePurchase? @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
+  giftCard        AppointmentGiftCard?        @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
+  membership      AppointmentMembership?      @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  createdByMember Member?                     @relation("AppointmentCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  payments        AppointmentPayment[]
+  waitlistOffers  AppointmentWaitlistEntry[]
+  messageLogs     AppointmentMessageLog[]
+
+  @@unique([businessId, code])
+  @@index([businessId, resourceId, startsAt])
+  @@index([businessId, startsAt])
+  @@index([businessId, customerId])
+  @@index([businessId, customerPhone])
+  @@index([businessId, status, startsAt])
+  @@map("appointments")
+}
+
+// Seña o pago de un turno (o de una clase, un pack, una gift card, una cuota).
+// NO se reutiliza `payments`: esa tabla exige orderId y está atada a pedidos.
+model AppointmentPayment {
+  id         String                 @id @default(uuid())
+  businessId String                 @map("business_id")
+  kind       AppointmentPaymentKind @default(DEPOSIT)
+
+  // A qué corresponde (uno solo, según `kind`).
+  appointmentId     String? @map("appointment_id")
+  enrollmentId      String? @map("enrollment_id")
+  packagePurchaseId String? @map("package_purchase_id")
+  giftCardId        String? @map("gift_card_id")
+  membershipId      String? @map("membership_id")
+
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  amount    Decimal       @db.Decimal(12, 2)
+  currency  String        @default("ARS")
+  reference String?       @db.VarChar(120) // nro de transferencia, etc.
+
+  // Mercado Pago del NEGOCIO (mp_credentials). null en efectivo/transferencia.
+  mpPreferenceId String?  @map("mp_preference_id")
+  mpPaymentId    String?  @map("mp_payment_id")
+  mpStatus       String?  @map("mp_status")
+  mpStatusDetail String?  @map("mp_status_detail")
+  mpFeeAmount    Decimal? @map("mp_fee_amount") @db.Decimal(12, 2)
+
+  paidAt               DateTime? @map("paid_at")
+  refundedAt           DateTime? @map("refunded_at")
+  // Quién lo registró a mano en el panel (seña cobrada en el local).
+  registeredByMemberId String?   @map("registered_by_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business           Business                    @relation(fields: [businessId], references: [id])
+  appointment        Appointment?                @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  enrollment         AppointmentClassEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  packagePurchase    AppointmentPackagePurchase? @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
+  giftCard           AppointmentGiftCard?        @relation(fields: [giftCardId], references: [id], onDelete: SetNull)
+  membership         AppointmentMembership?      @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  registeredByMember Member?                     @relation("AppointmentPaymentRegisteredBy", fields: [registeredByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+  @@index([appointmentId])
+  @@index([enrollmentId])
+  @@index([mpPaymentId])
+  @@index([mpPreferenceId])
+  @@map("appointment_payments")
+}
+
+// ─── Clases con cupo (agendaMode = CLASS) ───────────────────────────────────
+
+// La grilla semanal: "Spinning, lunes 18:00, 45 min, sala 2, 15 lugares".
+model AppointmentClassTemplate {
+  id                   String    @id @default(uuid())
+  businessId           String    @map("business_id")
+  serviceId            String    @map("service_id") // la actividad
+  weekday              Int // 0 = lunes … 6 = domingo
+  startMin             Int       @map("start_min") // minutos desde las 00:00 (Argentina)
+  durationMin          Int       @map("duration_min")
+  instructorResourceId String?   @map("instructor_resource_id") // PERSON
+  roomResourceId       String?   @map("room_resource_id") // SPACE
+  capacity             Int
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  business   Business                  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  service    AppointmentService        @relation(fields: [serviceId], references: [id])
+  instructor AppointmentResource?      @relation("AppointmentClassInstructor", fields: [instructorResourceId], references: [id], onDelete: SetNull)
+  room       AppointmentResource?      @relation("AppointmentClassRoom", fields: [roomResourceId], references: [id], onDelete: SetNull)
+  sessions   AppointmentClassSession[]
+
+  @@index([businessId, weekday])
+  @@map("appointment_class_templates")
+}
+
+// Una clase con fecha. No existe una fila por cada clase de la grilla: se
+// materializa recién cuando alguien se anota o cuando el negocio la suspende
+// o le cambia el cupo. Sin fila = clase normal con el cupo de la plantilla.
+model AppointmentClassSession {
+  id           String    @id @default(uuid())
+  businessId   String    @map("business_id")
+  templateId   String    @map("template_id")
+  date         String    @db.VarChar(10) // YYYY-MM-DD (día argentino)
+  startsAt     DateTime  @map("starts_at") // UTC, copiado de la plantilla al materializar
+  endsAt       DateTime  @map("ends_at")
+  capacity     Int? // null = el de la plantilla
+  isCancelled  Boolean   @default(false) @map("is_cancelled")
+  cancelReason String?   @map("cancel_reason") @db.VarChar(300)
+  cancelledAt  DateTime? @map("cancelled_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  business    Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  template    AppointmentClassTemplate     @relation(fields: [templateId], references: [id])
+  enrollments AppointmentClassEnrollment[]
+
+  @@unique([templateId, date])
+  @@index([businessId, startsAt])
+  @@map("appointment_class_sessions")
+}
+
+model AppointmentClassEnrollment {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  sessionId  String  @map("session_id")
+  // Mismo criterio que Appointment.code: único por negocio, y no se repite con
+  // el código de ningún turno (quien lo genera mira las dos tablas). Es solo
+  // una referencia visible; lo que autentica es accessToken.
+  code        String  @db.VarChar(12)
+  // Enlace personal de la inscripción: mismo criterio que Appointment.accessToken.
+  accessToken String  @unique @map("access_token") @db.VarChar(64)
+  customerId String? @map("customer_id")
+
+  customerName  String  @map("customer_name") @db.VarChar(120)
+  customerPhone String  @map("customer_phone") @db.VarChar(40)
+  customerEmail String? @map("customer_email") @db.VarChar(254)
+  customerNote  String? @map("customer_note") @db.VarChar(500)
+
+  status           AppointmentEnrollmentStatus @default(ENROLLED)
+  // Lugar en la lista de espera (1 = el próximo). null si no está en espera.
+  waitlistPosition Int?                        @map("waitlist_position")
+  // Se le ofreció un lugar: tiene hasta acá para aceptarlo.
+  offerExpiresAt   DateTime?                   @map("offer_expires_at")
+  origin           AppointmentOrigin
+  attended         Boolean? // null = todavía no se tomó asistencia
+
+  price          Decimal        @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal        @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  depositAmount  Decimal        @default(0) @map("deposit_amount") @db.Decimal(12, 2)
+  depositPaidAt  DateTime?      @map("deposit_paid_at")
+  depositMethod  PaymentMethod? @map("deposit_method")
+
+  wantsReminder  Boolean                 @default(true) @map("wants_reminder")
+  reminderSentAt DateTime?               @map("reminder_sent_at")
+  cancelledAt    DateTime?               @map("cancelled_at")
+  cancelledBy    AppointmentCancelledBy? @map("cancelled_by")
+
+  packagePurchaseId String? @map("package_purchase_id")
+  membershipId      String? @map("membership_id")
+  createdByMemberId String? @map("created_by_member_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business        Business                    @relation(fields: [businessId], references: [id])
+  session         AppointmentClassSession     @relation(fields: [sessionId], references: [id])
+  customer        Customer?                   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  packagePurchase AppointmentPackagePurchase? @relation(fields: [packagePurchaseId], references: [id], onDelete: SetNull)
+  membership      AppointmentMembership?      @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  createdByMember Member?                     @relation("AppointmentEnrollmentCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  payments        AppointmentPayment[]
+  messageLogs     AppointmentMessageLog[]
+
+  @@unique([businessId, code])
+  @@index([sessionId, status])
+  @@index([businessId, customerId])
+  @@index([businessId, customerPhone])
+  @@map("appointment_class_enrollments")
+}
+
+// ─── Clientes y equipo ──────────────────────────────────────────────────────
+
+// Lo propio de Turnos en la ficha del cliente, 1:1 con Customer, para no
+// tocar columnas de `customers` (que es de Tienda).
+model AppointmentCustomerProfile {
+  id              String    @id @default(uuid())
+  businessId      String    @map("business_id")
+  customerId      String    @unique @map("customer_id")
+  note            String?   @db.VarChar(1000) // "Prefiere turnos a la mañana"
+  insuranceName   String?   @map("insurance_name") @db.VarChar(120)
+  insuranceNumber String?   @map("insurance_number") @db.VarChar(60)
+  // Ausencias sin avisar: con depositForNoShows, la próxima reserva paga seña.
+  noShowCount     Int       @default(0) @map("no_show_count")
+  // Señas que quedaron "a favor" (depositOutOfWindow = credit) y todavía no se usaron.
+  depositCredit   Decimal   @default(0) @map("deposit_credit") @db.Decimal(12, 2)
+  acceptsPromos   Boolean   @default(false) @map("accepts_promos")
+  // Ya usó el descuento de bienvenida de la cuenta.
+  welcomeUsedAt   DateTime? @map("welcome_used_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("appointment_customer_profiles")
+}
+
+// Un pago registrado entre el negocio y una persona del equipo: cierra un
+// período de la liquidación ("pagado hasta el domingo 20").
+model AppointmentStaffPayout {
+  id                   String                     @id @default(uuid())
+  businessId           String                     @map("business_id")
+  resourceId           String                     @map("resource_id")
+  periodFrom           String                     @map("period_from") @db.VarChar(10) // YYYY-MM-DD, inclusive
+  periodTo             String                     @map("period_to") @db.VarChar(10) // YYYY-MM-DD, inclusive
+  amount               Decimal                    @db.Decimal(12, 2)
+  direction            AppointmentPayoutDirection
+  // Snapshot de la liquidación que se pagó (LiquidacionTurnos): la cuenta no
+  // cambia aunque después se edite la forma de pago o un turno viejo.
+  breakdown            Json?
+  note                 String?                    @db.VarChar(300)
+  paidAt               DateTime                   @default(now()) @map("paid_at")
+  registeredByMemberId String?                    @map("registered_by_member_id")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+
+  business           Business            @relation(fields: [businessId], references: [id])
+  resource           AppointmentResource @relation(fields: [resourceId], references: [id])
+  registeredByMember Member?             @relation("AppointmentPayoutRegisteredBy", fields: [registeredByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, resourceId, periodTo])
+  @@map("appointment_staff_payouts")
+}
+
+// ─── Avanzado (add-on ADVANCED) ─────────────────────────────────────────────
+
+// Paquetes y bonos: N sesiones de un servicio pagadas por adelantado.
+model AppointmentPackage {
+  id         String    @id @default(uuid())
+  businessId String    @map("business_id")
+  serviceId  String    @map("service_id")
+  sessions   Int
+  price      Decimal   @db.Decimal(12, 2)
+  validDays  Int       @default(0) @map("valid_days") // 0 = no vence
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  business  Business                     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  service   AppointmentService           @relation(fields: [serviceId], references: [id])
+  purchases AppointmentPackagePurchase[]
+
+  @@index([businessId, deletedAt])
+  @@map("appointment_packages")
+}
+
+model AppointmentPackagePurchase {
+  id            String    @id @default(uuid())
+  businessId    String    @map("business_id")
+  packageId     String    @map("package_id")
+  customerId    String?   @map("customer_id")
+  customerName  String    @map("customer_name") @db.VarChar(120)
+  customerPhone String    @map("customer_phone") @db.VarChar(40)
+  sessionsTotal Int       @map("sessions_total")
+  sessionsUsed  Int       @default(0) @map("sessions_used")
+  pricePaid     Decimal   @map("price_paid") @db.Decimal(12, 2)
+  paidAt        DateTime? @map("paid_at") // null = todavía no se cobró: no se puede usar
+  expiresAt     DateTime? @map("expires_at") // null = no vence
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  business     Business                     @relation(fields: [businessId], references: [id])
+  package      AppointmentPackage           @relation(fields: [packageId], references: [id])
+  customer     Customer?                    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+  enrollments  AppointmentClassEnrollment[]
+  payments     AppointmentPayment[]
+
+  @@index([businessId, customerId])
+  @@index([businessId, customerPhone])
+  @@map("appointment_package_purchases")
+}
+
+// Membresías y abonos: plan mensual con N clases por semana (0 = pase libre).
+model AppointmentMembershipPlan {
+  id         String    @id @default(uuid())
+  businessId String    @map("business_id")
+  name       String    @db.VarChar(80)
+  perWeek    Int       @default(0) @map("per_week") // 0 = libre
+  price      Decimal   @db.Decimal(12, 2) // por mes
+  isFeatured Boolean   @default(false) @map("is_featured")
+  isActive   Boolean   @default(true) @map("is_active")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  business    Business                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  memberships AppointmentMembership[]
+
+  @@index([businessId, deletedAt])
+  @@map("appointment_membership_plans")
+}
+
+model AppointmentMembership {
+  id            String                      @id @default(uuid())
+  businessId    String                      @map("business_id")
+  planId        String                      @map("plan_id")
+  customerId    String?                     @map("customer_id")
+  customerName  String                      @map("customer_name") @db.VarChar(120)
+  customerPhone String                      @map("customer_phone") @db.VarChar(40)
+  status        AppointmentMembershipStatus @default(ACTIVE)
+  startedAt     DateTime                    @default(now()) @map("started_at")
+  pausedFrom    DateTime?                   @map("paused_from")
+  pausedUntil   DateTime?                   @map("paused_until")
+  nextChargeAt  DateTime?                   @map("next_charge_at")
+  lastPaidAt    DateTime?                   @map("last_paid_at")
+  cancelledAt   DateTime?                   @map("cancelled_at")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  updatedAt     DateTime                    @updatedAt @map("updated_at")
+
+  business     Business                     @relation(fields: [businessId], references: [id])
+  plan         AppointmentMembershipPlan    @relation(fields: [planId], references: [id])
+  customer     Customer?                    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+  enrollments  AppointmentClassEnrollment[]
+  payments     AppointmentPayment[]
+
+  @@index([businessId, status])
+  @@index([businessId, customerId])
+  @@map("appointment_memberships")
+}
+
+// Gift cards: por monto (saldo que se descuenta) o por un servicio puntual.
+model AppointmentGiftCard {
+  id            String                  @id @default(uuid())
+  businessId    String                  @map("business_id")
+  code          String                  @db.VarChar(16) // lo que se canjea; único por negocio
+  kind          AppointmentGiftCardKind
+  amount        Decimal?                @db.Decimal(12, 2) // AMOUNT: valor de emisión
+  balance       Decimal?                @db.Decimal(12, 2) // AMOUNT: lo que queda
+  serviceId     String?                 @map("service_id") // SERVICE
+  redeemedAt    DateTime?               @map("redeemed_at") // SERVICE: cuándo se usó
+  style         String                  @default("noche") @db.VarChar(20) // noche | papel | aurora | marca
+  recipientName String?                 @map("recipient_name") @db.VarChar(80) // "Para"
+  senderName    String?                 @map("sender_name") @db.VarChar(80) // "De"
+  message       String?                 @db.VarChar(300)
+  // Quién la compró (puede no tener cuenta).
+  customerId    String?                 @map("customer_id")
+  buyerName     String?                 @map("buyer_name") @db.VarChar(120)
+  buyerPhone    String?                 @map("buyer_phone") @db.VarChar(40)
+  buyerEmail    String?                 @map("buyer_email") @db.VarChar(254)
+  pricePaid     Decimal                 @default(0) @map("price_paid") @db.Decimal(12, 2)
+  paidAt        DateTime?               @map("paid_at") // null = todavía no se cobró: no se puede canjear
+  expiresAt     DateTime?               @map("expires_at")
+  voidedAt      DateTime?               @map("voided_at") // anulada por el negocio
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  business     Business             @relation(fields: [businessId], references: [id])
+  service      AppointmentService?  @relation(fields: [serviceId], references: [id])
+  customer     Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+  payments     AppointmentPayment[]
+
+  @@unique([businessId, code])
+  @@map("appointment_gift_cards")
+}
+
+// Precios por horario: descuento en las franjas flojas o recargo en las pico.
+model AppointmentPriceRule {
+  id            String   @id @default(uuid())
+  businessId    String   @map("business_id")
+  weekdays      Int[] // 0 = lunes … 6 = domingo
+  fromMin       Int      @map("from_min") // minutos desde las 00:00, inclusive
+  toMin         Int      @map("to_min") // exclusivo
+  adjustPercent Int      @map("adjust_percent") // negativo = descuento, positivo = recargo
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("appointment_price_rules")
+}
+
+// Tarjeta de sellos de un cliente. Cuántos sellos hacen falta y cuál es el
+// premio está en la configuración (settings.loyaltyStamps / advanced.fidelidad).
+model AppointmentLoyaltyCard {
+  id              String    @id @default(uuid())
+  businessId      String    @map("business_id")
+  customerId      String    @unique @map("customer_id")
+  stamps          Int       @default(0) // sellos de la tarjeta en curso
+  rewardsEarned   Int       @default(0) @map("rewards_earned") // tarjetas completadas
+  rewardsRedeemed Int       @default(0) @map("rewards_redeemed")
+  lastStampAt     DateTime? @map("last_stamp_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("appointment_loyalty_cards")
+}
+
+// Turno fijo: el mismo horario cada semana, cada quince días o cada mes. Los
+// turnos de la serie son filas normales de `appointments` con recurringSeriesId.
+model AppointmentRecurringSeries {
+  id             String                @id @default(uuid())
+  businessId     String                @map("business_id")
+  customerId     String?               @map("customer_id")
+  customerName   String                @map("customer_name") @db.VarChar(120)
+  customerPhone  String                @map("customer_phone") @db.VarChar(40)
+  resourceId     String                @map("resource_id")
+  serviceId      String                @map("service_id")
+  frequency      AppointmentRecurrence
+  weekday        Int // 0 = lunes
+  startMin       Int                   @map("start_min") // hora del turno, en minutos (Argentina)
+  startDate      String                @map("start_date") @db.VarChar(10) // primer turno de la serie
+  maxOccurrences Int                   @map("max_occurrences")
+  isActive       Boolean               @default(true) @map("is_active")
+  endedAt        DateTime?             @map("ended_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  business     Business            @relation(fields: [businessId], references: [id])
+  customer     Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  resource     AppointmentResource @relation(fields: [resourceId], references: [id])
+  service      AppointmentService  @relation(fields: [serviceId], references: [id])
+  appointments Appointment[]
+
+  @@index([businessId, isActive])
+  @@map("appointment_recurring_series")
+}
+
+// Recuperar clientes: campaña "te extrañamos" para quien no vuelve hace N días.
+model AppointmentWinbackCampaign {
+  id              String    @id @default(uuid())
+  businessId      String    @map("business_id")
+  inactiveDays    Int       @map("inactive_days")
+  message         String    @db.VarChar(600) // con {nombre}, {negocio}, {servicio}
+  couponEnabled   Boolean   @default(false) @map("coupon_enabled")
+  couponPercent   Int       @default(0) @map("coupon_percent")
+  couponValidDays Int       @default(15) @map("coupon_valid_days")
+  // "auto" (se manda sola cada día a quien cumple los N días) | "manual" (cuando el dueño toca Enviar).
+  mode            String    @default("auto")
+  isActive        Boolean   @default(false) @map("is_active")
+  sentCount       Int       @default(0) @map("sent_count")
+  lastRunAt       DateTime? @map("last_run_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  business Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  sends    AppointmentWinbackSend[]
+
+  @@index([businessId])
+  @@map("appointment_winback_campaigns")
+}
+
+// A quién ya se le mandó cada campaña (para no escribirle dos veces) y con qué cupón.
+model AppointmentWinbackSend {
+  id              String    @id @default(uuid())
+  businessId      String    @map("business_id")
+  campaignId      String    @map("campaign_id")
+  customerId      String    @map("customer_id")
+  couponCode      String?   @map("coupon_code") @db.VarChar(20)
+  couponExpiresAt DateTime? @map("coupon_expires_at")
+  couponUsedAt    DateTime? @map("coupon_used_at")
+  sentAt          DateTime  @default(now()) @map("sent_at")
+
+  business Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaign AppointmentWinbackCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([businessId, couponCode])
+  @@map("appointment_winback_sends")
+}
+
+// Lista de espera de TURNOS (la de las clases es AppointmentClassEnrollment
+// con status WAITLIST): alguien que quiere un día/franja que está lleno.
+model AppointmentWaitlistEntry {
+  id              String                    @id @default(uuid())
+  businessId      String                    @map("business_id")
+  customerId      String?                   @map("customer_id")
+  customerName    String                    @map("customer_name") @db.VarChar(120)
+  customerPhone   String                    @map("customer_phone") @db.VarChar(40)
+  customerEmail   String?                   @map("customer_email") @db.VarChar(254)
+  serviceId       String                    @map("service_id")
+  resourceId      String?                   @map("resource_id") // null = cualquiera
+  date            String                    @db.VarChar(10) // YYYY-MM-DD
+  fromMin         Int?                      @map("from_min") // franja pedida; null = cualquier horario
+  toMin           Int?                      @map("to_min")
+  status          AppointmentWaitlistStatus @default(WAITING)
+  offeredAt       DateTime?                 @map("offered_at")
+  offerExpiresAt  DateTime?                 @map("offer_expires_at")
+  offeredStartsAt DateTime?                 @map("offered_starts_at") // el horario que se le ofreció
+  appointmentId   String?                   @map("appointment_id") // el turno que terminó tomando
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+
+  business    Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer    Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  service     AppointmentService   @relation(fields: [serviceId], references: [id])
+  resource    AppointmentResource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  appointment Appointment?         @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, date, status])
+  @@map("appointment_waitlist_entries")
+}
+
+// Cada mensaje automático que se despachó (o se intentó): confirmación,
+// recordatorio, cancelación, reprogramación, lista de espera, "te extrañamos".
+// Sirve para dos cosas: idempotencia (`dedupeKey`: el mismo mensaje no sale
+// dos veces aunque el cron corra de nuevo) y para mostrarle al negocio qué se
+// mandó. Guarda el destinatario: es dato personal y se borra en la baja.
+model AppointmentMessageLog {
+  id            String                    @id @default(uuid())
+  businessId    String                    @map("business_id")
+  appointmentId String?                   @map("appointment_id")
+  enrollmentId  String?                   @map("enrollment_id")
+  customerId    String?                   @map("customer_id")
+  channel       AppointmentMessageChannel
+  // Id de la plantilla: confirmacion | recordatorio | recordatorio2 |
+  // cancelacion | reprogramacion | espera | extranamos.
+  template      String                    @db.VarChar(40)
+  recipient     String                    @db.VarChar(254) // email o teléfono
+  status        AppointmentMessageStatus
+  error         String?                   @db.VarChar(500)
+  // "<plantilla>:<canal>:<id del turno>:<inicio del turno>" — ver CONTRATO.md § Mensajes.
+  dedupeKey     String?                   @map("dedupe_key") @db.VarChar(160)
+  createdAt     DateTime                  @default(now()) @map("created_at")
+
+  business    Business                    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointment Appointment?                @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  enrollment  AppointmentClassEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  customer    Customer?                   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@unique([businessId, dedupeKey])
+  @@index([businessId, createdAt])
+  @@index([appointmentId])
+  @@index([enrollmentId])
+  @@map("appointment_message_logs")
 }

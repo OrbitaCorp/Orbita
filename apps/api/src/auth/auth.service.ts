@@ -233,7 +233,7 @@ export class AuthService implements OnModuleInit {
         id: customerId, firstName: dto.firstName, lastName: dto.lastName ?? null, email: dto.email,
         avatarUrl: existingCustomer?.avatarUrl ?? null,
       },
-      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode, vertical: business.vertical },
     };
   }
 
@@ -328,7 +328,7 @@ export class AuthService implements OnModuleInit {
           member: { id: member.id, name: member.name, email: member.email, status: member.status, hasTempPassword: member.hasTempPassword },
           role: member.role.name,
           permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
-          business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+          business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode, vertical: business.vertical },
         };
       }
 
@@ -379,7 +379,7 @@ export class AuthService implements OnModuleInit {
         token,
         refreshToken,
         customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
-        business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+        business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode, vertical: business.vertical },
       };
     }
 
@@ -498,6 +498,7 @@ export class AuthService implements OnModuleInit {
         name: member.business.name,
         subdomain: member.business.subdomain,
         mode: member.business.mode,
+        vertical: member.business.vertical,
       },
     };
   }
@@ -959,7 +960,7 @@ export class AuthService implements OnModuleInit {
       token,
       refreshToken,
       customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
-      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode, vertical: business.vertical },
     };
   }
 
@@ -1027,6 +1028,7 @@ export class AuthService implements OnModuleInit {
         name: member.business.name,
         subdomain: member.business.subdomain,
         mode: member.business.mode,
+        vertical: member.business.vertical,
       },
     };
   }
@@ -1043,7 +1045,7 @@ export class AuthService implements OnModuleInit {
       where: { readOnly: true, business: { isDemo: true, deletedAt: null } },
       include: {
         role: { include: { rolePermissions: { include: { permission: true } } } },
-        business: { select: { id: true, name: true, subdomain: true, mode: true } },
+        business: { select: { id: true, name: true, subdomain: true, mode: true, vertical: true } },
       },
     });
     if (!member) throw new NotFoundException('La demo no está disponible');
@@ -1071,7 +1073,7 @@ export class AuthService implements OnModuleInit {
   private async demoSessionCliente(): Promise<DemoCustomerSessionResponse> {
     const customer = await this.prisma.customer.findFirst({
       where: { email: EMAIL_INVITADO_DEMO, deletedAt: null, business: { isDemo: true, deletedAt: null } },
-      include: { business: { select: { id: true, name: true, subdomain: true, mode: true } } },
+      include: { business: { select: { id: true, name: true, subdomain: true, mode: true, vertical: true } } },
     });
     if (!customer) throw new NotFoundException('La demo no está disponible');
     return {
@@ -1284,7 +1286,7 @@ export class AuthService implements OnModuleInit {
         // `industry` (el rubro del onboarding) viaja solo acá — /me es lo que
         // rearma la sesión del panel en cada carga, y el rubro se usa para
         // adaptar la UI (ej: los motivos de devolución según qué se vende).
-        business: { id: member.business.id, name: member.business.name, subdomain: member.business.subdomain, mode: member.business.mode, industry: member.business.industry },
+        business: { id: member.business.id, name: member.business.name, subdomain: member.business.subdomain, mode: member.business.mode, vertical: member.business.vertical, industry: member.business.industry },
       };
     }
 
@@ -1307,7 +1309,7 @@ export class AuthService implements OnModuleInit {
     return {
       type: 'customer',
       customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
-      business: { id: customer.business.id, name: customer.business.name, subdomain: customer.business.subdomain, mode: customer.business.mode },
+      business: { id: customer.business.id, name: customer.business.name, subdomain: customer.business.subdomain, mode: customer.business.mode, vertical: customer.business.vertical },
     };
   }
 

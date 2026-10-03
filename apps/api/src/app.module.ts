@@ -62,6 +62,7 @@ import { InternalCronModule } from './internal-cron/internal-cron.module';
 import { WizardAnalyticsModule } from './wizard-analytics/wizard-analytics.module';
 import { SupportModule } from './support/support.module';
 import { ImageStudioModule } from './image-studio/image-studio.module';
+import { AppointmentsModule } from './appointments/appointments.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     WizardAnalyticsModule,
     SupportModule,
     ImageStudioModule,
+    AppointmentsModule,
   ],
   controllers: [AppController],
   providers: [

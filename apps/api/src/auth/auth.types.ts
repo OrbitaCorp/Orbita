@@ -8,7 +8,7 @@ export interface MemberAuthResponse {
   member: { id: string; name: string; email: string; status: string; hasTempPassword: boolean };
   role: string;
   permissions: string[];
-  business: { id: string; name: string; subdomain: string; mode: string };
+  business: { id: string; name: string; subdomain: string; mode: string; vertical: string };
 }
 
 export interface CustomerAuthResponse {
@@ -16,7 +16,7 @@ export interface CustomerAuthResponse {
   token: string;
   refreshToken: string;
   customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null };
-  business: { id: string; name: string; subdomain: string; mode: string };
+  business: { id: string; name: string; subdomain: string; mode: string; vertical: string };
 }
 
 export interface PlatformAdminAuthResponse {

@@ -31,6 +31,11 @@ function makeService() {
         'mpCredentials', 'address', 'customer',
         // Orbi fase 1 (spec §3.11): la purga también borra estas tres tablas.
         'orbiPendingAction', 'orbiTurn', 'dailyQuota',
+        // Turnos & Agenda: la purga suelta punteros y borra el rastro de la persona.
+        'appointment', 'appointmentPayment', 'appointmentClassEnrollment', 'appointmentPackagePurchase',
+        'appointmentMembership', 'appointmentGiftCard', 'appointmentResource', 'appointmentCustomerProfile',
+        'appointmentLoyaltyCard', 'appointmentWaitlistEntry', 'appointmentWinbackSend',
+        'appointmentRecurringSeries', 'appointmentStaffPayout', 'appointmentMessageLog',
       ].map((modelo) => [modelo, { updateMany: jest.fn(), deleteMany: jest.fn() }]),
     ),
     $transaction: jest.fn((arr: any[]) => Promise.all(arr.map((p) => (typeof p === 'function' ? p() : p)))),

@@ -52,6 +52,21 @@ const MODELOS = [
   'member',
   'subscription',
   'subscriptionPayment',
+  // Turnos & Agenda (módulo appointments).
+  'appointment',
+  'appointmentPayment',
+  'appointmentClassEnrollment',
+  'appointmentPackagePurchase',
+  'appointmentMembership',
+  'appointmentGiftCard',
+  'appointmentResource',
+  'appointmentCustomerProfile',
+  'appointmentLoyaltyCard',
+  'appointmentWaitlistEntry',
+  'appointmentWinbackSend',
+  'appointmentRecurringSeries',
+  'appointmentStaffPayout',
+  'appointmentMessageLog',
 ] as const;
 
 const METODOS = ['update', 'updateMany', 'delete', 'deleteMany', 'create', 'findMany', 'findUnique', 'findFirst'] as const;
@@ -246,6 +261,61 @@ describe('Baja definitiva de un negocio: los punteros se sueltan antes de borrar
     await svc.processCancellationWindow();
     expect(prisma.discount.updateMany).toHaveBeenCalledWith({ where: { businessId: BIZ }, data: { customerId: null } });
     expect(prisma.gameSession.updateMany).toHaveBeenCalledWith({ where: { businessId: BIZ }, data: { customerId: null } });
+  });
+});
+
+describe('Baja definitiva de un negocio de turnos', () => {
+  it('conserva el turno y su pago, sin el vínculo con la persona ni sus datos sensibles', async () => {
+    const { svc, prisma, secuencia } = armar();
+    await svc.processCancellationWindow();
+
+    // El turno es el comprobante (igual que un pedido): no se borra. Deja de
+    // apuntar al cliente y a quien lo cargó, y pierde lo que no respalda un
+    // cobro: la nota, la obra social y el motivo de la consulta.
+    expect(prisma.appointment.updateMany).toHaveBeenCalledWith({
+      where: { businessId: BIZ },
+      data: {
+        customerId: null, createdByMemberId: null,
+        customerNote: null, internalNote: null, insuranceName: null, insuranceNumber: null, reason: null,
+      },
+    });
+    expect(prisma.appointmentPayment.updateMany).toHaveBeenCalledWith({ where: { businessId: BIZ }, data: { registeredByMemberId: null } });
+    for (const modelo of ['appointment', 'appointmentPayment', 'appointmentClassEnrollment', 'appointmentPackagePurchase', 'appointmentMembership', 'appointmentGiftCard', 'appointmentResource']) {
+      expect(prisma[modelo].deleteMany).not.toHaveBeenCalled();
+    }
+    expect(cuando(secuencia, 'appointment.updateMany')).toBeLessThan(cuando(secuencia, 'customer.deleteMany'));
+    expect(cuando(secuencia, 'appointmentPayment.updateMany')).toBeLessThan(cuando(secuencia, 'member.deleteMany'));
+  });
+
+  it('suelta al cliente de las clases, los packs, las membresías y las gift cards', async () => {
+    const { svc, prisma } = armar();
+    await svc.processCancellationWindow();
+
+    expect(prisma.appointmentClassEnrollment.updateMany).toHaveBeenCalledWith({ where: { businessId: BIZ }, data: { customerId: null, createdByMemberId: null, customerNote: null } });
+    for (const modelo of ['appointmentPackagePurchase', 'appointmentMembership', 'appointmentGiftCard']) {
+      expect(prisma[modelo].updateMany).toHaveBeenCalledWith({ where: { businessId: BIZ }, data: { customerId: null } });
+    }
+  });
+
+  it('la agenda queda sin la cuenta ni el contacto de la persona', async () => {
+    const { svc, prisma, secuencia } = armar();
+    await svc.processCancellationWindow();
+
+    expect(prisma.appointmentResource.updateMany).toHaveBeenCalledWith({
+      where: { businessId: BIZ },
+      data: { memberId: null, email: null, phone: null, photoUrl: null, bio: null },
+    });
+    expect(cuando(secuencia, 'appointmentResource.updateMany')).toBeLessThan(cuando(secuencia, 'member.deleteMany'));
+  });
+
+  it('borra la ficha del cliente, sus sellos, la lista de espera, los turnos fijos, los envíos de campañas, los pagos al equipo y el registro de mensajes', async () => {
+    const { svc, prisma, secuencia } = armar();
+    await svc.processCancellationWindow();
+
+    for (const modelo of ['appointmentCustomerProfile', 'appointmentLoyaltyCard', 'appointmentWaitlistEntry', 'appointmentWinbackSend', 'appointmentRecurringSeries', 'appointmentStaffPayout', 'appointmentMessageLog']) {
+      expect(prisma[modelo].deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+      expect(cuando(secuencia, `${modelo}.deleteMany`)).toBeLessThan(cuando(secuencia, 'customer.deleteMany'));
+    }
   });
 });
 

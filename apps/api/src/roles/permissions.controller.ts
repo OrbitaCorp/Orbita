@@ -10,7 +10,7 @@ export class PermissionsController {
 
   @Get()
   findAll(@CurrentBusiness() ctx: AuthContext) {
-    assertMemberContext(ctx);
-    return this.rolesService.findAllPermissions();
+    const member = assertMemberContext(ctx);
+    return this.rolesService.findAllPermissions(member.businessId);
   }
 }

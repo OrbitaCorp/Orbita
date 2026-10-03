@@ -226,6 +226,7 @@ export class BusinessesService {
     description: string | null;
     subdomain: string;
     mode: string;
+    vertical: string;
     isActive: boolean;
     isPaused: boolean;
     subrubros: string[];
@@ -242,6 +243,8 @@ export class BusinessesService {
       description: business.description,
       subdomain: business.subdomain,
       mode: business.mode,
+      // STORE | APPOINTMENTS: qué panel arma el frontend (Tienda o Turnos).
+      vertical: business.vertical,
       isActive: business.isActive,
       isPaused: business.isPaused,
       subrubros: business.subrubros,

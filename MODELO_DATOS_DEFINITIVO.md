@@ -2095,3 +2095,121 @@ Estos puntos están modelados en el schema pero requieren validación antes o du
 5. **Planes y precios:** hoy `plan = "standard"` es placeholder. Definir estructura de planes si habrá más de uno.
 
 **Ya resueltos en v2** (antes estaban pendientes): flujo de solicitud de opiniones (email post-entrega + comentar en producto verificado), política de mora (opción B — gracia 3-5 días), débito automático (va en V1 vía preapproval MP), transferencias POS (número de operación + alias fijo del negocio + verificación humana), dominios (caminos 1 y 3 en V1, camino 2 latente).
+
+---
+
+## 22. Turnos & Agenda (módulo `appointments`)
+
+Agregado el 2026-10-03. Segundo vertical de Órbita. Migraciones `20261003120000_appointments`
+(tablas) y `20261003120100_appointments_permisos` (permisos). Los bloques Prisma completos, con sus
+comentarios, están en `apps/api/prisma/schema.prisma` (sección "TURNOS & AGENDA"); el contrato de
+la API, en `apps/api/src/appointments/CONTRATO.md`. Acá va el mapa.
+
+En el backend "turno" ya es el turno de conversación de Orbi (`OrbiTurn`): por eso modelos y
+tablas se llaman `Appointment*` / `appointment_*`.
+
+### 22.1 Cambios en tablas que ya existían (todos aditivos)
+
+| Tabla | Campo | Para qué |
+|---|---|---|
+| `businesses` | `vertical` (`BusinessVertical`: `STORE` \| `APPOINTMENTS`, default `STORE`) | Qué producto es el negocio. Con `APPOINTMENTS`, `industry` guarda la key del rubro (`barberia`, `kinesio`…) |
+| `roles` | `appointments_role_key` (texto, nullable) | De qué rol de fábrica del rubro salió (para "volver a como venía") |
+| `roles` | `takes_appointments` (bool, default false) | Quien tiene el rol atiende turnos o da clases |
+| `permissions` | 15 filas nuevas, grupo "Turnos" (`appointments.*`) | Ver § 22.4 |
+
+`members` y `customers` no ganan columnas: solo relaciones inversas.
+
+### 22.2 Convenciones del módulo
+
+- **Hora:** Argentina fija (-03:00), sin zona por negocio. Instantes (`starts_at`, `ends_at`) en
+  UTC; días sueltos como texto `YYYY-MM-DD` del día argentino (`VARCHAR(10)`); horas del día en
+  minutos desde las 00:00 de Argentina.
+- **Día de la semana:** 0 = lunes … 6 = domingo (distinto de `discounts.active_days`, que arranca
+  en domingo).
+- **Horario semanal (Json):** 7 días, cada uno una lista de tramos `[desdeMin, hastaMin]` (máximo
+  dos: mañana y tarde). `[]` = cerrado.
+- **Plata:** `Decimal(12,2)` en pesos.
+- **Sin cuenta:** quien reserva no necesita registrarse. Cada turno guarda un snapshot (nombre,
+  teléfono…) y `customer_id` es opcional.
+- **RLS:** habilitado en las 23 tablas, sin policies.
+
+### 22.3 Tablas
+
+| Tabla (modelo) | Qué guarda |
+|---|---|
+| `appointment_settings` (`AppointmentSettings`) | 1:1 con el negocio. Rubro y modo de agenda, forma y apariencia del sitio (Json), horario semanal (Json), vacaciones, modalidades (local / domicilio), ciudad/zonas/indicaciones, todas las reglas de reserva, política de cancelación, cobro, beneficios de la cuenta, mensajes automáticos (Json), conexión de WhatsApp y el on/off + config de cada función de Avanzado (Json) |
+| `appointment_services` (`AppointmentService`) | Lo que se reserva: nombre, duración, precio, si se ofrece online, orden. Soft-delete. En modo clases es la "actividad" |
+| `appointment_resources` (`AppointmentResource`) | Una agenda: persona (`PERSON`) o espacio (`SPACE`). Días que atiende, horario propio (Json, null = sigue al negocio), vínculo opcional con un `member`, espacio asignado, y cómo cobra la persona (comisión, sueldo, mixto, alquiler, por clase; cada semana/quincena/mes). Soft-delete |
+| `appointment_special_days` (`AppointmentSpecialDay`) | Feriados y días con otro horario. Único por negocio y fecha |
+| `appointments` (`Appointment`) | El turno: agenda, servicio, cliente (opcional) + snapshot, inicio/fin, precio y descuento, estado, origen, modalidad, seña (monto, cuándo y cómo se pagó), reprogramaciones, cancelación, recordatorios, con qué se pagó (pack, gift card, membresía), serie de turno fijo. `code` (referencia visible, única por negocio) y `access_token` (secreto del enlace personal, único global) |
+| `appointment_payments` (`AppointmentPayment`) | Seña o pago de un turno, una clase, un pack, una gift card o una cuota. Medio, estado, monto, ids de Mercado Pago, quién lo registró. No se reutiliza `payments` (exige `order_id`) |
+| `appointment_class_templates` (`AppointmentClassTemplate`) | Grilla semanal de clases con cupo: actividad, día, hora, duración, profe, sala, cupo |
+| `appointment_class_sessions` (`AppointmentClassSession`) | Una clase con fecha. Se materializa al anotar a alguien o al suspenderla/cambiarle el cupo. Única por plantilla y fecha |
+| `appointment_class_enrollments` (`AppointmentClassEnrollment`) | Un anotado: cliente (opcional) + snapshot, estado (`ENROLLED` / `WAITLIST` / `CANCELLED`), lugar en la lista de espera, asistencia, seña. `code` y `access_token` como los turnos |
+| `appointment_customer_profiles` (`AppointmentCustomerProfile`) | Lo propio de Turnos en la ficha del cliente, 1:1 con `customers`: nota, obra social, ausencias, crédito de señas, si acepta promos, si ya usó la bienvenida |
+| `appointment_staff_payouts` (`AppointmentStaffPayout`) | Pago registrado entre el negocio y una persona del equipo: período, monto, dirección (negocio→persona o persona→negocio por alquiler), snapshot de la liquidación |
+| `appointment_message_logs` (`AppointmentMessageLog`) | Cada mensaje automático despachado: canal (email / WhatsApp), plantilla, destinatario, estado (`SENT` / `FAILED` / `SIMULATED`), clave de idempotencia |
+| `appointment_packages`, `appointment_package_purchases` | Avanzado: paquetes de sesiones y cada compra (sesiones usadas, vencimiento) |
+| `appointment_membership_plans`, `appointment_memberships` | Avanzado: planes mensuales y la membresía de cada cliente (estado, pausa, próximo cobro) |
+| `appointment_gift_cards` | Avanzado: gift cards por monto (saldo) o por servicio; código, estilo, para/de/mensaje, vencimiento |
+| `appointment_price_rules` | Avanzado: precios por horario (días, franja, ajuste %) |
+| `appointment_loyalty_cards` | Avanzado: tarjeta de sellos de cada cliente (la config va en settings) |
+| `appointment_recurring_series` | Avanzado: turno fijo (frecuencia, día, hora, máximo). Sus turnos son filas de `appointments` |
+| `appointment_winback_campaigns`, `appointment_winback_sends` | Avanzado: campaña "te extrañamos" y a quién se le mandó, con su cupón |
+| `appointment_waitlist_entries` | Lista de espera de turnos (la de clases va en las inscripciones) |
+
+Enums nuevos: `BusinessVertical`, `AppointmentAgendaMode`, `AppointmentResourceKind`,
+`AppointmentModality`, `AppointmentSpecialDayKind`, `AppointmentStatus` (`PENDING`, `CONFIRMED`,
+`COMPLETED`, `NO_SHOW`, `CANCELLED` — "en curso" no se guarda, se calcula con el reloj),
+`AppointmentOrigin`, `AppointmentCancelledBy`, `AppointmentPaymentKind`,
+`AppointmentEnrollmentStatus`, `AppointmentPayForm`, `AppointmentPayEvery`,
+`AppointmentPayoutDirection`, `AppointmentMembershipStatus`, `AppointmentGiftCardKind`,
+`AppointmentRecurrence`, `AppointmentWaitlistStatus`, `AppointmentMessageChannel`,
+`AppointmentMessageStatus`. Medio y estado de pago reutilizan `PaymentMethod` y `PaymentStatus`.
+
+Lo que NO tiene columna propia porque ya existía: nombre y descripción (`businesses`), logo
+(`storefront_config.logo_url`), dirección y mapa (sucursal principal de `branches`), WhatsApp,
+email, Instagram y alias/CBU/titular (`business_config`), Mercado Pago (`mp_credentials`), equipo
+con login (`members`) y roles (`roles` + `role_permissions`).
+
+### 22.4 Permisos (grupo "Turnos")
+
+El sistema es binario. Los alcances "todo / solo lo propio" de Turnos se modelan con pares: el
+código base da lo propio y `_all` lo extiende a todo el negocio.
+
+`appointments.agenda.view`, `appointments.agenda.view_all`, `appointments.agenda.manage`,
+`appointments.agenda.manage_all`, `appointments.clients.view`, `appointments.clients.view_all`,
+`appointments.clients.contact`, `appointments.cash.charge`, `appointments.earnings.view`,
+`appointments.earnings.view_all`, `appointments.earnings.settle`, `appointments.reports.view`,
+`appointments.services.manage`, `appointments.team.manage`, `appointments.settings.manage`.
+
+Viven en `src/common/permisos/catalogo.ts` y `prisma/seed.ts`; la migración de backfill se los da
+a los roles de fábrica `owner` y `admin`. No van al rol `empleado`. `GET /permissions` no los
+muestra a un negocio `STORE`.
+
+### 22.5 Anti doble reserva
+
+La migración le pone a `appointments` una constraint de exclusión escrita a mano
+(`appointments_no_overlap`): dos turnos no cancelados del mismo recurso no pueden pisarse en
+`[starts_at, ends_at)`. Necesita la extensión `btree_gist` (la migración la crea si falta; en
+Supabase, en el schema `extensions`). Prisma no la modela: no aparece en `schema.prisma` ni en
+`migrate diff`. Es la red de abajo; la regla completa (margen, horario, anticipación) la aplica el
+service en una transacción.
+
+### 22.6 Baja definitiva de un negocio
+
+`SubscriptionsService.operacionesDeBorradoDefinitivo` (mismo criterio que los pedidos: se borra la
+persona, se conserva el comprobante):
+
+- **Se conservan** `appointments`, `appointment_payments`, `appointment_class_enrollments`,
+  `appointment_package_purchases`, `appointment_memberships` y `appointment_gift_cards`, sin el
+  vínculo con el cliente ni con quien los cargó. De los turnos se vacían la nota, la nota interna,
+  la obra social y el motivo de la consulta. `appointment_resources` queda como ancla de los
+  turnos, sin `member_id`, email, teléfono, foto ni bio.
+- **Se borran** `appointment_customer_profiles`, `appointment_loyalty_cards`,
+  `appointment_waitlist_entries`, `appointment_winback_sends`, `appointment_recurring_series`,
+  `appointment_staff_payouts` y `appointment_message_logs`.
+
+### 22.7 Conteo de tablas
+
+Turnos suma 23 tablas al schema.

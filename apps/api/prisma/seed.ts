@@ -54,6 +54,27 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
   { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
   { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
+  // Turnos & Agenda (módulo appointments). El sistema es binario; los alcances
+  // "todo / solo lo propio" de Turnos van en pares: el código base da lo propio
+  // (su agenda, sus clientes, sus ganancias) y `_all` lo extiende a todo el
+  // negocio. Los negocios existentes los reciben por la migración
+  // 20261003120100_appointments_permisos (owner y admin). No van al Empleado
+  // por defecto: los roles de un negocio de turnos los siembra el alta.
+  { group: 'Turnos', code: 'appointments.agenda.view', label: 'Ver su agenda' },
+  { group: 'Turnos', code: 'appointments.agenda.view_all', label: 'Ver la agenda de todos' },
+  { group: 'Turnos', code: 'appointments.agenda.manage', label: 'Dar, mover y cancelar sus turnos' },
+  { group: 'Turnos', code: 'appointments.agenda.manage_all', label: 'Dar, mover y cancelar turnos de todos' },
+  { group: 'Turnos', code: 'appointments.clients.view', label: 'Ver sus clientes y su historial' },
+  { group: 'Turnos', code: 'appointments.clients.view_all', label: 'Ver todos los clientes' },
+  { group: 'Turnos', code: 'appointments.clients.contact', label: 'Ver teléfonos y escribirles' },
+  { group: 'Turnos', code: 'appointments.cash.charge', label: 'Cobrar y registrar señas' },
+  { group: 'Turnos', code: 'appointments.earnings.view', label: 'Ver sus ganancias' },
+  { group: 'Turnos', code: 'appointments.earnings.view_all', label: 'Ver las ganancias de todos' },
+  { group: 'Turnos', code: 'appointments.earnings.settle', label: 'Liquidar y registrar pagos al equipo' },
+  { group: 'Turnos', code: 'appointments.reports.view', label: 'Ver los números del negocio' },
+  { group: 'Turnos', code: 'appointments.services.manage', label: 'Editar servicios y precios' },
+  { group: 'Turnos', code: 'appointments.team.manage', label: 'Sumar gente y cambiar roles' },
+  { group: 'Turnos', code: 'appointments.settings.manage', label: 'Configurar el negocio de turnos' },
 ];
 
 // Permisos por rol default. empleado suma *.view de catálogo/equipo (y ahora

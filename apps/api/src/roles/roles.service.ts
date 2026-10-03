@@ -182,8 +182,15 @@ export class RolesService {
 
   // ── Permissions (catálogo global) ───────────────────────────────────────
 
-  findAllPermissions() {
-    return this.prisma.permission.findMany({ orderBy: [{ group: 'asc' }, { label: 'asc' }] });
+  // El catálogo es global, pero los permisos de Turnos (`appointments.*`) solo
+  // tienen sentido en un negocio de turnos: a una tienda no se le muestran, así
+  // su pantalla de roles queda como estaba antes de que existiera el módulo.
+  async findAllPermissions(businessId: string) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { vertical: true } });
+    return this.prisma.permission.findMany({
+      where: business?.vertical === 'APPOINTMENTS' ? {} : { NOT: { code: { startsWith: 'appointments.' } } },
+      orderBy: [{ group: 'asc' }, { label: 'asc' }],
+    });
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
