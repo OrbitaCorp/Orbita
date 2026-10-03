@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AppointmentsAvanzadoModule } from './avanzado/avanzado.module';
 
 // Turnos & Agenda: el segundo vertical de Órbita (Business.vertical =
 // APPOINTMENTS). En el backend "turno" ya es el turno de conversación de Orbi
@@ -17,5 +18,7 @@ import { Module } from '@nestjs/common';
 // Cada paquete agrega sus controllers/providers a este módulo y, si necesita
 // resolver el slug de una tienda o chequear el add-on, importa StorefrontModule
 // y BusinessesModule (ver CountdownModule como referencia).
-@Module({})
+@Module({
+  imports: [AppointmentsAvanzadoModule],
+})
 export class AppointmentsModule {}
