@@ -8,6 +8,7 @@ import { OrbiV2Contexto } from '../piezas/contexto'
 import { agruparSesiones, horaCorta, TITULO_POR_DEFECTO } from '../estado/agrupar'
 import { abrirSesion, nuevaSesion, useAccionesDeSesion, useListaDeSesiones } from '../estado/sesiones'
 import { useFlagOrbiV2 } from '../estado/flag'
+import { rutaDeVuelta } from '../estado/vuelta'
 import type { ResumenDeSesion } from '../api/sesiones'
 import { OrbiChat } from './OrbiChat'
 import { useAnunciador, useRutasDeOrbi } from './OrbiV2'
@@ -194,7 +195,14 @@ export default function OrbiPagina() {
   const { anunciar, region } = useAnunciador()
   useDisponibilidadOrbi('panel', prendido)
 
+  const abrirOrbi = useOrbiStore(st => st.open)
   const navegar = useCallback((ruta: string) => { void router.push(ruta) }, [router])
+  // Salir de la pantalla completa: a la pantalla de antes, con la misma
+  // conversación abierta al costado (el chat vive en el store, no se pierde nada).
+  const salir = useCallback(() => {
+    abrirOrbi()
+    void router.push(rutaDeVuelta(router.query.desde, rutas.inicio))
+  }, [abrirOrbi, router, rutas.inicio])
   const contexto = useMemo(() => ({ vista: 'pagina' as const, navegar, anunciar }), [navegar, anunciar])
 
   if (!prendido) {
@@ -212,7 +220,7 @@ export default function OrbiPagina() {
       <div className={`${s.raiz} ${s.pagina}`} style={{ height: '100%' }}>
         {ancha && <ColumnaDeSesiones />}
         <div className={s.chatPagina}>
-          <OrbiChat conSelector={!ancha} onAbrirManual={rutas.manual ? () => navegar(rutas.manual!) : undefined} />
+          <OrbiChat conSelector={!ancha} onSalir={salir} onAbrirManual={rutas.manual ? () => navegar(rutas.manual!) : undefined} />
         </div>
       </div>
     </OrbiV2Contexto.Provider>

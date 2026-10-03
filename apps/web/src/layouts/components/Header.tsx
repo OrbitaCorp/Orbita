@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
@@ -82,9 +82,9 @@ export default function Header({ onMenuClick }: Props) {
     // hardcodeados.
     const { logout, user } = useAuth()
 
-    // Orbi en el celular: el trigger del menú lateral queda dentro del drawer
-    // cerrado, así que la barra tiene su propio botón. Mismo store que el del
-    // sidebar, por eso abre y cierra el mismo panel.
+    // Orbi en la barra, al lado de la búsqueda (en escritorio y en el celular,
+    // donde el trigger del menú lateral queda dentro del drawer cerrado). Mismo
+    // store que el del sidebar y que Ctrl+K: abren y cierran el mismo panel.
     const orbiAbierto = useOrbiStore(s => s.isOpen)
     const alternarOrbi = useOrbiStore(s => s.toggle)
 
@@ -259,10 +259,13 @@ export default function Header({ onMenuClick }: Props) {
         <>
             <style>{`
                 .admin-menu-btn    { display: none; }
-                .admin-orbi-btn    { display: none; }
                 .admin-search-wrap { display: flex; }
-                .admin-user-name   { display: block; }
                 .admin-bc-full     { display: flex; }
+                .admin-header-bar button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .admin-orbi-btn { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 1px; border-radius: 9999px; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+                .admin-orbi-btn:hover { border-color: var(--color-primary) !important; }
+                .admin-orbi-kbd { font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--color-border); color: var(--color-muted); font-family: inherit; }
+                @media (max-width: 1279px) { .admin-orbi-kbd { display: none; } }
                 .admin-bc-mobile   { display: none; }
                 @media (max-width: 768px) {
                     .admin-header-bar {
@@ -286,9 +289,11 @@ export default function Header({ onMenuClick }: Props) {
                     }
                     .admin-notif-list { max-height: calc(100vh - 140px) !important; }
                     .admin-menu-btn    { display: flex !important; }
-                    .admin-orbi-btn    { display: grid !important; }
+                    /* En el celular: solo la mascota, con 44px de área táctil. */
+                    .admin-orbi-btn    { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 8px; }
+                    .admin-orbi-label  { display: none; }
+                    .admin-header-sep  { display: none; }
                     .admin-search-wrap { display: none !important; }
-                    .admin-user-name   { display: none !important; }
                     .admin-bc-full     { display: none !important; }
                     .admin-bc-mobile   { display: flex !important; }
                     .dcto-page-head    { display: none !important; }
@@ -375,21 +380,34 @@ export default function Header({ onMenuClick }: Props) {
                     {/* Buscador global (oculto en mobile) — Fase 4, Ale */}
                     <BusquedaGlobal />
 
-                    {/* Orbi — solo mobile (en escritorio vive en el menú lateral y con Ctrl+K).
-                        44px de área táctil: es la acción principal de la barra. */}
-                    <button
-                        onClick={alternarOrbi}
-                        aria-label="Abrir Orbi"
-                        aria-expanded={orbiAbierto}
-                        // Solo con el panel abierto: cerrado no está en el DOM y
-                        // un aria-controls a un id inexistente es inválido.
-                        aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
-                        className="admin-orbi-btn ds-hover place-items-center rounded-lg"
-                        style={{ width: 44, height: 44, background: 'transparent', border: '1px solid var(--color-border)', flexShrink: 0 }}
-                    >
-                        {/* El pet con la forma del módulo, sobre su disco navy (mismo uso que OrbiTrigger). */}
-                        <OrbiPet size={30} disc />
-                    </button>
+                    {/* Orbi — al lado de la búsqueda: la mascota del menú lateral, que toma
+                        la forma del módulo en el que estás. En su propia página no va: ahí
+                        el chat ya es la pantalla, y se sale con el botón del encabezado. */}
+                    {seccion !== 'orbi' && (
+                        <button
+                            type="button"
+                            onClick={alternarOrbi}
+                            aria-label={orbiAbierto ? 'Cerrar Orbi' : 'Abrir Orbi'}
+                            aria-expanded={orbiAbierto}
+                            // Solo con el panel abierto: cerrado no está en el DOM y
+                            // un aria-controls a un id inexistente es inválido.
+                            aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
+                            title="Orbi (Ctrl+K)"
+                            className="admin-orbi-btn"
+                            style={{
+                                flexShrink: 0, fontFamily: 'inherit',
+                                background: orbiAbierto ? 'var(--color-primary-bg)' : 'transparent',
+                                border: `1px solid ${orbiAbierto ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                color: 'var(--color-text)',
+                            }}
+                        >
+                            <OrbiPet size={34} animated={false} />
+                            <span className="admin-orbi-label" style={{ fontSize: 13, fontWeight: 600 }}>Orbi</span>
+                            <kbd className="admin-orbi-kbd" aria-hidden>Ctrl K</kbd>
+                        </button>
+                    )}
+
+                    <span className="admin-header-sep" aria-hidden style={{ width: 1, height: 20, background: 'var(--color-border)', flexShrink: 0, margin: '0 2px' }} />
 
                     {/* Dark mode toggle */}
                     <button
@@ -554,26 +572,33 @@ export default function Header({ onMenuClick }: Props) {
 
                     {/* Usuario */}
                     <div className="relative" ref={menuRef} style={{ flexShrink: 0 }}>
+                        {/* Solo el avatar: el nombre y el rol van adentro del menú. */}
                         <button
+                            type="button"
                             onClick={() => setUserMenuAbierto(!userMenuAbierto)}
-                            className="ds-hover flex items-center gap-2 rounded-lg"
-                            style={{ padding: '6px 8px', background: userMenuAbierto ? 'var(--color-surface-alt)' : 'transparent', border: '1px solid transparent', transition: 'background 150ms ease' }}
+                            aria-label={`Tu cuenta${nombreUsuario ? `: ${nombreUsuario}` : ''}`}
+                            aria-haspopup="menu"
+                            aria-expanded={userMenuAbierto}
+                            title={nombreUsuario || 'Tu cuenta'}
+                            className="grid place-items-center rounded-full"
+                            style={{
+                                width: 36, height: 36, padding: 0, cursor: 'pointer',
+                                background: 'transparent',
+                                border: `2px solid ${userMenuAbierto ? 'var(--color-primary)' : 'transparent'}`,
+                                transition: 'border-color 150ms ease',
+                            }}
                         >
-                            <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
+                            <span className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
                                 {iniciales(nombreUsuario)}
-                            </div>
-                            <div className="admin-user-name text-left">
-                                <div className="text-sm font-medium leading-none mb-0.5" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
-                                <div className="text-xs leading-none" style={{ color: 'var(--color-muted)' }}>{rolUsuario}</div>
-                            </div>
-                            <ChevronDown size={14} strokeWidth={1.5} className="admin-user-name" style={{ color: 'var(--color-subtle)', transform: userMenuAbierto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                            </span>
                         </button>
 
                         {userMenuAbierto && (
                             <div className="absolute right-0 mt-1 w-52 rounded-xl overflow-hidden z-50" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.10)' }}>
                                 <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
                                     <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
-                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{emailUsuario}</div>
+                                    {rolUsuario && <div className="text-xs mt-0.5" style={{ color: 'var(--color-body)' }}>{rolUsuario}</div>}
+                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emailUsuario}</div>
                                 </div>
                                 <div className="p-1">
                                     <button className="ds-hover flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}

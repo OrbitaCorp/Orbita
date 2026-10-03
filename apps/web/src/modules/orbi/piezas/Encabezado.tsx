@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ExternalLink, Maximize2, Search, SquarePen, X } from 'lucide-react'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { ChevronDown, ExternalLink, Maximize2, Minimize2, Search, SquarePen, X } from 'lucide-react'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import { usePetEstado } from '@/components/orbi/pet/usePetEstado'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiV2 } from '../estado/useOrbiV2'
 import { useListaDeSesiones, abrirSesion } from '../estado/sesiones'
@@ -89,14 +90,18 @@ function SelectorDeSesiones({ onCerrar, onVerTodas }: { onCerrar: () => void; on
  * Encabezado del chat (A2). El título abre el selector de sesiones; a la
  * derecha queda reservado el lugar de la barra de uso (fase 5).
  */
-export function Encabezado({ onNueva, onExpandir, onPestana, onCerrar, conSelector = true }: {
+export function Encabezado({ onNueva, onExpandir, onSalir, onPestana, onCerrar, conSelector = true }: {
   onNueva: () => void
   onExpandir?: () => void
+  onSalir?: () => void
   onPestana?: () => void
   onCerrar?: () => void
   conSelector?: boolean
 }) {
   const titulo = useOrbiV2(st => st.titulo)
+  // La mascota del menú lateral: toma la forma del módulo que se está viendo
+  // y pone cara de "escribiendo" mientras Orbi responde.
+  const estadoPet = usePetEstado()
   const abierto = useOrbiV2(st => st.selectorAbierto)
   const setAbierto = useOrbiV2(st => st.setSelectorAbierto)
   const botonTitulo = useRef<HTMLButtonElement>(null)
@@ -117,19 +122,20 @@ export function Encabezado({ onNueva, onExpandir, onPestana, onCerrar, conSelect
           title="Cambiar de conversación"
           onClick={() => setAbierto(!abierto)}
         >
-          <OrbiIcon size={24} disc animated={false} />
+          <OrbiPet size={36} animated={false} estado={estadoPet} />
           <span>{titulo ?? 'Nueva conversación'}</span>
           <ChevronDown className={s.chevron} aria-hidden />
         </button>
       ) : (
         <div className={s.titulo} style={{ cursor: 'default' }}>
-          <OrbiIcon size={24} disc animated={false} />
+          <OrbiPet size={36} animated={false} estado={estadoPet} />
           <span>{titulo ?? 'Nueva conversación'}</span>
         </div>
       )}
       <div className={s.reservado} aria-hidden />
       <button type="button" className={s.icono} onClick={onNueva} title="Nueva conversación" aria-label="Nueva conversación"><SquarePen aria-hidden /></button>
       {onExpandir && <button type="button" className={s.icono} onClick={onExpandir} title="Expandir a página" aria-label="Expandir a página"><Maximize2 aria-hidden /></button>}
+      {onSalir && <button type="button" className={s.icono} onClick={onSalir} title="Volver al panel con Orbi al costado" aria-label="Salir de la pantalla completa"><Minimize2 aria-hidden /></button>}
       {onPestana && <button type="button" className={`${s.icono} ${s.soloEscritorio}`} onClick={onPestana} title="Abrir en pestaña nueva" aria-label="Abrir en pestaña nueva"><ExternalLink aria-hidden /></button>}
       {onCerrar && <button type="button" className={s.icono} onClick={onCerrar} title="Cerrar Orbi" aria-label="Cerrar Orbi"><X aria-hidden /></button>}
       {conSelector && abierto && <SelectorDeSesiones onCerrar={cerrarSelector} onVerTodas={() => onExpandir?.()} />}

@@ -288,16 +288,18 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
                     </tspan>
                 ))}
             </text>
-            {/* Búsqueda global, modo oscuro, campana, avatar */}
-            <rect x={160.5} y={3.5} width={62} height={10} rx={5} fill={BLOQUE} />
+            {/* Búsqueda global, Orbi, modo oscuro, campana, avatar */}
+            <rect x={160.5} y={3.5} width={42} height={10} rx={5} fill={BLOQUE} />
             <circle cx={166} cy={8.5} r={1.8} fill="none" stroke={SUTIL} strokeWidth={0.8} />
-            <Rotulo x={170.5} y={10.5} size={5} color={SUTIL}>Buscar en Orbita...</Rotulo>
+            <Rotulo x={170.5} y={10.5} size={5} color={SUTIL}>Buscar...</Rotulo>
+            <rect x={205.5} y={3.5} width={21} height={10} rx={5} fill={ACENTO_BG} stroke={ACENTO} strokeOpacity={0.4} />
+            <circle cx={210.5} cy={8.5} r={2.6} fill={ACENTO} />
+            <Rotulo x={214.5} y={10.5} size={4.8} fuerte color={TEXTO}>Orbi</Rotulo>
             <path d="M 233 4.2 a 4 4 0 1 0 4 4.3 a 3 3 0 0 1 -4 -4.3 z" fill="none" stroke={TENUE} strokeWidth={0.9} />
             <path d="M 244.5 11 h 8 l -1.5 -2 v -2.5 a 2.5 2.5 0 0 0 -5 0 v 2.5 z" fill="none" stroke={TENUE} strokeWidth={0.9} strokeLinejoin="round" />
             <circle cx={252} cy={4.5} r={2.4} fill={TONOS.error.fg} />
             <Rotulo x={252} y={6} size={3.6} centro fuerte color={SOBRE_ACENTO}>3</Rotulo>
             <Avatar cx={265} cy={8.5} inicial="R" />
-            <Rotulo x={273} y={10.6} size={5.5} color={TEXTO}>Rama G.</Rotulo>
             <path d="M 304 7 l 2.5 2.5 l 2.5 -2.5" fill="none" stroke={TENUE} strokeWidth={0.9} />
             {children}
         </>
@@ -1202,12 +1204,12 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <PanelTienda />,
     },
     'layout-panel': {
-        titulo: 'El panel con el menú de la izquierda desplegado en Pedidos y la barra de arriba con la miga, la búsqueda, la campana y el avatar.',
+        titulo: 'El panel con el menú de la izquierda desplegado en Pedidos y la barra de arriba con la miga, la búsqueda, Orbi, la campana y el avatar.',
         leyenda: [
             'El buscador del menú: pedidos, clientes, productos y secciones, sin salir de ahí.',
             'El menú lateral: arriba el selector de espacio; cada módulo despliega sus sub-secciones. El puntito rojo en Mensajes es lo que te espera. Al pie, Orbi.',
             'La miga: en qué módulo y en qué pantalla estás.',
-            'La búsqueda global: un pedido por número, un cliente, un producto o una sección del panel.',
+            'La búsqueda global: un pedido por número, un cliente, un producto o una sección del panel. A su derecha, Orbi.',
             'La campana: lo que pasó mientras no estabas. A su izquierda, el modo oscuro.',
             'Tu avatar: Mi perfil, "Ir a la tienda" y Cerrar sesión.',
         ],
