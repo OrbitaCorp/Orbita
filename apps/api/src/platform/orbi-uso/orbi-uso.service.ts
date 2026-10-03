@@ -144,8 +144,11 @@ export class OrbiUsoService {
                coalesce(sum(actions_proposed),0)::int AS "accionesPropuestas", coalesce(sum(actions_confirmed),0)::int AS "accionesConfirmadas",
                coalesce(sum(actions_rejected),0)::int AS "accionesRechazadas", coalesce(sum(writes_rejected),0)::int AS "escriturasRechazadas"
         FROM orbi_turns WHERE created_at >= ${desde} AND created_at < ${hasta}`,
+      // created_at es TIMESTAMP sin zona y guarda UTC: un solo AT TIME ZONE lo
+      // tomaría como hora argentina y lo correría +3 h en vez de -3 h. Primero se
+      // lo declara UTC y recién después se pasa a hora argentina.
       this.prisma.$queryRaw<{ dia: string; mensajes: number; costoUsd: number }[]>`
-        SELECT to_char(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD') AS dia,
+        SELECT to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD') AS dia,
                count(*)::int AS mensajes, coalesce(sum(cost_usd),0)::float AS "costoUsd"
         FROM orbi_turns WHERE created_at >= ${desde} AND created_at < ${hasta} GROUP BY 1 ORDER BY 1`,
       // La combinación de tools (sin repetir, ordenadas) de cada mensaje.

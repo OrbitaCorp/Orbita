@@ -55,6 +55,14 @@ describe('OrbiUsoService.resumen', () => {
     expect(cupo.cupoDelNegocio).toHaveBeenCalledWith('n1', '2026-10');
   });
 
+  it('la serie diaria pasa created_at (UTC, sin zona) a hora argentina con el doble AT TIME ZONE', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    await armar().resumen('2026-10');
+    // El mock no evalúa SQL: se mira el texto de la consulta de la serie (la 2ª).
+    const sql = (prisma.$queryRaw.mock.calls[1][0] as string[]).join('?');
+    expect(sql).toContain("(created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires'");
+  });
+
   it('sin la variable, la lectura de conversaciones no está habilitada, y sin datos todo da cero', async () => {
     prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const r = await armar().resumen('2026-10');

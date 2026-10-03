@@ -184,14 +184,14 @@ export class PlatformAdminLogService {
   }
 
   // Un super admin abrió el texto de una conversación de Orbi. Queda quién, cuál
-  // y con qué motivo/ticket; NUNCA el contenido del chat.
-  async orbiConversacionAbierta(e: { adminId: string; conversationId: string; motivo: string; ticket?: string }): Promise<void> {
+  // y con qué motivo/ticket, de qué negocio; NUNCA el contenido del chat.
+  async orbiConversacionAbierta(e: { adminId: string; conversationId: string; businessId: string; motivo: string; ticket?: string }): Promise<void> {
     await this.registrar({
       adminId: e.adminId,
       action: ACCION_LOG_ADMIN.orbiConversacionAbierta,
       targetType: 'orbi_conversation',
       targetId: e.conversationId,
-      details: { motivo: e.motivo, ticket: e.ticket },
+      details: { businessId: e.businessId, motivo: e.motivo, ticket: e.ticket },
     });
   }
 

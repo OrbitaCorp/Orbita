@@ -23,17 +23,17 @@ describe('PlatformAdminLogService — Orbi', () => {
 
   it('orbiConversacionAbierta registra la conversación con motivo y ticket, y no lleva el texto', async () => {
     const { svc, create } = armar();
-    await svc.orbiConversacionAbierta({ adminId: 'ad1', conversationId: 'c1', motivo: 'Reclamo del dueño', ticket: 'SOP-12' });
+    await svc.orbiConversacionAbierta({ adminId: 'ad1', conversationId: 'c1', businessId: 'n1', motivo: 'Reclamo del dueño', ticket: 'SOP-12' });
     expect(ACCION_LOG_ADMIN.orbiConversacionAbierta).toBe('orbi_conversacion_abierta');
     const data = create.mock.calls[0][0].data;
     expect(data).toMatchObject({ adminId: 'ad1', action: 'orbi_conversacion_abierta', targetType: 'orbi_conversation', targetId: 'c1' });
-    expect(data.details).toEqual({ motivo: 'Reclamo del dueño', ticket: 'SOP-12' });
+    expect(data.details).toEqual({ businessId: 'n1', motivo: 'Reclamo del dueño', ticket: 'SOP-12' });
   });
 
   it('un ticket vacío se omite del detalle', async () => {
     const { svc, create } = armar();
-    await svc.orbiConversacionAbierta({ adminId: 'ad1', conversationId: 'c1', motivo: 'Reclamo', ticket: '' });
-    expect(create.mock.calls[0][0].data.details).toEqual({ motivo: 'Reclamo' });
+    await svc.orbiConversacionAbierta({ adminId: 'ad1', conversationId: 'c1', businessId: 'n1', motivo: 'Reclamo', ticket: '' });
+    expect(create.mock.calls[0][0].data.details).toEqual({ businessId: 'n1', motivo: 'Reclamo' });
   });
 
   it('si falla la escritura no rompe la acción que registra', async () => {
