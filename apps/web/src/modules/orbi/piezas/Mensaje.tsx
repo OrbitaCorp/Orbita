@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { ArrowRight, Ban, Check, ChevronDown, ChevronRight, CircleCheck, CircleHelp, CircleX, Clock, Copy, LoaderCircle, RotateCw } from 'lucide-react'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
 import { cleanToolLeaks, esTarjetaDeAccion, muestraNoLlegueAResponder } from '@/components/orbi/sesionOrbi'
 import { useOrbiChat } from '@/components/orbi/useOrbiChat'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
@@ -130,7 +130,7 @@ export const MensajeDeOrbi = memo(function MensajeDeOrbi({ msg, enVivo, onReinte
 
   return (
     <article className={`${s.mensajeOrbi}`} aria-label="Respuesta de Orbi">
-      <div className={s.autor}><OrbiIcon size={20} disc animated={false} />Orbi</div>
+      <div className={s.autor}><OrbiPet size={28} animated={false} />Orbi</div>
 
       {consultas.length > 0 && !enVivo && plegado && (
         <button type="button" className={`${s.plegado} ${s.foco}`} aria-expanded={abierto} onClick={() => setAbierto(a => !a)}>

@@ -103,7 +103,7 @@ Precio/planes y cupos por plan; si hay entrada de Orbi en el menú lateral; si "
 - **Gemini 3.x:** `thoughtSignature` obligatoria en la primera `functionCall` de cada turno; las paralelas van en UN turno; `includeThoughts` solo en inglés; `abortSignal` del SDK es del lado cliente (no cancela la generación en Google). Modelo vigente y gotchas en la memoria `proveedor-ia-gemini`.
 - **Windows/Git Bash:** `sleep` largo en foreground está bloqueado; usar tareas en background. `gh` no tiene scope `workflow` salvo que Alan lo refresque: un push que toque `.github/workflows/` se rechaza.
 - **graphify:** el repo tiene un grafo local (`graphify-out/`, ignorado) que se actualiza solo en cada commit; antes de explorar código hacer `graphify query "<pregunta>"` (regla del `CLAUDE.md`).
-- El `OrbiIcon` (`apps/web/src/components/orbi/OrbiIcon.tsx`) no acepta `color`; usar `disc`.
+- La estrella `OrbiIcon` se borró el 2026-10-03: Orbi se dibuja siempre con la mascota del menú lateral (`components/orbi/pet/OrbiPet.tsx`), que toma la forma del módulo que se está viendo. `disc` la apoya sobre el disco navy.
 
 ## 8. Reglas para trabajo desatendido (agente nocturno)
 

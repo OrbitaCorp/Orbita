@@ -160,8 +160,8 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Búsqueda global', texto: 'Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.' },
                     { label: 'Campana', texto: 'Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.' },
                     { label: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.' },
-                    { label: 'Orbi', texto: 'El asistente. Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.' },
-                    { label: 'Tu avatar', texto: 'Mi perfil, [[Ir a la tienda]] para verla como cliente, y Cerrar sesión.' },
+                    { label: 'Orbi', texto: 'El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. También se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.' },
+                    { label: 'Tu avatar', texto: 'El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, [[Ir a la tienda]] para verla como cliente, y Cerrar sesión.' },
                 ] },
             ],
         },
@@ -850,7 +850,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
             bloques: [
-                { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, o desde el botón **Orbi AI** al pie del menú de la izquierda.' },
+                { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón **Orbi** de la barra de arriba (al lado de la búsqueda) o desde **Orbi AI** al pie del menú de la izquierda.' },
                 { tipo: 'parrafo', texto: 'No es un buscador de ayuda genérica: contesta con los datos de **tu** negocio. "¿Cuánto vendí esta semana?", "¿qué pedidos tengo pendientes?", "¿cómo creo un cupón?" son todas preguntas válidas.' },
             ],
         },

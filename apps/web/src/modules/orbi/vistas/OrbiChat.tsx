@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown } from 'lucide-react'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import { usePetEstado } from '@/components/orbi/pet/usePetEstado'
 import { OrbiAvisoMantenimiento } from '@/components/orbi/OrbiAvisoMantenimiento'
 import { useOrbiChat } from '@/components/orbi/useOrbiChat'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
@@ -18,10 +19,14 @@ import { nuevaSesion } from '../estado/sesiones'
 import s from '../orbi.module.css'
 
 const CERCA_DEL_FINAL_PX = 80
+/** Tocar a la mascota le hace cosquillas; no hay nada más que avisar. */
+const sinAviso = () => {}
 
 /** Lo de adentro del chat: lo mismo en las cuatro vistas. */
-export function OrbiChat({ onExpandir, onPestana, onCerrar, onAbrirManual, conSelector = true }: {
+export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManual, conSelector = true }: {
   onExpandir?: () => void
+  /** En la página de Orbi: volver a la pantalla de antes, con Orbi al costado. */
+  onSalir?: () => void
   onPestana?: () => void
   onCerrar?: () => void
   onAbrirManual?: () => void
@@ -33,6 +38,7 @@ export function OrbiChat({ onExpandir, onPestana, onCerrar, onAbrirManual, conSe
   const conversationId = useOrbiStore(st => st.conversationId)
   const mantenimiento = useOrbiStore(st => st.mantenimiento)
   const abortar = useOrbiStore(st => st.abortar)
+  const estadoPet = usePetEstado()
   const { send } = useOrbiChat()
   const contexto = useOrbiContext()
   const { user } = useAuth()
@@ -102,6 +108,7 @@ export function OrbiChat({ onExpandir, onPestana, onCerrar, onAbrirManual, conSe
       <Encabezado
         onNueva={() => { nuevaSesion(); anunciar('Conversación nueva') }}
         onExpandir={onExpandir}
+        onSalir={onSalir}
         onPestana={onPestana}
         onCerrar={onCerrar}
         conSelector={conSelector}
@@ -109,7 +116,7 @@ export function OrbiChat({ onExpandir, onPestana, onCerrar, onAbrirManual, conSe
 
       {visibles.length === 0 ? (
         <div className={s.vacio}>
-          <OrbiIcon size={56} disc />
+          <OrbiPet size={72} estado={estadoPet} onCosquillas={sinAviso} />
           <h2>Hola, soy Orbi</h2>
           <p>Preguntame cómo se hace algo en el panel o pedime datos de tu tienda. Si te propongo un cambio, no pasa nada hasta que lo confirmes.</p>
           {!mantenimiento && sugerencias.length > 0 && (

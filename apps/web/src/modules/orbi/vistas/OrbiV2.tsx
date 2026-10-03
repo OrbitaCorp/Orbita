@@ -9,6 +9,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { OrbiV2Contexto, type Vista } from '../piezas/contexto'
 import { ANCHO_MAXIMO, ANCHO_MINIMO, topeDeAncho, useOrbiV2 } from '../estado/useOrbiV2'
 import { OrbiChat } from './OrbiChat'
+import { paginaDesde } from '../estado/vuelta'
 import s from '../orbi.module.css'
 
 const PASO_TECLADO_PX = 16
@@ -32,6 +33,7 @@ export function useRutasDeOrbi() {
   return useMemo(() => ({
     pagina: negocioId ? `${adminPath(negocioId, moduloPadre, 'orbi')}?vista=chat` : null,
     manual: negocioId ? adminPath(negocioId, moduloPadre, 'manual') : null,
+    inicio: negocioId ? adminPath(negocioId, moduloPadre, 'dashboard') : '/admin',
   }), [negocioId, moduloPadre])
 }
 
@@ -142,8 +144,10 @@ export default function OrbiV2() {
 
   if (!isOpen || enLaPagina) return null
 
-  const expandir = rutas.pagina ? () => { void router.push(rutas.pagina!) } : undefined
-  const pestana = rutas.pagina ? () => { window.open(rutas.pagina!, '_blank', 'noopener') } : undefined
+  // La página recuerda de dónde se vino, para que "Salir de la pantalla completa" vuelva ahí.
+  const paginaConVuelta = rutas.pagina ? paginaDesde(rutas.pagina, router.asPath) : null
+  const expandir = paginaConVuelta ? () => { void router.push(paginaConVuelta) } : undefined
+  const pestana = paginaConVuelta ? () => { window.open(paginaConVuelta, '_blank', 'noopener') } : undefined
   const manual = rutas.manual ? () => navegar(rutas.manual!) : undefined
   const chat = <OrbiChat onExpandir={expandir} onPestana={pestana} onCerrar={close} onAbrirManual={manual} />
 
