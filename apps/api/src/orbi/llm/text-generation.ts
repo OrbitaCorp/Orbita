@@ -29,6 +29,10 @@ export interface GenerarTextoResult {
   promptTokens?: number;
   /** Incluye los tokens de razonamiento: se cobran como salida. */
   completionTokens?: number;
+  /** De promptTokens, los que vinieron de caché. */
+  cachedTokens?: number;
+  /** De completionTokens, los de pensamiento. */
+  thinkingTokens?: number;
 }
 
 /**
@@ -71,6 +75,8 @@ async function conGemini(config: ConfigService, opts: GenerarTextoOpts): Promise
     model: opts.geminiModel,
     promptTokens: uso?.promptTokenCount ?? undefined,
     completionTokens: uso ? (uso.candidatesTokenCount ?? 0) + (uso.thoughtsTokenCount ?? 0) : undefined,
+    cachedTokens: uso?.cachedContentTokenCount ?? undefined,
+    thinkingTokens: uso?.thoughtsTokenCount ?? undefined,
   };
 }
 
@@ -95,5 +101,7 @@ async function conGroq(config: ConfigService, opts: GenerarTextoOpts): Promise<G
     model: GROQ_AUX_MODEL,
     promptTokens: response.usage?.prompt_tokens,
     completionTokens: response.usage?.completion_tokens,
+    cachedTokens: (response.usage as { prompt_tokens_details?: { cached_tokens?: number } } | undefined)?.prompt_tokens_details?.cached_tokens,
+    thinkingTokens: (response.usage as { completion_tokens_details?: { reasoning_tokens?: number } } | undefined)?.completion_tokens_details?.reasoning_tokens,
   };
 }

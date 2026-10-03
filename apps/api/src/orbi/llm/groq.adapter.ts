@@ -117,7 +117,7 @@ export class GroqAdapter implements LlmAdapter {
     });
 
     let currentToolCall: { id: string; name: string; argsJson: string } | null = null;
-    let usage: { promptTokens: number; completionTokens: number } | null = null;
+    let usage: { promptTokens: number; completionTokens: number; cachedTokens: number; thinkingTokens: number } | null = null;
 
     for await (const chunk of stream) {
       // El chunk con el consumo viene SIN choices, así que tiene que leerse
@@ -127,11 +127,19 @@ export class GroqAdapter implements LlmAdapter {
       // los tipos del SDK).
       const crudo = (chunk as { usage?: unknown; x_groq?: { usage?: unknown } });
       const u = (crudo.usage ?? crudo.x_groq?.usage) as
-        { prompt_tokens?: number; completion_tokens?: number } | undefined;
+        | {
+            prompt_tokens?: number;
+            completion_tokens?: number;
+            prompt_tokens_details?: { cached_tokens?: number };
+            completion_tokens_details?: { reasoning_tokens?: number };
+          }
+        | undefined;
       if (u?.prompt_tokens !== undefined) {
         usage = {
           promptTokens: u.prompt_tokens ?? 0,
           completionTokens: u.completion_tokens ?? 0,
+          cachedTokens: u.prompt_tokens_details?.cached_tokens ?? 0,
+          thinkingTokens: u.completion_tokens_details?.reasoning_tokens ?? 0,
         };
       }
 
