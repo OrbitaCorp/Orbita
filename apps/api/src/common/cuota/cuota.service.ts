@@ -31,4 +31,15 @@ export class CuotaService {
       RETURNING count`;
     return filas.length > 0;
   }
+
+  /** Devuelve un uso del día (un mensaje que no se pudo atender). Nunca baja de 0. Best-effort. */
+  async devolver(clave: string): Promise<void> {
+    const dia = fechaArgentina(new Date());
+    try {
+      await this.prisma.$executeRaw`
+        UPDATE daily_quota SET count = count - 1 WHERE key = ${clave} AND day = ${dia} AND count > 0`;
+    } catch {
+      // Si falla, el peor caso es el de hoy: el mensaje fallido igual contó.
+    }
+  }
 }

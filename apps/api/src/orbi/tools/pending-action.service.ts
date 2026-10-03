@@ -65,6 +65,8 @@ export class PendingActionService {
     businessId: string;
     memberId: string;
     conversationId: string | null;
+    /** El turno del chat que la propuso: ahí se cuenta si se confirmó o se canceló. */
+    turnId: string | null;
     resumen: string;
   }): Promise<string> {
     const id = randomBytes(16).toString('hex');
@@ -74,6 +76,7 @@ export class PendingActionService {
         businessId: a.businessId,
         memberId: a.memberId,
         conversationId: a.conversationId,
+        turnId: a.turnId,
         tool: a.tool,
         args: a.args as Prisma.InputJsonValue,
         summary: a.resumen,

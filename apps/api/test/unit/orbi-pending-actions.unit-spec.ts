@@ -22,6 +22,7 @@ const base = {
   businessId: 'biz-1',
   memberId: 'member-1',
   conversationId: 'conv-1',
+  turnId: 'turno-1' as string | null,
   resumen: 'Crear el cupón "VERANO20" de 20% off',
 };
 
@@ -72,6 +73,7 @@ describe('PendingActionService', () => {
         businessId: 'biz-1',
         memberId: 'member-1',
         conversationId: 'conv-1',
+        turnId: 'turno-1',
         tool: 'createCoupon',
         args: { code: 'VERANO20', value: 20 },
         summary: 'Crear el cupón "VERANO20" de 20% off',
@@ -85,6 +87,12 @@ describe('PendingActionService', () => {
       const prisma = prismaFijo({});
       await new PendingActionService(prisma as any).crear({ ...base, conversationId: null });
       expect((prisma.orbiPendingAction.create.mock.calls[0][0] as any).data.conversationId).toBeNull();
+    });
+
+    it('sin turno (null) guarda null', async () => {
+      const prisma = prismaFijo({});
+      await new PendingActionService(prisma as any).crear({ ...base, turnId: null });
+      expect((prisma.orbiPendingAction.create.mock.calls[0][0] as any).data.turnId).toBeNull();
     });
 
     it('cada acción tiene su propio id', async () => {

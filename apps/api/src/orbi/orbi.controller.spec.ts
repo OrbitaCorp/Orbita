@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { DemoIaService } from '../demo/demo-ia.service';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
@@ -60,7 +60,8 @@ describe('OrbiController', () => {
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
   let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock };
-  let turnos: { registrar: jest.Mock };
+  let turnos: { registrar: jest.Mock; contarDesenlace: jest.Mock };
+  let cuota: { consumir: jest.Mock; devolver: jest.Mock };
   let metering: { track: jest.Mock };
   let analitica: { logAiTurn: jest.Mock };
 
@@ -127,8 +128,8 @@ describe('OrbiController', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: UsageMeteringService, useValue: { track: jest.fn() } },
         // La cuota diaria vive en Postgres: acá siempre hay cupo.
-        { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true) } },
-        { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined) } },
+        { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true), devolver: jest.fn().mockResolvedValue(undefined) } },
+        { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined), contarDesenlace: jest.fn().mockResolvedValue(undefined) } },
         {
           provide: OrbiSaludService,
           useValue: {
@@ -145,6 +146,7 @@ describe('OrbiController', () => {
     acciones = module.get(PendingActionService);
     conversaciones = module.get(ConversationService);
     turnos = module.get(OrbiTurnService);
+    cuota = module.get(CuotaService);
     metering = module.get(UsageMeteringService);
     analitica = module.get(WizardAnalyticsService);
   });
@@ -643,10 +645,30 @@ describe('OrbiController', () => {
     };
     const cupon = {
       tool: 'createCoupon', args: { code: 'VERANO15' }, businessId: 'biz-1', memberId: 'member-1',
-      conversationId: 'conv-1' as string | null, resumen: 'Crear el cupón "VERANO15"',
+      conversationId: 'conv-1' as string | null, turnId: 'turno-1' as string | null, resumen: 'Crear el cupón "VERANO15"',
     };
     const OK = { success: true, label: 'Cupón "VERANO15" creado', data: { couponId: 'c-1' } };
     const ORDER_ID = '8f14e45f-ceea-467a-9575-6a1e1c2b3d4e';
+
+    it('confirmar cuenta el desenlace en el turno que propuso la acción; si no tiene turno, no cuenta', async () => {
+      registry.execute.mockResolvedValue(OK);
+      const id = await acciones.crear(cupon);
+      const huerfana = await acciones.crear({ ...cupon, turnId: null });
+
+      await controller.confirm({ actionId: id }, duenio as any);
+      await controller.confirm({ actionId: huerfana }, duenio as any);
+
+      expect(turnos.contarDesenlace).toHaveBeenCalledTimes(1);
+      expect(turnos.contarDesenlace).toHaveBeenCalledWith('turno-1', 'confirmada');
+    });
+
+    it('cancelar cuenta la acción como rechazada en su turno', async () => {
+      const id = await acciones.crear(cupon);
+
+      await controller.reject({ actionId: id }, duenio as any);
+
+      expect(turnos.contarDesenlace).toHaveBeenCalledWith('turno-1', 'rechazada');
+    });
 
     it('confirmar dos veces devuelve el mismo result y ejecuta la tool una sola vez', async () => {
       registry.execute.mockResolvedValue(OK);
@@ -1275,9 +1297,12 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledTimes(1);
       const t = turnos.registrar.mock.calls[0][0];
       expect(t).toEqual({
+        id: expect.stringMatching(UUID),
         businessId: 'biz-1', memberId: 'member-1', conversationId: 'conv-1', module: 'pedidos',
         model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, latencyMs: expect.any(Number),
-        rounds: 1, toolsUsed: [], actionsProposed: 0, status: 'ok',
+        rounds: 1, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'ok',
+        provider: 'gemini', ttftMs: expect.any(Number), steps: [expect.objectContaining({ tools: [] })],
+        contextChars: { system: 'Sos Orbi, el asistente de IA.'.length, tools: 0, history: 0, message: 'PREGUNTA-PRIVADA'.length },
       });
       expect(JSON.stringify(t)).not.toContain('PRIVADA');
     });
@@ -1313,6 +1338,75 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({
         rounds: 3, toolsUsed: ['createCoupon', 'listProducts'], actionsProposed: 1, status: 'ok',
       }));
+    });
+
+    it('el id del turno es el mismo en la ficha y en las acciones que propuso, con sus pasos', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      registry.proponer.mockResolvedValue({ resumen: 'Crear el cupón "VERANO"' });
+      const crear = jest.spyOn(acciones, 'crear');
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat({ message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL, section: 'cupones' } } as any, createMockResponse() as any, duenio as any);
+
+      const t = turnos.registrar.mock.calls[0][0];
+      expect(t.id).toMatch(UUID);
+      expect(crear).toHaveBeenCalledWith(expect.objectContaining({ turnId: t.id }));
+      expect(t.steps).toHaveLength(2);
+      expect(t.steps[0].tools).toEqual([expect.objectContaining({ name: 'createCoupon', tipo: 'propuesta' })]);
+      expect(t.section).toBe('cupones');
+      expect(t.actionsProposed).toBe(1);
+    });
+
+    it('error: guarda la categoría de la falla y devuelve el cupo del día', async () => {
+      mockLlm.streamChat = async function* () {
+        throw new Error('boom');
+      } as any;
+
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+
+      expect(cuota.devolver).toHaveBeenCalledWith('orbi-panel:biz-1');
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', errorCategory: 'INTERNAL' }));
+    });
+
+    it('un turno que sale bien o se corta no devuelve el cupo', async () => {
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+      expect(cuota.devolver).not.toHaveBeenCalled();
+    });
+
+    it('la demo que falla no devuelve cupo ni registra turno', async () => {
+      mockLlm.streamChat = async function* () {
+        throw new Error('boom');
+      } as any;
+
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any);
+
+      expect(cuota.devolver).not.toHaveBeenCalled();
+      expect(turnos.registrar).not.toHaveBeenCalled();
+    });
+
+    it('cuota diaria rechazada: 429 y queda registrado un turno con status quota', async () => {
+      cuota.consumir.mockResolvedValue(false);
+      const res = createMockResponse();
+
+      await expect(controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any)).rejects.toThrow(HttpException);
+
+      expect(turnos.registrar).toHaveBeenCalledWith({
+        id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
+        latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+      });
+      expect(cuota.devolver).not.toHaveBeenCalled();
+    });
+
+    it('cuota diaria rechazada en la demo: no se registra', async () => {
+      cuota.consumir.mockResolvedValue(false);
+      await expect(controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any)).rejects.toThrow(HttpException);
+      expect(turnos.registrar).not.toHaveBeenCalled();
     });
 
     it('error: status error', async () => {

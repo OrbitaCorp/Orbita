@@ -43,6 +43,35 @@ describe('CuotaService', () => {
     expect(prisma.$queryRaw.mock.calls[0].slice(1)).toEqual(['image-studio:biz-2', '2026-09-10', 30]);
   });
 
+  describe('devolver', () => {
+    function conEjecutar(ejecutar: jest.Mock) {
+      const prisma = { $queryRaw: jest.fn(), $executeRaw: ejecutar };
+      return { svc: new CuotaService(prisma as never), prisma };
+    }
+
+    it('resta un uso del día de Argentina, sin bajar de 0, con un solo UPDATE', async () => {
+      jest.useFakeTimers({ now: new Date('2026-09-11T02:00:00Z') });
+      const { svc, prisma } = conEjecutar(jest.fn().mockResolvedValue(1));
+
+      await svc.devolver('orbi-panel:biz-1');
+
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      const llamada = prisma.$executeRaw.mock.calls[0];
+      const sql = sqlDe(llamada);
+      expect(sql).toContain('UPDATE daily_quota SET count = count - 1');
+      expect(sql).toContain('count > 0');
+      expect(llamada.slice(1)).toEqual(['orbi-panel:biz-1', '2026-09-10']);
+    });
+
+    it('si la base falla no lanza (el peor caso es que el mensaje fallido igual cuente)', async () => {
+      const { svc, prisma } = conEjecutar(jest.fn().mockRejectedValue(new Error('db caída')));
+
+      await expect(svc.devolver('orbi-panel:biz-1')).resolves.toBeUndefined();
+
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('el día cambia a la medianoche de Argentina', async () => {
     jest.useFakeTimers({ now: new Date('2026-09-11T03:00:01Z') });
     const { svc, prisma } = servicio([{ count: 1 }]);

@@ -26,6 +26,8 @@ import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
 import { tituloAutomatico } from './sesiones/titulo';
 import { ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, vueltaDeTools } from './turno/vuelta';
 import { correrTurno, nuevoProgresoDelTurno, sumarConsumo, type ConsumoPorProveedor, type EmisorDelTurno } from './turno/motor-de-turno';
+import { caracteresDelContexto, proveedorDelTurno, totalesDelConsumo, type CaracteresDelContexto } from './turno/ficha-del-turno';
+import { clasificarError } from './salud/clasificar-error';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -205,6 +207,11 @@ export class OrbiController {
       throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
     }
 
+    // El id de este mensaje en orbi_turns: nace acá para que también lo tenga
+    // el turno que la cuota rechaza, y para que las acciones que proponga lo
+    // guarden (así se cuenta después si se confirmaron o se cancelaron).
+    const turnId = randomUUID();
+
     // El negocio SIEMPRE sale del token, nunca del body (auditoria interna
     // 09/09, item `api.common`, verificaciones 3 y 6).
     //
@@ -231,6 +238,22 @@ export class OrbiController {
 
     // Antes de abrir el stream, para que llegue como un 429 normal.
     if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
+      // Queda registrado: cuántos mensajes se rechazan por día es un dato del
+      // uso. La demo no (comparte negocio y miembro, ver el finally).
+      if (user.readOnly !== true) {
+        void this.orbiTurns.registrar({
+          id: turnId,
+          businessId: user.businessId,
+          memberId: user.memberId,
+          conversationId: null,
+          latencyMs: 0,
+          rounds: 0,
+          toolsUsed: [],
+          actionsProposed: 0,
+          writesRejected: 0,
+          status: 'quota',
+        });
+      }
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -262,6 +285,10 @@ export class OrbiController {
     // acción pendiente (ahí va la nota de confirmar o cancelar). Afuera del
     // try porque el metering y la telemetría del finally la usan.
     let conversacionVerificada: string | null = null;
+    // Lo que se mandó en la primera vuelta y por qué falló el turno (si falló):
+    // afuera del try porque la ficha del finally los usa.
+    let contextChars: CaracteresDelContexto | undefined;
+    let errorCategory: string | undefined;
 
     try {
       let history: LlmMessage[] = [];
@@ -329,8 +356,10 @@ export class OrbiController {
         surface: dto.context.surface,
         permissions: permisos,
         roleName: user.roleName,
+        turnId,
       };
 
+      contextChars = caracteresDelContexto({ system: messages[0].content, tools, history, message: dto.message });
       await correrTurno({
         llm: this.llm,
         registry: this.toolRegistry,
@@ -347,10 +376,12 @@ export class OrbiController {
           businessId: user.businessId,
           memberId: user.memberId,
           conversationId: conversacionVerificada,
+          turnId,
           resumen,
         }),
         emisor: emisorSse(res),
         progreso,
+        inicio: arrancoEn,
       });
       if (progreso.estado === 'max_rounds') estado = 'max_rounds';
 
@@ -373,6 +404,7 @@ export class OrbiController {
         estado = 'cancelled';
       } else {
         estado = 'error';
+        errorCategory = clasificarError(error).categoria;
         this.logger.error(`Orbi chat error: ${error}`);
         // Se clasifica (saldo, key, caída, bug nuestro) y se cuenta: si es una
         // de las que no se arreglan solas, o se repite, Orbi pasa a
@@ -390,6 +422,10 @@ export class OrbiController {
       });
       res.end();
 
+      // Un mensaje que falló por nuestra culpa o la del proveedor no gasta el
+      // cupo del día. Sin await y fuera de la demo (que no cuenta cupo propio).
+      if (estado === 'error' && !esDemo) void this.cuota.devolver(`orbi-panel:${user.businessId}`);
+
       // La demo no se registra: todos sus visitantes comparten negocio y
       // miembro, y sus turnos se mezclarían con las métricas de uso real del
       // negocio. El metering de arriba sí: ese consumo se paga igual.
@@ -397,13 +433,9 @@ export class OrbiController {
         // Sin await: la telemetría no puede demorar ni romper el cierre del
         // stream. registrar() nunca lanza. En un turno cancelado los tokens son
         // un piso: la llamada cortada se factura igual y su `usage` no llegó.
-        let promptTokens = 0;
-        let completionTokens = 0;
-        for (const c of progreso.consumo.values()) {
-          promptTokens += c.promptTokens;
-          completionTokens += c.completionTokens;
-        }
+        const totales = totalesDelConsumo(progreso.consumo);
         void this.orbiTurns.registrar({
+          id: turnId,
           businessId: user.businessId,
           memberId: user.memberId,
           conversationId: conversacionVerificada,
@@ -413,8 +445,17 @@ export class OrbiController {
           module: resolverModuloDelPanel(dto.context.module, dto.context.section).modulo ?? dto.context.module,
           model: progreso.modeloReportado ?? this.modeloPara(dto.context.surface),
           // undefined y no 0 si el proveedor no informó consumo.
-          promptTokens: promptTokens || undefined,
-          completionTokens: completionTokens || undefined,
+          promptTokens: totales.promptTokens || undefined,
+          completionTokens: totales.completionTokens || undefined,
+          provider: proveedorDelTurno(progreso.consumo),
+          cachedTokens: totales.cachedTokens || undefined,
+          thinkingTokens: totales.thinkingTokens || undefined,
+          ttftMs: progreso.ttftMs,
+          errorCategory,
+          section: dto.context.section,
+          contextChars,
+          steps: progreso.pasos,
+          writesRejected: progreso.escriturasRechazadas,
           latencyMs: Date.now() - arrancoEn,
           rounds: progreso.llamadasAlModelo,
           toolsUsed: progreso.toolsPedidas,
@@ -478,6 +519,7 @@ export class OrbiController {
     // acción ya se resolvió, y una conversación borrada o la base lenta no
     // pueden hacer que la persona crea que no pasó.
     await this.anotar(accion, user, (ids) => notaDeConfirmacion(accion.tool, result, ids));
+    if (accion.turnId) void this.orbiTurns.contarDesenlace(accion.turnId, 'confirmada');
     return result;
   }
 
@@ -507,6 +549,7 @@ export class OrbiController {
       case 'ok': {
         const accion = rechazo.accion;
         await this.anotar(accion, user, (ids) => notaDeCancelacion(accion.tool, ids));
+        if (accion.turnId) void this.orbiTurns.contarDesenlace(accion.turnId, 'rechazada');
         return { ok: true };
       }
       case 'ya_rechazada':

@@ -9,6 +9,7 @@ import { Logger } from '@nestjs/common';
 import { OrbiTurnService } from '../../src/orbi/orbi-turn.service';
 
 const turno = {
+  id: 't-1',
   businessId: 'biz-1',
   memberId: 'member-1',
   conversationId: 'conv-1' as string | null,
@@ -20,6 +21,7 @@ const turno = {
   rounds: 2,
   toolsUsed: ['listOrders'],
   actionsProposed: 0,
+  writesRejected: 0,
   status: 'ok' as const,
 };
 
@@ -31,15 +33,15 @@ describe('OrbiTurnService', () => {
 
     await new OrbiTurnService(prisma as any).registrar(turno);
 
-    expect(prisma.orbiTurn.create).toHaveBeenCalledWith({ data: turno });
+    expect(prisma.orbiTurn.create).toHaveBeenCalledWith({ data: expect.objectContaining(turno) });
   });
 
   it('lo que no vino queda en null (no en 0: un 0 se promedia como turno gratis)', async () => {
     const prisma = { orbiTurn: { create: jest.fn().mockResolvedValue({ id: 't-1' }) } };
 
     await new OrbiTurnService(prisma as any).registrar({
-      businessId: 'biz-1', memberId: 'member-1', conversationId: null,
-      latencyMs: 10, rounds: 0, toolsUsed: [], actionsProposed: 0, status: 'cancelled',
+      id: 't-2', businessId: 'biz-1', memberId: 'member-1', conversationId: null,
+      latencyMs: 10, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'cancelled',
     });
 
     expect(prisma.orbiTurn.create).toHaveBeenCalledWith({
