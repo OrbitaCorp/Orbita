@@ -573,6 +573,28 @@ describe('Clases con cupo', () => {
     await expect(new ClasesService(prisma, ctx, {} as any).aceptarOferta(BIZ, 'e2', AHORA)).rejects.toThrow('El lugar ya se ocupó.');
   });
 
+  it('el cupo no baja de los anotados ni de los lugares ya ofrecidos a la lista de espera', async () => {
+    const conteo = (anotados: number, ofertas: number) => (a: any) => (a.where.status === 'ENROLLED' ? anotados : a.where.offerExpiresAt?.gt ? ofertas : 0);
+    const { prisma, ctx } = base({ 'appointmentClassEnrollment.count': conteo(3, 0) });
+    await expect(new ClasesService(prisma, ctx, {} as any).actualizarSesion(DUENIO, 'tpl-1', FECHA, { capacity: 2 }, AHORA)).rejects.toThrow('Ya hay 3 anotados: el cupo no puede ser menor.');
+    const { prisma: p2, ctx: c2 } = base({ 'appointmentClassEnrollment.count': conteo(1, 1) });
+    await expect(new ClasesService(p2, c2, {} as any).actualizarSesion(DUENIO, 'tpl-1', FECHA, { capacity: 1 }, AHORA))
+      .rejects.toThrow('Hay 1 anotados y 1 lugar ofrecido a la lista de espera: el cupo no puede ser menor que 2.');
+  });
+
+  it('suspender cancela las inscripciones activas (SYSTEM) y lo registra', async () => {
+    const audit = { registrar: jest.fn() };
+    const { prisma, ctx, llamadas } = base({ 'appointmentClassEnrollment.updateMany': { count: 4 } });
+    await new ClasesService(prisma, ctx, {} as any, audit as any).actualizarSesion(DUENIO, 'tpl-1', FECHA, { cancelled: true, cancelReason: 'Lluvia' }, AHORA).catch(() => undefined);
+    expect(llamadas.find((l) => l.modelo === 'appointmentClassSession' && l.op === 'updateMany')!.args).toMatchObject({ where: { id: 'ses-1', businessId: BIZ }, data: { isCancelled: true, cancelReason: 'Lluvia' } });
+    expect(llamadas.find((l) => l.modelo === 'appointmentClassEnrollment' && l.op === 'updateMany')!.args).toMatchObject({
+      where: { businessId: BIZ, sessionId: 'ses-1', status: { in: ['ENROLLED', 'WAITLIST'] } }, data: { status: 'CANCELLED', cancelledBy: 'SYSTEM' },
+    });
+    expect(audit.registrar).toHaveBeenCalledWith(expect.objectContaining({ entityType: 'appointment_class_session', changes: expect.arrayContaining([{ field: 'inscripciones_canceladas', before: null, after: 4 }]) }));
+    const { prisma: p2, ctx: c2 } = base({ 'appointmentClassSession.upsert': sesion({ startsAt: new Date(AHORA.getTime() - 1) }) });
+    await expect(new ClasesService(p2, c2, {} as any).actualizarSesion(DUENIO, 'tpl-1', FECHA, { cancelled: true }, AHORA)).rejects.toThrow('Esa clase ya empezó');
+  });
+
   it('borrar una plantilla con gente anotada en clases que vienen → 400', async () => {
     const { prisma, ctx } = base({ 'appointmentClassEnrollment.count': 3 });
     await expect(new ClasesService(prisma, ctx, {} as any).borrarPlantilla(DUENIO, 'tpl-1', AHORA)).rejects.toThrow('Hay 3 personas anotadas en clases que vienen. Suspendé esas clases primero.');

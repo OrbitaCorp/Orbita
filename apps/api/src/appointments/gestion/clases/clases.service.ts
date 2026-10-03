@@ -224,8 +224,15 @@ export class ClasesService {
       }
       if (dto.capacity !== undefined) {
         const nuevo = dto.capacity ?? t.capacity;
-        const anotados = await tx.appointmentClassEnrollment.count({ where: { businessId, sessionId: s.id, status: 'ENROLLED' } });
+        const [anotados, ofertas] = await Promise.all([
+          tx.appointmentClassEnrollment.count({ where: { businessId, sessionId: s.id, status: 'ENROLLED' } }),
+          tx.appointmentClassEnrollment.count({ where: { businessId, sessionId: s.id, status: 'WAITLIST', offerExpiresAt: { gt: ahora } } }),
+        ]);
         if (nuevo < anotados) throw new BadRequestException(`Ya hay ${anotados} anotados: el cupo no puede ser menor.`);
+        // Un lugar ya ofrecido a la lista de espera es una promesa: no se le saca de abajo.
+        if (nuevo < anotados + ofertas) {
+          throw new BadRequestException(`Hay ${anotados} anotados y ${ofertas} ${ofertas === 1 ? 'lugar ofrecido' : 'lugares ofrecidos'} a la lista de espera: el cupo no puede ser menor que ${anotados + ofertas}.`);
+        }
         await tx.appointmentClassSession.updateMany({ where: { id: s.id, businessId }, data: { capacity: dto.capacity } });
         registro.push({ field: 'capacity', before: s.capacity ?? t.capacity, after: nuevo });
       }
