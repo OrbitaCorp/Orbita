@@ -9,12 +9,15 @@ import { PlatformAdminLogModule } from './platform-admin-log.module';
 import { CostsModule } from './costs/costs.module';
 import { OrbiSaludModule } from '../orbi/salud/orbi-salud.module';
 import { OrbiSaludController } from './orbi-salud.controller';
+import { CupoOrbiModule } from '../orbi/cupo/cupo-orbi.module';
+import { OrbiUsoPlataformaController } from './orbi-uso/orbi-uso.controller';
+import { OrbiUsoService } from './orbi-uso/orbi-uso.service';
 
 @Module({
   // PlatformAdminLogModule: registro en platform_admin_logs de los mails de
   // prueba (y, desde AuthModule, del login y el segundo factor).
-  imports: [SubscriptionsModule, WizardAnalyticsModule, PlatformAdminLogModule, CostsModule, OrbiSaludModule],
-  controllers: [PlatformController, PlatformAuditController, OrbiSaludController],
-  providers: [PlatformService, PlatformAuditService],
+  imports: [SubscriptionsModule, WizardAnalyticsModule, PlatformAdminLogModule, CostsModule, OrbiSaludModule, CupoOrbiModule],
+  controllers: [PlatformController, PlatformAuditController, OrbiSaludController, OrbiUsoPlataformaController],
+  providers: [PlatformService, PlatformAuditService, OrbiUsoService],
 })
 export class PlatformModule {}

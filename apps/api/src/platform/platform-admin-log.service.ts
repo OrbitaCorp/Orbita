@@ -53,6 +53,8 @@ export const ACCION_LOG_ADMIN = {
   },
   mailPrueba: 'send_mail_test',
   orbiMantenimiento: 'orbi_maintenance',
+  orbiCupoAjuste: 'orbi_cupo_ajuste',
+  orbiConversacionAbierta: 'orbi_conversacion_abierta',
   contrasenaRestablecida: 'password_reset',
 } as const;
 
@@ -165,6 +167,31 @@ export class PlatformAdminLogService {
       targetType: 'orbi',
       targetId: 'global',
       details: { accion: e.accion, detalle: e.detalle },
+    });
+  }
+
+  // Ajuste de créditos del cupo mensual de Orbi de un negocio (suma o resta). El
+  // rastro de quién dio de más o de menos y por qué; `ajusteId` apunta a la
+  // fila de orbi_cupo_ajustes.
+  async orbiCupoAjuste(e: { adminId: string; businessId: string; mes: string; creditos: number; motivo: string; ajusteId: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiCupoAjuste,
+      targetType: 'business',
+      targetId: e.businessId,
+      details: { mes: e.mes, creditos: e.creditos, motivo: e.motivo, ajusteId: e.ajusteId },
+    });
+  }
+
+  // Un super admin abrió el texto de una conversación de Orbi. Queda quién, cuál
+  // y con qué motivo/ticket; NUNCA el contenido del chat.
+  async orbiConversacionAbierta(e: { adminId: string; conversationId: string; motivo: string; ticket?: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiConversacionAbierta,
+      targetType: 'orbi_conversation',
+      targetId: e.conversationId,
+      details: { motivo: e.motivo, ticket: e.ticket },
     });
   }
 
