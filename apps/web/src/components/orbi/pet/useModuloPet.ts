@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router'
 import { moduloDeSeccion } from '@/layouts/components/moduloActivo'
 
-/** ¿Estamos en el panel de administración? Ahí Orbi es el pet; en el resto, la estrella. */
+/** ¿Estamos en el panel de administración? Ahí el pet toma la forma del módulo; afuera, la de Inicio. */
 export function esRutaPanel(pathname: string): boolean {
   return pathname === '/admin' || pathname.startsWith('/admin/')
 }

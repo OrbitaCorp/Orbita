@@ -22,6 +22,8 @@ const VARIABLES = [
   'EMAIL_LOGS_RETENTION_DAYS',
   'ORBI_PENDING_ACTIONS_RETENTION_DAYS',
   'ORBI_TURNS_RETENTION_DAYS',
+  'ORBI_PROVIDER_FAILURES_RETENTION_DAYS',
+  'ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS',
   'DAILY_QUOTA_RETENTION_DAYS',
 ];
 
@@ -35,6 +37,7 @@ function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean
     orbiPendingAction: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
     orbiTurn: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
     orbiProviderFailure: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+    orbiConversation: { deleteMany: jest.fn().mockResolvedValue({ count: 6 }) },
     dailyQuota: { deleteMany: jest.fn().mockResolvedValue({ count: 9 }) },
   };
   const original = { ...process.env };
@@ -69,6 +72,7 @@ describe('Retención de logs y registros', () => {
         orbi_pending_actions: 3,
         orbi_turns: 5,
         orbi_provider_failures: 2,
+        orbi_conversations: 6,
         daily_quota: 9,
       });
     } finally {
@@ -84,6 +88,10 @@ describe('Retención de logs y registros', () => {
       expect(prisma.orbiTurn.deleteMany).toHaveBeenCalledWith(corteHace(400));
       // Las fallas del proveedor de IA (mantenimiento automático de Orbi): 30 días.
       expect(prisma.orbiProviderFailure.deleteMany).toHaveBeenCalledWith(corteHace(30));
+      // Sesiones: solo las ARCHIVADAS, por la última actividad y no por la creación.
+      expect(prisma.orbiConversation.deleteMany).toHaveBeenCalledWith({
+        where: { archivedAt: { not: null }, lastActivityAt: { lt: new Date(AHORA.getTime() - 180 * DIA_MS) } },
+      });
       expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledWith(corteDiaHace(30));
       // Es un string, no un Date: la columna `day` es 'YYYY-MM-DD'.
       expect(prisma.dailyQuota.deleteMany.mock.calls[0][0].where.day.lt).toBe('2026-08-15');

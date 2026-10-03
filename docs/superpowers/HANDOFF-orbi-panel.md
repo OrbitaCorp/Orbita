@@ -103,7 +103,7 @@ Precio/planes y cupos por plan; si hay entrada de Orbi en el menú lateral; si "
 - **Gemini 3.x:** `thoughtSignature` obligatoria en la primera `functionCall` de cada turno; las paralelas van en UN turno; `includeThoughts` solo en inglés; `abortSignal` del SDK es del lado cliente (no cancela la generación en Google). Modelo vigente y gotchas en la memoria `proveedor-ia-gemini`.
 - **Windows/Git Bash:** `sleep` largo en foreground está bloqueado; usar tareas en background. `gh` no tiene scope `workflow` salvo que Alan lo refresque: un push que toque `.github/workflows/` se rechaza.
 - **graphify:** el repo tiene un grafo local (`graphify-out/`, ignorado) que se actualiza solo en cada commit; antes de explorar código hacer `graphify query "<pregunta>"` (regla del `CLAUDE.md`).
-- El `OrbiIcon` (`apps/web/src/components/orbi/OrbiIcon.tsx`) no acepta `color`; usar `disc`.
+- La estrella `OrbiIcon` se borró el 2026-10-03: Orbi se dibuja siempre con la mascota del menú lateral (`components/orbi/pet/OrbiPet.tsx`), que toma la forma del módulo que se está viendo. `disc` la apoya sobre el disco navy.
 
 ## 8. Reglas para trabajo desatendido (agente nocturno)
 
@@ -349,6 +349,39 @@ prompt "siempre llamá `navigateTo`" el manual entero podría recuperarlos: no s
 las dos bases sobre los JSON guardados**, sin llamar al modelo (se puede reaplicar `verificarExpectativas` al
 `turno` de cada resultado); (4) primer cambio de prompt medido: la confirmación de las acciones y la regla
 "no cites un pedido que no devolvió una tool" (con una regla nueva en las evals).
+
+- **2026-10-02 (sesión en la nube, rama `claude/nifty-ritchie-rahtf0`)** — Sin créditos de Gemini: todo lo que
+  no llama al modelo. Las ramas `awesome-cannon` y `orbi-mantenimiento` ya estaban en `main`. **Nada desplegado.**
+
+### 2026-10-02 — para revisar
+
+**Decidido por Alan:** archivadas sin actividad en 180 días se borran; ruta `/admin/ventas/orbi?vista=chat`; el
+diseño de la fase 3 lo hace Claude Design con `docs/superpowers/design/2026-10-02-orbi-panel-prompt-claude-design.md`.
+Recomendado y **esperando su OK** (spec fase 3 §11): flag por negocio, Radix + `react-markdown`, Playwright para 4
+recorridos, sin entrada de Orbi en el menú lateral.
+
+| Commit | Qué |
+|---|---|
+| `09e34ea4` | Prompt para Claude Design y decisiones de la fase 3 |
+| `eaa3587f` | Mantenimiento: aviso fijo arriba del input (input deshabilitado), `GET /orbi/estado` público, y la falla que apaga Orbi ya avisa "mantenimiento" en ese turno |
+| `e1010a25` | **Bug de producción:** todo descuento o cupón de Orbi para productos fallaba DESPUÉS de confirmar (faltaba `productLevel`); un 100 % también. Ahora se valida con el service antes de la tarjeta |
+| `d25a3310` | `orbi_turns.module` con el módulo real; las evals guardan antes de comparar; la demo dice "Redactar con Orbi" |
+| `da5a5fba` | Turnos grabados (la red del refactor) |
+| `287883d4` | Fase 3 R1: el motor de turno compartido por el chat y las evals |
+| `f315b764` | Fase 3 R2 sin narración: sesiones (migración, servicio, endpoints) y su retención |
+
+**Rulings:**
+1. **Push de la rama de trabajo** (el entorno lo exige; contenedor efímero). Mergear con `--no-ff` o PR con merge commit, nunca fast-forward.
+2. **Turnos grabados en vez de evals pagas para R1** (el plan pedía evals en R1). Un refactor sin cambio de comportamiento se prueba mejor reproduciendo turnos reales con un modelo guionado (determinista, gratis, 2244 salidas comparadas) que con 3 repeticiones del modelo real. Costo si está mal: un cambio que solo aparece con el modelo real streameando distinto que el guion (no hay ninguno conocido).
+3. **`GET /orbi/estado` público** (lo necesita el alta de negocios): dice si Orbi atiende y el mensaje, nunca la causa.
+4. **Descuentos de Orbi con `productLevel: 'padre'`**: Orbi trabaja con productos (ids de `listProducts`), nunca variantes. Y rechaza `scope` PRODUCT con `categoryIds` (o al revés) antes de la tarjeta.
+5. **Sesiones:** las fijadas van aparte (solo en la primera página) para no romper el cursor; las conversaciones viejas toman título del primer mensaje la primera vez que se listan y se guarda; `POST /orbi/sesiones` crea **v1** hasta que exista el stream v2 (si naciera v2, sus mensajes irían al Json igual). Borrar cancela las tarjetas pendientes como `rejected`.
+6. **T6, T7 y T8 quedan para cuando haya créditos:** la narración visible necesita sus evals (que no repita la respuesta ni filtre nombres internos).
+
+**Para llevarlo a producción** (además del orden del `CLAUDE.md`):
+- Migraciones, primero en **dev** y después en **producción** con `prisma-prod.sh`: `20261001170000_orbi_mantenimiento` (si no se aplicó con el merge anterior) y `20261002120000_orbi_sesiones` (aditiva; rellena `last_activity_at` con `updated_at`). El código nuevo escribe `title`, `screen` y `last_activity_at` en el chat de hoy: **sin la migración aplicada, el chat del panel falla al crear conversaciones** (`deploy.sh` igual se niega a desplegar con migraciones pendientes).
+- Nada del front cambia de forma visible salvo el aviso de mantenimiento.
+- Probar a mano: poner Orbi en mantenimiento desde la pestaña Orbi del superadmin, abrir el chat (aviso + input deshabilitado), rehabilitar (el aviso se va solo en ≤ 1 minuto con el chat abierto). Y un cupón por productos con Orbi: tiene que crearse al confirmar.
 
 ---
 

@@ -21,9 +21,11 @@ export class ConversationService {
    * persona: con el id viajando en cada mensaje, "nueva conversación" tiene
    * que ser nueva de verdad, y un id ajeno no puede terminar en la de otro.
    */
-  async crear(businessId: string, userId: string, surface: string) {
+  async crear(businessId: string, userId: string, surface: string, sesion: { titulo?: string | null; pantalla?: string } = {}) {
+    // Título y pantalla: para la lista de sesiones (fase 3). El título sale del
+    // primer mensaje de la persona (tituloAutomatico), sin llamar al modelo.
     return this.prisma.orbiConversation.create({
-      data: { businessId, userId, surface, messages: [] },
+      data: { businessId, userId, surface, messages: [], title: sesion.titulo ?? null, screen: sesion.pantalla ?? null },
     });
   }
 
@@ -71,7 +73,7 @@ export class ConversationService {
         SELECT COALESCE(jsonb_agg(m ORDER BY i), '[]'::jsonb)
         FROM jsonb_array_elements(messages || ${nuevo}::jsonb) WITH ORDINALITY AS t(m, i)
         WHERE i > jsonb_array_length(messages || ${nuevo}::jsonb) - 200
-      ), updated_at = now()
+      ), updated_at = now(), last_activity_at = now()
       WHERE id = ${conversationId} AND business_id = ${businessId} AND user_id = ${userId}`;
     if (filas === 0) throw new NotFoundException('Conversación no encontrada');
   }

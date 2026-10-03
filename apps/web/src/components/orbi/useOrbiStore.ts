@@ -33,6 +33,11 @@ interface OrbiState {
   // fue reemplazado por otro (chip tocado mientras Orbi respondía) lo ve
   // distinto y no toca el estado del nuevo.
   envio: number
+  // Orbi en mantenimiento (lo apagó el sistema o un admin): el aviso que se
+  // muestra fijo arriba del input, con el input deshabilitado. Es de Orbi, no
+  // de la conversación: reset() no lo toca. Lo pone useOrbiChat (503 o evento
+  // del stream) y lo pone o lo saca useDisponibilidadOrbi al abrir.
+  mantenimiento: string | null
 
   toggle: () => void
   open: () => void
@@ -57,6 +62,9 @@ interface OrbiState {
   iniciarEnvio: (c: AbortController) => number
   terminarEnvio: (envio: number, sesionAlEnviar: number) => void
   reset: () => void
+  setMantenimiento: (aviso: string | null) => void
+  quitarMensaje: (msgId: string) => void
+  cargarConversacion: (conversationId: string, mensajes: OrbiMessage[]) => void
 }
 
 export const useOrbiStore = create<OrbiState>((set, get) => ({
@@ -70,6 +78,7 @@ export const useOrbiStore = create<OrbiState>((set, get) => ({
   sesion: 0,
   abortEnCurso: null,
   envio: 0,
+  mantenimiento: null,
 
   // Cerrar Orbi corta la respuesta en curso: la vista se desmonta y nadie la
   // va a leer. Abrir no toca nada.
@@ -202,6 +211,23 @@ export const useOrbiStore = create<OrbiState>((set, get) => ({
       conversationId: null,
       isStreaming: false,
       welcomeGreetedStep: null,
+      sesion: s.sesion + 1,
+    }))
+  },
+
+  setMantenimiento: (aviso) => set({ mantenimiento: aviso }),
+
+  quitarMensaje: (msgId) => set(s => ({ messages: s.messages.filter(m => m.id !== msgId) })),
+
+  // Abrir una sesión guardada (Orbi nuevo): igual que un reset (corta lo que
+  // esté en curso y sube la sesión, así ningún stream viejo escribe acá), pero
+  // con sus mensajes y su id: el próximo envío sigue esa conversación.
+  cargarConversacion: (conversationId, mensajes) => {
+    get().abortar()
+    set(s => ({
+      messages: mensajes,
+      conversationId,
+      isStreaming: false,
       sesion: s.sesion + 1,
     }))
   },

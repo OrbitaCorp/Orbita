@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
 import { llmAdapterProvider } from './llm/llm-adapter.provider';
 import { ConversationService } from './conversation/conversation.service';
+import { SesionesController } from './sesiones/sesiones.controller';
+import { SesionesService } from './sesiones/sesiones.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ModuleDataService } from './context/module-data.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -56,7 +58,7 @@ import { PrismaService } from '../prisma/prisma.service';
     CostsModule,
     OrbiSaludModule,
   ],
-  controllers: [OrbiController],
+  controllers: [OrbiController, SesionesController],
   providers: [
     llmAdapterProvider,
     ConversationService,
@@ -65,6 +67,7 @@ import { PrismaService } from '../prisma/prisma.service';
     ToolRegistryService,
     PendingActionService,
     OrbiTurnService,
+    SesionesService,
   ],
 })
 export class OrbiModule {

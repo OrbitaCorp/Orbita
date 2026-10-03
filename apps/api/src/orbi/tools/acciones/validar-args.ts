@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, type ValidationError } from 'class-validator';
 
@@ -42,6 +43,26 @@ function primerMotivo(errores: ValidationError[], ruta = ''): string {
     if (e.children?.length) return primerMotivo(e.children, donde);
   }
   return 'Argumentos inválidos';
+}
+
+/**
+ * Corre la validación del service (las reglas cruzadas y lo que depende de la
+ * base: que los ids sean del negocio, que el nombre no esté tomado) antes de
+ * armar la tarjeta. Sin esto, esas reglas saltaban recién en execute(), es
+ * decir DESPUÉS de que la persona confirmara.
+ *
+ * Solo un rechazo 4xx del service es "argumento inválido" (su mensaje ya es
+ * para personas). Cualquier otra cosa (la base no respondió) se propaga: el
+ * registry la convierte en "No pude preparar esa acción".
+ */
+export async function validarConServicio(chequeo: () => Promise<unknown>): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await chequeo();
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof HttpException && e.getStatus() >= 400 && e.getStatus() < 500) return { ok: false, error: e.message };
+    throw e;
+  }
 }
 
 /**

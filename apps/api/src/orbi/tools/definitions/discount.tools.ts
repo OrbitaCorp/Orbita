@@ -5,7 +5,7 @@ import type { DiscountsService } from '../../../discounts/discounts.service';
 import type { CouponsService } from '../../../coupons/coupons.service';
 import { UpsertDiscountDto } from '../../../discounts/dto/upsert-discount.dto';
 import { UpsertCouponDto } from '../../../coupons/dto/upsert-coupon.dto';
-import { validarConDto } from '../acciones/validar-args';
+import { validarConDto, validarConServicio } from '../acciones/validar-args';
 import { cantidad, dato, entreComillas, presente } from '../acciones/formato';
 
 export class ListDiscountsTool implements OrbiTool {
@@ -93,10 +93,31 @@ function aDtoDescuento(args: Record<string, unknown>): UpsertDiscountDto {
     value: args.value as number,
     scope: args.scope as string,
     productIds: (args.productIds ?? undefined) as string[] | undefined,
+    // Orbi elige productos (los ids de listProducts), nunca variantes. El
+    // service exige el nivel con scope PRODUCT: sin esto, todo descuento por
+    // producto de Orbi fallaba DESPUÉS de que la persona lo confirmara.
+    productLevel: args.scope === 'PRODUCT' ? 'padre' : undefined,
     categoryIds: (args.categoryIds ?? undefined) as string[] | undefined,
     startDate: (args.startDate as string | undefined) ?? new Date().toISOString(),
     endDate: (args.endDate ?? undefined) as string | undefined,
   };
+}
+
+const tieneIds = (v: unknown) => Array.isArray(v) && v.length > 0;
+
+// El service acepta scope PRODUCT con categoryIds (y al revés), pero la
+// tarjeta diría "para productos elegidos, 2 categorías" y el panel nunca arma
+// esa mezcla: un modelo que la propone confundió los ids.
+function alcanceIncoherente(args: Record<string, unknown>): string | null {
+  const productos = tieneIds(args.productIds);
+  const categorias = tieneIds(args.categoryIds);
+  if (args.scope === 'PRODUCT' && (!productos || categorias)) {
+    return 'Argumento inválido (scope): con scope PRODUCT van solo productIds, los ids que te devolvió listProducts';
+  }
+  if (args.scope === 'CATEGORY' && (!categorias || productos)) {
+    return 'Argumento inválido (scope): con scope CATEGORY van solo categoryIds, ids de categorías del negocio';
+  }
+  return null;
 }
 
 export class CreateDiscountTool implements OrbiTool {
@@ -110,8 +131,13 @@ export class CreateDiscountTool implements OrbiTool {
     return `Crear el descuento ${entreComillas(args.name ?? 'sin nombre')} de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
   }
 
-  validarArgs(args: Record<string, unknown>) {
-    return validarConDto(UpsertDiscountDto, { ...aDtoDescuento(args) });
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
+    const dto = aDtoDescuento(args);
+    const forma = await validarConDto(UpsertDiscountDto, { ...dto });
+    if (!forma.ok) return forma;
+    const alcance = alcanceIncoherente(args);
+    if (alcance) return { ok: false as const, error: alcance };
+    return validarConServicio(() => this.discountsService.validarAlta(ctx.businessId, dto));
   }
 
   parameters = {
@@ -119,7 +145,7 @@ export class CreateDiscountTool implements OrbiTool {
     properties: {
       name: { type: 'string', description: 'Nombre del descuento' },
       type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de descuento' },
-      value: { type: 'number', description: 'Valor del descuento (porcentaje 1-100, o monto en pesos)' },
+      value: { type: 'number', description: 'Valor del descuento (porcentaje 1-99, o monto en pesos)' },
       scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el descuento' },
       productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
       categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },
@@ -167,8 +193,13 @@ export class CreateCouponTool implements OrbiTool {
     return `Crear el cupón ${entreComillas(args.code ?? '(sin código)')} (${entreComillas(args.name ?? 'sin nombre')}) de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
   }
 
-  validarArgs(args: Record<string, unknown>) {
-    return validarConDto(UpsertCouponDto, { ...aDtoCupon(args) });
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
+    const dto = aDtoCupon(args);
+    const forma = await validarConDto(UpsertCouponDto, { ...dto });
+    if (!forma.ok) return forma;
+    const alcance = alcanceIncoherente(args);
+    if (alcance) return { ok: false as const, error: alcance };
+    return validarConServicio(() => this.couponsService.validarAlta(ctx.businessId, dto));
   }
 
   parameters = {
@@ -177,7 +208,7 @@ export class CreateCouponTool implements OrbiTool {
       code: { type: 'string', description: 'Código del cupón (ej. VERANO20)' },
       name: { type: 'string', description: 'Nombre descriptivo del cupón' },
       type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de cupón' },
-      value: { type: 'number', description: 'Valor del cupón (porcentaje 1-100, o monto en pesos)' },
+      value: { type: 'number', description: 'Valor del cupón (porcentaje 1-99, o monto en pesos)' },
       scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el cupón' },
       productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
       categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },

@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "ae31a1cc75befcf4",
+  "version": "24f29ccc15471f90",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -41,13 +41,13 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "menu-lateral",
       "capitulo": "Moverte por el panel",
       "titulo": "El menú de la izquierda",
-      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla. En Configuración se colapsa solo, porque esa sección trae su propio menú adentro.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
+      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
     },
     {
       "id": "barra-superior",
       "capitulo": "Moverte por el panel",
       "titulo": "La barra de arriba",
-      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi: El asistente. Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
+      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi: El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. También se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
     },
     {
       "id": "permisos",
@@ -401,7 +401,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "como-se-navega",
       "capitulo": "Configuración",
       "titulo": "Cómo se navega",
-      "texto": "Configuración tiene su propio menú adentro, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\".",
+      "texto": "Las pantallas de Configuración están en el menú de la izquierda, debajo de Configuración: al entrar se despliegan Suscripción, Negocio, Contacto, Pagos, Envíos y el resto. Cada una es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\". Apariencia, que es la más larga, trae además un índice propio al costado para saltar de una sección a otra.",
       "destino": {
         "seccion": "configuracion",
         "label": "Ir a Configuración"
@@ -605,7 +605,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "orbi",
       "capitulo": "Si te trabás",
       "titulo": "Preguntale a Orbi",
-      "texto": "Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier pantalla del panel, o desde el botón Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas."
+      "texto": "Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón Orbi de la barra de arriba (al lado de la búsqueda) o desde Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas."
     },
     {
       "id": "tutorial",

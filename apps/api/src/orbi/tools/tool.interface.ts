@@ -76,11 +76,13 @@ export interface OrbiTool {
    */
   describirAccion?(args: Record<string, unknown>, ctx: ToolExecutionContext): string | Promise<string>;
   /**
-   * Valida los argumentos con el DTO del endpoint HTTP equivalente (ver
-   * acciones/validar-args.ts). Corre en proponer(), antes de armar la
-   * tarjeta: si no pasa, no se propone y el modelo recibe el motivo.
+   * Valida los argumentos con el DTO del endpoint HTTP equivalente y, si el
+   * service tiene reglas que dependen de la base, con esas también, acotadas
+   * a ctx.businessId (ver acciones/validar-args.ts). Corre en proponer(),
+   * antes de armar la tarjeta: si no pasa, no se propone y el modelo recibe
+   * el motivo.
    */
-  validarArgs?(args: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string }>;
+  validarArgs?(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<{ ok: true } | { ok: false; error: string }>;
   execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult>;
   toLlmDefinition(): LlmToolDefinition;
 }

@@ -90,7 +90,8 @@ describe('appendMessage — un solo UPDATE atómico', () => {
     "SET messages = ( SELECT COALESCE(jsonb_agg(m ORDER BY i), '[]'::jsonb)",
     'FROM jsonb_array_elements(messages || $?::jsonb) WITH ORDINALITY AS t(m, i)',
     'WHERE i > jsonb_array_length(messages || $?::jsonb) - 200',
-    '), updated_at = now()',
+    // last_activity_at: el orden de la lista de sesiones (fase 3).
+    '), updated_at = now(), last_activity_at = now()',
     'WHERE id = $? AND business_id = $? AND user_id = $?',
   ].join(' ');
 
@@ -124,7 +125,13 @@ describe('crear', () => {
   it('crea una conversación vacía de ese negocio, esa persona y esa superficie', async () => {
     const { svc, create } = servicio();
     const conv = await svc.crear('biz-1', 'member-1', 'panel');
-    expect(create).toHaveBeenCalledWith({ data: { businessId: 'biz-1', userId: 'member-1', surface: 'panel', messages: [] } });
+    expect(create).toHaveBeenCalledWith({ data: { businessId: 'biz-1', userId: 'member-1', surface: 'panel', messages: [], title: null, screen: null } });
     expect(conv.id).toBe('conv-nueva');
+  });
+
+  it('con título y pantalla (la lista de sesiones de la fase 3)', async () => {
+    const { svc, create } = servicio();
+    await svc.crear('biz-1', 'member-1', 'panel', { titulo: '¿Cuánto vendí ayer?', pantalla: 'pedidos' });
+    expect(create).toHaveBeenCalledWith({ data: { businessId: 'biz-1', userId: 'member-1', surface: 'panel', messages: [], title: '¿Cuánto vendí ayer?', screen: 'pedidos' } });
   });
 });

@@ -134,7 +134,7 @@ describe('OrbiController', () => {
           useValue: {
             exigirDisponible: jest.fn().mockResolvedValue(undefined),
             registrarOk: jest.fn().mockResolvedValue(undefined),
-            registrarFalla: jest.fn().mockResolvedValue({ categoria: 'INTERNAL', inmediata: false, detalle: 'x' }),
+            avisoDeFalla: jest.fn().mockResolvedValue({ code: 'ORBI_ERROR', message: 'Orbi tuvo un problema para responder. Probá de nuevo en unos minutos.' }),
           },
         },
       ],
@@ -571,7 +571,7 @@ describe('OrbiController', () => {
       const res = createMockResponse();
       await controller.chat(chatPanel(id), res as any, duenio as any);
 
-      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel');
+      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel', expect.objectContaining({ titulo: expect.any(String) }));
       const todo = res.chunks.join('');
       expect(res.chunks[0]).toBe('event: conversation\ndata: {"id":"conv-1"}\n\n');
       expect(todo).not.toContain(id);
@@ -1280,6 +1280,19 @@ describe('OrbiController', () => {
         rounds: 1, toolsUsed: [], actionsProposed: 0, status: 'ok',
       });
       expect(JSON.stringify(t)).not.toContain('PRIVADA');
+    });
+
+    it('guarda el módulo resuelto desde la pantalla, no el "ventas" que manda siempre el front', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'ok' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat(
+        { message: 'Hola', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos' } } as any,
+        createMockResponse() as any,
+        duenio as any,
+      );
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ module: 'pedidos' }));
     });
 
     it('cuenta las vueltas, las tools pedidas y las propuestas', async () => {

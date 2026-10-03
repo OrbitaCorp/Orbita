@@ -21,7 +21,7 @@ export type FuncionDemoIa = 'orbi-producto' | 'fondo-ia' | 'quitar-fondo' | 'orb
 // así que sus topes son holgados: están para cortar a quien le pegue directo
 // a la API con el token de la demo.
 export const FUNCIONES_DEMO_IA: Record<FuncionDemoIa, { nombre: string; limiteSemanal: number; unidad: string }> = {
-  'orbi-producto': { nombre: 'Generar con Orbi', limiteSemanal: 3, unidad: 'pruebas' },
+  'orbi-producto': { nombre: 'Redactar con Orbi', limiteSemanal: 3, unidad: 'pruebas' },
   'fondo-ia': { nombre: 'Fondo con IA', limiteSemanal: 2, unidad: 'pruebas' },
   'quitar-fondo': { nombre: 'Quitar fondo', limiteSemanal: 3, unidad: 'pruebas' },
   'orbi-chat': { nombre: 'el chat con Orbi', limiteSemanal: 10, unidad: 'mensajes' },
