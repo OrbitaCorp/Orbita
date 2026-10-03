@@ -209,7 +209,8 @@ export class AppointmentsPanelService {
   private async prepararDisponibilidad(member: MemberContext, serviceId: string, resourceId: string | undefined, except: string | undefined) {
     const businessId = member.businessId;
     const settings = await this.settings.delNegocio(businessId);
-    const servicio = await this.prisma.appointmentService.findFirst({ where: { id: serviceId, businessId, deletedAt: null } });
+    // Mismo criterio que el alta: un servicio pausado no se ofrece.
+    const servicio = await this.prisma.appointmentService.findFirst({ where: { id: serviceId, businessId, isActive: true, deletedAt: null } });
     if (!servicio) throw new NotFoundException('Ese servicio no existe.');
     const propias = await agendasPropias(this.prisma, member, 'appointments.agenda.manage_all');
     const candidatas = await this.nucleo.candidatas(businessId, settings, propias);
