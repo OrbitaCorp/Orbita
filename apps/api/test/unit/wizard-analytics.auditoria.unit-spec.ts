@@ -16,7 +16,7 @@ function servicio(env: Record<string, string> = {}) {
   };
   const original = { ...process.env };
   Object.assign(process.env, env);
-  const svc = new WizardAnalyticsService(prisma as any, {} as any);
+  const svc = new WizardAnalyticsService(prisma as any, {} as any, { track: jest.fn() } as any);
   return { svc, prisma, restaurar: () => { process.env = original; } };
 }
 
