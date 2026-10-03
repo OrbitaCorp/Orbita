@@ -7,6 +7,7 @@ import { CostAdapter } from './adapters/adapter.interface';
 import { InternalCostAdapter } from './adapters/internal.adapter';
 import { costoDelEvento } from './precios';
 import { COST_ADAPTERS } from './costs.constants';
+import { currentMonth } from './mes-de-costos';
 
 const DEFAULT_PROVIDERS = [
   { slug: 'gcloud', name: 'Google Cloud', color: '#4285f4', apiType: 'MANUAL' as const },
@@ -19,10 +20,6 @@ const DEFAULT_PROVIDERS = [
   { slug: 'serper', name: 'Serper (Google Images)', color: '#ea4335', apiType: 'MANUAL' as const },
   { slug: 'tavily', name: 'Tavily Search', color: '#00d2ff', apiType: 'MANUAL' as const },
 ];
-
-function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
-}
 
 function monthsAgo(n: number): string[] {
   const result: string[] = [];
