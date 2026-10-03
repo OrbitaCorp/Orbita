@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "24f29ccc15471f90",
+  "version": "db40613d3c66822d",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -144,7 +144,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "nuevo-pedido",
       "capitulo": "Pedidos",
       "titulo": "Cargar una venta a mano",
-      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás; si no, lo creás ahí mismo y queda para siempre en tu base.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
+      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás en el buscador. Si no, tocás \"Cargar un comprador a mano\" y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
       "destino": {
         "seccion": "pedidos",
         "vista": "nuevo",

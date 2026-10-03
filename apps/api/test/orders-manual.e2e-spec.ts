@@ -77,6 +77,9 @@ describe('Alta manual de pedidos (e2e)', () => {
       await prisma.orderItem.deleteMany({ where: { orderId: { in: creados } } });
       await prisma.order.deleteMany({ where: { id: { in: creados } } });
     }
+    // El comprador con email que cargan estos tests queda como cliente del
+    // negocio: se borra también (ya no tiene pedidos colgando).
+    await prisma.customer.deleteMany({ where: { businessId, email: 'e2e-alta-manual@example.com' } });
     await closeTestApp();
   });
 
@@ -186,6 +189,79 @@ describe('Alta manual de pedidos (e2e)', () => {
         .send(cuerpo({ channel: 'ONLINE', buyer: { name: `${PREFIJO} Con mail`, email: 'e2e-alta-manual@example.com' }, notifyCustomer: true })).expect(201);
       creados.push(res.body.id);
       expect(res.body.onlineOrderDetails.buyerEmail).toBe('e2e-alta-manual@example.com');
+    });
+  });
+
+  // Comprador tipeado a mano (Ale, 03/10): con email queda como cliente del
+  // negocio, sin email la venta es anónima. Se mira lo que quedó en la base,
+  // no solo la respuesta.
+  describe('comprador cargado a mano', () => {
+    const EMAIL = 'e2e-comprador-a-mano@example.com';
+    const clientesDelEmail = () =>
+      prisma.customer.findMany({ where: { businessId, email: { equals: EMAIL, mode: 'insensitive' } } });
+
+    afterEach(async () => {
+      // Un cliente con pedidos no se puede borrar: primero se sueltan.
+      await prisma.order.updateMany({ where: { id: { in: creados } }, data: { customerId: null } });
+      await prisma.customer.deleteMany({ where: { businessId, email: { equals: EMAIL, mode: 'insensitive' } } });
+    });
+
+    it('venta presencial con email: se guarda completa y la persona queda en Clientes', async () => {
+      const res = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ buyer: { name: '  Ana Paz Ruiz ', email: EMAIL.toUpperCase(), phone: '3757 111222' } })).expect(201);
+      creados.push(res.body.id);
+
+      // El pedido: venta presencial cerrada, del panel, con cobro y renglón.
+      expect(res.body).toMatchObject({ channel: 'POS', status: 'COMPLETED', origin: 'MANUAL' });
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.payments).toHaveLength(1);
+      expect(res.body.onlineOrderDetails).toMatchObject({ buyerName: '  Ana Paz Ruiz ', buyerPhone: '3757 111222' });
+
+      // La persona: un solo cliente de ESTE negocio, con el email normalizado,
+      // vinculado al pedido.
+      const clientes = await clientesDelEmail();
+      expect(clientes).toHaveLength(1);
+      expect(clientes[0]).toMatchObject({ businessId, firstName: 'Ana', lastName: 'Paz Ruiz', email: EMAIL, phone: '3757 111222' });
+      const enBase = await prisma.order.findUnique({ where: { id: res.body.id }, select: { customerId: true } });
+      expect(enBase!.customerId).toBe(clientes[0].id);
+
+      // Y aparece en la lista de Clientes del panel.
+      const lista = await http().get('/api/v1/customers').query({ search: EMAIL }).set(auth()).expect(200);
+      const filas = Array.isArray(lista.body) ? lista.body : lista.body.data ?? lista.body.items ?? [];
+      expect(filas.map((c: { id: string }) => c.id)).toContain(clientes[0].id);
+    });
+
+    it('pedido online con el mismo email (otra mayúscula) reutiliza al cliente, sin duplicar', async () => {
+      const a = await http().post('/api/v1/orders').set(auth()).send(cuerpo({ buyer: { name: 'Ana Paz', email: EMAIL } })).expect(201);
+      const b = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ channel: 'ONLINE', buyer: { name: 'Ana P.', email: EMAIL.replace('e2e', 'E2E') } })).expect(201);
+      creados.push(a.body.id, b.body.id);
+
+      const clientes = await clientesDelEmail();
+      expect(clientes).toHaveLength(1);
+      const pedidos = await prisma.order.findMany({ where: { id: { in: [a.body.id, b.body.id] } }, select: { customerId: true } });
+      expect(pedidos.map((p) => p.customerId)).toEqual([clientes[0].id, clientes[0].id]);
+      expect(b.body.status).toBe('PENDING');
+    });
+
+    it('sin email: el pedido se guarda y es anónimo (no crea ningún cliente)', async () => {
+      const antes = await prisma.customer.count({ where: { businessId } });
+      const res = await http().post('/api/v1/orders').set(auth()).send(cuerpo({ buyer: { name: `${PREFIJO} Mostrador` } })).expect(201);
+      creados.push(res.body.id);
+
+      expect(res.body).toMatchObject({ channel: 'POS', status: 'COMPLETED', origin: 'MANUAL' });
+      expect(res.body.onlineOrderDetails).toMatchObject({ buyerName: `${PREFIJO} Mostrador`, buyerEmail: null });
+      const enBase = await prisma.order.findUnique({ where: { id: res.body.id }, select: { customerId: true } });
+      expect(enBase!.customerId).toBeNull();
+      expect(await prisma.customer.count({ where: { businessId } })).toBe(antes);
+    });
+
+    it('si la venta falla (sin stock) no deja un cliente creado sin venta', async () => {
+      const res = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ buyer: { name: 'Ana Paz', email: EMAIL }, items: [{ variantId, quantity: stockInicial + 1000 }] }));
+      expect(res.status).toBe(422);
+
+      expect(await clientesDelEmail()).toHaveLength(0);
     });
   });
 });
