@@ -26,8 +26,11 @@ describe('mis reservas en el dispositivo', () => {
     expect(leerLista(JSON.stringify(Array.from({ length: 30 }, (_, i) => tk(i))))).toHaveLength(TOPE_RESERVAS)
   })
   it('depura lo que la API ya no reconoce, sin cambiar el orden', () => {
-    expect(depurarLista([tk(3), tk(2), tk(1)], [tk(1), tk(3)])).toEqual([tk(3), tk(1)])
-    expect(depurarLista([tk(1)], [])).toEqual([])
+    expect(depurarLista([tk(3), tk(2), tk(1)], [tk(3), tk(2), tk(1)], [tk(1), tk(3)])).toEqual([tk(3), tk(1)])
+    expect(depurarLista([tk(1)], [tk(1)], [])).toEqual([])
+  })
+  it('no borra una reserva guardada mientras el pedido viajaba', () => {
+    expect(depurarLista([tk(9), tk(2), tk(1)], [tk(2), tk(1)], [tk(1)])).toEqual([tk(9), tk(1)])
   })
   it('fuera del navegador no hay nada guardado', () => {
     expect(reservasGuardadas('barberia-lucas')).toEqual([])

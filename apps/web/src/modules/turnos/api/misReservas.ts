@@ -39,10 +39,15 @@ export function agregarALista(lista: readonly string[], token: string): string[]
   return [token, ...lista.filter(t => t !== token)].slice(0, TOPE_RESERVAS)
 }
 
-/** Se queda solo con los tokens que la API reconoció, en el orden en que estaban. */
-export function depurarLista(lista: readonly string[], reconocidos: readonly string[]): string[] {
+/**
+ * Saca los tokens que se mandaron a la API y no volvieron (ya no existen o no
+ * son de ese negocio). Los que no estaban en el pedido (una reserva guardada
+ * mientras el pedido viajaba) quedan. Mantiene el orden.
+ */
+export function depurarLista(lista: readonly string[], enviados: readonly string[], reconocidos: readonly string[]): string[] {
   const ok = new Set(reconocidos)
-  return lista.filter(t => ok.has(t))
+  const fuera = new Set(enviados.filter(t => !ok.has(t)))
+  return lista.filter(t => !fuera.has(t))
 }
 
 // ─── localStorage ───────────────────────────────────────────────────────────
@@ -92,10 +97,10 @@ export function olvidarReserva(slug: string, token: string) {
   escribir(slug, reservasGuardadas(slug).filter(t => t !== token))
 }
 
-/** Deja solo las reservas que la API reconoció (la respuesta de POST …/mine). */
-export function depurarReservas(slug: string, reconocidos: readonly string[]) {
+/** Después de POST …/mine: olvida los tokens enviados que la API no reconoció. */
+export function depurarReservas(slug: string, enviados: readonly string[], reconocidos: readonly string[]) {
   const actual = reservasGuardadas(slug)
-  const depurada = depurarLista(actual, reconocidos)
+  const depurada = depurarLista(actual, enviados, reconocidos)
   if (depurada.length !== actual.length) escribir(slug, depurada)
 }
 
