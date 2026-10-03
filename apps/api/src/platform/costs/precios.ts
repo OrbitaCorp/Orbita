@@ -9,24 +9,24 @@ import type { Prisma } from '@prisma/client';
 //   - https://ai.google.dev/gemini-api/docs/pricing ("Last updated 2026-10-01")
 //   - https://console.groq.com/docs/models
 // La salida de Gemini incluye los tokens de pensamiento (los adapters ya los suman a
-// completionTokens). No se modela la entrada cacheada (Flash: $0,075/1M): todavía no
-// se mide cachedContentTokenCount, así que toda la entrada va a precio lleno.
+// completionTokens). La entrada cacheada (cachedContentTokenCount) tiene su propio precio
+// (`cacheada`); si el modelo no lo trae, se cobra como entrada normal.
 //
 // UsageMeteringService guarda en estimatedCostUsd el costo de cada evento de tokens al
 // registrarlo: cambiar un precio acá no reescribe los meses ya registrados. Los eventos
 // anteriores, que no lo traen, se estiman con el precio vigente en la fecha del evento.
 
-/** USD por 1M de tokens. */
-export type PrecioTokens = { entrada: number; salida: number };
+/** USD por 1M de tokens. `cacheada` es lo que cuesta la parte de la entrada que sale de la caché. */
+export type PrecioTokens = { entrada: number; salida: number; cacheada: number };
 
 // Un tramo vale desde `desde` (inclusive, 00:00 UTC) hasta el `desde` del siguiente.
 // Van del más viejo al más nuevo; el primero, sin `desde`, vale desde siempre.
-type Tramo = PrecioTokens & { desde?: string };
+type Tramo = Omit<PrecioTokens, 'cacheada'> & { cacheada?: number; desde?: string };
 
 // gemini-3.6/3.7/3.8-flash: precio de lanzamiento hasta el 31/12/2026, el doble desde el 1/1/2027.
 const GEMINI_FLASH: Tramo[] = [
-  { entrada: 0.75, salida: 3.75 },
-  { desde: '2027-01-01', entrada: 1.5, salida: 7.5 },
+  { entrada: 0.75, cacheada: 0.075, salida: 3.75 },
+  { desde: '2027-01-01', entrada: 1.5, cacheada: 0.15, salida: 7.5 },
 ];
 
 export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
@@ -34,9 +34,9 @@ export const PRECIOS_IA: Record<string, Record<string, Tramo[]>> = {
     'gemini-3.6-flash': GEMINI_FLASH,
     'gemini-3.7-flash': GEMINI_FLASH,
     'gemini-3.8-flash': GEMINI_FLASH,
-    'gemini-3.5-flash-lite': [{ entrada: 0.3, salida: 2.5 }],
+    'gemini-3.5-flash-lite': [{ entrada: 0.3, cacheada: 0.03, salida: 2.5 }],
     // Hasta 200k tokens de entrada por pedido; arriba de eso Google cobra más.
-    'gemini-3.1-pro-preview': [{ entrada: 2, salida: 12 }],
+    'gemini-3.1-pro-preview': [{ entrada: 2, cacheada: 0.2, salida: 12 }],
   },
   groq: {
     'openai/gpt-oss-120b': [{ entrada: 0.15, salida: 0.6 }],
@@ -66,7 +66,7 @@ const PRECIO_POR_UNIDAD: Record<string, Record<string, number>> = {
 /** Proveedores cuyo costo sale de usage_events (los sincroniza InternalCostAdapter). */
 export const PROVEEDORES_INTERNOS = [...Object.keys(PRECIOS_IA), ...Object.keys(PRECIO_POR_UNIDAD)];
 
-const LADO_DE_LA_CATEGORIA: Record<string, keyof PrecioTokens> = {
+const LADO_DE_LA_CATEGORIA: Record<string, 'entrada' | 'salida'> = {
   prompt_tokens: 'entrada',
   completion_tokens: 'salida',
 };
@@ -89,7 +89,18 @@ export function precioTokens(proveedor: string, modelo: string | null | undefine
   for (const t of tramos) {
     if (!t.desde || fecha.getTime() >= Date.parse(t.desde)) vigente = t;
   }
-  return { entrada: vigente.entrada, salida: vigente.salida };
+  return { entrada: vigente.entrada, salida: vigente.salida, cacheada: vigente.cacheada ?? vigente.entrada };
+}
+
+/** Costo en USD de un consumo de tokens con caché. promptTokens INCLUYE los cacheados. */
+export function costoDeConsumoUsd(
+  c: { provider: string; model: string | null; promptTokens: number; cachedTokens?: number; completionTokens: number },
+  fecha: Date,
+): number {
+  const p = precioTokens(c.provider, c.model, fecha);
+  if (!p) return 0;
+  const cacheados = Math.min(c.cachedTokens ?? 0, c.promptTokens);
+  return ((c.promptTokens - cacheados) * p.entrada + cacheados * p.cacheada + c.completionTokens * p.salida) / 1_000_000;
 }
 
 /**

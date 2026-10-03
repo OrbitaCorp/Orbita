@@ -26,6 +26,8 @@ import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
 import { tituloAutomatico } from './sesiones/titulo';
 import { ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, vueltaDeTools } from './turno/vuelta';
 import { correrTurno, nuevoProgresoDelTurno, sumarConsumo, type ConsumoPorProveedor, type EmisorDelTurno } from './turno/motor-de-turno';
+import { costoDeConsumoUsd, redondearUsd } from '../platform/costs/precios';
+import { costoDelTurno } from './turno/costo-del-turno';
 import { caracteresDelContexto, proveedorDelTurno, totalesDelConsumo, type CaracteresDelContexto } from './turno/ficha-del-turno';
 import { clasificarError } from './salud/clasificar-error';
 import { DemoIa } from '../demo/demo-ia';
@@ -163,9 +165,22 @@ export class OrbiController {
         providerSlug: proveedor,
         businessId: ctx.businessId,
         unit: 'tokens',
-        metadata: { feature: ctx.feature, model: c.model, memberId: ctx.memberId, conversationId: ctx.conversationId },
+        metadata: {
+          feature: ctx.feature,
+          model: c.model,
+          memberId: ctx.memberId,
+          conversationId: ctx.conversationId,
+          cachedTokens: c.cachedTokens,
+          thinkingTokens: c.thinkingTokens,
+        },
       };
-      void this.usageMetering.track({ ...comun, category: 'prompt_tokens', quantity: c.promptTokens });
+      // El costo de la entrada se manda calculado: UsageMeteringService.track lo estima
+      // sin caché y acá hay que cobrar los tokens cacheados a su precio (promptTokens
+      // los incluye). El de la salida (que ya suma el pensamiento) lo estima track.
+      const costoEntrada = redondearUsd(
+        costoDeConsumoUsd({ provider: proveedor, model: c.model, promptTokens: c.promptTokens, cachedTokens: c.cachedTokens, completionTokens: 0 }, new Date()),
+      );
+      void this.usageMetering.track({ ...comun, category: 'prompt_tokens', quantity: c.promptTokens, estimatedCostUsd: costoEntrada });
       void this.usageMetering.track({ ...comun, category: 'completion_tokens', quantity: c.completionTokens });
     }
   }
@@ -434,6 +449,7 @@ export class OrbiController {
         // stream. registrar() nunca lanza. En un turno cancelado los tokens son
         // un piso: la llamada cortada se factura igual y su `usage` no llegó.
         const totales = totalesDelConsumo(progreso.consumo);
+        const costo = costoDelTurno(progreso.consumo, progreso.consumoDeTools, new Date());
         void this.orbiTurns.registrar({
           id: turnId,
           businessId: user.businessId,
@@ -450,6 +466,9 @@ export class OrbiController {
           provider: proveedorDelTurno(progreso.consumo),
           cachedTokens: totales.cachedTokens || undefined,
           thinkingTokens: totales.thinkingTokens || undefined,
+          costUsd: costo.costUsd,
+          toolsCostUsd: costo.toolsCostUsd,
+          credits: costo.credits,
           ttftMs: progreso.ttftMs,
           errorCategory,
           section: dto.context.section,

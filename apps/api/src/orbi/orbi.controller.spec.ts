@@ -1235,7 +1235,7 @@ describe('OrbiController', () => {
         vuelta += 1;
         if (vuelta === 1) {
           yield { type: 'tool_call' as const, call: { id: 'c1', name: 'listProducts', arguments: {} } };
-          yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 100, completionTokens: 20, provider: 'gemini' as const } };
+          yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 100, completionTokens: 20, cachedTokens: 40, thinkingTokens: 8, provider: 'gemini' as const } };
         } else {
           // La segunda vuelta la contestó el fallback.
           yield { type: 'text' as const, chunk: 'Listo.' };
@@ -1246,13 +1246,18 @@ describe('OrbiController', () => {
 
       await controller.chat({ message: 'Productos', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
 
-      const meta = (model: string) => ({ feature: 'orbi-panel', model, memberId: 'member-1', conversationId: 'conv-1' });
+      const meta = (model: string, cachedTokens: number, thinkingTokens: number) => ({
+        feature: 'orbi-panel', model, memberId: 'member-1', conversationId: 'conv-1', cachedTokens, thinkingTokens,
+      });
       const base = { businessId: 'biz-1', unit: 'tokens' };
+      const gem = meta('gemini-3.6-flash', 40, 8);
+      const groq = meta('openai/gpt-oss-120b', 0, 0);
       expect(metering.track).toHaveBeenCalledTimes(4);
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'prompt_tokens', quantity: 100, metadata: meta('gemini-3.6-flash') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'completion_tokens', quantity: 20, metadata: meta('gemini-3.6-flash') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'prompt_tokens', quantity: 70, metadata: meta('openai/gpt-oss-120b') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'completion_tokens', quantity: 30, metadata: meta('openai/gpt-oss-120b') });
+      // La entrada va con su costo ya calculado y la caché a su precio: 60 a 0,75 + 40 a 0,075 por 1M.
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'prompt_tokens', quantity: 100, estimatedCostUsd: 0.000048, metadata: gem });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'completion_tokens', quantity: 20, metadata: gem });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'prompt_tokens', quantity: 70, estimatedCostUsd: 0.000011, metadata: groq });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'completion_tokens', quantity: 30, metadata: groq });
     });
 
     it('wizard: openai/gpt-oss-120b cuenta como groq, con feature orbi-wizard', async () => {
@@ -1264,9 +1269,9 @@ describe('OrbiController', () => {
 
       await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, createMockResponse() as any);
 
-      const metadata = { feature: 'orbi-wizard', model: 'openai/gpt-oss-120b', memberId: null, conversationId: null };
+      const metadata = { feature: 'orbi-wizard', model: 'openai/gpt-oss-120b', memberId: null, conversationId: null, cachedTokens: 0, thinkingTokens: 0 };
       expect(metering.track).toHaveBeenCalledTimes(2);
-      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 10, unit: 'tokens', metadata });
+      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 10, unit: 'tokens', estimatedCostUsd: 0.000002, metadata });
       expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'completion_tokens', quantity: 5, unit: 'tokens', metadata });
     });
 
@@ -1303,6 +1308,8 @@ describe('OrbiController', () => {
         rounds: 1, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'ok',
         provider: 'gemini', ttftMs: expect.any(Number), steps: [expect.objectContaining({ tools: [] })],
         contextChars: { system: 'Sos Orbi, el asistente de IA.'.length, tools: 0, history: 0, message: 'PREGUNTA-PRIVADA'.length },
+        // 10 de entrada y 5 de salida de gemini-3.6-flash: (10 × 0,75 + 5 × 3,75) / 1M = USD 0,00002625 → 1 crédito.
+        costUsd: 0.000026, toolsCostUsd: 0, credits: 1,
       });
       expect(JSON.stringify(t)).not.toContain('PRIVADA');
     });

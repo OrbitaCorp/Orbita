@@ -1,4 +1,5 @@
 import {
+  costoDeConsumoUsd,
   costoDelEvento,
   costoEstimadoUsd,
   precioTokens,
@@ -25,27 +26,27 @@ describe('precioTokens (unit)', () => {
     ['groq', 'openai/gpt-oss-20b', 0.075, 0.3],
     ['groq', 'qwen/qwen3.8-27b', 0.8, 4],
   ])('%s %s: %d / %d USD por 1M', (proveedor, modelo, entrada, salida) => {
-    expect(precioTokens(proveedor, modelo, OCT_2026)).toEqual({ entrada, salida });
+    expect(precioTokens(proveedor, modelo, OCT_2026)).toMatchObject({ entrada, salida });
   });
 
   it('los Flash duplican el precio desde el 1/1/2027 a las 00:00 UTC', () => {
     for (const modelo of ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash']) {
-      expect(precioTokens('gemini', modelo, ULTIMO_INSTANTE_2026)).toEqual({ entrada: 0.75, salida: 3.75 });
-      expect(precioTokens('gemini', modelo, PRIMER_INSTANTE_2027)).toEqual({ entrada: 1.5, salida: 7.5 });
-      expect(precioTokens('gemini', modelo, new Date('2028-06-01T00:00:00Z'))).toEqual({ entrada: 1.5, salida: 7.5 });
+      expect(precioTokens('gemini', modelo, ULTIMO_INSTANTE_2026)).toMatchObject({ entrada: 0.75, salida: 3.75 });
+      expect(precioTokens('gemini', modelo, PRIMER_INSTANTE_2027)).toMatchObject({ entrada: 1.5, salida: 7.5 });
+      expect(precioTokens('gemini', modelo, new Date('2028-06-01T00:00:00Z'))).toMatchObject({ entrada: 1.5, salida: 7.5 });
     }
   });
 
   it('los modelos sin corte de precio no cambian en 2027', () => {
-    expect(precioTokens('gemini', 'gemini-3.5-flash-lite', PRIMER_INSTANTE_2027)).toEqual({ entrada: 0.3, salida: 2.5 });
-    expect(precioTokens('groq', 'openai/gpt-oss-120b', PRIMER_INSTANTE_2027)).toEqual({ entrada: 0.15, salida: 0.6 });
+    expect(precioTokens('gemini', 'gemini-3.5-flash-lite', PRIMER_INSTANTE_2027)).toMatchObject({ entrada: 0.3, salida: 2.5 });
+    expect(precioTokens('groq', 'openai/gpt-oss-120b', PRIMER_INSTANTE_2027)).toMatchObject({ entrada: 0.15, salida: 0.6 });
   });
 
   it('un modelo que no está en la tabla, o un evento sin modelo, se cobra con el default del proveedor', () => {
-    expect(precioTokens('gemini', 'gemini-flash-latest', OCT_2026)).toEqual({ entrada: 0.75, salida: 3.75 });
-    expect(precioTokens('gemini', null, PRIMER_INSTANTE_2027)).toEqual({ entrada: 1.5, salida: 7.5 });
-    expect(precioTokens('groq', 'llama-3.3-70b-versatile', OCT_2026)).toEqual({ entrada: 0.15, salida: 0.6 });
-    expect(precioTokens('groq', undefined, OCT_2026)).toEqual({ entrada: 0.15, salida: 0.6 });
+    expect(precioTokens('gemini', 'gemini-flash-latest', OCT_2026)).toMatchObject({ entrada: 0.75, salida: 3.75 });
+    expect(precioTokens('gemini', null, PRIMER_INSTANTE_2027)).toMatchObject({ entrada: 1.5, salida: 7.5 });
+    expect(precioTokens('groq', 'llama-3.3-70b-versatile', OCT_2026)).toMatchObject({ entrada: 0.15, salida: 0.6 });
+    expect(precioTokens('groq', undefined, OCT_2026)).toMatchObject({ entrada: 0.15, salida: 0.6 });
     expect(tienePrecioPropio('gemini', 'gemini-flash-latest')).toBe(false);
     expect(tienePrecioPropio('gemini', null)).toBe(false);
     expect(tienePrecioPropio('groq', 'qwen/qwen3.8-27b')).toBe(true);
@@ -54,6 +55,35 @@ describe('precioTokens (unit)', () => {
   it('un proveedor sin tabla de IA no tiene precio de tokens', () => {
     expect(precioTokens('openai', 'gpt-x', OCT_2026)).toBeNull();
     expect(precioTokens('serper', null, OCT_2026)).toBeNull();
+  });
+});
+
+describe('entrada cacheada y costoDeConsumoUsd (unit)', () => {
+  it('la entrada cacheada se cobra al precio de caché', () => {
+    const fecha = new Date('2026-10-03T12:00:00Z');
+    // 10.000 de entrada, 4.096 cacheados, 100 de salida, gemini-3.6-flash 2026: 0,75 / 0,075 / 3,75
+    const esperado = ((10000 - 4096) * 0.75 + 4096 * 0.075 + 100 * 3.75) / 1e6;
+    expect(
+      costoDeConsumoUsd({ provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 10000, cachedTokens: 4096, completionTokens: 100 }, fecha),
+    ).toBeCloseTo(esperado, 9);
+  });
+
+  it('desde 2027 la caché también se duplica', () => {
+    expect(precioTokens('gemini', 'gemini-3.6-flash', new Date('2027-01-02'))).toMatchObject({ cacheada: 0.15 });
+  });
+
+  it('un proveedor sin precio de caché cobra la entrada completa', () => {
+    expect(precioTokens('groq', 'openai/gpt-oss-120b', new Date())).toMatchObject({ cacheada: 0.15 });
+  });
+
+  it('sin cachedTokens es entrada y salida a precio lleno; los cacheados nunca superan la entrada', () => {
+    const base = { provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 1000, completionTokens: 100 };
+    expect(costoDeConsumoUsd(base, OCT_2026)).toBeCloseTo((1000 * 0.75 + 100 * 3.75) / 1e6, 9);
+    expect(costoDeConsumoUsd({ ...base, cachedTokens: 5000 }, OCT_2026)).toBeCloseTo((1000 * 0.075 + 100 * 3.75) / 1e6, 9);
+  });
+
+  it('un proveedor sin tabla de IA cuesta 0', () => {
+    expect(costoDeConsumoUsd({ provider: 'openai', model: 'gpt-x', promptTokens: 1000, completionTokens: 100 }, OCT_2026)).toBe(0);
   });
 });
 
