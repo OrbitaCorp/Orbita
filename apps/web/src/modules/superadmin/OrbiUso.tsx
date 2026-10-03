@@ -104,7 +104,8 @@ function Resumen({ data, onNegocio, cargando }: {
         <Kpi label="Latencia (mediana)" value={ms(k.latenciaP50)} hint={`p95: ${ms(k.latenciaP95)} · sin los frenados por cupo`} />
         <Kpi label="Primer token (mediana)" value={ms(k.ttftP50)} hint="Hasta que se empieza a ver la respuesta" />
         <Kpi label="Errores" value={tokens(k.errores)} hint={`${pct(porcentajeDe(k.errores, k.mensajes))} de los mensajes`} />
-        <Kpi label="Frenados por cupo" value={tokens(k.frenadosPorCupo)} hint="No llegaron al modelo" />
+        <Kpi label="Frenados por cupo mensual" value={tokens(k.frenadosPorCupoMensual)} hint="Sin créditos del mes (negocio o miembro). No llegaron al modelo" />
+        <Kpi label="Frenados por tope diario" value={tokens(k.frenadosPorTopeDiario)} hint="Pasaron los mensajes por día del negocio. No llegaron al modelo" />
         <Kpi label="Con Groq" value={tokens(k.conGroq)} hint="Gemini falló y respondió el respaldo en alguna vuelta" />
         <Kpi
           label="Acciones propuestas"

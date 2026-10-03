@@ -28,7 +28,10 @@ export interface ResumenDeUso {
     latenciaP95: number | null;
     ttftP50: number | null;
     errores: number;
-    frenadosPorCupo: number;
+    /** Rechazados por el cupo mensual en créditos (status quota, error_category cupo_mensual). */
+    frenadosPorCupoMensual: number;
+    /** Rechazados por el tope diario de mensajes del negocio. Las filas de antes de distinguirlos (sin categoría) eran todas de este. */
+    frenadosPorTopeDiario: number;
     conGroq: number;
     accionesPropuestas: number;
     accionesConfirmadas: number;
@@ -96,7 +99,7 @@ type FilaKpis = ResumenDeUso['kpis'];
 
 const KPIS_VACIOS: FilaKpis = {
   mensajes: 0, costoUsd: 0, creditos: 0, promptTokens: 0, cachedTokens: 0, completionTokens: 0, thinkingTokens: 0,
-  latenciaP50: null, latenciaP95: null, ttftP50: null, errores: 0, frenadosPorCupo: 0, conGroq: 0,
+  latenciaP50: null, latenciaP95: null, ttftP50: null, errores: 0, frenadosPorCupoMensual: 0, frenadosPorTopeDiario: 0, conGroq: 0,
   accionesPropuestas: 0, accionesConfirmadas: 0, accionesRechazadas: 0, escriturasRechazadas: 0,
 };
 
@@ -139,7 +142,9 @@ export class OrbiUsoService {
                percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE status <> 'quota') AS "latenciaP50",
                percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE status <> 'quota') AS "latenciaP95",
                percentile_cont(0.5) WITHIN GROUP (ORDER BY ttft_ms) AS "ttftP50",
-               count(*) FILTER (WHERE status = 'error')::int AS errores, count(*) FILTER (WHERE status = 'quota')::int AS "frenadosPorCupo",
+               count(*) FILTER (WHERE status = 'error')::int AS errores,
+               count(*) FILTER (WHERE status = 'quota' AND error_category = 'cupo_mensual')::int AS "frenadosPorCupoMensual",
+               count(*) FILTER (WHERE status = 'quota' AND error_category IS DISTINCT FROM 'cupo_mensual')::int AS "frenadosPorTopeDiario",
                count(*) FILTER (WHERE provider IN ('groq','mixto'))::int AS "conGroq",
                coalesce(sum(actions_proposed),0)::int AS "accionesPropuestas", coalesce(sum(actions_confirmed),0)::int AS "accionesConfirmadas",
                coalesce(sum(actions_rejected),0)::int AS "accionesRechazadas", coalesce(sum(writes_rejected),0)::int AS "escriturasRechazadas"

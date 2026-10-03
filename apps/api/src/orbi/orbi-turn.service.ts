@@ -6,7 +6,9 @@ import type { PasoDelTurno } from './turno/motor-de-turno';
 
 /**
  * Cómo terminó el turno. `max_rounds`: se cortó por el tope de vueltas de tools.
- * `quota`: no llegó a empezar, la cuota diaria del negocio lo rechazó.
+ * `quota`: no llegó a empezar, lo rechazó el tope diario del negocio
+ * (`errorCategory: 'tope_diario'`; las filas viejas tienen null) o el cupo
+ * mensual (`errorCategory: 'cupo_mensual'`).
  */
 export type EstadoDelTurno = 'ok' | 'error' | 'cancelled' | 'max_rounds' | 'quota';
 
@@ -103,7 +105,13 @@ export class OrbiTurnService {
     }
   }
 
-  /** El dueño confirmó o canceló una acción que propuso este turno. Best-effort: nunca lanza. */
+  /**
+   * El dueño confirmó o canceló una acción que propuso este turno. Best-effort: nunca lanza.
+   *
+   * `confirmada` cuenta que la persona apretó Confirmar, no que la acción haya
+   * salido bien: la ejecución puede fallar igual. Cómo terminó cada una está en
+   * `orbi_pending_actions.status` (executed o failed).
+   */
   async contarDesenlace(turnId: string, desenlace: 'confirmada' | 'rechazada'): Promise<void> {
     try {
       await this.prisma.orbiTurn.updateMany({

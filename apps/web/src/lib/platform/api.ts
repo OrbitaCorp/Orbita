@@ -250,7 +250,10 @@ export interface OrbiUsoResumen {
     latenciaP95: number | null
     ttftP50: number | null
     errores: number
-    frenadosPorCupo: number
+    /** Rechazados por el cupo mensual en créditos. */
+    frenadosPorCupoMensual: number
+    /** Rechazados por el tope diario de mensajes del negocio. */
+    frenadosPorTopeDiario: number
     conGroq: number
     accionesPropuestas: number
     accionesConfirmadas: number

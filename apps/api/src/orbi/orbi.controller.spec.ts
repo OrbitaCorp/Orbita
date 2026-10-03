@@ -1332,6 +1332,19 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ module: 'pedidos' }));
     });
 
+    it('sin consumo informado (ni del modelo ni de las tools): costo y créditos quedan sin dato, no en 0', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'ok' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+      const t = turnos.registrar.mock.calls[0][0];
+      // undefined → null en la base: un 0 se promediaría como un turno gratis.
+      expect(t.costUsd).toBeUndefined();
+      expect(t.toolsCostUsd).toBeUndefined();
+      expect(t.credits).toBeUndefined();
+    });
+
     it('cuenta las vueltas, las tools pedidas y las propuestas', async () => {
       registry.getTools.mockReturnValue([{ name: 'createCoupon' }, { name: 'listProducts' }]);
       registry.proponer.mockImplementation(async (nombre: string) => (nombre === 'createCoupon' ? { resumen: 'Crear el cupón "VERANO"' } : null));
@@ -1411,6 +1424,7 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledWith({
         id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
         latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+        errorCategory: 'tope_diario',
       });
       expect(cuota.devolver).not.toHaveBeenCalled();
     });
@@ -1432,6 +1446,7 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledWith({
         id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
         latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+        errorCategory: 'cupo_mensual',
       });
       expect(streamChat).not.toHaveBeenCalled();
       expect(cuota.consumir).not.toHaveBeenCalled();
@@ -1445,6 +1460,7 @@ describe('OrbiController', () => {
         .catch((e) => e);
       expect(error.getStatus()).toBe(429);
       expect(error.message).toBe(MENSAJE_CUPO_MIEMBRO);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'quota', errorCategory: 'cupo_mensual' }));
     });
 
     it('sin bloqueo (motivoDeBloqueo null): el chat sigue y responde', async () => {

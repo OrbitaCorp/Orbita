@@ -271,6 +271,8 @@ export class OrbiController {
           actionsProposed: 0,
           writesRejected: 0,
           status: 'quota',
+          // Lo distingue del tope diario en los números del superadmin.
+          errorCategory: 'cupo_mensual',
         });
         throw new HttpException(agotado === 'negocio' ? MENSAJE_CUPO_NEGOCIO : MENSAJE_CUPO_MIEMBRO, HttpStatus.TOO_MANY_REQUESTS);
       }
@@ -292,6 +294,7 @@ export class OrbiController {
           actionsProposed: 0,
           writesRejected: 0,
           status: 'quota',
+          errorCategory: 'tope_diario',
         });
       }
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
@@ -474,7 +477,10 @@ export class OrbiController {
         // stream. registrar() nunca lanza. En un turno cancelado los tokens son
         // un piso: la llamada cortada se factura igual y su `usage` no llegó.
         const totales = totalesDelConsumo(progreso.consumo);
-        const costo = costoDelTurno(progreso.consumo, progreso.consumoDeTools, new Date());
+        // Sin consumo informado (ni del modelo ni de las tools) el costo queda
+        // sin dato, como los tokens: un 0 se promediaría como un turno gratis.
+        const sinConsumo = progreso.consumo.size === 0 && progreso.consumoDeTools.size === 0;
+        const costo = sinConsumo ? undefined : costoDelTurno(progreso.consumo, progreso.consumoDeTools, new Date());
         void this.orbiTurns.registrar({
           id: turnId,
           businessId: user.businessId,
@@ -491,9 +497,9 @@ export class OrbiController {
           provider: proveedorDelTurno(progreso.consumo),
           cachedTokens: totales.cachedTokens || undefined,
           thinkingTokens: totales.thinkingTokens || undefined,
-          costUsd: costo.costUsd,
-          toolsCostUsd: costo.toolsCostUsd,
-          credits: costo.credits,
+          costUsd: costo?.costUsd,
+          toolsCostUsd: costo?.toolsCostUsd,
+          credits: costo?.credits,
           ttftMs: progreso.ttftMs,
           errorCategory,
           section: dto.context.section,
@@ -563,6 +569,8 @@ export class OrbiController {
     // acción ya se resolvió, y una conversación borrada o la base lenta no
     // pueden hacer que la persona crea que no pasó.
     await this.anotar(accion, user, (ids) => notaDeConfirmacion(accion.tool, result, ids));
+    // Cuenta el clic en Confirmar, también si la acción falló: el resultado de
+    // cada una queda en orbi_pending_actions.status (ver contarDesenlace).
     if (accion.turnId) void this.orbiTurns.contarDesenlace(accion.turnId, 'confirmada');
     return result;
   }
