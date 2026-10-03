@@ -292,10 +292,9 @@ export class ProductAiService {
   // Registra el consumo de IA de esta llamada en usage_events (el panel de costos
   // del superadmin lo agrega por proveedor). `metadata.feature` dice QUÉ ayuda lo
   // gastó (ai-assist, ai-variants, ai-scan) y `metadata.model` con qué modelo
-  // respondió de verdad — la categoría queda en prompt/completion_tokens para que
-  // el cálculo de costo por token de InternalCostAdapter lo tome igual que el
-  // chat de Orbi. Sin await: no demora la respuesta, y track() ya atrapa sus
-  // propios errores.
+  // respondió de verdad: con ese modelo track() calcula y guarda el costo
+  // (platform/costs/precios.ts), igual que en el chat de Orbi. Sin await: no
+  // demora la respuesta, y track() ya atrapa sus propios errores.
   private registrarUso(
     businessId: string,
     feature: string,
