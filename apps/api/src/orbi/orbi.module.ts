@@ -42,6 +42,8 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { OrbiSaludModule } from './salud/orbi-salud.module';
+import { CupoOrbiModule } from './cupo/cupo-orbi.module';
+import { OrbiUsoController } from './cupo/orbi-uso.controller';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -58,8 +60,9 @@ import { PrismaService } from '../prisma/prisma.service';
     OnboardingModule,
     CostsModule,
     OrbiSaludModule,
+    CupoOrbiModule,
   ],
-  controllers: [OrbiController, SesionesController],
+  controllers: [OrbiController, SesionesController, OrbiUsoController],
   providers: [
     llmAdapterProvider,
     ConversationService,

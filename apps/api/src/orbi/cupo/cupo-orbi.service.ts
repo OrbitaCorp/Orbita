@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { esMes, mesArgentina, rangoDeMesArgentina } from '../../common/utils/hora-argentina';
 
+/** Lo que ve la persona cuando el chat de Orbi se frena por el cupo del mes (429). */
+export const MENSAJE_CUPO_NEGOCIO = 'Este mes ya se usó todo el cupo de Orbi del negocio. Se renueva el 1° del mes que viene.';
+export const MENSAJE_CUPO_MIEMBRO = 'Ya usaste tu parte del cupo de Orbi de este mes. Pedile al dueño del negocio que la amplíe.';
+
 const CREDITOS_BASE = 1500;
 const CREDITOS_AVANZADO = 2000;
 

@@ -17,6 +17,7 @@ import { OrbiSurface } from './dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
 import { OrbiTurnService } from './orbi-turn.service';
 import { OrbiSaludService } from './salud/orbi-salud.service';
+import { CupoOrbiService, MENSAJE_CUPO_MIEMBRO, MENSAJE_CUPO_NEGOCIO } from './cupo/cupo-orbi.service';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
 
 interface MockResponse {
@@ -62,6 +63,7 @@ describe('OrbiController', () => {
   let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock };
   let turnos: { registrar: jest.Mock; contarDesenlace: jest.Mock };
   let cuota: { consumir: jest.Mock; devolver: jest.Mock };
+  let cupoOrbi: { motivoDeBloqueo: jest.Mock };
   let metering: { track: jest.Mock };
   let analitica: { logAiTurn: jest.Mock };
 
@@ -130,6 +132,8 @@ describe('OrbiController', () => {
         // La cuota diaria vive en Postgres: acá siempre hay cupo.
         { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true), devolver: jest.fn().mockResolvedValue(undefined) } },
         { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined), contarDesenlace: jest.fn().mockResolvedValue(undefined) } },
+        // El cupo mensual: por defecto no frena (bloqueo apagado o con saldo).
+        { provide: CupoOrbiService, useValue: { motivoDeBloqueo: jest.fn().mockResolvedValue(null) } },
         {
           provide: OrbiSaludService,
           useValue: {
@@ -147,6 +151,7 @@ describe('OrbiController', () => {
     conversaciones = module.get(ConversationService);
     turnos = module.get(OrbiTurnService);
     cuota = module.get(CuotaService);
+    cupoOrbi = module.get(CupoOrbiService);
     metering = module.get(UsageMeteringService);
     analitica = module.get(WizardAnalyticsService);
   });
@@ -1408,6 +1413,53 @@ describe('OrbiController', () => {
         latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
       });
       expect(cuota.devolver).not.toHaveBeenCalled();
+    });
+
+    it('cupo mensual del negocio agotado: 429 con el mensaje, turno quota y sin llamar al modelo ni gastar la cuota diaria', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('negocio');
+      const streamChat = jest.fn();
+      mockLlm.streamChat = streamChat as any;
+      const res = createMockResponse();
+
+      const error = await controller
+        .chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect(error.getStatus()).toBe(429);
+      expect(error.message).toBe(MENSAJE_CUPO_NEGOCIO);
+      expect(cupoOrbi.motivoDeBloqueo).toHaveBeenCalledWith('biz-1', 'member-1');
+      expect(turnos.registrar).toHaveBeenCalledWith({
+        id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
+        latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+      });
+      expect(streamChat).not.toHaveBeenCalled();
+      expect(cuota.consumir).not.toHaveBeenCalled();
+      expect(res.flushHeaders).not.toHaveBeenCalled();
+    });
+
+    it('tope del miembro agotado: 429 con el mensaje del miembro', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('miembro');
+      const error = await controller
+        .chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any)
+        .catch((e) => e);
+      expect(error.getStatus()).toBe(429);
+      expect(error.message).toBe(MENSAJE_CUPO_MIEMBRO);
+    });
+
+    it('sin bloqueo (motivoDeBloqueo null): el chat sigue y responde', async () => {
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+      expect(cupoOrbi.motivoDeBloqueo).toHaveBeenCalledTimes(1);
+      expect(res.chunks.join('')).toContain('event: done');
+    });
+
+    it('la demo no pasa por el cupo mensual', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('negocio');
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, { ...duenio, readOnly: true } as any);
+      expect(cupoOrbi.motivoDeBloqueo).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).toContain('event: done');
     });
 
     it('cuota diaria rechazada en la demo: no se registra', async () => {

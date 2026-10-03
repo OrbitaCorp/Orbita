@@ -8,6 +8,7 @@ import { ConfirmActionDto, OrbiChatDto, OrbiSurface, RejectActionDto } from './d
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { OrbiTurnService, type EstadoDelTurno } from './orbi-turn.service';
 import { OrbiSaludService } from './salud/orbi-salud.service';
+import { CupoOrbiService, MENSAJE_CUPO_MIEMBRO, MENSAJE_CUPO_NEGOCIO } from './cupo/cupo-orbi.service';
 import { ConversationService, type ConversationMessage } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
@@ -146,6 +147,7 @@ export class OrbiController {
     private readonly cuota: CuotaService,
     private readonly orbiTurns: OrbiTurnService,
     private readonly salud: OrbiSaludService,
+    private readonly cupoOrbi: CupoOrbiService,
   ) {}
 
   /**
@@ -250,6 +252,29 @@ export class OrbiController {
     // un mensaje que no se va a atender no gaste el cupo del día. Llega como un
     // 503 con error ORBI_MAINTENANCE.
     await this.salud.exigirDisponible('panel');
+
+    // Cupo mensual (spec 2026-10-03): solo frena con ORBI_CUPO_BLOQUEA=true;
+    // apagado, motivoDeBloqueo devuelve null y esto no hace nada. Antes de la
+    // cuota diaria, para que un mensaje rechazado no la gaste. La demo no: su
+    // miembro readOnly lo comparten todos los visitantes.
+    if (user.readOnly !== true) {
+      const agotado = await this.cupoOrbi.motivoDeBloqueo(user.businessId, user.memberId);
+      if (agotado) {
+        void this.orbiTurns.registrar({
+          id: turnId,
+          businessId: user.businessId,
+          memberId: user.memberId,
+          conversationId: null,
+          latencyMs: 0,
+          rounds: 0,
+          toolsUsed: [],
+          actionsProposed: 0,
+          writesRejected: 0,
+          status: 'quota',
+        });
+        throw new HttpException(agotado === 'negocio' ? MENSAJE_CUPO_NEGOCIO : MENSAJE_CUPO_MIEMBRO, HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
 
     // Antes de abrir el stream, para que llegue como un 429 normal.
     if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
