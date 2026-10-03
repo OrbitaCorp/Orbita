@@ -319,6 +319,25 @@ Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets), llevar
 el commit a `main` como cualquier otro cambio (el preflight no deja desplegar
 con el árbol sucio ni desde una rama) y correr `deploy.sh` de nuevo.
 
+### Orbi: cupo mensual y lectura de conversaciones
+
+Cuatro variables NO sensibles (van comentadas en `deploy/env-vars.yaml` con su
+default; se prenden descomentándolas y redesplegando). **Ojo: los dos
+interruptores no usan el mismo valor para "prendido"**: uno es `true` y el
+otro es `on`. Con el valor equivocado quedan apagados sin avisar.
+
+| Variable | Default | Valores |
+|---|---|---|
+| `ORBI_CUPO_BLOQUEA` | apagado | Solo el valor exacto `true` prende el bloqueo: al 100 % del cupo del negocio (o del tope de un miembro), Orbi contesta 429 y no llama al modelo. Cualquier otra cosa (sin definir, `on`, `1`, `TRUE`) = apagado: el cupo se mide y se muestra, pero no corta. |
+| `ORBI_LECTURA_CONVERSACIONES` | apagado | Solo el valor exacto `on` deja que el superadmin abra el texto (redactado) de una conversación, con motivo y registro. Cualquier otra cosa, `true` incluido, = apagado. **Prenderla recién después de actualizar la política de privacidad publicada.** |
+| `ORBI_CREDITOS_MES_BASE` | `1500` | Créditos por mes del plan base (1 crédito = USD 0,001). Número mayor que 0 (se trunca a entero); vacío, `0` o inválido = el default. |
+| `ORBI_CREDITOS_MES_AVANZADO` | `2000` | Ídem, para los negocios con el paquete Avanzado activo. |
+
+Los rechazos quedan en `orbi_turns` con `status = 'quota'` y
+`error_category` `cupo_mensual` (cupo mensual) o `tope_diario` (los 300
+mensajes por día del negocio, que no dependen de estas variables); el
+superadmin los ve separados en Orbi → Uso.
+
 ## Ver logs
 
 ```bash
