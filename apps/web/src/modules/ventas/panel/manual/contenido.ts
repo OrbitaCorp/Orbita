@@ -849,9 +849,18 @@ export const CAPITULOS: Capitulo[] = [
     temas: [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
+            pista: 'el cupo de Orbi del mes: cuánto se usó, cuánto usó cada persona y los topes',
             bloques: [
                 { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón **Orbi** de la barra de arriba (al lado de la búsqueda) o desde **Orbi AI** al pie del menú de la izquierda.' },
                 { tipo: 'parrafo', texto: 'No es un buscador de ayuda genérica: contesta con los datos de **tu** negocio. "¿Cuánto vendí esta semana?", "¿qué pedidos tengo pendientes?", "¿cómo creo un cupón?" son todas preguntas válidas.' },
+                { tipo: 'parrafo', texto: 'Orbi tiene un **cupo por mes**. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Si el dueño te puso un tope, el porcentaje es el de tu parte; si no, el del negocio.' },
+                { tipo: 'pasos', items: [
+                    { titulo: 'Abrí el uso del equipo', texto: 'Lo ven el dueño y los administradores. Con Orbi abierto, tocá [[Expandir a página]] y, en la columna de conversaciones, [[Uso del equipo]]. En pantallas angostas está en el desplegable del título del chat.' },
+                    { titulo: 'Mirá cuánto se usó', texto: 'Arriba, en **Uso de Orbi**, está el porcentaje del negocio en el mes. En **Equipo**, cada persona con el porcentaje que usó y su tope.' },
+                    { titulo: 'Repartí el cupo', texto: 'Solo el dueño: en la columna Tope de cada persona elegí Sin tope, 25%, 50%, 75% u Otro (un número entero entre 10 y 100, y después [[Aplicar]]). Con tope, el porcentaje de esa persona se cuenta sobre su parte.' },
+                    { titulo: 'Revisá lo que hizo Orbi', texto: 'En **Lo que hizo Orbi** están los cambios que Orbi aplicó en los últimos 30 días: fecha, quién se lo pidió, qué hizo y si quedó Hecho o Falló. Para volver al chat, [[Volver a la conversación]].' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'No se muestran las conversaciones: cada persona ve solo las suyas.' },
             ],
         },
         {

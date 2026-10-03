@@ -23,13 +23,15 @@ const CERCA_DEL_FINAL_PX = 80
 const sinAviso = () => {}
 
 /** Lo de adentro del chat: lo mismo en las cuatro vistas. */
-export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManual, conSelector = true }: {
+export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManual, onUsoDelEquipo, conSelector = true }: {
   onExpandir?: () => void
   /** En la página de Orbi: volver a la pantalla de antes, con Orbi al costado. */
   onSalir?: () => void
   onPestana?: () => void
   onCerrar?: () => void
   onAbrirManual?: () => void
+  /** En la página de Orbi angosta: "Uso del equipo" en el selector (dueño o administrador). */
+  onUsoDelEquipo?: () => void
   conSelector?: boolean
 }) {
   const { vista, anunciar } = useOrbiV2Contexto()
@@ -111,6 +113,7 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
         onSalir={onSalir}
         onPestana={onPestana}
         onCerrar={onCerrar}
+        onUsoDelEquipo={onUsoDelEquipo}
         conSelector={conSelector}
       />
 

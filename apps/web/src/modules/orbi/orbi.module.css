@@ -67,6 +67,24 @@
   .soloEscritorio { display: none; }
 }
 
+/* ─── Barra de uso (fase 5) ───────────────────────────────────────────────── */
+/* 3 px pegados al borde del encabezado (lo tapan: -1 px). El largo va con
+   transform, no con width: no recalcula el layout del chat. */
+.uso { flex: none; position: relative; }
+.usoBarra { height: 3px; margin-top: -1px; background: var(--color-surface-alt); overflow: hidden; }
+.usoBarra span {
+  display: block; height: 100%; width: 100%; transform-origin: left center;
+  background: var(--color-primary); transition: transform 300ms ease-out;
+}
+.uso[data-tono='alto'] .usoBarra span { background: var(--color-warning); }
+.uso[data-tono='agotado'] .usoBarra span { background: var(--color-error); }
+.usoTexto {
+  margin: 0; padding: 6px 16px; font-size: 12px; line-height: 1.4;
+  border-bottom: 1px solid var(--color-border);
+}
+.uso[data-tono='alto'] .usoTexto { background: var(--color-warning-bg); color: var(--chip-warning-fg); }
+.uso[data-tono='agotado'] .usoTexto { background: var(--color-error-bg); color: var(--chip-error-fg); }
+
 /* ─── Selector de sesiones ────────────────────────────────────────────────── */
 .selector {
   position: absolute; top: 60px; left: 10px; z-index: 5;
@@ -412,6 +430,8 @@
 .renombrar { flex: 1; min-width: 0; height: 32px; margin: 2px; padding: 0 8px; border: 1px solid var(--color-primary); border-radius: 6px; font: inherit; font-size: 13px; background: var(--color-bg); color: var(--color-text); outline: none; }
 .filtroArchivadas { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-muted); padding: 0 2px; }
 .notaArchivadas { font-size: 11px; color: var(--color-muted); padding: 0 10px 8px; line-height: 1.4; }
+.columnaAbajo { flex: none; padding: 8px; border-top: 1px solid var(--color-border); }
+.columnaAbajo .filaSesion[aria-current='page'] { background: var(--color-surface-alt); }
 .chatPagina { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .desplegableSesiones { display: none; }
 @media (max-width: 1023px) {
@@ -432,6 +452,46 @@
 .confirmarCaja h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .confirmarCaja p { margin: 0; font-size: 14px; color: var(--color-body); line-height: 1.5; }
 .botonPeligro { border: 1px solid transparent; background: var(--color-error); color: #fff; font-weight: 600; }
+
+/* ─── Uso del equipo (?vista=uso) ─────────────────────────────────────────── */
+.usoPagina { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.usoLectura { max-width: 880px; margin: 0 auto; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 28px; }
+.usoCabeza h1 { margin: 0; font-size: 20px; font-weight: 600; color: var(--color-text); }
+.usoCabeza p { margin: 6px 0 12px; font-size: 14px; line-height: 1.5; color: var(--color-body); }
+.usoCabeza strong { color: var(--color-text); font-weight: 600; }
+.usoSeccion h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--color-text); }
+.usoNota { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--color-muted); }
+.usoPrivado { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; }
+.usoPrivado svg { width: 14px; height: 14px; flex: none; }
+.medidor { height: 8px; max-width: 420px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
+.medidor span { display: block; height: 100%; width: 100%; transform-origin: left center; background: var(--color-primary); }
+.medidor[data-tono='alto'] span { background: var(--color-warning); }
+.medidor[data-tono='agotado'] span { background: var(--color-error); }
+.botonChico {
+  height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+  border: 1px solid var(--color-border-strong); border-radius: 8px;
+  background: var(--color-bg); color: var(--color-text); cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap;
+  transition: background-color 150ms;
+}
+.botonChico:hover:not(:disabled) { background: var(--color-surface-alt); }
+.botonChico:disabled { opacity: 0.5; cursor: not-allowed; }
+.botonChico svg { width: 15px; height: 15px; }
+.volver { align-self: flex-start; }
+.selectorTope { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.selectorTope select, .selectorTope input {
+  height: 32px; padding: 0 8px; border: 1px solid var(--color-border-strong); border-radius: 8px;
+  background: var(--color-bg); color: var(--color-text); font: inherit; font-size: 13px;
+}
+.selectorTope input { width: 72px; font-variant-numeric: tabular-nums; }
+.selectorTope select:disabled, .selectorTope input:disabled { opacity: 0.6; }
+.estadoTope { font-size: 12px; color: var(--color-muted); }
+.estadoTope:empty { display: none; }
+.errorChico { font-size: 12px; color: var(--chip-error-fg); }
+@media (max-width: 767px) {
+  .usoLectura { padding: 16px 16px 32px; gap: 24px; }
+  .botonChico, .selectorTope select, .selectorTope input { height: 44px; font-size: 16px; border-radius: 10px; }
+}
 
 /* ─── Movimiento ──────────────────────────────────────────────────────────── */
 @keyframes girar { to { transform: rotate(360deg); } }
