@@ -8,7 +8,7 @@ import s from '../orbi.module.css'
  * pasa a Detener. El texto es el borrador de la sesión: cambiar de vista o de
  * sesión no lo pierde.
  */
-export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitado, placeholder, contexto, onQuitarContexto, enfocar }: {
+export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitado, placeholder, contexto, onQuitarContexto, enfocar, conAviso = true }: {
   texto: string
   onTexto: (t: string) => void
   onEnviar: (t: string) => void
@@ -21,6 +21,8 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
   onQuitarContexto?: () => void
   /** Enfocar al montar (no en pantallas táctiles: abriría el teclado sin que nadie lo pida). */
   enfocar?: boolean
+  /** La línea de privacidad de abajo. Se apaga en la demo: ahí las conversaciones no se guardan. */
+  conAviso?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -60,6 +62,7 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
   }
 
   return (
+    <>
     <div className={s.caja}>
       {contexto && (
         <span className={s.contexto}>
@@ -102,5 +105,12 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
         )}
       </div>
     </div>
+    {conAviso && (
+      <p className={s.avisoPrivacidad}>
+        Lo que escribís queda en tu historial y lo procesa Google Gemini.{' '}
+        <a href="/privacidad" target="_blank" rel="noreferrer">Privacidad</a>
+      </p>
+    )}
+    </>
   )
 }

@@ -8,6 +8,7 @@ import { useOrbiContext } from '@/components/orbi/useOrbiContext'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { PLACEHOLDER_EN_MANTENIMIENTO } from '@/components/orbi/types'
 import { useAuth } from '@/hooks/useAuth'
+import { esVisitanteDemo } from '@/lib/demo/modo'
 import { Caja } from '../piezas/Caja'
 import { Encabezado } from '../piezas/Encabezado'
 import { BurbujaPersona, MensajeDeOrbi } from '../piezas/Mensaje'
@@ -162,6 +163,8 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
             contexto={conContexto ? nombrePantalla : undefined}
             onQuitarContexto={() => setSinContextoEn(contexto.section)}
             enfocar={vista !== 'hoja'}
+            // En la demo las conversaciones no se guardan: la línea sería falsa.
+            conAviso={!esVisitanteDemo()}
           />
         </div>
       </div>

@@ -327,6 +327,8 @@
 .texto::placeholder { color: var(--color-muted); }
 .cajaAbajo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ayuda { font-size: 11px; color: var(--color-muted); }
+.avisoPrivacidad { font-size: 11.5px; color: var(--color-muted); margin: 6px 2px 0; text-align: center; }
+.avisoPrivacidad a { color: inherit; text-decoration: underline; }
 .enviar {
   width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   border: none; border-radius: 999px; background: var(--color-primary); color: var(--orbi-on-primary); cursor: pointer;
