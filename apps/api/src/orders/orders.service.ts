@@ -611,12 +611,19 @@ export class OrdersService {
     if (!branch) throw new NotFoundException('Sucursal no encontrada');
 
     // El cliente es opcional, pero si viene tiene que ser de este negocio.
-    const customer = dto.customerId
+    let customer = dto.customerId
       ? await this.prisma.customer.findFirst({
           where: { id: dto.customerId, businessId, deletedAt: null },
         })
       : null;
     if (dto.customerId && !customer) throw new NotFoundException('Cliente no encontrado');
+    // Comprador tipeado a mano en el panel, con email: queda como cliente del
+    // negocio (Ale, 03/10). Antes el pedido guardaba nombre y email solo como
+    // texto y esa persona nunca aparecía en Clientes. El checkout público no
+    // pasa por acá: al invitado se lo invita a crear su cuenta.
+    if (!customer && !opts?.publicCheckout && dto.buyer?.email) {
+      customer = await this.clienteDelComprador(businessId, dto.buyer);
+    }
 
     // Si se pasa una dirección de envío, tiene que ser de ESTE negocio (y del
     // cliente del pedido si hay uno). Sin este chequeo, un id de otra tienda
@@ -1152,6 +1159,49 @@ export class OrdersService {
   // NotificationsModule en OrdersModule (mismo criterio que notifications.service.ts
   // evita depender de ReportsModule: menos import circular, no más). Nunca rompe
   // el alta ni la confirmación: si el mail falla queda en el log.
+  // El cliente que corresponde a un comprador cargado a mano: el que ya tiene
+  // ese email en el negocio (misma regla anti-duplicados que el alta de
+  // Clientes) o uno nuevo. Nunca frena la venta: si el alta choca y no hay a
+  // quién vincular (un cliente borrado conserva su email), el pedido sale sin
+  // cliente, como antes.
+  private async clienteDelComprador(
+    businessId: string,
+    buyer: { name: string; email?: string; phone?: string; dni?: string },
+  ) {
+    const email = buyer.email?.trim().toLowerCase();
+    if (!email || !buyer.name.trim()) return null;
+    const buscar = () =>
+      this.prisma.customer.findFirst({
+        where: { businessId, deletedAt: null, email: { equals: email, mode: 'insensitive' } },
+      });
+    const existente = await buscar();
+    if (existente) return existente;
+
+    const [firstName, ...resto] = buyer.name.trim().split(/\s+/);
+    const lastName = resto.join(' ') || null;
+    try {
+      const nuevo = await this.prisma.customer.create({
+        data: {
+          businessId,
+          firstName,
+          lastName,
+          email,
+          phone: buyer.phone?.trim() || null,
+          dni: buyer.dni?.trim() || null,
+        },
+      });
+      this.eventEmitter.emit('notification.cliente_nuevo', {
+        businessId,
+        customerName: `${firstName}${lastName ? ' ' + lastName : ''}`,
+        customerId: nuevo.id,
+      });
+      return nuevo;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return buscar();
+      throw e;
+    }
+  }
+
   private async invitarInvitadoACrearCuenta(businessId: string, orderNumber: number, buyerEmail: string) {
     try {
       const config = await this.prisma.notificationConfig.findUnique({ where: { businessId }, select: { matrix: true } });

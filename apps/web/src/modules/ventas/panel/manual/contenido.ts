@@ -286,7 +286,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'El botón [[Nuevo pedido]] sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
-                    { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás; si no, lo creás ahí mismo y queda para siempre en tu base.' },
+                    { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás en el buscador. Si no, tocás [[Cargar un comprador a mano]] y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.' },
                     { titulo: 'Elegí cómo se cobró y cerrá la venta', texto: 'Y el pedido entra a tus números como cualquier otro.' },
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña "Canal" del top.' },
