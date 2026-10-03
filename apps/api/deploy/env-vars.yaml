@@ -74,6 +74,9 @@ TRUST_PROXY_HOPS: "2"
 # ORBI_PENDING_ACTIONS_RETENTION_DAYS: "30"
 # ORBI_TURNS_RETENTION_DAYS: "400"
 # DAILY_QUOTA_RETENTION_DAYS: "30"
+# USAGE_EVENTS_RETENTION_DAYS: "400"
+# ORBI_CONVERSATION_ACCESS_RETENTION_DAYS: "365"
+# ORBI_SESIONES_INACTIVAS_RETENTION_DAYS: ""  # apagada por defecto; con un número borra sesiones sin archivar inactivas
 # Mails a clientes (individuales y masivos) por negocio y por día de Argentina, contando email_logs (hallazgo mail-masivo-sin-tope). Mínimo 50; comentada = el default de customers.service.ts.
 # MAIL_MASIVO_TOPE_DIARIO: "500"
 # Estudio de Fondo con IA activo en producción

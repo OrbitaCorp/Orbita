@@ -42,6 +42,9 @@ const MODELOS = [
   'orbiConversation',
   'orbiPendingAction',
   'orbiTurn',
+  'orbiCupoAjuste',
+  'orbiCupoMiembro',
+  'orbiConversationAccess',
   'dailyQuota',
   'refreshToken',
   'passwordResetToken',
@@ -94,6 +97,15 @@ function armar(opts: { vencido?: boolean } = {}) {
   }) as unknown as jest.Mock;
   prisma.member.findMany = jest.fn(() => [{ email: 'ana@x.com' }]) as unknown as jest.Mock;
 
+  // $executeRaw (tagged template): el UPDATE que limpia usage_events. Guarda el SQL
+  // y los valores para poder afirmar qué se ejecutó.
+  const sqlEjecutado: { sql: string; valores: unknown[] }[] = [];
+  (prisma as unknown as { $executeRaw: jest.Mock }).$executeRaw = jest.fn((strings: TemplateStringsArray, ...valores: unknown[]) => {
+    secuencia.push('$executeRaw');
+    sqlEjecutado.push({ sql: strings.join('?').replace(/\s+/g, ' ').trim(), valores });
+    return { count: 0 };
+  });
+
   const transacciones: unknown[][] = [];
   (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn((ops: unknown[]) => {
     secuencia.push('$transaction');
@@ -111,7 +123,7 @@ function armar(opts: { vencido?: boolean } = {}) {
   };
 
   const svc = new SubscriptionsService(prisma as any, config as any, {} as any, {} as any, {} as any, {} as any, mail as any, undefined);
-  return { svc, prisma, mail, secuencia, transacciones };
+  return { svc, prisma, mail, secuencia, transacciones, sqlEjecutado };
 }
 
 /** Índice de la primera llamada a `nombre` dentro de la secuencia real. */
@@ -160,6 +172,36 @@ describe('Baja definitiva de un negocio: se borran los datos de las personas', (
     // daily_quota no tiene businessId ni relación: la clave es `<prefijo>:<negocio>`
     // (orbi-panel:, ai-assist:, image-studio:), así que se borra por sufijo.
     expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledWith({ where: { key: { endsWith: `:${BIZ}` } } });
+  });
+
+  it('borra los cupos y ajustes de Orbi y el registro de quién leyó qué conversación', async () => {
+    const { svc, prisma } = armar();
+    await svc.processCancellationWindow();
+
+    // Mismo motivo que arriba: la baja solo pone `deletedAt`, el cascade no corre.
+    expect(prisma.orbiCupoAjuste.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+    expect(prisma.orbiCupoMiembro.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+    expect(prisma.orbiConversationAccess.deleteMany).toHaveBeenCalledWith({ where: { businessId: BIZ } });
+  });
+
+  it('usage_events se conserva (es gasto de la plataforma) pero sin a quién ni de qué conversación', async () => {
+    const { svc, prisma, sqlEjecutado, transacciones } = armar();
+    await svc.processCancellationWindow();
+
+    expect(prisma.usageEvent?.deleteMany).toBeUndefined(); // no hay delegate: nunca se borra
+    expect(sqlEjecutado).toHaveLength(1);
+    const { sql, valores } = sqlEjecutado[0];
+    expect(sql).toContain('UPDATE usage_events SET metadata = metadata - ');
+    for (const clave of ['memberId', 'conversationId', 'turnId']) expect(sql).toContain(`'${clave}'`);
+    // Acotado al negocio que se está dando de baja (valor parametrizado, no concatenado).
+    expect(sql).toContain('WHERE business_id = ?');
+    expect(valores).toEqual([BIZ]);
+    // Un metadata JSON null (lo que guarda track() sin metadata) no admite `-` y
+    // reventaría la transacción entera: solo se tocan los objetos.
+    expect(sql).toContain("jsonb_typeof(metadata) = 'object'");
+    // Va dentro de la misma transacción que el deletedAt.
+    expect(transacciones).toHaveLength(1);
+    expect(transacciones[0]).toContainEqual({ count: 0 });
   });
 
   it('borra las credenciales de Mercado Pago: son un secreto de alguien que ya se fue', async () => {
