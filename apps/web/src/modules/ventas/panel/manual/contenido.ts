@@ -853,7 +853,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón **Orbi** de la barra de arriba (al lado de la búsqueda) o desde **Orbi AI** al pie del menú de la izquierda.' },
                 { tipo: 'parrafo', texto: 'No es un buscador de ayuda genérica: contesta con los datos de **tu** negocio. "¿Cuánto vendí esta semana?", "¿qué pedidos tengo pendientes?", "¿cómo creo un cupón?" son todas preguntas válidas.' },
-                { tipo: 'parrafo', texto: 'Orbi tiene un **cupo por mes**. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Si el dueño te puso un tope, el porcentaje es el de tu parte; si no, el del negocio.' },
+                { tipo: 'parrafo', texto: 'Orbi tiene un **cupo por mes**. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Muestra el cupo que se está por terminar primero: el del negocio o, si el dueño te puso un tope, tu parte.' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Abrí el uso del equipo', texto: 'Lo ven el dueño y los administradores. Con Orbi abierto, tocá [[Expandir a página]] y, en la columna de conversaciones, [[Uso del equipo]]. En pantallas angostas está en el desplegable del título del chat.' },
                     { titulo: 'Mirá cuánto se usó', texto: 'Arriba, en **Uso de Orbi**, está el porcentaje del negocio en el mes. En **Equipo**, cada persona con el porcentaje que usó y su tope.' },

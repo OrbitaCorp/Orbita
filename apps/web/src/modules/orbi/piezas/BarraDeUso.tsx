@@ -6,7 +6,8 @@ import { CLAVE_DE_USO, mostrarBarra, porcentajeDeUso, textoDeUso, tonoDeUso } fr
 import s from '../orbi.module.css'
 
 /**
- * Cuánto Orbi queda este mes (fase 5): una barra de 3 px bajo el encabezado,
+ * Cuánto Orbi queda este mes (fase 5), por el cupo que se agota primero
+ * (`porcentajeDeUso`): una barra de 3 px bajo el encabezado,
  * desde el 50%. Desde el 80% también lo dice en texto. Se pide al abrir el
  * chat (se monta con él) y otra vez al terminar cada respuesta. Si la API no
  * contesta, no se muestra nada: la barra avisa, no bloquea.

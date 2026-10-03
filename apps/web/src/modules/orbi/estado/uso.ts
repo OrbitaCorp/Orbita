@@ -19,15 +19,18 @@ export function tonoDeUso(porcentaje: number): 'normal' | 'alto' | 'agotado' {
 }
 
 /**
- * El número que importa: con tope, la parte de la persona (es la que la frena
- * primero); sin tope, el del negocio. Es el mismo que dice `textoDeUso`.
+ * El número que importa: el del cupo que se agota primero. Orbi frena con el
+ * que llegue antes al 100%: el del negocio o, si la persona tiene tope, su
+ * parte. Sin tope el propio se cuenta sobre todo el cupo y nunca supera al del
+ * negocio. Es el mismo número que dice `textoDeUso`.
  */
 export function porcentajeDeUso(u: Uso): number {
-  return u.propio.topePorcentaje !== null ? u.propio.porcentaje : u.negocio.porcentaje
+  return Math.max(u.propio.porcentaje, u.negocio.porcentaje)
 }
 
+/** Habla de la parte de la persona solo si tiene tope y es la que va adelante (o empatada). */
 export function textoDeUso(u: Uso): string {
-  return u.propio.topePorcentaje !== null
+  return u.propio.topePorcentaje !== null && u.propio.porcentaje >= u.negocio.porcentaje
     ? `Usaste el ${u.propio.porcentaje}% de tu parte de Orbi este mes`
     : `El negocio usó el ${u.negocio.porcentaje}% de Orbi este mes`
 }

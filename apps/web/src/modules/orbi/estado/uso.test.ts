@@ -36,6 +36,19 @@ describe('textoDeUso', () => {
   })
 })
 
+describe('con tope pero el negocio se agota primero', () => {
+  const negocioAdelante = { negocio: { porcentaje: 95 }, propio: { porcentaje: 40, topePorcentaje: 50 } }
+  it('la barra va por el negocio: aparece, en tono alto y con el texto del negocio', () => {
+    expect(porcentajeDeUso(negocioAdelante)).toBe(95)
+    expect(mostrarBarra(porcentajeDeUso(negocioAdelante))).toBe(true)
+    expect(tonoDeUso(porcentajeDeUso(negocioAdelante))).toBe('alto')
+    expect(textoDeUso(negocioAdelante)).toBe('El negocio usó el 95% de Orbi este mes')
+  })
+  it('empatados, habla de la parte de la persona', () => {
+    expect(textoDeUso({ negocio: { porcentaje: 60 }, propio: { porcentaje: 60, topePorcentaje: 50 } })).toBe('Usaste el 60% de tu parte de Orbi este mes')
+  })
+})
+
 describe('porcentajeDeUso', () => {
   it('es el mismo número que dice el texto', () => {
     expect(porcentajeDeUso(conTope)).toBe(62)
