@@ -7,6 +7,14 @@ import { SocialProofController } from '../../src/social-proof/social-proof.contr
 import { TwoForOneController } from '../../src/two-for-one/two-for-one.controller';
 import { CountdownSettingsController } from '../../src/countdown/countdown-settings.controller';
 import { BusinessesController } from '../../src/businesses/businesses.controller';
+import { HubAvanzadoController } from '../../src/appointments/avanzado/hub/hub.controller';
+import { PaquetesController } from '../../src/appointments/avanzado/paquetes/paquetes.controller';
+import { MembresiasController } from '../../src/appointments/avanzado/membresias/membresias.controller';
+import { GiftCardsController } from '../../src/appointments/avanzado/gift-cards/gift-cards.controller';
+import { PreciosHorarioController } from '../../src/appointments/avanzado/precios-horario/precios-horario.controller';
+import { FidelidadController } from '../../src/appointments/avanzado/fidelidad/fidelidad.controller';
+import { TurnoFijoController } from '../../src/appointments/avanzado/turno-fijo/turno-fijo.controller';
+import { RecuperarController } from '../../src/appointments/avanzado/recuperar/recuperar.controller';
 
 // Gates de las funciones del paquete "Avanzado" (auditoría interna
 // 2026-09-09, verificaciones 2 y 5 del ítem `api.common`).
@@ -76,5 +84,63 @@ describe('Funciones pagas — gates de add-on y de permiso', () => {
     ] as [new (...args: never[]) => object, string][]) {
       expect(gates(controller, metodo).addon).toBe('ADVANCED');
     }
+  });
+});
+
+// Turnos & Agenda (CONTRATO.md de src/appointments, § 0 "Avanzado"): las
+// escrituras de Avanzado de Turnos piden el add-on y, en vez de
+// advanced.manage (que es de Tienda), appointments.settings.manage. Registrar
+// la cuota de una membresía a mano es cobrar: el contrato la pone en
+// appointments.cash.charge. El barrido completo (que ninguna escritura nueva
+// quede sin gate) está en appointments.p4.gates-aislamiento.unit-spec.ts.
+const ESCRITURAS_TURNOS: [string, new (...args: never[]) => object, string, string][] = [
+  ['turnos · prender/configurar una función', HubAvanzadoController, 'guardar', 'appointments.settings.manage'],
+  ['turnos · paquetes · crear', PaquetesController, 'crear', 'appointments.settings.manage'],
+  ['turnos · paquetes · editar', PaquetesController, 'editar', 'appointments.settings.manage'],
+  ['turnos · paquetes · borrar', PaquetesController, 'borrar', 'appointments.settings.manage'],
+  ['turnos · paquetes · vender en el local', PaquetesController, 'vender', 'appointments.settings.manage'],
+  ['turnos · planes · crear', MembresiasController, 'crearPlan', 'appointments.settings.manage'],
+  ['turnos · planes · editar', MembresiasController, 'editarPlan', 'appointments.settings.manage'],
+  ['turnos · planes · borrar', MembresiasController, 'borrarPlan', 'appointments.settings.manage'],
+  ['turnos · membresía · alta', MembresiasController, 'crear', 'appointments.settings.manage'],
+  ['turnos · membresía · pausar', MembresiasController, 'pausar', 'appointments.settings.manage'],
+  ['turnos · membresía · reanudar', MembresiasController, 'reanudar', 'appointments.settings.manage'],
+  ['turnos · membresía · cancelar', MembresiasController, 'cancelar', 'appointments.settings.manage'],
+  ['turnos · membresía · registrar cuota', MembresiasController, 'registrarCuota', 'appointments.cash.charge'],
+  ['turnos · gift card · emitir', GiftCardsController, 'emitir', 'appointments.settings.manage'],
+  ['turnos · gift card · anular', GiftCardsController, 'anular', 'appointments.settings.manage'],
+  ['turnos · precios por horario · crear', PreciosHorarioController, 'crear', 'appointments.settings.manage'],
+  ['turnos · precios por horario · editar', PreciosHorarioController, 'editar', 'appointments.settings.manage'],
+  ['turnos · precios por horario · borrar', PreciosHorarioController, 'borrar', 'appointments.settings.manage'],
+  ['turnos · fidelidad · canjear premio', FidelidadController, 'canjear', 'appointments.settings.manage'],
+  ['turnos · turno fijo · crear', TurnoFijoController, 'crear', 'appointments.settings.manage'],
+  ['turnos · turno fijo · terminar', TurnoFijoController, 'terminar', 'appointments.settings.manage'],
+  ['turnos · recuperar clientes · guardar', RecuperarController, 'guardar', 'appointments.settings.manage'],
+  ['turnos · recuperar clientes · enviar', RecuperarController, 'enviar', 'appointments.settings.manage'],
+];
+
+describe('Funciones pagas de Turnos — gates de add-on y de permiso', () => {
+  it.each(ESCRITURAS_TURNOS)('%s exige el add-on Avanzado y su permiso de Turnos', (_nombre, controller, metodo, permisoEsperado) => {
+    const { permiso, addon } = gates(controller, metodo);
+    expect(addon).toBe('ADVANCED');
+    expect(permiso).toBe(permisoEsperado);
+  });
+
+  it('las lecturas de Turnos piden el add-on; el hub no (se muestra con el candado)', () => {
+    for (const [controller, metodo] of [
+      [PaquetesController, 'listar'],
+      [PaquetesController, 'listarCompras'],
+      [MembresiasController, 'listarPlanes'],
+      [MembresiasController, 'listar'],
+      [GiftCardsController, 'listar'],
+      [PreciosHorarioController, 'listar'],
+      [FidelidadController, 'listar'],
+      [TurnoFijoController, 'listar'],
+      [RecuperarController, 'obtener'],
+      [RecuperarController, 'audiencia'],
+    ] as [new (...args: never[]) => object, string][]) {
+      expect(gates(controller, metodo).addon).toBe('ADVANCED');
+    }
+    expect(gates(HubAvanzadoController, 'obtener').addon).toBeUndefined();
   });
 });
