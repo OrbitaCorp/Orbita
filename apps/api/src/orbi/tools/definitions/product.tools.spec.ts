@@ -151,11 +151,33 @@ describe('GenerateDescriptionTool', () => {
     // contador diario del negocio.
     expect(cuota.consumir).toHaveBeenCalledWith('ai-assist:biz-1', AI_ASSIST_DIA_NEGOCIO);
     expect(result.success).toBe(true);
-    expect(mockAiService.assist).toHaveBeenCalledWith('biz-1', {
-      name: 'Remera algodón',
-      existingDescription: undefined,
-    });
+    expect(mockAiService.assist).toHaveBeenCalledWith(
+      'biz-1',
+      { name: 'Remera algodón', existingDescription: undefined },
+      expect.objectContaining({ memberId: 'user-1' }),
+    );
     expect((result.data as any).description).toBe('Una remera cómoda');
+  });
+
+  it('devuelve el consumo de la IA y le pasa a assist el turno y el miembro', async () => {
+    const uso = { provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 900, completionTokens: 420 };
+    const mockAiService = {
+      assist: jest.fn().mockImplementation(async (_biz: string, _dto: unknown, origen: any) => {
+        origen.alConsumir(uso);
+        return respuesta;
+      }),
+    };
+    const cuota = { consumir: jest.fn().mockResolvedValue(true) };
+
+    const tool = new GenerateDescriptionTool(mockAiService as any, cuota as any);
+    const result = await tool.execute({ productName: 'Remera algodón' }, { ...ctx, turnId: 'turno-1' });
+
+    expect(result.consumo).toEqual(uso);
+    expect(mockAiService.assist).toHaveBeenCalledWith(
+      'biz-1',
+      { name: 'Remera algodón', existingDescription: undefined },
+      expect.objectContaining({ memberId: 'user-1', turnId: 'turno-1', alConsumir: expect.any(Function) }),
+    );
   });
 
   it('si la cuota del día se agotó devuelve success:false y no llama a la IA', async () => {
