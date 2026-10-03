@@ -19,14 +19,15 @@ import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Cabecera } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo } from './configuracion/ui'
 import { Modal, ErrorCampo } from './piezasPanel'
-import { cuandoTxt, sinAcentos, tieneTelefono, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
+import { sinAcentos, useCalendarioDemo, tieneTelefono, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
 import { taparTelefono } from './equipoDemo'
 
 export const pluralCliente = (r: RubroTurnos) => esSalud(r) ? 'Pacientes' : r.modo === 'cupo' ? 'Alumnos' : 'Clientes'
 
-const HISTORIAL: { fecha: string; estado: EstadoTurno }[] = [
-  { fecha: '19/09', estado: 'completado' }, { fecha: '05/09', estado: 'completado' },
-  { fecha: '22/08', estado: 'ausente' }, { fecha: '08/08', estado: 'completado' },
+/** `dia`: hace cuántos días, contados desde hoy. */
+const HISTORIAL: { dia: number; estado: EstadoTurno }[] = [
+  { dia: -7, estado: 'completado' }, { dia: -21, estado: 'completado' },
+  { dia: -35, estado: 'ausente' }, { dia: -49, estado: 'completado' },
 ]
 
 type Filtro = 'todos' | 'frecuentes' | 'nuevos'
@@ -60,6 +61,7 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
   const [filtro, setFiltro] = useState<Filtro>('todos')
   // null: formulario cerrado; si no, el nombre con el que arranca.
   const [agregando, setAgregando] = useState<string | null>(null)
+  const { fechaCorta } = useCalendarioDemo()
   const salud = esSalud(rubro)
   const titulo = pluralCliente(rubro)
   const sel = clientes.find(c => c.id === selId) ?? null
@@ -165,7 +167,7 @@ export default function Clientes({ rubro, clientes, servicios, selId, onSel, pro
                   <span className="tu-cli-barra" style={{ display: 'block', width: `${(c.visitas / maxVisitas) * 100}%`, height: '100%', borderRadius: 999, background: 'var(--tuo-grad)' }} />
                 </span>
               </span>
-              <span className="tu-cli-ult tuo-num" style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.ultima}</span>
+              <span className="tu-cli-ult tuo-num" style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.ultima === null ? '—' : fechaCorta(c.ultima)}</span>
               <span className={salud ? 'tu-cli-extra' : 'tu-cli-extra tuo-num'} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{salud ? c.obraSocial : !verNumeros ? '' : c.gastado ? pesos(c.gastado) : '—'}</span>
               <ChevronRight size={16} className="tu-cli-flecha" aria-hidden />
             </button>
@@ -202,9 +204,10 @@ function FichaCliente({ cliente: c, rubro, maxVisitas, nombresServicio, proximo,
   verContacto: boolean; verNumeros: boolean; puedeAgendar: boolean
   onCerrar: () => void; onAbrirTurno: (t: TurnoAgenda) => void; onAgendar: () => void; onWhatsApp: () => void
 }) {
+  const { cuandoTxt, fechaCorta } = useCalendarioDemo()
   const salud = esSalud(rubro)
   const pila = c.nombre.split(' ')[0]
-  const historial = HISTORIAL.slice(0, Math.min(4, c.visitas))
+  const historial = HISTORIAL.slice(0, Math.min(4, c.visitas)).map(x => ({ fecha: fechaCorta(x.dia), estado: x.estado }))
 
   return (
     <Modal
@@ -280,7 +283,7 @@ function FormCliente({ inicial, rubro, clientes, onCerrar, onAgregar }: {
     if (repetido) { setError({ campo: 'nombre', texto: `Ya tenés a ${repetido.nombre} en tu lista.` }); return }
     if (telefono.trim() && !tieneTelefono(telefono)) { setError({ campo: 'telefono', texto: 'Revisá el teléfono: tiene que tener al menos 8 números.' }); return }
     onAgregar({
-      id: `c${Date.now()}`, nombre: limpio, telefono: telefono.trim() || 'Sin teléfono', visitas: 0, ultima: '—', gastado: 0,
+      id: `c${Date.now()}`, nombre: limpio, telefono: telefono.trim() || 'Sin teléfono', visitas: 0, ultima: null, gastado: 0,
       ...(nota.trim() ? { nota: nota.trim() } : {}),
       ...(salud ? { obraSocial: cobertura.trim() || 'Particular' } : {}),
     })

@@ -7,6 +7,7 @@ import { ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaClient
 import { ars, servicioBase } from './datosAvanzado'
 import { duracionTxt } from '@/modules/turnos/datos'
 import type { PropsFuncion } from './tipos'
+import { diaDeSemana, fechaCorta, sumarDias, useReloj, type Fecha } from '@/modules/turnos/reloj'
 
 type Frecuencia = 'semanal' | 'quincenal' | 'mensual'
 const FRECUENCIAS: { id: Frecuencia; label: string; cada: string; dias: number }[] = [
@@ -15,17 +16,9 @@ const FRECUENCIAS: { id: Frecuencia; label: string; cada: string; dias: number }
   { id: 'mensual', label: 'Una vez por mes', cada: 'una vez por mes', dias: 28 },
 ]
 
-// Fechas de ejemplo a partir del martes 29/09/2026 (sin Date para que el render sea puro y estable).
-function fechas(desde: number, cada: number, n: number) {
-  const mesesDias = [[9, 30], [10, 31], [11, 30], [12, 31]]
-  const out: string[] = []
-  let dia = desde, mesI = 0
-  for (let i = 0; i < n; i++) {
-    out.push(`${String(dia).padStart(2, '0')}/${String(mesesDias[mesI][0]).padStart(2, '0')}`)
-    dia += cada
-    while (dia > mesesDias[mesI][1]) { dia -= mesesDias[mesI][1]; mesI++ }
-  }
-  return out
+// Fechas de ejemplo a partir del próximo martes (de reloj.ts: la fecha real, sin leer el reloj en render).
+function fechas(desde: Fecha, cada: number, n: number) {
+  return Array.from({ length: n }, (_, i) => fechaCorta(sumarDias(desde, i * cada)))
 }
 
 const FIJOS = [
@@ -120,14 +113,18 @@ export default function TurnoFijo(p: PropsFuncion) {
 
 function PreviewFijo({ rubro, fp, habilitadas, onFrec, maximo, cobro }: PropsFuncion & { fp: typeof FRECUENCIAS[number]; habilitadas: typeof FRECUENCIAS; onFrec: (f: Frecuencia) => void; maximo: number; cobro: 'cada' | 'mes' }) {
   const base = servicioBase(rubro)
-  const proximas = fechas(29, fp.dias, 4)
+  const { fecha: hoy } = useReloj()
+  // El próximo martes (mañana en adelante).
+  const martes = sumarDias(hoy, (8 - diaDeSemana(hoy)) % 7 || 7)
+  const martesTxt = fechaCorta(martes)
+  const proximas = fechas(martes, fp.dias, 4)
   const [repetir, setRepetir] = useState(true)
   return (
     <VistaCliente rubro={rubro} nota="Último paso de la reserva, con datos de ejemplo. Probá cambiar la frecuencia.">
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Confirmá tu turno</div>
       <div style={{ borderRadius: 'var(--tu-r2)', border: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: 14 }}>
         <div style={{ fontFamily: 'var(--tu-fh)', fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>{base.nombre}</div>
-        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3 }}>Martes 29/09 · 18:00 · {duracionTxt(base.duracion)}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3 }}>Martes {martesTxt} · 18:00 · {duracionTxt(base.duracion)}</div>
       </div>
       <div style={{ borderRadius: 'var(--tu-r2)', border: `1.5px solid ${repetir ? 'var(--color-primary)' : 'var(--color-border)'}`, background: repetir ? 'var(--color-primary-bg)' : 'var(--color-surface)', padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -161,12 +158,12 @@ function PreviewFijo({ rubro, fp, habilitadas, onFrec, maximo, cobro }: PropsFun
             </div>
           </>
         ) : (
-          <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.45 }}>Reservás solo el martes 29/09. Prendelo para quedarte con el horario.</div>
+          <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.45 }}>Reservás solo el martes {martesTxt}. Prendelo para quedarte con el horario.</div>
         )}
       </div>
       <BotonVista aviso={repetir
-        ? `Demo: turno fijo confirmado, ${fp.cada} a las 18:00. El primero es el martes 29/09.`
-        : 'Demo: turno confirmado para el martes 29/09 a las 18:00.'}>
+        ? `Demo: turno fijo confirmado, ${fp.cada} a las 18:00. El primero es el martes ${martesTxt}.`
+        : `Demo: turno confirmado para el martes ${martesTxt} a las 18:00.`}>
         {repetir ? 'Confirmar turno fijo' : 'Confirmar turno'}
       </BotonVista>
     </VistaCliente>

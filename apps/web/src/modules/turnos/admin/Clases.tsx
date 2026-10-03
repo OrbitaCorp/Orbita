@@ -13,7 +13,7 @@ import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Cabecera } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo, Selector, Dos } from './configuracion/ui'
 import { Modal, ErrorCampo, Borrar } from './piezasPanel'
-import type { ClasePanel } from './agendaDemo'
+import { useCalendarioDemo, type ClasePanel } from './agendaDemo'
 
 function colorCupo(c: ClaseCupo) {
   const p = c.anotados / c.cupo
@@ -75,7 +75,10 @@ interface Props {
 }
 
 export default function Clases({ rubro, clases, actividades, salas, alumnos, profes, onGuardar, onBorrar, titulo = 'Clases de la semana' }: Props) {
-  const [dia, setDia] = useState(5)
+  // La semana en curso, de lunes a sábado. Arranca parada en hoy (el domingo no tiene columna: el sábado).
+  const { ahora, fechaCorta, lunesDe, numeroDia, rangoSemana } = useCalendarioDemo()
+  const lunes = lunesDe(0)
+  const [dia, setDia] = useState(Math.min(ahora.diaSemana, 5))
   // La clase del panel: una nueva (sin id) o el id de una que existe. La que
   // existe se lee siempre de la lista, así el panel ve a quien se anota.
   const [abierta, setAbierta] = useState<ClasePanel | null>(null)
@@ -115,7 +118,7 @@ export default function Clases({ rubro, clases, actividades, salas, alumnos, pro
         }
       `}</style>
       <Cabecera
-        rotulo="Semana del 21 al 26 de septiembre"
+        rotulo={rangoSemana(lunes, 5)}
         titulo={titulo}
         bajada="Cada clase tiene su cupo. Cuando se completa, los que lleguen tarde entran a la lista de espera."
         acciones={<button type="button" onClick={() => nueva()} className="tuo-btn tuo-btn--primario"><Plus size={16} /> Nueva clase</button>}
@@ -136,18 +139,18 @@ export default function Clases({ rubro, clases, actividades, salas, alumnos, pro
       <div className="ds-tira tu-cl-tira" style={{ gap: 8, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {DIAS_CORTOS.slice(0, 6).map((d, i) => {
           const a = i === dia
-          return <button key={d} type="button" onClick={() => setDia(i)} aria-pressed={a} className="ds-hover ds-tira-chip" data-activa={a} style={{ flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 999, border: a ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)', background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{d} {21 + i}</button>
+          return <button key={d} type="button" onClick={() => setDia(i)} aria-pressed={a} className="ds-hover ds-tira-chip" data-activa={a} style={{ flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 999, border: a ? '1.5px solid var(--color-primary)' : '1px solid var(--color-border)', background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{d} {numeroDia(lunes + i)}</button>
         })}
       </div>
 
       <div className="tu-cl-grid">
         {DIAS.slice(0, 6).map((d, i) => {
-          const hoy = i === 5
+          const hoy = i === ahora.diaSemana
           const delDia = clases.filter(c => c.dia === i).sort((a, b) => a.inicio - b.inicio)
           return (
             <div key={d} data-dia data-visible={i === dia} style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
               <div data-dia-titulo style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '9px 12px', borderRadius: 10, background: hoy ? 'var(--tuo-grad)' : 'var(--color-surface-alt)', color: hoy ? '#fff' : 'var(--color-text)', fontSize: 13, fontWeight: 600, boxShadow: hoy ? '0 6px 16px rgba(37,99,235,0.3)' : undefined }}>
-                {d} <span className="tuo-num" style={{ fontWeight: 400, fontSize: 11.5, color: hoy ? 'rgba(255,255,255,0.82)' : 'var(--color-muted)' }}>{21 + i}/09</span>
+                {d} <span className="tuo-num" style={{ fontWeight: 400, fontSize: 11.5, color: hoy ? 'rgba(255,255,255,0.82)' : 'var(--color-muted)' }}>{fechaCorta(lunes + i)}</span>
               </div>
               {delDia.map((c, k) => <TarjetaClase key={c.id} c={c} i={k + i} onClick={() => setAbierta(c)} />)}
               {delDia.length === 0 && (
@@ -188,6 +191,8 @@ function FormClase({ clase, rubro, clases, actividades, salas, alumnos, profes, 
   clase: ClasePanel; rubro: RubroTurnos; clases: ClasePanel[]; actividades: string[]; salas: string[]; alumnos: string[]; profes: string[]
   onCerrar: () => void; onGuardar: (c: ClasePanel) => void; onCambiarLista: (c: ClasePanel, aviso: string) => void; onBorrar: (id: string) => void
 }) {
+  const { lunesDe, numeroDia } = useCalendarioDemo()
+  const lunes = lunesDe(0)
   const [nombre, setNombre] = useState(clase.nombre)
   const [dia, setDia] = useState(clase.dia)
   const [inicio, setInicio] = useState(clase.inicio)
@@ -244,7 +249,7 @@ function FormClase({ clase, rubro, clases, actividades, salas, alumnos, profes, 
       ancho={560}
       rotulo="Clases"
       titulo={esNueva ? 'Nueva clase' : clase.nombre}
-      bajada={esNueva ? 'Aparece en la grilla y en tu página de reservas.' : `${DIAS[clase.dia]} ${21 + clase.dia} · ${horaTxt(clase.inicio)} a ${horaTxt(clase.inicio + clase.duracion)} · ${clase.sala}`}
+      bajada={esNueva ? 'Aparece en la grilla y en tu página de reservas.' : `${DIAS[clase.dia]} ${numeroDia(lunes + clase.dia)} · ${horaTxt(clase.inicio)} a ${horaTxt(clase.inicio + clase.duracion)} · ${clase.sala}`}
       onCerrar={onCerrar}
       onEnviar={guardar}
       pie={<>
@@ -254,7 +259,7 @@ function FormClase({ clase, rubro, clases, actividades, salas, alumnos, profes, 
     >
       <Selector label="Actividad" valor={nombre} onChange={v => { setNombre(v); setError('') }} opciones={opcionesActividad} />
       <Dos>
-        <Selector label="Día" valor={dia} onChange={v => { setDia(v); setError('') }} opciones={DIAS.slice(0, 6).map((d, i) => ({ id: i, label: `${d} ${21 + i}` }))} />
+        <Selector label="Día" valor={dia} onChange={v => { setDia(v); setError('') }} opciones={DIAS.slice(0, 6).map((d, i) => ({ id: i, label: `${d} ${numeroDia(lunes + i)}` }))} />
         <Selector label="Empieza" valor={inicio} onChange={v => { setInicio(v); setError('') }} opciones={horas} />
       </Dos>
       <Dos>

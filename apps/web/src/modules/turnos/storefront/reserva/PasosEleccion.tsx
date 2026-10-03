@@ -9,7 +9,7 @@ import { pesos, duracionTxt, horaTxt, semanaDeRecurso, type RubroTurnos, type Re
 import { diasTxt, tramosDe, tramosFrase } from '@/modules/turnos/horario'
 import { RETRATOS, type TemaNegocio } from '../tema'
 import { teclasRadio } from './acciones'
-import { clasePasada, esHoy, fechaDeClase, fechaLarga, mesCorto, nombreDiaCorto, proximosDias, type Fecha } from './calendario'
+import { fechaLarga, mesCorto, nombreDiaCorto, useCalendarioReserva, type CalendarioReserva, type Fecha } from './calendario'
 import { Tilde } from './piezas'
 
 const escalon = (i: number) => ({ ['--i' as string]: Math.min(i, 8) }) as React.CSSProperties
@@ -44,11 +44,12 @@ export function PasoServicio({ rubro, t, elegido, onElegir }: { rubro: RubroTurn
 
 // ─── Con quién / dónde ────────────────────────────────────────────────────────
 
-const cuandoCorto = (f: Fecha, m: number) => `${esHoy(f) ? 'Hoy' : `${nombreDiaCorto(f)} ${f.dia}`} ${horaTxt(m)}`
+const cuandoCorto = (esHoy: CalendarioReserva['esHoy'], f: Fecha, m: number) => `${esHoy(f) ? 'Hoy' : `${nombreDiaCorto(f)} ${f.dia}`} ${horaTxt(m)}`
 
 export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir }: {
   rubro: RubroTurnos; t: TemaNegocio; recursos: Recurso[]; duracion: number; elegido: string | null; onElegir: (id: string) => void
 }) {
+  const { esHoy, proximosDias } = useCalendarioReserva()
   const persona = rubro.modo === 'profesional'
   // "Cualquiera" solo tiene sentido cuando al cliente le puede dar lo mismo: una cancha de
   // fútbol 5 y una de pádel no son intercambiables.
@@ -80,7 +81,7 @@ export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir }:
             </span>
             {primero && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, color: 'var(--color-text)', fontWeight: 600, marginTop: 8 }}>
-                <span className="tur-vivo" aria-hidden /> Próximo horario: <span className="tur-num">{cuandoCorto(primero.f, primero.m)}</span>
+                <span className="tur-vivo" aria-hidden /> Próximo horario: <span className="tur-num">{cuandoCorto(esHoy, primero.f, primero.m)}</span>
               </span>
             )}
           </span>
@@ -103,7 +104,7 @@ export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir }:
                 <span style={{ display: 'block', fontSize: 13.5, color: 'var(--color-muted)', marginTop: 3 }}>{r.rol}{atiende ? ` · ${atiende}` : ''}</span>
                 {px && (
                   <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px 7px', fontSize: 13, color: 'var(--color-body)', marginTop: 10 }}>
-                    <span className="tur-vivo" aria-hidden /> Libre <span className="tur-num" style={{ color: 'var(--color-text)', fontWeight: 600 }}>{cuandoCorto(px.f, px.m)}</span>
+                    <span className="tur-vivo" aria-hidden /> Libre <span className="tur-num" style={{ color: 'var(--color-text)', fontWeight: 600 }}>{cuandoCorto(esHoy, px.f, px.m)}</span>
                   </span>
                 )}
               </span>
@@ -117,10 +118,13 @@ export function PasoRecurso({ rubro, t, recursos, duracion, elegido, onElegir }:
 
 // ─── Clase con cupo ───────────────────────────────────────────────────────────
 
-const DIAS_CLASE = [5, 0, 1, 2, 3, 4] // hoy (sábado) y después la semana que viene, de lunes a viernes
+// Los días con clases (lunes a sábado), empezando por hoy y siguiendo con los que vienen.
+const diasClaseDesde = (hoy: number) => [0, 1, 2, 3, 4, 5].sort((a, b) => (a - hoy + 7) % 7 - (b - hoy + 7) % 7)
 
 export function PasoClase({ clases, elegida, onElegir }: { clases: ClaseCupo[]; elegida: ClaseCupo | null; onElegir: (c: ClaseCupo) => void }) {
-  const [dia, setDia] = useState(elegida?.dia ?? 5)
+  const { ahora, clasePasada, esHoy, fechaDeClase } = useCalendarioReserva()
+  const DIAS_CLASE = diasClaseDesde(ahora.diaSemana)
+  const [dia, setDia] = useState(elegida?.dia ?? DIAS_CLASE[0])
   const lista = clases.filter(c => c.dia === dia).sort((a, b) => a.inicio - b.inicio)
   const primeraLibre = lista.find(c => !clasePasada(c))
 
@@ -134,7 +138,7 @@ export function PasoClase({ clases, elegida, onElegir }: { clases: ClaseCupo[]; 
           return (
             <button key={d} type="button" role="radio" aria-checked={sel} tabIndex={sel ? 0 : -1} className="tur-dia" onClick={() => setDia(d)}
               aria-label={`${fechaLarga(f)}${esHoy(f) ? ', hoy' : ''}, ${cuantas} clase${cuantas === 1 ? '' : 's'}`}>
-              {(d === 5 || f.dia === 1) && <span className="tur-dia-mes">{mesCorto(f)}</span>}
+              {(d === DIAS_CLASE[0] || f.dia === 1) && <span className="tur-dia-mes">{mesCorto(f)}</span>}
               <span className="tur-dia-sem">{esHoy(f) ? 'Hoy' : nombreDiaCorto(f)}</span>
               <span className="tur-dia-num">{f.dia}</span>
               <span className="tur-dia-txt" style={{ marginTop: 8 }}>{cuantas} clase{cuantas === 1 ? '' : 's'}</span>

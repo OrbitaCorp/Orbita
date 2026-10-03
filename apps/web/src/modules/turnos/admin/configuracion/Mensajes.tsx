@@ -9,6 +9,7 @@ import { temaDe } from '@/modules/turnos/storefront/tema'
 import { recursosDe, CLIENTES } from '@/modules/turnos/datos'
 import { useBorrador, Encabezado, SecCard, Switch, Selector, BarraGuardar, Chip, FilaSwitch, Campo, type PropsTab } from './ui'
 import { vozDe, iniciales, subdominioDe, type Voz } from './datos'
+import { DIAS_SEMANA, diaDeSemana, fechaCorta, sumarDias, useReloj } from '@/modules/turnos/reloj'
 
 type Canal = 'wa' | 'email'
 interface Mensaje { id: string; on: boolean; canales: Canal[]; cuando: string; texto: string }
@@ -56,9 +57,12 @@ export default function Mensajes({ rubro, avisar }: PropsTab) {
   const [abierto, setAbierto] = useState<string | null>('recordatorio')
   const setMsj = (id: string, m: Partial<Mensaje>) => b.set('mensajes', v.mensajes.map(x => x.id === id ? { ...x, ...m } : x))
 
+  // El ejemplo es un turno de mañana.
+  const { fecha: hoy } = useReloj()
+  const manana = sumarDias(hoy, 1)
   const quien = rubro.modo === 'profesional' ? recursosDe(rubro)[0].nombre : rubro.modo === 'cupo' ? 'Caro' : recursosDe(rubro)[0].nombre
   const ejemplo: Record<string, string> = {
-    nombre: CLIENTES[0].nombre.split(' ')[0], servicio: rubro.servicios[0].nombre.toLowerCase(), fecha: 'sábado 27/09', hora: '15:30',
+    nombre: CLIENTES[0].nombre.split(' ')[0], servicio: rubro.servicios[0].nombre.toLowerCase(), fecha: `${DIAS_SEMANA[diaDeSemana(manana)].toLowerCase()} ${fechaCorta(manana)}`, hora: '15:30',
     profesional: quien, negocio: t.nombre, link: `${subdominioDe(t.nombre)}.orbita.site/t/8KQ2`,
   }
   const activos = v.mensajes.filter(m => m.on).length

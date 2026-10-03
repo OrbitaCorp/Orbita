@@ -10,10 +10,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { X, Copy, Check, CheckCheck, Clock3, Send, Share2, Trash2, PhoneOff, Sun, Sunset, CalendarX } from 'lucide-react'
 import { DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { MEDIAS_HORAS, diasAbiertos, diasTxt, errorJornada, hhmm, jornadaDe, jornadaTxt, tramosDe, type Bloque, type Jornada, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Llave } from '@/modules/turnos/_shared/orbita/piezas'
 import { Segmentado } from './configuracion/ui'
-import { copiar, fechaDe, indiceDia, type Avisar, type GrupoLibres, type MensajeWA } from './agendaDemo'
+import { copiar, useCalendarioDemo, type Avisar, type GrupoLibres, type MensajeWA } from './agendaDemo'
 
 export const CSS_PIEZAS_PANEL = `
   .tu-error { display: flex; align-items: center; gap: 6px; margin: -8px 0 14px; font-size: 12.5px; font-weight: 500; color: var(--color-error); }
@@ -348,16 +348,17 @@ export function TiraJornada({ rango, tramos, turnos, color, ahora, label }: { ra
  * atiende ese día.
  */
 export function TiraDias({ dias, valor, onElegir, etiqueta = 'Día' }: { dias: { dia: number; cerrado?: boolean }[]; valor: number; onElegir: (dia: number) => void; etiqueta?: string }) {
+  const { indiceDia, numeroDia } = useCalendarioDemo()
   return (
     <div className="tu-tira-dias" role="group" aria-label={etiqueta}>
       {dias.map(({ dia, cerrado }) => {
         const semana = indiceDia(dia)
-        const nombre = `${DIAS[semana]} ${fechaDe(dia).getDate()}`
+        const nombre = `${DIAS[semana]} ${numeroDia(dia)}`
         return (
           <button key={dia} type="button" className="tu-dia-btn" aria-pressed={dia === valor} disabled={cerrado} onClick={() => onElegir(dia)}
             aria-label={cerrado ? `${nombre}: no atiende` : dia === 0 ? `Hoy, ${nombre}` : nombre} title={cerrado ? `${nombre}: no atiende` : nombre}>
             <small>{dia === 0 ? 'Hoy' : DIAS_CORTOS[semana]}</small>
-            <b>{fechaDe(dia).getDate()}</b>
+            <b>{numeroDia(dia)}</b>
           </button>
         )
       })}
@@ -400,6 +401,7 @@ const iniciales = (nombre: string) => nombre.split(' ').filter(Boolean).slice(0,
  * de compartir del equipo y, si el navegador no lo tiene, lo copia.
  */
 export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: MensajeWA; onCerrar: () => void; avisar: Avisar }) {
+  const { ahora } = useCalendarioDemo()
   const [texto, setTexto] = useState(mensaje.texto)
   // null: todavía no se copió; false: el navegador no dejó copiar.
   const [copiado, setCopiado] = useState<boolean | null>(null)
@@ -448,7 +450,7 @@ export function MensajeWhatsApp({ mensaje, onCerrar, avisar }: { mensaje: Mensaj
         <div className="tu-wa-fondo">
           <div className="tu-wa-burbuja">
             {texto.trim() || '…'}
-            <span className="tu-wa-hora">{horaTxt(AHORA_DEMO)} {enviado ? <CheckCheck size={13} style={{ color: '#53BDEB', opacity: 1 }} /> : <Clock3 size={11} />}</span>
+            <span className="tu-wa-hora">{horaTxt(ahora.minutos)} {enviado ? <CheckCheck size={13} style={{ color: '#53BDEB', opacity: 1 }} /> : <Clock3 size={11} />}</span>
           </div>
         </div>
       </div>

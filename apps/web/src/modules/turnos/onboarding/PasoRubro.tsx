@@ -4,9 +4,9 @@
 // seña sugerida y los servicios con los que arranca.
 import { useMemo, useState } from 'react'
 import { CalendarClock, Check, Coins, Search, SearchX, Users } from 'lucide-react'
-import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, type FamiliaId, type RubroTurnos } from '@/modules/turnos/datos'
+import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDeHoy, clientesDe, type FamiliaId, type RubroTurnos } from '@/modules/turnos/datos'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
-import { AHORA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
+import { useAhora } from '@/modules/turnos/reloj'
 import { DESCRIPCION_MODO, plano } from './modelo'
 
 const FAMILIA_CORTA: Record<FamiliaId, string> = { belleza: 'Belleza', salud: 'Salud', deporte: 'Deporte', clases: 'Clases' }
@@ -101,6 +101,9 @@ export function PasoRubro({ elegido, onElegir }: { elegido: RubroTurnos | null; 
 }
 
 function Previa({ rubro }: { rubro: RubroTurnos }) {
+  // El alta real (/onboarding/rubro) no trae la hora del servidor: hasta que el
+  // navegador la conoce, el dial deja su lugar reservado y aparece al hidratar.
+  const ahora = useAhora()
   const recursos = recursosDe(rubro)
   const clientes = clientesDe(rubro)
   return (
@@ -117,7 +120,9 @@ function Previa({ rubro }: { rubro: RubroTurnos }) {
           (son 13 tramos enfocables) y del lector de pantalla, que ya tiene los
           mismos datos en texto justo abajo. */}
       <div className="tuob-previa-dial" inert aria-hidden>
-        <OrbitaDia recursos={recursos} turnos={turnosDe(rubro)} ahora={AHORA_DEMO} nombreCliente={id => clientes.find(c => c.id === id)?.nombre ?? ''} pie="día de ejemplo" size={204} />
+        {ahora
+          ? <OrbitaDia recursos={recursos} turnos={turnosDeHoy(rubro, ahora)} ahora={ahora.minutos} nombreCliente={id => clientes.find(c => c.id === id)?.nombre ?? ''} pie="día de ejemplo" size={204} />
+          : <div style={{ width: 204, maxWidth: '100%', aspectRatio: '1' }} />}
       </div>
 
       <div className="tuob-dato">

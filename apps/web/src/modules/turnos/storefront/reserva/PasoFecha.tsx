@@ -9,7 +9,7 @@ import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Moon, Sun, Sunset,
 import { duracionTxt, horaTxt } from '@/modules/turnos/datos'
 import { corteDe, type Semana } from '@/modules/turnos/horario'
 import { teclasRadio } from './acciones'
-import { esHoy, fechaLarga, fechaRelativa, gruposDel, mesCorto, mismaFecha, nombreDiaCorto, primerLibre, proximosDias, tramosDeFecha, type Fecha, type GrupoHoras } from './calendario'
+import { fechaLarga, gruposDel, mesCorto, mismaFecha, nombreDiaCorto, tramosDeFecha, useCalendarioReserva, type Fecha, type GrupoHoras } from './calendario'
 
 interface Props {
   /** La semana en la que se puede reservar: la del negocio o, si ya se eligió con quién, la de esa persona. */
@@ -25,6 +25,7 @@ const ICONO: Record<GrupoHoras['nombre'], typeof Sun> = { Mañana: Sun, Tarde: S
 
 export function PasoFecha({ horarios, duracion, fecha, hora, onFecha, onHora }: Props) {
   const tira = useRef<HTMLDivElement>(null)
+  const { esHoy, fechaRelativa, primerLibre, proximosDias } = useCalendarioReserva()
   const dias = proximosDias(horarios, duracion)
   const tope = Math.max(...dias.map(d => d.libres), 1)
   const dia = dias.find(d => mismaFecha(d.f, fecha)) ?? dias[0]

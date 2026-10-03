@@ -14,18 +14,10 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { arco, punto } from '@/modules/turnos/_shared/orbita/geometria'
 import { clasesDe, horaTxt, pesos, recursosDe, semanaDe, type RubroTurnos } from '@/modules/turnos/datos'
 import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
-import { AHORA_DEMO, HOY_SEMANA, estadoA, tramosDelDia } from '@/modules/turnos/horario'
-import { HOY as HOY_FECHA, esHoy, fechaCortaRelativa, nombreDia, nombreDiaCorto, proximosDias, sumarDias } from './reserva/calendario'
+import { estadoA, tramosDelDia } from '@/modules/turnos/horario'
+import { useReloj, type Ahora } from '@/modules/turnos/reloj'
+import { nombreDia, nombreDiaCorto, sumarDias, useCalendarioReserva, type CalendarioReserva } from './reserva/calendario'
 import { temaDe, type TemaNegocio } from './tema'
-
-// ─── El "ahora" de la demo ───────────────────────────────────────────────────
-// Todo el sitio cuenta la misma escena que la reserva y el panel: sábado
-// 26/09/2026 a las 10:40 (horario.ts). Es una constante (no Date.now()) para
-// que servidor y cliente dibujen lo mismo y react-compiler no se queje.
-/** Día de hoy en t.horarios (0 = lunes): sábado. */
-export const HOY = HOY_SEMANA
-/** Minutos desde las 00:00. */
-export const AHORA = AHORA_DEMO
 
 // ─── Rutas ───────────────────────────────────────────────────────────────────
 
@@ -223,15 +215,16 @@ export function Encabezado({ eyebrow, titulo, bajada, accion, centro }: { eyebro
 // ─── Abierto / cerrado ───────────────────────────────────────────────────────
 
 /**
- * Estado del local a la hora de la demo, leído de los horarios del tema: abierto
- * (y hasta qué hora) o cerrado (y a qué hora vuelve a abrir hoy, si vuelve). Con
- * el día partido, "cierra" es el cierre de la mañana o el de la tarde.
+ * Estado del local ahora (`ahora`: el de reloj.ts), leído de los horarios del
+ * tema: abierto (y hasta qué hora) o cerrado (y a qué hora vuelve a abrir hoy,
+ * si vuelve). Con el día partido, "cierra" es el cierre de la mañana o el de la tarde.
  */
-export const estadoLocal = (t: TemaNegocio) => estadoA(tramosDelDia(t.horarios, HOY), AHORA)
+export const estadoLocal = (t: TemaNegocio, ahora: Ahora) => estadoA(tramosDelDia(t.horarios, ahora.diaSemana), ahora.minutos)
 
 /** "Abierto ahora · cierra 13:00" o "Cerrado ahora · abre 16:00": punto que late + texto (el estado no depende del color). */
 export function Abierto({ t, corto, style }: { t: TemaNegocio; corto?: boolean; style?: CSSProperties }) {
-  const e = estadoLocal(t)
+  const ahora = useReloj()
+  const e = estadoLocal(t, ahora)
   return (
     <span className="tu-abierto" data-abierto={e.abierto} style={style}>
       <span className={e.abierto ? 'tu-vivo' : 'tu-vivo tu-vivo--off'} aria-hidden />
@@ -282,17 +275,19 @@ export interface Proximo { rotulo: string; cuando: string; hora: string; detalle
 /**
  * Próximo hueco de la agenda, según cómo agenda el rubro. Sale del horario del
  * negocio (semanaDe), igual que el calendario de la reserva: si ahora está en el
- * corte del mediodía, el próximo es el primero de la tarde.
+ * corte del mediodía, el próximo es el primero de la tarde. `cal`: el calendario
+ * de hoy (useCalendarioReserva).
  */
-export function proximoLibre(rubro: RubroTurnos): Proximo {
+export function proximoLibre(rubro: RubroTurnos, cal: CalendarioReserva): Proximo {
+  const { ahora, HOY, fechaCortaRelativa, proximosDias } = cal
   if (rubro.modo === 'cupo') {
     const rotulo = 'Próxima clase con lugar'
     const conLugar = clasesDe(rubro).filter(c => c.cupo > c.anotados)
     // Hoy, lo que queda del día; después, día por día hasta dar con una clase con lugar.
     for (let k = 0; k < 7; k++) {
-      const dia = (HOY + k) % 7
-      const c = conLugar.filter(x => x.dia === dia && (k > 0 || x.inicio >= AHORA)).sort((a, b) => a.inicio - b.inicio)[0]
-      if (c) return { rotulo, cuando: fechaCortaRelativa(sumarDias(HOY_FECHA, k)), hora: horaTxt(c.inicio), detalle: `${c.nombre} · ${c.cupo - c.anotados} lugares`, otros: [], extra: { clase: c.id } }
+      const dia = (ahora.diaSemana + k) % 7
+      const c = conLugar.filter(x => x.dia === dia && (k > 0 || x.inicio >= ahora.minutos)).sort((a, b) => a.inicio - b.inicio)[0]
+      if (c) return { rotulo, cuando: fechaCortaRelativa(sumarDias(HOY, k)), hora: horaTxt(c.inicio), detalle: `${c.nombre} · ${c.cupo - c.anotados} lugares`, otros: [], extra: { clase: c.id } }
     }
     return { rotulo, cuando: 'Pronto', hora: '—', detalle: rubro.servicios[0].nombre, otros: [], extra: {} }
   }
@@ -313,7 +308,8 @@ export function proximoLibre(rubro: RubroTurnos): Proximo {
  * flotar sobre una foto.
  */
 export function ProximoLibre({ rubro, vidrio, style }: { rubro: RubroTurnos; vidrio?: boolean; style?: CSSProperties }) {
-  const p = proximoLibre(rubro)
+  const cal = useCalendarioReserva()
+  const p = proximoLibre(rubro, cal)
   const forma = useForma()
   return (
     <div className="tu-prox tu-spot" data-vidrio={!!vidrio} style={style}>
@@ -338,20 +334,20 @@ export function ProximoLibre({ rubro, vidrio, style }: { rubro: RubroTurnos; vid
 
 // Los próximos siete días, contados igual que el calendario de Reserva (salen
 // del mismo horario del negocio): el día que no abre figura cerrado y el
-// miércoles 30 ya no tiene lugar.
+// cuarto día desde hoy ya no tiene lugar.
 export interface DiaSemana { corto: string; largo: string; n: number; libres: number; total: number; primero?: number; cerrado?: boolean; hoy?: boolean }
 
 /** Cómo se nombra el día que cae a `k` días de hoy. */
-function rotulosDia(k: number) {
-  const f = sumarDias(HOY_FECHA, k)
-  const hoy = esHoy(f)
+function rotulosDia(k: number, cal: CalendarioReserva) {
+  const f = sumarDias(cal.HOY, k)
+  const hoy = cal.esHoy(f)
   return { corto: nombreDiaCorto(f), largo: hoy ? `Hoy, ${nombreDia(f).toLowerCase()} ${f.dia}` : `${nombreDia(f)} ${f.dia}`, n: f.dia, hoy }
 }
 
 /** La semana de un negocio que da turnos: cuántos horarios le quedan a cada día y cuál es el primero. */
-function semanaDeTurnos(rubro: RubroTurnos): DiaSemana[] {
-  return proximosDias(semanaDe(rubro), rubro.servicios[0]?.duracion ?? 30, 7).map((d, k) => ({
-    ...rotulosDia(k), libres: d.libres, total: d.grilla.length, primero: d.grilla.find(g => g.libre)?.m, cerrado: d.cerrado,
+function semanaDeTurnos(rubro: RubroTurnos, cal: CalendarioReserva): DiaSemana[] {
+  return cal.proximosDias(semanaDe(rubro), rubro.servicios[0]?.duracion ?? 30, 7).map((d, k) => ({
+    ...rotulosDia(k, cal), libres: d.libres, total: d.grilla.length, primero: d.grilla.find(g => g.libre)?.m, cerrado: d.cerrado,
   }))
 }
 
@@ -359,12 +355,12 @@ function semanaDeTurnos(rubro: RubroTurnos): DiaSemana[] {
  * La semana de un rubro con cupo sale de su grilla de clases (no del calendario
  * de turnos): cuántas clases quedan con lugar cada día y a qué hora es la primera.
  */
-function semanaDeClases(rubro: RubroTurnos): DiaSemana[] {
+function semanaDeClases(rubro: RubroTurnos, cal: CalendarioReserva): DiaSemana[] {
   const clases = clasesDe(rubro)
   return Array.from({ length: 7 }, (_, k) => {
-    const d = rotulosDia(k)
-    const dia = (HOY + k) % 7
-    const delDia = clases.filter(c => c.dia === dia && (!d.hoy || c.inicio >= AHORA))
+    const d = rotulosDia(k, cal)
+    const dia = (cal.ahora.diaSemana + k) % 7
+    const delDia = clases.filter(c => c.dia === dia && (!d.hoy || c.inicio >= cal.ahora.minutos))
     const conLugar = delDia.filter(c => c.cupo > c.anotados).sort((a, b) => a.inicio - b.inicio)
     return { ...d, cerrado: delDia.length === 0 && !d.hoy, libres: conLugar.length, total: delDia.length, primero: conLugar[0]?.inicio }
   })
@@ -381,7 +377,8 @@ const estadoDia = (d: DiaSemana, cupo: boolean) => d.cerrado ? 'Cerrado' : d.lib
 export function SemanaOrbita({ rubro }: { rubro: RubroTurnos }) {
   const [foco, setFoco] = useState<number | null>(null)
   const cupo = rubro.modo === 'cupo'
-  const dias = cupo ? semanaDeClases(rubro) : semanaDeTurnos(rubro)
+  const cal = useCalendarioReserva()
+  const dias = cupo ? semanaDeClases(rubro, cal) : semanaDeTurnos(rubro, cal)
   const C = 170, R = 118, PASO = 360 / 7, HUECO = 9
   // Sin nada señalado, el centro muestra el primer día con lugar (casi siempre, hoy).
   const d = dias[foco ?? Math.max(0, dias.findIndex(x => x.primero !== undefined))]

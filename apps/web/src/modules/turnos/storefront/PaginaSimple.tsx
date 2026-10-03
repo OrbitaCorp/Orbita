@@ -18,10 +18,11 @@ import { tramosDelDia, tramosFrase } from '@/modules/turnos/horario'
 import { DISENOS_SIMPLE, beneficiosTxt, useNegocioDemo, type DisenoSimple } from '@/modules/turnos/demo/negocioDemo'
 import SitioNegocio from './SitioNegocio'
 import { CSS_SIMPLE } from './estilos'
-import { Abierto, HOY, HorasDia, Marca, proximoLibre, ruta } from './piezas'
+import { Abierto, HorasDia, Marca, proximoLibre, ruta } from './piezas'
 import { useContacto } from './ContactoDemo'
 import { linkMapa } from './reserva/acciones'
 import { altFoto, type TemaNegocio } from './tema'
+import { useCalendarioReserva } from './reserva/calendario'
 
 const verbo = (r: RubroTurnos) => r.modo === 'cupo' ? 'Reservar mi lugar' : r.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
 const SIMPLE = { forma: 'simple' }
@@ -41,7 +42,9 @@ function Contenido({ rubro, t }: { rubro: RubroTurnos; t: TemaNegocio }) {
   const pedido = router.query.diseno as DisenoSimple
   const diseno = DISENOS_SIMPLE.includes(pedido) ? pedido : demo.simple
   const [verHorarios, setVerHorarios] = useState(false)
-  const prox = proximoLibre(rubro)
+  const cal = useCalendarioReserva()
+  const HOY = cal.ahora.diaSemana
+  const prox = proximoLibre(rubro, cal)
   const beneficios = beneficiosTxt(demo.cuentas, rubro)
   const conLocal = t.modalidades.includes('local')
   const hoy = tramosDelDia(t.horarios, HOY)

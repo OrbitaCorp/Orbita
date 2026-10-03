@@ -5,14 +5,16 @@ import { useState } from 'react'
 import { Plus, Trash2, Package, Wallet, Layers, Eye } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { ShellFuncion, Seccion, Campo, Segmentado, FilaSwitch, Dato, VistaCliente, BotonVista, BotonIcono, inputStyle } from './ui'
-import { ars, paquetesDe, serviciosVendibles, redondear, USOS_PAQUETE, type Paquete } from './datosAvanzado'
+import { ars, paquetesDe, serviciosVendibles, redondear, usosPaqueteDe, type Paquete } from './datosAvanzado'
 import type { PropsFuncion } from './tipos'
 import { pluralCliente } from '../Clientes'
+import { useReloj } from '@/modules/turnos/reloj'
 
 const venceTxt = (d: number) => d === 0 ? 'No vence' : `Vence a los ${d} días`
 
 export default function Paquetes(p: PropsFuncion) {
   const { rubro } = p
+  const { fecha: hoy } = useReloj()
   const vendibles = serviciosVendibles(rubro)
   const [paquetes, setPaquetes] = useState<Paquete[]>(() => paquetesDe(rubro))
   const [verId, setVerId] = useState<string>('p1')
@@ -108,7 +110,7 @@ export default function Paquetes(p: PropsFuncion) {
 
       <Seccion titulo={`${pluralCliente(rubro)} con un pack en curso`} desc="Se descuenta una sesión cada vez que asisten. Datos de ejemplo.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {USOS_PAQUETE.map(u => {
+          {usosPaqueteDe(hoy).map(u => {
             const pk = paquetes.find(x => x.id === u.paquete) ?? paquetesDe(rubro).find(x => x.id === u.paquete)!
             const pct = Math.round((u.usadas / pk.sesiones) * 100)
             return (

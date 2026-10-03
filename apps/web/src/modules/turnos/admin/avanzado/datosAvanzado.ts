@@ -8,6 +8,7 @@ import {
   BadgePercent, LayoutTemplate, CalendarPlus, Repeat2, Wallet, Palette,
 } from 'lucide-react'
 import { CLIENTES, type RubroTurnos, type ServicioTipo } from '@/modules/turnos/datos'
+import { DIAS_SEMANA_CORTOS, diaDeSemana, fechaCorta, sumarDias, type Fecha } from '@/modules/turnos/reloj'
 
 // ─── Catálogo de funciones ────────────────────────────────────────────────────
 
@@ -130,13 +131,15 @@ export function paquetesDe(r: RubroTurnos): Paquete[] {
   ]
 }
 
-/** Clientes con un pack en curso (de ejemplo). */
-export const USOS_PAQUETE = [
-  { cliente: CLIENTES[0].nombre, paquete: 'p1', usadas: 7, vence: '12/11' },
-  { cliente: CLIENTES[2].nombre, paquete: 'p2', usadas: 3, vence: '04/10' },
-  { cliente: CLIENTES[4].nombre, paquete: 'p1', usadas: 2, vence: '20/12' },
-  { cliente: CLIENTES[6].nombre, paquete: 'p3', usadas: 5, vence: '30/10' },
+/** Clientes con un pack en curso (de ejemplo). `vence`: dentro de cuántos días, desde hoy. */
+const USOS_PAQUETE = [
+  { cliente: CLIENTES[0].nombre, paquete: 'p1', usadas: 7, vence: 47 },
+  { cliente: CLIENTES[2].nombre, paquete: 'p2', usadas: 3, vence: 8 },
+  { cliente: CLIENTES[4].nombre, paquete: 'p1', usadas: 2, vence: 85 },
+  { cliente: CLIENTES[6].nombre, paquete: 'p3', usadas: 5, vence: 34 },
 ]
+/** Los packs en curso con la fecha en que vence cada uno ("12/11"), contada desde `hoy`. */
+export const usosPaqueteDe = (hoy: Fecha) => USOS_PAQUETE.map(u => ({ ...u, vence: fechaCorta(sumarDias(hoy, u.vence)) }))
 
 // ─── Membresías ───────────────────────────────────────────────────────────────
 
@@ -161,12 +164,18 @@ export function planesDe(r: RubroTurnos): PlanMembresia[] {
 
 // ─── Lista de espera ──────────────────────────────────────────────────────────
 
-export const EN_ESPERA = [
-  { cliente: 'Sofía Ramírez', franja: 'Lun 28/09 · tarde', frecuente: true, desde: 'hace 2 días' },
-  { cliente: 'Nicolás Torres', franja: 'Lun 28/09 · cualquier horario', frecuente: false, desde: 'hace 1 día' },
-  { cliente: 'Valentina Gómez', franja: 'Mar 29/09 · 18 a 20 h', frecuente: true, desde: 'hace 5 h' },
-  { cliente: 'Lautaro Castro', franja: 'Mié 30/09 · mañana', frecuente: false, desde: 'hace 3 h' },
+/** Quiénes esperan un lugar. `dia`: para dentro de cuántos días, desde hoy. */
+const EN_ESPERA = [
+  { cliente: 'Sofía Ramírez', dia: 2, franja: 'tarde', frecuente: true, desde: 'hace 2 días' },
+  { cliente: 'Nicolás Torres', dia: 2, franja: 'cualquier horario', frecuente: false, desde: 'hace 1 día' },
+  { cliente: 'Valentina Gómez', dia: 3, franja: '18 a 20 h', frecuente: true, desde: 'hace 5 h' },
+  { cliente: 'Lautaro Castro', dia: 4, franja: 'mañana', frecuente: false, desde: 'hace 3 h' },
 ]
+/** La lista de espera con el día de cada pedido en texto ("Lun 28/09 · tarde"), contado desde `hoy`. */
+export const enEsperaDe = (hoy: Fecha) => EN_ESPERA.map(({ dia, ...e }) => {
+  const f = sumarDias(hoy, dia)
+  return { ...e, franja: `${DIAS_SEMANA_CORTOS[diaDeSemana(f)]} ${fechaCorta(f)} · ${e.franja}` }
+})
 
 // ─── Recuperar clientes ───────────────────────────────────────────────────────
 

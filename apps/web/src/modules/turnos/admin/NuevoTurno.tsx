@@ -15,7 +15,7 @@ import { duracionTxt, horaTxt, pesos, type Cliente, type Recurso, type RubroTurn
 import type { Tramo } from '@/modules/turnos/horario'
 import { Campo, Dos, Selector } from './configuracion/ui'
 import { Modal, ErrorCampo, DatoFila, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaLarga, libresPorTramo, sinAcentos, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
+import { sinAcentos, useCalendarioDemo, tieneTelefono, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
 import { clientesTxt, taparTelefono } from './equipoDemo'
 
 const DIAS_A_LA_VISTA = 14
@@ -54,6 +54,7 @@ const CSS = `
 `
 
 export default function NuevoTurno({ rubro, pre, clientes, recursos, servicios, turnosDelDia, jornada, verContacto, onCerrar, onCrear }: Props) {
+  const { fechaLarga, libresPorTramo } = useCalendarioDemo()
   const [clienteId, setClienteId] = useState<string | null>(pre.clienteId ?? null)
   const [q, setQ] = useState('')
   const [lista, setLista] = useState(false)

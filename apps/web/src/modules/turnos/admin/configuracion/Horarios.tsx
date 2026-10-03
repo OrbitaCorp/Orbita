@@ -18,6 +18,7 @@ import { JORNADA_INICIAL, errorJornada, jornadaDe, jornadaTxt, minutosAbiertos, 
 import { BloquesJornada, DiasSemana } from '@/modules/turnos/admin/piezasPanel'
 import { useBorrador, Encabezado, SecCard, Switch, Segmentado, Campo, Dos, BarraGuardar, BotonBorde, FilaSwitch, Chip, Vacio, type PropsTab } from './ui'
 import { vozDe } from './datos'
+import { fechaDePartes, partesDe, sumarDias, useReloj, type Fecha } from '@/modules/turnos/reloj'
 
 type Rango = [string, string]
 /** Un día en el formulario: si abre, y su mañana y su tarde. */
@@ -65,14 +66,21 @@ export default function Horarios({ rubro, avisar }: PropsTab) {
   }
   const conError = errores.findIndex(Boolean)
 
+  const { fecha: hoy } = useReloj()
   const b = useBorrador(() => {
-    const especiales: Especial[] = [
-      { id: 'e1', fecha: '2026-10-12', motivo: 'Día de la Diversidad Cultural', tipo: 'cerrado', rango: ['09:00', '13:00'] },
-      { id: 'e2', fecha: '2026-11-20', motivo: 'Día de la Soberanía', tipo: 'especial', rango: ['10:00', '14:00'] },
-      { id: 'e3', fecha: '2026-12-24', motivo: 'Nochebuena', tipo: 'especial', rango: ['09:00', '14:00'] },
-      { id: 'e4', fecha: '2026-12-25', motivo: 'Navidad', tipo: 'cerrado', rango: ['09:00', '13:00'] },
-    ]
-    return { especiales, vacaciones: false, vacDesde: '2027-01-15', vacHasta: '2027-01-31', vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
+    // Feriados de ejemplo: la próxima vez que cae cada uno, de hoy en adelante.
+    const proxima = (mes: number, dia: number): Fecha => {
+      const anio = partesDe(hoy).anio
+      const este = fechaDePartes(anio, mes, dia)
+      return este >= hoy ? este : fechaDePartes(anio + 1, mes, dia)
+    }
+    const especiales: Especial[] = ([
+      { id: 'e1', fecha: proxima(10, 12), motivo: 'Día de la Diversidad Cultural', tipo: 'cerrado', rango: ['09:00', '13:00'] },
+      { id: 'e2', fecha: proxima(11, 20), motivo: 'Día de la Soberanía', tipo: 'especial', rango: ['10:00', '14:00'] },
+      { id: 'e3', fecha: proxima(12, 24), motivo: 'Nochebuena', tipo: 'especial', rango: ['09:00', '14:00'] },
+      { id: 'e4', fecha: proxima(12, 25), motivo: 'Navidad', tipo: 'cerrado', rango: ['09:00', '13:00'] },
+    ] satisfies Especial[]).sort((x, y) => x.fecha.localeCompare(y.fecha))
+    return { especiales, vacaciones: false, vacDesde: proxima(1, 15), vacHasta: sumarDias(proxima(1, 15), 16), vacMensaje: 'Nos tomamos unos días. Volvemos el 1 de febrero con todo: ya podés reservar para esa semana.' }
   })
   const v = b.valor
 

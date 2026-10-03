@@ -11,8 +11,8 @@
 // Todo es de ejemplo y vive en el estado de PanelTurnos: no hay cuentas ni
 // invitaciones de verdad.
 import { esSalud, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO } from '@/modules/turnos/horario'
-import { fechaDe, fechaLarga, indiceDia, type ClasePanel, type TurnoAgenda } from './agendaDemo'
+import { diaDeSemana, diasDelMesDe, diasEntre, fechaLarga, lunesDe, mesAnterior, primeroDelMes, rangoTxt, sumarDias, type Ahora, type Fecha } from '@/modules/turnos/reloj'
+import type { ClasePanel, TurnoAgenda } from './agendaDemo'
 
 // ─── Permisos ────────────────────────────────────────────────────────────────
 
@@ -352,26 +352,26 @@ export function personasDe(r: RubroTurnos, recursos: Recurso[], dominio: string)
 
 export type Periodo = 'hoy' | 'semana' | 'mes' | 'anterior'
 
-/** Cada período, como días contados desde hoy (sábado 26/09): [desde, hasta]. */
-export const RANGO: Record<Periodo, [number, number]> = {
-  hoy: [0, 0],
-  semana: [-5, 0],      // del lunes 21 a hoy
-  mes: [-25, 0],        // del 1 de septiembre a hoy
-  anterior: [-56, -26], // agosto entero
+/**
+ * Cada período, como días contados desde hoy: [desde, hasta]. La semana va del
+ * lunes a hoy, el mes del 1 a hoy y el mes pasado entero.
+ */
+export function rangoDe(periodo: Periodo, hoy: Fecha): [number, number] {
+  const dia = (f: Fecha) => diasEntre(hoy, f)
+  if (periodo === 'semana') return [dia(lunesDe(hoy)), 0]
+  if (periodo === 'mes') return [dia(primeroDelMes(hoy)), 0]
+  if (periodo === 'anterior') { const m = mesAnterior(hoy); return [dia(m.desde), dia(m.hasta)] }
+  return [0, 0]
 }
 export const PERIODO_LABEL: Record<Periodo, string> = { hoy: 'Hoy', semana: 'Esta semana', mes: 'Este mes', anterior: 'Mes pasado' }
 
-const mesDe = (f: Date) => f.toLocaleDateString('es-AR', { month: 'long' })
-/** "Del 21 al 26 de septiembre", "Del 28 de septiembre al 3 de octubre". */
-export function entreTxt(desde: number, hasta: number): string {
-  if (desde === hasta) return fechaLarga(desde)
-  const a = fechaDe(desde), b = fechaDe(hasta)
-  return a.getMonth() === b.getMonth() ? `Del ${a.getDate()} al ${b.getDate()} de ${mesDe(b)}` : `Del ${a.getDate()} de ${mesDe(a)} al ${b.getDate()} de ${mesDe(b)}`
+/** "Del 21 al 26 de septiembre", "Del 28 de septiembre al 3 de octubre". `desde` y `hasta`: días contados desde `hoy`. */
+export function entreTxt(desde: number, hasta: number, hoy: Fecha): string {
+  if (desde === hasta) return fechaLarga(sumarDias(hoy, desde))
+  const t = rangoTxt(sumarDias(hoy, desde), sumarDias(hoy, hasta))
+  return `${t[0].toUpperCase()}${t.slice(1)}`
 }
-export const periodoTxt = (p: Periodo) => entreTxt(...RANGO[p])
-
-/** Los días que tiene el mes en el que cae ese día: un sueldo mensual se reparte entre todos. */
-const diasDelMes = (dia: number) => { const f = fechaDe(dia); return new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate() }
+export const periodoTxt = (p: Periodo, hoy: Fecha) => entreTxt(...rangoDe(p, hoy), hoy)
 
 export interface Renglon { dia: number; inicio: number; clienteId: string; servicio: string; precio: number; /** Lo que le toca a la persona de ese turno. */ parte: number }
 
@@ -403,9 +403,10 @@ const VACIA: Omit<Liquidacion, 'desde' | 'hasta'> = { turnos: 0, clases: 0, fact
  * Lo que le corresponde a una persona entre dos días (contados desde hoy), según
  * cómo cobra. Cuenta los turnos ATENDIDOS de su agenda (los cancelados y las
  * ausencias no suman) y las clases que dio. El sueldo y el alquiler son
- * mensuales: se llevan la parte de los días que entran en el rango.
+ * mensuales: se llevan la parte de los días que entran en el rango (cada día
+ * aporta el monto dividido por los días de SU mes). `ahora`: el de reloj.ts.
  */
-export function liquidarEntre(persona: Persona, desde: number, hasta: number, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[]): Liquidacion {
+export function liquidarEntre(persona: Persona, desde: number, hasta: number, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[], ahora: Ahora): Liquidacion {
   if (hasta < desde) return { desde, hasta, ...VACIA }
   const p = persona.pago
   const pct = !p ? 0 : p.forma === 'comision' || p.forma === 'mixto' ? p.comision : p.forma === 'alquiler' ? 100 : 0
@@ -413,8 +414,9 @@ export function liquidarEntre(persona: Persona, desde: number, hasta: number, tu
   const renglones: Renglon[] = []
   let dadas = 0, fijo = 0, alquiler = 0
   for (let d = desde; d <= hasta; d++) {
-    if (p && (p.forma === 'sueldo' || p.forma === 'mixto')) fijo += p.sueldo / diasDelMes(d)
-    if (p?.forma === 'alquiler') alquiler += p.alquiler / diasDelMes(d)
+    const fecha = sumarDias(ahora.fecha, d)
+    if (p && (p.forma === 'sueldo' || p.forma === 'mixto')) fijo += p.sueldo / diasDelMesDe(fecha)
+    if (p?.forma === 'alquiler') alquiler += p.alquiler / diasDelMesDe(fecha)
     if (persona.recursoId) {
       for (const t of turnosDelDia(d)) {
         if (t.recursoId !== persona.recursoId || t.estado !== 'completado') continue
@@ -422,8 +424,8 @@ export function liquidarEntre(persona: Persona, desde: number, hasta: number, tu
       }
     }
     if (d <= 0) {
-      const semana = indiceDia(d)
-      dadas += clases.filter(c => c.dia === semana && c.profe === pila && (d < 0 || c.inicio + c.duracion <= AHORA_DEMO)).length
+      const semana = diaDeSemana(fecha)
+      dadas += clases.filter(c => c.dia === semana && c.profe === pila && (d < 0 || c.inicio + c.duracion <= ahora.minutos)).length
     }
   }
   renglones.sort((a, b) => b.dia - a.dia || b.inicio - a.inicio)
@@ -436,15 +438,21 @@ export function liquidarEntre(persona: Persona, desde: number, hasta: number, tu
   return { desde, hasta, turnos: renglones.length, clases: dadas, facturado, comision, fijo, porClases, alquiler, paraLaPersona, paraElNegocio: facturado - paraLaPersona, renglones }
 }
 
-export const liquidar = (persona: Persona, periodo: Periodo, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[]) =>
-  liquidarEntre(persona, RANGO[periodo][0], RANGO[periodo][1], turnosDelDia, clases)
+export const liquidar = (persona: Persona, periodo: Periodo, turnosDelDia: (dia: number) => TurnoAgenda[], clases: ClasePanel[], ahora: Ahora) =>
+  liquidarEntre(persona, ...rangoDe(periodo, ahora.fecha), turnosDelDia, clases, ahora)
 
 /**
  * Hasta qué día (contado desde hoy) se le pagó a alguien cuando arranca la demo:
- * el último cierre según cada cuánto cobra. Por semana, el domingo 20; por
- * quincena, el 15; por mes, el 31 de agosto. De ahí en adelante está pendiente.
+ * el último cierre antes de hoy según cada cuánto cobra. Por semana, el domingo
+ * pasado; por quincena, el 15 de este mes si ya pasó (si no, el último día del
+ * mes pasado); por mes, el último día del mes pasado. De ahí en adelante está pendiente.
  */
-export const pagadoHastaInicial = (p: Persona): number => (p.pago?.cada === 'semana' ? -6 : p.pago?.cada === 'quincena' ? -11 : -26)
+export function pagadoHastaInicial(p: Persona, hoy: Fecha): number {
+  const finMesPasado = diasEntre(hoy, mesAnterior(hoy).hasta)
+  if (p.pago?.cada === 'semana') return diasEntre(hoy, lunesDe(hoy)) - 1
+  if (p.pago?.cada === 'quincena') { const quince = diasEntre(hoy, sumarDias(primeroDelMes(hoy), 14)); return quince < 0 ? quince : finMesPasado }
+  return finMesPasado
+}
 
 /** La plata que se mueve entre el negocio y la persona: el negocio le paga (comisión, sueldo, clases) o ella le paga el alquiler. */
 export const aPagar = (persona: Persona, l: Liquidacion) => (!persona.pago || persona.pago.forma === 'alquiler' ? 0 : l.paraLaPersona)

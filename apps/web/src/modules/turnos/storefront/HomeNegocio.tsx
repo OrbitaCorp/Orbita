@@ -18,10 +18,12 @@ import { duracionTxt, recursosDe, clasesDe, horaTxt, type RubroTurnos, type Clas
 import { beneficiosTxt, useNegocioDemo, type BeneficioTxt } from '@/modules/turnos/demo/negocioDemo'
 import SitioNegocio from './SitioNegocio'
 import { CSS_PORTADA } from './estilos'
-import { Abierto, AnillosTema, Encabezado, Foto, HOY, AHORA, HorasDia, Marca, OrbitaMini, Precio, ProximoLibre, Reveal, SemanaOrbita, TarjetaSellos, estadoLocal, proximoLibre, ruta, useDialogo } from './piezas'
+import { Abierto, AnillosTema, Encabezado, Foto, HorasDia, Marca, OrbitaMini, Precio, ProximoLibre, Reveal, SemanaOrbita, TarjetaSellos, estadoLocal, proximoLibre, ruta, useDialogo } from './piezas'
 import { useContacto } from './ContactoDemo'
 import { linkMapa } from './reserva/acciones'
 import { RETRATOS, altFoto, temaDe, type TemaNegocio } from './tema'
+import { useReloj, type Ahora } from '@/modules/turnos/reloj'
+import { useCalendarioReserva } from './reserva/calendario'
 
 interface P { rubro: RubroTurnos; t: TemaNegocio }
 
@@ -153,11 +155,11 @@ function HeroCine({ rubro, t }: P) {
 
 // ─── Hero "impacto": condensada gigante, remate en contorno, tablero de datos ─
 
-function datosRapidos(rubro: RubroTurnos, t: TemaNegocio): { valor: string; rotulo: string }[] {
+function datosRapidos(rubro: RubroTurnos, t: TemaNegocio, ahora: Ahora): { valor: string; rotulo: string }[] {
   const abre = { valor: String(t.horarios.filter(([, h]) => h).length), rotulo: 'días por semana' }
   if (rubro.modo === 'cupo') {
     const semana = clasesDe(rubro)
-    const lugares = semana.filter(c => c.dia === HOY && c.inicio >= AHORA).reduce((a, c) => a + Math.max(0, c.cupo - c.anotados), 0)
+    const lugares = semana.filter(c => c.dia === ahora.diaSemana && c.inicio >= ahora.minutos).reduce((a, c) => a + Math.max(0, c.cupo - c.anotados), 0)
     return [{ valor: String(semana.length), rotulo: 'clases por semana' }, { valor: String(lugares), rotulo: 'lugares libres hoy' }, abre]
   }
   const recursos = recursosDe(rubro)
@@ -173,6 +175,7 @@ function datosRapidos(rubro: RubroTurnos, t: TemaNegocio): { valor: string; rotu
 }
 
 function HeroImpacto({ rubro, t }: P) {
+  const ahora = useReloj()
   return (
     <section className="tup-hero tup-hero--impacto">
       <div className="tup-hero-foto"><FotoParallax src={t.fotoHero} alt={altFoto(t.fotoHero)} /></div>
@@ -189,7 +192,7 @@ function HeroImpacto({ rubro, t }: P) {
       </div>
       <div className="tu-cont">
         <dl className="tup-tablero tu-entra" style={{ ['--i' as string]: 7 }}>
-          {datosRapidos(rubro, t).map(d => (
+          {datosRapidos(rubro, t, ahora).map(d => (
             <div key={d.rotulo}>
               <dd className="tu-num">{d.valor}</dd>
               <dt className="tu-rotulo">{d.rotulo}</dt>
@@ -277,7 +280,8 @@ function Cinta({ rubro, t }: P) {
 // ─── Franja de confianza ─────────────────────────────────────────────────────
 
 function Confianza({ rubro, t }: P) {
-  const e = estadoLocal(t)
+  const ahora = useReloj()
+  const e = estadoLocal(t, ahora)
   const conLocal = t.modalidades.includes('local')
   return (
     <Reveal className="tu-cont tu-sec tu-sec--corta">
@@ -420,6 +424,7 @@ function estadoCupo(c: ClaseCupo) {
 }
 
 function Clases({ rubro }: { rubro: RubroTurnos }) {
+  const { diaSemana: HOY, minutos: AHORA } = useReloj()
   // Lo que queda de hoy y, para completar, las primeras del lunes.
   const todas = clasesDe(rubro)
   const clases = [...todas.filter(c => c.dia === HOY && c.inicio >= AHORA), ...todas.filter(c => c.dia === 0)].sort((a, b) => (a.dia === HOY ? -1 : 0) - (b.dia === HOY ? -1 : 0) || a.inicio - b.inicio).slice(0, 6)
@@ -776,6 +781,7 @@ function Mapa({ t }: { t: TemaNegocio }) {
 }
 
 function Ubicacion({ t }: { t: TemaNegocio }) {
+  const { diaSemana: HOY } = useReloj()
   const contactar = useContacto()
   const conLocal = t.modalidades.includes('local')
   const domicilio = t.modalidades.includes('domicilio')
@@ -865,7 +871,8 @@ function Cierre({ rubro, t }: P) {
 /** Botón flotante de reserva que aparece al pasar el hero (solo escritorio; en celular ya está la barra fija). */
 function BotonFlotante({ rubro }: { rubro: RubroTurnos }) {
   const [ver, setVer] = useState(false)
-  const p = proximoLibre(rubro)
+  const cal = useCalendarioReserva()
+  const p = proximoLibre(rubro, cal)
   useEffect(() => {
     const f = () => setVer(window.scrollY > 760 && window.scrollY < document.documentElement.scrollHeight - window.innerHeight - 380)
     // El primer cálculo va en el próximo cuadro: un setState sincrónico dentro del effect dispara un render en cascada.

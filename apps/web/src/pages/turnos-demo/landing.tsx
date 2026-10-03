@@ -10,6 +10,7 @@ import { ArrowLeft } from 'lucide-react'
 import { PaginaV2 } from '@/modules/landing/components/v2/PaginaV2'
 import RubrosTurnos from '@/modules/turnos/landing/RubrosTurnos'
 import { ContactoDemo } from '@/modules/turnos/landing/ContactoDemo'
+import { RelojTurnos, semillaReloj } from '@/modules/turnos/reloj'
 
 // El navbar y el footer son los de la landing real y apuntan al producto de
 // verdad. Adentro de la demo, lo que crea una cuenta o pide sesión se desvía a
@@ -21,9 +22,9 @@ const DESVIOS: Record<string, string> = {
 }
 
 export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: { reloj: semillaReloj() } }
 
-export default function Page() {
+export default function Page({ reloj }: { reloj: number }) {
   const router = useRouter()
   // Se conserva el ?rubro= con el que se llegó, para volver al índice en el mismo rubro.
   const rubro = typeof router.query.rubro === 'string' ? router.query.rubro : undefined
@@ -77,7 +78,7 @@ export default function Page() {
         <PaginaV2 scrollKey="/turnos-demo/landing" planeta={false}>
           {/* Aire para el navbar fijo de la landing. */}
           <div style={{ height: 72 }} />
-          <RubrosTurnos onEscribir={abrirContacto} />
+          <RelojTurnos semilla={reloj}><RubrosTurnos onEscribir={abrirContacto} /></RelojTurnos>
         </PaginaV2>
       </div>
       {contacto && <ContactoDemo onCerrar={cerrarContacto} />}

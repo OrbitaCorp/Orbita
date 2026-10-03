@@ -10,12 +10,13 @@
 import { useState } from 'react'
 import { Plus, Clock, CalendarDays, Pencil, Check, UserRound, MoonStar } from 'lucide-react'
 import { DIAS_CORTOS, horaTxt, horarioDeRecurso, type Recurso, type RubroTurnos, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, minutosAbiertos, tramosTxt, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { minutosAbiertos, tramosTxt, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
 import { Campo } from './configuracion/ui'
 import { Modal, ErrorCampo, Borrar, CamposAgenda, TiraJornada, agendaDeForm, agendaFormDe, errorAgenda } from './piezasPanel'
 import { COLORES_EQUIPO, type Persona } from './equipoDemo'
+import { useReloj } from '@/modules/turnos/reloj'
 
 export const CSS_ESPACIOS = `
   .tu-eq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
@@ -48,14 +49,15 @@ export const CSS_ESPACIOS = `
 export function ResumenAgenda({ recurso: r, semana, turnos, tramos, rango, verbo }: {
   recurso: Recurso; semana: Semana; turnos: Turno[]; tramos: Tramo[]; rango: Tramo; /** "atiende" para una persona, "se usa" para un espacio. */ verbo: string
 }) {
+  const { minutos: ahora } = useReloj()
   const lista = turnos.filter(t => t.recursoId === r.id && t.estado !== 'cancelado')
-  const sigue = lista.filter(t => t.inicio > AHORA_DEMO).sort((a, b) => a.inicio - b.inicio)[0]
+  const sigue = lista.filter(t => t.inicio > ahora).sort((a, b) => a.inicio - b.inicio)[0]
   return (
     <>
       <div className="tuo-rotulo" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
         <span>Hoy</span><span>{tramos.length === 0 ? `No ${verbo}` : `${lista.length} turno${lista.length === 1 ? '' : 's'}`}</span>
       </div>
-      <TiraJornada rango={rango} tramos={tramos} turnos={lista} color={r.color} ahora={AHORA_DEMO} label={tramos.length ? `Jornada de ${r.nombre}: ${lista.length} turnos` : `${r.nombre} hoy no ${verbo}`} />
+      <TiraJornada rango={rango} tramos={tramos} turnos={lista} color={r.color} ahora={ahora} label={tramos.length ? `Jornada de ${r.nombre}: ${lista.length} turnos` : `${r.nombre} hoy no ${verbo}`} />
       <div className="tu-eq-dias" role="img" aria-label={`Días que ${verbo}: ${r.dias}`}>
         {DIAS_CORTOS.map((d, i) => <span key={d} aria-hidden data-on={r.atiende.includes(i)}>{d[0]}</span>)}
       </div>

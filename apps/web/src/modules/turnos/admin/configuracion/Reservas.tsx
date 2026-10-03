@@ -15,11 +15,12 @@ import {
   CalendarClock, BadgeCheck, Wallet, RotateCcw, Repeat, Users, Hourglass, IdCard, UserX, CalendarRange,
   Timer, ShieldCheck, Eye, Clock, CircleCheck, Gift, UserRound, UserRoundCheck, BellRing, AlarmClock, ScrollText, Copy,
 } from 'lucide-react'
-import { esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
+import { DIAS_CORTOS, esSalud, pesos, duracionTxt, horaTxt } from '@/modules/turnos/datos'
 import { beneficiosTxt, plazoTxt, politicaTxt, useNegocioDemo, type BeneficiosCuenta, type PoliticaReserva } from '@/modules/turnos/demo/negocioDemo'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useBorrador, Encabezado, SecCard, Segmentado, Selector, Campo, Dos, FilaSwitch, Divisor, BarraGuardar, BotonBorde, Rotulo, OpcionTarjeta, type PropsTab } from './ui'
 import { vozDe, cap } from './datos'
+import { useCalendarioDemo } from '../agendaDemo'
 
 const ANT_MIN = [{ id: 0, label: 'Sin mínimo' }, { id: 60, label: '1 hora' }, { id: 120, label: '2 horas' }, { id: 240, label: '4 horas' }, { id: 720, label: '12 horas' }, { id: 1440, label: '1 día' }]
 const ANT_MAX = [{ id: 7, label: '1 semana' }, { id: 14, label: '2 semanas' }, { id: 30, label: '30 días' }, { id: 60, label: '2 meses' }, { id: 90, label: '3 meses' }]
@@ -232,23 +233,22 @@ export default function Reservas({ rubro, avisar }: PropsTab) {
   )
 }
 
-const AHORA = 10 * 60 // la demo "está" a las 10:00
-
 // Tarjeta que imita el paso de elegir horario del sitio público, con los
 // textos que genera cada regla. Pinta con los colores del sitio del negocio
 // (tema.ts) para que se sienta "del otro lado del mostrador".
 function Resumen({ v, rubro, senaMonto, cuentas, politica }: { v: Reglas; rubro: PropsTab['rubro']; senaMonto: number; cuentas: BeneficiosCuenta; politica: PoliticaReserva }) {
   const voz = vozDe(rubro)
   const t = temaDe(rubro)
+  const { ahora, indiceDia, numeroDia } = useCalendarioDemo()
   const cupo = rubro.modo === 'cupo'
   const ejemplo = rubro.servicios.find(s => s.precio > 0) ?? rubro.servicios[0]
   const paso = v.grilla
   const slots = Array.from({ length: 12 }, (_, i) => 9 * 60 + i * paso).filter(m => m <= 19 * 60).slice(0, 9)
-  const primero = AHORA + v.minAnt
+  const primero = ahora.minutos + v.minAnt
   const antTxt = v.minAnt === 0 ? 'hasta último momento' : `con al menos ${v.minAnt >= 1440 ? '1 día' : `${v.minAnt / 60} h`} de anticipación`
   const maxTxt = ANT_MAX.find(x => x.id === v.maxAnt)?.label ?? `${v.maxAnt} días`
   const fuera = politica.senaFueraDePlazo === 'se-pierde' ? 'la seña no se devuelve' : 'la seña te queda a favor'
-  const dias = ['Hoy', 'Mañana', 'Lun 28', 'Mar 29', 'Mié 30']
+  const dias = ['Hoy', 'Mañana', ...[2, 3, 4].map(d => `${DIAS_CORTOS[indiceDia(d)]} ${numeroDia(d)}`)]
   const beneficios = beneficiosTxt(cuentas, rubro)
 
   const lineas: [LucideIcon, ReactNode][] = [

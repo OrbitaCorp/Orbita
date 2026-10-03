@@ -17,12 +17,12 @@
 // Las flechas mueven de a un día, una semana o un mes, y "Hoy" vuelve al día de
 // la demo. Tocar un espacio libre de una columna abre "Nuevo turno" con esa
 // hora y esa agenda ya elegidas.
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Coins, MoonStar } from 'lucide-react'
 import { ESTADO_TURNO, DIAS, DIAS_CORTOS, horaTxt, type Recurso, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { diasAbiertos, extremos, minutosAbiertos, tramosDelDia, tramosFrase, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { Cabecera, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
-import { fechaCorta, fechaDe, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, rangoSemana, type NuevoTurnoPre, type TurnoAgenda } from './agendaDemo'
+import { useCalendarioDemo, type NuevoTurnoPre, type TurnoAgenda } from './agendaDemo'
 
 const PX_HORA = 92
 type Vista = 'dia' | 'semana' | 'mes'
@@ -62,6 +62,8 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
   const [dia, setDia] = useState(0)
   const [elegido, setElegido] = useState(recursos[0]?.id)
   const [enMes, setEnMes] = useState('todos')
+  const { ahora, fechaCorta, fechaLarga, grillaDelMes, indiceDia, lunesDe, mesTxt, mismoMes, moverMes, numeroDia, rangoSemana } = useCalendarioDemo()
+  const minutoActual = ahora.minutos
   // Si el elegido ya no está (se sacó del equipo), se muestra el primero.
   const recursoMovil = recursos.some(r => r.id === elegido) ? elegido : recursos[0]?.id
   const filtroMes = enMes !== 'todos' && recursos.some(r => r.id === enMes) ? enMes : 'todos'
@@ -69,7 +71,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
   const esPersona = rubro.modo === 'profesional'
   const abre = (d: number) => tramosDelDia(semana, indiceDia(d)).length > 0
 
-  // Hoy (sábado) es el día real de la demo; los demás días los arma PanelTurnos.
+  // Hoy es el día real; los demás días los arma PanelTurnos.
   const lunes = lunesDe(dia)
   const abiertos = diasAbiertos(semana)
   const diasSemana = abiertos.length ? abiertos : [0, 1, 2, 3, 4, 5]
@@ -107,7 +109,9 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
 
   // La grilla abre parada en "ahora" (con un poco de aire arriba), no en la apertura.
   const grilla = useRef<HTMLDivElement>(null)
-  useEffect(() => { grilla.current?.scrollTo({ top: Math.max(0, ((AHORA_DEMO - desde) / 60) * PX_HORA - 190) }) }, [vista, desde])
+  // Al cambiar de vista, no cada minuto: la hora se lee al momento de acomodar la grilla.
+  const pararEnAhora = useEffectEvent(() => { grilla.current?.scrollTo({ top: Math.max(0, ((minutoActual - desde) / 60) * PX_HORA - 190) }) })
+  useEffect(() => { pararEnAhora() }, [vista, desde])
 
   const mover = (sentido: 1 | -1) => setDia(d => (vista === 'mes' ? moverMes(d, sentido) : d + sentido * (vista === 'semana' ? 7 : 1)))
   const unidad = vista === 'dia' ? 'Día' : vista === 'semana' ? 'Semana' : 'Mes'
@@ -117,7 +121,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
     if (e.target !== e.currentTarget || !recursoId) return
     const px = e.clientY - e.currentTarget.getBoundingClientRect().top
     const inicio = desde + Math.floor((px / PX_HORA) * 2) * 30
-    if (!tramos.some(([a, b]) => inicio >= a && inicio < b) || (d === 0 && inicio + 30 <= AHORA_DEMO)) return
+    if (!tramos.some(([a, b]) => inicio >= a && inicio < b) || (d === 0 && inicio + 30 <= minutoActual)) return
     onNuevo({ recursoId, inicio, dia: d })
   }
 
@@ -286,7 +290,7 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                     aria-pressed={d === dia} onClick={() => setDia(d)} onDoubleClick={() => { setDia(d); setVista('dia') }}
                     aria-label={`${fechaLarga(d)}: ${motivo || `${lista.length} turno${lista.length === 1 ? '' : 's'}`}`}>
                     <span className="tu-ag-celda-cab">
-                      <span className="tu-ag-celda-num">{fechaDe(d).getDate()}</span>
+                      <span className="tu-ag-celda-num">{numeroDia(d)}</span>
                       {lista.length > 0 && <span className="tu-ag-celda-total">{lista.length} turno{lista.length === 1 ? '' : 's'}</span>}
                     </span>
                     {lista.length === 0 && motivo && <span className="tu-ag-celda-nota">{motivo}</span>}
@@ -363,10 +367,10 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
             {/* Columna de horas */}
             <div style={{ position: 'sticky', left: 0, zIndex: 4, background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)', height: y(hasta) }}>
               {horas.map(hh => {
-                const actual = hoyALaVista && hh <= AHORA_DEMO && hh + 60 > AHORA_DEMO
+                const actual = hoyALaVista && hh <= minutoActual && hh + 60 > minutoActual
                 return <div key={hh} className="tuo-num" style={{ height: PX_HORA, fontSize: 11, color: actual ? 'var(--color-primary)' : 'var(--color-subtle)', fontWeight: actual ? 600 : 400, textAlign: 'right', padding: '5px 10px 0 0' }}>{horaTxt(hh)}</div>
               })}
-              {hoyALaVista && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && <span className="tuo-num" aria-hidden style={{ position: 'absolute', right: 4, top: y(AHORA_DEMO) - 10, height: 20, padding: '0 6px', borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 10.5, fontWeight: 600, color: '#fff', background: 'var(--tuo-grad)', boxShadow: '0 4px 12px rgba(37,99,235,0.4)' }}>{horaTxt(AHORA_DEMO)}</span>}
+              {hoyALaVista && minutoActual >= desde && minutoActual <= hasta && <span className="tuo-num" aria-hidden style={{ position: 'absolute', right: 4, top: y(minutoActual) - 10, height: 20, padding: '0 6px', borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 10.5, fontWeight: 600, color: '#fff', background: 'var(--tuo-grad)', boxShadow: '0 4px 12px rgba(37,99,235,0.4)' }}>{horaTxt(minutoActual)}</span>}
             </div>
 
             {/* Columnas */}
@@ -389,9 +393,9 @@ export default function Agenda({ rubro, semana, recursos, turnosDelDia, jornada,
                   </div>
                 ))}
                 {/* Lo que ya pasó del día */}
-                {c.dia <= 0 && <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hoy ? Math.max(0, y(AHORA_DEMO)) : '100%', background: 'color-mix(in srgb, var(--color-surface-alt) 38%, transparent)', pointerEvents: 'none' }} />}
-                {hoy && AHORA_DEMO >= desde && AHORA_DEMO <= hasta && (
-                  <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: y(AHORA_DEMO) - 1, height: 2, background: 'linear-gradient(90deg, #3B82F6, #818CF8)', boxShadow: '0 0 12px rgba(59,130,246,0.7)', zIndex: 1 }}>
+                {c.dia <= 0 && <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hoy ? Math.max(0, y(minutoActual)) : '100%', background: 'color-mix(in srgb, var(--color-surface-alt) 38%, transparent)', pointerEvents: 'none' }} />}
+                {hoy && minutoActual >= desde && minutoActual <= hasta && (
+                  <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: y(minutoActual) - 1, height: 2, background: 'linear-gradient(90deg, #3B82F6, #818CF8)', boxShadow: '0 0 12px rgba(59,130,246,0.7)', zIndex: 1 }}>
                     {(ci === 0 || c.esDia) && <span className="tuo-late" style={{ position: 'absolute', left: -5, top: -4, width: 10, height: 10, borderRadius: '50%', background: '#93C5FD', boxShadow: '0 0 0 3px rgba(59,130,246,0.35)' }} />}
                   </div>
                 )}

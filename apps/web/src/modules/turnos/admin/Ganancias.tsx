@@ -17,9 +17,9 @@ import { horaTxt, type Cliente, type RubroTurnos } from '@/modules/turnos/datos'
 import { Cabecera, Indicador, Sigla } from '@/modules/turnos/_shared/orbita/piezas'
 import { Modal, DatoFila } from './piezasPanel'
 import { CamposPago } from './PagoPersona'
-import { fechaCorta, fechaLarga, type ClasePanel, type MensajeWA, type TurnoAgenda } from './agendaDemo'
+import { useCalendarioDemo, type ClasePanel, type MensajeWA, type TurnoAgenda } from './agendaDemo'
 import {
-  CADA_TXT, PERIODO_LABEL, RANGO, aCobrar, aPagar, entreTxt, facturadoEntre, formaCorta, liquidarEntre, lugarAlquiler, pagadoHastaInicial, pagoTxt, periodoTxt, plata,
+  CADA_TXT, PERIODO_LABEL, aCobrar, aPagar, entreTxt, facturadoEntre, formaCorta, liquidarEntre, lugarAlquiler, pagadoHastaInicial, pagoTxt, periodoTxt, plata, rangoDe,
   type Liquidacion, type Pago, type Periodo, type Persona, type Rol,
 } from './equipoDemo'
 
@@ -107,16 +107,17 @@ export default function Ganancias({ rubro, personas, roles, clientes, clases, tu
   const [periodo, setPeriodo] = useState<Periodo>('semana')
   const [abierta, setAbierta] = useState<string | null>(null)
   const [editando, setEditando] = useState<string | null>(null)
-  const [desde, hasta] = RANGO[periodo]
+  const { ahora } = useCalendarioDemo()
+  const [desde, hasta] = rangoDe(periodo, ahora.fecha)
   const cupo = rubro.modo === 'cupo'
   const propio = alcance === 'propio'
 
   const filas: Fila[] = personas.map(p => {
-    const hastaPago = pagadoHasta[p.id] ?? pagadoHastaInicial(p)
+    const hastaPago = pagadoHasta[p.id] ?? pagadoHastaInicial(p, ahora.fecha)
     return {
       p, rol: roles.find(r => r.id === p.rolId), hastaPago,
-      l: liquidarEntre(p, desde, hasta, turnosDelDia, clases),
-      pend: liquidarEntre(p, Math.max(desde, hastaPago + 1), hasta, turnosDelDia, clases),
+      l: liquidarEntre(p, desde, hasta, turnosDelDia, clases, ahora),
+      pend: liquidarEntre(p, Math.max(desde, hastaPago + 1), hasta, turnosDelDia, clases, ahora),
     }
   })
   const negocioTotal = facturadoEntre(desde, hasta, turnosDelDia)
@@ -143,14 +144,14 @@ export default function Ganancias({ rubro, personas, roles, clientes, clases, tu
     const cuanto = cupo ? `${f.l.clases} clase${f.l.clases === 1 ? '' : 's'} dada${f.l.clases === 1 ? '' : 's'}` : f.p.recursoId ? `${f.l.turnos} turno${f.l.turnos === 1 ? '' : 's'} atendido${f.l.turnos === 1 ? '' : 's'} (${plata(f.l.facturado)} facturados)` : ''
     onAvisar({
       titulo: `Avisarle a ${pila}`, para: f.p.nombre, telefono: f.p.telefono || undefined,
-      texto: `¡Hola ${pila}! Te paso tu liquidación (${periodoTxt(periodo).toLowerCase()})${cuanto ? `: ${cuanto}` : ''}. Te corresponden ${plata(f.l.paraLaPersona)}${monto > 0 && monto !== f.l.paraLaPersona ? `, de los que quedan por pagarte ${plata(monto)}` : ''}. Cualquier duda, lo vemos.`,
+      texto: `¡Hola ${pila}! Te paso tu liquidación (${periodoTxt(periodo, ahora.fecha).toLowerCase()})${cuanto ? `: ${cuanto}` : ''}. Te corresponden ${plata(f.l.paraLaPersona)}${monto > 0 && monto !== f.l.paraLaPersona ? `, de los que quedan por pagarte ${plata(monto)}` : ''}. Cualquier duda, lo vemos.`,
     })
   }
 
   if (propio && !yo) {
     return (
       <div className="panel-page">
-        <Cabecera rotulo={periodoTxt(periodo)} titulo="Mis ganancias" bajada="Lo que atendiste y lo que te corresponde cobrar, según lo que acordaste con el negocio." />
+        <Cabecera rotulo={periodoTxt(periodo, ahora.fecha)} titulo="Mis ganancias" bajada="Lo que atendiste y lo que te corresponde cobrar, según lo que acordaste con el negocio." />
         <div className="tuo-card tuo-entra" style={{ padding: '44px 20px', textAlign: 'center' }}>
           <HandCoins size={22} color="var(--color-subtle)" />
           <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 10 }}>Todavía no hay nadie con este rol</div>
@@ -163,7 +164,7 @@ export default function Ganancias({ rubro, personas, roles, clientes, clases, tu
   return (
     <div className="panel-page">
       <Cabecera
-        rotulo={periodoTxt(periodo)}
+        rotulo={periodoTxt(periodo, ahora.fecha)}
         titulo={propio ? 'Mis ganancias' : 'Ganancias'}
         bajada={propio ? 'Lo que atendiste y lo que te corresponde cobrar, según lo que acordaste con el negocio.' : 'Cuánto facturó cada uno, cuánto le corresponde según cómo cobra y cuánto queda para el negocio.'}
         acciones={
@@ -345,6 +346,7 @@ function DetalleLiquidacion({ fila, rubro, periodo, clientes, propio, puedeLiqui
 
 /** La cuenta de una liquidación, renglón por renglón: de dónde sale lo que le corresponde. */
 function Cuenta({ fila: { p, l }, rubro, propio }: { fila: Fila; rubro: RubroTurnos; propio: boolean }) {
+  const { ahora } = useCalendarioDemo()
   const pago = p.pago
   const alquila = pago?.forma === 'alquiler'
   const dias = l.hasta - l.desde + 1
@@ -352,7 +354,7 @@ function Cuenta({ fila: { p, l }, rubro, propio }: { fila: Fila; rubro: RubroTur
   const lugar = lugarAlquiler(rubro)
   return (
     <div className="tuo-card" style={{ padding: '4px 14px', boxShadow: 'none', background: 'var(--color-surface)', marginBottom: 16 }}>
-      <DatoFila label="Período"><span>{entreTxt(l.desde, l.hasta)}</span></DatoFila>
+      <DatoFila label="Período"><span>{entreTxt(l.desde, l.hasta, ahora.fecha)}</span></DatoFila>
       {!pago && <DatoFila label="Es el dueño">Lo que factura queda para el negocio</DatoFila>}
       {pago && (pago.forma === 'comision' || pago.forma === 'mixto') && <DatoFila label={`Comisión del ${pago.comision}% sobre ${plata(l.facturado)}`}><span className="tuo-num">{plata(l.comision)}</span></DatoFila>}
       {pago && (pago.forma === 'sueldo' || pago.forma === 'mixto') && <DatoFila label={`Sueldo de ${plata(pago.sueldo)}: ${parte}`}><span className="tuo-num">{plata(l.fijo)}</span></DatoFila>}
@@ -367,6 +369,7 @@ function Cuenta({ fila: { p, l }, rubro, propio }: { fila: Fila; rubro: RubroTur
 
 /** Lo que falta pagar del período, o que ya está al día. */
 function EstadoPago({ fila: { p, l, pend, hastaPago }, propio }: { fila: Fila; propio: boolean }) {
+  const { ahora, fechaLarga } = useCalendarioDemo()
   const pago = p.pago
   if (!pago) return null
   const debe = aPagar(p, pend)
@@ -379,7 +382,7 @@ function EstadoPago({ fila: { p, l, pend, hastaPago }, propio }: { fila: Fila; p
         <Clock3 size={15} />
         <span>
           {alquila ? <><b>{propio ? 'Debés' : `${pila} te debe`} {plata(cobra)}</b> de alquiler</> : <><b>Pendiente de {propio ? 'cobro' : 'pago'}: {plata(debe)}</b></>}
-          {pend.desde > l.desde ? `, ${entreTxt(pend.desde, pend.hasta).toLowerCase()}. Lo anterior ya está ${alquila ? (propio ? 'pagado' : 'cobrado') : (propio ? 'cobrado' : 'pagado')}.` : `, ${entreTxt(pend.desde, pend.hasta).toLowerCase()}.`}
+          {pend.desde > l.desde ? `, ${entreTxt(pend.desde, pend.hasta, ahora.fecha).toLowerCase()}. Lo anterior ya está ${alquila ? (propio ? 'pagado' : 'cobrado') : (propio ? 'cobrado' : 'pagado')}.` : `, ${entreTxt(pend.desde, pend.hasta, ahora.fecha).toLowerCase()}.`}
         </span>
       </div>
     )
@@ -394,6 +397,7 @@ function EstadoPago({ fila: { p, l, pend, hastaPago }, propio }: { fila: Fila; p
 
 /** Los turnos atendidos que componen la liquidación, con lo que le toca de cada uno. */
 function Renglones({ l, pago, clientes, propio, conTitulo }: { l: Liquidacion; pago: Pago | null; clientes: Cliente[]; propio: boolean; conTitulo?: boolean }) {
+  const { fechaCorta } = useCalendarioDemo()
   const [todos, setTodos] = useState(false)
   const nombre = (id: string) => clientes.find(c => c.id === id)?.nombre ?? '—'
   const visibles = todos ? l.renglones : l.renglones.slice(0, A_LA_VISTA)

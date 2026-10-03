@@ -8,6 +8,7 @@ import { ShellFuncion, Seccion, Segmentado, FilaSwitch, Dato, VistaCliente, Boto
 import { ars, servicioBase, FRANJAS_INICIALES, OCUPACION, FRANJAS_OCUPACION, type Franja } from './datosAvanzado'
 import { DIAS_CORTOS } from '@/modules/turnos/datos'
 import type { PropsFuncion } from './tipos'
+import { fechaCorta, sumarDias, useReloj } from '@/modules/turnos/reloj'
 
 const DIAS_OPC = ['Lun a vie', 'Lun a jue', 'Sábados', 'Todos los días']
 const HORAS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00']
@@ -99,6 +100,9 @@ export default function PreciosHorario(p: PropsFuncion) {
 
 function PreviewHorarios({ rubro, franjas, tachado }: PropsFuncion & { franjas: Franja[]; tachado: boolean }) {
   const base = servicioBase(rubro)
+  // El próximo lunes (de mañana en adelante).
+  const { fecha: hoy, diaSemana } = useReloj()
+  const lunes = fechaCorta(sumarDias(hoy, 7 - diaSemana))
   const horarios = ['09:00', '10:00', '11:00', '13:00', '14:30', '16:00', '18:00', '19:30']
   const [elegido, setElegido] = useState('10:00')
   const precioDe = (h: string) => {
@@ -109,7 +113,7 @@ function PreviewHorarios({ rubro, franjas, tachado }: PropsFuncion & { franjas: 
     <VistaCliente rubro={rubro} nota="Horarios de ejemplo de un lunes. Cambiá las franjas y mirá cómo se actualizan.">
       <div>
         <div style={{ fontFamily: 'var(--tu-fh)', fontSize: 19, fontWeight: 700, color: 'var(--color-text)' }}>Elegí horario</div>
-        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{base.nombre} · lunes 28/09</div>
+        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{base.nombre} · lunes {lunes}</div>
       </div>
       <div role="radiogroup" aria-label="Horarios del lunes (vista previa)" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {horarios.map(h => {

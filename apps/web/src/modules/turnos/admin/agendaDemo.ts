@@ -1,13 +1,15 @@
 // DEMO — lo que el panel de Turnos necesita para funcionar sin backend: los
-// tipos de lo que se edita en memoria, el calendario alrededor del día de la
-// demo (sábado 26/09) y los turnos y los horarios libres de cada día. Todo vive
+// tipos de lo que se edita en memoria, el calendario alrededor de hoy (la fecha
+// real, de reloj.ts) y los turnos y los horarios libres de cada día. Todo vive
 // en el estado de PanelTurnos: al recargar la página vuelve a los datos de ejemplo.
 //
 // La agenda sigue el horario del negocio (mañana y tarde, con el corte del
 // mediodía) y, dentro de ese horario, los días y las horas de cada agenda: nada
 // cae cuando el negocio está cerrado ni cuando esa persona no atiende.
-import { DIAS, horaTxt, tramosDeRecurso, turnosDe, type ClaseCupo, type Recurso, type RubroTurnos, type ServicioTipo, type Turno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { useMemo } from 'react'
+import { horaTxt, tramosDeRecurso, turnosDe, type ClaseCupo, type Recurso, type RubroTurnos, type ServicioTipo, type Turno } from '@/modules/turnos/datos'
+import type { Semana, Tramo } from '@/modules/turnos/horario'
+import * as reloj from '@/modules/turnos/reloj'
 
 /** Turno con su día: `dia` son los días contados desde hoy (0 = hoy, -1 = ayer). */
 export type TurnoAgenda = Turno & { dia?: number }
@@ -29,115 +31,107 @@ export type Avisar = (titulo: string, descripcion?: string) => void
 
 export const SLOT = 30
 
-// ─── Calendario ───────────────────────────────────────────────────────────────
-
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-const MS_DIA = 24 * 60 * 60 * 1000
-
-export const fechaDe = (dia: number) => new Date(2026, 8, 26 + dia)
-/** Los días que hay de hoy (la fecha de la demo) a una fecha. */
-const diaDesde = (f: Date) => Math.round((f.getTime() - fechaDe(0).getTime()) / MS_DIA)
-/** 0 = lunes … 6 = domingo, igual que DIAS. */
-export const indiceDia = (dia: number) => (fechaDe(dia).getDay() + 6) % 7
-export const lunesDe = (dia: number) => dia - indiceDia(dia)
-
-export function fechaLarga(dia: number) {
-  const f = fechaDe(dia)
-  return `${DIAS[indiceDia(dia)]} ${f.getDate()} de ${MESES[f.getMonth()]}`
-}
-export function fechaCorta(dia: number) {
-  const f = fechaDe(dia)
-  return `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}`
-}
-/** "Semana del 21 al 26 de septiembre": del lunes al último día que se muestra. */
-export function rangoSemana(lunes: number, ultimo = 5) {
-  const a = fechaDe(lunes), b = fechaDe(lunes + ultimo)
-  return a.getMonth() === b.getMonth()
-    ? `Semana del ${a.getDate()} al ${b.getDate()} de ${MESES[b.getMonth()]}`
-    : `Semana del ${a.getDate()} de ${MESES[a.getMonth()]} al ${b.getDate()} de ${MESES[b.getMonth()]}`
-}
-export const cuandoTxt = (dia: number) => (dia === 0 ? 'Hoy' : dia === 1 ? 'Mañana' : dia === -1 ? 'Ayer' : fechaLarga(dia))
-
-/** "Septiembre de 2026": el mes en el que cae ese día. */
-export function mesTxt(dia: number) {
-  const f = fechaDe(dia)
-  const m = MESES[f.getMonth()]
-  return `${m[0].toUpperCase()}${m.slice(1)} de ${f.getFullYear()}`
-}
-export const mismoMes = (a: number, b: number) => fechaDe(a).getMonth() === fechaDe(b).getMonth() && fechaDe(a).getFullYear() === fechaDe(b).getFullYear()
-/** Los días del calendario del mes: semanas enteras, de lunes a domingo (trae días del mes anterior y del siguiente). */
-export function grillaDelMes(dia: number): number[] {
-  const f = fechaDe(dia)
-  const desde = lunesDe(diaDesde(new Date(f.getFullYear(), f.getMonth(), 1)))
-  const hasta = lunesDe(diaDesde(new Date(f.getFullYear(), f.getMonth() + 1, 0))) + 6
-  return Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i)
-}
-/** El mismo día del mes, `pasos` meses más adelante (o atrás). Si ese mes es más corto, su último día. */
-export function moverMes(dia: number, pasos: number) {
-  const f = fechaDe(dia)
-  const tope = new Date(f.getFullYear(), f.getMonth() + pasos + 1, 0).getDate()
-  return diaDesde(new Date(f.getFullYear(), f.getMonth() + pasos, Math.min(f.getDate(), tope)))
-}
-
-// ─── Turnos de cada día ───────────────────────────────────────────────────────
+// ─── Calendario y turnos de cada día ────────────────────────────────────────
+// En todo el panel un día se nombra por cuántos días faltan desde hoy (0 = hoy,
+// -1 = ayer, 7 = dentro de una semana). Lo que traduce ese número a una fecha
+// real depende del "ahora", así que viene armado por `calendarioDemo(ahora)` y
+// los componentes lo toman con `useCalendarioDemo()`.
 
 /** Las agendas del negocio de ejemplo: los turnos de muestra (datos.ts) son de r1, r2 y r3. */
 const AGENDAS_EJEMPLO = ['r1', 'r2', 'r3']
 
-/**
- * Los turnos de ejemplo de un día. Se arman con el horario del negocio y con los
- * días y las horas de cada agenda tal como están AHORA en el panel: si el dueño
- * cambia el horario, o le saca la mañana a alguien, la agenda de muestra lo sigue.
- * Hoy es el día real de la demo (lo que ya pasó está atendido, lo que está
- * pasando, en curso). El resto de los días rota los mismos turnos para que la
- * agenda tenga una densidad creíble.
- */
-export function turnosDelDia(rubro: RubroTurnos, recursos: Recurso[], semana: Semana, dia: number): TurnoAgenda[] {
-  const d = indiceDia(dia)
-  const jornadas = AGENDAS_EJEMPLO.map(id => {
-    const r = recursos.find(x => x.id === id)
-    return r ? tramosDeRecurso(r, semana, d) : []
-  })
-  const base = turnosDe(rubro, jornadas, dia === 0 ? AHORA_DEMO : null)
-  if (dia === 0) return base.map(t => ({ ...t, dia }))
-  const n = Math.abs(dia + 5)
-  return base
-    .filter((t, i) => (i + n) % 3 !== 0 && t.estado !== 'cancelado')
-    .map(t => ({ ...t, id: `${t.id}.${dia}`, dia, estado: dia < 0 ? 'completado' as const : t.estado === 'pendiente' && dia < 3 ? 'pendiente' as const : 'confirmado' as const, nota: undefined }))
+export function calendarioDemo(ahora: reloj.Ahora) {
+  const hoy = ahora.fecha
+  /** La fecha real ("YYYY-MM-DD") de un día contado desde hoy. */
+  const fechaDe = (dia: number) => reloj.sumarDias(hoy, dia)
+  /** Los días que hay de hoy a una fecha. */
+  const diaDesde = (f: reloj.Fecha) => reloj.diasEntre(hoy, f)
+  /** 0 = lunes … 6 = domingo, igual que DIAS. */
+  const indiceDia = (dia: number) => reloj.diaDeSemana(fechaDe(dia))
+  const lunesDe = (dia: number) => dia - indiceDia(dia)
+  /** El número del día en el mes (26 para el 26/09). */
+  const numeroDia = (dia: number) => reloj.partesDe(fechaDe(dia)).dia
+  const fechaLarga = (dia: number) => reloj.fechaLarga(fechaDe(dia))
+  const fechaCorta = (dia: number) => reloj.fechaCorta(fechaDe(dia))
+  /** "Semana del 21 al 26 de septiembre": del lunes al último día que se muestra. */
+  const rangoSemana = (lunes: number, ultimo = 5) => `Semana ${reloj.rangoTxt(fechaDe(lunes), fechaDe(lunes + ultimo))}`
+  const cuandoTxt = (dia: number) => (dia === 0 ? 'Hoy' : dia === 1 ? 'Mañana' : dia === -1 ? 'Ayer' : fechaLarga(dia))
+  /** "Septiembre de 2026": el mes en el que cae ese día. */
+  const mesTxt = (dia: number) => reloj.mesTxt(fechaDe(dia))
+  const mismoMes = (a: number, b: number) => reloj.mismoMes(fechaDe(a), fechaDe(b))
+  /** Los días del calendario del mes: semanas enteras, de lunes a domingo (trae días del mes anterior y del siguiente). */
+  const grillaDelMes = (dia: number): number[] => reloj.grillaDelMes(fechaDe(dia)).map(diaDesde)
+  /** El mismo día del mes, `pasos` meses más adelante (o atrás). Si ese mes es más corto, su último día. */
+  const moverMes = (dia: number, pasos: number) => diaDesde(reloj.moverMes(fechaDe(dia), pasos))
+
+  /**
+   * Los turnos de ejemplo de un día. Se arman con el horario del negocio y con los
+   * días y las horas de cada agenda tal como están AHORA en el panel: si el dueño
+   * cambia el horario, o le saca la mañana a alguien, la agenda de muestra lo sigue.
+   * Hoy es el día real (lo que ya pasó está atendido, lo que está pasando, en
+   * curso). El resto de los días rota los mismos turnos para que la agenda tenga
+   * una densidad creíble.
+   */
+  function turnosDelDia(rubro: RubroTurnos, recursos: Recurso[], semana: Semana, dia: number): TurnoAgenda[] {
+    const d = indiceDia(dia)
+    const jornadas = AGENDAS_EJEMPLO.map(id => {
+      const r = recursos.find(x => x.id === id)
+      return r ? tramosDeRecurso(r, semana, d) : []
+    })
+    const base = turnosDe(rubro, jornadas, dia === 0 ? ahora.minutos : null)
+    if (dia === 0) return base.map(t => ({ ...t, dia }))
+    const n = Math.abs(dia + 5)
+    return base
+      .filter((t, i) => (i + n) % 3 !== 0 && t.estado !== 'cancelado')
+      .map(t => ({ ...t, id: `${t.id}.${dia}`, dia, estado: dia < 0 ? 'completado' as const : t.estado === 'pendiente' && dia < 3 ? 'pendiente' as const : 'confirmado' as const, nota: undefined }))
+  }
+
+  /** Horarios de inicio donde entra un turno de esa duración sin pisar a otro, dentro de los tramos en que esa agenda atiende ese día. */
+  function horariosLibres(turnos: Turno[], tramos: Tramo[], recursoId: string, duracion: number, dia: number, salvo?: string) {
+    if (dia < 0) return []
+    const ocupados = turnos.filter(t => t.recursoId === recursoId && t.estado !== 'cancelado' && t.id !== salvo)
+    const libres: number[] = []
+    for (const [abre, cierra] of tramos) {
+      for (let m = abre; m + duracion <= cierra; m += SLOT) {
+        if (dia === 0 && m < ahora.minutos) continue
+        if (!ocupados.some(t => m < t.inicio + t.duracion && m + duracion > t.inicio)) libres.push(m)
+      }
+    }
+    return libres
+  }
+
+  /**
+   * Los horarios libres de un día, agrupados como atiende esa agenda: la mañana y
+   * la tarde, cada una con su rango. Si atiende de corrido todo el día, por
+   * momento del día.
+   */
+  function libresPorTramo(turnos: Turno[], tramos: Tramo[], recursoId: string, duracion: number, dia: number, salvo?: string): GrupoLibres[] {
+    const deCorrido = tramos.length === 1 && tramos[0][1] - tramos[0][0] > 6 * 60
+    if (!deCorrido) return tramos.map(t => ({ nombre: momento(t[0]), rango: `${horaTxt(t[0])} a ${horaTxt(t[1])}`, libres: horariosLibres(turnos, [t], recursoId, duracion, dia, salvo) }))
+    const todos = horariosLibres(turnos, tramos, recursoId, duracion, dia, salvo)
+    return ([['Mañana', 0, 13 * 60], ['Tarde', 13 * 60, 19 * 60], ['Noche', 19 * 60, 24 * 60]] as const)
+      .map(([nombre, a, b]) => ({ nombre, rango: '', libres: todos.filter(m => m >= a && m < b) }))
+      .filter(g => g.libres.length > 0)
+  }
+
+  return {
+    ahora, fechaDe, diaDesde, indiceDia, lunesDe, numeroDia, fechaLarga, fechaCorta, rangoSemana, cuandoTxt, mesTxt, mismoMes, grillaDelMes, moverMes,
+    turnosDelDia, horariosLibres, libresPorTramo,
+  }
 }
 
-/** Horarios de inicio donde entra un turno de esa duración sin pisar a otro, dentro de los tramos en que esa agenda atiende ese día. */
-export function horariosLibres(turnos: Turno[], tramos: Tramo[], recursoId: string, duracion: number, dia: number, salvo?: string) {
-  if (dia < 0) return []
-  const ocupados = turnos.filter(t => t.recursoId === recursoId && t.estado !== 'cancelado' && t.id !== salvo)
-  const libres: number[] = []
-  for (const [abre, cierra] of tramos) {
-    for (let m = abre; m + duracion <= cierra; m += SLOT) {
-      if (dia === 0 && m < AHORA_DEMO) continue
-      if (!ocupados.some(t => m < t.inicio + t.duracion && m + duracion > t.inicio)) libres.push(m)
-    }
-  }
-  return libres
+export type CalendarioDemo = ReturnType<typeof calendarioDemo>
+
+/** El calendario del panel con la hora real. Dentro de un <RelojTurnos>. */
+export function useCalendarioDemo(): CalendarioDemo {
+  const ahora = reloj.useReloj()
+  return useMemo(() => calendarioDemo(ahora), [ahora])
 }
 
 /** A qué momento del día cae una hora: así se rotula cada turno de atención. */
 export const momento = (m: number): 'Mañana' | 'Tarde' | 'Noche' => (m < 12 * 60 ? 'Mañana' : m < 19 * 60 ? 'Tarde' : 'Noche')
 
 export interface GrupoLibres { nombre: 'Mañana' | 'Tarde' | 'Noche'; /** "09:00 a 13:00" si es un turno de atención. */ rango: string; libres: number[] }
-
-/**
- * Los horarios libres de un día, agrupados como atiende esa agenda: la mañana y
- * la tarde, cada una con su rango. Si atiende de corrido todo el día, por
- * momento del día.
- */
-export function libresPorTramo(turnos: Turno[], tramos: Tramo[], recursoId: string, duracion: number, dia: number, salvo?: string): GrupoLibres[] {
-  const deCorrido = tramos.length === 1 && tramos[0][1] - tramos[0][0] > 6 * 60
-  if (!deCorrido) return tramos.map(t => ({ nombre: momento(t[0]), rango: `${horaTxt(t[0])} a ${horaTxt(t[1])}`, libres: horariosLibres(turnos, [t], recursoId, duracion, dia, salvo) }))
-  const todos = horariosLibres(turnos, tramos, recursoId, duracion, dia, salvo)
-  return ([['Mañana', 0, 13 * 60], ['Tarde', 13 * 60, 19 * 60], ['Noche', 19 * 60, 24 * 60]] as const)
-    .map(([nombre, a, b]) => ({ nombre, rango: '', libres: todos.filter(m => m >= a && m < b) }))
-    .filter(g => g.libres.length > 0)
-}
 
 /** Bloques de media hora sin turno, dentro de los tramos en que esa agenda atiende. */
 export function huecosDe(turnos: Turno[], tramos: Tramo[], recursoId: string) {

@@ -6,10 +6,12 @@ import { useState } from 'react'
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { useBorrador, Encabezado, SecCard, FilaSwitch, Campo, Dos, Selector, BarraGuardar, Chip, BotonBorde, Boton, type PropsTab } from './ui'
 import { subdominioDe, vozDe } from './datos'
+import { fechaNumerica, sumarDias, useReloj } from '@/modules/turnos/reloj'
 
 export default function Pagos({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
   const t = temaDe(rubro)
+  const { fecha: hoy } = useReloj()
   const b = useBorrador(() => ({
     conectado: rubro.sena > 0, plazo: 'inmediato' as 'inmediato' | '10d' | '18d', cobroOnline: 'sena' as 'sena' | 'total' | 'elige',
     efectivo: true, transferencia: true, debito: true, credito: rubro.familia !== 'clases', qr: true,
@@ -31,7 +33,7 @@ export default function Pagos({ rubro, avisar }: PropsTab) {
                 <span aria-hidden style={{ width: 44, height: 44, borderRadius: 12, background: '#009EE3', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, boxShadow: '0 8px 18px rgba(0,158,227,0.35)' }}><Wallet size={20} /></span>
                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{t.nombre}</div>
-                  <div className="tuo-num" style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>hola@{subdominioDe(t.nombre)}.com.ar · conectada el 02/09/2026</div>
+                  <div className="tuo-num" style={{ fontSize: 12, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>hola@{subdominioDe(t.nombre)}.com.ar · conectada el {fechaNumerica(sumarDias(hoy, -24))}</div>
                 </div>
                 <BotonBorde Icon={Unplug} onClick={() => { b.set('conectado', false); avisar('Mercado Pago desconectado', 'Mientras tanto no se cobran señas online.') }}>Desconectar</BotonBorde>
               </div>

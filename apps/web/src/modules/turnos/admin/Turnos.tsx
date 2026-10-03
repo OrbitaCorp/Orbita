@@ -16,10 +16,10 @@ import { X, Phone, MessageCircle, CalendarClock, Check, UserX, Ban, Coins, FileT
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { DIAS, horaTxt, duracionTxt, pesos, esSalud, type Cliente, type Recurso, type RubroTurnos, type EstadoTurno } from '@/modules/turnos/datos'
-import { AHORA_DEMO, ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
+import { ChipEstado } from '@/modules/turnos/_shared/components/ChipEstado'
 import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Modal, TiraDias, HorasLibres } from './piezasPanel'
-import { fechaDe, fechaLarga, indiceDia, type GrupoLibres, type TurnoAgenda } from './agendaDemo'
+import { useCalendarioDemo, type GrupoLibres, type TurnoAgenda } from './agendaDemo'
 import { taparTelefono } from './equipoDemo'
 
 interface Props {
@@ -48,6 +48,7 @@ interface Props {
 export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover, libresMover, puedeEditar, puedeCobrar, verContacto, onCerrar, onEstado, onMover, onSena, onAgendarOtro, onWhatsApp }: Props) {
   const dia = turno.dia ?? 0
   const [moviendo, setMoviendo] = useState(false)
+  const { ahora, fechaCorta, fechaLarga, indiceDia, numeroDia } = useCalendarioDemo()
   const [aDia, setADia] = useState(Math.max(0, dia))
   const [aHora, setAHora] = useState<number | null>(null)
   const [confirmarCancelar, setConfirmarCancelar] = useState(false)
@@ -55,12 +56,12 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
   const salud = esSalud(rubro)
   const cerrado = turno.estado === 'cancelado' || turno.estado === 'completado' || turno.estado === 'ausente'
   const nombrePila = cliente?.nombre.split(' ')[0]
-  const porVenir = dia > 0 || (dia === 0 && turno.inicio > AHORA_DEMO)
+  const porVenir = dia > 0 || (dia === 0 && turno.inicio > ahora.minutos)
   const senaMonto = rubro.sena > 0 ? Math.round(turno.precio * rubro.sena / 100) : 0
   const grupos = moviendo ? libresMover(aDia) : []
   const elegida = aHora !== null && grupos.some(g => g.libres.includes(aHora)) ? aHora : null
   // "a las", "a mañana, a las", "al lunes 28, a las": adónde va el turno, para el botón.
-  const destino = (d: number) => (d === dia ? 'a las' : d === 0 ? 'a hoy, a las' : d === 1 ? 'a mañana, a las' : `al ${DIAS[indiceDia(d)].toLowerCase()} ${fechaDe(d).getDate()}, a las`)
+  const destino = (d: number) => (d === dia ? 'a las' : d === 0 ? 'a hoy, a las' : d === 1 ? 'a mañana, a las' : `al ${DIAS[indiceDia(d)].toLowerCase()} ${numeroDia(d)}, a las`)
 
   const cabecera = (
     <div className="tuo-espacio" style={{ padding: '18px 20px 20px', flexShrink: 0 }}>
@@ -161,7 +162,7 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
               <span className="tuo-chip"><b className="tuo-num" style={{ color: 'var(--color-text)' }}>{cliente.visitas}</b> visitas</span>
-              <span className="tuo-chip">Última <b className="tuo-num" style={{ color: 'var(--color-text)' }}>{cliente.ultima}</b></span>
+              <span className="tuo-chip">Última <b className="tuo-num" style={{ color: 'var(--color-text)' }}>{cliente.ultima === null ? '—' : fechaCorta(cliente.ultima)}</b></span>
               {salud && cliente.obraSocial && <span className="tuo-chip tuo-chip--primario"><ShieldCheck size={13} /> {cliente.obraSocial}</span>}
             </div>
             {cliente.nota && <p style={{ fontSize: 13, color: 'var(--color-body)', margin: '12px 0 0', paddingLeft: 12, borderLeft: '2px solid var(--color-border-strong)', lineHeight: 1.5 }}>{cliente.nota}</p>}
@@ -174,7 +175,7 @@ export default function DetalleTurno({ turno, rubro, cliente, recurso, diasMover
             <div className="tuo-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <FileText size={13} /> Ficha del paciente
             </div>
-            {[['Motivo de la consulta', 'Control de rutina'], ['Alergias', 'No registra'], ['Última atención', cliente?.ultima ?? '—']].map(([k, v], i) => (
+            {[['Motivo de la consulta', 'Control de rutina'], ['Alergias', 'No registra'], ['Última atención', cliente?.ultima == null ? '—' : fechaCorta(cliente.ultima)]].map(([k, v], i) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? '1px solid var(--color-border)' : 'none', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-muted)' }}>{k}</span><span style={{ color: 'var(--color-text)', textAlign: 'right', fontWeight: 500 }}>{v}</span>
               </div>

@@ -1,4 +1,4 @@
-// DEMO INTERNA — índice del vertical Turnos & Agenda (2026-09-26).
+// DEMO INTERNA — índice del vertical Turnos & Agenda.
 // http://localhost:3001/turnos-demo — ver modules/turnos/datos.ts.
 //
 // Está pensado como un centro de control: arriba el día en órbita del rubro
@@ -12,15 +12,15 @@ import type { GetServerSideProps } from 'next'
 import { ArrowRight, ArrowUpRight, CalendarCheck, CalendarX2, Check, Globe, LayoutDashboard, ListChecks, Megaphone, Rocket, Search, SearchX, Smartphone, Store } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { BarraDemo, SelectorRubro, useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
-import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, type FamiliaId } from '@/modules/turnos/datos'
+import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDeHoy, clientesDe, type FamiliaId } from '@/modules/turnos/datos'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Estrellas, Anillos } from '@/modules/turnos/_shared/orbita/Cielo'
-import { AHORA_DEMO, FECHA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
+import { RelojTurnos, fechaLarga, semillaReloj, useReloj } from '@/modules/turnos/reloj'
 
 // Solo en localhost, igual que /propuestas: en producción no existe.
 export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: { reloj: semillaReloj() } }
 
 type Boceto = 'onboarding' | 'panel' | 'sitio' | 'simple' | 'servicios' | 'reserva' | 'mis-turnos' | 'vacio' | 'landing'
 
@@ -268,13 +268,18 @@ function BocetoPantalla({ tipo }: { tipo: Boceto }) {
   )
 }
 
-export default function TurnosDemoIndice() {
+export default function Page({ reloj }: { reloj: number }) {
+  return <RelojTurnos semilla={reloj}><TurnosDemoIndice /></RelojTurnos>
+}
+
+function TurnosDemoIndice() {
+  const ahora = useReloj()
   const [rubro, setRubro] = useRubroDemo()
   const [busqueda, setBusqueda] = useState('')
   const [familia, setFamilia] = useState<'todas' | FamiliaId>('todas')
 
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
-  const turnos = useMemo(() => turnosDe(rubro), [rubro])
+  const turnos = useMemo(() => turnosDeHoy(rubro, ahora), [rubro, ahora])
   const clientes = useMemo(() => clientesDe(rubro), [rubro])
   const nombreCliente = (id: string) => clientes.find(c => c.id === id)?.nombre ?? 'Cliente'
   const activos = turnos.filter(t => t.estado !== 'cancelado')
@@ -327,12 +332,12 @@ export default function TurnosDemoIndice() {
               <div className="tui-marco-cab">
                 <div style={{ minWidth: 0 }}>
                   <div className="tuo-rotulo">Agenda · hoy</div>
-                  <div className="tuo-h2" style={{ marginTop: 4 }}>{FECHA_DEMO}</div>
+                  <div className="tuo-h2" style={{ marginTop: 4 }}>{fechaLarga(ahora.fecha)}</div>
                 </div>
                 <SelectorRubro valor={rubro.key} onChange={setRubro} />
               </div>
               <div className="tui-marco-dial">
-                <OrbitaDia recursos={recursos} turnos={turnos} ahora={AHORA_DEMO} nombreCliente={nombreCliente} pie={`${activos.length} turnos hoy`} size={360} />
+                <OrbitaDia recursos={recursos} turnos={turnos} ahora={ahora.minutos} nombreCliente={nombreCliente} pie={`${activos.length} turnos hoy`} size={360} />
               </div>
               <ul className="tui-leyenda" aria-label={`Anillos del dial: ${MODO_LABEL[rubro.modo].toLowerCase()}`}>
                 {recursos.map(r => (

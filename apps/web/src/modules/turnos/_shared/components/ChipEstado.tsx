@@ -15,6 +15,3 @@ export function ChipEstado({ estado, size = 'md' }: { estado: EstadoTurno; size?
     </span>
   )
 }
-
-// El "ahora" de la demo vive en horario.ts; se reexporta acá porque medio panel lo importa de este archivo.
-export { AHORA_DEMO, FECHA_DEMO } from '@/modules/turnos/horario'

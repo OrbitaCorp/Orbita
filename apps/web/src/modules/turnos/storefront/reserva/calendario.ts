@@ -1,70 +1,38 @@
-// Calendario de ejemplo de la reserva. "Hoy" es el sábado 26/09/2026 a las
-// 10:40 (AHORA_DEMO), fijo: así la demo se ve igual cualquier día y no hace
-// falta Date.now() en render, que react-compiler prohíbe.
+// Calendario de la reserva. "Hoy" es el día real (reloj.ts, hora de Argentina):
+// lo que depende de él lo arma `calendarioReserva(ahora)` y los componentes lo
+// toman con `useCalendarioReserva()`, así no se lee el reloj durante el render
+// (react-compiler lo prohíbe) y servidor y navegador dibujan lo mismo.
 //
 // Los horarios que se ofrecen salen del horario del negocio (el que el dueño
 // cargó en el alta o guardó en Configuración → Horarios): cada día tiene su
 // mañana y su tarde, y en el corte del mediodía no hay turnos. Cuáles están
 // libres y cuáles ocupados sale de una cuenta determinista, no de una agenda real.
-import { AHORA_DEMO, tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
+import { useMemo } from 'react'
+import { tramosDelDia, type Semana, type Tramo } from '@/modules/turnos/horario'
 import { DIAS, DIAS_CORTOS, type ClaseCupo } from '@/modules/turnos/datos'
+import * as reloj from '@/modules/turnos/reloj'
 
-export interface Fecha { mes: number; dia: number }
+/** Un día del calendario (mes 1 = enero). */
+export interface Fecha { anio: number; mes: number; dia: number }
 export interface Franja { m: number; libre: boolean }
 
-export const HOY: Fecha = { mes: 9, dia: 26 }
+/** La fecha de un "YYYY-MM-DD". */
+export const fechaDeIso = (iso: reloj.Fecha): Fecha => reloj.partesDe(iso)
+/** "YYYY-MM-DD" de una fecha. */
+export const isoDe = (f: Fecha): reloj.Fecha => reloj.fechaDePartes(f.anio, f.mes, f.dia)
 
-// primerDia: día de la semana del 1° (0 = lunes). Septiembre 2026 arranca martes; octubre, jueves.
-const MESES: Record<number, { nombre: string; corto: string; dias: number; primerDia: number }> = {
-  9: { nombre: 'septiembre', corto: 'sep', dias: 30, primerDia: 1 },
-  10: { nombre: 'octubre', corto: 'oct', dias: 31, primerDia: 3 },
-}
-
-export const mismaFecha = (a: Fecha | null, b: Fecha | null) => !!a && !!b && a.mes === b.mes && a.dia === b.dia
-export const diaSemana = (f: Fecha) => (MESES[f.mes].primerDia + f.dia - 1) % 7
-export const esHoy = (f: Fecha) => mismaFecha(f, HOY)
+export const mismaFecha = (a: Fecha | null, b: Fecha | null) => !!a && !!b && a.anio === b.anio && a.mes === b.mes && a.dia === b.dia
+export const diaSemana = (f: Fecha) => reloj.diaDeSemana(isoDe(f))
 /** Los turnos de atención de ese día (mañana y tarde). Sin ninguno, el negocio está cerrado. */
 export const tramosDeFecha = (horarios: Semana, f: Fecha): Tramo[] => tramosDelDia(horarios, diaSemana(f))
 export const esCerrado = (horarios: Semana, f: Fecha) => tramosDeFecha(horarios, f).length === 0
-/** Días desde hoy (0 = hoy). */
-export const enDias = (f: Fecha) => (f.mes === HOY.mes ? f.dia - HOY.dia : MESES[HOY.mes].dias - HOY.dia + f.dia)
 
-export function sumarDias(f: Fecha, n: number): Fecha {
-  let { mes, dia } = f
-  dia += n
-  while (MESES[mes] && dia > MESES[mes].dias) { dia -= MESES[mes].dias; mes += 1 }
-  return { mes, dia }
-}
+export const sumarDias = (f: Fecha, n: number): Fecha => fechaDeIso(reloj.sumarDias(isoDe(f), n))
 
 export const nombreDia = (f: Fecha) => DIAS[diaSemana(f)]
 export const nombreDiaCorto = (f: Fecha) => DIAS_CORTOS[diaSemana(f)]
-export const mesCorto = (f: Fecha) => MESES[f.mes].corto
-export const fechaLarga = (f: Fecha) => `${nombreDia(f)} ${f.dia} de ${MESES[f.mes].nombre}`
-/** "hoy", "mañana" o "el martes 29 de septiembre": para armar frases. */
-export const fechaRelativa = (f: Fecha) => (esHoy(f) ? 'hoy' : enDias(f) === 1 ? 'mañana' : `el ${fechaLarga(f).toLowerCase()}`)
-/** "Hoy", "Mañana" o "Mar 29": para los carteles de "próximo turno libre". */
-export const fechaCortaRelativa = (f: Fecha) => (esHoy(f) ? 'Hoy' : enDias(f) === 1 ? 'Mañana' : `${nombreDiaCorto(f)} ${f.dia}`)
-
-/**
- * Todas las franjas del día, las libres y las ya tomadas (para mostrarlas
- * tachadas). Solo dentro de la mañana y de la tarde de ese día: un turno tiene
- * que terminar antes de que el negocio cierre.
- */
-export function grillaDel(horarios: Semana, f: Fecha, duracion: number): Franja[] {
-  const paso = duracion >= 60 ? 60 : 30
-  // El miércoles 30 está completo a propósito: muestra cómo se ve un día sin lugar.
-  const completo = f.mes === 9 && f.dia === 30
-  const out: Franja[] = []
-  for (const [abre, cierra] of tramosDeFecha(horarios, f)) {
-    for (let m = abre; m + duracion <= cierra; m += paso) {
-      if (esHoy(f) && m < AHORA_DEMO + 30) continue // lo que ya pasó (o está por empezar) no se ofrece
-      out.push({ m, libre: !completo && (Math.floor(m / 30) + f.dia * 3) % 4 !== 1 })
-    }
-  }
-  return out
-}
-
-export const libresDel = (horarios: Semana, f: Fecha, duracion: number) => grillaDel(horarios, f, duracion).filter(x => x.libre)
+export const mesCorto = (f: Fecha) => reloj.MESES_CORTOS[f.mes - 1]
+export const fechaLarga = (f: Fecha) => reloj.fechaLarga(isoDe(f))
 
 export interface GrupoHoras { nombre: 'Mañana' | 'Tarde' | 'Noche'; desde: number; hasta: number; /** "09:00 a 13:00" si es un turno de atención del negocio. */ rango?: string }
 
@@ -86,26 +54,71 @@ export function gruposDel(horarios: Semana, f: Fecha): GrupoHoras[] {
 
 export interface DiaAgenda { f: Fecha; grilla: Franja[]; libres: number; cerrado: boolean }
 
-/** Los próximos `cuantos` días, desde hoy, con su disponibilidad. */
-export function proximosDias(horarios: Semana, duracion: number, cuantos = 21): DiaAgenda[] {
-  return Array.from({ length: cuantos }, (_, i) => {
-    const f = sumarDias(HOY, i)
-    const grilla = grillaDel(horarios, f, duracion)
-    return { f, grilla, libres: grilla.filter(x => x.libre).length, cerrado: esCerrado(horarios, f) }
-  })
-}
+// ─── Lo que depende de hoy ──────────────────────────────────────────────────
 
-/** El primer horario libre de la agenda: día y hora. */
-export function primerLibre(horarios: Semana, duracion: number): { f: Fecha; m: number } | null {
-  for (const d of proximosDias(horarios, duracion)) {
-    const x = d.grilla.find(g => g.libre)
-    if (x) return { f: d.f, m: x.m }
+export function calendarioReserva(ahora: reloj.Ahora) {
+  const HOY = fechaDeIso(ahora.fecha)
+  const esHoy = (f: Fecha) => mismaFecha(f, HOY)
+  /** Días desde hoy (0 = hoy). */
+  const enDias = (f: Fecha) => reloj.diasEntre(ahora.fecha, isoDe(f))
+  /** "hoy", "mañana" o "el martes 29 de septiembre": para armar frases. */
+  const fechaRelativa = (f: Fecha) => (esHoy(f) ? 'hoy' : enDias(f) === 1 ? 'mañana' : `el ${fechaLarga(f).toLowerCase()}`)
+  /** "Hoy", "Mañana" o "Mar 29": para los carteles de "próximo turno libre". */
+  const fechaCortaRelativa = (f: Fecha) => (esHoy(f) ? 'Hoy' : enDias(f) === 1 ? 'Mañana' : `${nombreDiaCorto(f)} ${f.dia}`)
+
+  /**
+   * Todas las franjas del día, las libres y las ya tomadas (para mostrarlas
+   * tachadas). Solo dentro de la mañana y de la tarde de ese día: un turno tiene
+   * que terminar antes de que el negocio cierre.
+   */
+  function grillaDel(horarios: Semana, f: Fecha, duracion: number): Franja[] {
+    const paso = duracion >= 60 ? 60 : 30
+    // El cuarto día desde hoy está completo a propósito: muestra cómo se ve un día sin lugar.
+    const completo = enDias(f) === 4
+    const out: Franja[] = []
+    for (const [abre, cierra] of tramosDeFecha(horarios, f)) {
+      for (let m = abre; m + duracion <= cierra; m += paso) {
+        if (esHoy(f) && m < ahora.minutos + 30) continue // lo que ya pasó (o está por empezar) no se ofrece
+        out.push({ m, libre: !completo && (Math.floor(m / 30) + f.dia * 3) % 4 !== 1 })
+      }
+    }
+    return out
   }
-  return null
+
+  const libresDel = (horarios: Semana, f: Fecha, duracion: number) => grillaDel(horarios, f, duracion).filter(x => x.libre)
+
+  /** Los próximos `cuantos` días, desde hoy, con su disponibilidad. */
+  function proximosDias(horarios: Semana, duracion: number, cuantos = 21): DiaAgenda[] {
+    return Array.from({ length: cuantos }, (_, i) => {
+      const f = sumarDias(HOY, i)
+      const grilla = grillaDel(horarios, f, duracion)
+      return { f, grilla, libres: grilla.filter(x => x.libre).length, cerrado: esCerrado(horarios, f) }
+    })
+  }
+
+  /** El primer horario libre de la agenda: día y hora. */
+  function primerLibre(horarios: Semana, duracion: number): { f: Fecha; m: number } | null {
+    for (const d of proximosDias(horarios, duracion)) {
+      const x = d.grilla.find(g => g.libre)
+      if (x) return { f: d.f, m: x.m }
+    }
+    return null
+  }
+
+  // Clases con cupo: la grilla semanal va de lunes (0) a sábado (5). Cada clase
+  // cae en el próximo día de la semana que le toca, de hoy en adelante (las de
+  // hoy, hoy; las de un día que ya pasó esta semana, la semana que viene).
+  const fechaDeClase = (dia: number): Fecha => sumarDias(HOY, (dia - ahora.diaSemana + 7) % 7)
+  /** La clase de hoy que ya empezó. */
+  const clasePasada = (c: ClaseCupo) => c.dia === ahora.diaSemana && c.inicio <= ahora.minutos
+
+  return { ahora, HOY, esHoy, enDias, fechaRelativa, fechaCortaRelativa, grillaDel, libresDel, proximosDias, primerLibre, fechaDeClase, clasePasada }
 }
 
-// ─── Clases con cupo ──────────────────────────────────────────────────────────
-// La grilla semanal va de lunes (0) a sábado (5). Hoy es sábado: las clases de
-// hoy son las del 26 y el resto cae en la semana que arranca el lunes 28.
-export const fechaDeClase = (dia: number): Fecha => (dia === 5 ? HOY : sumarDias({ mes: 9, dia: 28 }, dia))
-export const clasePasada = (c: ClaseCupo) => c.dia === 5 && c.inicio <= AHORA_DEMO
+export type CalendarioReserva = ReturnType<typeof calendarioReserva>
+
+/** El calendario de la reserva con la fecha real. Dentro de un <RelojTurnos>. */
+export function useCalendarioReserva(): CalendarioReserva {
+  const ahora = reloj.useReloj()
+  return useMemo(() => calendarioReserva(ahora), [ahora])
+}

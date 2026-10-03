@@ -11,11 +11,13 @@ import { ars, servicioBase, slugDe, INACTIVOS_POR_DIAS, MUESTRA_INACTIVOS, TASA_
 import { temaDe } from '@/modules/turnos/storefront/tema'
 import { pluralCliente } from '../Clientes'
 import type { PropsFuncion } from './tipos'
+import { MESES, mesAnterior, partesDe, useReloj } from '@/modules/turnos/reloj'
 
 const VARIABLES = ['{nombre}', '{negocio}', '{servicio}']
 
 export default function Recuperar(p: PropsFuncion) {
   const { rubro } = p
+  const { fecha: hoy } = useReloj()
   const negocio = temaDe(rubro).nombre
   const base = servicioBase(rubro)
   const [dias, setDias] = useState(60)
@@ -54,7 +56,7 @@ export default function Recuperar(p: PropsFuncion) {
       kpis={<>
         <Dato label={`Sin volver hace ${dias}+ días`} valor={String(cantidad)} nota="Datos de ejemplo" Icon={Users} acento="var(--color-warning)" />
         <Dato label="Ingreso estimado" valor={ars(estimado)} nota={`Si vuelven ${vuelven} (ver supuesto abajo)`} Icon={TrendingUp} acento="var(--color-success)" />
-        <Dato label="Volvieron con la última" valor="6" nota="Campaña de agosto · ejemplo" Icon={UserRoundCheck} />
+        <Dato label="Volvieron con la última" valor="6" nota={`Campaña de ${MESES[partesDe(mesAnterior(hoy).desde).mes - 1]} · ejemplo`} Icon={UserRoundCheck} />
       </>}
       preview={
         <VistaCliente rubro={rubro} cabecera={false} titulo="El mensaje que le llega" nota="WhatsApp de ejemplo, con el nombre de un cliente de muestra.">

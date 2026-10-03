@@ -16,7 +16,8 @@ import { useState } from 'react'
 import { CalendarCheck, Clock3, UserX, Wallet, ArrowRight, Plus, Send, BellRing, CalendarDays } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { horaTxt, pesos, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, FECHA_DEMO, minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
+import { minutosAbiertos, type Tramo } from '@/modules/turnos/horario'
+import { DIAS_SEMANA, fechaLarga, useReloj } from '@/modules/turnos/reloj'
 import { OrbitaDia, Anillo } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
 import { Indicador } from '@/modules/turnos/_shared/orbita/piezas'
@@ -52,19 +53,21 @@ const A_LA_VISTA = 6
 
 export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, clientes, recursos, jornada, rango, puedeAgendar, verNumeros, onAbrir, onIr, onNuevo, onCompartir }: Props) {
   const [desplegados, setDesplegados] = useState<string[]>([])
+  const reloj = useReloj()
+  const ahora = reloj.minutos
   const nombre = (id: string) => clientes.find(c => c.id === id)?.nombre ?? '—'
   const activos = turnos.filter(t => t.estado !== 'cancelado')
   const ausentes = turnos.filter(t => t.estado === 'ausente').length
   const ingresos = activos.filter(t => t.estado !== 'ausente').reduce((s, t) => s + t.precio, 0)
-  const proximos = turnos.filter(t => t.inicio + t.duracion > AHORA_DEMO && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
-  const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= AHORA_DEMO) }))
+  const proximos = turnos.filter(t => t.inicio + t.duracion > ahora && t.estado !== 'cancelado').sort((a, b) => a.inicio - b.inicio)
+  const libresFuturos = recursos.map(r => ({ r, libres: huecosDe(turnos, jornada(r.id), r.id).filter(m => m >= ahora) }))
   const totalLibres = libresFuturos.reduce((s, x) => s + x.libres.length, 0)
   const pendientes = turnos.filter(t => t.estado === 'pendiente').sort((a, b) => a.inicio - b.inicio)
   const sinConfirmar = pendientes.length
   const etiquetaRecurso = rubro.modo === 'profesional' ? rubro.profesional : 'Espacio'
   const enCurso = turnos.find(t => t.estado === 'en-curso')
-  const sigue = proximos.find(t => t.inicio > AHORA_DEMO)
-  const avance = enCurso ? Math.min(1, Math.max(0, (AHORA_DEMO - enCurso.inicio) / enCurso.duracion)) : 0
+  const sigue = proximos.find(t => t.inicio > ahora)
+  const avance = enCurso ? Math.min(1, Math.max(0, (ahora - enCurso.inicio) / enCurso.duracion)) : 0
 
   const compartir = () => {
     const conLugar = libresFuturos.filter(x => x.libres.length > 0)
@@ -119,11 +122,11 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
       <section className="tuo-espacio tu-res-hero tuo-entra" aria-label="El día de hoy">
         <Estrellas cantidad={38} />
         <div style={{ minWidth: 0 }}>
-          <div className="tuo-eyebrow">{FECHA_DEMO}</div>
-          <h1 className="tuo-h1" style={{ fontSize: 'clamp(25px, 3vw, 34px)', marginTop: 12 }}>{saludo(AHORA_DEMO)}, {aQuien}</h1>
+          <div className="tuo-eyebrow">{fechaLarga(reloj.fecha)}</div>
+          <h1 className="tuo-h1" style={{ fontSize: 'clamp(25px, 3vw, 34px)', marginTop: 12 }}>{saludo(ahora)}, {aQuien}</h1>
           <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--color-body)', margin: '10px 0 0', maxWidth: '52ch' }}>
             Hoy tenés <b style={{ color: 'var(--color-text)' }}>{activos.length} turnos</b>. Quedan <b style={{ color: 'var(--color-text)' }}>{proximos.length} por delante</b>
-            {sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - AHORA_DEMO)}</b>.</> : '.'}
+            {sigue ? <> y el próximo arranca en <b style={{ color: 'var(--color-text)' }}>{faltan(sigue.inicio - ahora)}</b>.</> : '.'}
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
             {puedeAgendar && <button onClick={() => onNuevo()} className="tuo-btn tuo-btn--primario"><Plus size={16} /> Nuevo turno</button>}
@@ -154,7 +157,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
               <button className="tu-res-mini" onClick={() => onAbrir(sigue)}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span className="tuo-rotulo">Sigue</span>
-                  <span className="tuo-num" style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--color-muted)' }}>en {faltan(sigue.inicio - AHORA_DEMO)}</span>
+                  <span className="tuo-num" style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--color-muted)' }}>en {faltan(sigue.inicio - ahora)}</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
                   <span className="tuo-num" style={{ width: 54, height: 34, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 600, color: '#BFDBFE', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(147,197,253,0.2)' }}>{horaTxt(sigue.inicio)}</span>
@@ -170,7 +173,7 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
         </div>
 
         <div className="tu-res-dial" style={{ width: '100%', minWidth: 0 }}>
-          <OrbitaDia recursos={recursos} turnos={turnos} ahora={AHORA_DEMO} apertura={rango[0]} cierre={rango[1]} nombreCliente={nombre} onAbrir={onAbrir} pie={`${proximos.length} turnos por venir`} />
+          <OrbitaDia recursos={recursos} turnos={turnos} ahora={ahora} apertura={rango[0]} cierre={rango[1]} nombreCliente={nombre} onAbrir={onAbrir} pie={`${proximos.length} turnos por venir`} />
           <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap', marginTop: -14 }}>
             {recursos.map(r => (
               <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-body)' }}>
@@ -192,9 +195,9 @@ export default function ResumenDia({ negocio, saludo: aQuien, rubro, turnos, cli
       )}
 
       <div className="tu-res-kpis" style={{ ['--tu-kpis' as string]: verNumeros ? 4 : 3 }}>
-        <Indicador i={1} label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} color="#3B82F6" cambio="+12,5%" nota="vs. sábado pasado" tendencia={[8, 9, 7, 11, 10, 12, 13]} />
+        <Indicador i={1} label="Turnos hoy" valor={activos.length} Icon={CalendarCheck} color="#3B82F6" cambio="+12,5%" nota={`vs. ${DIAS_SEMANA[reloj.diaSemana].toLowerCase()} pasado`} tendencia={[8, 9, 7, 11, 10, 12, 13]} />
         <Indicador i={2} label="Huecos libres" valor={`${(totalLibres * SLOT / 60).toLocaleString('es-AR', { maximumFractionDigits: 1 })} h`} Icon={Clock3} color="#8B5CF6" nota="de acá al cierre" tendencia={[14, 12, 13, 11, 12, 10.5, 10.5]} />
-        <Indicador i={3} label="Ausencias" valor={ausentes} Icon={UserX} color="#EF4444" cambio="−1" bueno="baja" nota="vs. sábado pasado" tendencia={[3, 2, 3, 2, 2, 2, 1]} />
+        <Indicador i={3} label="Ausencias" valor={ausentes} Icon={UserX} color="#EF4444" cambio="−1" bueno="baja" nota={`vs. ${DIAS_SEMANA[reloj.diaSemana].toLowerCase()} pasado`} tendencia={[3, 2, 3, 2, 2, 2, 1]} />
         {verNumeros && <Indicador i={4} label="Ingresos estimados" valor={pesos(ingresos)} Icon={Wallet} color="#10B981" cambio="+8,2%" nota="si vienen todos" tendencia={[98, 110, 104, 126, 131, 138, 149]} />}
       </div>
 

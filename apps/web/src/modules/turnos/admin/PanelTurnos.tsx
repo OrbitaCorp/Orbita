@@ -22,7 +22,8 @@ import { temaDe } from '@/modules/turnos/storefront/tema'
 import LayoutTurnos, { type ItemNav, type AvisoNav, type ItemBusqueda } from '@/modules/turnos/layout/LayoutTurnos'
 import { useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import { ESTADO_TURNO, recursosDe, clientesDe, clasesDe, semanaDe, tramosDeRecurso, esSalud, horaTxt, duracionTxt, pesos, type EstadoTurno, type Turno, type Cliente, type Recurso, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA_DEMO, HOY_SEMANA, extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
+import { extremos, tramosDelDia, type Tramo } from '@/modules/turnos/horario'
+import { fechaHoraCorta } from '@/modules/turnos/reloj'
 import ResumenDia from './KPIs'
 import Agenda from './Agenda'
 import DetalleTurno from './Turnos'
@@ -40,7 +41,7 @@ import AvanzadoTurnos from './avanzado/AvanzadoTurnos'
 import { CSS_UI_CONFIG } from './configuracion/ui'
 import { subdominioDe } from './configuracion/datos'
 import { CSS_PIEZAS_PANEL, MensajeWhatsApp } from './piezasPanel'
-import { cuandoTxt, fechaLarga, indiceDia, libresPorTramo, tieneTelefono, turnosDelDia, type ClasePanel, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
+import { tieneTelefono, useCalendarioDemo, type ClasePanel, type MensajeWA, type NuevoTurnoPre, type ServicioPanel, type TurnoAgenda } from './agendaDemo'
 import { clientesDeLaAgenda, pagadoHastaInicial, personasDe, plata, puedeDe, rolesDe, taparTelefono, type Pago, type Persona, type Rol, type VerComo } from './equipoDemo'
 
 const CSS_PANEL = CSS_UI_CONFIG + CSS_PIEZAS_PANEL + CSS_ESPACIOS + CSS_EQUIPO + CSS_ROLES + CSS_PAGO + CSS_GANANCIAS + `
@@ -70,6 +71,7 @@ export default function PanelTurnos() {
 
 function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const router = useRouter()
+  const { ahora, cuandoTxt, fechaLarga, indiceDia, libresPorTramo, turnosDelDia } = useCalendarioDemo()
   // Mismo nombre que muestra el sitio público de ese rubro.
   const negocio = temaDe(rubro).nombre
   // El horario del negocio. Cambia solo si se guarda otro en Configuración → Horarios.
@@ -110,14 +112,14 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     const dias = new Map<number, TurnoAgenda[]>()
     for (let d = -62; d <= 62; d++) dias.set(d, armar(d))
     return { dias, armar }
-  }, [rubro, recursos, semana, agregados, ocultos, cambios])
+  }, [rubro, recursos, semana, agregados, ocultos, cambios, turnosDelDia])
   const delDia = (dia: number): TurnoAgenda[] => porDia.dias.get(dia) ?? porDia.armar(dia)
   /** En qué tramos atiende una agenda un día (contado desde hoy). */
   const jornada = (recursoId: string, dia: number): Tramo[] => {
     const r = recursos.find(x => x.id === recursoId)
     return r ? tramosDeRecurso(r, semana, indiceDia(dia)) : []
   }
-  const tramosHoy = tramosDelDia(semana, HOY_SEMANA)
+  const tramosHoy = tramosDelDia(semana, ahora.diaSemana)
   const rangoHoy: Tramo = tramosHoy.length ? [tramosHoy[0][0], tramosHoy[tramosHoy.length - 1][1]] : extremos(semana)
 
   // ── Quién mira ──
@@ -220,7 +222,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     const sello = ++serie.current
     const clienteId = clienteNuevo ? `c${sello}` : t.clienteId
     if (clienteNuevo) {
-      setClientes(cs => [...cs, { id: clienteId, nombre: clienteNuevo.nombre, telefono: clienteNuevo.telefono || 'Sin teléfono', visitas: 0, ultima: '—', gastado: 0, ...(esSalud(rubro) ? { obraSocial: 'Particular' } : {}) }])
+      setClientes(cs => [...cs, { id: clienteId, nombre: clienteNuevo.nombre, telefono: clienteNuevo.telefono || 'Sin teléfono', visitas: 0, ultima: null, gastado: 0, ...(esSalud(rubro) ? { obraSocial: 'Particular' } : {}) }])
     }
     setAgregados(a => [...a, { ...t, id: `n${sello}`, clienteId }])
     setNuevo(null)
@@ -253,7 +255,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
   const proximoDe = (clienteId: string): TurnoAgenda | null => {
     for (let d = 0; d <= 21; d++) {
       const t = delDiaVista(d)
-        .filter(x => x.clienteId === clienteId && (x.estado === 'confirmado' || x.estado === 'pendiente') && (d > 0 || x.inicio > AHORA_DEMO))
+        .filter(x => x.clienteId === clienteId && (x.estado === 'confirmado' || x.estado === 'pendiente') && (d > 0 || x.inicio > ahora.minutos))
         .sort((a, b) => a.inicio - b.inicio)[0]
       if (t) return t
     }
@@ -397,7 +399,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
     <LayoutTurnos
       negocio={negocio}
       rubro={rubro.label}
-      fecha="Sáb 26 sep · 10:40"
+      fecha={fechaHoraCorta(ahora.fecha, ahora.minutos)}
       items={items}
       activo={vista}
       onIr={ir}
@@ -453,7 +455,7 @@ function PanelDeRubro({ rubro }: { rubro: RubroTurnos }) {
       {vista === 'ganancias' && (
         <Ganancias
           rubro={rubro} personas={puede('ganancias.ver') === 'propio' ? (yo ? [yo] : []) : personas} roles={roles} clientes={clientes} clases={clases} turnosDelDia={delDia}
-          pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p)]))}
+          pagadoHasta={Object.fromEntries(personas.map(p => [p.id, pagadoHasta[p.id] ?? pagadoHastaInicial(p, ahora.fecha)]))}
           alcance={puede('ganancias.ver') === 'propio' ? 'propio' : 'todo'} puedeLiquidar={puede('ganancias.liquidar') !== 'no'}
           onPagar={registrarPago} onPago={guardarPago} onAvisar={setMensaje}
         />

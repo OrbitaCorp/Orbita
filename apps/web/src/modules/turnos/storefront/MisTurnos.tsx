@@ -28,7 +28,7 @@ import { TarjetaSellos, useForma } from './piezas'
 import { RETRATOS, type TemaNegocio } from './tema'
 import { EstiloReserva } from './reserva/estilo'
 import { CODIGO_DEMO, descargarICS, linkMapa, teclasRadio, urlTurno } from './reserva/acciones'
-import { enDias, esHoy, fechaLarga, mesCorto, mismaFecha, nombreDiaCorto, proximosDias, type Fecha } from './reserva/calendario'
+import { fechaLarga, mesCorto, mismaFecha, nombreDiaCorto, sumarDias, useCalendarioReserva, type Fecha } from './reserva/calendario'
 import { OrbitaVacia } from './reserva/Confirmacion'
 import { SELLOS_DEMO } from './reserva/PasoDatos'
 import { BotonCarga, Campo, FirmaOrbita, Fondo } from './reserva/piezas'
@@ -198,11 +198,13 @@ function Codigo({ tel, onListo, onVolver }: { tel: string; onListo: () => void; 
 interface TurnoCliente { id: string; servicio: number; recurso: number; fecha: Fecha; hora: number; estado: 'confirmado' | 'cancelado' | 'espera'; sena?: boolean; lugar?: number; cambiado?: boolean }
 type Pendiente = { tipo: 'cancelar'; id: string } | { tipo: 'reprogramar'; id: string; fecha: Fecha; hora: number }
 
-const faltan = (f: Fecha) => { const n = enDias(f); return n <= 0 ? 'Es hoy' : n === 1 ? 'Es mañana' : `Faltan ${n} días` }
+/** `n`: días desde hoy. */
+const faltan = (n: number) => (n <= 0 ? 'Es hoy' : n === 1 ? 'Es mañana' : `Faltan ${n} días`)
 
 function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSalir: () => void }) {
   const router = useRouter()
   const sinNada = router.query.estado === 'vacio'
+  const { HOY, enDias } = useCalendarioReserva()
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
   const clases = useMemo(() => clasesDe(rubro), [rubro])
   const cupo = rubro.modo === 'cupo'
@@ -226,8 +228,8 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
   )
 
   const [turnos, setTurnos] = useState<TurnoCliente[]>(() => sinNada ? [] : [
-    { id: 'a', servicio: 1, recurso: 1, fecha: { mes: 9, dia: 29 }, hora: 16 * 60, estado: 'confirmado', sena: rubro.sena > 0 },
-    { id: 'b', servicio: 0, recurso: 0, fecha: { mes: 10, dia: 13 }, hora: 11 * 60, estado: cupo ? 'espera' : 'confirmado', lugar: 2 },
+    { id: 'a', servicio: 1, recurso: 1, fecha: sumarDias(HOY, 3), hora: 16 * 60, estado: 'confirmado', sena: rubro.sena > 0 },
+    { id: 'b', servicio: 0, recurso: 0, fecha: sumarDias(HOY, 17), hora: 11 * 60, estado: cupo ? 'espera' : 'confirmado', lugar: 2 },
   ])
   const [reprog, setReprog] = useState<TurnoCliente | null>(null)
   const [cancelar, setCancelar] = useState<TurnoCliente | null>(null)
@@ -262,8 +264,10 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
   const activos = turnos.filter(x => x.estado !== 'cancelado').sort(orden)
   const prox = activos[0]
   const resto = [...activos.slice(1), ...turnos.filter(x => x.estado === 'cancelado').sort(orden)]
+  // Turnos que ya pasaron: hace 2, 5, 8 y 11 semanas, con la fecha en palabras ("12 sep").
+  const hace = (dias: number) => { const f = sumarDias(HOY, -dias); return `${f.dia} ${mesCorto(f)}` }
   const HIST = sinNada ? [] : [
-    { f: '12 sep', s: 0, r: 0 }, { f: '22 ago', s: 1, r: 1 }, { f: '1 ago', s: 0, r: 0 }, { f: '10 jul', s: 2 % rubro.servicios.length, r: 2 },
+    { f: hace(14), s: 0, r: 0 }, { f: hace(35), s: 1, r: 1 }, { f: hace(56), s: 0, r: 0 }, { f: hace(78), s: 2 % rubro.servicios.length, r: 2 },
   ]
 
   return (
@@ -370,7 +374,7 @@ function Panel({ rubro, t, onSalir }: { rubro: RubroTurnos; t: TemaNegocio; onSa
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 16.5, fontWeight: 700, color: 'var(--color-text)' }}>{nombreServ(x.servicio)}</div>
                         <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 2 }}>
-                          <span className="tur-num">{horaTxt(x.hora)}</span>{persona ? ` · con ${recursos[x.recurso % recursos.length].nombre.split(' ')[0]}` : ''}{x.estado === 'confirmado' ? ` · ${faltan(x.fecha).toLowerCase()}` : ''}
+                          <span className="tur-num">{horaTxt(x.hora)}</span>{persona ? ` · con ${recursos[x.recurso % recursos.length].nombre.split(' ')[0]}` : ''}{x.estado === 'confirmado' ? ` · ${faltan(enDias(x.fecha)).toLowerCase()}` : ''}
                         </div>
                       </div>
                       {x.estado === 'espera' ? (
@@ -515,6 +519,7 @@ function Modal({ titulo, onCerrar, children }: { titulo: string; onCerrar: () =>
 
 function Reprogramar({ horarios, duracion, actual, guardando, onCerrar, onListo }: { horarios: Semana; duracion: number; actual: TurnoCliente; guardando: boolean; onCerrar: () => void; onListo: (fecha: Fecha, hora: number) => void }) {
   // Solo días con lugar, sin contar hoy: reprogramar para dentro de un rato no es el caso.
+  const { esHoy, proximosDias } = useCalendarioReserva()
   const dias = proximosDias(horarios, duracion).filter(d => d.libres > 0 && !esHoy(d.f)).slice(0, 8)
   const [fecha, setFecha] = useState<Fecha>(dias[0].f)
   const [hora, setHora] = useState<number | null>(null)

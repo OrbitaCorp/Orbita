@@ -1,4 +1,4 @@
-// DEMO INTERNA — datos de ejemplo del vertical Turnos & Agenda (2026-09-26).
+// DEMO INTERNA — datos de ejemplo del vertical Turnos & Agenda.
 // Solo visual: nada de esto sale de la API ni se guarda en ninguna base. Lo usan
 // las pantallas de /turnos-demo (localhost; en producción dan 404).
 //
@@ -8,7 +8,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type { AparienciaDemo, IdentidadDemo } from './demo/negocioDemo'
 import {
-  AHORA_DEMO, HOY_SEMANA, SEMANA_CANCHAS, SEMANA_CLASES, SEMANA_PARTIDA, cruzar, diasAbiertos, diasTxt, tramosDe, tramosDelDia, tramosTxt,
+  SEMANA_CANCHAS, SEMANA_CLASES, SEMANA_PARTIDA, cruzar, diasAbiertos, diasTxt, tramosDe, tramosDelDia, tramosTxt,
   type Semana, type Tramo,
 } from './horario'
 import {
@@ -326,7 +326,8 @@ export interface Recurso {
   /** Los mismos días, en texto: "Lun a sáb". */
   dias: string
 }
-export interface Cliente { id: string; nombre: string; telefono: string; visitas: number; ultima: string; gastado: number; nota?: string; obraSocial?: string }
+/** `ultima`: la última visita, en días contados desde hoy (-14 = hace dos semanas); null = todavía no vino. */
+export interface Cliente { id: string; nombre: string; telefono: string; visitas: number; ultima: number | null; gastado: number; nota?: string; obraSocial?: string }
 export interface Turno {
   id: string
   recursoId: string
@@ -405,14 +406,14 @@ export const horarioDeRecurso = (rec: Recurso, semana: Semana): string =>
   rec.horario || semana[rec.atiende.find(d => semana[d]?.[1]) ?? -1]?.[1] || ''
 
 export const CLIENTES: Cliente[] = [
-  { id: 'c1', nombre: 'Sofía Ramírez', telefono: '11 5555-0101', visitas: 14, ultima: '12/09', gastado: 212000, nota: 'Prefiere turnos a la mañana' },
-  { id: 'c2', nombre: 'Juan Pérez', telefono: '11 5555-0102', visitas: 3, ultima: '02/09', gastado: 41000 },
-  { id: 'c3', nombre: 'Valentina Gómez', telefono: '11 5555-0103', visitas: 22, ultima: '19/09', gastado: 356000, nota: 'Clienta frecuente' },
-  { id: 'c4', nombre: 'Nicolás Torres', telefono: '11 5555-0104', visitas: 1, ultima: '—', gastado: 0 },
-  { id: 'c5', nombre: 'Camila López', telefono: '11 5555-0105', visitas: 8, ultima: '15/09', gastado: 118000 },
-  { id: 'c6', nombre: 'Mateo Díaz', telefono: '11 5555-0106', visitas: 5, ultima: '10/09', gastado: 64000, nota: 'Faltó 1 vez sin avisar' },
-  { id: 'c7', nombre: 'Agustina Ruiz', telefono: '11 5555-0107', visitas: 11, ultima: '20/09', gastado: 167000 },
-  { id: 'c8', nombre: 'Lautaro Castro', telefono: '11 5555-0108', visitas: 2, ultima: '28/08', gastado: 24000 },
+  { id: 'c1', nombre: 'Sofía Ramírez', telefono: '11 5555-0101', visitas: 14, ultima: -14, gastado: 212000, nota: 'Prefiere turnos a la mañana' },
+  { id: 'c2', nombre: 'Juan Pérez', telefono: '11 5555-0102', visitas: 3, ultima: -24, gastado: 41000 },
+  { id: 'c3', nombre: 'Valentina Gómez', telefono: '11 5555-0103', visitas: 22, ultima: -7, gastado: 356000, nota: 'Clienta frecuente' },
+  { id: 'c4', nombre: 'Nicolás Torres', telefono: '11 5555-0104', visitas: 1, ultima: null, gastado: 0 },
+  { id: 'c5', nombre: 'Camila López', telefono: '11 5555-0105', visitas: 8, ultima: -11, gastado: 118000 },
+  { id: 'c6', nombre: 'Mateo Díaz', telefono: '11 5555-0106', visitas: 5, ultima: -16, gastado: 64000, nota: 'Faltó 1 vez sin avisar' },
+  { id: 'c7', nombre: 'Agustina Ruiz', telefono: '11 5555-0107', visitas: 11, ultima: -6, gastado: 167000 },
+  { id: 'c8', nombre: 'Lautaro Castro', telefono: '11 5555-0108', visitas: 2, ultima: -29, gastado: 24000 },
 ]
 
 // Datos de salud: inventados, sin diagnósticos. La ficha real va a necesitar
@@ -461,21 +462,18 @@ function bloquesDe(jornada: Tramo[]): { manana: Tramo | null; tarde: Tramo | nul
 
 /**
  * La agenda de ejemplo de un día. `jornadas` trae los tramos en que atiende cada
- * agenda (r1, r2, r3; [] = ese día no atiende) y `ahora` la hora de la demo si
- * el día es hoy (null = otro día: no hay nada "en curso").
+ * agenda (r1, r2, r3; [] = ese día no atiende) y `ahora` los minutos de la hora
+ * actual si el día es hoy (null = otro día: no hay nada "en curso").
  *
  * Los turnos se acomodan uno atrás del otro dentro de cada tramo con la duración
  * real de cada servicio: nunca se pisan ni caen fuera de horario, sea cual sea
  * el rubro. El estado sale de la hora: lo que ya terminó está atendido, lo que
  * está pasando está en curso y lo que falta, confirmado o sin confirmar.
  */
-export function turnosDe(r: RubroTurnos, jornadas?: Tramo[][], ahora: number | null = AHORA_DEMO): Turno[] {
+export function turnosDe(r: RubroTurnos, jornadas: Tramo[][], ahora: number | null): Turno[] {
   const s = r.servicios
   const out: Turno[] = []
-  // Sin jornadas, las de hoy del negocio de ejemplo: las de sus tres agendas (recursosDe).
-  const semana = semanaDe(r)
-  const agendas = jornadas ?? recursosDe(r).map(x => tramosDeRecurso(x, semana, HOY_SEMANA))
-  agendas.forEach((jornada, k) => {
+  jornadas.forEach((jornada, k) => {
     const bloques = bloquesDe(jornada)
     for (const tarde of [false, true]) {
       const tramo = tarde ? bloques.tarde : bloques.manana
@@ -502,6 +500,16 @@ export function turnosDe(r: RubroTurnos, jornadas?: Tramo[][], ahora: number | n
     }
   })
   return out
+}
+
+/**
+ * La agenda de ejemplo de hoy del negocio de ejemplo, con las jornadas de sus
+ * tres agendas (recursosDe) en el día de la semana de hoy y lo que ya pasó
+ * según la hora. `ahora`: la de reloj.ts (minutos y día de la semana, 0 = lunes).
+ */
+export function turnosDeHoy(r: RubroTurnos, ahora: { minutos: number; diaSemana: number }): Turno[] {
+  const semana = semanaDe(r)
+  return turnosDe(r, recursosDe(r).map(x => tramosDeRecurso(x, semana, ahora.diaSemana)), ahora.minutos)
 }
 
 export const horaTxt = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`

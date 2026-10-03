@@ -7,7 +7,7 @@
 //
 // En todos lados el horario de un día viaja como texto, que es lo que se
 // muestra: "09:00 – 13:00 · 16:00 – 20:00" ('' = cerrado). Acá está cómo se lee
-// y se escribe ese texto, y la hora en la que "está" la demo.
+// y se escribe ese texto.
 //
 // No importa nada de datos.ts a propósito: datos.ts arma la agenda de ejemplo
 // con lo de acá.
@@ -21,15 +21,7 @@ export type Semana = [string, string][]
 export interface Bloque { on: boolean; desde: number; hasta: number }
 export interface Jornada { manana: Bloque; tarde: Bloque }
 
-// ─── El "ahora" de la demo ───────────────────────────────────────────────────
-// Sábado 26/09/2026 a las 10:40, fijo: así la demo se ve igual cualquier día,
-// servidor y navegador dibujan lo mismo y no hace falta Date.now() en render
-// (react-compiler lo prohíbe). A media mañana se ve bien el día partido: lo que
-// ya pasó, lo que queda de la mañana, el corte y toda la tarde por delante.
-export const AHORA_DEMO = 10 * 60 + 40
-export const FECHA_DEMO = 'Sábado 26 de septiembre'
-/** Hoy en una Semana (0 = lunes): sábado. */
-export const HOY_SEMANA = 5
+// La fecha y la hora actuales no viven acá: son las reales, de reloj.ts.
 
 // ─── Texto ↔ minutos ─────────────────────────────────────────────────────────
 

@@ -14,6 +14,7 @@ import RolesPermisos from '../Roles'
 import { CADA_TXT, pagoTxt, type EquipoConfig } from '../equipoDemo'
 import { useBorrador, Encabezado, SecCard, Campo, Dos, Chip, BotonBorde, BarraGuardar, Boton, Dialogo, type PropsTab } from './ui'
 import { subdominioDe, vozDe, cap } from './datos'
+import { fechaDePartes, fechaNumerica, moverMes, partesDe, useReloj } from '@/modules/turnos/reloj'
 
 // ─── Dominio ─────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,12 @@ const $ = (n: number) => `$${n.toLocaleString('es-AR')}`
 
 export function Suscripcion({ rubro, avisar }: PropsTab) {
   const voz = vozDe(rubro)
+  // El plan se cobra el 2 de cada mes: la próxima renovación y los tres cobros anteriores.
+  const { fecha: hoy } = useReloj()
+  const partes = partesDe(hoy)
+  const esteMes = fechaDePartes(partes.anio, partes.mes, 2)
+  const renueva = esteMes > hoy ? esteMes : moverMes(esteMes, 1)
+  const cobros = [1, 2, 3].map(n => fechaNumerica(moverMes(renueva, -n)))
   const [plan, setPlan] = useState('mensual')
   const actual = PLANES.find(p => p.id === plan) ?? PLANES[0]
   const [tarjeta, setTarjeta] = useState({ marca: 'Visa', final: '4242', vence: '08/28' })
@@ -128,7 +135,7 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
             <div style={{ flex: '1 1 220px' }}>
               <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Plan {actual.nombre}</div>
               <div className="tuo-num" style={{ fontSize: 34, lineHeight: 1.1, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--color-text)' }}>{$(actual.precio)}<span style={{ fontSize: 14, color: 'var(--color-muted)', fontWeight: 500 }}>/mes</span></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-body)', marginTop: 6 }}><CalendarDays size={13} aria-hidden /> Se renueva el 02/10/2026</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-body)', marginTop: 6 }}><CalendarDays size={13} aria-hidden /> Se renueva el {fechaNumerica(renueva)}</div>
             </div>
             <div className="tuc-renglon" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
               <CreditCard size={18} aria-hidden style={{ color: 'var(--color-muted)' }} />
@@ -172,7 +179,7 @@ export function Suscripcion({ rubro, avisar }: PropsTab) {
 
         <SecCard titulo="Pagos" Icon={CreditCard} bajada="Tus últimos cobros de Órbita.">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {[['02/09/2026', 16500], ['02/08/2026', 16500], ['02/07/2026', 16500]].map(([f, m], i) => (
+            {cobros.map(f => [f, 16500] as const).map(([f, m], i) => (
               <div key={String(f)} className="tuc-linea" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 8px', margin: '0 -8px', borderTop: i ? '1px solid var(--color-border)' : 'none', fontSize: 13.5 }}>
                 <span className="tuo-num" style={{ flex: 1, color: 'var(--color-body)' }}>{f}</span>
                 <Chip tono="ok">Pagado</Chip>

@@ -8,7 +8,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import Link from 'next/link'
 import { CalendarCheck, Check, CheckCheck, Info, SendHorizontal } from 'lucide-react'
 import { horaTxt, type RubroTurnos } from '@/modules/turnos/datos'
-import { AHORA, Dialogo, Marca, ruta, useForma } from './piezas'
+import { Dialogo, Marca, ruta, useForma } from './piezas'
+import { useReloj } from '@/modules/turnos/reloj'
 import { altFoto, type TemaNegocio } from './tema'
 
 export type Contacto = { canal: 'whatsapp'; texto: string } | { canal: 'instagram' }
@@ -33,6 +34,7 @@ function WhatsApp({ texto, t, rubro, onCerrar }: { texto: string; t: TemaNegocio
   const [enviados, setEnviados] = useState<string[]>([])
   const [respondio, setRespondio] = useState(false)
   const forma = useForma()
+  const { minutos } = useReloj()
   // La respuesta automática llega un momento después, como en un chat de verdad (una sola vez).
   useEffect(() => {
     if (!enviados.length || respondio) return
@@ -48,7 +50,7 @@ function WhatsApp({ texto, t, rubro, onCerrar }: { texto: string; t: TemaNegocio
     setBorrador('')
   }
   const reservar = rubro.modo === 'cupo' ? 'Reservar lugar' : rubro.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
-  const hora = horaTxt(AHORA)
+  const hora = horaTxt(minutos)
   return (
     <Dialogo titulo="WhatsApp" onCerrar={onCerrar}>
       <div className="tu-wa">

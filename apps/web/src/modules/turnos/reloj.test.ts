@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ahoraDe, diaDeSemana, diasDe, diasDelMes, diasEntre, esFecha, fechaArgentina, fechaCorta, fechaLarga, fechaYMinutos, grillaDelMes,
+  ahoraDe, diaDeSemana, diasDe, diasDelMes, diasEntre, esFecha, fechaArgentina, fechaCorta, fechaHoraCorta, fechaLarga, fechaYMinutos, grillaDelMes,
   instanteDe, isoDe, lunesDe, mesAnterior, mesDe, mesTxt, minutosArgentina, moverMes, rangoTxt, semanaDe, sumarDias,
 } from './reloj'
 
@@ -126,6 +126,7 @@ describe('texto', () => {
     expect(fechaLarga('2026-09-26')).toBe('Sábado 26 de septiembre')
     expect(fechaCorta('2026-10-03')).toBe('03/10')
     expect(mesTxt('2027-01-04')).toBe('Enero de 2027')
+    expect(fechaHoraCorta('2026-09-26', 640)).toBe('Sáb 26 sep · 10:40')
   })
   it('rangos', () => {
     expect(rangoTxt('2026-09-21', '2026-09-26')).toBe('del 21 al 26 de septiembre')

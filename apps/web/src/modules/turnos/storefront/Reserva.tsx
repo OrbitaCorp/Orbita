@@ -27,7 +27,7 @@ import { tramosDe, tramosFrase } from '@/modules/turnos/horario'
 import SitioNegocio from './SitioNegocio'
 import { RETRATOS, type TemaNegocio } from './tema'
 import { EstiloReserva } from './reserva/estilo'
-import { fechaDeClase, fechaLarga, primerLibre, HOY, type Fecha } from './reserva/calendario'
+import { fechaLarga, useCalendarioReserva, type Fecha } from './reserva/calendario'
 import { OrbitaPasos } from './reserva/OrbitaPasos'
 import { PasoServicio, PasoRecurso, PasoClase } from './reserva/PasosEleccion'
 import { PasoFecha } from './reserva/PasoFecha'
@@ -81,6 +81,7 @@ function preseleccion(q: ParsedUrlQuery, rubro: RubroTurnos, recursos: { id: str
 
 function Flujo({ rubro, t, simple }: { rubro: RubroTurnos; t: TemaNegocio; simple: boolean }) {
   const router = useRouter()
+  const { HOY, fechaDeClase, primerLibre } = useCalendarioReserva()
   const vacio = router.query.estado === 'vacio'
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
   const clases = useMemo(() => clasesDe(rubro), [rubro])

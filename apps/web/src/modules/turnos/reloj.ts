@@ -34,6 +34,7 @@ const DESFASE_ARGENTINA_MS = 3 * 60 * MS_MINUTO
 export const MINUTOS_DEL_DIA = 24 * 60
 export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+export const DIAS_SEMANA_CORTOS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 export const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 const dos = (n: number) => String(n).padStart(2, '0')
@@ -167,6 +168,12 @@ export const fechaCorta = (fecha: Fecha) => { const p = partesDe(fecha); return 
 
 /** "26/09/2026". */
 export const fechaNumerica = (fecha: Fecha) => { const p = partesDe(fecha); return `${dos(p.dia)}/${dos(p.mes)}/${p.anio}` }
+
+/** "Sáb 26 sep · 10:40". */
+export function fechaHoraCorta(fecha: Fecha, minutos: number): string {
+  const p = partesDe(fecha)
+  return `${DIAS_SEMANA_CORTOS[diaDeSemana(fecha)]} ${p.dia} ${MESES_CORTOS[p.mes - 1]} · ${hhmm(minutos)}`
+}
 
 /** "Septiembre de 2026". */
 export function mesTxt(fecha: Fecha): string {

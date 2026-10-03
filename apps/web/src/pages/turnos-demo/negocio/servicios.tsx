@@ -4,17 +4,18 @@ import type { GetServerSideProps } from 'next'
 import { BarraDemo, useRubroDemo } from '@/modules/turnos/demo/BarraDemo'
 import ServiciosNegocio from '@/modules/turnos/storefront/ServiciosNegocio'
 import { temaDe } from '@/modules/turnos/storefront/tema'
+import { RelojTurnos, semillaReloj } from '@/modules/turnos/reloj'
 
 export const getServerSideProps: GetServerSideProps = async () =>
-  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: { reloj: semillaReloj() } }
 
-export default function Page() {
+export default function Page({ reloj }: { reloj: number }) {
   const [rubro] = useRubroDemo()
   return (
     <>
       <Head><title>{`Servicios y precios · ${temaDe(rubro).nombre}`}</title></Head>
       <BarraDemo />
-      <ServiciosNegocio key={rubro.key} rubro={rubro} />
+      <RelojTurnos semilla={reloj}><ServiciosNegocio key={rubro.key} rubro={rubro} /></RelojTurnos>
     </>
   )
 }

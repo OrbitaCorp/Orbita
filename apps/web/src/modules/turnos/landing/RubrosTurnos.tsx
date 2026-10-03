@@ -17,11 +17,11 @@ import { ArrowRight, BellRing, CalendarRange, Coins, Globe } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Seccion } from '@/modules/landing/components/v2/Reveal'
 import { useContacto } from '@/modules/landing/components/v2/Contacto'
-import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDe, clientesDe, rubroPorKey, type FamiliaId } from '@/modules/turnos/datos'
+import { FAMILIAS, RUBROS_TURNOS, MODO_LABEL, pesos, duracionTxt, recursosDe, turnosDeHoy, clientesDe, rubroPorKey, type FamiliaId } from '@/modules/turnos/datos'
 import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
 import { OrbitaDia } from '@/modules/turnos/_shared/orbita/OrbitaDia'
 import { Estrellas } from '@/modules/turnos/_shared/orbita/Cielo'
-import { AHORA_DEMO } from '@/modules/turnos/_shared/components/ChipEstado'
+import { useReloj } from '@/modules/turnos/reloj'
 import { CSS_LANDING_TURNOS } from './estilo'
 
 const QUE_TRAE: { titulo: string; texto: string; Icon: LucideIcon }[] = [
@@ -63,7 +63,8 @@ export default function RubrosTurnos({ onEscribir }: Props) {
   const rubro = rubroPorKey(pasando ?? fijo)
 
   const recursos = useMemo(() => recursosDe(rubro), [rubro])
-  const turnos = useMemo(() => turnosDe(rubro), [rubro])
+  const ahora = useReloj()
+  const turnos = useMemo(() => turnosDeHoy(rubro, ahora), [rubro, ahora])
   const clientes = useMemo(() => clientesDe(rubro), [rubro])
   const activos = turnos.filter(t => t.estado !== 'cancelado')
 
@@ -119,7 +120,7 @@ export default function RubrosTurnos({ onEscribir }: Props) {
               <Estrellas cantidad={34} />
               <div className="tul-marco-dial">
                 <OrbitaDia
-                  recursos={recursos} turnos={turnos} ahora={AHORA_DEMO}
+                  recursos={recursos} turnos={turnos} ahora={ahora.minutos}
                   nombreCliente={id => clientes.find(c => c.id === id)?.nombre ?? 'Cliente'}
                   pie={`${activos.length} turnos hoy`} size={420}
                 />

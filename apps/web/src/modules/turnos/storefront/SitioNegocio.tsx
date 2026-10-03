@@ -26,9 +26,10 @@ import type { FormaSitio } from '@/modules/turnos/demo/negocioDemo'
 import { CSS_SITIO } from './estilos'
 import { ContactoProvider, DialogoContacto, type Contacto } from './ContactoDemo'
 import { Legales, LEGALES, type Legal } from './Legales'
-import { AnillosTema, FormaProvider, HOY, HorasDia, Marca, SelloOrbita, proximoLibre, ruta, useTema, type PaginaNegocio } from './piezas'
+import { AnillosTema, FormaProvider, HorasDia, Marca, SelloOrbita, proximoLibre, ruta, useTema, type PaginaNegocio } from './piezas'
 import { linkMapa } from './reserva/acciones'
 import { variablesTema, type TemaNegocio } from './tema'
+import { useCalendarioReserva } from './reserva/calendario'
 
 export { ruta, useReveal, Reveal } from './piezas'
 export type { PaginaNegocio } from './piezas'
@@ -47,6 +48,8 @@ interface Props {
 
 export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, ctaMovil = true, children }: Props) {
   const t = useTema(rubro)
+  const cal = useCalendarioReserva()
+  const HOY = cal.ahora.diaSemana
   const simple = forma === 'simple'
   const [solido, setSolido] = useState(!sobreFoto)
   const [menu, setMenu] = useState(false)
@@ -99,7 +102,7 @@ export default function SitioNegocio({ rubro, pagina, forma = 'web', sobreFoto, 
   ]
   const transparente = !!sobreFoto && !solido && !menu
   const reservar = rubro.modo === 'cupo' ? 'Reservar lugar' : rubro.modo === 'cancha' ? 'Reservar cancha' : 'Reservar turno'
-  const prox = proximoLibre(rubro)
+  const prox = proximoLibre(rubro, cal)
   const fuentes = `https://fonts.googleapis.com/css2?${t.fuentes.map(f => `family=${f}`).join('&')}&display=swap`
   const barraMovil = !simple && ctaMovil && pagina !== 'reserva'
 

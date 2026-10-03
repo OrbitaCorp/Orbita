@@ -1,19 +1,21 @@
 // Lo que pasa después de reservar: calendario, mapa y WhatsApp. Son las únicas
 // acciones que hacen algo de verdad en la demo, y las tres salen del navegador
 // (un archivo .ics, un link a Maps, un link a wa.me): no dependen de ninguna API.
-import type { Fecha } from './calendario'
+import { isoDe, type Fecha } from './calendario'
+import { instanteDe } from '@/modules/turnos/reloj'
 
 export const CODIGO_DEMO = 'ORB-4F7K'
 
-const dos = (n: number) => String(n).padStart(2, '0')
 const limpio = (s: string) => s.replace(/([,;\\])/g, '\\$1')
 
 /** Baja un .ics con el turno: lo abren Google Calendar, el calendario del iPhone y Outlook. */
 export function descargarICS({ titulo, fecha, inicio, duracion, lugar }: { titulo: string; fecha: Fecha; inicio: number; duracion: number; lugar: string }) {
-  const sello = (m: number) => `2026${dos(fecha.mes)}${dos(fecha.dia)}T${dos(Math.floor(m / 60))}${dos(m % 60)}00`
+  // Instantes en UTC (con Z): el turno es a esa hora de Argentina, se abra donde se abra el calendario.
+  const utc = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const sello = (m: number) => utc(instanteDe(isoDe(fecha), m))
   const cuerpo = [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Orbita//Turnos//ES', 'BEGIN:VEVENT',
-    `UID:${CODIGO_DEMO}-${sello(inicio)}@orbita.site`, 'DTSTAMP:20260926T134000',
+    `UID:${CODIGO_DEMO}-${sello(inicio)}@orbita.site`, `DTSTAMP:${utc(Date.now())}`,
     `DTSTART:${sello(inicio)}`, `DTEND:${sello(Math.min(inicio + duracion, 23 * 60 + 59))}`,
     `SUMMARY:${limpio(titulo)}`, `LOCATION:${limpio(lugar)}`,
     'END:VEVENT', 'END:VCALENDAR',
