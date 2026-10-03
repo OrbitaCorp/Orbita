@@ -12,8 +12,30 @@ import { ESCRITURA_EN_DEMO, ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_
 
 const logger = new Logger('OrbiMotorDeTurno');
 
+/** Una tool que se pidió dentro de una vuelta, y qué pasó con ella. */
+export interface ToolDelPaso {
+  name: string;
+  tipo: 'lectura' | 'propuesta' | 'rechazada';
+  ms: number;
+  ok: boolean;
+}
+
+/** Una vuelta al modelo: lo que gastó, cuánto tardó y las tools que pidió. */
+export interface PasoDelTurno {
+  n: number;
+  provider: LlmUsage['provider'] | null;
+  model: string | null;
+  promptTokens: number | null;
+  cachedTokens: number | null;
+  completionTokens: number | null;
+  thinkingTokens: number | null;
+  /** Duración de la vuelta: stream del modelo más las tools que se corrieron adentro. */
+  ms: number;
+  tools: ToolDelPaso[];
+}
+
 /** Tokens de un turno, separados por quién respondió cada llamada. */
-export type ConsumoPorProveedor = Map<LlmUsage['provider'], { model: string; promptTokens: number; completionTokens: number }>;
+export type ConsumoPorProveedor = Map<LlmUsage['provider'], { model: string; promptTokens: number; completionTokens: number; cachedTokens: number; thinkingTokens: number }>;
 
 /**
  * Suma el `usage` de una llamada al proveedor que la contestó. El fallback se
@@ -26,6 +48,8 @@ export function sumarConsumo(consumo: ConsumoPorProveedor, u: LlmUsage): void {
     model: u.model,
     promptTokens: (previo?.promptTokens ?? 0) + u.promptTokens,
     completionTokens: (previo?.completionTokens ?? 0) + u.completionTokens,
+    cachedTokens: (previo?.cachedTokens ?? 0) + (u.cachedTokens ?? 0),
+    thinkingTokens: (previo?.thinkingTokens ?? 0) + (u.thinkingTokens ?? 0),
   });
 }
 
@@ -39,10 +63,18 @@ export interface ProgresoDelTurno {
   propuestas: number;
   consumo: ConsumoPorProveedor;
   modeloReportado?: string;
+  /** Una entrada por vuelta al modelo, en orden. */
+  pasos: PasoDelTurno[];
+  /** Escrituras que el modelo pidió y no se pudieron proponer (argumentos inválidos, sin permiso, demo). */
+  escriturasRechazadas: number;
+  /** Ms desde que arrancó el turno hasta el primer texto que ve la persona. */
+  ttftMs?: number;
+  /** Lo que gastaron las tools por su cuenta (ej. generateDescription), aparte del consumo del modelo del turno. */
+  consumoDeTools: ConsumoPorProveedor;
 }
 
 export function nuevoProgresoDelTurno(): ProgresoDelTurno {
-  return { texto: '', estado: 'ok', llamadasAlModelo: 0, toolsPedidas: [], propuestas: 0, consumo: new Map() };
+  return { texto: '', estado: 'ok', llamadasAlModelo: 0, toolsPedidas: [], propuestas: 0, consumo: new Map(), pasos: [], escriturasRechazadas: 0, ttftMs: undefined, consumoDeTools: new Map() };
 }
 
 /** Lo que el loop va contando hacia afuera, en el orden en que pasa. */
@@ -81,10 +113,26 @@ export interface TurnoACorrer {
   crearPendiente(p: { call: LlmToolCall; resumen: string }): Promise<string>;
   emisor: EmisorDelTurno;
   progreso: ProgresoDelTurno;
+  /** Para los tests; por defecto Date.now(). */
+  reloj?: () => number;
+  /** Para los tests: cuándo arrancó el turno. Por defecto, al entrar a correrTurno. */
+  inicio?: number;
 }
 
 export async function correrTurno(t: TurnoACorrer): Promise<void> {
-  const { emisor, progreso, signal, messages, tools } = t;
+  const { progreso, signal, messages, tools } = t;
+  const reloj = t.reloj ?? Date.now;
+  const inicio = t.inicio ?? reloj();
+
+  // El primer texto no vacío que sale hacia la persona marca el TTFT.
+  const emisorOriginal = t.emisor;
+  const emisor: EmisorDelTurno = {
+    ...emisorOriginal,
+    texto: (chunk) => {
+      if (progreso.ttftMs === undefined && chunk) progreso.ttftMs = reloj() - inicio;
+      emisorOriginal.texto(chunk);
+    },
+  };
 
   // Con herramientas en juego el texto de la vuelta se BUFEREA en vez de
   // streamearse, para que el preámbulo que Gemini dice antes de llamar la tool
@@ -107,6 +155,9 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
     // Cada vuelta es una llamada paga: si el cliente ya se fue, no se pide.
     signal?.throwIfAborted();
     progreso.llamadasAlModelo++;
+    const paso: PasoDelTurno = { n: progreso.llamadasAlModelo, provider: null, model: null, promptTokens: null, cachedTokens: null, completionTokens: null, thinkingTokens: null, ms: 0, tools: [] };
+    progreso.pasos.push(paso);
+    const arrancoLaVuelta = reloj();
     continueLoop = false;
     let textoVuelta = '';
     let resetEnviado = false;
@@ -120,6 +171,7 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
       } else if (event.type === 'tool_call') {
         // Con el cliente ido, ni se propone ni se ejecuta nada.
         signal?.throwIfAborted();
+        const arrancoLaTool = reloj();
         progreso.toolsPedidas.push(event.call.name);
         emisor.toolPedida?.({ call: event.call });
         // Si se bufereó, no hay nada que resetear: el preámbulo se descarta
@@ -151,6 +203,8 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
         // hay tarjeta ni acción pendiente. El modelo recibe el motivo como
         // resultado fallido de la tool, para corregir o contarle qué faltó.
         if (propuesta && 'error' in propuesta) {
+          progreso.escriturasRechazadas++;
+          paso.tools.push({ name: event.call.name, tipo: 'rechazada', ms: reloj() - arrancoLaTool, ok: false });
           emisor.escrituraRechazada?.({ call: event.call });
           vuelta.responder(event.call, JSON.stringify({ success: false, error: propuesta.error }));
           continueLoop = true;
@@ -160,6 +214,8 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
         // Una escritura que no se pudo proponer (demo, sin permiso, otra
         // surface) NO se ejecuta directo: solo /orbi/confirm escribe.
         if (!propuesta && t.registry.requiereConfirmacion(event.call.name)) {
+          progreso.escriturasRechazadas++;
+          paso.tools.push({ name: event.call.name, tipo: 'rechazada', ms: reloj() - arrancoLaTool, ok: false });
           emisor.escrituraRechazada?.({ call: event.call });
           vuelta.responder(event.call, JSON.stringify({ success: false, error: t.soloLectura ? ESCRITURA_EN_DEMO : ESCRITURA_NO_DISPONIBLE }));
           continueLoop = true;
@@ -173,6 +229,7 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
           signal?.throwIfAborted();
           const actionId = await t.crearPendiente({ call: event.call, resumen: propuesta.resumen });
           progreso.propuestas++;
+          paso.tools.push({ name: event.call.name, tipo: 'propuesta', ms: reloj() - arrancoLaTool, ok: true });
           emisor.propuesta({ id: stepId, actionId, call: event.call, resumen: propuesta.resumen });
           // Que diga PENDIENTE y no que falló (reintentaría) ni que salió bien
           // (le contaría a la persona que ya está hecho).
@@ -187,13 +244,23 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
         // Acá solo llegan lecturas. soloLectura igual, como segunda barrera de
         // la demo (ver ToolRegistryService#execute).
         const resultado = await t.registry.execute(event.call.name, event.call.arguments, t.toolCtx, t.stepName, { soloLectura: t.soloLectura });
-        emisor.lecturaFin({ id: stepId, call: event.call, resultado });
-        vuelta.responder(event.call, JSON.stringify(resultado));
+        // El consumo de IA de la tool va a la ficha, nunca al modelo ni al front.
+        const { consumo: consumoDeLaTool, ...paraAfuera } = resultado;
+        if (consumoDeLaTool) sumarConsumo(progreso.consumoDeTools, consumoDeLaTool);
+        paso.tools.push({ name: event.call.name, tipo: 'lectura', ms: reloj() - arrancoLaTool, ok: paraAfuera.success });
+        emisor.lecturaFin({ id: stepId, call: event.call, resultado: paraAfuera });
+        vuelta.responder(event.call, JSON.stringify(paraAfuera));
         continueLoop = true;
       } else if (event.type === 'usage') {
         // Se suma aunque el cliente ya se haya ido: la llamada se factura.
         sumarConsumo(progreso.consumo, event.usage);
         progreso.modeloReportado = event.usage.model;
+        paso.provider = event.usage.provider;
+        paso.model = event.usage.model;
+        paso.promptTokens = (paso.promptTokens ?? 0) + event.usage.promptTokens;
+        paso.completionTokens = (paso.completionTokens ?? 0) + event.usage.completionTokens;
+        paso.cachedTokens = (paso.cachedTokens ?? 0) + (event.usage.cachedTokens ?? 0);
+        paso.thinkingTokens = (paso.thinkingTokens ?? 0) + (event.usage.thinkingTokens ?? 0);
       } else if (event.type === 'done') {
         if (!continueLoop) {
           // Vuelta final: si se bufereó, recién acá sale el texto — de una, y
@@ -204,6 +271,7 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
         }
       }
     }
+    paso.ms = reloj() - arrancoLaVuelta;
     // Terminó el stream de la vuelta: recién ahora sus calls y resultados
     // entran al historial, todos en un solo turno del modelo.
     vuelta.volcarEn(messages);
