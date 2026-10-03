@@ -22,7 +22,7 @@ export class StorefrontApiError extends Error {
   }
 }
 
-async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/storefront${path}`, init)
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null

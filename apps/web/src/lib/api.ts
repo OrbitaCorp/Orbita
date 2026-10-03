@@ -436,7 +436,7 @@ const MENSAJE_SUBSCRIPTION_CANCELLED =
 
 // Ayudante que usan todas las funciones de abajo: hace el pedido al backend con
 // la sesión puesta y, si algo falla, arma el error con el mensaje para la pantalla.
-async function panelRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function panelRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, options)
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
