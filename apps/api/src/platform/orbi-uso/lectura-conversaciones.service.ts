@@ -41,16 +41,17 @@ export class LecturaConversacionesService {
     });
     if (!conv) throw new NotFoundException('No existe esa conversación');
 
-    const ticket = dto.ticket?.trim() || null;
+    // El DTO ya recorta detalle y ticket; un ticket vacío se guarda como null.
+    const ticket = dto.ticket || null;
     await this.prisma.orbiConversationAccess.create({
-      data: { adminId, conversationId, businessId: conv.businessId, memberId: conv.userId, motivo: dto.motivo, detalle: dto.detalle.trim(), ticket },
+      data: { adminId, conversationId, businessId: conv.businessId, memberId: conv.userId, motivo: dto.motivo, detalle: dto.detalle, ticket },
     });
     await this.adminLog.orbiConversacionAbierta({ adminId, conversationId, businessId: conv.businessId, motivo: dto.motivo, ticket: ticket ?? undefined });
 
     const mensajes = conv.version === 2 ? await this.mensajesV2(conv.id, conv.businessId) : mensajesV1(conv.messages);
     return {
       id: conv.id,
-      titulo: conv.title,
+      titulo: conv.title ? redact(conv.title) : null,
       businessId: conv.businessId,
       memberId: conv.userId,
       mensajes: mensajes.map((m) => ({ ...m, texto: redact(m.texto) })),

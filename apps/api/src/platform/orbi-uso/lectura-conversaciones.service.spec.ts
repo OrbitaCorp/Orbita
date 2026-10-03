@@ -4,7 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { LecturaConversacionesService } from './lectura-conversaciones.service';
 import { AbrirConversacionDto } from './dto/abrir-conversacion.dto';
 
-const dto = { motivo: 'soporte', detalle: 'El cliente reportó un error al cargar stock', ticket: ' T-123 ' } as const;
+const dto = { motivo: 'soporte', detalle: 'El cliente reportó un error al cargar stock', ticket: 'T-123' } as const;
 
 function armar(flag: string | undefined, conv: unknown, mensajesV2: unknown[] = []) {
   const prisma = {
@@ -20,7 +20,7 @@ function armar(flag: string | undefined, conv: unknown, mensajesV2: unknown[] = 
 
 const v1 = {
   id: 'c1',
-  title: 'Stock',
+  title: 'Stock de juan@mail.com',
   businessId: 'b1',
   userId: 'm1',
   version: 1,
@@ -42,6 +42,11 @@ describe('LecturaConversacionesService', () => {
     expect(adminLog.orbiConversacionAbierta).not.toHaveBeenCalled();
   });
 
+  it('sin título devuelve null y con título lo redacta', async () => {
+    const { svc } = armar('on', { ...v1, title: null });
+    expect((await svc.abrir('c1', 'ad1', dto)).titulo).toBeNull();
+  });
+
   it('conversación inexistente: 404 sin registro', async () => {
     const { svc, prisma, adminLog } = armar('on', null);
     await expect(svc.abrir('nope', 'ad1', dto)).rejects.toBeInstanceOf(NotFoundException);
@@ -58,7 +63,7 @@ describe('LecturaConversacionesService', () => {
     expect(adminLog.orbiConversacionAbierta).toHaveBeenCalledWith({ adminId: 'ad1', conversationId: 'c1', businessId: 'b1', motivo: 'soporte', ticket: 'T-123' });
     expect(r).toEqual({
       id: 'c1',
-      titulo: 'Stock',
+      titulo: 'Stock de [email]',
       businessId: 'b1',
       memberId: 'm1',
       mensajes: [
@@ -122,6 +127,13 @@ describe('AbrirConversacionDto', () => {
   it('acepta soporte/abuso/calidad con detalle y ticket opcional', async () => {
     expect(await errores({ motivo: 'abuso', detalle: 'Detalle suficiente' })).toEqual([]);
     expect(await errores({ motivo: 'calidad', detalle: 'Detalle suficiente', ticket: 'T-1' })).toEqual([]);
+  });
+
+  it('recorta antes de validar: puros espacios o relleno no pasan como detalle', async () => {
+    expect(await errores({ motivo: 'soporte', detalle: '          ' })).toEqual(['detalle']);
+    expect(await errores({ motivo: 'soporte', detalle: '         x' })).toEqual(['detalle']);
+    const d = plainToInstance(AbrirConversacionDto, { motivo: 'soporte', detalle: '  Detalle suficiente  ', ticket: '  T-9  ' });
+    expect([d.detalle, d.ticket]).toEqual(['Detalle suficiente', 'T-9']);
   });
 
   it('rechaza motivo desconocido, detalle corto o ticket larguísimo', async () => {
