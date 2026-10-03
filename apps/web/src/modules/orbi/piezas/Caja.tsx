@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { ArrowUp, Square, X } from 'lucide-react'
+import { AVISO_PRIVACIDAD, URL_PRIVACIDAD } from '@/components/orbi/avisoPrivacidad'
 import s from '../orbi.module.css'
 
 /**
@@ -107,8 +108,8 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
     </div>
     {conAviso && (
       <p className={s.avisoPrivacidad}>
-        Lo que escribís queda en tu historial y lo procesa Google Gemini.{' '}
-        <a href="/privacidad" target="_blank" rel="noreferrer">Privacidad</a>
+        {AVISO_PRIVACIDAD}{' '}
+        <a href={URL_PRIVACIDAD} target="_blank" rel="noreferrer">Privacidad</a>
       </p>
     )}
     </>

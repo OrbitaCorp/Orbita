@@ -14,6 +14,7 @@ import { useDisponibilidadOrbi } from './useDisponibilidadOrbi'
 import { OrbiAvisoMantenimiento } from './OrbiAvisoMantenimiento'
 import { track } from '@/lib/analytics/wizardTracker'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
 import { ID_PANEL_ORBI, PLACEHOLDER_EN_MANTENIMIENTO } from './types'
 
 // Las cosquillas del encabezado no muestran texto: solo la reacción del pet.
@@ -168,6 +169,9 @@ export function OrbiPanel() {
           streaming={isStreaming}
           onStop={abortar}
           placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
+          // Solo en el panel: el wizard no guarda la conversación, y en la
+          // demo tampoco se guarda, así que la línea sería falsa.
+          conAviso={!isWizard && !esVisitanteDemo()}
         />
       </div>
 
