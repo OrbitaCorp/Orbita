@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "76261334ed871da0",
+  "version": "1c3d3665347b6b83",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -105,6 +105,16 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "capitulo": "Inicio",
       "titulo": "Top: productos, categorías y canal",
       "texto": "Al lado del gráfico hay una tarjeta con tres pestañas.\n\n- Productos: Lo más vendido del período, con su barra de participación. Lo que aparece acá es lo que conviene tener siempre con stock y destacado en la portada.\n- Categorías: Lo mismo pero agrupado por categoría: te dice qué rubro tuyo tracciona de verdad.\n- Canal: Una torta que separa las ventas que entraron solas por la tienda online de las que cargaste vos a mano (mostrador, WhatsApp). Es la forma de medir cuánto te está aportando la tienda además de lo de siempre.\n\nDato: Si el período elegido no tuvo ventas, cada pestaña te lo dice en vez de mostrar un gráfico vacío.",
+      "destino": {
+        "seccion": "dashboard",
+        "label": "Ir al Inicio"
+      }
+    },
+    {
+      "id": "metricas-avanzadas",
+      "capitulo": "Inicio",
+      "titulo": "Métricas avanzadas: ganancia, conversión y cuándo te compran",
+      "texto": "Debajo del gráfico y el top hay una barra \"Métricas avanzadas\". Está cerrada: tocala y se despliega (queda abierta la próxima vez que entres). Se calcula con el mismo período que elegiste arriba y cada número se compara contra el período anterior.\n\nCada métrica tiene un ícono de exclamación: pasale el mouse por encima (o tocalo en el celular) y te explica qué mide, cómo se calcula y qué NO incluye.\n\n- Ganancia estimada: Lo que te queda de lo vendido después de restar lo que te costó la mercadería: ingresos de productos menos costo. Ya considera los descuentos y cupones, pero no resta envíos, comisiones de cobro, devoluciones ni gastos fijos. Usa el costo actual de cada producto y solo cuenta los que tienen el costo cargado.\n- Margen: Qué parte de lo que cobrás por tus productos es ganancia: ganancia estimada dividida por los ingresos.\n- Ganancia potencial del stock: Lo que ganarías si vendieras hoy todo el stock a los precios actuales. Es la misma «Ganancia estimada» que ves en Productos y no depende del período.\n- Conversión: De cada 100 visitas a la tienda, cuántas terminaron en un pedido. No cuenta los pedidos cargados a mano.\n- Cancelación: Qué porcentaje de los pedidos terminó cancelado. Acá que SUBA es malo.\n- Clientes que vuelven: De los que compraron en el período, cuántos ya te habían comprado antes.\n- Unidades por pedido: Cuántos productos lleva en promedio cada pedido.\n- Devoluciones: La plata devuelta en el período por devoluciones aprobadas y qué porcentaje es de las ventas.\n- Descuentos otorgados: El total de descuentos y cupones aplicados en los pedidos del período.\n\nAbajo hay cuatro gráficos: ventas y ganancia (por hora, por día o por semana según el largo del período), cuándo te compran (por hora del día o por día de la semana), clientes nuevos contra los que vuelven, y la rentabilidad de cada categoría.\n\nConsejo: Si la ganancia sale \"—\" o dice que se calculó sobre una parte de lo vendido, es porque faltan productos con el costo cargado. Se carga al crear o editar el producto, en el campo Costo.",
       "destino": {
         "seccion": "dashboard",
         "label": "Ir al Inicio"
@@ -217,8 +227,8 @@ export const MANUAL_GENERADO: ManualGenerado = {
     {
       "id": "numeros-catalogo",
       "capitulo": "Productos",
-      "titulo": "Los cinco números de arriba",
-      "texto": "- Total: Cuántos productos tenés cargados, publicados o no.\n- Publicados: Los que tu cliente ve en la tienda ahora mismo.\n- Sin stock: Se quedaron en cero. Es tu lista de reposición.\n- No publicados: Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.\n- Valor de inventario: Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.",
+      "titulo": "Los seis números de arriba",
+      "texto": "- Total: Cuántos productos tenés cargados, publicados o no.\n- Publicados: Los que tu cliente ve en la tienda ahora mismo.\n- Sin stock: Se quedaron en cero. Es tu lista de reposición.\n- No publicados: Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.\n- Valor de inventario: Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.\n- Ganancia estimada: Lo que ganarías si vendieras todo el stock que tenés hoy a los precios actuales: el precio de venta menos el costo de cada producto, por sus unidades disponibles. Es una estimación (no descuenta envíos, comisiones ni descuentos) y solo cuenta los productos con stock que tienen el costo cargado; si hay productos sin costo, el ícono de exclamación te avisa cuántos.",
       "destino": {
         "seccion": "catalogo",
         "label": "Ir a Productos"
@@ -391,7 +401,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "las-cinco-pestanas",
       "capitulo": "Reportes",
       "titulo": "Las cinco pestañas",
-      "texto": "El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.\n\n- Ventas: Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.\n- Productos: Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada.\n- Clientes: Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.\n- Inventario: Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.\n- Pagos: Por dónde te pagan y cuánto te queda después de comisiones. Es el reporte que más sorprende la primera vez que se mira.\n\nConsejo: Los reportes de Productos y de Clientes también se abren directo desde el menú de la izquierda, adentro de Productos y de Clientes.",
+      "texto": "El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.\n\n- Ventas: Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.\n- Productos: Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada. Muestra también la ganancia estimada de lo vendido y la potencial del stock, y la ganancia de cada producto más vendido (los que no tienen el costo cargado no la muestran).\n- Clientes: Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.\n- Inventario: Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.\n- Pagos: Por dónde te pagan y cuánto te queda después de comisiones. Es el reporte que más sorprende la primera vez que se mira.\n\nConsejo: Los reportes de Productos y de Clientes también se abren directo desde el menú de la izquierda, adentro de Productos y de Clientes.",
       "destino": {
         "seccion": "reportes",
         "label": "Ir a Reportes"

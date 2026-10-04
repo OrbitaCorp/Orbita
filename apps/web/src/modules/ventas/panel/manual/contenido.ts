@@ -239,6 +239,26 @@ export const CAPITULOS: Capitulo[] = [
             ],
         },
         {
+            id: 'metricas-avanzadas', titulo: 'Métricas avanzadas: ganancia, conversión y cuándo te compran',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Debajo del gráfico y el top hay una barra [[Métricas avanzadas]]. Está cerrada: tocala y se despliega (queda abierta la próxima vez que entres). Se calcula con el mismo período que elegiste arriba y cada número se compara contra el período anterior.' },
+                { tipo: 'parrafo', texto: 'Cada métrica tiene un ícono de exclamación: pasale el mouse por encima (o tocalo en el celular) y te explica qué mide, cómo se calcula y qué NO incluye.' },
+                { tipo: 'campos', items: [
+                    { label: 'Ganancia estimada', texto: 'Lo que te queda de lo vendido después de restar lo que te costó la mercadería: ingresos de productos menos costo. Ya considera los descuentos y cupones, pero no resta envíos, comisiones de cobro, devoluciones ni gastos fijos. Usa el costo actual de cada producto y solo cuenta los que tienen el costo cargado.' },
+                    { label: 'Margen', texto: 'Qué parte de lo que cobrás por tus productos es ganancia: ganancia estimada dividida por los ingresos.' },
+                    { label: 'Ganancia potencial del stock', texto: 'Lo que ganarías si vendieras hoy todo el stock a los precios actuales. Es la misma «Ganancia estimada» que ves en Productos y no depende del período.' },
+                    { label: 'Conversión', texto: 'De cada 100 visitas a la tienda, cuántas terminaron en un pedido. No cuenta los pedidos cargados a mano.' },
+                    { label: 'Cancelación', texto: 'Qué porcentaje de los pedidos terminó cancelado. Acá que SUBA es malo.' },
+                    { label: 'Clientes que vuelven', texto: 'De los que compraron en el período, cuántos ya te habían comprado antes.' },
+                    { label: 'Unidades por pedido', texto: 'Cuántos productos lleva en promedio cada pedido.' },
+                    { label: 'Devoluciones', texto: 'La plata devuelta en el período por devoluciones aprobadas y qué porcentaje es de las ventas.' },
+                    { label: 'Descuentos otorgados', texto: 'El total de descuentos y cupones aplicados en los pedidos del período.' },
+                ] },
+                { tipo: 'parrafo', texto: 'Abajo hay cuatro gráficos: ventas y ganancia (por hora, por día o por semana según el largo del período), cuándo te compran (por hora del día o por día de la semana), clientes nuevos contra los que vuelven, y la rentabilidad de cada categoría.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si la ganancia sale "—" o dice que se calculó sobre una parte de lo vendido, es porque faltan productos con el costo cargado. Se carga al crear o editar el producto, en el campo Costo.' },
+            ],
+        },
+        {
             id: 'actividad', titulo: 'Actividad reciente',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista de abajo: los últimos pedidos, con número, cliente, qué compró, monto y estado. Clickeás cualquier fila y caés directo en el detalle de ese pedido.' },
@@ -378,7 +398,7 @@ export const CAPITULOS: Capitulo[] = [
     ir: { label: 'Ir a Productos', seccion: 'catalogo' },
     temas: [
         {
-            id: 'numeros-catalogo', titulo: 'Los cinco números de arriba',
+            id: 'numeros-catalogo', titulo: 'Los seis números de arriba',
             bloques: [
                 { tipo: 'campos', items: [
                     { label: 'Total', texto: 'Cuántos productos tenés cargados, publicados o no.' },
@@ -386,6 +406,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Sin stock', texto: 'Se quedaron en cero. Es tu lista de reposición.' },
                     { label: 'No publicados', texto: 'Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.' },
                     { label: 'Valor de inventario', texto: 'Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.' },
+                    { label: 'Ganancia estimada', texto: 'Lo que ganarías si vendieras todo el stock que tenés hoy a los precios actuales: el precio de venta menos el costo de cada producto, por sus unidades disponibles. Es una estimación (no descuenta envíos, comisiones ni descuentos) y solo cuenta los productos con stock que tienen el costo cargado; si hay productos sin costo, el ícono de exclamación te avisa cuántos.' },
                 ] },
             ],
         },
@@ -606,7 +627,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.' },
                 { tipo: 'campos', items: [
                     { label: 'Ventas', texto: 'Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.' },
-                    { label: 'Productos', texto: 'Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada.' },
+                    { label: 'Productos', texto: 'Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada. Muestra también la ganancia estimada de lo vendido y la potencial del stock, y la ganancia de cada producto más vendido (los que no tienen el costo cargado no la muestran).' },
                     { label: 'Clientes', texto: 'Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.' },
                     { label: 'Inventario', texto: 'Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.' },
                     { label: 'Pagos', texto: 'Por dónde te pagan y **cuánto te queda después de comisiones**. Es el reporte que más sorprende la primera vez que se mira.' },

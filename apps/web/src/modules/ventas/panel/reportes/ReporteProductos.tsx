@@ -2,7 +2,7 @@
 // Conectado a GET /reports/products (ventana de 30 días por defecto).
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, Package, Tag, ShoppingBag, AlertTriangle } from 'lucide-react'
+import { ChevronDown, Package, Tag, ShoppingBag, AlertTriangle, TrendingUp, Wallet } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { SkeletonKpis, SkeletonFilas } from '@/design-system/components/Skeleton'
@@ -11,6 +11,8 @@ import type { VistaReporte } from './components/ReporteTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import { fmtMoney } from '@/lib/utils'
 import { panelGetProductsReport, ApiError, type ApiProductsReport } from '@/lib/api'
+
+const fmtPct = (n: number) => `${n.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
 
 // Miniatura con imagen real; si el producto no tiene, cae al placeholder de
 // color derivado del id (mismo criterio que la lista de productos).
@@ -59,9 +61,9 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
             <style>{`
                 @media (max-width: 768px) {
                     /* Tres KPIs en fila daban tarjetas de ~100px: "Electronica"
-                       a 26px se salia por el borde derecho de la card. */
+                       a 26px se salia por el borde derecho de la card. Con seis
+                       caen en tres filas parejas de dos. */
                     .rp-kpis { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
-                    .rp-kpis > *:last-child { grid-column: 1 / -1 !important; }
                     .rp-head h1 { font-size: 21px !important; }
                 }
             `}</style>
@@ -82,12 +84,69 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 
             <div className="rp-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
                 {cargandoInicial ? (
-                    <SkeletonKpis cantidad={3} />
+                    <SkeletonKpis cantidad={6} />
                 ) : (
                     <>
                         <StatCard label="Productos vendidos" value={data?.resumen.productosVendidos ?? 0} icon={Package} accent="#3B82F6" />
                         <StatCard label="Categoría top" value={categoriaTop} icon={Tag} accent="#8B5CF6" />
                         <StatCard label="Unidades vendidas" value={data?.resumen.unidadesVendidas ?? 0} icon={ShoppingBag} accent="#10B981" />
+                        {/* Ganancia: llega con el backend nuevo; antes queda en "-". */}
+                        <StatCard
+                            label="Ganancia de lo vendido"
+                            value={data?.resumen.gananciaVendida !== undefined && data.resumen.margenVendidoPct != null ? fmtMoney(data.resumen.gananciaVendida) : '-'}
+                            icon={TrendingUp}
+                            accent="#10B981"
+                            sub={data?.resumen.margenVendidoPct != null ? `margen ${fmtPct(data.resumen.margenVendidoPct)}` : undefined}
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Lo que te quedó de lo que vendiste en estos {data?.periodoDias ?? 30} días después de restar lo que te costó la mercadería: <strong>ingresos − costo</strong>.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Usa el <strong>costo actual</strong> de cada producto (si lo cambiaste, las ventas anteriores se recalculan) y solo cuenta los que tienen el campo <strong>Costo</strong> cargado. No resta envíos ni comisiones de cobro.
+                                    </p>
+                                    {!!data?.resumen.importeSinCosto && (
+                                        <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
+                                            Hay <strong>{fmtMoney(data.resumen.importeSinCosto)}</strong> vendidos de productos sin costo cargado que quedan fuera de este número.
+                                        </p>
+                                    )}
+                                </>
+                            }
+                        />
+                        <StatCard
+                            label="Ganancia potencial del stock"
+                            value={data?.resumen.gananciaInventario !== undefined && data.resumen.margenInventarioPct != null ? fmtMoney(data.resumen.gananciaInventario) : '-'}
+                            icon={Wallet}
+                            accent="#8B5CF6"
+                            sub={data?.resumen.margenInventarioPct != null ? `margen ${fmtPct(data.resumen.margenInventarioPct)}` : undefined}
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Lo que ganarías si vendieras <strong>todo el stock que tenés hoy</strong> a los precios actuales: (precio − costo) × unidades de cada producto.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Es una proyección, no plata cobrada, y no depende del período del reporte. Es la misma «Ganancia estimada» que ves arriba en Productos.
+                                    </p>
+                                </>
+                            }
+                        />
+                        <StatCard
+                            label="Sin costo cargado"
+                            value={data?.resumen.productosSinCosto ?? '-'}
+                            icon={AlertTriangle}
+                            accent="#F59E0B"
+                            sub={data?.resumen.productosSinCosto ? 'con stock, fuera de la ganancia' : data?.resumen.productosSinCosto === 0 ? 'todos tienen costo' : undefined}
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Productos que tienen stock pero no tienen cargado el campo <strong>Costo</strong>. No entran en ninguna de las ganancias de este reporte porque no se puede saber cuánto ganás con ellos.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Para sumarlos, editá el producto y completá el costo.
+                                    </p>
+                                </>
+                            }
+                        />
                     </>
                 )}
             </div>
@@ -121,6 +180,12 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
                                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.importe)}</div>
                                     <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{p.unidades} u.</div>
+                                    {/* Ganancia estimada de este producto; sin costo cargado no se muestra nada. */}
+                                    {p.ganancia != null && (
+                                        <div title="Ganancia estimada: ingresos − costo" style={{ fontSize: 11, fontWeight: 600, color: p.ganancia >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontFamily: '"Geist Mono", monospace' }}>
+                                            {p.ganancia >= 0 ? '+' : '−'}{fmtMoney(Math.abs(p.ganancia))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -1143,7 +1143,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         <div className="prod-page" style={pageWrap}>
             <style>{`
                 .prod-page       { padding: 24px 32px 64px; }
-                .prod-kpis       { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
+                /* Seis métricas: 3 por fila (2 filas parejas) y las seis juntas solo en
+                   pantallas anchas — a ~180px por tarjeta las etiquetas se partían. */
+                .prod-kpis       { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
+                @media (min-width: 1600px) { .prod-kpis { grid-template-columns: repeat(6,1fr); } }
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
                 .prod-table-wrap { display: block; }
                 .prod-cards-wrap { display: none; }
@@ -1225,7 +1228,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* KPIs */}
             <div className="prod-kpis">
                 {cargando && !stats ? (
-                    Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+                    Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
                 ) : (
                     <>
                         <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
@@ -1259,6 +1262,35 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                     {!!stats?.sinCostoCargado && (
                                         <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
                                             Ahora hay <strong>{stats.sinCostoCargado} {stats.sinCostoCargado === 1 ? 'producto con stock sin costo cargado' : 'productos con stock sin costo cargado'}</strong> que no se {stats.sinCostoCargado === 1 ? 'está sumando' : 'están sumando'}.
+                                        </p>
+                                    )}
+                                </>
+                            }
+                        />
+                        {/* Ganancia estimada del stock: (precio − costo) × unidades. Sale del
+                            mismo cálculo que el valor de inventario (ver valorizarInventario()
+                            en la API), así que los dos números son coherentes. Con un backend
+                            sin desplegar todavía no llega y queda en "-". */}
+                        <StatCard
+                            label="Ganancia estimada"
+                            value={stats?.gananciaEstimada !== undefined && stats.margenEstimadoPct !== null ? fmtMoney(stats.gananciaEstimada) : '-'}
+                            icon={TrendingUp}
+                            accent="#10B981"
+                            sub={stats?.margenEstimadoPct != null ? `margen ${stats.margenEstimadoPct.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%` : undefined}
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Lo que ganarías si vendieras <strong>todo el stock que tenés hoy</strong> a los precios actuales: el <strong>precio de venta menos el costo</strong> de cada producto, por las unidades que te quedan.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Es una estimación, no plata que ya cobraste: no descuenta envíos, comisiones de cobro ni descuentos que des al vender.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Solo cuentan los productos con stock que tienen cargado el campo <strong>Costo</strong>. El margen es la ganancia dividida por lo que cobrarías.
+                                    </p>
+                                    {!!stats?.sinCostoCargado && (
+                                        <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
+                                            Hay <strong>{stats.sinCostoCargado} {stats.sinCostoCargado === 1 ? 'producto con stock sin costo cargado' : 'productos con stock sin costo cargado'}</strong> que no se {stats.sinCostoCargado === 1 ? 'está sumando' : 'están sumando'}: cargales el costo para que la ganancia sea más real.
                                         </p>
                                     )}
                                 </>
