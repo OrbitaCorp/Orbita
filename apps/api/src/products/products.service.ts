@@ -28,6 +28,7 @@ import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { UpdateProductContentDto } from './dto/update-product-content.dto';
+import { valorizarInventario } from '../common/utils/inventario';
 
 const PRODUCT_IMAGES_BUCKET = 'product-images';
 
@@ -523,17 +524,13 @@ export class ProductsService {
       select: {
         status: true,
         cost: true,
-        variants: { select: { stock: { select: { quantity: true } } } },
+        variants: { select: { price: true, stock: { select: { quantity: true } } } },
       },
     });
 
     let publicados = 0;
     let borradores = 0;
     let sinStock = 0;
-    let valorInventario = 0;
-    // Productos con stock a los que les falta el costo: no entran en el valor de
-    // inventario y la tarjeta del panel avisa cuántos son.
-    let sinCostoCargado = 0;
 
     for (const p of products) {
       if (p.status === 'PUBLISHED') publicados++;
@@ -544,24 +541,26 @@ export class ProductsService {
         stockProducto += v.stock.reduce((s, st) => s + st.quantity, 0);
       }
       if (stockProducto === 0) sinStock++;
-      // Valor de inventario = costo cargado × unidades en stock, y NADA MÁS: un
-      // producto sin costo cargado no se suma (antes se estimaba con el precio de
-      // venta, y el número mezclaba plata invertida con plata a cobrar). El costo
-      // es uno solo por producto, vale para todas sus variantes. Stock negativo
-      // (sobreventa) no resta valor.
-      if (stockProducto > 0) {
-        if (p.cost !== null) valorInventario += stockProducto * Number(p.cost);
-        else sinCostoCargado++;
-      }
     }
+
+    // Valor de inventario = costo cargado × unidades en stock, y NADA MÁS: un
+    // producto sin costo cargado no se suma (antes se estimaba con el precio de
+    // venta, y el número mezclaba plata invertida con plata a cobrar). La
+    // ganancia estimada sale del mismo cálculo: (precio − costo) × stock.
+    // Ver valorizarInventario() para las reglas completas.
+    const inv = valorizarInventario(products);
 
     return {
       total: products.length,
       publicados,
       borradores,
       sinStock,
-      valorInventario: Math.round(valorInventario * 100) / 100,
-      sinCostoCargado,
+      valorInventario: inv.valorCosto,
+      // Productos con stock a los que les falta el costo: no entran en el valor
+      // de inventario ni en la ganancia, y la tarjeta del panel avisa cuántos son.
+      sinCostoCargado: inv.sinCosto,
+      gananciaEstimada: inv.gananciaPotencial,
+      margenEstimadoPct: inv.margenPct,
     };
   }
 

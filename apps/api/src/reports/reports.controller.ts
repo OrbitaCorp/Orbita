@@ -25,6 +25,20 @@ export class ReportsController {
     return this.reportsService.dashboard(member.businessId, from, to);
   }
 
+  // Las métricas avanzadas del desplegable del inicio (rentabilidad, conversión,
+  // cancelación, clientes que repiten, series). Mismo permiso que el dashboard:
+  // incluye costos y ganancia, que son todavía más sensibles que las ventas.
+  @Get('dashboard/advanced')
+  @RequirePermission('reports.dashboard')
+  dashboardAdvanced(
+    @CurrentBusiness() ctx: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.reportsService.dashboardAvanzado(member.businessId, from, to);
+  }
+
   // El resumen del mes para el historial de pedidos. Pide el mismo permiso que
   // la lista (orders.view) porque es una pantalla del modulo de pedidos.
   @Get('sales')

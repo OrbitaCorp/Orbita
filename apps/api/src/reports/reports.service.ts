@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 import { diaYHoraArgentina, fechaArgentina, inicioDeDiaArgentina, inicioDeMesArgentina } from '../common/utils/hora-argentina';
+import { redondear2, valorizarInventario } from '../common/utils/inventario';
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const SOLO_DIA = /^\d{4}-\d{2}-\d{2}$/;
@@ -66,14 +67,19 @@ export class ReportsService {
         quantity: true,
         unitPrice: true,
         discountAmount: true,
-        variant: { select: { productId: true } },
+        // El costo vive en el producto (uno solo para todas sus variantes). OJO:
+        // es el costo de HOY, no el de cuando se vendió — el pedido no guarda un
+        // costo congelado, solo el precio. Si el dueño lo corrigió después, la
+        // ganancia de ventas viejas se recalcula con el costo nuevo.
+        variant: { select: { productId: true, product: { select: { cost: true } } } },
       },
     });
 
-    const acumPorProducto = new Map<string, { unidades: number; importe: number }>();
+    const acumPorProducto = new Map<string, { unidades: number; importe: number; costo: number | null }>();
     for (const it of items) {
       const key = it.variant.productId;
-      const previo = acumPorProducto.get(key) ?? { unidades: 0, importe: 0 };
+      const costoUnitario = it.variant.product.cost !== null ? Number(it.variant.product.cost) : null;
+      const previo = acumPorProducto.get(key) ?? { unidades: 0, importe: 0, costo: costoUnitario };
       previo.unidades += it.quantity;
       previo.importe += it.quantity * Number(it.unitPrice) - Number(it.discountAmount);
       acumPorProducto.set(key, previo);
@@ -109,7 +115,7 @@ export class ReportsService {
     // Más vendidos
     const masVendidos = productos
       .map((p) => {
-        const acum = acumPorProducto.get(p.id) ?? { unidades: 0, importe: 0 };
+        const acum = acumPorProducto.get(p.id) ?? { unidades: 0, importe: 0, costo: null };
         return {
           id: p.id,
           name: p.name,
@@ -117,6 +123,9 @@ export class ReportsService {
           primaryImageUrl: pickPrimaryImageUrl(p.images),
           unidades: acum.unidades,
           importe: Math.round(acum.importe * 100) / 100,
+          // Null cuando el producto no tiene costo cargado: no se inventa un
+          // costo de cero, que mostraría una ganancia del 100%.
+          ganancia: acum.costo !== null ? Math.round((acum.importe - acum.unidades * acum.costo) * 100) / 100 : null,
         };
       })
       .filter((p) => p.unidades > 0)
@@ -192,6 +201,23 @@ export class ReportsService {
     const unidadesTotales = [...acumPorProducto.values()].reduce((s, a) => s + a.unidades, 0);
     const importeTotal = [...acumPorProducto.values()].reduce((s, a) => s + a.importe, 0);
 
+    // Ganancia estimada de lo vendido: ingresos − costo, SOLO de los productos
+    // con costo cargado. `importeSinCosto` es lo que quedó afuera, para que el
+    // panel avise que el número no cubre todo.
+    let gananciaVendida = 0;
+    let importeConCosto = 0;
+    let importeSinCosto = 0;
+    for (const a of acumPorProducto.values()) {
+      if (a.costo === null) {
+        importeSinCosto += a.importe;
+        continue;
+      }
+      importeConCosto += a.importe;
+      gananciaVendida += a.importe - a.unidades * a.costo;
+    }
+    // Ganancia potencial del stock que hay hoy ((precio − costo) × unidades).
+    const inventario = valorizarInventario(productos);
+
     return {
       periodoDias: days,
       resumen: {
@@ -199,6 +225,12 @@ export class ReportsService {
         unidadesVendidas: unidadesTotales,
         importeVendido: Math.round(importeTotal * 100) / 100,
         variantesConVenta: variantIds.length,
+        gananciaVendida: redondear2(gananciaVendida),
+        margenVendidoPct: importeConCosto > 0 ? Math.round((gananciaVendida / importeConCosto) * 1000) / 10 : null,
+        importeSinCosto: redondear2(importeSinCosto),
+        gananciaInventario: inventario.gananciaPotencial,
+        margenInventarioPct: inventario.margenPct,
+        productosSinCosto: inventario.sinCosto,
       },
       masVendidos,
       sinRotacion,
@@ -556,6 +588,247 @@ export class ReportsService {
         createdAt: o.createdAt.toISOString(),
         productos: o.items.map((it) => `${it.quantity}× ${it.productName}`).join(' · '),
       })),
+    };
+  }
+
+  // ── Dashboard avanzado ────────────────────────────────────────────────────
+  // Las métricas del desplegable "Métricas avanzadas" del inicio: rentabilidad,
+  // conversión, cancelación, clientes que repiten, devoluciones y descuentos,
+  // más las series para los gráficos (por franja, por hora y día de la semana,
+  // por categoría). Va aparte de dashboard() a propósito: trae los renglones de
+  // todos los pedidos de DOS períodos, así que el panel lo pide recién cuando el
+  // dueño abre la sección, y el inicio no se vuelve más lento para quien no la usa.
+  //
+  // Cada métrica viene para el período elegido (`actual`) y para el anterior de
+  // igual largo (`anterior`), así el panel calcula sus variaciones.
+  //
+  // La GANANCIA es una estimación:
+  //   ingreso neto de productos − costo de lo vendido, solo de los productos con
+  //   costo cargado. El ingreso neto es cantidad × precio de lista menos TODOS los
+  //   descuentos del pedido (los de cada ítem y los del ticket); el envío y los
+  //   ítems libres (sin costo) quedan afuera. No resta comisiones de cobro,
+  //   devoluciones ni gastos fijos. Y el costo es el que el producto tiene HOY (el
+  //   pedido no guarda un costo congelado).
+  async dashboardAvanzado(businessId: string, fromISO?: string, toISO?: string) {
+    const { desde, hastaExcl } = this.rangoDe(fromISO, toISO);
+    const duracion = hastaExcl.getTime() - desde.getTime();
+    const desdeAnterior = new Date(desde.getTime() - duracion);
+
+    const devolucionesDe = (gte: Date, lt: Date) =>
+      this.prisma.return.aggregate({
+        _sum: { amount: true },
+        where: { businessId, status: 'APPROVED', updatedAt: { gte, lt } },
+      });
+
+    const [ordenes, devueltoActual, devueltoAnterior, visitasActual, visitasAnterior, productos] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { businessId, deletedAt: null, createdAt: { gte: desdeAnterior, lt: hastaExcl } },
+        select: {
+          status: true,
+          createdAt: true,
+          customerId: true,
+          origin: true,
+          total: true,
+          discountTotal: true,
+          items: {
+            select: {
+              quantity: true,
+              unitPrice: true,
+              isConcept: true,
+              variant: { select: { product: { select: { cost: true, categoryId: true, category: { select: { name: true } } } } } },
+            },
+          },
+        },
+      }),
+      devolucionesDe(desde, hastaExcl),
+      devolucionesDe(desdeAnterior, desde),
+      this.prisma.storeVisit.count({ where: { businessId, createdAt: { gte: desde, lt: hastaExcl } } }),
+      this.prisma.storeVisit.count({ where: { businessId, createdAt: { gte: desdeAnterior, lt: desde } } }),
+      this.prisma.product.findMany({
+        where: { businessId, deletedAt: null },
+        select: { cost: true, variants: { select: { price: true, stock: { select: { quantity: true } } } } },
+      }),
+    ]);
+
+    type OrdenAv = (typeof ordenes)[number];
+    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
+
+    // Los renglones de un pedido ya con su ingreso neto (el descuento del pedido
+    // repartido en proporción al precio de cada ítem) y su costo, si lo tiene.
+    const renglonesNetos = (o: OrdenAv) => {
+      const bruto = o.items.reduce((s, it) => s + it.quantity * Number(it.unitPrice), 0);
+      const factor = bruto > 0 ? Math.min(1, Math.max(0, 1 - Number(o.discountTotal) / bruto)) : 1;
+      return o.items
+        .filter((it) => !it.isConcept)
+        .map((it) => {
+          const costoUnitario = it.variant.product.cost;
+          return {
+            unidades: it.quantity,
+            neto: it.quantity * Number(it.unitPrice) * factor,
+            costo: costoUnitario !== null ? it.quantity * Number(costoUnitario) : null,
+            categoriaId: it.variant.product.categoryId ?? 'sin-categoria',
+            categoriaNombre: it.variant.product.category?.name ?? 'Sin categoría',
+          };
+        });
+    };
+
+    // Compradores identificados del período y cuántos de ellos ya habían comprado
+    // antes (o compraron más de una vez dentro del período).
+    const compradoresDe = async (ords: OrdenAv[], antesDe: Date) => {
+      const vendidas = ords.filter((o) => o.status !== 'CANCELLED' && o.customerId);
+      const enPeriodo = new Map<string, number>();
+      for (const o of vendidas) enPeriodo.set(o.customerId!, (enPeriodo.get(o.customerId!) ?? 0) + 1);
+      const ids = [...enPeriodo.keys()];
+      if (ids.length === 0) return { total: 0, recurrentes: 0 };
+      const previos = await this.prisma.order.groupBy({
+        by: ['customerId'],
+        where: { businessId, deletedAt: null, status: ESTADOS_VENDIDOS, customerId: { in: ids }, createdAt: { lt: antesDe } },
+        orderBy: { customerId: 'asc' },
+        _count: true,
+      });
+      const previosPorCliente = new Map(previos.map((g) => [g.customerId, typeof g._count === 'number' ? g._count : 0]));
+      const recurrentes = ids.filter((id) => (previosPorCliente.get(id) ?? 0) + (enPeriodo.get(id) ?? 0) >= 2).length;
+      return { total: ids.length, recurrentes };
+    };
+
+    const metricasDe = (ords: OrdenAv[], visitas: number, devuelto: number, comp: { total: number; recurrentes: number }) => {
+      let pedidos = 0;
+      let cancelados = 0;
+      let pedidosTienda = 0;
+      let ventas = 0;
+      let descuentos = 0;
+      let unidades = 0;
+      let ingresosConCosto = 0;
+      let ingresosSinCosto = 0;
+      let costo = 0;
+      for (const o of ords) {
+        if (o.status === 'CANCELLED') {
+          cancelados++;
+          continue;
+        }
+        pedidos++;
+        if (o.origin !== 'MANUAL') pedidosTienda++;
+        ventas += Number(o.total);
+        descuentos += Number(o.discountTotal);
+        for (const r of renglonesNetos(o)) {
+          unidades += r.unidades;
+          if (r.costo === null) ingresosSinCosto += r.neto;
+          else {
+            ingresosConCosto += r.neto;
+            costo += r.costo;
+          }
+        }
+      }
+      const ganancia = ingresosConCosto - costo;
+      const ingresos = ingresosConCosto + ingresosSinCosto;
+      return {
+        pedidos,
+        cancelados,
+        tasaCancelacionPct: pct(cancelados, pedidos + cancelados),
+        ventas: redondear2(ventas),
+        ingresos: redondear2(ingresos),
+        costo: redondear2(costo),
+        ganancia: redondear2(ganancia),
+        margenPct: pct(ganancia, ingresosConCosto),
+        // Qué parte de los ingresos entra en la ganancia (la que tiene costo cargado).
+        coberturaCostoPct: pct(ingresosConCosto, ingresos),
+        unidades,
+        unidadesPorPedido: pedidos > 0 ? Math.round((unidades / pedidos) * 10) / 10 : 0,
+        descuentos: redondear2(descuentos),
+        visitas,
+        // Solo los pedidos que hizo el cliente por la tienda: los que carga el
+        // negocio a mano no vinieron de una visita.
+        conversionPct: visitas > 0 ? Math.min(100, pct(pedidosTienda, visitas) ?? 0) : null,
+        devuelto: redondear2(devuelto),
+        tasaDevolucionPct: pct(devuelto, ventas),
+        compradores: comp.total,
+        recurrentes: comp.recurrentes,
+        recurrentesPct: pct(comp.recurrentes, comp.total),
+      };
+    };
+
+    const ordActual = ordenes.filter((o) => o.createdAt >= desde);
+    const ordAnterior = ordenes.filter((o) => o.createdAt < desde);
+    const [compActual, compAnterior] = await Promise.all([compradoresDe(ordActual, desde), compradoresDe(ordAnterior, desdeAnterior)]);
+    const num = (v: { _sum: { amount: unknown } }) => (v._sum.amount != null ? Number(v._sum.amount) : 0);
+    const actual = metricasDe(ordActual, visitasActual, num(devueltoActual), compActual);
+    const anterior = metricasDe(ordAnterior, visitasAnterior, num(devueltoAnterior), compAnterior);
+
+    // Pedidos sin cliente registrado (compra como invitado o carga manual).
+    const sinRegistrar = ordActual.filter((o) => o.status !== 'CANCELLED' && !o.customerId).length;
+
+    // ── Serie de ventas y ganancia: por hora si el rango es un día, por día hasta
+    // ~un mes, y por semana si es más largo (400 días daban 400 barras ilegibles).
+    const dias = Math.round(duracion / DIA_MS);
+    const granularidad: 'hora' | 'dia' | 'semana' = dias <= 1 ? 'hora' : dias <= 31 ? 'dia' : 'semana';
+    const tamanoBucket = granularidad === 'hora' ? 60 * 60 * 1000 : granularidad === 'dia' ? DIA_MS : 7 * DIA_MS;
+    const cantBuckets = Math.max(1, Math.ceil(duracion / tamanoBucket));
+    const ventasSerie = new Array<number>(cantBuckets).fill(0);
+    const gananciaSerie = new Array<number>(cantBuckets).fill(0);
+    const labels = Array.from({ length: cantBuckets }, (_, i) => {
+      const inicio = new Date(desde.getTime() + i * tamanoBucket);
+      if (granularidad === 'hora') return `${diaYHoraArgentina(inicio).hhmm.slice(0, 2)}h`;
+      const [, m, d] = fechaArgentina(inicio).split('-');
+      return `${d}/${m}`;
+    });
+
+    const porHora = new Array<number>(24).fill(0);
+    const porDiaSemana = new Array<number>(7).fill(0);
+    const porCategoriaMap = new Map<string, { label: string; ingresos: number; ingresosConCosto: number; ganancia: number }>();
+
+    for (const o of ordActual) {
+      if (o.status === 'CANCELLED') continue;
+      const { dia, hhmm } = diaYHoraArgentina(o.createdAt);
+      porHora[Number(hhmm.slice(0, 2))]++;
+      porDiaSemana[dia]++;
+      const idx = Math.min(cantBuckets - 1, Math.floor((o.createdAt.getTime() - desde.getTime()) / tamanoBucket));
+      ventasSerie[idx] += Number(o.total);
+      for (const r of renglonesNetos(o)) {
+        if (r.costo !== null) gananciaSerie[idx] += r.neto - r.costo;
+        const cat = porCategoriaMap.get(r.categoriaId) ?? { label: r.categoriaNombre, ingresos: 0, ingresosConCosto: 0, ganancia: 0 };
+        cat.ingresos += r.neto;
+        if (r.costo !== null) {
+          cat.ingresosConCosto += r.neto;
+          cat.ganancia += r.neto - r.costo;
+        }
+        porCategoriaMap.set(r.categoriaId, cat);
+      }
+    }
+
+    const porCategoria = [...porCategoriaMap.values()]
+      .sort((a, b) => b.ingresos - a.ingresos)
+      .slice(0, 6)
+      .map((c) => ({
+        label: c.label,
+        ingresos: redondear2(c.ingresos),
+        // Null = ningún producto de la categoría tiene costo cargado.
+        ganancia: c.ingresosConCosto > 0 ? redondear2(c.ganancia) : null,
+        margenPct: pct(c.ganancia, c.ingresosConCosto),
+      }));
+
+    const inventario = valorizarInventario(productos);
+
+    return {
+      desde: desde.toISOString(),
+      hasta: new Date(hastaExcl.getTime() - 1).toISOString(),
+      actual,
+      anterior,
+      clientes: {
+        compradores: compActual.total,
+        recurrentes: compActual.recurrentes,
+        nuevos: compActual.total - compActual.recurrentes,
+        sinRegistrar,
+      },
+      porFranja: {
+        granularidad,
+        labels,
+        ventas: ventasSerie.map(redondear2),
+        ganancia: gananciaSerie.map(redondear2),
+      },
+      porHora,
+      porDiaSemana,
+      porCategoria,
+      inventario,
     };
   }
 
