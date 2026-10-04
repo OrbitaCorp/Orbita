@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
+import { Check, ChevronLeft, Shield, ShoppingBag, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
-import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from '@/modules/onboarding/BarraPasos'
+import { borrarAlta, useAlta } from '@/modules/turnos/onboarding/estadoAlta'
+import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
+import { pasosDe } from '@/modules/turnos/onboarding/modelo'
+import { OrbitaPasos } from '@/modules/turnos/onboarding/OrbitaPasos'
+import { CSS_ONBOARDING } from '@/modules/turnos/onboarding/estilo'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -81,12 +87,6 @@ const CARDS: CardPlan[] = [
   },
 ]
 
-// Resumen de alto nivel, NO una re-lista de los pasos granulares del wizard
-// (esos ya se mostraron en SetupUnificado.tsx, incluyendo "Pago" como último
-// ítem desde el principio — ver PENDIENTES.md). Acá solo queda un paso real:
-// confirmar el pago.
-const PASOS = ['Configuración', 'Pago']
-
 const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
   day: '2-digit', month: 'long', year: 'numeric',
 })
@@ -106,74 +106,39 @@ function MercadoPagoLogo({ size = 22 }: { size?: number }) {
 
 // ─── Header con stepper (compartido) ────────────────────────────────────────
 
-function Header() {
-  return (
-    <div className="ob-hd" style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      display: 'flex', alignItems: 'center', height: 56,
-      background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
-    }}>
-      {/* Responsive de esta pantalla, todo junto acá (el resto del archivo son
-          estilos inline, que no admiten media queries).
+// La cabecera es LA MISMA del alta (modules/turnos/onboarding/Alta.tsx): la
+// marca a la izquierda y el arco de pasos, con el pago como última estación.
+// Antes esta pantalla tenía su propia barra pegada arriba y otro dibujo del
+// arco dentro de una franja, y al llegar parecía que la página se rediseñaba.
+// Tocar una estación ya hecha vuelve al alta en ese paso.
+const PASOS_ALTA = pasosDe('tienda')
+const PASO_PAGO = PASOS_ALTA.findIndex(x => x.id === 'pago')
 
-          El stepper estaba centrado con position:absolute, o sea FUERA de
-          flujo: en celular no había forma de que empujara al logo, así que se
-          le montaba encima y tapaba la "a" de Órbita (reportado con captura).
-          De 560px para abajo deja de estar centrado, pasa a flujo normal
-          contra la derecha, y el paso ya terminado se queda solo con su
-          tilde — el nombre del paso actual alcanza para ubicarse, y justo
-          abajo el wizard repite "Pago · 6 de 6". */}
+function Header({ terminado = false }: { terminado?: boolean }) {
+  const router = useRouter()
+  const { cambiar } = useAlta()
+  const actual = terminado ? PASOS_ALTA.length : PASO_PAGO
+  const volverAlPaso = (paso: number) => {
+    if (terminado || paso >= PASO_PAGO) return
+    cambiar(e => ({ ...e, paso, alcanzado: Math.max(e.alcanzado, PASO_PAGO - 1) }))
+    void router.push('/onboarding/rubro?paso=cuenta')
+  }
+  return (
+    <header className="tuob-cab">
+      {/* Responsive de esta pantalla, todo junto acá (el resto del archivo son
+          estilos inline, que no admiten media queries). */}
       <style>{`
-        .ob-hd { padding: 0 28px; }
-        .ob-hd-pasos { position: absolute; left: 50%; transform: translateX(-50%); }
         .ob-caja { padding: 24px 28px 20px; }
-        .ob-pagina { padding: 52px 24px 80px; }
+        .ob-pagina { padding: 18px 24px 24px; animation: tuobDesdeDerecha 300ms var(--tuo-ease) both; }
         @media (max-width: 560px) {
-          .ob-hd { padding: 0 14px; }
-          .ob-hd-pasos { position: static; transform: none; margin-left: auto; }
-          .ob-hd-hecho { display: none; }
           .ob-caja { padding: 18px 18px 16px; }
-          .ob-pagina { padding: 32px 16px 64px; }
+          .ob-pagina { padding: 18px 16px 16px; }
         }
+        @media (prefers-reduced-motion: reduce) { .ob-pagina { animation: none; } }
       `}</style>
-      <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8, flexShrink: 0 }}>
-        <OrbitaLogo size={24} />
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
-      </a>
-      <div className="ob-hd-pasos" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {PASOS.map((paso, i) => {
-          const done    = i < 1
-          const current = i === 1
-          return (
-            <div key={paso} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                  background: done ? '#10B981' : current ? '#2563EB' : 'var(--color-surface-alt)',
-                  color: (done || current) ? 'white' : 'var(--color-subtle)',
-                }}>
-                  {done ? <Check size={11} strokeWidth={3} /> : i + 1}
-                </div>
-                <span
-                  className={done ? 'ob-hd-hecho' : undefined}
-                  style={{
-                    fontSize: 13, fontWeight: 600,
-                    color: current ? 'var(--color-text)' : done ? '#10B981' : 'var(--color-subtle)',
-                  }}
-                >
-                  {paso}
-                </span>
-              </div>
-              {i < PASOS.length - 1 && (
-                <div style={{ width: 24, height: 1, background: done ? '#10B981' : 'var(--color-border)' }} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+      <Link href="/" className="tuob-marca" aria-label="Órbita: volver al inicio"><OrbitaLogo size={26} /> Órbita</Link>
+      <OrbitaPasos pasos={PASOS_ALTA} actual={actual} alcanzado={actual} onIr={volverAlPaso} />
+    </header>
   )
 }
 
@@ -312,31 +277,37 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   const precioBienvenidaMostrado = esGratis ? 0 : descuento ? descuento.amountFinal : cardActual.precioBienvenida
   const precioPorMesDurante3 = Math.round(precioBienvenidaMostrado / 3)
   const [detalle, setDetalle] = useState<PlanKey | null>(null)
+  const nombreNegocio = useOnboardingStore(st => st.wizard.nombre)
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
-      {/* La barra única del onboarding, con todo tildado menos el pago: el
-          mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
-      <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={5} />
+      {/* La misma botonera fija del alta, para poder volver al paso anterior. El
+          botón de pagar se queda en la tarjeta del plan. */}
+      <div className="tuob-pie" role="region" aria-label="Volver en el alta">
+        <div className="tuob-ancho tuob-pie-in">
+          <div className="tuob-pie-resumen">
+            <span aria-hidden><ShoppingBag size={19} strokeWidth={1.75} /></span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <b>{nombreNegocio || 'Tu tienda en Órbita'}</b>
+              <small>Paso {PASO_PAGO + 1} de {PASOS_ALTA.length} · Pago</small>
+            </div>
+          </div>
+          <div className="tuob-pie-botones">
+            <button type="button" className="tuo-btn tuo-btn--lg tuob-volver" onClick={onVolver} aria-label="Volver al paso anterior">
+              <ChevronLeft size={18} className="tuob-flecha tuob-flecha--atras" aria-hidden /> <span>Volver</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div className="ob-pagina" style={{
         maxWidth: 520, margin: '0 auto',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%', marginBottom: 20,
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #2563EB 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
-        }}>
-          <OrbitaLogo size={36} />
+        {/* Mismo título que los demás pasos del alta. */}
+        <div className="tuob-titulo">
+          <h1 className="tuob-h1">Último paso: <em>tu plan.</em></h1>
+          <p>Tu negocio está configurado. Elegí el plan de inicio para publicar tu espacio en Órbita.</p>
         </div>
-
-        <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 8px', textAlign: 'center' }}>
-          Activá tu cuenta
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 36px', textAlign: 'center', lineHeight: 1.5 }}>
-          Tu negocio está configurado. Elegí el plan de inicio para publicar tu espacio en Órbita.
-        </p>
 
         {error && (
           <div style={{
@@ -773,7 +744,7 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
         @keyframes exitoFade  { from { opacity:0;transform:translateY(16px) } to { opacity:1;transform:translateY(0) } }
       `}</style>
 
-      <Header />
+      <Header terminado />
 
       <div className="ob-pagina" style={{
         maxWidth: 480, margin: '0 auto',
@@ -910,7 +881,7 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
 
 // ─── Página principal ────────────────────────────────────────────────────────
 
-export default function PlanPage() {
+function PlanContenido() {
   const router = useRouter()
   const next   = (router.query.next as string) ?? '/admin'
   const wizard      = useOnboardingStore(s => s.wizard)
@@ -1080,7 +1051,7 @@ export default function PlanPage() {
     setEstado('procesando')
     activarNegocio()
       .then(() => publishBusiness())
-      .then(() => { saliendoRef.current = true; resetWizard(); setEstado('exito') })
+      .then(() => { saliendoRef.current = true; resetWizard(); borrarAlta(); setEstado('exito') })
       .catch(manejarError)
   }
 
@@ -1089,12 +1060,9 @@ export default function PlanPage() {
   // vino (tienda o turnos); si no lo dice, al selector de rubro, que reconstruye
   // el camino sin perder lo ya cargado.
   function volverAPoner() {
-    const destino = next.includes('/turnos/')
-      ? '/onboarding/turnos/setup?paso=cuenta'
-      : next.includes('/tienda/')
-        ? '/onboarding/tienda/setup?paso=cuenta'
-        : '/onboarding/rubro'
-    void router.push(destino)
+    // El alta es una sola pantalla (modules/turnos/onboarding/Alta.tsx) y
+    // retoma sola en "Tu cuenta" con lo que ya estaba cargado.
+    void router.push('/onboarding/rubro?paso=cuenta')
   }
 
   function irAlPanel() {
@@ -1116,5 +1084,29 @@ export default function PlanPage() {
       plan={plan}
       onCambiarPlan={cambiarPlan}
     />
+  )
+}
+
+// El mismo lienzo del alta (modules/turnos/onboarding/Alta.tsx): fondo negro
+// con el cielo de estrellas, sus tipografías y sus tokens de color, para que el
+// pago sea un paso más del mismo wizard y no otra página. `.tuo-espacio`
+// redefine los tokens a la paleta oscura; las tres pantallas (plan, procesando,
+// éxito) dejan ver el cielo porque su fondo de página pasa a transparente.
+const CSS_FONDO = `
+  .ob-espacio.tuob.tuo-espacio { min-height: 100vh; }
+  .ob-espacio > div:not(.tuob-cielo) { background: transparent !important; }
+`
+
+export default function PlanPage() {
+  return (
+    <div className="tuo tuo-espacio tuob ob-espacio">
+      <EstiloTurnos />
+      <style>{CSS_ONBOARDING}</style>
+      <style>{CSS_FONDO}</style>
+      <div className="tuob-cielo" aria-hidden>
+        <EscenaEspacial planeta={false} />
+      </div>
+      <PlanContenido />
+    </div>
   )
 }

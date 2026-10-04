@@ -204,6 +204,8 @@ apps/web/src/modules/orbi/
 - Detrás de un flag: `NEXT_PUBLIC_ORBI_PANEL_V2`. Con el flag apagado, el panel sigue con el Orbi
   de hoy. **Provisorio**: si Alan prefiere un flag por negocio (para probar en su tienda en
   producción antes que el resto), hace falta un lugar donde guardarlo (no existe hoy).
+  **Actualización 2026-10-04:** el flag se quitó. El Orbi nuevo es el del panel para todos, sin
+  variable ni `?orbiV2`; el viejo (`components/orbi`) queda solo para el alta.
 
 ## 5. Vistas
 
@@ -333,18 +335,31 @@ leería como otro producto pegado.
   vista sin perder la sesión, Detener, aprobar desde una sesión reabierta). Chromium ya está en el
   entorno de las sesiones de Claude. **Pendiente de Alan** (es infraestructura nueva de tests).
 
-## 11. Preguntas abiertas (no las decide este spec)
+## 11. Preguntas abiertas
 
-| Pregunta | Qué propone el estudio o este spec |
+**Decididas por Alan (2026-10-02):**
+
+| Pregunta | Decisión |
 |---|---|
-| ¿Orbi tiene entrada propia en el menú lateral? | Sin recomendación firme; la página dedicada no la necesita |
-| ¿Radix (shadcn init) y una librería de markdown? | El estudio recomienda Radix para menús y diálogos accesibles. v1 puede salir sin las dos, con el formato actual |
-| Retención de sesiones | Provisorio: archivadas sin actividad en 180 días se borran |
-| Ruta de la página dedicada | Provisorio: `/admin/ventas/orbi?vista=chat` |
-| Flag de lanzamiento: global o por negocio | Provisorio: global por env |
-| Título automático con modelo o determinista | Provisorio: determinista |
-| Playwright para los recorridos de UI | Propuesto, sin decidir |
-| ¿El selector de modos se muestra en la fase 3? | Propuesto: no, entra con la fase 4 |
+| Retención de sesiones | Las **archivadas** sin actividad en **180 días** se borran |
+| Ruta de la página dedicada | `/admin/ventas/orbi?vista=chat` |
+| Diseño visual | Lo hace Claude Design con el prompt de `docs/superpowers/design/2026-10-02-orbi-panel-prompt-claude-design.md`; el front (R3) espera ese diseño |
+
+**Recomendadas, esperando confirmación de Alan** (se explicaron el 2026-10-02):
+
+| Pregunta | Recomendación | Por qué |
+|---|---|---|
+| Flag de lanzamiento: global o por negocio | **Por negocio** (campo en la base + switch en el superadmin) | Con el global, la única forma de probarlo en producción es prendérselo a todos |
+| ¿Radix y una librería de markdown? | **Las dos** (Radix vía shadcn; `react-markdown` sin HTML crudo) | Menús, diálogos y la vista superpuesta necesitan foco y teclado bien resueltos; Gemini responde con listas, encabezados y tablas que hoy salen crudos |
+| Playwright para los recorridos de UI | **Sí, 4 recorridos, en CI** | La fase 3 es casi toda pantalla y hoy no hay tests con DOM |
+| ¿Orbi tiene entrada propia en el menú lateral? | **No, por ahora** | Ya se abre con el botón de la barra, Ctrl+K y "Expandir a página"; reevaluar con datos de uso |
+
+**Siguen provisorias:**
+
+| Pregunta | Qué propone este spec |
+|---|---|
+| Título automático con modelo o determinista | Determinista |
+| ¿El selector de modos se muestra en la fase 3? | No, entra con la fase 4 |
 
 ## 12. Checklist de entrega (de la skill, adaptado)
 

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { escaparHtml } from '../common/utils/html';
 import { fmtPesos } from '../common/utils/pesos';
+import { desgloseDePedido } from '../orders/order-mail-breakdown';
 import { ROLES_PROPIETARIO } from './notification-events';
 import { fechaArgentina, inicioDeDiaArgentina } from '../common/utils/hora-argentina';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
@@ -33,6 +34,9 @@ export type DispatchPayload = {
     orderNumber: number;
     total: string;
     items: { name: string; quantity: number; price: string }[];
+    subtotal?: string;
+    discounts?: { label: string; amount: string }[];
+    shipping?: string;
     orderUrl: string;
   };
 };
@@ -198,6 +202,7 @@ export class NotificationsService {
         orderNumber: p.orderNumber,
         total: fmtPesos(p.total),
         items: p.items.map((it) => ({ name: it.name, quantity: it.quantity, price: fmtPesos(it.price) })),
+        ...(await desgloseDePedido(this.prisma, p.businessId, p.orderId)),
         orderUrl: link,
       },
       resourceType: 'order',

@@ -11,6 +11,7 @@ export interface FilaDePrueba {
   businessId: string;
   memberId: string;
   conversationId: string | null;
+  turnId: string | null;
   tool: string;
   args: unknown;
   summary: string;
@@ -42,6 +43,7 @@ export function prismaDeAcciones<T extends object>(extra?: T) {
     create: jest.fn(async ({ data }: { data: Partial<FilaDePrueba> & { id: string } }) => {
       const fila = {
         conversationId: null,
+        turnId: null,
         status: 'pending',
         result: null,
         startedAt: null,

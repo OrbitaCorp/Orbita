@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "ae31a1cc75befcf4",
+  "version": "5c1ee3588c4f9b58",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -41,13 +41,13 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "menu-lateral",
       "capitulo": "Moverte por el panel",
       "titulo": "El menú de la izquierda",
-      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla. En Configuración se colapsa solo, porque esa sección trae su propio menú adentro.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
+      "texto": "Es la navegación principal. Cada módulo se despliega y muestra sus sub-secciones — Pedidos, por ejemplo, abre Lista, Historial, Cancelaciones y devoluciones, y Nuevo +.\n\n- Arriba de todo, el selector de espacio: tu negocio y su rubro.\n- Abajo, el buscador del menú: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.\n- El ícono de colapsar, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla.\n- Los puntitos y números al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.\n\nConsejo: En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda."
     },
     {
       "id": "barra-superior",
       "capitulo": "Moverte por el panel",
       "titulo": "La barra de arriba",
-      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi: El asistente. Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
+      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi: El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. También se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
     },
     {
       "id": "permisos",
@@ -144,7 +144,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "nuevo-pedido",
       "capitulo": "Pedidos",
       "titulo": "Cargar una venta a mano",
-      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás; si no, lo creás ahí mismo y queda para siempre en tu base.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
+      "texto": "El botón \"Nuevo pedido\" sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.\n\n1. Buscá los productos: Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.\n2. Cargá el cliente: Si ya existe, lo encontrás en el buscador. Si no, tocás \"Cargar un comprador a mano\" y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.\n3. Elegí cómo se cobró y cerrá la venta: Y el pedido entra a tus números como cualquier otro.\n\nConsejo: Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña \"Canal\" del top.",
       "destino": {
         "seccion": "pedidos",
         "vista": "nuevo",
@@ -401,7 +401,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "como-se-navega",
       "capitulo": "Configuración",
       "titulo": "Cómo se navega",
-      "texto": "Configuración tiene su propio menú adentro, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\".",
+      "texto": "Las pantallas de Configuración están en el menú de la izquierda, debajo de Configuración: al entrar se despliegan Suscripción, Negocio, Contacto, Pagos, Envíos y el resto. Cada una es una pantalla distinta, y cada una se guarda por separado con su botón \"Guardar cambios\". Apariencia, que es la más larga, trae además un índice propio al costado para saltar de una sección a otra.",
       "destino": {
         "seccion": "configuracion",
         "label": "Ir a Configuración"
@@ -575,7 +575,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "funciones-avanzado",
       "capitulo": "Avanzado",
       "titulo": "Qué trae",
-      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
+      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda y el WhatsApp, y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
       "destino": {
         "seccion": "avanzado",
         "label": "Ir a Avanzado"
@@ -605,7 +605,8 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "orbi",
       "capitulo": "Si te trabás",
       "titulo": "Preguntale a Orbi",
-      "texto": "Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier pantalla del panel, o desde el botón Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas."
+      "pista": "el cupo de Orbi del mes: cuánto se usó, cuánto usó cada persona y los topes",
+      "texto": "Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón Orbi de la barra de arriba (al lado de la búsqueda) o desde Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas.\n\nOrbi tiene un cupo por mes. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Muestra el cupo que se está por terminar primero: el del negocio o, si el dueño te puso un tope, tu parte.\n\n1. Abrí el uso del equipo: Lo ven el dueño y los administradores. Con Orbi abierto, tocá \"Expandir a página\" y, en la columna de conversaciones, \"Uso del equipo\". En pantallas angostas está en el desplegable del título del chat.\n2. Mirá cuánto se usó: Arriba, en Uso de Orbi, está el porcentaje del negocio en el mes. En Equipo, cada persona con el porcentaje que usó y su tope.\n3. Repartí el cupo: Solo el dueño: en la columna Tope de cada persona elegí Sin tope, 25%, 50%, 75% u Otro (un número entero entre 10 y 100, y después \"Aplicar\"). Con tope, el porcentaje de esa persona se cuenta sobre su parte.\n4. Revisá lo que hizo Orbi: En Lo que hizo Orbi están los cambios que Orbi aplicó en los últimos 30 días: fecha, quién se lo pidió, qué hizo y si quedó Hecho o Falló. Para volver al chat, \"Volver a la conversación\".\n\nDato: No se muestran las conversaciones: cada persona ve solo las suyas."
     },
     {
       "id": "tutorial",

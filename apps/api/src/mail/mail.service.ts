@@ -95,7 +95,10 @@ const CTA_BUTTON_PARTIAL = `
 // aviso al equipo del negocio (new-order-team): así los dos se ven igual y un
 // cambio de diseño se hace en un solo lugar. Se invoca como
 // `{{> order-items-table this}}` y espera `items` ({name, quantity, price}) y
-// `total` ya formateados.
+// `total` ya formateados. Si el total no es la suma de los renglones llegan
+// además `subtotal`, `discounts` ({label, amount}) y `shipping` (ver
+// orders/order-mail-breakdown.ts) y se listan antes del total: sin eso el mail
+// mostraba un total menor que los productos sin decir por qué.
 const ORDER_ITEMS_TABLE_PARTIAL = `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;">
   <tr>
@@ -108,6 +111,25 @@ const ORDER_ITEMS_TABLE_PARTIAL = `
     <td style="padding:10px 0; border-top:1px solid #e3e8ee; font-size:13.5px; color:#1a1f36; text-align:right; white-space:nowrap;">{{this.price}}</td>
   </tr>
   {{/each}}
+  {{#if subtotal}}
+  <tr>
+    <td style="padding:10px 0 0; border-top:1px solid #e3e8ee; font-size:13px; color:#4f566b;">Subtotal</td>
+    <td style="padding:10px 0 0; border-top:1px solid #e3e8ee; font-size:13px; color:#4f566b; text-align:right; white-space:nowrap;">{{subtotal}}</td>
+  </tr>
+  {{#each discounts}}
+  <tr>
+    <td style="padding:6px 0 0; font-size:13px; color:#0e7a4b;">Descuento: {{this.label}}</td>
+    <td style="padding:6px 0 0; font-size:13px; color:#0e7a4b; text-align:right; white-space:nowrap;">−{{this.amount}}</td>
+  </tr>
+  {{/each}}
+  {{#if shipping}}
+  <tr>
+    <td style="padding:6px 0 0; font-size:13px; color:#4f566b;">Envío</td>
+    <td style="padding:6px 0 0; font-size:13px; color:#4f566b; text-align:right; white-space:nowrap;">{{shipping}}</td>
+  </tr>
+  {{/if}}
+  <tr><td colspan="2" style="height:10px; line-height:10px; font-size:0;">&nbsp;</td></tr>
+  {{/if}}
   <tr>
     <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36;">Total</td>
     <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36; text-align:right;">{{total}} <span style="font-weight:400; color:#8792a2; font-size:12px;">ARS</span></td>
@@ -850,6 +872,9 @@ export class MailService {
       // El template los imprime tal cual: llegan ya formateados ("$12.500").
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       // "Ver mi pedido" — undefined para un comprador invitado (sin cuenta):
       // esa página exige sesión de cliente, y un invitado no tiene con qué
       // loguearse ahí. Quien llama decide (ver orders.service.ts) según si
@@ -872,6 +897,9 @@ export class MailService {
       orderNumber: number;
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       orderUrl?: string;
     },
     meta?: MailMeta,
@@ -891,6 +919,9 @@ export class MailService {
       orderNumber: number;
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       // Link al pedido en el panel.
       orderUrl: string;
     },

@@ -52,7 +52,13 @@ falla de una llamada de Orbi  ──▶  clasificarError()
 | Orbi apagado | 503 antes de abrir el stream, `error: 'ORBI_MAINTENANCE'`: "Orbi está en mantenimiento por un problema técnico. Ya avisamos al equipo. Mientras tanto, el Manual del panel sigue disponible." | Igual, y "Podés seguir completando los pasos sin su ayuda." |
 | Una falla suelta | Evento SSE `error` con `code: 'ORBI_PROVIDER_DOWN'` u `'ORBI_ERROR'` y "Orbi tuvo un problema para responder. Probá de nuevo en unos minutos." | Ídem |
 
-El chequeo va **antes de la cuota diaria**: un mensaje que no se va a atender no gasta el cupo. El front ya mostraba `message` de las respuestas no-OK, así que no cambió el chat. (El filtro global de excepciones reescribe el cuerpo como `{ error, statusCode, message }`; por eso el código viaja en `error`, no en `code`.)
+El chequeo va **antes de la cuota diaria**: un mensaje que no se va a atender no gasta el cupo. (El filtro global de excepciones reescribe el cuerpo como `{ error, statusCode, message }`; por eso el código viaja en `error`, no en `code`.)
+
+**Aviso fijo en el chat (2026-10-02).** El mantenimiento ya no se escribe como respuesta en cada envío:
+
+- Al abrir Orbi, el chat pregunta `GET /orbi/estado?surface=panel|wizard` (público, sin la causa, `{ disponible }` o `{ disponible: false, mensaje }`). Mientras está en mantenimiento vuelve a preguntar cada minuto, así el aviso se va solo cuando un admin lo rehabilita. Si el endpoint no existe (API vieja) o falla, no se toca nada.
+- El 503 `ORBI_MAINTENANCE` y el evento `error` con `code: 'ORBI_MAINTENANCE'` ponen el mismo estado. La falla que **apaga** Orbi ya avisa mantenimiento en ese mismo turno (`OrbiSaludService.avisoDeFalla`), no "probá en unos minutos".
+- Se ve un aviso ámbar arriba del input, con "Abrir el Manual del panel" en el panel; el input queda deshabilitado ("Orbi no está disponible por ahora") y sin los chips del wizard.
 
 ## 5. Piezas
 

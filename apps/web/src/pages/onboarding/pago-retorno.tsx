@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
 import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
+import { borrarAlta } from '@/modules/turnos/onboarding/estadoAlta'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de pagar (o no) el
 // beneficio de bienvenida — un Checkout Pro de pago único (ver
@@ -106,6 +107,7 @@ export default function PagoRetornoPage() {
           // pagar), y quien decidía no pagar y volvía con "atrás" perdía todo
           // lo cargado (ver el comentario en plan.tsx#pagar).
           resetWizard()
+          borrarAlta()
         } else if (preapprovalId.startsWith('FREE-')) {
           // No hay MercadoPago de por medio en este caso — si no se activó es
           // que el PendingSignup ya no estaba (doble click, o la pestaña

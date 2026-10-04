@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useRouter } from 'next/router'
 import { SquarePen, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
@@ -9,8 +10,12 @@ import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
 import { OrbiBottomSheet } from './OrbiBottomSheet'
 import { useMediaQuery } from './useMediaQuery'
+import { useDisponibilidadOrbi } from './useDisponibilidadOrbi'
+import { OrbiAvisoMantenimiento } from './OrbiAvisoMantenimiento'
 import { track } from '@/lib/analytics/wizardTracker'
-import { ID_PANEL_ORBI } from './types'
+import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { ID_PANEL_ORBI, PLACEHOLDER_EN_MANTENIMIENTO } from './types'
 
 // Las cosquillas del encabezado no muestran texto: solo la reacción del pet.
 const sinAviso = () => {}
@@ -25,6 +30,20 @@ export function OrbiPanel() {
   const isWizard = context.surface === 'wizard'
   const isMobile = useMediaQuery('(max-width: 767px)')
   const estadoPet = usePetEstado()
+  const mantenimiento = useOrbiStore(s => s.mantenimiento)
+  const router = useRouter()
+  useDisponibilidadOrbi(context.surface, isOpen)
+
+  // Mismo armado de la ruta que Soporte. Sin negocio identificable (no
+  // debería pasar en el panel) no se ofrece el botón.
+  const negocioId = currentSlug() ?? (typeof router.query.negocioId === 'string' ? router.query.negocioId : null)
+  const abrirManual = !isWizard && negocioId
+    ? () => {
+        const moduloPadre = typeof router.query.moduloPadre === 'string' ? router.query.moduloPadre : 'ventas'
+        void router.push(adminPath(negocioId, moduloPadre, 'manual'))
+        close()
+      }
+    : undefined
 
   useEffect(() => {
     if (!isOpen || !isWizard) return
@@ -141,12 +160,18 @@ export function OrbiPanel() {
         {/* Messages */}
         <OrbiMessages />
 
+        {mantenimiento && <OrbiAvisoMantenimiento mensaje={mantenimiento} onAbrirManual={abrirManual} />}
+
         {/* Input */}
         <OrbiInput
           onSend={(message) => send(message, context)}
-          disabled={isStreaming}
+          disabled={isStreaming || mantenimiento !== null}
           streaming={isStreaming}
           onStop={abortar}
+          placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
+          // Solo en el panel: el wizard no guarda la conversación, y en la
+          // demo tampoco se guarda, así que la línea sería falsa.
+          conAviso={!isWizard && !esVisitanteDemo()}
         />
       </div>
 

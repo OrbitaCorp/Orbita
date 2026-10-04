@@ -319,6 +319,25 @@ Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets), llevar
 el commit a `main` como cualquier otro cambio (el preflight no deja desplegar
 con el árbol sucio ni desde una rama) y correr `deploy.sh` de nuevo.
 
+### Orbi: cupo mensual y lectura de conversaciones
+
+Cuatro variables NO sensibles (van comentadas en `deploy/env-vars.yaml` con su
+default; se prenden descomentándolas y redesplegando). **Ojo: los dos
+interruptores no usan el mismo valor para "prendido"**: uno es `true` y el
+otro es `on`. Con el valor equivocado quedan apagados sin avisar.
+
+| Variable | Default | Valores |
+|---|---|---|
+| `ORBI_CUPO_BLOQUEA` | apagado | Solo el valor exacto `true` prende el bloqueo: al 100 % del cupo del negocio (o del tope de un miembro), Orbi contesta 429 y no llama al modelo. Cualquier otra cosa (sin definir, `on`, `1`, `TRUE`) = apagado: el cupo se mide y se muestra, pero no corta. |
+| `ORBI_LECTURA_CONVERSACIONES` | apagado | Solo el valor exacto `on` deja que el superadmin abra el texto (redactado) de una conversación, con motivo y registro. Cualquier otra cosa, `true` incluido, = apagado. **Prenderla recién después de actualizar la política de privacidad publicada.** |
+| `ORBI_CREDITOS_MES_BASE` | `1500` | Créditos por mes del plan base (1 crédito = USD 0,001). Número mayor que 0 (se trunca a entero); vacío, `0` o inválido = el default. |
+| `ORBI_CREDITOS_MES_AVANZADO` | `2000` | Ídem, para los negocios con el paquete Avanzado activo. |
+
+Los rechazos quedan en `orbi_turns` con `status = 'quota'` y
+`error_category` `cupo_mensual` (cupo mensual) o `tope_diario` (los 300
+mensajes por día del negocio, que no dependen de estas variables); el
+superadmin los ve separados en Orbi → Uso.
+
 ## Ver logs
 
 ```bash
@@ -747,10 +766,13 @@ de la analítica del wizard. Código:
 | `orbi_pending_actions` | `ORBI_PENDING_ACTIONS_RETENTION_DAYS` | 30 días | acciones que Orbi propuso al dueño, confirmadas, canceladas o vencidas |
 | `orbi_turns` | `ORBI_TURNS_RETENTION_DAYS` | 400 días | métricas de cada turno del chat de Orbi (sin texto); 400 alcanzan para comparar año contra año |
 | `daily_quota` | `DAILY_QUOTA_RETENTION_DAYS` | 30 días | contador diario compartido de Orbi, ayudas de IA y estudio de imágenes |
+| `usage_events` | `USAGE_EVENTS_RETENTION_DAYS` | 400 días | gasto de cada llamada a un proveedor (tokens y costo); se corta por `timestamp` |
+| `orbi_conversation_access` | `ORBI_CONVERSATION_ACCESS_RETENTION_DAYS` | 365 días | registro de quién leyó qué conversación de Orbi (acceso auditado) |
+| `orbi_conversations` (no archivadas) | `ORBI_SESIONES_INACTIVAS_RETENTION_DAYS` | **apagada** | sesiones sin archivar y sin actividad; ver la nota de abajo |
 | `wizard_events` / `wizard_ai_turns` | `WIZARD_ANALYTICS_RETENTION_DAYS` | 180 días | analítica del wizard (ya existía, `wizard-analytics.service.ts`) |
 
-Reglas, iguales para las seis (las tres primeras, de `logs-sin-retencion`; las
-tres de Orbi, de la fase 1):
+Reglas, iguales para todas (las tres primeras, de `logs-sin-retencion`; las
+de Orbi, de la fase 1 y de medición y cupos):
 
 - Se cuenta en días desde `created_at`, con el instante actual como referencia.
   La excepción es `daily_quota`, que no tiene `created_at`: corta por su
@@ -760,6 +782,17 @@ tres de Orbi, de la fase 1):
   mes se pierde la trazabilidad de cualquier reclamo reciente.
 - `0` u `off` **apaga** la purga de esa tabla sola; las otras siguen.
 - Vacía o inválida (`"un año"`) = el default.
+- `orbi_conversations` sin archivar (`ORBI_SESIONES_INACTIVAS_RETENTION_DAYS`) es
+  la única que viene **apagada**: su default es "ninguno", así que con la
+  variable vacía el log dice `apagada` y no se borra nada. Se prende poniendo
+  un número de días (mínimo 30), y entonces borra las sesiones NO archivadas
+  sin actividad en ese plazo (incluye las de miembros ya borrados). Hasta que
+  Alan fije el plazo (spec 2026-10-03, D11) queda así: las ARCHIVADAS siguen
+  yéndose a los 180 días por `ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS`.
+- `usage_events` corta por `timestamp` (no tiene `created_at`).
+- La baja definitiva de un negocio borra sus cupos y lecturas de Orbi, y deja
+  `usage_events` pero sin `memberId`, `conversationId` ni `turnId` en el
+  `metadata` (el gasto se conserva, sin datos de personas).
 - Cada corrida loguea por tabla `Retención de <tabla> (<n> días): <k> filas
   borradas` (o `apagada por <variable>`). Una tabla que falla se anota con
   `error` y no frena a las otras ni a la corrida nocturna: mañana vuelve a
@@ -768,7 +801,7 @@ tres de Orbi, de la fase 1):
   excepción permitida y `test/unit/audit.auditoria.unit-spec.ts` la vigila
   (borra por fecha y nada más, nunca por negocio, entidad ni acción).
 
-Las seis variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
+Las variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
 están **comentadas con su default**. Para cambiar una, descomentarla, poner el
 valor y volver a desplegar (§ Actualizar variables NO sensibles).
 

@@ -436,6 +436,38 @@ describe('Registro de consumo de IA de producto (unit)', () => {
     ]);
   });
 
+  it('assist con origen: los eventos llevan memberId y turnId, y alConsumir recibe el consumo real', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => ({
+      text: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }),
+      provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 900, completionTokens: 420, cachedTokens: 100, thinkingTokens: 50,
+    }));
+    const alConsumir = jest.fn();
+
+    await svc.assist('biz-1', dto, { memberId: 'm1', turnId: 't1', alConsumir });
+
+    expect(eventos()).toEqual([
+      expect.objectContaining({ category: 'prompt_tokens', metadata: { feature: 'ai-assist', model: 'gemini-3.6-flash', memberId: 'm1', turnId: 't1' } }),
+      expect.objectContaining({ category: 'completion_tokens', metadata: { feature: 'ai-assist', model: 'gemini-3.6-flash', memberId: 'm1', turnId: 't1' } }),
+    ]);
+    expect(alConsumir).toHaveBeenCalledTimes(1);
+    expect(alConsumir).toHaveBeenCalledWith({
+      provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 900, completionTokens: 420, cachedTokens: 100, thinkingTokens: 50,
+    });
+  });
+
+  it('assist sin origen no agrega memberId ni turnId a la metadata', async () => {
+    const svc = makeService('gsk-test');
+    mockGen(async () => ({
+      text: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }),
+      provider: 'gemini', model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5,
+    }));
+
+    await svc.assist('biz-1', dto);
+
+    for (const e of eventos()) expect(Object.keys(e.metadata)).toEqual(['feature', 'model']);
+  });
+
   it('suggestVariants registra su propia función y, si respondió Groq de respaldo, lo marca', async () => {
     const svc = makeService('gsk-test');
     mockGen(async () => ({

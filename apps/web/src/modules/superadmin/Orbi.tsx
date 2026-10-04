@@ -5,6 +5,7 @@ import {
   useFetch, Card, Table, PageHeader, Loader, ErrorBox, Chip, ModalShell, Field,
   btnGhost, btnPrimary, inputStyle, dateTime,
 } from './ui'
+import { OrbiUso } from './OrbiUso'
 
 // Estado de Orbi (IA) — apex orbita.site/superadmin?seccion=orbi.
 // Si el proveedor de IA falla de forma sostenida (o se agota el saldo), Orbi se
@@ -32,7 +33,53 @@ export const MOTIVOS: Record<string, { label: string; ayuda?: { texto: string; u
 const motivoDe = (c: string | null) => (c ? MOTIVOS[c]?.label ?? c : '—')
 const DONDE: Record<string, string> = { panel: 'Panel', wizard: 'Alta de negocio' }
 
+// Dos vistas: Estado (si Orbi anda, y rehabilitarlo) y Uso (cuánto se usó y
+// cuánto costó, en OrbiUso.tsx). La de Estado se refresca sola cada 30 s solo
+// mientras está a la vista: al pasar a Uso se desmonta y deja de pedir.
+const VISTAS: { value: 'estado' | 'uso'; label: string }[] = [
+  { value: 'estado', label: 'Estado' },
+  { value: 'uso', label: 'Uso' },
+]
+
 export function TabOrbi() {
+  const [vista, setVista] = useState<'estado' | 'uso'>('estado')
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* Mismo control segmentado que el selector de período (charts.tsx / Costos.tsx). */}
+      <div
+        role="group"
+        aria-label="Vista de Orbi"
+        style={{ display: 'inline-flex', width: 'fit-content', padding: 3, gap: 2, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}
+      >
+        {VISTAS.map((v) => {
+          const activo = v.value === vista
+          return (
+            <button
+              key={v.value}
+              type="button"
+              onClick={() => setVista(v.value)}
+              aria-pressed={activo}
+              className={activo ? undefined : 'ds-hover'}
+              style={{
+                height: 30, padding: '0 15px', borderRadius: 8, cursor: 'pointer',
+                fontFamily: 'inherit', border: 'none',
+                background: activo ? 'var(--color-bg)' : 'transparent',
+                color: activo ? 'var(--color-text)' : 'var(--color-muted)',
+                fontSize: 13, fontWeight: activo ? 600 : 500,
+                boxShadow: activo ? 'var(--shadow-card)' : 'none',
+              }}
+            >
+              {v.label}
+            </button>
+          )
+        })}
+      </div>
+      {vista === 'estado' ? <EstadoDeOrbi /> : <OrbiUso />}
+    </div>
+  )
+}
+
+function EstadoDeOrbi() {
   const [tick, setTick] = useState(0)
   const refrescar = () => setTick((k) => k + 1)
   // Se vuelve a pedir cada 30 s con la pestaña visible: si otro admin lo

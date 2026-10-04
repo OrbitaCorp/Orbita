@@ -4,7 +4,7 @@
 // panel (esto es una vitrina, no producto).
 
 import type { CSSProperties, ReactNode } from 'react'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
 
 export const FONT = 'Geist, Inter, system-ui, sans-serif'
 export const FONT_DISPLAY = 'Sora, Geist, Inter, system-ui, sans-serif'
@@ -152,9 +152,9 @@ export function Pantalla({ children, tipo = 'panel', style, ancho }: { children:
   )
 }
 
-/** Avatar de Orbi: el mismo logo facetado (5a) que usa el asistente en la app. */
+/** Avatar de Orbi: la mascota del panel en su forma base (Inicio), sobre el disco navy. */
 export function OrbiAvatar({ size = 28 }: { size?: number }) {
-  return <OrbiIcon size={size} disc />
+  return <OrbiPet modulo="dashboard" size={size} disc />
 }
 
 export function formatoARS(n: number): string {

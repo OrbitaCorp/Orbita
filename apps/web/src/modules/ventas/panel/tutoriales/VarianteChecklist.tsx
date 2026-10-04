@@ -470,7 +470,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                     <div key={t.id} style={{ borderTop: i === 0 || abreGrupo ? 'none' : '1px solid var(--color-border)' }}>
                         {abreGrupo && (
                             // Mismo tratamiento que los grupos del menú de
-                            // Configuración (ConfigSidebar.tsx): versalita
+                            // Configuración (Sidebar.tsx): versalita
                             // chica y apagada — ordena sin competir con los
                             // títulos de las tareas.
                             <div

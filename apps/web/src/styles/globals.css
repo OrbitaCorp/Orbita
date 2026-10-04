@@ -771,10 +771,6 @@ html.light body { background: #eef4ff; color: #0f172a; }
   .ob-rubro-h1  { font-size: 22px !important; }
   .ob-bottom-bar { padding: 12px 16px !important; }
 
-  /* SetupUnificado: hide full progress bar, show compact step indicator */
-  .ob-inner-progress { display: none !important; }
-  .ob-mobile-step    { display: flex !important; }
-
   /* SetupUnificado: step content + nav bar padding */
   .ob-step-content { padding: 24px 16px 140px !important; }
   .ob-nav-bar      { padding: 12px 16px !important; }

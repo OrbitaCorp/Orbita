@@ -129,9 +129,21 @@ describe('GeminiAdapter', () => {
 
     expect(events).toEqual([
       { type: 'text', chunk: 'ok' },
-      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8, provider: 'gemini' } },
+      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8, cachedTokens: 0, thinkingTokens: 3, provider: 'gemini' } },
       { type: 'done' },
     ]);
+  });
+
+  it('informa tokens cacheados y de pensamiento sin cambiar los totales', async () => {
+    configService.get.mockReturnValue('test-key');
+    mockStream(adapter, [
+      textChunk('Hola'),
+      { candidates: [{ content: { parts: [] } }], usageMetadata: { promptTokenCount: 5000, cachedContentTokenCount: 4096, candidatesTokenCount: 40, thoughtsTokenCount: 60 } },
+    ]);
+    const events: any[] = [];
+    for await (const e of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) events.push(e);
+    const usage = events.find(e => e.type === 'usage').usage;
+    expect(usage).toMatchObject({ promptTokens: 5000, completionTokens: 100, cachedTokens: 4096, thinkingTokens: 60, provider: 'gemini' });
   });
 
   // Spec §3.7. Ojo: el abortSignal de @google/genai corta del lado del

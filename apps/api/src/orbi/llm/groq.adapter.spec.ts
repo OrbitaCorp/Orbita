@@ -62,8 +62,31 @@ describe('GroqAdapter', () => {
 
     expect(events).toContainEqual({
       type: 'usage',
-      usage: { model: 'openai/gpt-oss-120b', promptTokens: 7, completionTokens: 3, provider: 'groq' },
+      usage: { model: 'openai/gpt-oss-120b', promptTokens: 7, completionTokens: 3, cachedTokens: 0, thinkingTokens: 0, provider: 'groq' },
     });
+  });
+
+  it('informa tokens cacheados y de razonamiento (forma OpenAI)', async () => {
+    configService.get.mockImplementation((k: string) => (k === 'GROQ_API_KEY' ? 'test-key' : undefined));
+    const mockStream = (async function* () {
+      yield { choices: [{ delta: { content: 'ok' } }] };
+      yield {
+        choices: [],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 20,
+          prompt_tokens_details: { cached_tokens: 64 },
+          completion_tokens_details: { reasoning_tokens: 5 },
+        },
+      };
+    })();
+    (adapter as any).client = { chat: { completions: { create: jest.fn().mockResolvedValue(mockStream) } } };
+
+    const events: any[] = [];
+    for await (const event of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) events.push(event);
+
+    const usage = events.find(e => e.type === 'usage').usage;
+    expect(usage).toMatchObject({ promptTokens: 100, completionTokens: 20, cachedTokens: 64, thinkingTokens: 5, provider: 'groq' });
   });
 
   // Spec §3.7: la señal va en las opciones del request (segundo argumento).

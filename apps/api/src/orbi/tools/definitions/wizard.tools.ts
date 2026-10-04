@@ -4,7 +4,9 @@ import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interfa
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OnboardingService } from '../../../onboarding/onboarding.service';
 import { DEFAULT_MODEL } from '../../llm/gemini-client';
-import { generarTexto } from '../../llm/text-generation';
+import { generarTexto, type GenerarTextoResult } from '../../llm/text-generation';
+import type { UsageMeteringService } from '../../../platform/costs/usage-metering.service';
+import { medirConsumoDeTexto } from '../../../platform/costs/medir-texto';
 
 // Estas llamadas son chicas (un JSON de nombres, una descripción de 160
 // caracteres): el flash alcanza de sobra. Overridable por env igual que el resto.
@@ -17,6 +19,8 @@ function wizardToolsModel(config: ConfigService): string {
 async function generarConGemini(
   config: ConfigService,
   opts: { system: string; user: string; maxOutputTokens: number; json?: boolean },
+  // Para medir el consumo (usage_events). Opcional: sin medidor la tool anda igual.
+  medir?: (r: GenerarTextoResult) => void,
 ): Promise<string> {
   const r = await generarTexto(config, {
     system: opts.system,
@@ -25,6 +29,7 @@ async function generarConGemini(
     json: opts.json,
     geminiModel: wizardToolsModel(config),
   });
+  medir?.(r);
   return r.text;
 }
 
@@ -46,7 +51,12 @@ export class SuggestBusinessNameTool implements OrbiTool {
   constructor(
     private readonly config: ConfigService,
     private readonly onboarding: OnboardingService,
+    private readonly metering?: UsageMeteringService,
   ) {}
+
+  private medir(r: GenerarTextoResult): void {
+    if (this.metering) medirConsumoDeTexto(this.metering, r, { feature: 'orbi-wizard-tools' });
+  }
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -78,7 +88,7 @@ export class SuggestBusinessNameTool implements OrbiTool {
           'guardes ideas ni repitas variantes triviales de un mismo nombre. Devolvé SOLO un JSON ' +
           'con esta forma exacta, sin texto adicional: {"names": ["...", "...", ...]}',
         user: prompt,
-      });
+      }, r => this.medir(r));
 
       const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')) as { names?: unknown };
       const candidatos = Array.isArray(parsed.names) ? parsed.names.filter((n): n is string => typeof n === 'string') : [];
@@ -188,7 +198,14 @@ export class SuggestDescriptionTool implements OrbiTool {
     required: ['businessName', 'rubro'],
   };
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly metering?: UsageMeteringService,
+  ) {}
+
+  private medir(r: GenerarTextoResult): void {
+    if (this.metering) medirConsumoDeTexto(this.metering, r, { feature: 'orbi-wizard-tools' });
+  }
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -216,7 +233,7 @@ export class SuggestDescriptionTool implements OrbiTool {
           `Rubro: ${args.rubro}`,
           args.detalle ? `Detalle de lo que vende: ${args.detalle}` : '',
         ].filter(Boolean).join('\n'),
-      });
+      }, r => this.medir(r));
 
       if (!description) throw new Error('Gemini no devolvió una descripción');
 

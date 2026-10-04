@@ -7,8 +7,9 @@ function makeService(events: any[]) {
   return { svc: new CostsService(prisma, [] as any), prisma };
 }
 
-const ev = (provider: string, category: string, quantity: number, metadata: unknown, estimatedCostUsd: number | null = null) => ({
-  provider: { slug: provider }, category, quantity, estimatedCostUsd, metadata,
+const SEPT_2026 = new Date('2026-09-15T12:00:00Z');
+const ev = (provider: string, category: string, quantity: number, metadata: unknown, estimatedCostUsd: number | null = null, timestamp = SEPT_2026) => ({
+  provider: { slug: provider }, category, quantity, estimatedCostUsd, metadata, timestamp,
 });
 
 describe('CostsService.getAiUsageByFeature (unit)', () => {
@@ -27,10 +28,12 @@ describe('CostsService.getAiUsageByFeature (unit)', () => {
     expect(r.rows).toHaveLength(2);
     const assist = r.rows.find((x) => x.feature === 'ai-assist')!;
     expect(assist).toMatchObject({ provider: 'gemini', model: 'gemini-3.6-flash', requests: 2, promptTokens: 3000, completionTokens: 600 });
-    // gemini: $0.10/M entrada + $0.40/M salida (tabla PRICING del adapter interno)
-    expect(assist.costUsd).toBeCloseTo(3000 * 0.10 / 1e6 + 600 * 0.40 / 1e6, 8);
+    // Eventos sin estimatedCostUsd: precio del modelo (precios.ts). gemini-3.6-flash: $0,75/M entrada + $3,75/M salida.
+    expect(assist.costUsd).toBeCloseTo(3000 * 0.75 / 1e6 + 600 * 3.75 / 1e6, 8);
     const variantes = r.rows.find((x) => x.feature === 'ai-variants')!;
     expect(variantes).toMatchObject({ provider: 'groq', requests: 1, promptTokens: 300, completionTokens: 80 });
+    // openai/gpt-oss-20b: $0,075/M entrada + $0,30/M salida = 0,0000465, y la fila va a 6 decimales.
+    expect(variantes.costUsd).toBe(0.000047);
     expect(r.totalUsd).toBeCloseTo(assist.costUsd + variantes.costUsd, 8);
   });
 
@@ -47,6 +50,15 @@ describe('CostsService.getAiUsageByFeature (unit)', () => {
     const { svc } = makeService([ev('gemini', 'prompt_tokens', 1_000_000, { feature: 'ai-scan' }, 0.5)]);
     const r = await svc.getAiUsageByFeature('2026-09');
     expect(r.rows[0].costUsd).toBe(0.5);
+  });
+
+  it('un evento viejo sin estimatedCostUsd se estima con el precio vigente en su fecha (Flash se duplica en 2027)', async () => {
+    const { svc } = makeService([
+      ev('gemini', 'completion_tokens', 1_000_000, { feature: 'orbi-panel', model: 'gemini-3.6-flash' }, null, new Date('2026-12-31T23:00:00Z')),
+      ev('gemini', 'completion_tokens', 1_000_000, { feature: 'orbi-panel', model: 'gemini-3.6-flash' }, null, new Date('2027-01-01T01:00:00Z')),
+    ]);
+    const r = await svc.getAiUsageByFeature('2027-01');
+    expect(r.rows[0].costUsd).toBeCloseTo(3.75 + 7.5, 6);
   });
 
   it('ordena de mayor a menor costo y pide solo tokens de Gemini y Groq del mes', async () => {

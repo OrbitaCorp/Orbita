@@ -1781,6 +1781,8 @@ export type ApiCartEvaluation = {
   discountTotal: number
   total: number
   itemDiscounts: { variantId: string; discountId: string; discountName: string; amount: number }[]
+  // Descuento sobre el total de la compra (alcance "ticket"), si hay uno vigente.
+  ticketDiscount: { discountId: string; discountName: string; amount: number; type: 'PERCENT_TICKET' | 'AMOUNT_TICKET'; value: number } | null
 }
 
 export function panelEvaluateCart(items: { variantId: string; quantity: number }[], customerId?: string) {

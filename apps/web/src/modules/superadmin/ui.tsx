@@ -30,6 +30,9 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_code_blocked: 'Código de acceso bloqueado',
   send_mail_test: 'Enviar mail de prueba',
   password_reset: 'Restablecer contraseña',
+  // Orbi: ajuste de cupo mensual y lectura de una conversación (platform-admin-log.service.ts).
+  orbi_cupo_ajuste: 'Ajustar cupo de Orbi',
+  orbi_conversacion_abierta: 'Abrir conversación de Orbi',
   // Soporte: los escribe el módulo support (support-admin.controller.ts).
   support_reply: 'Responder consulta de soporte',
   support_status: 'Cambiar estado de consulta',
@@ -384,9 +387,14 @@ export const btnPrimary: React.CSSProperties = { height: 38, padding: '0 18px', 
 export const inputStyle: React.CSSProperties = { height: 40, padding: '0 13px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
 
 // ─── Modales ───────────────────────────────────────────────────────────────────
-export function ModalShell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+/**
+ * `cerrarAlClickAfuera` (true por defecto): con false, un clic en el fondo no
+ * cierra; sí la cruz y los botones propios. Para modales que perderían algo al
+ * cerrarse sin querer (un formulario a medio llenar, una lectura registrada).
+ */
+export function ModalShell({ title, children, onClose, cerrarAlClickAfuera = true }: { title: string; children: React.ReactNode; onClose: () => void; cerrarAlClickAfuera?: boolean }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', zIndex: 90, display: 'grid', placeItems: 'center', padding: 16 }}>
+    <div onClick={cerrarAlClickAfuera ? onClose : undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', zIndex: 90, display: 'grid', placeItems: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(460px, 100%)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 16, boxShadow: 'var(--shadow-card-hover)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '18px 22px 14px', borderBottom: '1px solid var(--color-border)' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>{title}</h3>

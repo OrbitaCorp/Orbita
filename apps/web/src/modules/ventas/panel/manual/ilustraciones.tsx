@@ -185,7 +185,8 @@ const MODULOS: { id: ModuloId; label: string; subs?: string[] }[] = [
     { id: 'productos', label: 'Productos', subs: ['Lista de productos', 'Crear producto', 'Categorías', 'Rep. productos'] },
     { id: 'mensajes', label: 'Mensajes', subs: ['Bandeja', 'Plantillas'] },
     { id: 'descuentos', label: 'Descuentos', subs: ['Descuentos', 'Cupones', 'Rendimiento'] },
-    { id: 'config', label: 'Configuración' },
+    // Son catorce: en el dibujo entran las primeras y el resto se resume.
+    { id: 'config', label: 'Configuración', subs: ['Suscripción', 'Negocio', 'Contacto', 'Pagos', 'Envíos', 'y 9 más…'] },
     { id: 'avanzado', label: 'Avanzado' },
     { id: 'manual', label: 'Manual' },
 ]
@@ -205,7 +206,7 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
     sub?: string
     /** Miga de la barra, después de "Ventas". */
     miga: string[]
-    /** Menú principal reducido a íconos (pasa solo al entrar a Configuración). */
+    /** Menú principal reducido a íconos. */
     colapsado?: boolean
     /** Puntito rojo en Mensajes. */
     noLeidos?: boolean
@@ -287,16 +288,18 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
                     </tspan>
                 ))}
             </text>
-            {/* Búsqueda global, modo oscuro, campana, avatar */}
-            <rect x={160.5} y={3.5} width={62} height={10} rx={5} fill={BLOQUE} />
+            {/* Búsqueda global, Orbi, modo oscuro, campana, avatar */}
+            <rect x={160.5} y={3.5} width={42} height={10} rx={5} fill={BLOQUE} />
             <circle cx={166} cy={8.5} r={1.8} fill="none" stroke={SUTIL} strokeWidth={0.8} />
-            <Rotulo x={170.5} y={10.5} size={5} color={SUTIL}>Buscar en Orbita...</Rotulo>
+            <Rotulo x={170.5} y={10.5} size={5} color={SUTIL}>Buscar...</Rotulo>
+            <rect x={205.5} y={3.5} width={21} height={10} rx={5} fill={ACENTO_BG} stroke={ACENTO} strokeOpacity={0.4} />
+            <circle cx={210.5} cy={8.5} r={2.6} fill={ACENTO} />
+            <Rotulo x={214.5} y={10.5} size={4.8} fuerte color={TEXTO}>Orbi</Rotulo>
             <path d="M 233 4.2 a 4 4 0 1 0 4 4.3 a 3 3 0 0 1 -4 -4.3 z" fill="none" stroke={TENUE} strokeWidth={0.9} />
             <path d="M 244.5 11 h 8 l -1.5 -2 v -2.5 a 2.5 2.5 0 0 0 -5 0 v 2.5 z" fill="none" stroke={TENUE} strokeWidth={0.9} strokeLinejoin="round" />
             <circle cx={252} cy={4.5} r={2.4} fill={TONOS.error.fg} />
             <Rotulo x={252} y={6} size={3.6} centro fuerte color={SOBRE_ACENTO}>3</Rotulo>
             <Avatar cx={265} cy={8.5} inicial="R" />
-            <Rotulo x={273} y={10.6} size={5.5} color={TEXTO}>Rama G.</Rotulo>
             <path d="M 304 7 l 2.5 2.5 l 2.5 -2.5" fill="none" stroke={TENUE} strokeWidth={0.9} />
             {children}
         </>
@@ -967,42 +970,13 @@ function Reportes() {
     )
 }
 
-/** Configuración: el menú principal colapsado, el menú propio, la sección Negocio y Guardar cambios. */
+/** Configuración: el módulo desplegado en el menú principal, la sección Negocio y Guardar cambios. */
 function Config() {
-    // Grupos del menú propio (ConfigSidebar.tsx). El separador va entre grupos.
-    const grupos: string[][] = [
-        ['Suscripción'],
-        ['Negocio', 'Contacto', 'Pagos', 'Envíos', 'Redes sociales', 'Dominios', 'Canc. y devol.'],
-        ['Apariencia', 'Equipo', 'Notificaciones', 'Registro de actividad'],
-        ['Soporte'],
-        ['Zona peligrosa'],
-    ]
-    const items: ReactElement[] = []
-    let y = 27
-    grupos.forEach((g, gi) => {
-        if (gi > 0) {
-            items.push(<line key={`sep-${gi}`} x1={30.5} y1={y - 1.5} x2={92.5} y2={y - 1.5} stroke={LINEA} />)
-            y += 2
-        }
-        for (const label of g) {
-            const activo = label === 'Negocio'
-            const peligro = label === 'Zona peligrosa'
-            items.push(
-                <g key={label}>
-                    {activo && <rect x={28.5} y={y - 6.5} width={64} height={9.5} rx={2} fill={ACENTO_BG} />}
-                    <Icono x={31} y={y - 4.5} s={3.5} color={activo ? ACENTO : peligro ? TONOS.error.fg : TENUE} opacity={activo || peligro ? 1 : 0.55} />
-                    <Rotulo x={37} y={y} size={5} fuerte={activo} color={activo ? ACENTO : peligro ? TONOS.error.fg : TEXTO}>{label}</Rotulo>
-                </g>,
-            )
-            y += 10.5
-        }
-    })
     return (
-        <Panel colapsado activo="config" miga={['Configuración', 'Negocio']}>
-            {/* El menú propio de Configuración */}
-            <rect x={21} y={17} width={76} height={166.5} fill={SUPERFICIE} />
-            <line x1={96.5} y1={17} x2={96.5} y2={183.5} stroke={LINEA} />
-            {items}
+        <Panel activo="config" abierto="config" sub="Negocio" miga={['Configuración', 'Negocio']}>
+            {/* El dibujo de la sección está pensado para arrancar en x=104:
+                se corre a la izquierda para pegarlo al menú (60 de ancho). */}
+            <g transform="translate(-32 0)">
             {/* La sección Negocio */}
             <Rotulo x={104} y={32} size={7} fuerte>Negocio</Rotulo>
             <Rotulo x={104} y={39.5} size={4.4}>Lo que ven tus clientes y lo que usa el envío para calcular distancias.</Rotulo>
@@ -1020,11 +994,11 @@ function Config() {
             <path d="M 282 88 c -4 -5 -6 -8 -6 -11 a 6 6 0 0 1 12 0 c 0 3 -2 6 -6 11 z" fill={ACENTO} />
             <circle cx={282} cy={77} r={2} fill={SOBRE_ACENTO} />
             <Boton x={104} y={118} w={60} label="Guardar cambios" primario size={5.2} />
-            <Callout n={1} x={13} y={52} />
-            <Callout n={2} x={93} y={25} />
-            <Callout n={3} x={313} y={22} />
-            <Callout n={4} x={171} y={124} />
-            <Callout n={5} x={88} y={171} />
+            </g>
+            <Callout n={1} x={63} y={100} />
+            <Callout n={2} x={63} y={121} />
+            <Callout n={3} x={285} y={27} />
+            <Callout n={4} x={139} y={124} />
         </Panel>
     )
 }
@@ -1230,12 +1204,12 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <PanelTienda />,
     },
     'layout-panel': {
-        titulo: 'El panel con el menú de la izquierda desplegado en Pedidos y la barra de arriba con la miga, la búsqueda, la campana y el avatar.',
+        titulo: 'El panel con el menú de la izquierda desplegado en Pedidos y la barra de arriba con la miga, la búsqueda, Orbi, la campana y el avatar.',
         leyenda: [
             'El buscador del menú: pedidos, clientes, productos y secciones, sin salir de ahí.',
             'El menú lateral: arriba el selector de espacio; cada módulo despliega sus sub-secciones. El puntito rojo en Mensajes es lo que te espera. Al pie, Orbi.',
             'La miga: en qué módulo y en qué pantalla estás.',
-            'La búsqueda global: un pedido por número, un cliente, un producto o una sección del panel.',
+            'La búsqueda global: un pedido por número, un cliente, un producto o una sección del panel. A su derecha, Orbi.',
             'La campana: lo que pasó mientras no estabas. A su izquierda, el modo oscuro.',
             'Tu avatar: Mi perfil, "Ir a la tienda" y Cerrar sesión.',
         ],
@@ -1348,13 +1322,12 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <Reportes />,
     },
     config: {
-        titulo: 'Configuración: el menú principal colapsado a íconos, el menú propio de Configuración y la sección Negocio con su botón Guardar cambios.',
+        titulo: 'Configuración: el módulo desplegado en el menú principal con sus pantallas y la sección Negocio con su botón Guardar cambios.',
         leyenda: [
-            'El menú principal se colapsa solo a una franja de íconos al entrar.',
-            'El menú propio de Configuración: cada ítem es una pantalla distinta.',
-            'La pantalla de la sección elegida (acá, Negocio).',
+            'Configuración, en el menú de la izquierda: al entrar se despliegan sus pantallas.',
+            'Cada ítem es una pantalla distinta (acá, Negocio). Al final de la lista está la Zona peligrosa.',
+            'La pantalla de la sección elegida.',
             '"Guardar cambios": cada sección se guarda por separado.',
-            'Zona peligrosa: lo que no tiene vuelta atrás, separado del resto.',
         ],
         dibujo: <Config />,
     },

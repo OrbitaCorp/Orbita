@@ -24,6 +24,13 @@ function makeService(config: Record<string, string | undefined>) {
 const CONFIG_OK = { R2_ACCOUNT_ID: 'acc-1', CF_WORKERS_AI_API_TOKEN: 'token-1' };
 
 describe('CloudflareImageService', () => {
+  // En Node 26 `fetch` no es una propiedad propia de `global`: después del
+  // primer restoreAllMocks() desaparecía y los spyOn siguientes fallaban con
+  // "Property `fetch` does not exist". Se la vuelve a poner antes de cada test.
+  const fetchOriginal = global.fetch;
+  beforeEach(() => {
+    global.fetch = fetchOriginal;
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it('generateImage: sin credenciales, 503 sin llamar a fetch', async () => {

@@ -8,12 +8,14 @@ import { SupabaseCostAdapter } from './adapters/supabase.adapter';
 import { InternalCostAdapter } from './adapters/internal.adapter';
 import { GcloudCostAdapter } from './adapters/gcloud.adapter';
 
+import { AlertasDeCostoService } from './alertas-de-costo.service';
 import { COST_ADAPTERS } from './costs.constants';
 
 @Module({
   controllers: [CostsController],
   providers: [
     CostsService,
+    AlertasDeCostoService,
     UsageMeteringService,
     VercelCostAdapter,
     CloudflareCostAdapter,
@@ -27,7 +29,7 @@ import { COST_ADAPTERS } from './costs.constants';
       inject: [VercelCostAdapter, CloudflareCostAdapter, SupabaseCostAdapter, GcloudCostAdapter],
     },
   ],
-  exports: [UsageMeteringService, CostsService],
+  exports: [UsageMeteringService, CostsService, AlertasDeCostoService],
 })
 export class CostsModule implements OnModuleInit {
   private readonly logger = new Logger(CostsModule.name);

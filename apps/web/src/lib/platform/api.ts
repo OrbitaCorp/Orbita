@@ -231,6 +231,124 @@ export interface OrbiEstadoResponse {
 }
 export type OrbiRehabilitarResultado = { ok: true } | { ok: false; categoria: string; detalle: string }
 
+// Uso de Orbi (Orbi → Uso). Espejo de ResumenDeUso, DetalleDeNegocio y
+// FichaDeTurno de apps/api/src/platform/orbi-uso/orbi-uso.service.ts: si
+// cambian allá, cambian acá. Solo el superadmin: acá viajan USD, tokens y créditos.
+export interface OrbiUsoResumen {
+  mes: string
+  /** ORBI_LECTURA_CONVERSACIONES === 'on': si se puede abrir el texto de un chat. */
+  lecturaHabilitada: boolean
+  kpis: {
+    mensajes: number
+    /** null = ningún mensaje del mes tiene costo medido (los de antes del 4/10/2026 no lo guardaban): se muestra "Sin dato", no USD 0. */
+    costoUsd: number | null
+    creditos: number | null
+    /** Mensajes (sin contar los frenados por cupo) sin costo medido. */
+    mensajesSinCosto: number
+    promptTokens: number
+    cachedTokens: number
+    completionTokens: number
+    thinkingTokens: number
+    latenciaP50: number | null
+    latenciaP95: number | null
+    ttftP50: number | null
+    errores: number
+    /** Rechazados por el cupo mensual en créditos. */
+    frenadosPorCupoMensual: number
+    /** Rechazados por el tope diario de mensajes del negocio. */
+    frenadosPorTopeDiario: number
+    conGroq: number
+    accionesPropuestas: number
+    accionesConfirmadas: number
+    accionesRechazadas: number
+    escriturasRechazadas: number
+  }
+  serie: { dia: string; mensajes: number; costoUsd: number | null }[]
+  acciones: { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number; latenciaPromedio: number }[]
+  negocios: { businessId: string; nombre: string; mensajes: number; costoUsd: number | null; creditos: number | null; mensajesSinCosto: number; cupo: number; porcentaje: number }[]
+}
+
+export interface OrbiUsoNegocio {
+  mes: string
+  businessId: string
+  nombre: string
+  /** CupoDelNegocio de cupo-orbi.service.ts. */
+  cupo: { mes: string; base: number; ajustes: number; total: number; avanzado: boolean }
+  usados: number
+  porcentaje: number
+  ajustes: { id: string; creditos: number; motivo: string; admin: string; fecha: string }[]
+  miembros: {
+    memberId: string
+    nombre: string
+    mensajes: number
+    costoUsd: number | null
+    creditos: number | null
+    mensajesSinCosto: number
+    promptTokens: number
+    completionTokens: number
+    latenciaP50: number | null
+    topePorcentaje: number | null
+  }[]
+}
+
+export interface OrbiFichaTurno {
+  id: string
+  fecha: string
+  memberId: string
+  miembro: string
+  conversationId: string | null
+  section: string | null
+  module: string | null
+  model: string | null
+  provider: string | null
+  status: string
+  errorCategory: string | null
+  promptTokens: number | null
+  cachedTokens: number | null
+  completionTokens: number | null
+  thinkingTokens: number | null
+  latencyMs: number
+  ttftMs: number | null
+  rounds: number
+  toolsUsed: string[]
+  actionsProposed: number
+  actionsConfirmed: number
+  actionsRejected: number
+  writesRejected: number
+  costUsd: number | null
+  toolsCostUsd: number | null
+  credits: number | null
+  /** Json de la base: OrbiCaracteresDelContexto o null en filas viejas. Se lee con contextoDe() (superadmin/orbiUsoFormato.ts). */
+  contextChars: unknown
+  /** Json de la base: OrbiPasoDelTurno[] o null en filas viejas. Se lee con pasosDe() (superadmin/orbiUsoFormato.ts). */
+  steps: unknown
+}
+
+/** Forma de cada paso de `steps` (PasoDelTurno de apps/api/src/orbi/turno/motor-de-turno.ts). */
+export interface OrbiToolDelPaso { name: string; tipo: 'lectura' | 'propuesta' | 'rechazada'; ms: number; ok: boolean }
+export interface OrbiPasoDelTurno {
+  n: number
+  provider: string | null
+  model: string | null
+  promptTokens: number | null
+  cachedTokens: number | null
+  completionTokens: number | null
+  thinkingTokens: number | null
+  ms: number
+  tools: OrbiToolDelPaso[]
+}
+/** Tamaño de lo que se manda en la primera vuelta, en caracteres (ficha-del-turno.ts). */
+export interface OrbiCaracteresDelContexto { system: number; tools: number; history: number; message: number }
+
+export type OrbiMotivoDeLectura = 'soporte' | 'abuso' | 'calidad'
+export interface OrbiConversacionAbierta {
+  id: string
+  titulo: string | null
+  businessId: string
+  memberId: string
+  mensajes: { rol: 'user' | 'assistant'; texto: string; fecha: string | null }[]
+}
+
 export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR'
 
 export interface AdminRow {
@@ -784,6 +902,15 @@ export const platformApi = {
   orbiEstado: () => getJSON<OrbiEstadoResponse>('/platform/orbi/estado'),
   orbiRehabilitar: () => sendJSON<OrbiRehabilitarResultado>('/platform/orbi/rehabilitar', 'POST'),
   orbiMantenimiento: (motivo?: string) => sendJSON<{ ok: true; yaEstabaEnMantenimiento: boolean }>('/platform/orbi/mantenimiento', 'POST', motivo ? { motivo } : {}),
+  orbiUso: (mes: string) => getJSON<OrbiUsoResumen>(`/platform/orbi/uso?mes=${mes}`),
+  orbiUsoNegocio: (id: string, mes: string) => getJSON<OrbiUsoNegocio>(`/platform/orbi/uso/negocios/${id}?mes=${mes}`),
+  // De a 50, del más nuevo al más viejo; `siguiente` es el `antesDe` de la próxima página (null = no hay más).
+  orbiUsoTurnos: (p: { businessId: string; memberId?: string; mes: string; antesDe?: string }) =>
+    getJSON<{ turnos: OrbiFichaTurno[]; siguiente: string | null }>(`/platform/orbi/uso/turnos?${new URLSearchParams(Object.entries(p).filter(([, v]) => v) as [string, string][])}`),
+  orbiAjustarCupo: (b: { businessId: string; mes: string; creditos: number; motivo: string }) => sendJSON<{ ok: true; id: string }>('/platform/orbi/uso/ajustes', 'POST', b),
+  // 403 con mensaje si la lectura está apagada (ORBI_LECTURA_CONVERSACIONES). El acceso queda registrado antes de devolver el texto.
+  orbiAbrirConversacion: (id: string, b: { motivo: OrbiMotivoDeLectura; detalle: string; ticket?: string }) =>
+    sendJSON<OrbiConversacionAbierta>(`/platform/orbi/conversaciones/${id}/abrir`, 'POST', b),
   costsUsage: () => getJSON<CostUsageResponse>('/platform/costs/usage'),
   costsOverview: (months = 3) => getJSON<CostOverviewResponse>(`/platform/costs/overview?months=${months}`),
   costsHistory: (months = 6) => getJSON<CostHistoryResponse>(`/platform/costs/history?months=${months}`),

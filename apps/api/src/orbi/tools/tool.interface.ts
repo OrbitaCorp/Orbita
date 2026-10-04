@@ -1,4 +1,4 @@
-import type { LlmToolDefinition } from '../llm/llm-adapter.interface';
+import type { LlmToolDefinition, LlmUsage } from '../llm/llm-adapter.interface';
 import type { OrbiSurface } from '../dto/orbi-chat.dto';
 
 export interface ToolExecutionContext {
@@ -22,6 +22,8 @@ export interface ToolExecutionContext {
    * no hacía nada, y el usuario no tenía forma de saber por qué.
    */
   availableOptions?: { key: string; label: string; description?: string }[];
+  /** El turno de Orbi que corre la tool (para atribuirle la IA que dispare). */
+  turnId?: string;
 }
 
 export interface ToolResult {
@@ -29,6 +31,8 @@ export interface ToolResult {
   data?: unknown;
   error?: string;
   label: string;
+  /** Consumo de IA que hizo la tool (ej. generateDescription). Solo para la ficha del turno: el motor lo saca antes de mandarle el resultado al modelo. */
+  consumo?: LlmUsage;
 }
 
 export interface OrbiTool {
@@ -76,11 +80,13 @@ export interface OrbiTool {
    */
   describirAccion?(args: Record<string, unknown>, ctx: ToolExecutionContext): string | Promise<string>;
   /**
-   * Valida los argumentos con el DTO del endpoint HTTP equivalente (ver
-   * acciones/validar-args.ts). Corre en proponer(), antes de armar la
-   * tarjeta: si no pasa, no se propone y el modelo recibe el motivo.
+   * Valida los argumentos con el DTO del endpoint HTTP equivalente y, si el
+   * service tiene reglas que dependen de la base, con esas también, acotadas
+   * a ctx.businessId (ver acciones/validar-args.ts). Corre en proponer(),
+   * antes de armar la tarjeta: si no pasa, no se propone y el modelo recibe
+   * el motivo.
    */
-  validarArgs?(args: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string }>;
+  validarArgs?(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<{ ok: true } | { ok: false; error: string }>;
   execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult>;
   toLlmDefinition(): LlmToolDefinition;
 }

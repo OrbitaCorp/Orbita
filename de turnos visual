@@ -1,0 +1,113 @@
+[33mb8ab2[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge remote-tracking branch 'origin/main' into merge/awesome-cannon
+[33mdd88a[m fix(suscripcion): la tarjeta del Avanzado ya no repite la activación del bloque de arriba
+[33m4740a[m fix(suscripcion): elegir el plan (Base o Base + Avanzado) al activar, con nombres claros
+[33m2c118[m feat(catalogo): aviso para activar el Avanzado al subir una foto en producto nuevo
+[33mcd1ce[m refactor(categorias): sacar el selector de color al crear y editar una categoría
+[33m861ba[m feat(avanzado): el escaneo de productos con una foto pasa a ser solo del Avanzado
+[33mee6e8[m fix(suscripcion): "Activar Avanzado" lleva a pagar, lista completa del Avanzado y cancelar/reactivar
+[33m5d99d[m fix(subscriptions): el log del webhook de bienvenida ya no imprime la sesión del dueño
+[33m801e0[m[33m ([m[1;31morigin/claude/awesome-cannon-s749lf[m[33m)[m feat(orbi): Pedidos busca con la tool, no cita números inventados y la tarjeta es la confirmación
+[33mb3244[m test(orbi): corregir falsos positivos de las evals del panel y recalcular sin llamar al modelo
+[33m2682f[m Merge de la línea de base paralela de las evals del panel (2026-10-01)
+[33mf7cad[m docs(orbi): línea de base y comparación de las evals del panel (2026-10-01)
+[33m7fd87[m docs(orbi): línea de base de las evals del panel (base, rama y manual entero)
+[33maf967[m fix(fondo-ia): detectar el marco liso por planitud (no por color) y borrar islas sueltas
+[33mecbdb[m test(plantillas): modo check automático y skill reescrita como procedimiento
+[33md332a[m docs(orbi): traspaso con la revisión final de la rama
+[33m78587[m fix(orbi): hallazgos de la revisión final de la rama
+[33m52d5d[m docs(orbi): registro de la sesión nocturna en el traspaso (sección 9)
+[33m8eb1d[m fix(orbi): frase de actividad del resumen por período y lista de tools de las evals
+[33me7d57[m Merge origin/main en la rama de Orbi
+[33m2e5b7[m fix(fondo-ia): detectar el marco aunque el borde de la foto venga antialiasado
+[33m2e3b7[m fix(orbi): arreglos de la revisión de la fase 6 (manual y tools de estado)
+[33m32acb[m feat(catalogo): spinner en la miniatura al quitar fondo y en la vista previa al aplicar/quitar fondo
+[33mc98b6[m fix(orbi): las evals del panel miden la línea de base real sobre main
+[33md5845[m docs(orbi): spec y plan de la fase 3 (la UI nueva del panel), para revisión
+[33m5bc86[m fix(fondo-ia): Negro liso y Blanco liso se componen siempre en local, sin Workers AI
+[33m1b40e[m feat(orbi): resumen por período y snapshot con los números del panel
+[33m78352[m docs(orbi): aviso de mantenimiento del manual para quien toca el panel
+[33mdbfce[m fix(orbi): evals del panel corregidas tras la revisión adversarial
+[33m5db8f[m feat(orbi): Orbi lee el manual y el estado real del negocio
+[33mac3b7[m Merge origin/main en feat/demo-visual
+[33m4dd45[m fix(fondo-ia): quitar el marco liso de fotos enmarcadas antes de recortar
+[33mf3f6b[m feat(orbi): el manual del panel llega a la API como artefacto generado
+[33m01066[m fix(manual): dos desfases con el panel real y un contrato que los atrapa
+[33m0923d[m feat(orbi): evals del panel — golden set de 85 casos con ataques y runner
+[33md8c5e[m docs(orbi): el traspaso del panel queda versionado en el repo
+[33m61a08[m docs(orbi): traspaso del proyecto Orbi del panel (estado, roadmap y reglas para trabajo desatendido)
+[33m3e8a8[m Merge branch 'main' into feat/orbi-fase-1
+[33mf1ed9[m[33m ([m[1;31morigin/claude/logo-5a-facetada-orbi-cx2hx3[m[33m)[m feat(orbi): el pet del panel de chat más grande y sin fondo oscuro
+[33m8368a[m fix(orbi): el panel recibe la capa y el snapshot de su pantalla
+[33m5841e[m feat(orbi): el pet del menú lateral queda vivo (flota, parpadea y orbita)
+[33m02361[m feat(orbi): el pet se ve transformarse al cambiar de módulo y llega a Crear tu espacio
+[33mba63f[m fix(orbi): el pet del menú lateral más grande y sin disco oscuro
+[33m3ae5d[m Merge remote-tracking branch 'origin/main' into claude/logo-5a-facetada-orbi-cx2hx3
+[33md04db[m feat(orbi): el pet en los estados vacíos de los listados del panel
+[33m43c65[m feat(orbi): el pet de Orbi toma la forma de cada módulo del panel
+[33m6c4bd[m fix(orbi): las tool calls paralelas de Gemini van en un solo turno con su firma
+[33m3a81a[m refactor(fondo-ia): la descontaminación de color del borde también corre con U2Netp
+[33mef9f9[m Merge origin/main en feat/demo-visual
+[33md5590[m fix(fondo-ia): bordes limpios en recortes de alto contraste (producto claro sobre negro)
+[33mb8efc[m chore: forzar deploy de producción
+[33m118fb[m[33m ([m[1;31morigin/feat/orbi-fase-1[m[33m)[m Merge origin/main en feat/orbi-fase-1
+[33m9e9b8[m test(e2e): el guard es lista blanca de la base de dev y se documenta cómo correrlos
+[33m0fcfe[m fix(deploy): prisma-prod.sh toma solo stdout de gcloud como valor del secret
+[33m9bcc5[m chore: forzar deploy de producción
+[33m2b1f1[m fix(orbi): el wizard rechaza cualquier tool que pida confirmación
+[33mbda02[m fix(orbi): la tarjeta del pedido avisa qué pasa con el pago pendiente
+[33m37dcc[m feat(orbi): logo 5a facetada en el icono del asistente
+[33m83d9e[m test(orbi): pruebas contra Postgres de acciones, cuota e historial
+[33ma83df[m docs(orbi): devolver dos JSDoc a su función y reflowear una línea larga
+[33mce0c1[m fix(orbi): pulido de la tarjeta de acción y del botón de Orbi en el celular
+[33m0ee2c[m chore(orbi): limpieza de código muerto, comentarios y constantes
+[33m62451[m fix(orbi): unir contents por rol de Gemini y afinar la categoría permiso
+[33m2b9cf8[m fix(orbi): robustez de confirm, corte y telemetría del chat
+[33mc6b9e[m fix(orbi): consumir lee la acción antes de reclamarla
+[33ma51ca[m feat(orbi): botón de Orbi en la barra del celular
+[33m13f52[m feat(orbi): la tarjeta de acción muestra todos sus estados y refresca la pantalla
+[33m03917[m fix(orbi): un envío nuevo corta al anterior y no le pisa el estado
+[33m59a20[m feat(orbi): recuerda la conversación, Nueva conversación y Detener
+[33m4a801[m fix(orbi): seguir leyendo el stream después de done para no perder turn
+[33ma88bb[m feat(orbi): parser SSE que no pierde eventos y tests de front en CI
+[33m92708[m feat(retiro): 'Transferencia' como medio seleccionable al retirar en local
+[33me4839[m feat(onboarding): la tienda nace con todos los métodos de pago apagados
+[33md3908[m fix(orbi): navigateTo arma links que existen
+[33m5663f[m feat(orbi): retención y purga en la baja para las tablas nuevas
+[33m2bb5c[m feat(orbi): cortar la respuesta cuando el cliente se va, metering por proveedor y telemetría de turnos
+[33m3d68e[m feat(orbi): el servidor emite el id de conversación y el historial se escribe de forma atómica
+[33mff576[m feat(orbi): acciones pendientes en Postgres; confirmar idempotente y cancelar
+[33m61051[m fix(orbi): la tarjeta saca los controles bidi, los de ancho cero y los C1
+[33m80dd4[m feat(orbi): las escrituras muestran cada valor, validan con el DTO del endpoint y la demo no propone
+[33m9bae0[m fix(orbi): permisos reales en las tools y en el snapshot del prompt
+[33m5f32b[m fix(orbi): RLS en las tablas nuevas de la fase 1
+[33m16971[m feat(cuota): cuota diaria compartida en Postgres para Orbi y las IA de productos
+[33m1a1a8[m feat(orbi): tablas de acciones pendientes, cuota diaria y turnos
+[33m429fb[m docs(orbi): plan de implementación de la fase 1 y spec §7 al día
+[33mccfb6[m docs(orbi): specs de la fase 1 (base) y de la base de conocimiento
+[33m8d229[m fix(search): el buscador global exige discounts.view para descuentos y cupones
+[33m243ac[m fix(deploy): el preflight migra y chequea la base de producción, no la de dev
+[33m16d2b[m fix(tienda): el cartel del 2x1 entre varios productos ya no pide agregar todos, sino las unidades de la promo
+[33m73671[m feat(web): aviso de cookies flotante y política de cookies en las tiendas y en orbita.site
+[33m96d94[m test(api): justificar la consulta a email_logs del aviso de proveedor de fotos caído
+[33m4e8f7[m feat(api): claves de Serper y Tavily en Cloud Run y aviso a soporte cuando un proveedor de fotos falla
+[33m01790[m fix(tienda): el botón de arrepentimiento del pie se muestra siempre
+[33m7fbf2[m feat(tienda): pie obligatorio, crédito de Órbita en español con enlace y botón de arrepentimiento reubicado
+[33ma67bc[m feat(tienda): pestaña flotante para volver a jugar o ver el anuncio (Avanzado)
+[33m99cb3[m Merge remote-tracking branch 'origin/main' into feat/demo-visual
+[33m2ee46[m fix(costos): mostrar Serper y Tavily en Uso del Plan aunque no tengan consultas
+[33m6b661[m fix(responsive): la tienda ya no se ensancha en el celular; desplegables del Inicio del panel ajustados
+[33m02dae[m chore(deploy): pasar SUPABASE_PAT a Cloud Run para el uso de Supabase en Costos
+[33ma99c8[m Merge remote-tracking branch 'origin/main'
+[33mbca7ab[m feat(costos): uso de Resend, top de negocios con costo real y huella de datos, costo de Workers AI por neuronas y sincronización diaria
+[33m8525e[m Merge remote-tracking branch 'origin/main' into feat/demo-visual
+[33m5bf72[m feat(demo): los mensajes de la tienda y del panel son el mismo chat, en el navegador
+[33m332da[m feat(costos): fecha de última actualización en Uso del Plan
+[33m39f16[m feat(costos): uso de Cloud Run (Cloud Monitoring) y de Gemini en Uso del Plan
+[33m16c4f[m Update Contacto.tsx
+[33m5085e[m feat(suscripcion): código de descuento al activar el plan (vale para el primer cobro)
+[33mac3ef[m feat(tienda): la fila de la oferta relámpago se pasa con flechas; la de la demo descuenta de verdad
+[33m237fe[m fix(subscriptions): una alta pagada ya no se pierde si la persona no vuelve al sitio
+[33m96935[m feat(demo): oferta relámpago sembrada en Nébula Tech, que nunca vence
+[33m5fe95[m feat(demo): hover de las tarjetas de /demo con brillo que sigue al cursor y recorrido de la miniatura; sin el punto verde
+[33m68f91[m fix(demo): la entrada de /demo se anima con CSS (con rol elegido quedaba invisible) y el fondo se reconoce más
+[33mdd05b[m feat(landing): vista propia para entrar a la demo (/demo)

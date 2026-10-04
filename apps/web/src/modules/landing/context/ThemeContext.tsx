@@ -52,6 +52,15 @@ export function ThemeProvider({ children, forceDark = false }: { children: React
   );
 }
 
+/**
+ * Igual que useTheme pero sin exigir el provider: fuera de la landing devuelve
+ * null. Lo usa la escena espacial cuando se monta en otra pantalla (el alta),
+ * donde montar el ThemeProvider le cambiaría la clase de tema al <html>.
+ */
+export function useThemeOpcional(): ThemeContextValue | null {
+  return useContext(ThemeContext);
+}
+
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');

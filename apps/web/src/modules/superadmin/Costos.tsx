@@ -935,6 +935,8 @@ const AI_FEATURE_LABELS: Record<string, string> = {
   'orbi-chat': 'Chat de Orbi',
   'orbi-panel': 'Orbi (panel)',
   'orbi-wizard': 'Orbi (wizard)',
+  'orbi-wizard-tools': 'Orbi (herramientas del alta)',
+  'wizard-classifier': 'Clasificador nocturno del alta',
 }
 
 // ─── Alert row ───────────────────────────────────────────────────────────────

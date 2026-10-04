@@ -73,12 +73,11 @@ export class ToolRegistryService {
       return { error: `Argumento inválido: "${name}" no acepta el parámetro ${desconocido}` };
     }
 
-    if (tool.validarArgs) {
-      const validacion = await tool.validarArgs(args);
-      if (!validacion.ok) return { error: validacion.error };
-    }
-
     try {
+      if (tool.validarArgs) {
+        const validacion = await tool.validarArgs(args, ctx);
+        if (!validacion.ok) return { error: validacion.error };
+      }
       const resumen = tool.describirAccion ? await tool.describirAccion(args, ctx) : `Ejecutar: ${tool.name}`;
       return { resumen };
     } catch (e) {

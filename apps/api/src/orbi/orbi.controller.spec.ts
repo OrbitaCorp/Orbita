@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { DemoIaService } from '../demo/demo-ia.service';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
@@ -17,6 +17,7 @@ import { OrbiSurface } from './dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../common/permisos/catalogo';
 import { OrbiTurnService } from './orbi-turn.service';
 import { OrbiSaludService } from './salud/orbi-salud.service';
+import { CupoOrbiService, MENSAJE_CUPO_MIEMBRO, MENSAJE_CUPO_NEGOCIO } from './cupo/cupo-orbi.service';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter';
 
 interface MockResponse {
@@ -60,7 +61,9 @@ describe('OrbiController', () => {
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
   let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock };
-  let turnos: { registrar: jest.Mock };
+  let turnos: { registrar: jest.Mock; contarDesenlace: jest.Mock };
+  let cuota: { consumir: jest.Mock; devolver: jest.Mock };
+  let cupoOrbi: { motivoDeBloqueo: jest.Mock };
   let metering: { track: jest.Mock };
   let analitica: { logAiTurn: jest.Mock };
 
@@ -127,14 +130,16 @@ describe('OrbiController', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: UsageMeteringService, useValue: { track: jest.fn() } },
         // La cuota diaria vive en Postgres: acá siempre hay cupo.
-        { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true) } },
-        { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined) } },
+        { provide: CuotaService, useValue: { consumir: jest.fn().mockResolvedValue(true), devolver: jest.fn().mockResolvedValue(undefined) } },
+        { provide: OrbiTurnService, useValue: { registrar: jest.fn().mockResolvedValue(undefined), contarDesenlace: jest.fn().mockResolvedValue(undefined) } },
+        // El cupo mensual: por defecto no frena (bloqueo apagado o con saldo).
+        { provide: CupoOrbiService, useValue: { motivoDeBloqueo: jest.fn().mockResolvedValue(null) } },
         {
           provide: OrbiSaludService,
           useValue: {
             exigirDisponible: jest.fn().mockResolvedValue(undefined),
             registrarOk: jest.fn().mockResolvedValue(undefined),
-            registrarFalla: jest.fn().mockResolvedValue({ categoria: 'INTERNAL', inmediata: false, detalle: 'x' }),
+            avisoDeFalla: jest.fn().mockResolvedValue({ code: 'ORBI_ERROR', message: 'Orbi tuvo un problema para responder. Probá de nuevo en unos minutos.' }),
           },
         },
       ],
@@ -145,6 +150,8 @@ describe('OrbiController', () => {
     acciones = module.get(PendingActionService);
     conversaciones = module.get(ConversationService);
     turnos = module.get(OrbiTurnService);
+    cuota = module.get(CuotaService);
+    cupoOrbi = module.get(CupoOrbiService);
     metering = module.get(UsageMeteringService);
     analitica = module.get(WizardAnalyticsService);
   });
@@ -571,7 +578,7 @@ describe('OrbiController', () => {
       const res = createMockResponse();
       await controller.chat(chatPanel(id), res as any, duenio as any);
 
-      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel');
+      expect(conversaciones.crear).toHaveBeenCalledWith('biz-1', 'member-1', 'panel', expect.objectContaining({ titulo: expect.any(String) }));
       const todo = res.chunks.join('');
       expect(res.chunks[0]).toBe('event: conversation\ndata: {"id":"conv-1"}\n\n');
       expect(todo).not.toContain(id);
@@ -643,10 +650,30 @@ describe('OrbiController', () => {
     };
     const cupon = {
       tool: 'createCoupon', args: { code: 'VERANO15' }, businessId: 'biz-1', memberId: 'member-1',
-      conversationId: 'conv-1' as string | null, resumen: 'Crear el cupón "VERANO15"',
+      conversationId: 'conv-1' as string | null, turnId: 'turno-1' as string | null, resumen: 'Crear el cupón "VERANO15"',
     };
     const OK = { success: true, label: 'Cupón "VERANO15" creado', data: { couponId: 'c-1' } };
     const ORDER_ID = '8f14e45f-ceea-467a-9575-6a1e1c2b3d4e';
+
+    it('confirmar cuenta el desenlace en el turno que propuso la acción; si no tiene turno, no cuenta', async () => {
+      registry.execute.mockResolvedValue(OK);
+      const id = await acciones.crear(cupon);
+      const huerfana = await acciones.crear({ ...cupon, turnId: null });
+
+      await controller.confirm({ actionId: id }, duenio as any);
+      await controller.confirm({ actionId: huerfana }, duenio as any);
+
+      expect(turnos.contarDesenlace).toHaveBeenCalledTimes(1);
+      expect(turnos.contarDesenlace).toHaveBeenCalledWith('turno-1', 'confirmada');
+    });
+
+    it('cancelar cuenta la acción como rechazada en su turno', async () => {
+      const id = await acciones.crear(cupon);
+
+      await controller.reject({ actionId: id }, duenio as any);
+
+      expect(turnos.contarDesenlace).toHaveBeenCalledWith('turno-1', 'rechazada');
+    });
 
     it('confirmar dos veces devuelve el mismo result y ejecuta la tool una sola vez', async () => {
       registry.execute.mockResolvedValue(OK);
@@ -1213,7 +1240,7 @@ describe('OrbiController', () => {
         vuelta += 1;
         if (vuelta === 1) {
           yield { type: 'tool_call' as const, call: { id: 'c1', name: 'listProducts', arguments: {} } };
-          yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 100, completionTokens: 20, provider: 'gemini' as const } };
+          yield { type: 'usage' as const, usage: { model: 'gemini-3.6-flash', promptTokens: 100, completionTokens: 20, cachedTokens: 40, thinkingTokens: 8, provider: 'gemini' as const } };
         } else {
           // La segunda vuelta la contestó el fallback.
           yield { type: 'text' as const, chunk: 'Listo.' };
@@ -1224,13 +1251,18 @@ describe('OrbiController', () => {
 
       await controller.chat({ message: 'Productos', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
 
-      const meta = (model: string) => ({ feature: 'orbi-panel', model, memberId: 'member-1', conversationId: 'conv-1' });
+      const meta = (model: string, cachedTokens: number, thinkingTokens: number) => ({
+        feature: 'orbi-panel', model, memberId: 'member-1', conversationId: 'conv-1', cachedTokens, thinkingTokens,
+      });
       const base = { businessId: 'biz-1', unit: 'tokens' };
+      const gem = meta('gemini-3.6-flash', 40, 8);
+      const groq = meta('openai/gpt-oss-120b', 0, 0);
       expect(metering.track).toHaveBeenCalledTimes(4);
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'prompt_tokens', quantity: 100, metadata: meta('gemini-3.6-flash') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'completion_tokens', quantity: 20, metadata: meta('gemini-3.6-flash') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'prompt_tokens', quantity: 70, metadata: meta('openai/gpt-oss-120b') });
-      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'completion_tokens', quantity: 30, metadata: meta('openai/gpt-oss-120b') });
+      // La entrada va con su costo ya calculado y la caché a su precio: 60 a 0,75 + 40 a 0,075 por 1M.
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'prompt_tokens', quantity: 100, estimatedCostUsd: 0.000048, metadata: gem });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'gemini', category: 'completion_tokens', quantity: 20, metadata: gem });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'prompt_tokens', quantity: 70, estimatedCostUsd: 0.000011, metadata: groq });
+      expect(metering.track).toHaveBeenCalledWith({ ...base, providerSlug: 'groq', category: 'completion_tokens', quantity: 30, metadata: groq });
     });
 
     it('wizard: openai/gpt-oss-120b cuenta como groq, con feature orbi-wizard', async () => {
@@ -1242,9 +1274,9 @@ describe('OrbiController', () => {
 
       await controller.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, createMockResponse() as any);
 
-      const metadata = { feature: 'orbi-wizard', model: 'openai/gpt-oss-120b', memberId: null, conversationId: null };
+      const metadata = { feature: 'orbi-wizard', model: 'openai/gpt-oss-120b', memberId: null, conversationId: null, cachedTokens: 0, thinkingTokens: 0 };
       expect(metering.track).toHaveBeenCalledTimes(2);
-      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 10, unit: 'tokens', metadata });
+      expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'prompt_tokens', quantity: 10, unit: 'tokens', estimatedCostUsd: 0.000002, metadata });
       expect(metering.track).toHaveBeenCalledWith({ providerSlug: 'groq', category: 'completion_tokens', quantity: 5, unit: 'tokens', metadata });
     });
 
@@ -1275,11 +1307,42 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledTimes(1);
       const t = turnos.registrar.mock.calls[0][0];
       expect(t).toEqual({
+        id: expect.stringMatching(UUID),
         businessId: 'biz-1', memberId: 'member-1', conversationId: 'conv-1', module: 'pedidos',
         model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 5, latencyMs: expect.any(Number),
-        rounds: 1, toolsUsed: [], actionsProposed: 0, status: 'ok',
+        rounds: 1, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'ok',
+        provider: 'gemini', ttftMs: expect.any(Number), steps: [expect.objectContaining({ tools: [] })],
+        contextChars: { system: 'Sos Orbi, el asistente de IA.'.length, tools: 0, history: 0, message: 'PREGUNTA-PRIVADA'.length },
+        // 10 de entrada y 5 de salida de gemini-3.6-flash: (10 × 0,75 + 5 × 3,75) / 1M = USD 0,00002625 → 1 crédito.
+        costUsd: 0.000026, toolsCostUsd: 0, credits: 1,
       });
       expect(JSON.stringify(t)).not.toContain('PRIVADA');
+    });
+
+    it('guarda el módulo resuelto desde la pantalla, no el "ventas" que manda siempre el front', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'ok' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat(
+        { message: 'Hola', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos' } } as any,
+        createMockResponse() as any,
+        duenio as any,
+      );
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ module: 'pedidos' }));
+    });
+
+    it('sin consumo informado (ni del modelo ni de las tools): costo y créditos quedan sin dato, no en 0', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'ok' };
+        yield { type: 'done' as const };
+      } as any;
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+      const t = turnos.registrar.mock.calls[0][0];
+      // undefined → null en la base: un 0 se promediaría como un turno gratis.
+      expect(t.costUsd).toBeUndefined();
+      expect(t.toolsCostUsd).toBeUndefined();
+      expect(t.credits).toBeUndefined();
     });
 
     it('cuenta las vueltas, las tools pedidas y las propuestas', async () => {
@@ -1300,6 +1363,125 @@ describe('OrbiController', () => {
       expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({
         rounds: 3, toolsUsed: ['createCoupon', 'listProducts'], actionsProposed: 1, status: 'ok',
       }));
+    });
+
+    it('el id del turno es el mismo en la ficha y en las acciones que propuso, con sus pasos', async () => {
+      registry.getTools.mockReturnValue([{ name: 'createCoupon' }]);
+      registry.proponer.mockResolvedValue({ resumen: 'Crear el cupón "VERANO"' });
+      const crear = jest.spyOn(acciones, 'crear');
+      let vuelta = 0;
+      mockLlm.streamChat = async function* () {
+        vuelta += 1;
+        if (vuelta === 1) yield { type: 'tool_call' as const, call: { id: 'c1', name: 'createCoupon', arguments: { code: 'VERANO' } } };
+        else yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat({ message: 'Hacé un cupón', context: { surface: OrbiSurface.PANEL, section: 'cupones' } } as any, createMockResponse() as any, duenio as any);
+
+      const t = turnos.registrar.mock.calls[0][0];
+      expect(t.id).toMatch(UUID);
+      expect(crear).toHaveBeenCalledWith(expect.objectContaining({ turnId: t.id }));
+      expect(t.steps).toHaveLength(2);
+      expect(t.steps[0].tools).toEqual([expect.objectContaining({ name: 'createCoupon', tipo: 'propuesta' })]);
+      expect(t.section).toBe('cupones');
+      expect(t.actionsProposed).toBe(1);
+    });
+
+    it('error: guarda la categoría de la falla y devuelve el cupo del día', async () => {
+      mockLlm.streamChat = async function* () {
+        throw new Error('boom');
+      } as any;
+
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+
+      expect(cuota.devolver).toHaveBeenCalledWith('orbi-panel:biz-1');
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', errorCategory: 'INTERNAL' }));
+    });
+
+    it('un turno que sale bien o se corta no devuelve el cupo', async () => {
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any);
+      expect(cuota.devolver).not.toHaveBeenCalled();
+    });
+
+    it('la demo que falla no devuelve cupo ni registra turno', async () => {
+      mockLlm.streamChat = async function* () {
+        throw new Error('boom');
+      } as any;
+
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any);
+
+      expect(cuota.devolver).not.toHaveBeenCalled();
+      expect(turnos.registrar).not.toHaveBeenCalled();
+    });
+
+    it('cuota diaria rechazada: 429 y queda registrado un turno con status quota', async () => {
+      cuota.consumir.mockResolvedValue(false);
+      const res = createMockResponse();
+
+      await expect(controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any)).rejects.toThrow(HttpException);
+
+      expect(turnos.registrar).toHaveBeenCalledWith({
+        id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
+        latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+        errorCategory: 'tope_diario',
+      });
+      expect(cuota.devolver).not.toHaveBeenCalled();
+    });
+
+    it('cupo mensual del negocio agotado: 429 con el mensaje, turno quota y sin llamar al modelo ni gastar la cuota diaria', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('negocio');
+      const streamChat = jest.fn();
+      mockLlm.streamChat = streamChat as any;
+      const res = createMockResponse();
+
+      const error = await controller
+        .chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect(error.getStatus()).toBe(429);
+      expect(error.message).toBe(MENSAJE_CUPO_NEGOCIO);
+      expect(cupoOrbi.motivoDeBloqueo).toHaveBeenCalledWith('biz-1', 'member-1');
+      expect(turnos.registrar).toHaveBeenCalledWith({
+        id: expect.stringMatching(UUID), businessId: 'biz-1', memberId: 'member-1', conversationId: null,
+        latencyMs: 0, rounds: 0, toolsUsed: [], actionsProposed: 0, writesRejected: 0, status: 'quota',
+        errorCategory: 'cupo_mensual',
+      });
+      expect(streamChat).not.toHaveBeenCalled();
+      expect(cuota.consumir).not.toHaveBeenCalled();
+      expect(res.flushHeaders).not.toHaveBeenCalled();
+    });
+
+    it('tope del miembro agotado: 429 con el mensaje del miembro', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('miembro');
+      const error = await controller
+        .chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, duenio as any)
+        .catch((e) => e);
+      expect(error.getStatus()).toBe(429);
+      expect(error.message).toBe(MENSAJE_CUPO_MIEMBRO);
+      expect(turnos.registrar).toHaveBeenCalledWith(expect.objectContaining({ status: 'quota', errorCategory: 'cupo_mensual' }));
+    });
+
+    it('sin bloqueo (motivoDeBloqueo null): el chat sigue y responde', async () => {
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, duenio as any);
+      expect(cupoOrbi.motivoDeBloqueo).toHaveBeenCalledTimes(1);
+      expect(res.chunks.join('')).toContain('event: done');
+    });
+
+    it('la demo no pasa por el cupo mensual', async () => {
+      cupoOrbi.motivoDeBloqueo.mockResolvedValue('negocio');
+      const res = createMockResponse();
+      await controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, res as any, { ...duenio, readOnly: true } as any);
+      expect(cupoOrbi.motivoDeBloqueo).not.toHaveBeenCalled();
+      expect(res.chunks.join('')).toContain('event: done');
+    });
+
+    it('cuota diaria rechazada en la demo: no se registra', async () => {
+      cuota.consumir.mockResolvedValue(false);
+      await expect(controller.chat({ message: 'Hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any)).rejects.toThrow(HttpException);
+      expect(turnos.registrar).not.toHaveBeenCalled();
     });
 
     it('error: status error', async () => {

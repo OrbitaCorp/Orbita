@@ -4,8 +4,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLimitDto } from './dto/create-limit.dto';
 import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 import { CostAdapter } from './adapters/adapter.interface';
-import { InternalCostAdapter, PRICING } from './adapters/internal.adapter';
+import { InternalCostAdapter } from './adapters/internal.adapter';
+import { costoDelEvento } from './precios';
 import { COST_ADAPTERS } from './costs.constants';
+import { currentMonth } from './mes-de-costos';
 
 const DEFAULT_PROVIDERS = [
   { slug: 'gcloud', name: 'Google Cloud', color: '#4285f4', apiType: 'MANUAL' as const },
@@ -18,10 +20,6 @@ const DEFAULT_PROVIDERS = [
   { slug: 'serper', name: 'Serper (Google Images)', color: '#ea4335', apiType: 'MANUAL' as const },
   { slug: 'tavily', name: 'Tavily Search', color: '#00d2ff', apiType: 'MANUAL' as const },
 ];
-
-function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
-}
 
 function monthsAgo(n: number): string[] {
   const result: string[] = [];
@@ -187,8 +185,9 @@ export class CostsService {
   // Consumo de IA (Gemini y Groq) del mes agrupado por función, proveedor y modelo:
   // `metadata.feature` lo pone cada ayuda al registrar el uso (ai-assist, ai-variants,
   // ai-scan…; el chat de Orbi pone orbi-panel u orbi-wizard). Los eventos viejos del
-  // chat, que no traían feature, se agrupan como 'orbi-chat'. El costo sale del estimatedCostUsd del evento si lo trae y, si no, de
-  // tokens × precio de PRICING (la misma tabla del adapter interno).
+  // chat, que no traían feature, se agrupan como 'orbi-chat'. El costo sale del estimatedCostUsd
+  // que se guardó al registrar el evento y, si no lo trae (eventos viejos), de tokens × el precio
+  // del modelo vigente en la fecha del evento (precios.ts, la misma tabla del adapter interno).
   async getAiUsageByFeature(month: string) {
     const start = new Date(`${month}-01`);
     const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
@@ -204,6 +203,7 @@ export class CostsService {
         quantity: true,
         estimatedCostUsd: true,
         metadata: true,
+        timestamp: true,
         provider: { select: { slug: true } },
       },
     });
@@ -225,7 +225,7 @@ export class CostsService {
       } else {
         fila.completionTokens += cantidad;
       }
-      fila.costUsd += e.estimatedCostUsd != null ? Number(e.estimatedCostUsd) : cantidad * (PRICING[provider]?.[e.category] ?? 0);
+      fila.costUsd += costoDelEvento(provider, e);
       filas.set(clave, fila);
     }
 
@@ -236,7 +236,7 @@ export class CostsService {
   }
 
   // Top de negocios por consumo. El costo sale del estimatedCostUsd del evento y, si no lo
-  // trae (los de tokens no lo traen), de cantidad × PRICING. Además de lo medido en
+  // trae (eventos viejos), de la tabla de precios.ts en la fecha del evento. Además de lo medido en
   // usage_events se suma la huella en la base (productos, clientes, pedidos): un negocio sin
   // IA ni emails igual ocupa datos, y así deja de aparecer todo en cero.
   async getByBusiness(month: string) {
@@ -251,6 +251,8 @@ export class CostsService {
           category: true,
           quantity: true,
           estimatedCostUsd: true,
+          metadata: true,
+          timestamp: true,
           provider: { select: { slug: true } },
         },
       }),
@@ -272,9 +274,7 @@ export class CostsService {
       const bId = e.businessId!;
       const fila = byBiz.get(bId) ?? { total: 0, byCategory: {}, aiRequests: 0, aiTokens: 0, emails: 0 };
       const cantidad = Number(e.quantity);
-      const cost = e.estimatedCostUsd != null
-        ? Number(e.estimatedCostUsd)
-        : cantidad * (PRICING[e.provider.slug]?.[e.category] ?? 0);
+      const cost = costoDelEvento(e.provider.slug, e);
       fila.total += cost;
       const key = `${e.provider.slug}:${e.category}`;
       fila.byCategory[key] = (fila.byCategory[key] ?? 0) + cost;

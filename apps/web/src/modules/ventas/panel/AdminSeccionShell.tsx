@@ -42,6 +42,11 @@ const componentMap: Record<string, Record<SeccionDelPanel, ComponentType>> = {
     },
 }
 
+// La página de Orbi (fase 3) va aparte de componentMap a propósito: esa lista
+// es la que copia la API para que navigateTo arme links, y Orbi no tiene por
+// qué ofrecer "ir a Orbi" desde Orbi.
+const OrbiPagina = dynamic(() => import('@/modules/orbi/vistas/OrbiPagina'), { ssr: false })
+
 export default function AdminSeccionShell() {
   const { slug } = useRouter().query
   const partes = Array.isArray(slug) ? slug : []
@@ -49,7 +54,9 @@ export default function AdminSeccionShell() {
   // (subdominio), moduloPadre/seccion quedan en la misma posición relativa.
   const seccion = partes[partes.length - 1]
   const moduloPadre = partes[partes.length - 2]
-  const Componente = componentMap[moduloPadre as string]?.[seccion as SeccionDelPanel]
+  const Componente = moduloPadre === 'ventas' && seccion === 'orbi'
+    ? OrbiPagina
+    : componentMap[moduloPadre as string]?.[seccion as SeccionDelPanel]
 
   if (!Componente) return <div>Página no encontrada</div>
 

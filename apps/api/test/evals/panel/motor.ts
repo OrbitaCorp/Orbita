@@ -4,31 +4,24 @@
  * run.ts (la CLI) para que el unit test lo pruebe con un modelo guionado:
  * así el loop que decide QUÉ se juzga también corre en CI.
  *
- * El loop replica OrbiController.chat con las mismas piezas
- * (src/orbi/turno/vuelta.ts): proponer → error al modelo / escritura no
- * disponible / tarjeta pendiente / lectura ejecutada, y las calls de una
- * vuelta vuelven al historial juntas (tools paralelas de Gemini 3). Lo que se
- * juzga es lo que se ve: el texto de la vuelta final más tarjetas y botones.
+ * El loop es el de producción (src/orbi/turno/motor-de-turno.ts, el mismo que
+ * corre OrbiController.chat), con un emisor que anota lo que se juzga en vez
+ * de escribir SSE. Lo que se juzga es lo que se ve: el texto final más
+ * tarjetas y botones.
  */
 
 // Los decoradores de los DTOs (class-validator) piden Reflect.getMetadata: sin
 // esto, el motor depende de que algún import anterior lo haya cargado.
 import 'reflect-metadata';
 
-import type { LlmAdapter, LlmMessage, LlmToolDefinition } from '../../../src/orbi/llm/llm-adapter.interface';
+import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from '../../../src/orbi/llm/llm-adapter.interface';
 import { OrbiSurface } from '../../../src/orbi/dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../../../src/orbi/prompts/core';
 import { getPanelPrompt } from '../../../src/orbi/prompts/panel';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
-import {
-  ESCRITURA_NO_DISPONIBLE,
-  MAX_VUELTAS_TOOLS,
-  MENSAJE_VUELTAS,
-  RESPUESTA_DE_PROPUESTA,
-  vueltaDeTools,
-} from '../../../src/orbi/turno/vuelta';
+import { correrTurno, nuevoProgresoDelTurno, type EmisorDelTurno } from '../../../src/orbi/turno/motor-de-turno';
 import { resolverModuloDelPanel } from '../../../src/orbi/navegacion/modulo-de-orbi';
 import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
 import {
@@ -171,19 +164,33 @@ export function pedidosConocidos(
   return { dichos, existentes: d.pedidos.map((p) => p.numero) };
 }
 
-export async function conReintentoPorRateLimit<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
-  for (let i = 1; ; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      const esRateLimit = msg.includes('rate_limit') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      if (!esRateLimit || i >= intentos) throw error;
-      const segundos = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? /try again in ([\d.]+)s/.exec(msg)?.[1] ?? 15);
-      console.log(`  … rate limit, esperando ${segundos.toFixed(0)}s`);
-      await new Promise((r) => setTimeout(r, Math.ceil((segundos + 1) * 1000)));
-    }
-  }
+/**
+ * El modelo, con reintento ante rate limit. Solo se reintenta si la vuelta
+ * falló ANTES de devolver algo: con eventos ya entregados (una tool ya
+ * ejecutada), repetirla duplicaría el turno.
+ */
+export function conReintentoPorRateLimit(llm: Pick<LlmAdapter, 'streamChat'>, intentos = 3): Pick<LlmAdapter, 'streamChat'> {
+  return {
+    async *streamChat(params): AsyncGenerator<LlmEvent> {
+      for (let i = 1; ; i++) {
+        let entrego = false;
+        try {
+          for await (const ev of llm.streamChat(params)) {
+            entrego = true;
+            yield ev;
+          }
+          return;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          const esRateLimit = msg.includes('rate_limit') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+          if (entrego || !esRateLimit || i >= intentos) throw error;
+          const segundos = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? /try again in ([\d.]+)s/.exec(msg)?.[1] ?? 15);
+          console.log(`  … rate limit, esperando ${segundos.toFixed(0)}s`);
+          await new Promise((r) => setTimeout(r, Math.ceil((segundos + 1) * 1000)));
+        }
+      }
+    },
+  };
 }
 
 export type Modelo = { llm: Pick<LlmAdapter, 'streamChat'>; nombre?: string };
@@ -243,72 +250,55 @@ export async function correrCaso(
     numerosDeTools: [],
     toolsOfrecidas: tools.map((t) => t.name),
   };
-  const tokens = { entrada: 0, salida: 0 };
+  const tokens = () => {
+    const t = { entrada: 0, salida: 0 };
+    for (const c of progreso.consumo.values()) {
+      t.entrada += c.promptTokens;
+      t.salida += c.completionTokens;
+    }
+    return t;
+  };
+
+  // Lo que se ve: el emisor anota tarjetas, botones y el texto final, en el
+  // mismo orden en que el controller los escribe por SSE.
+  let enPantalla = '';
+  const emisor: EmisorDelTurno = {
+    toolPedida: ({ call }) => { turno.toolCalls.push({ name: call.name, arguments: call.arguments }); },
+    texto: (chunk) => { enPantalla += chunk; },
+    reiniciarTexto: () => { enPantalla = ''; },
+    escrituraRechazada: ({ call }) => { turno.escriturasRechazadas.push({ name: call.name, arguments: call.arguments }); },
+    propuesta: ({ call, resumen }) => { turno.propuestas.push({ tool: call.name, args: call.arguments, resumen }); },
+    lecturaInicio: () => undefined,
+    lecturaFin: ({ call, resultado }) => {
+      const data = resultado.data as { path?: unknown } | undefined;
+      if (resultado.success && typeof data?.path === 'string') {
+        const destino = destinoDelPath(data.path);
+        if (destino) turno.destinos.push({ tool: call.name, path: data.path, ...destino });
+      }
+      if (call.name === 'leerTemaDelManual' && Array.isArray(call.arguments.ids)) {
+        turno.temasLeidos.push(...call.arguments.ids.map(String));
+      }
+      turno.numerosDeTools!.push(...(JSON.stringify(resultado).match(/\d{3,6}/g) ?? []).map(Number));
+    },
+    fin: () => undefined,
+  };
+  const progreso = nuevoProgresoDelTurno();
 
   try {
-    let continuar = true;
-    let vueltas = 0;
-    while (continuar) {
-      if (++vueltas > MAX_VUELTAS_TOOLS) {
-        // El controller corta con un mensaje fijo: es lo que se ve.
-        turno.texto = MENSAJE_VUELTAS;
-        turno.cortadoPorVueltas = true;
-        break;
-      }
-      continuar = false;
-      const vuelta = vueltaDeTools();
-
-      const parcial = await conReintentoPorRateLimit(async () => {
-        const p = { texto: '', llamadas: [] as { id: string; name: string; arguments: Record<string, unknown>; thoughtSignature?: string }[], entrada: 0, salida: 0 };
-        for await (const ev of modelo.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo.nombre })) {
-          if (ev.type === 'text') p.texto += ev.chunk;
-          else if (ev.type === 'tool_call') p.llamadas.push(ev.call);
-          else if (ev.type === 'usage') { p.entrada += ev.usage.promptTokens; p.salida += ev.usage.completionTokens; }
-        }
-        return p;
-      });
-      tokens.entrada += parcial.entrada;
-      tokens.salida += parcial.salida;
-
-      for (const call of parcial.llamadas) {
-        continuar = true;
-        turno.toolCalls.push({ name: call.name, arguments: call.arguments });
-
-        const propuesta = await registry.proponer(call.name, call.arguments, toolCtx);
-        if (propuesta && 'error' in propuesta) {
-          turno.escriturasRechazadas.push({ name: call.name, arguments: call.arguments });
-          vuelta.responder(call, JSON.stringify({ success: false, error: propuesta.error }));
-          continue;
-        }
-        if (!propuesta && registry.requiereConfirmacion(call.name)) {
-          turno.escriturasRechazadas.push({ name: call.name, arguments: call.arguments });
-          vuelta.responder(call, JSON.stringify({ success: false, error: ESCRITURA_NO_DISPONIBLE }));
-          continue;
-        }
-        if (propuesta) {
-          turno.propuestas.push({ tool: call.name, args: call.arguments, resumen: propuesta.resumen });
-          vuelta.responder(call, JSON.stringify(RESPUESTA_DE_PROPUESTA));
-          continue;
-        }
-
-        const resultado = await registry.execute(call.name, call.arguments, toolCtx);
-        const data = resultado.data as { path?: unknown } | undefined;
-        if (resultado.success && typeof data?.path === 'string') {
-          const destino = destinoDelPath(data.path);
-          if (destino) turno.destinos.push({ tool: call.name, path: data.path, ...destino });
-        }
-        if (call.name === 'leerTemaDelManual' && Array.isArray(call.arguments.ids)) {
-          turno.temasLeidos.push(...call.arguments.ids.map(String));
-        }
-        turno.numerosDeTools!.push(...(JSON.stringify(resultado).match(/\d{3,6}/g) ?? []).map(Number));
-        vuelta.responder(call, JSON.stringify(resultado));
-      }
-
-      // Con tools en juego el chat descarta el texto de las vueltas con tool:
-      // en pantalla queda solo el de la vuelta final.
-      if (!continuar) turno.texto = parcial.texto.trim();
-      vuelta.volcarEn(messages);
-    }
+    await correrTurno({
+      llm: conReintentoPorRateLimit(modelo.llm),
+      registry,
+      messages,
+      tools,
+      modelo: modelo.nombre,
+      toolCtx,
+      soloLectura: false,
+      crearPendiente: async () => 'accion-de-la-eval',
+      emisor,
+      progreso,
+    });
+    turno.texto = enPantalla.trim();
+    if (progreso.estado === 'max_rounds') turno.cortadoPorVueltas = true;
   } catch (error) {
     // Nada del modelo llega acá: las tools atrapan sus errores y se los
     // devuelven al modelo. Lo que tira es el proveedor (un 429 que no se
@@ -317,7 +307,7 @@ export async function correrCaso(
     const mensaje = error instanceof Error ? error.message : String(error);
     return {
       id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
-      ms: Date.now() - arrancoEn, tokens,
+      ms: Date.now() - arrancoEn, tokens: tokens(),
       error: faltasDelFake.length ? `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}` : `Proveedor: ${mensaje}`,
       infra: true,
     };
@@ -326,7 +316,7 @@ export async function correrCaso(
   if (faltasDelFake.length) {
     return {
       id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
-      ms: Date.now() - arrancoEn, tokens,
+      ms: Date.now() - arrancoEn, tokens: tokens(),
       error: `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}`,
       infra: true,
     };
@@ -343,6 +333,6 @@ export async function correrCaso(
 
   return {
     id: caso.id, categoria: caso.categoria, intento, ok: todas.length === 0,
-    violaciones: todas, noAplica, turno, ms: Date.now() - arrancoEn, tokens,
+    violaciones: todas, noAplica, turno, ms: Date.now() - arrancoEn, tokens: tokens(),
   };
 }
