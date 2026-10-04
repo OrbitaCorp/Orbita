@@ -7,7 +7,7 @@ export class ListCustomersTool implements OrbiTool {
   name = 'listCustomers';
   description = 'Listar clientes del negocio. Úsalo para buscar un cliente por nombre o email, o para dar contexto general.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['customers.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -44,9 +44,9 @@ export class ListCustomersTool implements OrbiTool {
 
 export class GetCustomerDetailTool implements OrbiTool {
   name = 'getCustomerDetail';
-  description = 'Obtener el detalle completo de un cliente: datos de contacto, direcciones y pedidos recientes.';
+  description = 'Obtener el detalle de un cliente: nombre, cuántos pedidos hizo y cuánto gastó, sus pedidos recientes y su localidad. No incluye datos de contacto (mail, teléfono, DNI, direcciones).';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['customers.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -68,7 +68,33 @@ export class GetCustomerDetailTool implements OrbiTool {
       return {
         success: true,
         label: `Cliente: ${customer.firstName}${customer.lastName ? ' ' + customer.lastName : ''}`,
-        data: customer,
+        // Se mapea campo por campo, igual que getOrderDetail, en vez de devolver
+        // el objeto entero que trae findOne (DNI, mail, teléfono, direcciones
+        // completas y los asuntos de los mails que se le mandaron). Orbi no
+        // necesita nada de eso para contar cómo viene comprando un cliente, y
+        // varios de esos textos los escribe un tercero: cuanto menos texto
+        // ajeno entre al contexto del modelo, menos superficie de inyección
+        // (ver RBT-695). De las direcciones va solo la localidad.
+        data: {
+          id: customer.id,
+          nombre: `${customer.firstName}${customer.lastName ? ' ' + customer.lastName : ''}`,
+          tieneCuenta: customer.hasAccount,
+          cantidadPedidos: customer.orderCount,
+          totalGastado: customer.totalSpent,
+          ticketPromedio: customer.avgTicket,
+          ultimoPedido: customer.lastOrderAt,
+          clienteDesde: customer.createdAt,
+          pedidos: customer.orders.map((o) => ({
+            id: o.id,
+            orderNumber: o.orderNumber,
+            channel: o.channel,
+            status: o.status,
+            total: o.total,
+            cantidadItems: o.itemCount,
+            createdAt: o.createdAt,
+          })),
+          localidades: [...new Set(customer.addresses.map((a) => a.city).filter(Boolean))],
+        },
       };
     } catch (error: any) {
       const msg = error?.response?.message ?? error?.message ?? String(error);

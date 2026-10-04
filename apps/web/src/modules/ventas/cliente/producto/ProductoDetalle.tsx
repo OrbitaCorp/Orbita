@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag, Play } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
@@ -7,7 +7,6 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
-import { FichaTecnicaModal } from '@/components/storefront/FichaTecnicaModal'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp, parseVideoEmbed } from '@/lib/storefront/utils'
@@ -31,7 +30,10 @@ import { ContenidoFicha } from '@/components/storefront/SeccionVideos'
 // (reportado). Compartiendo la constante, además, no hay dos copias de los
 // breakpoints que se puedan desincronizar con el tiempo.
 const CSS_FICHA = `
+  .sf-pd-specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
+  .sf-pd-spec  { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--color-border); }
   @media (max-width: 768px) {
+    .sf-pd-specs { grid-template-columns: minmax(0, 1fr); }
     .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
     .sf-pd-main     { grid-template-columns: minmax(0,1fr) !important; gap: 32px !important; }
     /* align-items:flex-start viene del inline de .sf-pd-gallery
@@ -50,8 +52,15 @@ const CSS_FICHA = `
     .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
     .sf-pd-img-main > div { height: 300px !important; }
     .sf-pd-belowimg { margin-left: 0 !important; }
+    /* En una sola columna, las características (y la caja de envíos cuando
+       va abajo de la foto) quedaban entre la foto y el título: el cliente
+       tenía que pasar toda la ficha técnica para ver el precio y comprar.
+       La columna de la foto se "disuelve" en la grilla y lo de abajo de la
+       foto pasa después del panel de compra. */
+    .sf-pd-col-izq  { display: contents !important; }
+    .sf-pd-belowimg { order: 2; }
     .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
-    .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
+    .sf-pd-related  { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     /* La silueta de la foto sigue los MISMOS altos que la foto real de
        arriba: si el skeleton mide 560 y la foto 300, al terminar de
        cargar la página pega un salto de 260px. El !important es para
@@ -68,6 +77,12 @@ const CSS_FICHA = `
 
 function fechaResenia(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// YouTube y Vimeo arrancan solos con autoplay=1 en el link del embed (el
+// iframe ya declara allow="autoplay"). parseVideoEmbed arma links sin query.
+function conAutoplay(src: string): string {
+  return `${src}${src.includes('?') ? '&' : '?'}autoplay=1`
 }
 
 function hueFromId(id: string): number {
@@ -145,16 +160,6 @@ export default function ProductoDetalle() {
   const [enviandoResenia, setEnviandoResenia] = useState(false)
   const [errorResenia, setErrorResenia] = useState('')
 
-  // Ficha técnica vs. columna derecha (título/precio/botones/envíos): ver el
-  // useLayoutEffect de más abajo — null = sin recortar (mobile, o todavía no
-  // se pudo medir), un número = cuántas filas entran antes de necesitar el
-  // link "Ver más detalles".
-  const [specsVisibles, setSpecsVisibles] = useState<number | null>(null)
-  const [fichaAbierta, setFichaAbierta] = useState(false)
-  const colDerechaRef = useRef<HTMLDivElement>(null)
-  const specsHeaderRef = useRef<HTMLDivElement>(null)
-  const specsMedicionRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     if (!slug) return
     let cancelado = false
@@ -223,86 +228,6 @@ export default function ProductoDetalle() {
     reviewEligibility(id).then(r => { if (!cancelado) setElegibilidad(r) }).catch(() => {})
     return () => { cancelado = true }
   }, [id, authStatus, cliente, config?.business?.mode])
-
-  // La ficha técnica vive al lado del título/precio/botones/envíos (columna
-  // derecha) — sin este ajuste, un producto con muchas specs (electrónica,
-  // sobre todo) estiraba esa tabla mucho más abajo que el resto de la
-  // columna derecha, dejando la ficha "flotando" sola contra el pie de
-  // página (reportado con captura). Se mide el alto REAL de la columna
-  // derecha (varía según el largo del nombre, si hay WhatsApp, etc.) contra
-  // el alto REAL de cada fila (varía: specs con etiqueta o valor largo
-  // ocupan dos líneas, ej. "ALMACENAMIENTO INTERNO") y se recorta la lista a
-  // lo que entra, sumando un link al pie que abre el resto en un modal.
-  //
-  // La medición de las filas se hace sobre un clon oculto con TODAS las
-  // specs (nunca sobre la lista visible, que puede estar ya recortada) —
-  // así un resize que agranda la ventana puede volver a mostrar más filas,
-  // no solo achicar.
-  useLayoutEffect(() => {
-    if (!producto || producto.specs.length === 0) return
-    function recalcular() {
-      // Layout de una sola columna (celular/tablet, ver CSS_FICHA en @768px):
-      // la ficha ya no está al lado de nada, se ve completa siempre.
-      if (window.innerWidth <= 768) { setSpecsVisibles(null); return }
-      const colDerecha = colDerechaRef.current
-      const medicion = specsMedicionRef.current
-      const header = specsHeaderRef.current
-      if (!colDerecha || !medicion || !header) return
-      const ultimoHijo = colDerecha.lastElementChild as HTMLElement | null
-      if (!ultimoHijo) return
-      // El presupuesto para las FILAS es lo que queda entre el pie del
-      // encabezado "Características" (ahí arrancan) y el pie del último
-      // elemento de la columna derecha (la caja de envíos). OJO con dos
-      // errores fáciles de cometer acá:
-      // 1) NO restar contra el techo de colDerecha: la tarjeta de specs
-      //    arranca bien más abajo que ese techo (debajo de la foto/galería
-      //    de la columna izquierda) — medir desde ahí infla el presupuesto
-      //    con una altura que la tarjeta ni siquiera puede usar (bug real,
-      //    encontrado al verificar contra producción: nunca recortaba nada
-      //    porque el "disponible" resultante casi siempre daba de sobra).
-      // 2) NO leer colDerecha.getBoundingClientRect().height a secas — es un
-      //    item de este mismo grid (.sf-pd-main), y CSS Grid por default
-      //    estira ambas columnas a la altura de la MÁS ALTA de las dos; si la
-      //    ficha (sin recortar todavía, primera pasada) fuera más alta que
-      //    el contenido real de la derecha, ese alto estirado reflejaría el
-      //    propio alto de la ficha, no el de la columna — la cuenta se
-      //    muerde la cola. Comparando el PISO del último hijo contra el PISO
-      //    del encabezado (ambos ancenados en el documento, no en el grid
-      //    estirado) se esquivan los dos problemas de una.
-      const disponible = ultimoHijo.getBoundingClientRect().bottom - header.getBoundingClientRect().bottom
-      const filas = Array.from(medicion.children) as HTMLElement[]
-      const altoTotal = filas.reduce((acc, f) => acc + f.getBoundingClientRect().height, 0)
-      if (altoTotal <= disponible) { setSpecsVisibles(filas.length); return }
-      const ALTO_LINK = 41 // similar a una fila, para no romper el ritmo visual del corte
-      let usado = 0
-      let visibles = 0
-      for (const fila of filas) {
-        const alto = fila.getBoundingClientRect().height
-        if (usado + alto > disponible - ALTO_LINK) break
-        usado += alto
-        visibles++
-      }
-      setSpecsVisibles(Math.max(visibles, 1))
-    }
-    recalcular()
-    window.addEventListener('resize', recalcular)
-    // Un webfont que termina de cargar después del primer layout puede
-    // cambiar el alto real de las filas (aunque sea un pixel) — recalcular
-    // una vez más cuando eso pasa evita quedar con un corte levemente
-    // desalineado contra la columna derecha.
-    document.fonts?.ready.then(recalcular).catch(() => {})
-    return () => window.removeEventListener('resize', recalcular)
-    // `cargando` entra a propósito: `producto` ya puede estar seteado
-    // mientras todavía se está pidiendo la página de relacionados (ver el
-    // useEffect de arriba, cargando recién pasa a false en el .finally() de
-    // ESE fetch) — en ese momento el componente devuelve el SKELETON (early
-    // return de más abajo), que no tiene ninguno de los refs que este efecto
-    // necesita, y el guard de arriba corta en silencio. Sin `cargando` acá,
-    // este efecto no vuelve a correr cuando el contenido real recién se
-    // monta (la referencia de `producto` no cambia entre esos dos renders),
-    // y specsVisibles se queda en null para siempre (bug real, encontrado
-    // verificando contra producción: nunca recortaba nada).
-  }, [producto, cargando])
 
   async function enviarResenia() {
     if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
@@ -428,7 +353,7 @@ export default function ProductoDetalle() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
       </StorefrontChrome>
     )
@@ -567,7 +492,7 @@ export default function ProductoDetalle() {
         <div className="sf-pd-main" style={{ display: 'grid', gridTemplateColumns: '1fr 500px', gap: 60, marginBottom: 72 }}>
 
           {/* ── Galería + Características ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="sf-pd-col-izq" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
             <div className="sf-pd-gallery" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
 
@@ -578,6 +503,10 @@ export default function ProductoDetalle() {
                       key={img.url + i}
                       className="ds-hover"
                       onClick={() => setImgIdx(i)}
+                      // Como Mercado Libre: con el mouse encima ya se ve
+                      // grande, sin clic, y queda esa foto al salir. La del
+                      // video no: sin clic el navegador no deja que suene.
+                      onMouseEnter={() => setImgIdx(i)}
                       style={{
                         width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
                         border: `2px solid ${i === idxMostrado ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -632,13 +561,31 @@ export default function ProductoDetalle() {
                   // acá abajo, para que el salto entre foto y video no mueva
                   // el layout de alrededor.
                   <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 14, position: 'relative', overflow: 'hidden', background: '#000' }}>
+                    {/* Arranca solo apenas carga: se llega acá con un clic
+                        (miniatura o flechas). Si el navegador no deja que
+                        arranque con sonido, arranca en silencio y el cliente
+                        lo activa desde los controles. */}
                     {videoEmbed.tipo === 'file' ? (
-                      <video controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                      <video
+                        controls
+                        autoPlay
+                        playsInline
+                        onCanPlay={e => {
+                          // Solo la primera vez: canplay vuelve a dispararse
+                          // al adelantar, y ahí no hay que pisar una pausa.
+                          const v = e.currentTarget
+                          if (v.dataset.arranco) return
+                          v.dataset.arranco = '1'
+                          if (!v.paused) return
+                          v.play().catch(() => { v.muted = true; void v.play().catch(() => {}) })
+                        }}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                      >
                         <source src={videoEmbed.src} />
                       </video>
                     ) : (
                       <iframe
-                        src={videoEmbed.src}
+                        src={conAutoplay(videoEmbed.src)}
                         title={producto.name}
                         loading="lazy"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -719,59 +666,6 @@ export default function ProductoDetalle() {
               </div>
             </div>
 
-            {/* Ficha técnica: la carga el vendedor (a mano o con Orbi) al crear
-                el producto — si no cargó ninguna, la tabla entera no se
-                muestra (no hay nada genérico/mock que rellenar acá). Su
-                altura se recorta para no superar la de la columna derecha —
-                ver el useLayoutEffect de arriba — con un link al fondo que
-                abre el resto en un modal (FichaTecnicaModal). */}
-            {producto.specs.length > 0 && (() => {
-              const specsAMostrar = producto.specs.slice(0, specsVisibles ?? producto.specs.length)
-              const hayMas = specsVisibles !== null && specsVisibles < producto.specs.length
-              return (
-                <div className="sf-pd-belowimg" style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', marginLeft: anchoMiniaturas }}>
-                  <div ref={specsHeaderRef} style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
-                    Características
-                  </div>
-                  <div style={{ padding: '4px 0' }}>
-                    {specsAMostrar.map((c, i) => (
-                      <div key={`${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px', borderBottom: (i < specsAMostrar.length - 1 || hayMas) ? '1px solid var(--color-border)' : 'none' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
-                        <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {hayMas && (
-                    <button
-                      className="ds-hover"
-                      onClick={() => setFichaAbierta(true)}
-                      style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, textAlign: 'left', cursor: 'pointer' }}
-                    >
-                      Ver más detalles →
-                    </button>
-                  )}
-
-                  {/* Clon invisible con TODAS las specs (nunca recortado),
-                      usado solo para medir el alto real de cada fila — mismo
-                      ancho que la tarjeta real (mismo padre en columna, mismo
-                      criterio de stretch), overflow:hidden + height:0 lo saca
-                      de la vista sin sacarlo del layout. Así un resize que
-                      agranda la ventana puede volver a mostrar más filas, no
-                      solo recortar de más. */}
-                  <div aria-hidden style={{ height: 0, overflow: 'hidden', visibility: 'hidden' }}>
-                    <div ref={specsMedicionRef}>
-                      {producto.specs.map((c, i) => (
-                        <div key={`m-${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px' }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
-                          <span style={{ fontSize: 13 }}>{c.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
-
             {/* Envíos/cambios/pago — su lugar "de siempre" es la columna
                 derecha, pegado a los botones de compra (ver más abajo). Pero
                 sin ficha técnica (la mayoría de los productos no son
@@ -791,7 +685,7 @@ export default function ProductoDetalle() {
           </div>
 
           {/* ── Panel de info ── */}
-          <div ref={colDerechaRef}>
+          <div>
             {producto.categoryName && (
               <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
                 {producto.categoryName}
@@ -850,7 +744,7 @@ export default function ProductoDetalle() {
                     {producto.promo.scope === 'CATEGORY' ? (
                       <> combinando cualquier producto de la categoría <strong>{producto.promo.categoryName}</strong>.</>
                     ) : producto.promo.otherProducts.length > 0 ? (
-                      <> combinando este producto con {producto.promo.otherProducts.length === 1 ? 'el siguiente' : 'los siguientes'}:</>
+                      <> entre este producto y {producto.promo.otherProducts.length === 1 ? 'el siguiente' : 'los siguientes'} (la unidad más barata sale gratis):</>
                     ) : (
                       <> de este mismo producto — entre las unidades que elijas, la más barata sale gratis.</>
                     )}
@@ -881,7 +775,7 @@ export default function ProductoDetalle() {
                     ambigüedad, distinta según haga falta OTRO producto o no. */}
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                   {producto.promo.scope === 'PRODUCT' && producto.promo.otherProducts.length > 0
-                    ? `Agregá los ${producto.promo.otherProducts.length + 1} productos al carrito (en total, ${producto.promo.llevaCantidad} unidades) para que el descuento se aplique.`
+                    ? `Agregá ${producto.promo.llevaCantidad} unidades al carrito, del mismo producto o combinando los de arriba en cualquier orden, para que el descuento se aplique.`
                     : producto.promo.scope === 'CATEGORY'
                     ? `Agregá ${producto.promo.llevaCantidad} unidades de la categoría "${producto.promo.categoryName}" al carrito (pueden ser de distintos productos) para que el descuento se aplique.`
                     : `Agregá ${producto.promo.llevaCantidad} unidades de este producto al carrito para que el descuento se aplique.`}
@@ -1015,7 +909,7 @@ export default function ProductoDetalle() {
                     className="ds-hover"
                     disabled={!varianteSeleccionada || !enStock || restante === 0}
                     onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
-                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
+                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: agregado ? '#fff' : 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
                   >
                     {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
                   </button>
@@ -1067,8 +961,25 @@ export default function ProductoDetalle() {
           </div>
         </div>
 
-        {fichaAbierta && (
-          <FichaTecnicaModal nombre={producto.name} specs={producto.specs} onClose={() => setFichaAbierta(false)} />
+        {/* ══ CARACTERÍSTICAS ══ — sección propia de ancho completo, entre la
+            compra y el contenido de la ficha, completa y en dos columnas.
+            Antes iba debajo de la foto, recortada a la altura de la columna
+            de compra: con un nombre corto entraba una sola fila y el resto
+            quedaba detrás de "Ver más detalles" (pedido 29/09). */}
+        {producto.specs.length > 0 && (
+          <section style={{ marginBottom: 72 }} aria-labelledby="sf-pd-specs-titulo">
+            <h2 id="sf-pd-specs-titulo" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: '0 0 16px' }}>
+              Características
+            </h2>
+            <dl className="sf-pd-specs" style={{ margin: 0, borderTop: '1px solid var(--color-border)' }}>
+              {producto.specs.map((c, i) => (
+                <div key={`${c.label}-${i}`} className="sf-pd-spec">
+                  <dt style={{ fontSize: 13, color: 'var(--color-muted)' }}>{c.label}</dt>
+                  <dd style={{ margin: 0, fontSize: 14, fontWeight: 500, color: 'var(--color-text)' }}>{c.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         )}
 
         {/* ══ CONTENIDO DE LA FICHA ══ — videos alternados con texto que el
@@ -1131,7 +1042,7 @@ export default function ProductoDetalle() {
                 disabled={!textoResenia.trim() || enviandoResenia}
                 style={{
                   marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8,
-                  background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none',
+                  background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 13, fontWeight: 600, border: 'none',
                   cursor: (!textoResenia.trim() || enviandoResenia) ? 'not-allowed' : 'pointer',
                   opacity: (!textoResenia.trim() || enviandoResenia) ? 0.6 : 1,
                 }}
@@ -1144,7 +1055,7 @@ export default function ProductoDetalle() {
               <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
                 <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
-                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
+                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
               </div>
               {/* El velo que tapa el formulario. Antes era
                   `rgba(var(--color-bg-raw, 255,255,255), 0.72)`, pero
@@ -1183,7 +1094,7 @@ export default function ProductoDetalle() {
           </div>
         )}
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
   )

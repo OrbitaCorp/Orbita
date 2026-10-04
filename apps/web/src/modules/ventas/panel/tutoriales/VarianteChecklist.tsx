@@ -34,7 +34,7 @@ const SIDEBAR_DE: Record<string, string> = {
     configuracion: 'Configuración',
     categorias: 'Productos',
     catalogo: 'Productos',
-    dashboard: 'Dashboard',
+    dashboard: 'Inicio',
     // Segunda etapa.
     pedidos: 'Pedidos',
     clientes: 'Clientes',
@@ -470,7 +470,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                     <div key={t.id} style={{ borderTop: i === 0 || abreGrupo ? 'none' : '1px solid var(--color-border)' }}>
                         {abreGrupo && (
                             // Mismo tratamiento que los grupos del menú de
-                            // Configuración (ConfigSidebar.tsx): versalita
+                            // Configuración (Sidebar.tsx): versalita
                             // chica y apagada — ordena sin competir con los
                             // títulos de las tareas.
                             <div
@@ -586,7 +586,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                                     <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--color-body)' }}>{t.detalle}</div>
                                     {t.tip && (
                                         // Tip con la estética de Orbi (violeta + Sparkles, como el
-                                        // botón real "Generar con Orbi" de la pantalla de producto):
+                                        // botón real "Redactar con Orbi" de la pantalla de producto):
                                         // tokens --color-violet-bg / --chip-violet-fg del sistema.
                                         <div style={{
                                             display: 'flex', gap: 8, marginTop: 8, padding: '8px 10px',

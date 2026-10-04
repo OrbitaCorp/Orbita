@@ -5,6 +5,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { AuthError, googleLoginUrl } from '@/lib/auth/authClient'
 import { tenantUrl, apexUrl, sesionViajaASubdominios } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
+import { EstiloTurnos } from '@/modules/turnos/_shared/orbita/estilo'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
 
 // Login de DUEÑO (panel), servido en el apex: orbita.local/login.
 // Como no estamos en un subdominio de tienda, el AuthContext no manda
@@ -16,7 +18,7 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 // refresh token en una cookie httpOnly scopeada a `.orbita.local` (compartida).
 // Al aterrizar en {slug}.orbita.local/panel, el AuthProvider hace /api/auth/refresh
 // (la cookie viaja) y recupera un token nuevo. Ningún token viaja en la URL.
-export default function AdminLogin() {
+function LoginContenido() {
   const { login, verifyPlatformAdminCode } = useAuth()
   const router = useRouter()
   const [email,  setEmail]  = useState('')
@@ -128,20 +130,15 @@ export default function AdminLogin() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
-      <a href="/" className="ds-link" style={{
-        position: 'fixed', top: 24, left: 24,
+    <div className="lg-pagina" style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
+      <a href="/" className="ds-link lg-atras" style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         fontSize: 13, fontWeight: 500, color: 'var(--color-muted)',
         textDecoration: 'none',
       }}>
         <ArrowLeft size={15} strokeWidth={2} /> Atrás
       </a>
-      <div style={{
-        background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-        borderRadius: 16, padding: 36, width: 420,
-        boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-      }}>
+      <div className="lg-tarjeta">
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <OrbitaLogo size={44} />
         </div>
@@ -308,6 +305,65 @@ function Input({ type = 'text', value, onChange, placeholder, icon, rightIcon }:
         }}
       />
       {rightIcon && <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>{rightIcon}</span>}
+    </div>
+  )
+}
+
+// El mismo lienzo del alta y del pago (modules/turnos/onboarding/Alta.tsx):
+// fondo negro con el cielo de estrellas. `.tuo-espacio` redefine los tokens de
+// color a la paleta oscura, así que el formulario se pinta solo; el fondo de
+// página pasa a transparente para dejar ver el cielo.
+const CSS_FONDO = `
+  .lg-espacio.tuo-espacio { overflow: clip; min-height: 100vh; background: #000; }
+  .lg-espacio-cielo { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .lg-espacio > div:not(.lg-espacio-cielo) { background: transparent !important; }
+
+  /* La página y la tarjeta. Antes la tarjeta medía 420px fijos: en un celular
+     se salía de la pantalla y el "Atrás" (fijo arriba) le quedaba encima. */
+  .lg-pagina { box-sizing: border-box; padding: 72px 20px 40px; }
+  .lg-atras { position: absolute; top: 18px; left: 20px; min-height: 44px; padding: 0 6px; border-radius: 8px; }
+  .lg-tarjeta { box-sizing: border-box; width: 100%; max-width: 420px; padding: 36px; border-radius: 18px;
+    border: 1px solid var(--color-border); background: rgba(8,11,19,0.72);
+    -webkit-backdrop-filter: blur(14px) saturate(130%); backdrop-filter: blur(14px) saturate(130%);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
+  /* Autocompletado del navegador: Chrome pinta el campo de celeste claro y
+     desentona con el fondo. No se puede cambiar el background, pero sí taparlo
+     con una sombra interior del color del campo. */
+  .lg-tarjeta input:-webkit-autofill,
+  .lg-tarjeta input:-webkit-autofill:hover,
+  .lg-tarjeta input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text); caret-color: var(--color-text);
+    -webkit-box-shadow: 0 0 0 1000px #0B101D inset !important; box-shadow: 0 0 0 1000px #0B101D inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
+  /* Con foco, .ds-field pone su anillo con !important y pisaba el tapado de
+     arriba: quedaba el celeste claro de Chrome con el texto claro encima y no
+     se leía nada. Acá van los dos juntos: el tapado y el anillo. */
+  .lg-tarjeta input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #0B101D inset, 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+    box-shadow: 0 0 0 1000px #0B101D inset, 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+  }
+  /* Y sin autocompletar, el campo enfocado mantiene fondo oscuro y texto claro. */
+  .lg-tarjeta input, .lg-tarjeta input:focus { background-color: #0B101D !important; color: var(--color-text) !important; color-scheme: dark; }
+  @media (max-width: 480px) {
+    .lg-pagina { padding: 64px 14px 28px; place-items: start center !important; }
+    .lg-atras { left: 10px; top: 10px; }
+    .lg-tarjeta { padding: 26px 18px 22px; border-radius: 16px; }
+    .lg-tarjeta h1 { font-size: 20px !important; }
+    /* 16px: por debajo de eso iOS hace zoom solo al enfocar el campo. */
+    .lg-tarjeta input { font-size: 16px !important; }
+  }
+`
+
+export default function AdminLogin() {
+  return (
+    <div className="tuo-espacio lg-espacio">
+      <EstiloTurnos />
+      <style>{CSS_FONDO}</style>
+      <div className="lg-espacio-cielo" aria-hidden>
+        <EscenaEspacial planeta={false} />
+      </div>
+      <LoginContenido />
     </div>
   )
 }

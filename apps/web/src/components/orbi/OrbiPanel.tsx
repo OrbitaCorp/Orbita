@@ -1,22 +1,49 @@
 import { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { SquarePen, X } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
 import { useOrbiContext } from './useOrbiContext'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
+import { usePetEstado } from './pet/usePetEstado'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
 import { OrbiBottomSheet } from './OrbiBottomSheet'
 import { useMediaQuery } from './useMediaQuery'
+import { useDisponibilidadOrbi } from './useDisponibilidadOrbi'
+import { OrbiAvisoMantenimiento } from './OrbiAvisoMantenimiento'
 import { track } from '@/lib/analytics/wizardTracker'
+import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { ID_PANEL_ORBI, PLACEHOLDER_EN_MANTENIMIENTO } from './types'
+
+// Las cosquillas del encabezado no muestran texto: solo la reacción del pet.
+const sinAviso = () => {}
 
 export function OrbiPanel() {
   const isOpen = useOrbiStore(s => s.isOpen)
   const close = useOrbiStore(s => s.close)
+  const reset = useOrbiStore(s => s.reset)
+  const abortar = useOrbiStore(s => s.abortar)
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
   const isWizard = context.surface === 'wizard'
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const estadoPet = usePetEstado()
+  const mantenimiento = useOrbiStore(s => s.mantenimiento)
+  const router = useRouter()
+  useDisponibilidadOrbi(context.surface, isOpen)
+
+  // Mismo armado de la ruta que Soporte. Sin negocio identificable (no
+  // debería pasar en el panel) no se ofrece el botón.
+  const negocioId = currentSlug() ?? (typeof router.query.negocioId === 'string' ? router.query.negocioId : null)
+  const abrirManual = !isWizard && negocioId
+    ? () => {
+        const moduloPadre = typeof router.query.moduloPadre === 'string' ? router.query.moduloPadre : 'ventas'
+        void router.push(adminPath(negocioId, moduloPadre, 'manual'))
+        close()
+      }
+    : undefined
 
   useEffect(() => {
     if (!isOpen || !isWizard) return
@@ -50,6 +77,7 @@ export function OrbiPanel() {
       />
 
       <div
+        id={ID_PANEL_ORBI}
         className="orbi-panel-root"
         style={{
           position: 'fixed',
@@ -70,16 +98,16 @@ export function OrbiPanel() {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '14px 16px',
+          padding: '10px 16px',
           borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
         }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: '#3B82F6', display: 'grid', placeItems: 'center', flexShrink: 0,
-          }}>
-            <OrbiIcon size={17} color="white" />
-          </div>
+          {/* En el panel toma la forma del módulo y reacciona al chat; en "Crear tu
+              espacio" (wizard) queda en su forma base. */}
+          {/* Grande y sin disco: el pet suelto sobre el panel. Se le pueden hacer cosquillas. */}
+          {isWizard
+            ? <OrbiPet modulo="dashboard" size={56} onCosquillas={sinAviso} />
+            : <OrbiPet size={56} estado={estadoPet} onCosquillas={sinAviso} />}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
             {context.module && (
@@ -88,6 +116,31 @@ export function OrbiPanel() {
               </div>
             )}
           </div>
+          {/* Solo en el panel: el wizard no guarda la conversación en el
+              servidor, así que ahí no hay hilo que reiniciar. reset() corta
+              lo que esté en curso y el saludo vuelve a aparecer. El alto
+              visible es 32px; el margen negativo extiende el área táctil a
+              44px sin agrandar el encabezado. */}
+          {!isWizard && (
+            <button
+              type="button"
+              onClick={reset}
+              aria-label="Nueva conversación con Orbi"
+              className="orbi-foco"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                minHeight: 44, margin: '-6px 0', padding: '0 6px',
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                borderRadius: 8, font: 'inherit', fontSize: 12, fontWeight: 600,
+                color: 'var(--color-muted)', whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)' }}
+            >
+              <SquarePen size={14} strokeWidth={2} aria-hidden />
+              Nueva conversación
+            </button>
+          )}
           <button
             onClick={close}
             aria-label="Cerrar Orbi"
@@ -107,10 +160,18 @@ export function OrbiPanel() {
         {/* Messages */}
         <OrbiMessages />
 
+        {mantenimiento && <OrbiAvisoMantenimiento mensaje={mantenimiento} onAbrirManual={abrirManual} />}
+
         {/* Input */}
         <OrbiInput
           onSend={(message) => send(message, context)}
-          disabled={isStreaming}
+          disabled={isStreaming || mantenimiento !== null}
+          streaming={isStreaming}
+          onStop={abortar}
+          placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
+          // Solo en el panel: el wizard no guarda la conversación, y en la
+          // demo tampoco se guarda, así que la línea sería falsa.
+          conAviso={!isWizard && !esVisitanteDemo()}
         />
       </div>
 

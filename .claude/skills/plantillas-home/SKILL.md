@@ -1,990 +1,553 @@
 ---
 name: plantillas-home
-description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda, y el trabajo de enganchar cada una con la tienda real (las dieciseis ya se aplican). Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, enganchar una plantilla a datos reales, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el contrato de aplicación real (plantillaReal.ts, StorefrontChrome.tsx, PLANTILLAS_ENGANCHADAS, heroPropio/heroGrande), el estándar visual, de dónde salen las fotos, y el chequeo automático de las dieciséis en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, enganchar, aplicar."
+description: "Plantillas de Home de Órbita (paquete Avanzado): crear, modificar o revisar los diseños alternativos de la PORTADA de una tienda. Usar cuando el pedido sea agregar una plantilla nueva, cambiar el diseño o el editor de una existente, sumar un bloque al vocabulario de recetas, sumar fotos, o verificar que las plantillas anden (modo check). Cubre el modelo (diseño fijo de la plantilla + contenido editable por el dueño), las recetas y su editor generado, el modo check automático (`pnpm test plantillas`), el contrato con la tienda real (plantillaReal.ts, StorefrontChrome.tsx), el estándar visual y las fotos. Palabras clave: plantilla, plantillas, home, portada, template, theme, receta, bloque, check, verificar, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, lienzo, pulso, terracota, base, carbón, bloque, sobrio, roble, pétalo, sello."
 ---
 
 # Plantillas de Home
 
-Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las elige
-desde el panel: Avanzado → Plantillas de Home → Configurar. Hoy hay
-**veintiséis**, todas del módulo tienda, y **todas se pueden activar de
-verdad** en un negocio (ver § Cómo se aplica una plantilla, más abajo).
+Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las
+elige desde el panel: Avanzado → Plantillas de Home. Hay **veintiséis**, todas
+del módulo tienda, y todas se aplican de verdad en un negocio.
 
-Se escriben de dos formas —con bloque propio o con receta— y elegir bien cuál
-es la primera decisión: ver § Dos formas de escribir una plantilla.
+## El modelo, en cuatro líneas
 
-## Las cinco reglas que no se negocian
+1. **El diseño es de la plantilla y es fijo.** Paleta, tipografías, radio,
+   sombra, tipo de hero, forma de las categorías, orden de los bloques. El
+   dueño no los cambia: eligió la plantilla justamente por eso.
+2. **El contenido es el de Apariencia.** Todo lo que el dueño puede prender,
+   apagar y cargar en Configuración → Apariencia tiene que poder hacerlo igual
+   con una plantilla activa, con los mismos datos. La plantilla decide dónde
+   va cada cosa y cómo se ve; no decide qué hay. Ver § El estándar.
+3. **La funcionalidad es la de cualquier tienda de Órbita.** Buscador, cuenta,
+   carrito, los enlaces del menú, el pie con sus legales. Una plantilla no
+   agrega un ícono ni una página que la tienda no tiene, y no saca ninguno.
+4. **Una plantilla no está lista hasta que pasa el modo check.** No alcanza
+   con que la vitrina se vea bien: ahí siempre se ve bien.
 
-1. **La ESTRUCTURA de catálogo, ficha de producto, carrito, checkout y perfil no
-   cambia con ninguna plantilla** — mismos filtros, mismo carrito, misma
-   navegación. Si una propuesta es "una grilla con filtros distinta", eso es el
-   catálogo, no una portada — no va. Lo que SÍ cambia en esas páginas, cuando la
-   plantilla está enganchada de verdad (hoy Vidriera y Escaparate): la paleta y la
-   tipografía se heredan a todo el sitio vía `StorefrontChrome.tsx` — es una
-   decisión aparte y explícita (ver § Cómo se aplica), no una excepción a esta
-   regla. La ESTRUCTURA sigue siendo la de siempre en todas partes menos el home.
-2. **Una plantilla por vez pertenece a UN módulo.** Hoy las dieciséis son del
-   módulo **tienda**. Gastronomía, turnos y el resto van a tener las suyas. No
-   mezclar una carta de restaurante entre las de tienda.
-3. **Solo secciones que Órbita realmente genera.** El home real (ver
-   `cliente/inicio/Inicio.tsx`) tiene: cartel, hero, barra de stats,
-   categorías, filas de productos, banner de WhatsApp y pie. **No hay
-   newsletter, ni testimonios, ni planes por suscripción** — una plantilla que
-   los muestre promete algo que después la tienda no puede cumplir. Pedido
-   explícito del dueño: *"eso no lo ofrecemos"*. Mismo criterio para
-   `AccionesTienda`: el header real no tiene un ícono aparte de "Mis pedidos"
-   (vive adentro del menú de cuenta, junto con "Mi perfil" y "Mis direcciones")
-   — la maqueta no puede prometer un ícono que la tienda real no tiene.
+## El estándar
 
-   **Y tampoco DATOS que Órbita no tiene.** Esta es la mitad de la regla que se
-   escapó más veces, porque no se ve como una sección inventada sino como un
-   texto de relleno: un `−40%` sobre una categoría, un "ENVÍO GRATIS
-   +$120.000" en el cintillo, "9 sucursales", "4,9 de puntaje", "Algodón
-   orgánico certificado", "Retiro en 2 horas". Nada de eso sale de la base: son
-   los textos con los que se diseñó la plantilla, y en una tienda real son
-   promesas que el dueño nunca hizo.
+Una plantilla que traía una sola fila de productos, "Top ventas", no le servía
+a un negocio que recién empieza: no vendió nada, y no podía cambiarla. De ahí
+sale la regla: **toda plantilla ubica todos los bloques de Apariencia**, y el
+dueño decide cuáles se ven.
 
-   Hay que distinguir **etiqueta** de **afirmación**. "Más vendidos" describe
-   la sección y su `porDefecto` está perfecto; "3 CUOTAS SIN INTERÉS" dice algo
-   del negocio y va marcada `afirmacion: true` en `secciones.ts` — ver el punto
-   8 de § Lo que apareció DESPUÉS. La prueba: leer el texto poniéndole adelante
-   *"esta tienda garantiza que…"*. Si suena a algo que Órbita no puede saber,
-   es una afirmación.
-4. **Tienen que verse MUY distintas entre sí**, no la misma página repintada.
-   Lo que las diferencia de verdad: header propio, forma propia de mostrar el
-   producto, proporción propia de imagen y al menos una sección que las otras
-   no tengan. (Se probó unificarlas todas bajo el esqueleto de Vidriera y el
-   dueño lo volvió atrás: quiere variedad. Más tarde se agregó una tanda de
-   ocho nuevas mitad-y-mitad —cuatro con esqueleto propio, cuatro reusando
-   `tienda`— y las cuatro que reusaban `tienda` terminaron dándose de baja por
-   parecerse demasiado a Vidriera: **de acá en más, una plantilla nueva escribe
-   su propio esqueleto en `homes.tsx`**, salvo pedido explícito de lo
-   contrario.) `tienda` es el esqueleto de Vidriera, sigue disponible como tipo
-   por si hiciera falta, pero no es el default.
-5. **Las acciones de tienda son iguales en todas.** Ingresar / cuenta con "Mis
-   pedidos" adentro / Carrito con contador (`AccionesTienda`). Cambia la
-   portada, no la forma de entrar a la cuenta ni de comprar.
+| Bloque | Se prende y se carga en | Cuándo no se dibuja |
+|---|---|---|
+| Anuncio (fijo o cartelera) | Contenido → Textos de tu tienda | Apagado o sin texto |
+| Hero | Hero | Nunca: sin slides, uno neutro con el nombre del negocio |
+| Oferta con cuenta regresiva | Avanzado → Oferta relámpago | Sin una activa |
+| Barra de estadísticas | Contenido → Barra de estadísticas | Apagada o sin ítems |
+| Categorías | Contenido → Sección de categorías | Apagada o sin categorías |
+| Destacados | Contenido → Filas de productos | Apagado, o ningún producto con la estrella |
+| Nuevos ingresos | ídem | Apagado, o la tienda no tiene productos |
+| Recomendados | ídem | Apagado, o nada con reseñas ni en oferta |
+| Top ventas | ídem | Apagado, o todavía no hubo ventas |
+| Banner parallax | Contenido → Banner con efecto parallax | Apagado o sin foto |
+| Marcas | Contenido → Marcas con las que trabajás | Apagado o sin marcas |
+| Video | Contenido → Video en tu tienda | Apagado o sin un link válido |
+| WhatsApp | Contenido → WhatsApp | Apagado o sin número en Contacto |
+| Buscador | Contenido → Barra de búsqueda | Apagado |
+| Pie | Pie de página | Nunca: lleva los legales |
+
+Cómo funciona: `plantillaReal()` lee Apariencia y resuelve los interruptores
+**antes** del render (`contenidoDeApariencia`). Un estante apagado llega vacío;
+un parallax apagado o sin foto no llega. El bloque dibuja lo que hay, y una
+plantilla nueva respeta los interruptores sin escribir nada.
+
+- Los cuatro estantes se llenan con lo mismo que el home clásico: los pide
+  `Inicio.tsx` y llegan en `p.estantes`. No se barajan: "Top ventas" es un ranking.
+- En la **vitrina** no hay Apariencia: se ven Destacados y Nuevos ingresos con
+  los productos de muestra, y el `cartel` como anuncio. Parallax, marcas, video
+  y estadísticas no se ven ahí (no hay nada cargado), igual que en una tienda nueva.
+- Las **secciones propias** siguen existiendo (`franja`, `campana`, "El taller"
+  de Premium): son de la plantilla y se editan en la pestaña Secciones. Lo que
+  no puede pasar es que una sección propia duplique un dato de Apariencia.
+  Las recetas tenían un cintillo y un parallax propios; se unificaron, y lo
+  que una tienda ya había cargado ahí se sigue mostrando y se pasa a los
+  campos de Apariencia al abrir el editor (`pasarAApariencia`).
+
+### Cómo lo cumple cada tipo de plantilla
+
+**Con receta:** declara todos los bloques en su lista (el check falla si falta
+uno). El lugar y el estilo de cada uno son su diseño.
+
+**Con bloque propio:** dibuja con su diseño lo que la distingue, y lo demás
+sale de piezas comunes de `Home()`:
+
+- **Su fila de productos no tiene un estante fijo.** La sección se marca con
+  `estante: 0` en `secciones.ts` (`1` para una segunda fila, como en Vidriera
+  y Circuito). `plantillaReal()` le pasa en `p.productos` el **primer estante
+  con productos** —Destacados, si no Nuevos ingresos, si no Recomendados, si no
+  Top ventas— y en `p.productosSecundarios` el siguiente. Así la fila que
+  distingue a la plantilla nunca queda vacía porque el negocio no marcó
+  destacados o todavía no vendió.
+- **Su título sale del estante que le tocó** si el dueño no escribió uno
+  (`txt()` lo resuelve solo con `estante`). En el editor esos dos campos van
+  vacíos, con la aclaración, en vez de precargar "Top ventas".
+- **El título de cada estante se edita por estante**, no por fila: `seccionesDe()`
+  le suma a todo bloque propio cuatro secciones "Fila: Destacados / Nuevos
+  ingresos / Recomendados / Top ventas" (`est-<estante>`), con un solo campo.
+  Vale donde sea que ese estante se dibuje: en la fila propia (si el dueño no
+  le escribió un título a esa fila) o en una de las que agrega `resto()`.
+- **Una sección propia con productos que no es un estante** (el look de
+  Escaparate, los ambientes de Cobijo) los pide con `aparte(n, clave)`: salen
+  del catálogo salteando los que ya se ven en las filas. Con `p.productos` la
+  portada mostraba el mismo producto en la fila y otra vez más abajo.
+- **`{resto(n)}`** antes del cupón o del pie dibuja lo que el bloque no tiene:
+  los estantes que sobran (`n` es cuántas filas propias tiene), el parallax,
+  las marcas y el video, con el tema de la plantilla. `resto(n, true)` suma las
+  categorías, para la que no tiene una sección propia (Glow).
+- **`aviso` / `avisoCartelera`** en lugar de un cintillo propio: es el anuncio
+  de Apariencia. `{barraAnuncio}` para la que no tenía cintillo.
+- **`{buscador()}`** debajo del header: el buscador en celular.
+  `buscador(true)` si la barra tampoco lo trae en computadora.
+- **`hayFila`, `hayFila2`, `(p.categorias ?? []).length > 0`, `!sinWpp`**
+  delante de cada sección: sin productos, sin categorías o sin WhatsApp, la
+  sección no se dibuja. Un título arriba de una grilla vacía es peor que nada.
+
+**La oferta con cuenta regresiva** (paquete Avanzado) también entra: la dibuja
+la tienda (`acciones.renderOferta`) y la plantilla la ubica — pegada al hero en
+las recetas, al principio de `resto()` en las de bloque propio.
+
+**Estado:** las veintiséis cumplen el estándar y `PENDIENTES` está vacía.
+Sigue afuera la cantidad de productos de "Nuevos ingresos": con plantilla cada
+fila es de un renglón.
+
+### Nada de la maqueta en una tienda real
+
+La marca, la bajada, los productos, las categorías y el hero de muestra son
+para la vitrina. `plantillaReal()` los pisa **siempre**, también cuando el
+negocio no cargó los suyos:
+
+- sin bajada, el pie no escribe ninguna (antes quedaba la de la maqueta);
+- sin slides, un **hero neutro** con el nombre del negocio, su bajada y un
+  botón al catálogo, sobre un degradé del primario de la plantilla
+  (`heroNeutro`). Sin hero no se deja: en varias es media portada;
+- un texto de muestra que solo tiene sentido en el rubro de la maqueta se
+  calla con `afirmacion` (los maridajes de Bodega) o se cambia con
+  `porDefectoReal`.
+
+El check busca en la portada de la tienda de prueba cada uno de esos datos de
+muestra.
+
+## Las seis reglas que no se negocian
+
+1. **La ESTRUCTURA de catálogo, ficha, carrito, checkout y perfil no cambia.**
+   Una plantilla cambia la portada, y hereda su paleta, su tipografía y su
+   header al resto de la tienda (`StorefrontChrome.tsx`). Si la propuesta es
+   "una grilla con filtros distinta", eso es el catálogo: no va.
+2. **Una plantilla pertenece a UN módulo.** Hoy todas son de tienda. No mezclar
+   una carta de restaurante entre ellas.
+3. **Solo lo que Órbita realmente tiene.** Secciones: cartel, hero, barra de
+   stats, categorías, filas de productos, banner de WhatsApp y pie. No hay
+   newsletter, testimonios, reseñas ni suscripciones. Y tampoco **datos**
+   inventados: un "−40%", un "envío gratis desde $80.000", "9 sucursales", un
+   CUIT. En una tienda real son promesas que el dueño nunca hizo.
+4. **Tienen que verse MUY distintas entre sí.** No alcanza con cambiar el
+   color (ver § Que no se parezca a otra).
+5. **Comprar y entrar a la cuenta es igual en todas.** Cuenta con "Mis
+   pedidos" adentro y carrito con contador. Cambia cómo se ve, no qué hace.
+
+6. **En celular tiene que quedar tan bien como en computadora.** La mayoría de
+   los clientes de una tienda entra desde el teléfono: la versión de celular no
+   es la de escritorio achicada, se diseña. Ver § Celular.
 
 ## Dónde vive todo
 
 ```
 apps/web/src/modules/ventas/panel/avanzado/plantillas/
-  tipos.ts             Tema, Layout, Producto, Slide, Plantilla, IMG, sans/serif/ar
-  datos.tsx            PLANTILLAS[] — marca, tagline, tema, slides y productos de muestra
-  piezas.tsx           CSS + componentes compartidos + marcos Notebook/Celular
-  homes.tsx            Home({p, movil, soloCuerpo, acciones}) — un bloque
-                       `if (p.layout === '...')` por plantilla; soloCuerpo/acciones
-                       son el enganche con la tienda real (ver más abajo)
-  PlantillasConfig.tsx Pantalla del panel: galería → detalle. También el editor de
-                       apariencia de la plantilla ENGANCHADA (ver PLANTILLAS_ENGANCHADAS)
-apps/web/public/plantillas/   129 fotos JPG locales, ~20 MB (SÍ van a git desde
-                              que esto es una pantalla del panel, no una demo)
+  tipos.ts             Tema, Plantilla, Receta/BloqueReceta, CampoSeccion, AccionesHome
+  datos.tsx            PLANTILLAS[]: tema, receta y datos de muestra de cada una
+  homes.tsx            Home(): el render. Rama `if (p.receta)` + un bloque por layout propio
+  piezas.tsx           CSS, componentes compartidos, FUENTES_PLANTILLAS, marcos Notebook/Celular
+  secciones.ts         El editor: esquemaDeReceta() y SECCIONES_POR_PLANTILLA
+  plantillas.test.ts   El modo check
+  PlantillasConfig.tsx Galería y detalle en el panel
+apps/web/public/plantillas/            Fotos de muestra, locales (van a git)
 
 apps/web/src/modules/ventas/cliente/inicio/
-  Inicio.tsx           Home real. Con plantilla activa, dibuja PlantillaHome
-                       (el MISMO Home() de arriba) con datos reales
-  plantillaReal.ts     Adaptador: catálogo/categorías/stats reales → forma `Plantilla`
+  Inicio.tsx           La portada real: dibuja el MISMO Home() con datos reales
+  plantillaReal.ts     Adaptador: catálogo/categorías/stats reales → `Plantilla`
 apps/web/src/components/storefront/
-  StorefrontChrome.tsx Envoltorio de TODAS las páginas del storefront: header +
-                       anuncio + paleta/tipografía de la plantilla activa
-  StorefrontHeader.tsx El header real. Prop `centrado` = layout de Vidriera
-                       (logo centrado, buscador a la izquierda, nav debajo)
-  ProductCard.tsx      La tarjeta de producto real. Con `tema` (Tema de la
-                       plantilla) se dibuja en SU vocabulario visual; sin
-                       `tema`, con el de Apariencia de siempre
+  StorefrontChrome.tsx Envuelve TODAS las páginas: header, paleta, fuentes y CSS de la plantilla
+  ProductCard.tsx      La tarjeta real. Con `tema` se dibuja en el vocabulario de la plantilla
+apps/web/src/modules/ventas/panel/configuracion/Apariencia.tsx
+                       Con `soloContenido`, es el editor de la plantilla activa
+apps/api/src/businesses/dto/set-home-template.dto.ts
+                       HOME_TEMPLATES_DISPONIBLES: la lista que acepta la API
 ```
 
-`Avanzado.tsx` la engancha con `vista === 'plantillas'` (mismo patrón que
-`JuegosConfig`), sin ruta propia: el dueño nunca sale de la pantalla.
+La pieza central: **el mismo `Home()` dibuja la vitrina del panel y la tienda
+real.** Lo único que cambia son los datos (`plantillaReal()` pisa los de
+muestra) y `acciones`, que solo existe en la tienda y trae la navegación, el
+carrito y la tarjeta de producto de verdad.
 
-## Cómo se aplica una plantilla a una tienda real (las dieciséis)
+## Crear una plantilla
 
-Esto NO es una vitrina que no aplica nada — dejó de serlo. **Las dieciséis
-tienen el camino completo armado.**
+El camino por defecto es **con receta**: la plantilla declara qué bloques
+muestra y en qué orden, y el render y el editor ya existen.
 
-**El interruptor.** `PlantillasConfig.tsx`:
-
-```ts
-const PLANTILLAS_ENGANCHADAS = new Set(PLANTILLAS.map(x => x.id))
-```
-
-El `Set` quedó porque el gateo sigue existiendo —si mañana se agrega una
-plantilla a medio hacer, se la saca de acá y no muestra el botón— pero hoy
-están todas. **Ojo:** el backend tiene su propia lista
-(`HOME_TEMPLATES_DISPONIBLES` en `set-home-template.dto.ts`); si no coinciden,
-el panel ofrece una plantilla que la API rechaza con 400.
-
-Solo si `p.id` está en ese `Set` aparece el botón "Usar esta plantilla". Activarla
-llama a `panelSetHomeTemplate(id)`, que guarda `homeTemplate` en
-`storefront_config` (backend: `businesses.service.ts#setHomeTemplate`).
-
-**El render compartido.** `homes.tsx` exporta `Home({p, movil, soloCuerpo,
-acciones})` — la MISMA función dibuja el preview del panel (con datos de
-muestra) y el home real (con datos reales). Dos props hacen la diferencia:
-
-- `soloCuerpo?: boolean` — si es `true`, el bloque de la plantilla NO dibuja su
-  propio header/footer (porque `StorefrontChrome` ya puso el header real
-  arriba, y el home real trae su propio footer/WhatsApp). Sin esto, activar la
-  plantilla dibuja DOS headers superpuestos. **Ojo**: `soloCuerpo` gatilla el
-  header y el footer, pero NO necesariamente el hero — ver `heroPropio` más
-  abajo, Escaparate es el primer caso donde el hero se queda adentro de
-  `Home()` a propósito.
-- `acciones?: AccionesHome` — funciones reales para navegar (`irACatalogo`,
-  `irACategoria`, `irAProducto`, `abrirWhatsapp`, `irALink`) y sobre todo
-  `renderProducto(x, i, opts)`, que Inicio.tsx usa para dibujar la
-  `ProductCard` REAL (con carrito, variantes, stock) en vez de la tarjeta de
-  maqueta (que no tiene ninguna de esas cosas y siempre manda `precio: ''`).
-
-**Hoy `soloCuerpo`/`acciones`/`renderProducto` están conectados en los bloques
-`tienda` y `escaparate`** — el resto de los bloques de `homes.tsx` todavía
-ignora esas props. Activar cualquier otra plantilla hoy dibujaría el header de
-la maqueta encima del real, y productos sin precio — por eso no está en
-`PLANTILLAS_ENGANCHADAS` todavía.
-
-**El hero, cuando no es el carrusel genérico.** `HeroCarousel` (el real, en
-`Inicio.tsx`) es UN slide rotando a pantalla completa — no sabe dibujar nada
-estructuralmente distinto (dos campañas partidas, un muro sin hero, lo que
-sea). Dos flags en `Plantilla` (`tipos.ts`) resuelven esto sin hardcodear el id:
-
-- `heroGrande?: boolean` — pide el modo "grande" del `HeroCarousel` (tipografía
-  editorial 132/62px, CTA subrayado). Solo tiene sentido si la plantilla usa el
-  `HeroCarousel` genérico (como Vidriera). Reemplaza el viejo hardcode
-  `homeTemplate === 'vidriera'`.
-- `heroPropio?: boolean` — la plantilla dibuja SU PROPIO hero adentro de
-  `Home()`, no gateado por `soloCuerpo` (a diferencia del header/footer, sí se
-  sigue dibujando con datos reales). `Inicio.tsx` saltea su `HeroCarousel`
-  genérico para esa plantilla (`!plantilla?.heroPropio`), para no terminar con
-  dos heros superpuestos. Escaparate lo usa: sus "dos campañas partidas" leen
-  `p.slides.slice(0, 2)` — los MISMOS dos primeros slides que el dueño ya edita
-  en Apariencia (mismo editor, mismo dato, ninguna pantalla nueva) — y navegan
-  con `s.link` (el `ctaLink` real) vía `acciones.irALink`. Sin `kicker`:
-  Apariencia no tiene ese campo (es de la maqueta nomás), así que se dibuja
-  solo si vino de datos de muestra (`{s.kicker && (...)}`).
-
-**El adaptador.** `plantillaReal.ts` arma el objeto `Plantilla` con el que se
-dibuja el home real, a partir del catálogo/categorías/stats/cupón/hero de ESE
-negocio:
-
-- `definicionPlantilla(id)` — busca la entrada en `PLANTILLAS` por id.
-- `plantillaReal({ base, productos, destacados, masVendidos, categorias, stats,
-  cupon, heroSlides })` — devuelve `{ ...base, confianza, categorias, cupon,
-  productos, productosSecundarios }` con los datos reales pisando los de
-  muestra, y ADEMÁS pisa `slides` con los `heroSlides` reales SOLO si
-  `base.heroPropio` (si no, el campo se ignora — esas plantillas dibujan su
-  hero con `HeroCarousel` aparte, no con `p.slides`). Todo lo visual (tema,
-  tipografía, radios, sombras) sale de `base` sin tocar.
-- `headerCentrado(id)` — `true` si la plantilla marca `headerCentrado: true` en
-  su entrada de `datos.tsx`. Lo consume `StorefrontChrome` para decidir la
-  FORMA del header real en TODA la tienda (no solo el home) — a propósito,
-  pedido explícito: *"solamente quiero que el header cambie... en las otras
-  vistas"*. Hoy solo Vidriera lo marca (Escaparate usa el header por defecto,
-  no necesitó una forma nueva).
-- `variablesDeTema(tema)` — traduce el `Tema` de la plantilla a las variables
-  CSS del storefront (`--color-primary`, `--font-heading`, etc.).
-
-**El envoltorio único.** `StorefrontChrome.tsx` reemplaza el `<div>` raíz que
-antes cada página del storefront (Catálogo, Categoría, Producto, Carrito,
-Perfil, cupones, pedido/\*) copiaba a mano. Aplica `variablesDeTema(tema)` en su
-`<div>` raíz — se heredan a TODO lo de adentro — y decide la forma del header
-con `headerCentrado`. Por esto una plantilla enganchada repinta colores y
-tipografía en TODA la tienda, no solo el home; es intencional (pedido con
-capturas: *"no entiendo por qué no aplicás como componente?"*) y no contradice
-la regla 1 — la ESTRUCTURA de esas páginas no cambia, solo el color y la
-fuente.
-
-**La tarjeta de producto real.** `ProductCard.tsx` tiene DOS ramas de render:
-con `tema` (un `Tema` de plantilla) dibuja su propio vocabulario visual —radio,
-sombra, layout a sangre—; sin `tema`, la de siempre. Es el estándar para toda
-plantilla futura: **una plantilla define su tema y sus altos de grilla, la
-tarjeta real se adapta sola — nunca se escribe una tarjeta por plantilla.**
-
-**Cuando una funcionalidad de la maqueta no existe de verdad, se saca en el
-camino real, no se finge.** Escaparate tenía "Agregar" (agrega directo, sin
-pasar por el picker de variante) y "Agregar los 3 · $446.000" (combo de tres
-productos distintos de un tilde) — ninguna de las dos existe en el carrito de
-Órbita. Con `acciones` presente, "Agregar" pasa a decir "Ver" y navega a la
-ficha (ahí sí hay picker real), y el botón de combo directamente no se
-dibuja. Mismo criterio que newsletter/testimonios (regla 3), aplicado a
-interacciones, no solo a secciones.
-
-## El plan: dejar fina cada plantilla, una por una
-
-Las dieciséis ya se pueden activar y se dibujan con su diseño intacto (la
-inversión está explicada arriba: la maqueta ES el render real). Lo que queda es
-pulirlas de a una. **Premium es la referencia**: es la primera que pasó el
-checklist completo de abajo, y cada punto salió de un bug real encontrado
-probándola aplicada en una tienda con catálogo de verdad.
-
-Las dieciseis ya pasaron por acá (incluida Circuito, ver `headerLateral` abajo)
-y las dieciseis tienen su esquema en `secciones.ts`. El checklist queda como
-guía para la próxima plantilla que se agregue, y como lo que hay que revisar
-cuando se toque una existente.
-
-### Checklist por plantilla
-
-**A. Que funcione con datos reales**
-
-1. El bloque dibuja su header, su hero y su pie: marcarla con
-   `headerPropio`/`heroPropio`/`piePropio` en `datos.tsx` (las catorce ya lo
-   están). Vidriera y Escaparate son la excepción histórica: van con
-   `soloCuerpo` y la tienda real les pone el chrome.
-2. Cada grilla de productos usa `producto(x, i, opts)` (que enruta a
-   `acciones.renderProducto`), o al menos `abrir(x)` si la plantilla dibuja SU
-   propia tarjeta — el diseño de la tarjeta es parte de lo que la distingue, no
-   se reemplaza por la de Órbita; lo que se le enchufa es el click a la ficha,
-   que es donde vive el carrito real.
-3. Los links/CTAs sueltos pasan a llamar `acciones?.irACatalogo` /
-   `irACategoria` / `irAProducto` / `abrirWhatsapp` / `irALink` / `irAInicio`.
-4. El nav inventado del header pasa por `navDe(p.links ?? [...], acciones)`:
-   con tienda real son los enlaces de Apariencia, y en la vitrina siguen los de
-   muestra.
-5. **Las secciones de categorías usan `p.categorias`, nunca una lista fija.**
-   Premium tenía Anillos/Collares/Aros/Relojes clavadas, así que una tienda de
-   ropa mostraba categorías que no vende. Las de muestra van en `datos.tsx`
-   (`categorias`), que es lo que pisa `plantillaReal()`. Y la sección no se
-   dibuja si no hay ninguna.
-6. Cualquier interacción que Órbita no tenga (agregar sin variante, combos,
-   calculadoras, "armá tu setup") se saca o se cambia por una real cuando
-   `acciones` está presente — no se finge.
-
-**B. Que el chrome sea el de la plantilla, en toda la tienda**
-
-7. **El header no es del home: es de la tienda entera.** Separar el encabezado
-   del bloque en una variable y devolverlo con `soloHeader`, y sumar el layout
-   a `LAYOUTS_CON_HEADER_PROPIO` (homes.tsx). `StorefrontChrome` lo dibuja en
-   catálogo, ficha, carrito y perfil. Sin esto, la ficha de producto sale con
-   el header clásico de Órbita mientras la portada tiene el de la plantilla
-   (bug reportado con captura en Premium).
-8. **El buscador del header tiene que buscar de verdad**: `acciones.renderBuscador`
-   cuando está, y el dibujito solo en la vitrina. Lo mismo la marca, que con el
-   header en todas las vistas es la única forma de volver al inicio
-   (`irAInicio`).
-9. **La paleta y la tipografía de la plantilla mandan siempre**, en todas las
-   vistas y sin importar el modo oscuro del visitante (`variablesDeTema` en
-   `StorefrontChrome`, ya sin el viejo `!isDark`).
-10. **La `ProductCard` de todas las páginas recibe el tema**
-    (`temaDePlantilla(config?.appearance?.homeTemplate)`). Sin eso cae a su
-    rama por defecto y, en una plantilla oscura, los íconos flotantes de
-    "agregar" y "ver" salen blancos sobre la tarjeta (bug de "También te puede
-    gustar" en la ficha).
-11. Si el hero dibuja UN slide y Apariencia deja cargar varios, tiene que rotar
-    y traer navegación — ver `navHero` e `iActual` en el cuerpo de `Home()`.
-    Ojo: el estado va ahí arriba, sin condicionar; los bloques son ramas del
-    mismo componente y un hook adentro de un `if` no es válido.
-
-**C. Que el dueño pueda editarla**
-
-12. Declarar sus secciones propias en `secciones.ts`, **en el orden en que se
-    ven en la portada**, con su `porDefecto`. Ese texto vive SOLO ahí: lo leen
-    la portada (`txt()`) y el editor (que lo muestra precargado), así no se
-    desincronizan.
-13. Reemplazar los textos, fotos y números clavados del bloque por `txt()` /
-    `activo()`. Todo campo vacío tiene que caer a su `porDefecto`: una tienda
-    que no editó nada se ve idéntica a su vitrina.
-14. **Sacar del editor lo que esa plantilla no dibuja.** Si trae su propio
-    cintillo (`headerPropio`), el anuncio de Apariencia no aplica; si trae su
-    propia franja, marcar `usaStats: false` (diez ya lo están). Si no queda
-    nada, la pestaña "Contenido" no se muestra. Un interruptor que no mueve
-    nada es peor que no tenerlo.
-15. Si la plantilla tiene una franja de texto, evaluar el campo `switch` de
-    cartelera (como el cintillo de Premium) en vez de dejarla siempre fija.
-
-**D. Antes de darla por lista**
-
-16. Confirmar que `plantillaReal()` cubra todo lo que esa plantilla muestra.
-17. Probarla en una tienda real con catálogo de verdad y con los casos límite:
-    categorías sin foto, sin cupón, sin stats, hero con menos slides de los que
-    espera.
-18. `npx tsc --noEmit`, `npx eslint` y el chequeo de `referencia/verificacion.js`
-    en las dos vistas — enganchar no exime de verificar la vitrina.
-
-### El header lateral de Circuito
-
-`StorefrontHeader.tsx` sigue sabiendo dibujar solo DOS formas (la de siempre y
-`centrado`), pero eso ya no importa: con `soloHeader` cada plantilla pone SU
-propio header en todas las vistas.
-
-El caso raro es **Circuito**: su header no es una franja arriba sino una
-columna al costado, así que el contenido de la página va a su DERECHA y no
-debajo. Se resuelve con `headerLateral: true` en `datos.tsx`
-— `StorefrontChrome` arma una fila y mete `children` adentro, en vez de
-apilarlos. En celular no aplica: ahí el propio bloque dibuja una barra común
-arriba y se apila como el resto, por eso `headerLateral` se mira junto a
-`useMovilPlantilla()`. Si aparece otra plantilla con panel lateral, marcarla
-igual; no hace falta tocar el chrome.
-
-Ojo con `movil`: el chrome lo tenía clavado en `false`, y eso le servía el
-navbar de escritorio —columna de 232px incluida— a quien entraba desde el
-teléfono al catálogo o a una ficha. Sale de `useMovilPlantilla()`, que arranca
-en `false` para que hidrate igual que el SSR.
-
-## Piezas compartidas (usarlas antes de escribir una nueva)
-
-`Reveal` (scroll-reveal), `Foto` (con segunda imagen al hover, y fondo degradé
-si `src` es un `linear-gradient(...)` en vez de una URL — así se ve la tienda
-real sin fotos cargadas), `Estrellas` (sin uso en la tarjeta de producto real:
-Órbita no tiene valoraciones, ver regla 3), `Card`, `Boton`, `Titulo`,
-`Marquee`, `AccionesTienda`, `HeaderCentrado`, `HeaderLateral`, `Carrusel`,
-`Beneficios`, `Resenas`, `Newsletter`, `Pie`, `Notebook`, `Celular`, `TONOS`,
-`CSS`, `cargarFuentes`.
-
-`Tira` (fila horizontal con snap) vive en `homes.tsx`, no en `piezas.tsx`.
-
-## El estándar visual
-
-Referencia del dueño: **travistrend.com.ar**, y el nivel de las theme stores de
-Shopify/Tiendanube. Lo que separa esto de un wireframe:
-
-- **Detalle en la tarjeta de producto**: segunda foto al hover, swatches de
-  color, aviso de stock, precio con transferencia y cuotas. Sin estrellas ni
-  reseñas — ver regla 3.
-- **Movimiento**: reveals al scrollear, zoom lento en las fotos, carrusel que
-  avanza solo, marquee.
-- **Profundidad**: sombras propias del tema (`tema.sombra`), no una sombra
-  genérica para todas.
-- **Fotos reales**, nunca bloques de color (salvo el degradé de respaldo, ver
-  `Foto` arriba).
-- Cada plantilla trae **su tipografía** (`fh` títulos / `fb` cuerpo) y **su
-  radio** (`radio: 0` para las duras, 10–16 para las amables).
-
-## Tipografías
-
-`loadFont()` de `lib/fonts.ts` NO sirve acá: solo conoce las siete familias que
-el dueño puede elegir en Apariencia y, para cualquier otra, arma un `<link>`
-roto (`family=undefined`). Las plantillas tienen su propio cargador,
-`cargarFuentes()` en `piezas.tsx`, con la lista `FUENTES_PLANTILLAS` y los pesos
-exactos que se usan (varias piden 800/900, que los specs de Apariencia no
-traen). Fuente nueva → agregarla ahí, no en `lib/fonts.ts`, y chequear que
-exista antes de usarla:
-
-```bash
-curl -o /dev/null -w "%{http_code}\n" "https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700"
-```
-
-Y al revés: si una plantilla se da de baja, sacar su fuente de la lista SI
-ningún otro la usa (`grep` el nombre en `datos.tsx` antes de tocar
-`FUENTES_PLANTILLAS`).
-
-## Fotos
-
-Son **locales a propósito**: con URLs remotas la pantalla se ve rota sin
-internet y depende de un tercero.
-
-- Fuente que funciona: `https://images.unsplash.com/photo-{id}?w=1400&q=80`.
-  `picsum.photos` está bloqueado y `source.unsplash.com` devuelve 503.
-- **De dónde salen los ids**: `curl` a `unsplash.com/s/photos/{búsqueda}` está
-  bloqueado. Lo que sí anda: abrir esa URL en el navegador del Browser pane y
-  sacarlos del DOM, que además trae el `alt` traducido y dice qué es cada foto
-  antes de bajarla:
-  `[...document.querySelectorAll('figure img')].filter(i => i.src.includes('images.unsplash.com')).map(i => ({ id: (i.src.match(/photo-([0-9a-f-]+)/)||[])[1], alt: i.alt }))`
-  El filtro por host no es opcional: las de `plus.unsplash.com` son de pago y
-  bajan un `<html>404</html>` con extensión `.jpg` (7 de 48 en una tanda).
-- Bajarlas a `apps/web/public/plantillas/` con nombre por rubro:
-  `joya-collar.jpg`, `tech-teclado.jpg`, `moda-mujer-invierno.jpg`.
-  Prefijos en uso: `vidriera- casa- tech- moda- belleza- comida- joya- local-
-  editorial- relato- libre- ferre- dep- masc- vino- bebe-`.
-- **Verificar cada id con curl antes de asignarla** y mirarlas todas juntas en
-  una hoja de contactos (ver `referencia/fotos.md`) — bajar a ciegas termina en
-  una foto que no tiene nada que ver. El `alt` tampoco alcanza solo: una foto
-  de "frasco de vidrio con líquido marrón" resultó ser un frasco de páprika con
-  la etiqueta a la vista, que se iba a vender como miel.
-- **Que no desentonen con la paleta.** Una hoja verde tropical adentro de una
-  joyería carbón y dorado arruina la fila entera.
-- **Sin repetir la misma foto dos veces en pantalla** (una en el mosaico de
-  categorías y otra en la fila de productos se nota y se lee como vagancia).
-- **Chequear duplicados por hash**, no de memoria: dos ids distintos de Unsplash
-  pueden traer el mismo archivo.
-  `md5sum *.jpg | awk '{print $1}' | sort | uniq -d`
-
-## Agregar una plantilla nueva
-
-1. **Fotos primero.** Bajar 8–12 del rubro, verificarlas, hoja de contactos.
-2. `tipos.ts`: sumar el id al `type Layout`.
-3. `datos.tsx`: entrada nueva con `id`, `nombre`, `para`, `queCambia`,
-   `secciones[]`, `marca`, `tagline`, `layout`, `tema`, `slides[]`, `productos[]`.
-   `queCambia` se muestra en el panel: que diga qué la hace distinta, no adjetivos.
-4. `homes.tsx`: bloque `if (p.layout === 'nuevo') { ... }` con esqueleto
-   **propio** (ver regla 4 — reusar `tienda` es la excepción, no el default).
-   Empezar por el header (con `<AccionesTienda t={t} movil={movil} />`, y
-   envuelto en `{!soloCuerpo && (...)}` si de entrada se piensa engancharla),
-   seguir por el hero y después las secciones.
-5. Todo bloque que no sea header ni hero va envuelto en `<Reveal>`.
-6. Cada medida con su variante `movil ? x : y`. Usar el helper `cols(d, m)`.
-7. Actualizar el conteo de plantillas en la bajada y el comentario de arriba de
-   `PlantillasConfig.tsx`. Y cuidado con las comparaciones que envejecen dentro
-   de `queCambia` ("la más sobria de las X" miente en cuanto entra una más).
-8. `npx tsc --noEmit` y `npx eslint src/modules/ventas/panel/avanzado/plantillas`.
-   Los warnings de `no-img-element` son esperados (ver Convenciones).
-9. Correr el chequeo de `referencia/verificacion.js` en las dos vistas, y
-   **mirar la nueva con los ojos**: el script no dice si una foto miente ni si
-   el hero se lee.
-
-Si además se va a enganchar con la tienda real desde el arranque, seguir
-también el checklist de § El plan de acá arriba.
-
-### Ocultar o dar de baja una plantilla
-
-`oculta: true` en la entrada la saca de la galería sin borrar nada (para
-guardarla "por si se pide de vuelta"). **Dar de baja de verdad** (como pasó con
-cuatro plantillas que se parecían demasiado a Vidriera) es otra cosa: sacar la
-entrada de `datos.tsx`, sacar sus fotos de `apps/web/public/plantillas/` SI son
-exclusivas (`grep` el prefijo en `datos.tsx` antes de borrar — puede estar
-compartido), sacar su fuente de `FUENTES_PLANTILLAS` SI nadie más la usa, y
-actualizar el conteo en `PlantillasConfig.tsx` y esta skill. Si la plantilla
-llegó a estar en `PLANTILLAS_ENGANCHADAS`, sacarla de ahí primero y coordinar
-con cualquier negocio que la tuviera activa antes de borrar sus datos.
-
-## Verificación (obligatoria antes de decir que está listo)
-
-Pegar `referencia/verificacion.js` en la consola del panel, en
-`/admin/{negocioId}/ventas/avanzado?vista=plantillas`. Va de a una plantilla
-(`__chequear(0..15)`) porque varias juntas pasan el timeout de CDP (45 s): de a
-tres entra, de a cinco+ se corta o da falsos positivos (ver más abajo).
-
-Tiene que dar, en **escritorio y celular**: `rotas: 0`, `desborda: false`,
-`ocultas: 0`. Cualquier otra cosa es un bug, no un detalle.
-
-**La pestaña tiene que estar ADELANTE mientras corre.** En una pestaña de fondo
-Chrome congela los timers y el IntersectionObserver: el reveal no dispara nunca
-y `ocultas` da distinto de cero aunque no haya nada roto. El script avisa —
-chequear `document.visibilityState === 'visible'` antes de creerle al número.
-
-**Ni siquiera con la pestaña adelante, de a cinco o más seguidas da confiable**:
-un `__chequear` puede devolver "sin marco" o `ocultas` de más por una
-condición de carrera entre clicks — antes de reportar un bug real, repetir esa
-plantilla SOLA.
-
-**Sin backend a mano**, la pantalla corre sola: una página temporal en
-`apps/web/src/pages/` que devuelva `<PlantillasConfig onVolver={() => {}} />`
-alcanza — no llama a la API con éxito, y `useAuth`/`panelGetAppearance` fallan
-en silencio (la vitrina sigue andando, solo no hay ninguna enganchada). Borrarla
-antes de commitear.
-
-**Con el Browser pane oculto la página no hace layout**: el primer `.click()`
-programático no hace nada y `getBoundingClientRect()` da todo en cero. Frontear
-la pestaña y sacar un screenshot una vez destraba el layout; después el resto
-del chequeo corre igual con el pane escondido.
-
-**Para sacar capturas**, apagar el movimiento primero, si no el screenshot se
-corta por timeout y el carrusel aparece a mitad del fade:
-
-```js
-const s = document.createElement('style')
-s.textContent = '.pl-slide{animation:none!important;opacity:1!important}.pl-marquee-track{animation-play-state:paused!important}.pl-reveal{opacity:1!important;transform:none!important;transition:none!important}'
-document.head.appendChild(s)
-```
-
-Y para que entre la página entera en una captura, `document.documentElement.style.zoom = '0.62'`.
-
-## Lo que apareció DESPUÉS de dar las dieciséis por terminadas
-
-Las dieciséis pasaron el checklist y se aplicaban con su diseño intacto. Aun
-así, probándolas en una tienda real con catálogo de verdad salieron estos
-bugs. **Todos son de la misma familia**: algo que la maqueta resolvía con un
-valor fijo y que en la tienda real tiene que salir de los datos. Revisar los
-cinco puntos de acá abajo en cualquier plantilla nueva, antes de darla por
-lista.
-
-### 1. Lo que solo estaba en la portada
-
-`Inicio.tsx` inyectaba `PLANTILLA_CSS` y llamaba a `cargarFuentes()`. Las dos
-cosas valían **solo en el home**. En el catálogo y en la ficha:
-
-- Sin `.pl-media .pl-b { position: absolute; opacity: 0 }`, la segunda foto de
-  la tarjeta no se apilaba sobre la primera: **se dibujaba al lado**, y el
-  crossfade del hover no existía. Se reportó como "se ven dos imágenes en el
-  product card" en *También te puede gustar*.
-- Sin `cargarFuentes()`, las variables CSS decían la tipografía de la
-  plantilla pero el archivo de la fuente nunca se bajaba: caía al fallback.
-
-Las dos viven ahora en `StorefrontChrome`, que envuelve TODAS las vistas.
-**Regla: lo que la plantilla necesita para verse bien no puede vivir en
-`Inicio.tsx`.** Si la plantilla se ve en otra vista, va en el chrome.
-
-### 2. Fondo clavado + tinta del tema (o al revés)
-
-Dos bugs de contraste, el mismo patrón:
-
-- El velo de "Solo compradores verificados" era
-  `rgba(var(--color-bg-raw, 255,255,255), 0.72)` — y **`--color-bg-raw` no
-  existe en ningún lado del repo**, así que el fallback blanco se aplicaba
-  siempre. Sobre una plantilla oscura quedaba un parche gris ilegible.
-- Las flechas de la galería son una pastilla blanca fija (correcto: van sobre
-  la foto del producto) pero con `color: var(--color-text)`. En plantilla
-  oscura: chevron casi blanco sobre blanco.
-
-**Regla: si el fondo va clavado, la tinta también; si la tinta sale del tema,
-el fondo también.** Mezclarlas es lo que rompe. Para velos, `color-mix(in
-srgb, var(--color-bg) 78%, transparent)` — que ya es convención del repo.
-Y antes de usar una variable CSS, `grep` que esté definida: una var
-inexistente no falla, cae al fallback en silencio.
-
-### 3. Datos que el adaptador arma y el bloque no dibuja
-
-`plantillaReal.ts` ya calculaba el precio con transferencia y lo dejaba en
-`x.transfer`, pero **once plantillas que dibujan SU PROPIA tarjeta nunca lo
-pintaban**. Solo Corralón y Nítida lo hacían.
-
-**Regla: si la plantilla arma su propia tarjeta, tiene que dibujar todo lo que
-`aProductoPlantilla()` rellena**, no solo `nombre`/`precio`/`img`. Hoy eso es
-`antes`, `transfer` y `variantOptions`. Las que van por `producto()` →
-`ProductCard` o por la `Card` de `piezas.tsx` lo heredan gratis — preferirlas.
-Y guardar siempre (`{x.transfer && ...}`): sin guarda queda un div vacío
-metiendo aire cuando la tienda no tiene ese descuento. En los bloques que
-parten celular/escritorio, guardar además con `movil &&` o se duplica.
-
-### 4. Enlaces que no son enlaces
-
-En el pie, los ítems de columna se dibujaban como `<div>` — sin `href` ni
-`onClick`. **Ningún enlace del footer navegaba a ningún lado**, en las catorce
-plantillas.
-
-**Regla: cualquier cosa que parezca clickeable tiene que serlo.** Después de
-enganchar una plantilla, `grep` por `accion="` sin `onAccion`, por `<Boton`
-sin `onClick` y por columnas de texto que deberían ser `<a>`. En esta pasada
-aparecieron **ocho** `<Titulo>` con un "Ver todo →" a la derecha que no hacía
-nada.
-
-### 5. El pie es contenido real, no decoración
-
-El pie era la maqueta entera en producción: categorías que la tienda no tiene,
-y un `cierre` clavado en `homes.tsx` — **once plantillas** mostraban cosas
-como `CUIT 30-71234567-8`, `Local en Av. Rivadavia 4820` o `Vinoteca en
-Palermo` en tiendas de verdad. Un CUIT falso.
-
-Peor: al pie de la plantilla le faltaba lo que `StorefrontFooter` tiene **por
-obligación legal** — Términos, Política de privacidad y el botón de
-Arrepentimiento/Devolución (RBT-683). En el home de esas catorce no estaban,
-aunque en el catálogo y la ficha sí.
-
-**Regla: el pie de una plantilla aporta DISEÑO, nunca contenido.** Las
-dieciséis llamadas a `<Pie>` eran idénticas — el "pie propio" era solo color y
-tipografía. El contenido lo arma `pieReal()` en `plantillaReal.ts` con las
-mismas columnas que `StorefrontFooter`. Si mañana se agrega algo legal al pie
-normal, hay que agregarlo también acá.
-
-### 6. Los toggles de Apariencia que la plantilla ignora
-
-"Mostrar footer" no lo respetaban las plantillas con `piePropio`: el que lo
-chequeaba era `StorefrontFooter`, que ahí ni se dibuja. Ahora va por
-`ocultarPie`.
-
-**Regla: cuando una plantilla reemplaza un componente de Órbita, hereda sus
-toggles.** Antes de dar por listo el reemplazo, mirar qué banderas de
-Apariencia leía el componente original (`showFooter`, `showSocialFooter`,
-`showStatsBar`, `showWhatsapp`…) y pasarlas.
-
-### 7. El navbar es contenido real, igual que el pie
-
-Mosaico dibujaba en su header un `☰` decorativo, la marca y las acciones — y
-**ningún enlace**. Desde la portada de una tienda real no había forma de llegar
-a Catálogo, a Ofertas ni a las categorías.
-
-**Regla: los enlaces del nav son los MISMOS que el header de Órbita.** Salen de
-`acciones.nav` (que arma `navRealDe()` con los `headerLinks` de Apariencia,
-categorías `cat:<slug>` incluidas). Lo propio de la plantilla es **cómo se
-ven**, no cuáles son — igual que el pie. Y "Estilo de header" de Apariencia
-vale aunque haya plantilla activa: `minimal` saca el nav en las catorce a la
-vez (resuelto adentro de `navDe()`), `standard`/`centered` ubican. La única
-excepción es `centrado`, que para Vidriera es identidad.
-
-### 8. `porDefecto` que promete algo es una mentira en producción
-
-El más caro de todos, y el que más se repitió: **46 campos** en las dieciséis.
-
-Mosaico mostraba `−40%`, `−25%` y `−30%` sobre las categorías de una tienda que
-nunca cargó esos descuentos. Casi todas prometen algo en el cintillo
-(`3 CUOTAS SIN INTERÉS`, `ENVÍO GRATIS +$120.000`, `GARANTÍA OFICIAL 12 MESES`)
-y varias inventan cantidades (`+18.000` clientes, `9` sucursales, `4.100`
-piezas, `26` años, `4,9` de puntaje), certificaciones, plazos de entrega y
-hasta precios (la lista de Papelería).
-
-El problema **no es el texto, es dónde vive**: `porDefecto` se usa en los dos
-mundos. Lo que en la vitrina del panel está bien —vende la plantilla— en una
-tienda real es una promesa que el dueño nunca hizo.
-
-**Regla: distinguir ETIQUETA de AFIRMACIÓN.**
-
-- *Etiqueta* ("Más vendidos", "Comprá por categoría", "Ambiente 1"): describe
-  la sección. Su `porDefecto` está perfecto.
-- *Afirmación* (un descuento, un envío gratis, una cuota, un plazo, una
-  cantidad, una certificación, un precio): dice algo del negocio. Va marcada
-  con `afirmacion: true` en `secciones.ts`.
-
-`txt()` en `homes.tsx` solo cae al ejemplo de una afirmación cuando **no** hay
-`acciones` — y `acciones` existe únicamente en la tienda real, así que la
-vitrina se sigue viendo completa. En el editor esos campos van como
-*placeholder*, no precargados: con el valor puesto, guardar sin tocarlo
-alcanzaría para afirmarlo.
-
-**Al marcar una afirmación, guardar el render.** Con el texto vacío no puede
-quedar nada colgado: sin cintillo no se dibuja la franja de color, un par
-número+etiqueta se filtra entero (un "años" sin el 26 adelante no dice nada,
-y ojo con el orden — la ficha de Nocturno es `[etiqueta, valor]` y filtraba por
-la etiqueta), y una banda entera que se queda sin su frase se saca completa en
-vez de dejar medio fondo con un botón suelto.
-
-**La prueba rápida:** leé el texto en voz alta poniéndole adelante "esta tienda
-garantiza que…". Si suena a algo que Órbita no puede saber, es una afirmación.
-
-### 9. Un control decorativo es peor que no tenerlo
-
-El `☰` de Mosaico, Premium, Bodega y `HeaderCentrado` era un glifo dibujado.
-En escritorio **sobraba** —los enlaces ya están a la vista— y en celular era
-**peor**: el nav se esconde con `!movil`, así que era el único control que
-prometía navegación y no hacía nada. Una tienda sin forma de llegar al catálogo
-desde el teléfono.
-
-**Regla: el navbar tiene que funcionar en las dos pantallas.** Si el nav se
-esconde en celular, hay que poner `MenuMovil` (piezas.tsx) — panel lateral con
-los mismos `acciones.nav`, pintado con el tema de la plantilla. Y si un control
-no lleva a ningún lado en esa vista, se saca: no se deja "de adorno".
-
-Dos detalles al usarlo:
-
-- **En la vitrina del panel se queda como el glifo.** Un panel con
-  `position: fixed` se escaparía del marco del celular dibujado y taparía el
-  panel entero. `MenuMovil` lo resuelve solo mirando `acciones`.
-- **Dónde ubicarlo lo dice el header.** En las filas inline va donde estaba el
-  nav; en los headers centrados (Crecer, Glow) va absoluto a la izquierda,
-  espejando las acciones que ya están absolutas a la derecha.
-
-Y los enlaces necesitan **hover**: sin él la única señal de que son clickeables
-es el cursor. La clase compartida es `.pl-nav`, y va por **opacidad +
-subrayado, no por color** — así sirve igual en las paletas claras y en las
-oscuras sin pedirle a cada plantilla un tono de hover que hoy no define.
-
-### 10. "Rellenar con lo primero que haya" tampoco es contenido real
-
-Al enganchar una plantilla, la tentación es que ninguna sección quede vacía. El
-atajo de siempre: tomar las primeras N categorías o los primeros N productos.
-Pasó en Nocturno con "Armá tu setup" —los tres pasos eran
-`p.categorias.slice(0, 3)`— y **no significa nada**: qué va en un recorrido de
-tres pasos es una decisión del dueño, no el orden en que tenga cargadas las
-categorías.
-
-**Regla: `slice(0, n)` sirve para una FILA, no para una SELECCIÓN.**
-
-- *Fila* ("Más vendidos", "Destacados"): mostrar los primeros N está bien, el
-  criterio es la fila misma.
-- *Selección* (tres pasos, un antes/después, una pieza del mes, un combo): lo
-  elige el dueño, con el tipo de campo `seleccion`.
-
-`seleccion` (`TipoCampo` en tipos.ts) guarda `cat:<slug>` o `prod:<id>` —con
-prefijo, igual que los `headerLinks`, para que una categoría y un producto no
-choquen nunca— y el panel dibuja un desplegable con el catálogo real agrupado.
-Lo resuelve `elegido()` en `homes.tsx` contra `p.categorias` y `p.catalogo`; si
-lo elegido se borró después devuelve `null`, y la tarjeta se saltea en vez de
-romperse.
-
-**Pero "no elegido" NO significa "no dibujar la sección".** Ese fue el primer
-intento en Nocturno y salió mal: la portada perdía una sección entera y se
-reportó como si la hubieran borrado. Una tienda recién configurada tiene TODOS
-los campos vacíos — si cada sección elegible desaparece hasta que el dueño la
-complete, la plantilla que eligió no se parece a la que vio en la vitrina.
-
-Lo correcto es `lugares(n, seccion, clave)`: lo elegido manda, y los lugares
-sin elegir se llenan con el catálogo igual que cualquier otra fila. Ni se
-rellena "porque sí" con las primeras N categorías, ni desaparece.
-
-Esto convive con la regla de las afirmaciones (punto 8) sin contradecirla: un
-texto que promete algo se calla hasta que lo escriban, porque decirlo sin que
-sea cierto es peor que no decirlo. Un lugar de una grilla no promete nada —
-mostrar un producto del catálogo ahí es verdad igual. **Callarse aplica a las
-afirmaciones, no al layout.**
-
-### 11. Una sección que el dueño tiene que llenar a mano no es una función
-
-La comparativa de Nocturno ("¿Cuál te conviene más?") era una tabla de tres
-modelos con sus specs y sus precios, inventada. Al sacarle los datos falsos
-quedó como cinco campos de texto libre con formato `etiqueta | col1 | col2 |
-col3`. Se sacó entera.
-
-**Regla: si al quitarle lo inventado una sección queda en "escribí vos una
-tabla de 5×4", la sección no va.** Órbita no tiene con qué llenarla, y pedirle
-eso al dueño para que se vea algo no es una función: es un formulario. Antes de
-pelear por conservar una sección, preguntarse qué dato REAL la llena.
-
-### 12. Un número es una afirmación cuando su etiqueta lo vuelve una
-
-El barrido del punto 8 marcó 46 campos pero se salteó dos: los números `12` y
-`12` de Nocturno. Vistos solos parecen inocuos —es un número— pero sus
-etiquetas decían "meses de garantía" y "cuotas sin interés".
-
-**Regla: en un par valor+etiqueta, mirar los DOS juntos antes de decidir.** Y
-marcar el par completo: si solo se marca el valor, la etiqueta queda huérfana
-y se dibuja sola.
-
-### 13. Una fila se corta por el ancho de su grilla, no por el largo del array
-
-Ninguna de las trece filas cortaba: se dibujaba `p.productos.map(...)` entero
-contra un `cols(4)`. Con cinco destacados quedaba **uno colgado** en una
-segunda fila; con tres, **un hueco** a la derecha.
-
-**Regla: `cols(d, m)` y `cuantos(d, m)` van SIEMPRE de a pares.** Si se toca
-uno hay que tocar el otro — son el mismo número escrito dos veces, y la única
-forma de que la fila cierre.
-
-Ojo con los atajos que tapan el síntoma en vez de arreglarlo: Mosaico hacía
-`[...p.productos, p.productos[0]]` para llenar el quinto hueco —el mismo
-producto dos veces en la misma fila— y Circuito dibujaba
-`[...p.productos].reverse()` para que su segunda fila pareciera otra. Las dos
-cosas se ven, y se ven mal.
-
-### 14. `p.productos` son los DESTACADOS, no el catálogo
-
-Rellenar toda la portada con `p.productos` hace que la tienda muestre siempre
-los mismos cinco productos, sección tras sección.
-
-**Regla: solo salen de destacados las secciones que lo DICEN.** El "Destacados"
-y el "Más vendidos" de Vidriera, sí. El resto sale de `fila(n, clave)`, que
-toma del catálogo (`p.catalogo`) en un orden barajado, y la `clave` de sección
-desplaza el arranque para que dos secciones de la misma portada no muestren lo
-mismo.
-
-**El barajado no puede usar `Math.random()`.** Tiene que dar lo mismo en el
-servidor y en el cliente —si no, React se queja al hidratar— y no puede
-rebarajarse en cada render. Se ordena por un hash del slug: da un orden
-estable para esa tienda, distinto para cada una, y sobrevive al `useMemo`.
-
-Las listas verticales y los carruseles quedan afuera: ahí no hay hueco que
-tapar y el largo es parte del diseño (Escaparate lista tres productos porque
-son los tres puntos sobre la foto).
-
-### 15. Un dato que el dueño escribe a mano se desactualiza solo
-
-La lista escolar de Papelería eran cinco renglones `producto | precio`
-escritos a mano. El precio queda **pegado en la portada**: el dueño cambia el
-precio del producto y la home sigue mostrando el viejo.
-
-**Regla: si el dato ya vive en el catálogo, no se escribe — se elige.** Campo
-`seleccion`, y el nombre y el precio salen del producto. Vale para cualquier
-sección que muestre productos "de ejemplo": listas sugeridas, combos,
-recomendados, pasos.
-
-Corolario: un campo de texto con formato (`producto | precio`, `etiqueta |
-col1 | col2`) casi siempre es señal de que falta un tipo de campo. Si hay que
-explicar una sintaxis en el `help`, revisar si no debería ser un selector.
-
-### 16. Las categorías son las que son: la grilla se reparte, no se rellena
-
-Papelería dibujaba `cols(6)` con cuatro categorías: **dos huecos a la
-derecha**. Y al revés también — un `.map()` sin cortar manda la quinta a una
-segunda fila a medio llenar. Pasaba en NUEVE plantillas.
-
-**Regla: `colsDe(max, cuantas, movil)` para toda grilla de categorías**, y un
-`.slice(0, max)` que la acompañe.
-
-La diferencia con los productos importa: una fila de productos siempre se
-puede llenar —`fila()` toma del catálogo— pero **las categorías no se
-inventan**. Si hay cuatro, la fila se reparte entre cuatro. Escaparate ya lo
-resolvía a mano con `Math.min(cats.length, N)`; ahora es un helper y vale para
-todas.
-
-### 17. Si el dato ya está en Configuración, no se pide de nuevo
-
-El botón "Mandar mi lista" del banner de campaña era un `<span>` sin
-`onClick`. Lo que corresponde es que abra el WhatsApp del negocio — y el
-número **no se carga en la plantilla**: ya está en Configuración.
-
-**Regla: la plantilla edita CONTENIDO propio, nunca datos del negocio.** El
-texto del botón sí es de la plantilla y va editable; el número de WhatsApp, el
-email, el horario y el CUIT no — tenerlos en dos lados garantiza que un día no
-coincidan. Lo mismo que ya vale para el pie (punto 5).
-
-### 18. La plantilla se diseña para un rubro, pero la aplica cualquiera
-
-Papelería encabezaba sus categorías con **"Buscá por rubro"** — jerga de
-librería — y eso terminó arriba de "Camisas street" en una tienda de ropa que
-le gustó el diseño. Lo mismo con "¿Cuántos meses tiene?" (Crecer),
-"Departamentos" y "Entrá por rubro" (Corralón), "Por familia" (Nítida).
-
-Esto es fácil de no ver, porque **en la vitrina se lee perfecto**: ahí la
-plantilla viene con su marca de muestra y sus productos de muestra, todos del
-mismo rubro. El texto solo desentona cuando lo aplica un negocio de otra cosa
-— que es el caso normal, no la excepción.
-
-**Regla: un `porDefecto` que nombra el rubro necesita su `porDefectoReal`.**
-La vitrina sigue mostrando la versión sabrosa —es lo que le da personalidad a
-la plantilla y ayuda al dueño a elegirla— y la tienda real muestra la neutra.
-El editor precarga la neutra, porque edita la tienda, no la vitrina.
-
-No confundir con `afirmacion` (punto 8), aunque el mecanismo sea parecido:
-
-| | Qué pasa | Qué se hace |
-|---|---|---|
-| `afirmacion` | Promete algo que puede ser falso | Se calla hasta que lo escriban |
-| `porDefectoReal` | No es falso, pero asume el rubro | Se reemplaza por una versión neutra |
-
-Callarse no serviría acá: la sección se quedaría sin encabezado.
-
-**La prueba:** leer el texto imaginando la plantilla aplicada en una tienda de
-otro rubro. Si "Buscá por rubro" arriba de "Camisas street" suena raro, hace
-falta la versión neutra.
-
-## Dos formas de escribir una plantilla
-
-El catálogo tiene **veintiséis**, y se dividen en dos familias. Antes de
-arrancar una nueva, decidir cuál es.
-
-### A. Con bloque propio (las dieciséis primeras)
-
-Cada una escribe su `if (p.layout === '...')` en `homes.tsx` y declara su
-esquema a mano en `secciones.ts`. Es lo que hay que hacer cuando la plantilla
-tiene una IDEA que ninguna otra tiene: el panel lateral fijo de Circuito, el
-muro de Mosaico, "Comprá el look" de Escaparate.
-
-Cuesta: una sección nueva es JSX + esquema + los dieciocho puntos de abajo.
-
-### B. Con receta (las diez nuevas)
-
-La plantilla declara **qué bloques muestra y en qué orden**, y el render es
-compartido (rama `if (p.receta)` en `homes.tsx`). Cambia el DISEÑO —paleta,
-tipografía, radio, sombra, tipo de hero, forma de las categorías, ritmo de las
-filas— sin inventar funcionalidad.
+### 1. Elegir los bloques
 
 ```ts
 receta: {
-  header: 'centrado',
+  header: 'centrado',                              // o 'izquierda' (default)
   bloques: [
     { t: 'hero', estilo: 'partido' },
+    { t: 'stats' },
     { t: 'categorias', estilo: 'altas', cols: 4 },
-    { t: 'fila', id: 'fila', cols: 4 },
-    { t: 'franja', estilo: 'apilada' },
+    { t: 'fila', id: 'destacados', fuente: 'destacados', cols: 4 },
+    { t: 'franja', estilo: 'apilada' },            // propio de esta plantilla
+    { t: 'fila', id: 'nuevos', fuente: 'nuevos', estilo: 'tira' },
+    { t: 'parallax' },
+    { t: 'fila', id: 'recomendados', fuente: 'recomendados', cols: 4 },
+    { t: 'fila', id: 'topVentas', fuente: 'topVentas', cols: 4 },
+    { t: 'marcas' },
+    { t: 'video' },
     { t: 'whatsapp' },
   ],
 }
 ```
 
-El vocabulario sale de lo que el storefront YA genera (regla 3):
-
-| Bloque | Variantes |
-|---|---|
-| `hero` | `pleno` · `partido` · `minimo` · `tarjeta` |
-| `categorias` | `grilla` · `pastillas` · `tira` · `altas` |
-| `fila` | `grilla` · `tira` · `sangre`, con `fuente` destacados/masVendidos/catálogo |
-| `porCategoria` | el nombre de la categoría y productos DE esa categoría |
-| `franja` | `plena` · `filete` · `cartelera` · `apilada` |
-| `parallax` | foto quieta, contenido pasando por encima |
-| `campana` | foto ancha con texto encima |
-| `whatsapp` | el bloque de consulta |
-
-**El editor se genera solo** (`esquemaDeReceta()` en `secciones.ts`): cada
-bloque sabe qué campos necesita. Una plantilla con receta NO agrega nada a
-`SECCIONES_POR_PLANTILLA`.
-
-**Regla: si la plantilla se puede escribir con el vocabulario, va con receta.**
-Un bloque propio se justifica por una idea, no por querer mover un margen.
-
-### El riesgo de B, y cómo se mitiga
-
-La regla 4 sale de un fracaso real: cuatro plantillas que reusaban el
-esqueleto de Vidriera terminaron dándose de baja por parecerse demasiado. Una
-receta corre el mismo riesgo si solo se le cambia el color.
-
-Lo que hace que dos recetas se vean distintas de verdad —y hay que mover
-VARIAS, no una—: el tipo de hero, la forma de las categorías, el ritmo de las
-filas, el radio (0 se ve completamente distinto a 24), la sombra (`none`
-contra una sombra dura tipo `6px 6px 0`), y sobre todo el par de tipografías.
-Una serif fina sobre papel y una condensada en mayúsculas sobre negro no se
-parecen en nada aunque compartan el render.
-
-### Las genéricas
-
-Cuatro de las diez (`base`, `carbon`, `bloque`, `sobrio`) no están pensadas
-para ningún rubro. Eran un hueco del catálogo: las dieciséis viejas son todas
-de un rubro, y ahí aparece el problema del punto 18 —"Buscá por rubro" arriba
-de "Camisas street"—. Una genérica no lo tiene, porque su texto de muestra no
-nombra ningún rubro.
-
-**Al agregar una genérica: ningún texto puede nombrar un rubro.** Ni el
-`cartel`, ni los `links`, ni las categorías de muestra, ni el `tagline`. Si
-hace falta un `porDefectoReal` para que se lea bien en otra tienda, la
-plantilla no era genérica.
-
-### Antes de dar por lista una plantilla con receta
-
-1. `datos.tsx` y `HOME_TEMPLATES_DISPONIBLES` (`set-home-template.dto.ts`)
-   tienen que coincidir **exactamente**. Si no, el panel ofrece una plantilla
-   que la API rechaza con 400. Cruzarlas, no confiar.
-2. Tocar ese DTO es tocar `apps/api/src/`: **necesita `./deploy/deploy.sh`**.
-   Un push a `main` no despliega la API.
-3. Verificar que las fotos de muestra existan en `public/plantillas/` — un
-   nombre inventado no falla en compilación, se ve como un cuadro roto.
-4. **La portada (`slides[0].img`) tiene que ser única entre las veintiséis.**
-   Es la foto de la tarjeta en la galería, y dos vecinas con la misma foto
-   parecen la misma plantilla aunque el diseño de adentro no tenga nada que
-   ver. Adentro (productos, categorías) repetir no molesta: eso es catálogo
-   de muestra. Cruzar la lista entera, no confiar en la memoria.
-
-## Errores ya cometidos — no repetirlos
-
-| Error | Por qué pasó | Qué hacer |
+| Bloque | Variantes | De dónde sale |
 |---|---|---|
-| Las seis se veían iguales | Se reusó `StorePreview` del panel, que arma siempre la misma página | Cada plantilla tiene su propio bloque de JSX |
-| Secciones invisibles en la vista previa | El `IntersectionObserver` con `root: null` mira el viewport, no el marco que scrollea | `scrollParent(el)` como root **y** un `setTimeout` de respaldo que revela sí o sí |
-| Una plantilla "Catálogo" | Es otra página del sitio, no una portada | Ver regla 1 |
-| Una plantilla de gastronomía entre las de tienda | Se perdió de vista el módulo | Ver regla 2 |
-| Hero ilegible en celular | El degradé estaba pensado para el ancho de escritorio | Degradé propio para `movil`, más opaco y más alto |
-| Fotos que desentonan | Se asignaron sin mirarlas | Hoja de contactos antes de asignar |
-| La tipografía no se aplicaba | `loadFont()` solo conoce las fuentes de Apariencia | Usar `cargarFuentes()` de `piezas.tsx` |
-| Fotos repetidas entre plantillas | Dos ids de Unsplash devolvían el mismo archivo | Comparar por `md5sum`, no de memoria |
-| El marco mostraba un UUID | El primer segmento de `/admin/{id}/...` es el id, no el subdominio | Sacar el subdominio de la sesión (`useAuth`) |
-| Newsletter, testimonios y suscripciones | Se copiaron de tiendas de referencia sin chequear qué genera Órbita | Ver regla 3 |
-| El título del hero desbordaba | El carrusel lo dibuja a 132 px, pensado para `3x1` | Título corto; la frase va en `bajada` |
-| Hero lavado en las plantillas oscuras | El velo del `Carrusel` era blanco fijo y el título va con `t.text`, casi blanco: sobre una foto clara no se leía | El velo sale de `t.oscuro` (negro para las oscuras, blanco para las claras) |
-| Un panel lateral que desbordaba en celular | El contenedor quedó en `flex` row para las dos vistas y los dos hijos no entran en 390 px | Toda estructura de dos columnas necesita su `flexDirection: movil ? 'column' : 'row'` |
-| `ocultas: 5` con el reveal andando bien | Se medía `getComputedStyle(...).opacity`, y con la ventana sin pintar Chrome no avanza la transición CSS | Medir la clase `pl-on`, que no depende del compositor |
-| Media docena de fotos bajadas como HTML | Eran de `plus.unsplash.com` (Unsplash+), que devuelve 404 en `images.unsplash.com` | Filtrar por host al sacar los ids, y `file --mime-type` después de bajar |
-| Cuatro plantillas nuevas de baja al toque | Reusaban `tienda` (mismo esqueleto que Vidriera) y terminaron pareciéndose demasiado — el dueño las dio de baja apenas las vio | Ver regla 4: de acá en más, esqueleto propio por default |
-| Casi se enganchó Escaparate asumiendo que `HeroCarousel` real le servía igual que a Vidriera | `HeroCarousel` es UN slide rotando a pantalla completa — Escaparate necesita dos campañas partidas fijas, algo que ese componente no sabe dibujar | `heroPropio: true`: el hero se queda adentro de `Home()` con datos reales, e `Inicio.tsx` saltea su `HeroCarousel` para esa plantilla |
-| El hero editable de Escaparate casi termina con un campo nuevo en Apariencia | Se pensó en agregar un "kicker" propio para la maqueta antes de mirar qué campos tiene de verdad `StorefrontHeroSlide` | Reusar el `heroSlides` que YA edita el dueño (mismo editor de Vidriera): sin `kicker` porque Apariencia no lo tiene, y el bloque lo trata como opcional |
-| Esta skill decía "es una vitrina, no aplica nada" mientras Vidriera ya se podía activar en producción | El enganche real se hizo en otra sesión/rama y nadie volvió a esta skill a corregirla | Cuando se toque el enganche real, actualizar esta skill en el mismo commit — no en uno aparte |
-| `datos.tsx` quedó con `{ {` duplicado al borrar un bloque a mano con `sed`/Python por rango de líneas | El límite superior de un corte incluía la llave de apertura del bloque que se quería sacar, y el límite inferior del otro corte también traía la suya | Después de cualquier borrado por rango de líneas, correr `tsc` antes de dar por terminado — un error de sintaxis en un objeto grande a veces apunta a una línea lejos del problema real |
+| `hero` | `pleno` · `partido` · `minimo` · `tarjeta` | Slides de Apariencia, más un segundo botón propio |
+| `stats` | — | Barra de estadísticas de Apariencia |
+| `categorias` | `grilla` · `pastillas` · `tira` · `altas` | Las categorías del negocio. El encabezado es editable |
+| `porCategoria` | `cuantas`, `porFila` | Productos de cada categoría. Cuenta como `categorias` |
+| `fila` | `grilla` · `tira` · `sangre`; `fuente`: uno de los cuatro estantes | El estante. El encabezado es editable |
+| `parallax` | — | Banner parallax de Apariencia |
+| `marcas` | — | Marcas de Apariencia |
+| `video` | — | Video de Apariencia |
+| `whatsapp` | — | Título, bajada y botón propios. El número sale de Configuración |
+| `franja` | `plena` · `filete` · `cartelera` · `apilada` | **Propio.** Título, bajada y botón. Vacía, no se dibuja |
+| `campana` | — | **Propio.** Foto, volanta, título, texto, botón |
 
-| Dos fotos a la vez en la tarjeta, y el hover sin efecto | `PLANTILLA_CSS` se inyectaba solo en `Inicio.tsx`: fuera del home, `.pl-b` no era `absolute` ni `opacity: 0` | El CSS y `cargarFuentes()` van en `StorefrontChrome`, que envuelve todas las vistas |
-| Un parche gris ilegible sobre las plantillas oscuras | El velo usaba `var(--color-bg-raw, 255,255,255)` y esa variable NO EXISTE en el repo: caía siempre al blanco | `grep` que la variable esté definida antes de usarla; para velos, `color-mix` sobre `var(--color-bg)` |
-| Chevrons blancos sobre pastilla blanca | Fondo clavado (`rgba(255,255,255,0.92)`) con tinta del tema (`var(--color-text)`) | Si el fondo va clavado, la tinta también; si la tinta sale del tema, el fondo también |
-| Once plantillas sin el precio con transferencia | El adaptador ya lo dejaba en `x.transfer`, pero las que dibujan SU tarjeta nunca lo pintaban | Una tarjeta propia debe dibujar TODO lo que `aProductoPlantilla()` rellena, guardado con `{x.campo && ...}` |
-| Ocho "Ver todo →" que no hacían nada | `<Titulo>` con `accion` pero sin `onAccion` — el enlace se dibuja igual | `grep` por `accion="` sin `onAccion` y por `<Boton` sin `onClick` después de enganchar |
-| Un CUIT falso en el pie de tiendas reales | El `cierre` estaba clavado en `homes.tsx` (once plantillas), y las columnas eran las de la maqueta con `<div>` en vez de `<a>` | El pie aporta diseño, nunca contenido: lo arma `pieReal()` en `plantillaReal.ts` |
-| Faltaban Términos, Privacidad y Arrepentimiento en el home | Con `piePropio` no se dibuja `StorefrontFooter`, que es quien los traía por obligación legal | Al reemplazar un componente de Órbita, replicar lo legal Y heredar sus toggles de Apariencia |
+**Una receta lleva todos los del estándar:** `hero`, `stats`, `categorias` (o
+`porCategoria`), una `fila` por cada estante (`destacados`, `nuevos`,
+`recomendados`, `topVentas`), `parallax`, `marcas`, `video` y `whatsapp`. El
+check falla si falta uno. Lo que diferencia una receta de otra es el orden, el
+estilo de cada bloque y los propios que sume en el medio.
 
-| Mosaico sin ningún enlace en el header | Dibujaba el `☰` decorativo, la marca y las acciones, pero nunca `p.links` | El nav sale de `acciones.nav`, igual que el pie: la plantilla aporta cómo se ve, no cuáles son |
-| "Estilo de header" de Apariencia sin efecto con plantilla activa | `navCentrada`/`sinNav` se forzaban a false cuando había `homeTemplate` | El ajuste vale siempre; solo `centrado` lo puede pisar una plantilla que lo declare |
-| −40% / −25% / −30% sobre categorías de una tienda sin descuentos | El `porDefecto` de la maqueta se usa igual en la vitrina y en la tienda real | Marcar el campo con `afirmacion: true`: `txt()` deja de caer al ejemplo cuando hay `acciones` |
-| Una franja de color vacía arriba de todo | Al vaciarse el cintillo el `<div>` contenedor seguía dibujándose | Toda afirmación necesita su guarda: sin texto, la sección entera no va |
+Cada `fila` lleva un `id` distinto: es la clave de su encabezado editable. No
+cambiar el `id` de una fila de una plantilla ya publicada: lo que el dueño
+escribió se busca por ahí.
 
-| Una hamburguesa que no abría nada | Se dibujó el `☰` como parte del diseño del header, sin menú detrás | `MenuMovil` de piezas.tsx; y si no lleva a ningún lado en esa vista, se saca |
-| Sin navegación en celular | El nav va con `!movil` en casi todas y no había reemplazo | El navbar tiene que funcionar en las dos pantallas — es parte del checklist |
-| Enlaces del nav sin hover | Los estilos van inline y el hover necesita una clase | `.pl-nav`, por opacidad y subrayado (no por color: tiene que servir en paletas claras y oscuras) |
+### 2. Definir el tema
 
-| "Armá tu setup" con las tres primeras categorías | Al enganchar, se rellenó la sección con `slice(0, 3)` para que no quedara vacía | Campo `seleccion` para elegirlo, y `lugares()` para llenar lo que no se eligió |
-| Una sección elegible que desaparecía de la portada | Se escondió "hasta que el dueño elija", y una tienda nueva tiene todo vacío | Callarse es para las AFIRMACIONES, no para el layout: `lugares()` llena con el catálogo |
-| Una sección que pedía escribir una tabla de 5×4 a mano | Se le quitó el contenido inventado pero se quiso conservar la sección igual | Si lo que queda es un formulario, la sección no va — preguntarse qué dato REAL la llena |
-| Dos afirmaciones que el barrido no marcó | El valor era `12`, que parece un número inocente; la promesa estaba en la etiqueta | En un par valor+etiqueta, mirar los dos juntos y marcar el par completo |
+```ts
+tema: {
+  bg, surf, soft, text, muted, border,   // fondo, superficie, fondo suave, texto, apagado, borde
+  primary, onPrimary, accent,            // botón, texto del botón, acento
+  fh: serif('Cormorant Garamond'), fb: sans('Lato'),
+  radio: 0, oscuro: false,
+  sombra: '0 18px 40px -18px rgba(15,23,42,0.28)',
+}
+```
 
-| Un producto colgado solo en una segunda fila | `p.productos.map()` completo contra un `cols(4)` — la fila no cortaba por el ancho de la grilla | `cols(d, m)` y `cuantos(d, m)` van siempre de a pares |
-| El mismo producto dos veces en la misma fila | Mosaico hacía `[...p.productos, p.productos[0]]` para tapar el quinto hueco | Tapar el síntoma se ve; cortar por `cuantos()` lo arregla |
-| Toda la portada con los mismos cinco productos | `p.productos` son los destacados, y se usaban para rellenar cada sección | Solo las secciones que dicen "destacados" salen de ahí; el resto, `fila(n, clave)` sobre el catálogo |
+- Las fuentes tienen que estar en `FUENTES_PLANTILLAS` (`piezas.tsx`), con los
+  pesos que se usan. `loadFont()` de `lib/fonts.ts` NO sirve: solo conoce las
+  de Apariencia. Antes de sumar una, comprobar que exista:
+  `curl -o /dev/null -w "%{http_code}\n" "https://fonts.googleapis.com/css2?family=Fraunces:wght@400;700"`
+- Contraste mínimo: texto sobre fondo 4.5, texto del botón sobre el primario 3.
+  El check lo mide.
 
-| Un precio escrito a mano en la portada | La lista sugerida se cargaba como texto `producto \| precio` | Si el dato vive en el catálogo, se elige (`seleccion`), no se escribe |
-| Dos huecos a la derecha en la grilla de categorías | `cols(6)` fijo contra las categorías que el negocio tenga (cuatro) | `colsDe(max, cuantas, movil)` + `.slice(0, max)`: la grilla se reparte entre las que haya |
-| Un botón de WhatsApp que no abría nada | Se dibujó como `<span>` decorativo al maquetar la sección | Que abra `acciones.abrirWhatsapp`; el número sale de Configuración, no se pide en la plantilla |
+### 3. Que no se parezca a otra
 
-| "Buscá por rubro" arriba de "Camisas street" | El `porDefecto` estaba escrito para el rubro de la maqueta, y en la vitrina se leía bien | `porDefectoReal` con la versión neutra: la vitrina conserva la sabrosa, la tienda muestra la neutra |
+Cuatro plantillas que reusaban el esqueleto de Vidriera se dieron de baja por
+parecerse demasiado. Una receta corre el mismo riesgo si solo cambia el color.
+Lo que separa dos recetas de verdad, y hay que mover **varias a la vez**:
 
-| Dos plantillas idénticas en la galería | Compartían la foto de `slides[0]`, que es la portada de la tarjeta | La portada es única entre las veintiséis; adentro repetir no molesta |
-| Una plantilla nueva que pedía editor nuevo | Se escribió su bloque a mano aunque usaba el vocabulario de siempre | Si se puede escribir con `receta`, va con receta: el editor sale solo |
-| El panel ofrecía una plantilla que la API rechazaba con 400 | `datos.tsx` sumó ids y `HOME_TEMPLATES_DISPONIBLES` quedó atrás | Cruzar las dos listas antes de cerrar, y desplegar la API a mano |
+- el tipo de hero y la forma de las categorías;
+- el ritmo de las filas (grilla, tira, a sangre) y el orden de los bloques;
+- el radio (0 contra 24) y la sombra (`none` contra una dura tipo `6px 6px 0`);
+- sobre todo, el par de tipografías: una serif fina sobre papel y una
+  condensada en mayúsculas sobre negro no se parecen aunque compartan render.
+
+Para paleta, tipografías y estilo, invocar la skill `ui-ux-pro-max` (regla del
+repo para toda tarea de UI). Referencia del dueño: travistrend.com.ar y las
+theme stores de Shopify/Tiendanube. Y su criterio: minimalista, sin acento por
+sección ni badges en mayúscula; el color solo donde es el dato o se clickea.
+
+### 4. Cargar los datos de muestra
+
+En `datos.tsx`: `id`, `nombre`, `para`, `queCambia`, `secciones[]`, `marca`,
+`tagline`, `layout: 'receta'`, `headerPropio`/`heroPropio`/`piePropio` en
+`true`, `cartel`, `links`, `categorias`, `slides[]`, `productos[]`.
+
+- `queCambia` se muestra en el panel: que diga qué la hace distinta, no
+  adjetivos. Sin comparaciones que envejecen ("la más sobria de las X").
+- La foto de `slides[0]` es la portada en la galería: **única** entre todas.
+- Fotos: ver `referencia/fotos.md`. Bajarlas, mirarlas en una hoja de
+  contactos y recién ahí asignarlas.
+- **Si la plantilla es genérica** (no es de un rubro), ningún texto de muestra
+  puede nombrar un rubro: ni `cartel`, ni `links`, ni categorías, ni `tagline`.
+
+### 5. Registrarla en la API
+
+Sumar el id a `HOME_TEMPLATES_DISPONIBLES`
+(`apps/api/src/businesses/dto/set-home-template.dto.ts`). Sin esto el panel la
+ofrece y la API la rechaza con 400. **Tocar ese archivo obliga a desplegar la
+API a mano** (`./deploy/deploy.sh`, ver CLAUDE.md): un push a `main` no alcanza.
+
+### 6. Pasar el check y mirarla
+
+Ver § El modo check. Después, actualizar el conteo de plantillas en esta skill
+y en el comentario de arriba de `PlantillasConfig.tsx`.
+
+## Celular
+
+Cada bloque se escribe dos veces, una por pantalla. `Home()` recibe `movil` y
+el corte es a 768px; en la tienda sale de `useMovilPlantilla()`.
+
+**Lo que tiene que cumplir toda plantilla en celular:**
+
+- **Nada desborda a lo ancho.** Ni una barra de scroll horizontal en la página.
+  Lo que no entra se apila o va en una tira que scrollea adentro de su bloque.
+- **Toda estructura de dos columnas se apila**: `flexDirection: movil ?
+  'column' : 'row'`, o `gridTemplateColumns: movil ? '1fr' : '1fr 1fr'`.
+- **Las grillas bajan a dos columnas** (`cols(d, 2)`), o a una si la tarjeta
+  es horizontal. Las tiras se quedan como tiras.
+- **Se puede navegar.** Si los enlaces del header no entran, va `MenuMovil`.
+  Nunca un `☰` dibujado.
+- **Se puede buscar, entrar a la cuenta y ver el carrito**, igual que en
+  computadora. El buscador va en un renglón propio debajo de la barra si no
+  entra al lado de la marca.
+- **El hero se lee.** El título no desborda (frase corta; lo largo va en la
+  bajada) y el velo sobre la foto se piensa para el formato parado, que deja
+  el texto sobre otra parte de la imagen.
+- **Tipografía y aire propios**: los títulos de 60px de escritorio bajan a
+  30–38, y los márgenes de 40px a 16.
+- **Lo que se toca, se puede tocar**: botones y enlaces de 40px de alto o más,
+  sin depender del hover (la segunda foto de la tarjeta y los subrayados no
+  existen en un teléfono).
+- **El parallax se apaga solo** (`.pl-parallax`): en celular la foto fija se
+  ve mal y varios navegadores no la soportan.
+
+**Qué revisa el check y qué no.** Corre todo en las dos pantallas, así que ve
+si en celular falta el menú, el buscador, la cuenta, un estante o un legal. No
+mide tamaños: el desborde, un título cortado o un botón chico solo se ven
+mirando. Por eso cada plantilla nueva o modificada se mira en **Celular** en la
+vitrina (Avanzado → Plantillas → Ver cómo queda) y aplicada en una tienda desde
+un teléfono de verdad, no solo achicando la ventana.
+
+## Modificar una plantilla
+
+| Qué se quiere cambiar | Dónde |
+|---|---|
+| Colores, tipografía, radio, sombra | `tema` en `datos.tsx` |
+| Orden o variante de los bloques (receta) | `receta.bloques` en `datos.tsx` |
+| Cómo se ve un bloque en TODAS las recetas | rama `if (p.receta)` de `homes.tsx` |
+| Qué campos ofrece el editor de un bloque de receta | `esquemaDeReceta()` en `secciones.ts` |
+| Una plantilla de bloque propio | su `if (p.layout === '…')` en `homes.tsx` + su esquema en `secciones.ts` |
+| Fotos o textos de la vitrina | `datos.tsx` (muestra) o `porDefecto` en `secciones.ts` |
+| Datos reales que llegan a la portada | `plantillaReal.ts` |
+| Header, paleta o fuentes fuera de la portada | `StorefrontChrome.tsx` |
+
+Tocar la rama de receta o `esquemaDeReceta()` cambia las diez plantillas con
+receta a la vez. Es lo que se busca, pero hay que mirar más de una después.
+
+**Sumar un bloque al vocabulario** (cuando varias plantillas lo van a usar):
+el tipo en `BloqueReceta` (`tipos.ts`), su render en la rama de receta, y sus
+campos en `esquemaDeReceta()`. Solo si lo llena un dato que Órbita ya tiene.
+
+**Si Apariencia suma un contenido nuevo**, entra al estándar: el dato en
+`contenidoDeApariencia()` (`plantillaReal.ts`), el bloque en `BLOQUES_ESTANDAR`
+(`tipos.ts`) y en la rama de receta, su lugar en las diez recetas, su tarjeta
+en la pestaña Contenido, y su prueba de prendido/apagado en el check.
+
+## El editor: qué puede tocar el dueño
+
+Con la plantilla activa, Configuración → Apariencia queda bloqueada y el
+dueño edita desde Avanzado → Plantillas de Home:
+
+| Pestaña | Qué edita | De dónde sale |
+|---|---|---|
+| Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
+| Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
+| Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las veintiséis. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
+| Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
+
+Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`
+(`secTextos`, `secEstadisticas`, `secParallax`, `secMarcas`, `secVideo`): si
+Apariencia suma un contenido nuevo, se suma como bloque al estándar y su
+tarjeta se muestra acá, no se escribe un formulario aparte.
+
+Lo guardado va a `homeTemplateData.secciones[idSeccion][idCampo]`, un JSON por
+negocio: sumar un campo no necesita migración.
+
+### El editor ofrece exactamente lo que la plantilla dibuja
+
+Ni un campo de más ni uno de menos. Un campo que se carga y no se ve es una
+promesa del panel que la tienda no cumple, y es fácil de escribir sin darse
+cuenta: el editor y el bloque están en archivos distintos. Pasó en Lienzo (el
+editor pedía la imagen de cada slide y su hero no dibujaba ninguna), y la
+prueba que salió de ahí encontró 29 casos más en 20 plantillas.
+
+Lo que hay que cuidar al tocar un bloque o el editor:
+
+- **Hero:** título, bajada, botón e imagen de cada slide se ven en la portada.
+  Con más de un slide, rota y trae con qué navegarlo (`navHero`), o cada uno
+  tiene su lugar fijo y la plantilla declara `heroMaxSlides` (ahí el editor
+  dice "Imágenes del hero" y no deja cargar de más).
+- **La imagen del slide es opcional en todas.** Sin imagen el hero se dibuja
+  igual, sobre un degradé del primario. En un hero que por diseño es solo
+  texto (el `minimo` de las recetas) la foto se muestra detrás del texto si el
+  dueño subió una (`Slide.fotoPropia`), y sin foto queda el diseño original.
+- **Secciones:** cada campo del esquema cambia algo. En una receta el
+  formulario sale de la variante del bloque: una franja en `cartelera` pide
+  solo el título; unas categorías en `pastillas` no piden el enlace.
+- **Contenido:** el anuncio respeta "Mostrar como cartelera" y los varios
+  ítems; la barra de estadísticas se ofrece solo si se dibuja (`usaStats`).
+- **Pie:** la descripción y el interruptor de redes. El cupón se ofrece con
+  `dibujaCupon()`: las que declaran uno de muestra, y todas las recetas.
+
+El grupo `editor-portada` del check lo prueba al revés de como se escribe el
+bug: no mira el código del editor, cambia cada dato que el editor deja
+cambiar y exige que la portada cambie.
+
+### Cómo se declara un campo
+
+```ts
+{ id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Comprá por categoría' }
+```
+
+- **Tipos:** `texto`, `parrafo`, `imagen`, `switch` y `seleccion` (elegir una
+  categoría o un producto del catálogo real).
+- **`porDefecto` vive solo en `secciones.ts`.** Lo leen la portada (`txt()`) y
+  el editor, así no se desincronizan. Un campo vacío cae a su `porDefecto`:
+  una tienda que no editó nada se ve igual que su vitrina.
+- **`afirmacion: true`** si el texto promete algo del negocio (un descuento, un
+  envío gratis, cuotas, un plazo, una cantidad, una certificación). En la
+  vitrina se ve; en la tienda real no se dibuja hasta que el dueño lo escriba.
+  La prueba: leerlo con *"esta tienda garantiza que…"* adelante. En un par
+  número + etiqueta ("12" + "cuotas sin interés") se marcan los dos.
+- **`porDefectoReal`** si el texto no promete nada pero nombra el rubro de la
+  maqueta ("Buscá por rubro", "¿Cuántos meses tiene?"). La vitrina muestra el
+  sabroso y la tienda el neutro.
+- **Si el dato ya está en el catálogo o en Configuración, no se escribe.** Un
+  producto se elige (`seleccion`) y su nombre y precio salen solos; el número
+  de WhatsApp, el horario y las redes no se piden en la plantilla.
+- **Si al sacarle lo inventado una sección queda en "escribí vos una tabla",
+  la sección no va.** Preguntarse qué dato real la llena.
+- **Un interruptor que no mueve nada es peor que no tenerlo.** Si la plantilla
+  no dibuja la barra de stats, `usaStats: false`.
+
+## El modo check
+
+```bash
+pnpm --dir apps/web test plantillas
+```
+
+Tarda dos segundos y no usa navegador. Dibuja cada plantilla con el mismo
+`Home()` y el mismo `plantillaReal()` que la tienda, contra cuatro tiendas de
+prueba y en dos pantallas, y revisa el HTML que sale. También corre en CI con
+cada push a `main` (`pnpm test`).
+
+Las cuatro tiendas: **vacía** (recién creada), **mínima** (una categoría, dos
+productos, sin fotos, nada editado), **completa** y **grande** (nueve
+categorías, cuarenta productos).
+
+| Grupo | Qué revisa |
+|---|---|
+| catálogo | Ids únicos y **coinciden con la lista de la API**; portada única; fuentes en `FUENTES_PLANTILLAS`; receta bien formada |
+| editor | Cada `txt()` del bloque tiene su campo en `secciones.ts`, y cada campo se dibuja (solo bloque propio; el de una receta se genera) |
+| tema | Contraste del texto y del botón |
+| vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
+| tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
+| estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
+| editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
+| header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
+
+### Cómo leer un fallo
+
+```
+tienda > base:
+  - promete "Envío gratis desde $80.000" sin que el dueño lo haya escrito (franja.titulo)  (en todos los casos)
+```
+
+Dice el grupo, la plantilla, qué pasa, el campo y en qué tiendas y pantallas.
+Si falla solo en `minima` o `vacia`, es un caso límite: una sección que asume
+que siempre hay categorías, fotos o destacados.
+
+### La lista de pendientes
+
+`PENDIENTES`, arriba de `plantillas.test.ts`, es para anotar lo que el check
+encuentre en una plantilla ya publicada y no se arregle en el momento. Hoy
+está vacía. Funciona como trinquete:
+
+- Un problema que no está en la lista hace fallar el check. **Una plantilla
+  nueva no suma nada ahí: se arregla.**
+- Cuando se arregla uno de la lista, el check falla pidiendo que se borre el
+  renglón. La lista solo se achica.
+
+Arreglar un pendiente cambia cómo se ve una tienda que hoy está andando:
+avisarle al dueño antes, no hacerlo de pasada.
+
+### Lo que el check no ve
+
+El HTML estático no tiene tamaños, ni `onClick`, ni ojos. Hay que mirar a mano,
+en la vitrina (Avanzado → Plantillas → Ver cómo queda), en Computadora y en
+Celular:
+
+- que nada desborde a lo ancho y que el hero se lea sobre su foto;
+- que las fotos tengan que ver con el rubro y no desentonen con la paleta;
+- que todo lo que parece clickeable lo sea. En el código: `grep` de
+  `accion="` sin `onAccion`, de `<Boton` sin `onClick`, y de un `☰` dibujado
+  sin `MenuMovil`;
+- que se distinga de las otras veinticinco.
+
+Las pruebas con el navegador las hace el dueño: decirle qué plantilla mirar y
+qué probar, en vez de abrir el navegador integrado. Si hace falta medir
+desborde o fotos rotas en la vitrina, `referencia/verificacion.md` explica
+cómo usar el script de consola.
+
+## Cuándo un bloque propio
+
+Solo cuando la plantilla tiene una **idea** que el vocabulario no puede
+expresar: el panel lateral fijo de Circuito, el muro de Mosaico, "Comprá el
+look" de Escaparate. No por querer mover un margen.
+
+Cuesta: escribir el bloque en `homes.tsx`, declarar el esquema a mano en
+`secciones.ts`, y cumplir el estándar con las piezas comunes (ver § El
+estándar → Cómo lo cumple cada tipo de plantilla): una receta lo trae resuelto. Antes de
+empezar, leer `referencia/bloque-propio.md` (cómo se engancha y el checklist)
+y `referencia/errores.md` (los dieciocho bugs que ya pasaron). Las dieciséis
+que existen quedan como están; se tocan si el dueño lo pide o si el check
+encuentra algo.
+
+Si la idea la van a usar varias plantillas, no es un bloque propio: es un
+bloque nuevo del vocabulario.
+
+## Ocultar o dar de baja
+
+`oculta: true` la saca de la galería sin borrar nada. Dar de baja de verdad:
+sacar la entrada de `datos.tsx`, el id de `HOME_TEMPLATES_DISPONIBLES`, sus
+fotos de `public/plantillas/` y su fuente de `FUENTES_PLANTILLAS` **si nadie
+más las usa** (`grep` antes de borrar), y coordinar antes con cualquier
+negocio que la tenga activa.
+
+## Antes de decir que está lista
+
+1. `pnpm --dir apps/web test plantillas` en verde, sin sumar a `PENDIENTES`.
+2. `pnpm --dir apps/web typecheck`.
+3. Si se tocó `apps/api/`, typecheck y tests de la API, y avisar que hace
+   falta `deploy.sh`.
+4. Decirle al dueño qué mirar: la plantilla en la vitrina, en las dos
+   pantallas, y aplicada en una tienda de prueba.
+5. Si cambió algo de cómo se crean, se editan o se verifican las plantillas,
+   actualizar esta skill en el mismo commit.
 
 ## Convenciones del repo
 
-- Los archivos son **CRLF** (`core.autocrlf=true`). Un script de Python que
-  edite con `\n` rompe los matches: leer con `.replace('\r\n','\n')` y escribir
-  con `.replace('\n','\r\n')`.
-- Comentarios en **castellano rioplatense**, explicando el *por qué* (sobre todo
-  cuando algo costó llegar), no el *qué*.
-- Estilos **inline**, como el resto del panel. Solo van al string `CSS` las
-  cosas que necesitan clase: hover, animaciones y el reveal.
+- Los archivos son **CRLF** (`core.autocrlf=true`). Un script que edite con
+  `\n` rompe los matches: leer con `.replace('\r\n','\n')` y escribir al revés.
+- Comentarios en castellano rioplatense, explicando el *por qué*.
+- Estilos **inline**, como el resto del panel. Al string `CSS` de `piezas.tsx`
+  solo va lo que necesita clase: hover, animaciones y el reveal.
+- Cada medida con su variante `movil ? x : y`. `cols(d, m)` y `cuantos(d, m)`
+  van siempre de a pares; para categorías, `colsDe(max, cuantas, movil)`.
 - Nada de `next/image` acá: son fotos de muestra, `<img>` está bien.
+- Un hook no puede ir adentro de un bloque: los bloques son ramas del mismo
+  componente. El estado va arriba de `Home()`, sin condicionar.

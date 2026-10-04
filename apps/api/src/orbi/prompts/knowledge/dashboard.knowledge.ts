@@ -10,6 +10,6 @@ Las métricas clave de un e-commerce son:
 
 ## Cómo actuar
 - Si te saludan o preguntan "cómo va", ofrecé un resumen ejecutivo rápido con las 3-4 métricas más relevantes.
-- Compará siempre con el mes anterior para dar contexto ("vendiste 20% más que el mes pasado").
+- Compará con el mes anterior para dar contexto, teniendo en cuenta que el mes en curso todavía no terminó ("en lo que va del mes llevás $X; el mes pasado entero cerró en $Y").
 - Si hay alertas (pedidos pendientes, sin stock, mensajes sin leer), mencionálas primero — son accionables.
 - No tires todos los números juntos: priorizá lo importante y ofrecé profundizar.`;

@@ -12,6 +12,10 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ReturnRequestModal } from '@/components/storefront/ReturnRequestModal'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { WhatsappBanner } from '@/components/storefront/WhatsappBanner'
+import { DEMO_SLUG } from '@/lib/demo/modo'
+import { DEMO_WHATSAPP, MENSAJE_WHATSAPP_DEMO, TEXTOS_WHATSAPP_DEMO } from '@/lib/demo/whatsapp'
+import { MenuDemoTienda } from '@/modules/demo/MenuDemoTienda'
+import { MenuPromociones } from '@/components/storefront/MenuPromociones'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { SeccionVideos } from '@/components/storefront/SeccionVideos'
@@ -26,7 +30,7 @@ import {
 import { conOverrides, esPreview, usarOverridesPreview } from '@/lib/storefront/previewBridge'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado, declinadoKey } from '@/modules/ventas/cliente/juegos/JuegoInline'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -47,7 +51,7 @@ const STATS_DEFAULT: StorefrontStatsItem[] = [
     { id: 'st4', value: '3 cuotas', label: 'sin interés' },
 ]
 
-type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null; imageUrl: string | null }
+export type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null; imageUrl: string | null }
 
 // Huella del conjunto de juegos activos en este momento (tipo + campaña de
 // cada uno) — si cambia (se activó/desactivó otro juego, o se reactivó
@@ -114,6 +118,22 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // frente al modal de juegos.
     const [promoActivo, setPromoActivo] = useState<ActivePromoModal | null>(null)
     const [modalPromo, setModalPromo] = useState(false)
+
+    // Tienda demo: los juegos y anuncios NO se abren solos al entrar; se
+    // abren a mano desde el menú flotante (MenuDemoTienda), siempre como si
+    // fuera la primera visita. `vez` remonta el juego en cada apertura.
+    const enDemo = slug === DEMO_SLUG
+    const [juegoDemo, setJuegoDemo] = useState<{ juego: ActiveGame; vez: number } | null>(null)
+    const [anuncioDemo, setAnuncioDemo] = useState<ActivePromoModal | null>(null)
+    function abrirJuegoDemo(juego: ActiveGame) {
+        try {
+            for (const estado of ['ganado', 'perdido', 'declinado']) {
+                localStorage.removeItem(`orbita-juego-${estado}:${slug}:${juego.type}:${juego.campaignVersion}`)
+            }
+        } catch { /* sin localStorage: el juego abre igual */ }
+        setAnuncioDemo(null)
+        setJuegoDemo(prev => ({ juego, vez: (prev?.vez ?? 0) + 1 }))
+    }
 
     useEffect(() => {
         if (!slug) return
@@ -209,7 +229,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // distinto y vuelve a mostrarse, aunque ya se haya visto/declinado/
     // jugado la combinación anterior.
     useEffect(() => {
-        if (!slug || reclamo || elegibles.length === 0) return
+        if (!slug || enDemo || reclamo || elegibles.length === 0) return
         const key = `orbita-juego-modal:${slug}:${estadoJuegos(elegibles)}`
         try {
             if (localStorage.getItem(key)) return
@@ -217,7 +237,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             setModalJuego(true)
         } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slug, reclamo, estadoJuegos(elegibles)])
+    }, [slug, enDemo, reclamo, estadoJuegos(elegibles)])
 
     // Al cerrar con la X se declina lo que el modal esté ofreciendo en ese
     // momento — el picker completo si todavía no se eligió uno (varios
@@ -244,17 +264,36 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // ofrece — se va a mostrar en una visita futura en la que el juego ya
     // no sea elegible. Sin cola ni orden configurable por ahora (ver plan).
     useEffect(() => {
-        if (!slug || !promoActivo || reclamo || modalJuego || elegibles.length > 0) return
+        if (!slug || enDemo || !promoActivo || reclamo || modalJuego || elegibles.length > 0) return
         const key = `orbita-promo-modal:${slug}:${promoActivo.campaignVersion}`
         try {
             if (localStorage.getItem(key)) return
             localStorage.setItem(key, '1')
             setModalPromo(true)
         } catch { /* sin localStorage — simplemente no se muestra */ }
-    }, [slug, promoActivo, reclamo, modalJuego, elegibles.length])
+    }, [slug, enDemo, promoActivo, reclamo, modalJuego, elegibles.length])
 
     function cerrarModalPromo() {
         setModalPromo(false)
+    }
+
+    // Pestaña flotante (paquete Avanzado): los modales se abren UNA sola vez por
+    // navegador y cerrarlos los da por descartados, así que sin esto un visitante
+    // que cerró sin querer no tenía forma de volver a jugar ni de ver el anuncio.
+    // Ofrece lo que sigue disponible: los juegos que no ganó ni perdió (los
+    // declinados incluidos: son los que cerró con la X) y el anuncio activo. Ganar
+    // o perder una campaña sí la cierra, igual que antes. Recién cuando no hay un
+    // modal abierto, para no taparlo ni superponerse.
+    const jugables = slug && !enDemo ? juegosActivos.filter(g => !yaGano(slug, g.type, g.campaignVersion) && !yaPerdio(slug, g.type, g.campaignVersion)) : []
+    const hayModalAbierto = modalJuego || modalPromo || !!reclamo
+    function reabrirJuego(g: ActiveGame) {
+        // El juego, al montarse, mira si esta campaña está declinada y en ese caso
+        // muestra "no querés jugar": se revierte y, si se cierra de nuevo, se
+        // vuelve a declinar en cerrarModal().
+        try { if (slug) localStorage.removeItem(declinadoKey(slug, g.type, g.campaignVersion)) } catch { /* sin localStorage: abre igual */ }
+        setModalPromo(false)
+        setJuegoElegido(g.type)
+        setModalJuego(true)
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
@@ -329,8 +368,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     }
     const nuevosIngresos = productos.slice(0, limiteNuevos)
     const badgesEstante = { showNew: ap?.showNewBadge, showOffer: ap?.showOfferBadge, showLowStock: ap?.showLowStock }
-    const estanteRecomendados = recomendados.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
-    const estanteTopVentas = topVentas.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
+    // Enteros (hasta 8) para las plantillas: cada una corta por el ancho de SU
+    // grilla, que puede ser de tres, de cinco o una tira de seis. El home
+    // clásico se queda con una fila de la grilla de Apariencia.
+    const todosRecomendados = recomendados.map(p => toProducto(p, badgesEstante))
+    const todosTopVentas = topVentas.map(p => toProducto(p, badgesEstante))
+    const estanteRecomendados = todosRecomendados.slice(0, porEstante)
+    const estanteTopVentas = todosTopVentas.slice(0, porEstante)
     // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
     // (la segunda tanda de lo más nuevo): sus filas se configuran en la
     // pestaña Secciones de cada plantilla, no con estos interruptores.
@@ -368,7 +412,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 <style>{`
                     .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
                     .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
-                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
+                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
@@ -453,7 +497,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-marcas-volanta { font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-muted); text-align:center; margin-bottom:22px; }
                 .sf-marca { display:flex; align-items:center; justify-content:center; height:46px; padding:0 10px; flex-shrink:0; }
                 .sf-marca-img { max-height:46px; max-width:150px; width:auto; object-fit:contain; display:block; transition:filter 260ms ease, opacity 260ms ease; }
-                .sf-marca-txt { font-family:var(--font-heading, inherit); font-size:23px; font-weight:600; letter-spacing:0.02em; white-space:nowrap; color:var(--color-muted); transition:color 260ms ease; }
+                .sf-marca-txt { font-family:var(--font-heading, inherit); font-size:23px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; white-space:nowrap; color:var(--color-muted); transition:color 260ms ease; }
                 @media (hover:hover) {
                     .sf-marca-img { filter:grayscale(1); opacity:0.55; }
                     .sf-marca:hover .sf-marca-img { filter:grayscale(0); opacity:1; }
@@ -466,14 +510,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                    target, y el hover moviendo color o la foto DENTRO de un
                    overflow:hidden — nunca la caja, para no correr el layout. */
 
-                /* Índice: dos columnas de nombres grandes con filete. */
+                /* Índice: dos columnas de nombres grandes con filete y botón de acceso. */
                 .sf-cat-indice { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:40px; }
-                .sf-cat-indice-row { display:flex; align-items:baseline; gap:12px; width:100%; min-height:52px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
+                .sf-cat-indice-row { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:54px; padding:12px 2px; background:none; border:none; border-bottom:1px solid var(--color-border); cursor:pointer; font-family:inherit; text-align:left; transition:border-color 150ms; }
                 .sf-cat-indice-row:hover { border-bottom-color:var(--color-text); }
                 .sf-cat-indice-nombre { font-size:22px; font-weight:700; letter-spacing:-0.02em; color:var(--color-text); transition:color 150ms; }
                 .sf-cat-indice-row:hover .sf-cat-indice-nombre { color:var(--color-primary); }
-                .sf-cat-indice-count { font-size:11.5px; color:var(--color-subtle); font-family:"Geist Mono",monospace; flex-shrink:0; }
-                @media(max-width:760px){ .sf-cat-indice { grid-template-columns:minmax(0,1fr); } .sf-cat-indice-nombre { font-size:18px } }
+                .sf-cat-indice-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-muted); display:grid; place-items:center; flex-shrink:0; transition:background 180ms cubic-bezier(0.16,1,0.3,1), border-color 180ms, color 180ms, transform 180ms; }
+                .sf-cat-indice-row:hover .sf-cat-indice-btn { background:var(--color-primary); border-color:var(--color-primary); color:var(--color-on-primary,#fff); transform:translateX(3px); }
+                @media(max-width:760px){
+                    .sf-cat-indice { grid-template-columns:minmax(0,1fr); }
+                    .sf-cat-indice-nombre { font-size:18px; }
+                    .sf-cat-indice-btn { width:28px; height:28px; }
+                }
 
                 /* Etiquetas: una línea con scroll, solo el nombre. */
                 .sf-cat-chips-wrap { overflow-x:auto; scrollbar-width:none; }
@@ -493,7 +542,6 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-cat-tile-texto { position:absolute; left:16px; right:16px; bottom:14px; display:flex; flex-direction:column; gap:2px; text-align:left; }
                 .sf-cat-tile-nombre { color:#fff; font-weight:700; font-size:16px; letter-spacing:-0.01em; }
                 .sf-cat-tile--grande .sf-cat-tile-nombre { font-size:22px; }
-                .sf-cat-tile-count { color:rgba(255,255,255,0.78); font-size:11.5px; font-family:"Geist Mono",monospace; }
                 @media(max-width:1024px){ .sf-cat-mosaico { grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:132px } .sf-cat-tile--grande { grid-row:span 1 } }
 
                 /* Tarjetas: grilla pareja, nombre debajo de la foto. */
@@ -599,17 +647,27 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-parallax { position:relative; min-height:440px; margin-bottom:56px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
                 .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
                 .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
-                /* iOS Safari históricamente ignora/rompe background-attachment:
-                   fixed (y en Android puede tildar en equipos de gama baja) —
-                   se apaga en mobile a propósito: el banner se ve idéntico,
-                   solo sin el efecto, en vez de arriesgar un fondo roto. */
-                @media(max-width:640px){ .sf-parallax { background-attachment:scroll; } }
+                /* iOS Safari ignora background-attachment: fixed (y en Android
+                   es poco fiable), así que en celular el efecto se hace de otra
+                   forma: una capa position:fixed del tamaño de la pantalla con
+                   la foto, y la sección la recorta con clip-path — se ve solo
+                   la franja que cae dentro del banner y la foto "queda quieta"
+                   mientras la página pasa. Sin JS, lo anima el compositor. La
+                   URL llega por la variable --sf-par-img (inline, propia de
+                   cada tienda). Con prefers-reduced-motion se queda estático. */
+                @media(max-width:640px){
+                    .sf-parallax { background-attachment:scroll; }
+                    @media (prefers-reduced-motion: no-preference) {
+                        .sf-parallax { background-image:none !important; clip-path:inset(0); }
+                        .sf-parallax::before { content:''; position:fixed; top:0; left:0; width:100%; height:100vh; height:100lvh; background:var(--sf-par-img) center/cover no-repeat; z-index:0; pointer-events:none; }
+                    }
+                }
                 @media (prefers-reduced-motion: reduce) { .sf-parallax { background-attachment:scroll; } }
 
                 /* ── Tablet (≤1024px) ── */
                 @media(max-width:1024px){
                     .sf-w         { padding:0 24px }
-                    .sf-g4        { grid-template-columns:repeat(2,1fr); gap:12px }
+                    .sf-g4        { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px }
                     .sf-hero-grid { grid-template-columns:1fr; padding:0 32px }
                     .sf-hero-inner { min-height:max(520px, calc(100vh - 120px)); min-height:max(520px, calc(100svh - 120px)); padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
@@ -636,9 +694,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                        inline desde arrowStyle() (Inicio.tsx), más
                        específico que esta clase. */
                     .sf-hero-arrow-left, .sf-hero-arrow-right { top:auto !important; bottom:14px !important; transform:none !important; }
-                    .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
+                    /* Grilla de 2×2 en vez de renglones sueltos alineados a
+                       la izquierda (pedido 29/09): valor arriba, leyenda
+                       abajo, centrados y con filetes — mismo criterio que
+                       las plantillas avanzadas en celular. Si hay una
+                       cantidad impar, el último ocupa el ancho entero. */
+                    .sf-stats-wrap { padding:0 !important }
+                    .sf-stats-row  { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); width:100% }
+                    .sf-stats-cell { display:block !important }
+                    .sf-stats-cell:nth-child(even) { border-left:1px solid var(--color-border) }
+                    .sf-stats-cell:nth-child(n+3)  { border-top:1px solid var(--color-border) }
+                    .sf-stats-cell:last-child:nth-child(odd) { grid-column:1 / -1 }
                     .sf-stats-div  { display:none !important }
-                    .sf-stats-item { padding:4px 16px !important }
+                    .sf-stats-item { flex-direction:column; align-items:center !important; text-align:center; gap:2px !important; padding:12px 8px !important }
                     .sf-parallax   { min-height:320px; margin-bottom:32px; }
                     .sf-parallax-title { font-size:26px; }
                     .sf-parallax-sub   { font-size:14px; }
@@ -674,10 +742,18 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // navegan) y el contacto real (redes y horario).
                         baseUrl: base,
                         contacto: config?.contact,
-                        mostrarPie: config?.appearance?.showFooter ?? true,
+                        // El pie es obligatorio (lleva los legales): ya no se apaga desde Apariencia.
+                        mostrarPie: true,
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
+                        // Lo de Apariencia: interruptores, anuncio, parallax,
+                        // marcas, y los estantes con lo que dice su nombre.
+                        apariencia: config?.appearance,
+                        nuevos: productos,
+                        recomendados: todosRecomendados,
+                        topVentas: todosTopVentas,
+                        hayWhatsapp: !!tienda.wpp,
                     })}
                     movil={movil}
                     // `soloCuerpo` recorta header, hero y pie de la maqueta
@@ -691,11 +767,15 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irACatalogo: () => go('/catalogo'),
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),
-                        abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
+                        // Con el interruptor de WhatsApp apagado no hay a
+                        // quién escribirle: los botones de la plantilla que
+                        // abren el chat no se dibujan.
+                        abrirWhatsapp: tienda.wpp && config?.appearance?.showWhatsapp !== false ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
-                        // la plantilla tiene que poder abrirlo igual.
+                        // la plantilla tiene que poder abrirlo igual, sin
+                        // depender del interruptor de devoluciones.
                         abrirDevolucion: () => setDevolucionAbierta(true),
                         // Los tres huecos interactivos del navbar de la
                         // plantilla: cuenta+carrito, buscador y navegación.
@@ -708,7 +788,36 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                                 esVidriera={config?.business?.mode === 'SHOWCASE'}
                             />
                         ),
-                        renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Barra de búsqueda" apagada: null, y no `undefined`
+                        // — sin la función, el header dibuja el buscador de
+                        // muestra de la vitrina, que no busca nada.
+                        renderBuscador: ({ placeholder }) => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} placeholder={placeholder || undefined} /> : null,
+                        // La cuenta regresiva de la portada y su fila de
+                        // productos en oferta: los mismos dos componentes
+                        // del home clásico. Sin countdown activo no dibujan
+                        // nada.
+                        renderOferta: () => slug ? (
+                            <>
+                                <CountdownBanner slug={slug} lugar="HOME" />
+                                <CountdownOfertaSection
+                                    slug={slug}
+                                    badges={{ showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }}
+                                />
+                            </>
+                        ) : null,
+                        // "Video en tu tienda": el mismo componente del
+                        // home clásico. Sin ningún link válido devuelve null
+                        // y el bloque de la plantilla no se dibuja.
+                        renderVideo: () => (config?.appearance?.showVideo ?? false) ? (
+                            <SeccionVideos
+                                titulo={tituloVideo}
+                                subtitulo={subtituloVideo}
+                                layout={config?.appearance?.videoLayout}
+                                videos={config?.appearance?.videos}
+                                videoUrlLegado={config?.appearance?.videoUrl}
+                                go={go}
+                            />
+                        ) : null,
                         // "Estilo de header" de Apariencia: con plantilla
                         // activa antes se ignoraba del todo.
                         navLayout: (config?.appearance?.headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
@@ -726,7 +835,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // de quedar siempre con el look por defecto de Órbita
                         // adentro de una grilla pensada para otra cosa.
                         renderProducto: (x, _i, opts) => {
-                            const real = productos.find(pr => pr.id === x.slug) ?? destacados.find(pr => pr.id === x.slug)
+                            // En todos los estantes: Recomendados y Top
+                            // ventas vienen de pedidos aparte y pueden traer
+                            // un producto que no está entre los últimos 16.
+                            const real = [productos, destacados, todosRecomendados, todosTopVentas]
+                                .map(lista => lista.find(pr => pr.id === x.slug)).find(Boolean)
                             return real ? (
                                 <ProductCard
                                     producto={real}
@@ -752,11 +865,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                    <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                    <div className="sf-stats-wrap" style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
                         <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
                             <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
                                 {stats.map((s, i, arr) => (
-                                    <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <span key={s.id} className="sf-stats-cell" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                         <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
                                             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
                                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
@@ -825,7 +938,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 (fondo fijo, texto y CTA encima, el resto de la página
                 sigue el scroll normal). */}
             {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
-                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})` }}>
+                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                     <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                         <div style={{ maxWidth: 520, padding: '56px 0' }}>
@@ -834,7 +947,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                             <button
                                 className="ds-hover"
                                 onClick={() => irACtaParallax(config.appearance?.parallaxCtaLink)}
-                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: '#fff', color: '#0F172A', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'background 150ms, color 150ms' }}
                             >
                                 {config.appearance.parallaxCtaText || 'Ver más'}
                             </button>
@@ -891,7 +1004,17 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 WhatsappBanner.tsx y WHATSAPP_LAYOUTS en apariencia.mock.ts).
                 El gate (toggle + número real cargado) sigue acá, como en
                 cualquier otra sección; el componente decide el resto. */}
-            {config?.appearance?.showWhatsapp !== false && tienda.wpp && (
+            {/* Tienda demo: el banner invita a tener la tienda propia y le
+                escribe a Órbita (ver lib/demo/whatsapp.ts). Por slug y no por
+                window, así sale igual en el render del servidor. */}
+            {config?.business?.subdomain === DEMO_SLUG ? (DEMO_WHATSAPP && (
+                <WhatsappBanner
+                    layout="clasico"
+                    wpp={DEMO_WHATSAPP}
+                    message={MENSAJE_WHATSAPP_DEMO}
+                    textos={TEXTOS_WHATSAPP_DEMO}
+                />
+            )) : config?.appearance?.showWhatsapp !== false && tienda.wpp && (
                 <WhatsappBanner
                     layout={config?.appearance?.whatsappLayout}
                     wpp={tienda.wpp}
@@ -906,7 +1029,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 PlantillaHome (es parte de su diseño: columnas, tipografía y
                 cierre propios). Sin esto quedaban dos pies, uno abajo del otro. */}
             {!plantilla?.piePropio && (
-                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+                <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
             )}
             {/* El pie de la plantilla dibuja el boton, pero el modal en si lo
                 monta esta pagina: dentro de PlantillaHome no hay a donde. */}
@@ -945,6 +1068,31 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             {modalPromo && promoActivo && !modalJuego && !reclamo && (
                 <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
                     <PromoModalContenido promo={promoActivo} go={go} />
+                </ModalJuego>
+            )}
+
+            {!enDemo && !hayModalAbierto && (jugables.length > 0 || promoActivo) && (
+                <MenuPromociones
+                    juegos={jugables}
+                    anuncios={promoActivo ? [promoActivo] : []}
+                    onJugar={reabrirJuego}
+                    onAnuncio={() => setModalPromo(true)}
+                />
+            )}
+            {enDemo && (
+                <MenuDemoTienda juegos={juegosActivos} onJugar={abrirJuegoDemo} onAnuncio={a => { setJuegoDemo(null); setAnuncioDemo(a) }} />
+            )}
+            {juegoDemo && (
+                <ModalJuego
+                    titulo={juegoDemo.juego.name || TEMAS[juegoDemo.juego.type]?.titulo || 'Juego con premio'}
+                    onCerrar={() => setJuegoDemo(null)}
+                >
+                    <JuegoInline key={juegoDemo.vez} slug={slug} tipo={juegoDemo.juego.type} nombreTienda={tienda.nombre} />
+                </ModalJuego>
+            )}
+            {anuncioDemo && (
+                <ModalJuego titulo={anuncioDemo.title} onCerrar={() => setAnuncioDemo(null)}>
+                    <PromoModalContenido promo={anuncioDemo} go={go} />
                 </ModalJuego>
             )}
         </StorefrontChrome>
@@ -1219,11 +1367,9 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                             {s.cta || 'Ver catálogo'}
                                         </span>
                                     ) : (
-                                        // Botón sólido blanco con texto oscuro de siempre —
-                                        // se invierte con 'blanco' (fondo claro): sin esto
-                                        // quedaría un botón blanco encima de un velo blanco,
-                                        // invisible.
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: textoOscuro ? '#0F172A' : '#fff', color: textoOscuro ? '#fff' : '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        // Botón sólido que toma el color primario de Apariencia
+                                        // adaptando inteligentemente el texto con var(--color-on-primary)
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
@@ -1423,13 +1569,20 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
 // todas para índice; las primeras N (por orden del catálogo) CON FOTO para
 // mosaico/tarjetas — nunca cae a un color de relleno ahí, la foto no es
 // opcional en esos dos estilos.
-function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryIds: string[] | null | undefined): CatVisual[] {
+export function resolverCategorias(cats: CatVisual[], estilo: CategoryLayout, categoryIds: string[] | null | undefined): CatVisual[] {
     if (estilo !== 'indice' && estilo !== 'mosaico' && estilo !== 'tarjetas') return cats
 
-    // El filter sobre `cats` ya preserva el orden del catálogo (no el de
-    // selección) — no hace falta reordenar aparte.
-    const elegidas = categoryIds && categoryIds.length > 0 ? cats.filter(c => categoryIds.includes(c.id)) : cats
-    const candidatas = elegidas.length > 0 ? elegidas : cats
+    // Si se definieron categorías específicas, se respeta el orden explícito
+    // indicado por el usuario (categoryIds), no el orden por defecto del catálogo.
+    let candidatas: CatVisual[]
+    if (categoryIds && categoryIds.length > 0) {
+        const mapa = new Map(cats.map(c => [c.id, c]))
+        const elegidas = categoryIds.map(id => mapa.get(id)).filter((c): c is CatVisual => Boolean(c))
+        candidatas = elegidas.length > 0 ? elegidas : cats
+    } else {
+        candidatas = cats
+    }
+
     const base = estilo === 'indice' ? candidatas : candidatas.filter(c => !!c.imageUrl)
     const tope = CATEGORY_LAYOUT_MAX[estilo]
     return tope ? base.slice(0, tope) : base
@@ -1485,9 +1638,8 @@ function CatMedallon({ c, size }: { c: CatVisual; size: number }) {
 }
 
 // ── Índice ── Editorial: solo los nombres, en tipografía grande a dos
-// columnas, separados por filete. Cero dependencia de fotos e íconos — es el
-// estilo para una marca que quiere que la sección se lea sobria y no compita
-// con las fotos de producto.
+// columnas, separados por filete y con botón flecha para acceder directamente
+// a cada categoría. Cero dependencia de fotos e íconos — sobrio y directo.
 function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
     return (
         <div className="sf-w">
@@ -1495,6 +1647,9 @@ function CatIndice({ cats, go }: { cats: CatVisual[]; go: (p: string) => void })
                 {cats.map(c => (
                     <button key={c.id} className="sf-cat-indice-row" onClick={() => go(`/catalogo?cat=${encodeURIComponent(c.slug)}`)}>
                         <span className="sf-cat-indice-nombre">{c.nombre}</span>
+                        <span className="sf-cat-indice-btn" aria-hidden="true">
+                            <ArrowRight size={15} strokeWidth={2.2} />
+                        </span>
                     </button>
                 ))}
             </div>
@@ -1550,9 +1705,10 @@ function CatMosaico({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }
                             así que una sola clave cubre los dos casos. */}
                         <span className="sf-cat-tile-foto" style={{ backgroundImage: c.imageUrl ? `url(${c.imageUrl})` : `linear-gradient(135deg, oklch(0.80 0.07 ${c.hue}), oklch(0.66 0.09 ${c.hue}))` }} />
                         <span className="sf-cat-tile-velo" />
+                        {/* Sin "N productos" (pedido 29/09): en el mosaico la
+                            foto y el nombre alcanzan, el contador era ruido. */}
                         <span className="sf-cat-tile-texto">
                             <span className="sf-cat-tile-nombre">{c.nombre}</span>
-                            <span className="sf-cat-tile-count">{c.count} productos</span>
                         </span>
                     </button>
                 ))}

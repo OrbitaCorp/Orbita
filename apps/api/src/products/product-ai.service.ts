@@ -5,6 +5,7 @@ import { DEFAULT_MODEL, createGeminiClient, THINKING_MINIMO } from '../orbi/llm/
 import { generarTexto } from '../orbi/llm/text-generation';
 import { createGroqClient, GROQ_MAX_IMAGE_BASE64, GROQ_VISION_MODEL } from '../orbi/llm/groq-client';
 import { esErrorDeDisponibilidad } from '../orbi/llm/llm-errors';
+import type { LlmUsage } from '../orbi/llm/llm-adapter.interface';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
@@ -34,6 +35,17 @@ export interface AiScanProductResult {
   imageSearchQuery?: string;
 }
 
+// Quién pidió esta ayuda de IA, cuando no es el botón del panel sino Orbi: se
+// suma a la metadata de los eventos de consumo (para atribuir el gasto al turno
+// y al miembro) y `alConsumir` devuelve el consumo real para que el turno lo
+// sume a su ficha. Sin origen, todo queda como antes.
+export interface OrigenDeIa {
+  memberId?: string;
+  turnId?: string;
+  /** Recibe el consumo real de la llamada (para sumarlo a la ficha del turno de Orbi). */
+  alConsumir?: (u: LlmUsage) => void;
+}
+
 export interface AiAssistResult {
   description: string;
   suggestedCategoryId: string | null;
@@ -43,7 +55,7 @@ export interface AiAssistResult {
   // técnica, etc.); vacío si no aplica. Va siempre en la misma respuesta que
   // descripción/categoría/tags para no duplicar el llamado a Gemini — el
   // wizard del panel decide qué campos aplicar según desde qué botón se
-  // llamó ("Generar con Orbi" de la info general, o el de especificaciones).
+  // llamó ("Redactar con Orbi" de la info general, o el de especificaciones).
   suggestedSpecs: { label: string; value: string }[];
 }
 
@@ -143,7 +155,7 @@ export class ProductAiService {
     return this.config.get<string>('PRODUCT_AI_MODEL') ?? DEFAULT_MODEL;
   }
 
-  async assist(businessId: string, dto: AiAssistDto): Promise<AiAssistResult> {
+  async assist(businessId: string, dto: AiAssistDto, origen?: OrigenDeIa): Promise<AiAssistResult> {
     let categorias: CategoryListItem[];
     let tagsUsados: Awaited<ReturnType<TagsService['findAll']>>;
     try {
@@ -173,7 +185,7 @@ export class ProductAiService {
       system: SYSTEM_PROMPT,
       user: contexto.join('\n'),
       maxTokens: 3000,
-    });
+    }, origen);
 
     const result = parsed as Partial<AiAssistResult>;
     const description = typeof result.description === 'string' ? result.description.trim() : '';
@@ -244,6 +256,7 @@ export class ProductAiService {
     businessId: string,
     feature: string,
     opts: { system: string; user: string; maxTokens: number },
+    origen?: OrigenDeIa,
   ): Promise<unknown> {
     let raw: string | undefined;
     let finishReason: string | undefined;
@@ -251,7 +264,7 @@ export class ProductAiService {
       const r = await generarTexto(this.config, { ...opts, json: true, geminiModel: this.modelo });
       raw = r.text;
       finishReason = r.finishReason; // 'MAX_TOKENS' = cortó por tope de tokens
-      this.registrarUso(businessId, feature, r);
+      this.registrarUso(businessId, feature, r, origen);
     } catch (error) {
       // "GEMINI_API_KEY / GROQ_API_KEY no configurada" ya viene como 503 con
       // mensaje claro — se propaga tal cual.
@@ -292,18 +305,40 @@ export class ProductAiService {
   // Registra el consumo de IA de esta llamada en usage_events (el panel de costos
   // del superadmin lo agrega por proveedor). `metadata.feature` dice QUÉ ayuda lo
   // gastó (ai-assist, ai-variants, ai-scan) y `metadata.model` con qué modelo
-  // respondió de verdad — la categoría queda en prompt/completion_tokens para que
-  // el cálculo de costo por token de InternalCostAdapter lo tome igual que el
-  // chat de Orbi. Sin await: no demora la respuesta, y track() ya atrapa sus
-  // propios errores.
+  // respondió de verdad: con ese modelo track() calcula y guarda el costo
+  // (platform/costs/precios.ts), igual que en el chat de Orbi. Sin await: no
+  // demora la respuesta, y track() ya atrapa sus propios errores.
   private registrarUso(
     businessId: string,
     feature: string,
-    uso: { provider?: 'gemini' | 'groq'; model?: string; promptTokens?: number; completionTokens?: number; viaFallback?: boolean },
+    uso: {
+      provider?: 'gemini' | 'groq';
+      model?: string;
+      promptTokens?: number;
+      completionTokens?: number;
+      cachedTokens?: number;
+      thinkingTokens?: number;
+      viaFallback?: boolean;
+    },
+    origen?: OrigenDeIa,
   ): void {
     // Sin consumo informado no se inventa un 0: se promediaría como llamada gratis.
     if (!uso.provider || !uso.promptTokens) return;
-    const metadata = { feature, model: uso.model, ...(uso.viaFallback ? { viaFallback: true } : {}) };
+    const metadata = {
+      feature,
+      model: uso.model,
+      ...(uso.viaFallback ? { viaFallback: true } : {}),
+      ...(origen?.memberId ? { memberId: origen.memberId } : {}),
+      ...(origen?.turnId ? { turnId: origen.turnId } : {}),
+    };
+    origen?.alConsumir?.({
+      provider: uso.provider,
+      model: uso.model ?? '',
+      promptTokens: uso.promptTokens,
+      completionTokens: uso.completionTokens ?? 0,
+      cachedTokens: uso.cachedTokens,
+      thinkingTokens: uso.thinkingTokens,
+    });
     void this.usageMetering.track({
       providerSlug: uso.provider, businessId, category: 'prompt_tokens', quantity: uso.promptTokens, unit: 'tokens', metadata,
     });

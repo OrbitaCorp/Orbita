@@ -447,7 +447,12 @@ export class StorefrontService {
       payment: contact
         ? {
             acceptsMercadopago: contact.acceptsMercadopago,
-            mercadopagoAvailable: await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
+            // La demo pública no tiene cuenta de MP conectada: el botón se
+            // muestra igual y el pago lo simula el navegador (apps/web,
+            // lib/demo/recursos/checkout.ts). El checkout real lo corta DemoGuard.
+            mercadopagoAvailable: business.isDemo
+              ? contact.acceptsMercadopago
+              : await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
             acceptsCash: contact.acceptsCash,
             acceptsTransfer: contact.acceptsTransfer,
             acceptsPickup: contact.acceptsPickup,
@@ -1163,8 +1168,23 @@ export class StorefrontService {
       include: { _count: { select: { products: { where: { deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } } } } },
     });
 
+    // Una categoría madre casi nunca tiene productos propios (viven en las
+    // hijas), así que filtrar solo por conteo la sacaba de la lista y el
+    // storefront veía todas las subcategorías como raíces. Se conservan los
+    // ancestros de toda categoría con productos; su `productCount` sigue siendo
+    // el propio (0), el front decide cómo mostrarlas.
+    const porId = new Map(categories.map((c) => [c.id, c]));
+    const visibles = new Set(categories.filter((c) => (c._count?.products ?? 0) > 0).map((c) => c.id));
+    for (const id of [...visibles]) {
+      let padreId = porId.get(id)?.parentId ?? null;
+      while (padreId && !visibles.has(padreId) && porId.has(padreId)) {
+        visibles.add(padreId);
+        padreId = porId.get(padreId)!.parentId;
+      }
+    }
+
     return categories
-      .filter((c) => (c._count?.products ?? 0) > 0)
+      .filter((c) => visibles.has(c.id))
       .map((c) => ({
         id: c.id,
         name: c.name,

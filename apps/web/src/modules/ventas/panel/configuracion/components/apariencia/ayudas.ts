@@ -91,9 +91,9 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
         afecta: 'Apagar algo no borra nada: los datos quedan guardados y vuelven a mostrarse cuando lo prendés de nuevo.',
     },
     visibilidadPlantilla: {
-        que: 'Los interruptores de las dos franjas que tu plantilla toma de acá: el anuncio de arriba y la barra de confianza.',
-        donde: 'El anuncio, arriba del header, en todas las páginas. La barra de confianza, debajo del hero de la portada.',
-        afecta: 'Apagar una no borra su contenido: los datos quedan guardados y vuelven a mostrarse cuando la prendés otra vez. El resto de la portada lo define la plantilla, no esta pantalla.',
+        que: 'Qué partes de la portada ven tus clientes. La plantilla decide cómo se ve cada una y dónde va; vos decidís cuáles se muestran.',
+        donde: 'En la portada de tu tienda. El anuncio y el buscador, además, en todas las páginas.',
+        afecta: 'Apagar una no borra su contenido: los datos quedan guardados y vuelven a mostrarse cuando la prendés otra vez. Una fila de productos sin nada para mostrar no aparece aunque esté prendida.',
     },
     textos: {
         que: 'El aviso de la franja finita de arriba, y el mensaje con el que arranca una charla de WhatsApp.',
@@ -196,11 +196,6 @@ export const AYUDA_OPCIONES: Partial<Record<keyof Apariencia, Ayuda>> = {
         que: 'Hace que el aviso de la franja de arriba se deslice de derecha a izquierda, en loop, como una cartelera.',
         donde: 'En la misma franja finita de arriba del header.',
         afecta: 'Moviéndose llama más la atención y entra un texto más largo sin cortarse; quieto y centrado se lee más tranquilo. Solo tiene efecto si la franja está prendida.',
-    },
-    mostrarFooter: {
-        que: 'El pie de página completo: logo, descripción, datos de contacto, links y redes.',
-        donde: 'Abajo de todo, en todas las páginas de la tienda.',
-        afecta: 'Apagado se va TODO el bloque, incluidos los datos de contacto y el acceso a devoluciones. La tienda termina directo donde termina el contenido de cada página.',
     },
     mostrarRedesFooter: {
         que: 'Los iconitos que llevan a tus redes (Instagram, Facebook, TikTok).',

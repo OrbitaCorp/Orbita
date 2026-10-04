@@ -147,10 +147,13 @@ function Lienzo({ alto = 260, cargando, children }: { alto?: number; cargando?: 
 // ─── Serie(s) en el tiempo, en líneas ─────────────────────────────────────────
 // Para conteos comparables (negocios/suscripciones, pedidos/clientes). Con 2
 // series siempre hay leyenda: la identidad nunca queda solo en el color.
-export function LineSeriesChart({ data, series, formatValue = fmtCount, cargando, alto }: {
+// `formatTick` (opcional) formatea el eje Y y habilita decimales: sin él el
+// eje es de conteos enteros, y una serie en USD de centavos quedaba plana en 0.
+export function LineSeriesChart({ data, series, formatValue = fmtCount, formatTick, cargando, alto }: {
   data: Record<string, string | number>[]
   series: { key: string; label: string }[]
   formatValue?: (n: number) => string
+  formatTick?: (n: number) => string
   cargando?: boolean
   alto?: number
 }) {
@@ -163,7 +166,11 @@ export function LineSeriesChart({ data, series, formatValue = fmtCount, cargando
           dataKey="date" tickFormatter={fmtShortDate} tick={ejeTick}
           axisLine={{ stroke: 'var(--chart-axis)' }} tickLine={false} minTickGap={28} dy={4}
         />
-        <YAxis tick={ejeTick} axisLine={false} tickLine={false} width={40} allowDecimals={false} />
+        <YAxis
+          tick={ejeTick} axisLine={false} tickLine={false}
+          width={formatTick ? 56 : 40} allowDecimals={!!formatTick}
+          tickFormatter={formatTick ? (v) => formatTick(v as number) : undefined}
+        />
         <Tooltip content={<ChartTooltip formatValue={formatValue} />} cursor={CURSOR} />
         {series.length > 1 && (
           <Legend

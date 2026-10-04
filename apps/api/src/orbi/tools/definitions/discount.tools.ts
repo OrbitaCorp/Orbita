@@ -3,12 +3,16 @@ import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interfa
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { DiscountsService } from '../../../discounts/discounts.service';
 import type { CouponsService } from '../../../coupons/coupons.service';
+import { UpsertDiscountDto } from '../../../discounts/dto/upsert-discount.dto';
+import { UpsertCouponDto } from '../../../coupons/dto/upsert-coupon.dto';
+import { validarConDto, validarConServicio } from '../acciones/validar-args';
+import { cantidad, dato, entreComillas, presente } from '../acciones/formato';
 
 export class ListDiscountsTool implements OrbiTool {
   name = 'listDiscounts';
   description = 'Listar los descuentos automáticos del negocio (sin código). Úsalo para mostrar qué descuentos existen o dar contexto antes de crear uno nuevo.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['discounts.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -45,25 +49,95 @@ export class ListDiscountsTool implements OrbiTool {
 }
 
 /**
- * "20% off" o "$500 off", según el tipo. Va en el botón de confirmación: la
- * persona tiene que poder ver de un vistazo si el modelo entendió bien, y
- * "PERCENT_TICKET / 20" no se lee de un vistazo.
+ * "20% off en cada producto" o "$500 off sobre el total de la compra", según
+ * el tipo. Va en el botón de confirmación: la persona tiene que poder ver de
+ * un vistazo si el modelo entendió bien, y "PERCENT_TICKET / 20" no se lee de
+ * un vistazo.
  */
 function formatearValor(tipo: unknown, valor: unknown): string {
   const n = typeof valor === 'number' ? valor : Number(valor);
   if (!Number.isFinite(n)) return 'valor inválido';
-  return String(tipo).startsWith('PERCENT') ? `${n}% off` : `$${n} off`;
+  const cuanto = String(tipo).startsWith('PERCENT') ? `${n}% off` : `$${n} off`;
+  const donde = String(tipo).endsWith('_TICKET') ? 'sobre el total de la compra' : 'en cada producto';
+  return `${cuanto} ${donde}`;
+}
+
+const ALCANCE: Record<string, string> = {
+  PRODUCT: 'productos elegidos',
+  CATEGORY: 'categorías elegidas',
+  TICKET: 'toda la compra',
+};
+
+// Alcance, cuántos productos/categorías y vigencia (spec §3.2): con solo el
+// código y el valor, un cupón "para 1 producto" y uno "para toda la tienda"
+// se veían igual en la tarjeta. Los ids no se muestran (no le dicen nada a
+// nadie): se muestra cuántos son, que es lo que la persona puede chequear.
+function alcanceYVigencia(args: Record<string, unknown>): string {
+  const partes = [`para ${ALCANCE[String(args.scope)] ?? dato(args.scope)}`];
+  if (presente(args.productIds)) partes.push(cantidad(args.productIds, 'producto', 'productos'));
+  if (presente(args.categoryIds)) partes.push(cantidad(args.categoryIds, 'categoría', 'categorías'));
+  const desde = presente(args.startDate) ? `desde ${dato(args.startDate)}` : 'desde ahora';
+  const hasta = presente(args.endDate) ? `hasta ${dato(args.endDate)}` : 'sin fecha de fin';
+  return `${partes.join(', ')}; ${desde}, ${hasta}`;
+}
+
+// Lo que se le manda al service, armado en un solo lugar: validarArgs() lo
+// pasa por el DTO del endpoint y execute() lo escribe, así lo validado es
+// exactamente lo escrito. Un null del modelo en un opcional es "no mandar":
+// no se escribe nada que la tarjeta no muestre. Sin conversiones de tipo: si
+// el modelo manda "20" en vez de 20, el DTO lo rechaza, igual que por HTTP.
+function aDtoDescuento(args: Record<string, unknown>): UpsertDiscountDto {
+  return {
+    name: args.name as string,
+    type: args.type as string,
+    value: args.value as number,
+    scope: args.scope as string,
+    productIds: (args.productIds ?? undefined) as string[] | undefined,
+    // Orbi elige productos (los ids de listProducts), nunca variantes. El
+    // service exige el nivel con scope PRODUCT: sin esto, todo descuento por
+    // producto de Orbi fallaba DESPUÉS de que la persona lo confirmara.
+    productLevel: args.scope === 'PRODUCT' ? 'padre' : undefined,
+    categoryIds: (args.categoryIds ?? undefined) as string[] | undefined,
+    startDate: (args.startDate as string | undefined) ?? new Date().toISOString(),
+    endDate: (args.endDate ?? undefined) as string | undefined,
+  };
+}
+
+const tieneIds = (v: unknown) => Array.isArray(v) && v.length > 0;
+
+// El service acepta scope PRODUCT con categoryIds (y al revés), pero la
+// tarjeta diría "para productos elegidos, 2 categorías" y el panel nunca arma
+// esa mezcla: un modelo que la propone confundió los ids.
+function alcanceIncoherente(args: Record<string, unknown>): string | null {
+  const productos = tieneIds(args.productIds);
+  const categorias = tieneIds(args.categoryIds);
+  if (args.scope === 'PRODUCT' && (!productos || categorias)) {
+    return 'Argumento inválido (scope): con scope PRODUCT van solo productIds, los ids que te devolvió listProducts';
+  }
+  if (args.scope === 'CATEGORY' && (!categorias || productos)) {
+    return 'Argumento inválido (scope): con scope CATEGORY van solo categoryIds, ids de categorías del negocio';
+  }
+  return null;
 }
 
 export class CreateDiscountTool implements OrbiTool {
   name = 'createDiscount';
   description = 'Crear un descuento automático (sin código) para productos, categorías o el ticket total. Se aplica solo, sin que el cliente escriba nada.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['discounts:write'];
+  requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
-    return `Crear el descuento "${String(args.name ?? 'sin nombre')}" de ${formatearValor(args.type, args.value)}`;
+    return `Crear el descuento ${entreComillas(args.name ?? 'sin nombre')} de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
+  }
+
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
+    const dto = aDtoDescuento(args);
+    const forma = await validarConDto(UpsertDiscountDto, { ...dto });
+    if (!forma.ok) return forma;
+    const alcance = alcanceIncoherente(args);
+    if (alcance) return { ok: false as const, error: alcance };
+    return validarConServicio(() => this.discountsService.validarAlta(ctx.businessId, dto));
   }
 
   parameters = {
@@ -71,7 +145,7 @@ export class CreateDiscountTool implements OrbiTool {
     properties: {
       name: { type: 'string', description: 'Nombre del descuento' },
       type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de descuento' },
-      value: { type: 'number', description: 'Valor del descuento (porcentaje 1-100, o monto en pesos)' },
+      value: { type: 'number', description: 'Valor del descuento (porcentaje 1-99, o monto en pesos)' },
       scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el descuento' },
       productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
       categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },
@@ -89,16 +163,7 @@ export class CreateDiscountTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const discount = await this.discountsService.create(ctx.businessId, ctx.userId, {
-        name: args.name as string,
-        type: args.type as string,
-        value: Number(args.value),
-        scope: args.scope as string,
-        productIds: args.productIds as string[] | undefined,
-        categoryIds: args.categoryIds as string[] | undefined,
-        startDate: (args.startDate as string) ?? new Date().toISOString(),
-        endDate: args.endDate as string | undefined,
-      });
+      const discount = await this.discountsService.create(ctx.businessId, ctx.userId, aDtoDescuento(args));
 
       return {
         success: true,
@@ -112,15 +177,29 @@ export class CreateDiscountTool implements OrbiTool {
   }
 }
 
+// Mismo criterio que aDtoDescuento, con el código.
+function aDtoCupon(args: Record<string, unknown>): UpsertCouponDto {
+  return { ...aDtoDescuento(args), code: args.code as string };
+}
+
 export class CreateCouponTool implements OrbiTool {
   name = 'createCoupon';
   description = 'Crear un cupón con código que el cliente ingresa manualmente en el checkout.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['discounts:write'];
+  requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
   describirAccion(args: Record<string, unknown>): string {
-    return `Crear el cupón ${String(args.code ?? '(sin código)')} de ${formatearValor(args.type, args.value)}`;
+    return `Crear el cupón ${entreComillas(args.code ?? '(sin código)')} (${entreComillas(args.name ?? 'sin nombre')}) de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
+  }
+
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
+    const dto = aDtoCupon(args);
+    const forma = await validarConDto(UpsertCouponDto, { ...dto });
+    if (!forma.ok) return forma;
+    const alcance = alcanceIncoherente(args);
+    if (alcance) return { ok: false as const, error: alcance };
+    return validarConServicio(() => this.couponsService.validarAlta(ctx.businessId, dto));
   }
 
   parameters = {
@@ -129,7 +208,7 @@ export class CreateCouponTool implements OrbiTool {
       code: { type: 'string', description: 'Código del cupón (ej. VERANO20)' },
       name: { type: 'string', description: 'Nombre descriptivo del cupón' },
       type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de cupón' },
-      value: { type: 'number', description: 'Valor del cupón (porcentaje 1-100, o monto en pesos)' },
+      value: { type: 'number', description: 'Valor del cupón (porcentaje 1-99, o monto en pesos)' },
       scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el cupón' },
       productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
       categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },
@@ -147,17 +226,7 @@ export class CreateCouponTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const coupon = await this.couponsService.create(ctx.businessId, ctx.userId, {
-        code: args.code as string,
-        name: args.name as string,
-        type: args.type as string,
-        value: Number(args.value),
-        scope: args.scope as string,
-        productIds: args.productIds as string[] | undefined,
-        categoryIds: args.categoryIds as string[] | undefined,
-        startDate: (args.startDate as string) ?? new Date().toISOString(),
-        endDate: args.endDate as string | undefined,
-      });
+      const coupon = await this.couponsService.create(ctx.businessId, ctx.userId, aDtoCupon(args));
 
       return {
         success: true,

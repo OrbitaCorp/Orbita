@@ -1,4 +1,4 @@
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 import { useOrbiStore } from './useOrbiStore'
 import { useOrbiChat } from './useOrbiChat'
 import type { OrbiContext } from './types'
@@ -40,13 +40,7 @@ export function OrbiNudge({ field, context, onDismiss }: Props) {
           animation: 'orbi-nudge-in 300ms ease-out',
         }}
       >
-        <div style={{
-          width: 34, height: 34, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-          display: 'grid', placeItems: 'center', flexShrink: 0,
-        }}>
-          <OrbiIcon size={18} color="white" />
-        </div>
+        <OrbiPet size={34} disc />
 
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8, lineHeight: 1.4 }}>

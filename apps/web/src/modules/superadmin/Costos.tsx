@@ -168,7 +168,22 @@ function AlertSkeleton() {
 }
 
 function fmtUsd(n: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  const abs = Math.abs(n)
+  const digits = abs === 0 || abs >= 0.01 ? 2 : abs >= 0.0001 ? 4 : 6
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n)
+}
+
+function fmtActividad(b: {
+  aiRequests?: number; emails?: number; productos?: number; clientes?: number; pedidos?: number
+}): string {
+  const partes = [
+    b.aiRequests ? `${b.aiRequests.toLocaleString('es-AR')} llamadas IA` : null,
+    b.emails ? `${b.emails.toLocaleString('es-AR')} emails` : null,
+    `${(b.productos ?? 0).toLocaleString('es-AR')} productos`,
+    `${(b.clientes ?? 0).toLocaleString('es-AR')} clientes`,
+    `${(b.pedidos ?? 0).toLocaleString('es-AR')} pedidos`,
+  ]
+  return partes.filter(Boolean).join(' · ')
 }
 
 function fmtUsdShort(n: number): string {
@@ -318,7 +333,7 @@ const PROVIDER_CARD_STYLES: Record<string, { bg: string; accent: string; text: s
   supabase:   { bg: '#e8faf0', accent: '#3ecf8e', text: '#0a3d22' },
   gcloud:     { bg: '#eaf1fd', accent: '#4285f4', text: '#1a2744' },
   gemini:     { bg: '#f0ecfd', accent: '#886ef8', text: '#2a1f4e' },
-  resend:     { bg: '#f0f0f0', accent: '#111111', text: '#1a1a1a' },
+  resend:     { bg: '#f0f0f0', accent: '#71717a', text: '#1a1a1a' },
   groq:       { bg: '#fdeeed', accent: '#f55036', text: '#4a1008' },
   serper:     { bg: '#fdf2f2', accent: '#ea4335', text: '#3c1010' },
   tavily:     { bg: '#e6f9fd', accent: '#00b4d8', text: '#05313d' },
@@ -460,14 +475,24 @@ function UsageSection({ usage }: { usage: CostUsageResponse | null }) {
   if (slugs.length === 0) return null
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-      gap: 16,
-    }}>
-      {slugs.map((slug) => (
-        <UsageProviderBlock key={slug} slug={slug} items={usage.providers[slug].items} />
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {usage.updatedAt && (
+        <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+          Última actualización:{' '}
+          {new Date(usage.updatedAt).toLocaleString('es-AR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          })}
+        </div>
+      )}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: 16,
+      }}>
+        {slugs.map((slug) => (
+          <UsageProviderBlock key={slug} slug={slug} items={usage.providers[slug].items} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -816,7 +841,10 @@ export function TabCostos() {
               rows={byBiz.businesses.slice(0, 10).map((b) => ({
                 key: b.businessId,
                 cells: [
-                  <span key="n" style={{ fontWeight: 500 }}>{b.businessName}</span>,
+                  <div key="n" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontWeight: 500 }}>{b.businessName}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{fmtActividad(b)}</span>
+                  </div>,
                   <span key="t" style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600 }}>{fmtUsd(b.totalEstimatedUsd)}</span>,
                   <div key="p" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ flex: 1, height: 5, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', minWidth: 40 }}>
@@ -903,7 +931,12 @@ const AI_FEATURE_LABELS: Record<string, string> = {
   'ai-assist': 'Redactar y especificaciones (Orbi)',
   'ai-variants': 'Sugerir variantes (Orbi)',
   'ai-scan': 'Escaneo de producto por foto',
+  // Eventos anteriores a la fase 1 de Orbi, que no traían feature.
   'orbi-chat': 'Chat de Orbi',
+  'orbi-panel': 'Orbi (panel)',
+  'orbi-wizard': 'Orbi (wizard)',
+  'orbi-wizard-tools': 'Orbi (herramientas del alta)',
+  'wizard-classifier': 'Clasificador nocturno del alta',
 }
 
 // ─── Alert row ───────────────────────────────────────────────────────────────

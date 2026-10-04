@@ -235,7 +235,7 @@ export default function SeguimientoPedido() {
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos mostrar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
-          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600 }}>
+          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', border: 'none', fontSize: 14, fontWeight: 600 }}>
             Volver a la tienda
           </button>
         </div>
@@ -624,7 +624,7 @@ export default function SeguimientoPedido() {
                 onClick={() => router.push(`${base}/pedido/${id}/comprobante`)}
                 style={{
                   width: '100%', height: 44, borderRadius: 10,
-                  background: 'var(--color-primary)', color: '#fff',
+                  background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)',
                   fontSize: 14, fontWeight: 600, border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8,
                 }}
@@ -648,7 +648,7 @@ export default function SeguimientoPedido() {
         </div>
       </div>
 
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
     </StorefrontChrome>
   )
 }

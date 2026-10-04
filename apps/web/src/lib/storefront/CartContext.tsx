@@ -250,6 +250,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidratado, slug, cupon?.codigo, authStatus])
 
+  // Y cada vez que cambia QUÉ hay en el carrito (productos o cantidades). Sin
+  // esto, "Comprar ahora" agregaba y salía directo a /checkout/datos sin pasar
+  // por el carrito ni el drawer (los únicos que revalidaban): el descuento
+  // sobre el total de la compra no figuraba en todo el checkout y aparecía
+  // recién en el total cobrado (pedido #50: $15.000 en pantalla, $13.500 en el
+  // mail). La espera corta junta los toques seguidos de +/− en un solo pedido.
+  const firmaCarrito = useMemo(() => items.map(it => `${it.id}:${it.qty}`).join('|'), [items])
+  useEffect(() => {
+    if (!hidratado || authStatus === 'loading' || !firmaCarrito) return
+    const t = setTimeout(() => { revalidar() }, 250)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaCarrito])
+
   const cartCount = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.qty), 0), [items])
   const subtotal  = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.precio * i.qty), 0), [items])
 

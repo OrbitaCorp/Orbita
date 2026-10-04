@@ -129,9 +129,35 @@ describe('GeminiAdapter', () => {
 
     expect(events).toEqual([
       { type: 'text', chunk: 'ok' },
-      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8 } },
+      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8, cachedTokens: 0, thinkingTokens: 3, provider: 'gemini' } },
       { type: 'done' },
     ]);
+  });
+
+  it('informa tokens cacheados y de pensamiento sin cambiar los totales', async () => {
+    configService.get.mockReturnValue('test-key');
+    mockStream(adapter, [
+      textChunk('Hola'),
+      { candidates: [{ content: { parts: [] } }], usageMetadata: { promptTokenCount: 5000, cachedContentTokenCount: 4096, candidatesTokenCount: 40, thoughtsTokenCount: 60 } },
+    ]);
+    const events: any[] = [];
+    for await (const e of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) events.push(e);
+    const usage = events.find(e => e.type === 'usage').usage;
+    expect(usage).toMatchObject({ promptTokens: 5000, completionTokens: 100, cachedTokens: 4096, thinkingTokens: 60, provider: 'gemini' });
+  });
+
+  // Spec §3.7. Ojo: el abortSignal de @google/genai corta del lado del
+  // cliente (deja de leer y cierra la conexión); lo ya generado se factura.
+  it('pasa la señal de corte como config.abortSignal', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+    const corte = new AbortController();
+
+    for await (const _ of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }], signal: corte.signal })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].config.abortSignal).toBe(corte.signal);
   });
 
   it('usa el modelo que le pasan por parámetro en vez del default', async () => {
@@ -167,6 +193,131 @@ describe('GeminiAdapter', () => {
     expect(arg.contents).toEqual([
       { role: 'user', parts: [{ text: 'hola' }] },
       { role: 'model', parts: [{ text: 'buenas' }] },
+    ]);
+  });
+
+  // Spec §3.3, "Historial bien formado". Un turno fallido o cortado deja dos
+  // `user` seguidos en la conversación guardada, y una respuesta vacía queda
+  // como `assistant` vacío. Gemini espera turnos alternados y sin partes
+  // vacías: se unen los consecutivos del mismo rol y se tiran los vacíos.
+  it('une entradas consecutivas del mismo rol en un solo content y descarta las vacías', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'system', content: 'Sos Orbi.' },
+        { role: 'user', content: 'hola' },
+        { role: 'user', content: 'sigo acá?' },
+        { role: 'assistant', content: '' },
+        { role: 'assistant', content: 'uno' },
+        { role: 'assistant', content: 'dos' },
+        { role: 'user', content: '  ' },
+        { role: 'user', content: 'chau' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'hola' }, { text: 'sigo acá?' }] },
+      { role: 'model', parts: [{ text: 'uno' }, { text: 'dos' }] },
+      { role: 'user', parts: [{ text: 'chau' }] },
+    ]);
+  });
+
+  // 'tool' y 'user' son los dos 'user' en Gemini: se unen por el rol de
+  // Gemini, no por el nuestro. Hoy el chat no deja un user después de un
+  // resultado de tool, pero si pasara no pueden salir dos 'user' seguidos.
+  it('un resultado de tool seguido de un user sale como un solo content user', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'x' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name: 'listProducts', arguments: {} }] },
+        { role: 'tool', content: '{"ok":1}', toolCallId: 'c1' },
+        { role: 'user', content: 'y ahora?' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'x' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listProducts', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listProducts', response: { output: { ok: 1 } } } }, { text: 'y ahora?' }] },
+    ]);
+  });
+
+  it('un assistant sin texto pero con tool call no se descarta, y la vuelta de tools sigue alternando', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'x' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c1', name: 'listProducts', arguments: {} }] },
+        { role: 'tool', content: '{"ok":1}', toolCallId: 'c1' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'c2', name: 'listOrders', arguments: {} }] },
+        { role: 'tool', content: '{"ok":2}', toolCallId: 'c2' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(gen.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'x' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listProducts', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listProducts', response: { output: { ok: 1 } } } }] },
+      { role: 'model', parts: [{ functionCall: { name: 'listOrders', args: {} } }] },
+      { role: 'user', parts: [{ functionResponse: { name: 'listOrders', response: { output: { ok: 2 } } } }] },
+    ]);
+  });
+  // Tool calls paralelas de Gemini 3.x (bug de producción del 2026-09-30): un
+  // assistant con varias calls + un tool por call tiene que salir como UN
+  // content model con todos los functionCall (la firma solo en el primero,
+  // tal como llegó) y UN content user con los functionResponse en el mismo
+  // orden. Si no, Gemini rechaza el segundo functionCall por no tener firma.
+  it('calls paralelas: un content model con todos los functionCall y un content user con las respuestas en orden', async () => {
+    configService.get.mockReturnValue('test-key');
+    const generateContentStream = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'resumen de 7 días' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 'c1', name: 'getSalesReport', arguments: { days: 7 }, thoughtSignature: 'sig-1' },
+            { id: 'c2', name: 'getProductReport', arguments: { days: 7 } },
+          ],
+        },
+        { role: 'tool', content: '{"total":100}', toolCallId: 'c1' },
+        { role: 'tool', content: '{"top":["Remera"]}', toolCallId: 'c2' },
+      ],
+    })) {
+      // consumir
+    }
+
+    expect(generateContentStream.mock.calls[0][0].contents).toEqual([
+      { role: 'user', parts: [{ text: 'resumen de 7 días' }] },
+      {
+        role: 'model',
+        parts: [
+          { functionCall: { name: 'getSalesReport', args: { days: 7 } }, thoughtSignature: 'sig-1' },
+          { functionCall: { name: 'getProductReport', args: { days: 7 } } },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { name: 'getSalesReport', response: { output: { total: 100 } } } },
+          { functionResponse: { name: 'getProductReport', response: { output: { top: ['Remera'] } } } },
+        ],
+      },
     ]);
   });
 });

@@ -34,8 +34,9 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { tenantUrl } from '@/lib/tenant';
 
 const LINKS: { label: string; href: string }[] = [
+    // "Cómo funciona" salió del menú (pedido 29/09): la sección sigue en la
+    // página, pero el menú quedó más corto y centrado.
     { label: 'Qué incluye',   href: '#modulos'       },
-    { label: 'Cómo funciona', href: '#como-funciona' },
     { label: 'Comparativa',   href: '#comparativa'   },
     { label: 'Qué vendés',    href: '#rubros'        },
     { label: 'Avanzado',      href: '#avanzado'      },
@@ -51,12 +52,6 @@ export function NavbarV2() {
     const [abierto, setAbierto] = useState(false);
     const [activa, setActiva] = useState('');
     const [hoverLink, setHoverLink] = useState<string | null>(null);
-    // Pedido explícito: un invitado que ya scrolleó más allá del hero no
-    // necesita "Iniciar sesión" fijo en el header — ahí le sirve más el CTA
-    // de alta, que en el hero ya dejó de estar a la vista. Logueado no
-    // cambia nada (sigue "Ir a mi panel" siempre). Ver el efecto de scroll
-    // de abajo para cómo se calcula.
-    const [pasadoHero, setPasadoHero] = useState(false);
 
     // Mismo criterio que el navbar viejo: la landing la mira sobre todo gente
     // deslogueada, así que se muestra el estado deslogueado y recién cambia si
@@ -68,13 +63,6 @@ export function NavbarV2() {
     useEffect(() => {
         const onScroll = () => {
             setScrolleado(window.scrollY > 20);
-            // El hero solo existe en el home (HeroCinematic.tsx, clase
-            // "oc-hero", sin id porque nada más lo necesita). En cualquier
-            // otra página (/nosotros, /planes) no hay hero que pasar, así que
-            // se toma como ya pasado desde el arranque — mismo criterio que
-            // el resto del componente da a esas páginas (hrefReal, esActivo).
-            const hero = document.querySelector('.oc-hero');
-            setPasadoHero(hero ? hero.getBoundingClientRect().bottom <= 0 : true);
         };
         onScroll();
         window.addEventListener('scroll', onScroll, { passive: true });
@@ -116,12 +104,17 @@ export function NavbarV2() {
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
 
-                {/* Los 8 links + los dos botones de la derecha no entran en una fila por
+                {/* Los links + los dos botones de la derecha no entran en una fila por
                     debajo de ~1280px (y por eso la barra se ensancha a `max-w-7xl` en `xl`): antes, a 1024–1200px el texto de "Qué incluye" /
-                    "Cómo funciona" / "Qué vendés" se partía en dos líneas. Ahora el
+                    "Qué vendés" se partía en dos líneas. Ahora el
                     menú de escritorio arranca en `xl`, los links no se parten
-                    (`whitespace-nowrap`) y por debajo va el menú hamburguesa. */}
-                <ul className="ml-2 hidden flex-1 items-center gap-0.5 xl:flex">
+                    (`whitespace-nowrap`) y por debajo va el menú hamburguesa.
+                    Centrados en el hueco entre el logo y los botones (flex-1 +
+                    justify-center): queda la misma separación a los dos lados.
+                    Centrarlos contra el header entero dejaba un hueco grande
+                    junto al logo y el menú pegado a los botones, que son más
+                    anchos que el logo (se probó el 29/09 y se descartó). */}
+                <ul className="hidden flex-1 items-center justify-center gap-0.5 xl:flex">
                     {LINKS.map(l => {
                         const act = esActivo(l.href);
                         return (
@@ -152,23 +145,6 @@ export function NavbarV2() {
                         >
                             Ir a mi panel
                         </a>
-                    ) : pasadoHero ? (
-                        /* Pedido explícito: pasado el hero, "Iniciar sesión" se saca del
-                           header y el único CTA que queda es "Crear tu espacio" — a esta
-                           altura el de arriba del hero ya no está a la vista, así que acá
-                           es donde más falta hace. Visible en TODOS los anchos (a
-                           diferencia del de abajo, que en mobile chico se esconde porque
-                           mientras estás en el hero ya está repetido ahí mismo). */
-                        <a
-                            href="/onboarding/rubro"
-                            className="oc-cta inline-flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
-                            style={{ minHeight: 40 }}
-                        >
-                            Crear tu espacio
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                        </a>
                     ) : (
                         <>
                             {/* Siempre visible (sin hidden/breakpoint): en mobile chico
@@ -178,13 +154,14 @@ export function NavbarV2() {
                                 tenía ningún otro lugar visible sin abrir el menú
                                 hamburguesa. Pedido explícito: priorizar login en el navbar
                                 mobile por sobre duplicar el CTA que ya está en el hero.
-                                Con borde (`oc-ghost`, la misma clase que "Ver cómo
-                                funciona" del hero) en vez de texto suelto: como texto
+                                Con borde (`oc-ghost`, la misma clase que "Probá la
+                                demo" del hero) en vez de texto suelto: como texto
                                 plano quedaba perdido contra el fondo oscuro — sin forma
                                 de botón, costaba notar que se podía tocar.
-                                Solo se llega hasta acá mientras `pasadoHero` es false —
-                                osea, todavía dentro del hero (o en una página sin hero,
-                                donde `pasadoHero` ya arranca en true y nunca se ve esto). */}
+                                Se queda fijo en TODO el scroll (pedido de Ale, 02/10):
+                                antes desaparecía al pasar el hero y quedaba solo
+                                "Crear tu espacio", y quien ya tenía cuenta no
+                                encontraba por dónde entrar. */}
                             <a
                                 href="/login"
                                 className="oc-ghost inline-flex cursor-pointer items-center whitespace-nowrap rounded-xl px-3.5 text-[13.5px] font-semibold transition-colors duration-200 hover:bg-white/10"

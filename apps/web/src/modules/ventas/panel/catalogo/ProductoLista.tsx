@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -14,6 +14,7 @@ import { fmtMoney, toastEsError } from '@/lib/utils'
 import {
     panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
     panelDeleteProduct, panelDuplicateProduct, panelToggleProductFeatured,
+    panelUpdateProductStatus,
     ApiError,
     type ApiProductRow, type ApiProductStats, type ApiCategory,
     type ProductStatusFilter,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/productUploadTracker'
 
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { EVENTO_ACCION_EJECUTADA, recargaProductos } from '@/components/orbi/confirmarAccion'
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -32,6 +34,7 @@ import type { EstadoProducto } from './types/catalogo.types'
 import { ResenasProducto } from './components/ResenasProducto'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 import { StockRapidoModal } from './components/StockRapido'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 10
@@ -224,7 +227,7 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas, onEditarStock, onContenido }: {
+function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured, onResenas, onEditarStock, onContenido, onPublicar, publicando }: {
     p: ApiProductRow
     upload?: ProductUploadState
     // Producto EXISTENTE guardando cambios en segundo plano (ver
@@ -242,6 +245,8 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     onResenas: () => void
     onEditarStock: () => void
     onContenido?: () => void
+    onPublicar?: () => void
+    publicando?: boolean
 }) {
     const [indice, setIndice] = useState(0)
     const [cargandoImg, setCargandoImg] = useState(false)
@@ -440,7 +445,17 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
                     {!upload && (
                         <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
-                            {editando ? <EditandoTag e={editando} /> : <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />}
+                            {editando ? (
+                                <EditandoTag e={editando} />
+                            ) : (
+                                <ProductoEstadoBadge
+                                    estado={estadoVisual(p)}
+                                    sobreImagen
+                                    onClick={p.status === 'DRAFT' && onPublicar ? onPublicar : undefined}
+                                    title={p.status === 'DRAFT' ? 'Hacé clic para publicar este producto' : undefined}
+                                    cargando={publicando}
+                                />
+                            )}
                         </span>
                     )}
 
@@ -517,6 +532,34 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative', opacity: editando ? 0.4 : 1, pointerEvents: editando ? 'none' : 'auto' }}
                     onClick={e => e.stopPropagation()}
                 >
+                    {p.status === 'DRAFT' && onPublicar && (
+                        <button
+                            type="button"
+                            onClick={onPublicar}
+                            disabled={publicando}
+                            title="Publicar producto en la tienda"
+                            className="ds-hover"
+                            style={{
+                                marginRight: 'auto',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                height: 26,
+                                padding: '0 8px',
+                                borderRadius: 6,
+                                background: 'var(--color-primary-bg)',
+                                color: 'var(--color-primary)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                opacity: publicando ? 0.6 : 1,
+                            }}
+                        >
+                            {publicando ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
+                            {publicando ? 'Publicando…' : 'Publicar'}
+                        </button>
+                    )}
                     <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
                         <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                     </button>
@@ -555,6 +598,14 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                                 aria-hidden="true"
                             />
                             <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 9999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170, maxWidth: 'calc(100vw - 24px)' }}>
+                                {p.status === 'DRAFT' && onPublicar && (
+                                    <>
+                                        <button className="ds-hover" onClick={() => { setMenuAbierto(false); onPublicar() }} style={{ ...menuItem, color: 'var(--color-primary)' }}>
+                                            <UploadCloud size={14} /> Publicar producto
+                                        </button>
+                                        <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                                    </>
+                                )}
                                 <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                 {onContenido && <button className="ds-hover" onClick={() => { setMenuAbierto(false); onContenido() }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>}
                                 <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
@@ -571,7 +622,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
 // ─── Card mobile ─────────────────────────────────────────────────────────────
 
-function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void; onEditarStock: () => void }) {
+function ProductoCard({ p, upload, editando, onEditar, onEditarStock, onPublicar, publicando }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void; onEditarStock: () => void; onPublicar?: () => void; publicando?: boolean }) {
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
@@ -589,7 +640,18 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: Api
                         </div>
                     )}
                 </div>
-                {!upload && (editando ? <EditandoTag e={editando} /> : <ProductoEstadoBadge estado={estadoVisual(p)} />)}
+                {!upload && (
+                    editando ? (
+                        <EditandoTag e={editando} />
+                    ) : (
+                        <ProductoEstadoBadge
+                            estado={estadoVisual(p)}
+                            onClick={p.status === 'DRAFT' && onPublicar ? onPublicar : undefined}
+                            title={p.status === 'DRAFT' ? 'Hacé clic para publicar este producto' : undefined}
+                            cargando={publicando}
+                        />
+                    )
+                )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
@@ -613,7 +675,35 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock }: { p: Api
                 </div>
             </div>
             {!upload && (
-                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', opacity: editando ? 0.4 : 1, pointerEvents: editando ? 'none' : 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end', opacity: editando ? 0.4 : 1, pointerEvents: editando ? 'none' : 'auto' }} onClick={e => e.stopPropagation()}>
+                    {p.status === 'DRAFT' && onPublicar && (
+                        <button
+                            type="button"
+                            onClick={onPublicar}
+                            disabled={publicando}
+                            title="Publicar producto"
+                            className="ds-hover"
+                            style={{
+                                marginRight: 'auto',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                height: 28,
+                                padding: '0 10px',
+                                borderRadius: 6,
+                                background: 'var(--color-primary-bg)',
+                                color: 'var(--color-primary)',
+                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                opacity: publicando ? 0.6 : 1,
+                            }}
+                        >
+                            {publicando ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
+                            {publicando ? 'Publicando…' : 'Publicar'}
+                        </button>
+                    )}
                     <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
                 </div>
             )}
@@ -861,6 +951,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         })()
     }, [edits, cargarSilencioso, onToast])
 
+    // Orbi creó un producto desde el chat (tarjeta de acción confirmada): se
+    // trae la lista de nuevo para que aparezca. createdProductIds solo marca
+    // filas que ya están cargadas; sin esto el producto nuevo no se veía
+    // hasta cambiar de filtro o recargar.
+    useEffect(() => {
+        const alEjecutar = (e: Event) => {
+            if (recargaProductos((e as CustomEvent).detail)) void cargarSilencioso()
+        }
+        window.addEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+        return () => window.removeEventListener(EVENTO_ACCION_EJECUTADA, alEjecutar)
+    }, [cargarSilencioso])
+
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
     }, [])
@@ -968,6 +1070,26 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         }
     }
 
+    const [publicandoId, setPublicandoId] = useState<string | null>(null)
+
+    async function publicarRapido(p: ApiProductRow) {
+        if (publicandoId) return
+        if (p.totalStock <= 0) {
+            onToast('No podés publicar un producto sin stock. Cargá stock inicial primero.')
+            return
+        }
+        setPublicandoId(p.id)
+        try {
+            await panelUpdateProductStatus(p.id, 'PUBLISHED')
+            onToast(`"${p.name}" publicado con éxito`)
+            await cargar()
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo publicar el producto')
+        } finally {
+            setPublicandoId(null)
+        }
+    }
+
     // Mismo patrón que duplicar()/confirmarBorrado(): sin actualización
     // optimista, se refresca la lista entera desde el backend.
     async function toggleFeatured(p: ApiProductRow) {
@@ -1008,11 +1130,23 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         ])
     }, [categorias])
 
+    // Sin búsqueda ni filtros y sin filas: el negocio todavía no cargó productos.
+    // Ahí va el pet del módulo; con filtros queda el "sin productos para estos filtros".
+    const sinFiltros = !busqDebounced && fcat === 'todos' && fest === 'todos'
+    const vacioInicial = (
+        <OrbiPetVacio modulo="productos" titulo="Todavía no tenés productos" descripcion="Cargá el primero y lo vas a ver acá.">
+            <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+        </OrbiPetVacio>
+    )
+
     return (
         <div className="prod-page" style={pageWrap}>
             <style>{`
                 .prod-page       { padding: 24px 32px 64px; }
-                .prod-kpis       { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
+                /* Seis métricas: 3 por fila (2 filas parejas) y las seis juntas solo en
+                   pantallas anchas — a ~180px por tarjeta las etiquetas se partían. */
+                .prod-kpis       { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
+                @media (min-width: 1600px) { .prod-kpis { grid-template-columns: repeat(6,1fr); } }
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
                 .prod-table-wrap { display: block; }
                 .prod-cards-wrap { display: none; }
@@ -1094,7 +1228,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* KPIs */}
             <div className="prod-kpis">
                 {cargando && !stats ? (
-                    Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+                    Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
                 ) : (
                     <>
                         <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
@@ -1128,6 +1262,35 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                     {!!stats?.sinCostoCargado && (
                                         <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
                                             Ahora hay <strong>{stats.sinCostoCargado} {stats.sinCostoCargado === 1 ? 'producto con stock sin costo cargado' : 'productos con stock sin costo cargado'}</strong> que no se {stats.sinCostoCargado === 1 ? 'está sumando' : 'están sumando'}.
+                                        </p>
+                                    )}
+                                </>
+                            }
+                        />
+                        {/* Ganancia estimada del stock: (precio − costo) × unidades. Sale del
+                            mismo cálculo que el valor de inventario (ver valorizarInventario()
+                            en la API), así que los dos números son coherentes. Con un backend
+                            sin desplegar todavía no llega y queda en "-". */}
+                        <StatCard
+                            label="Ganancia estimada"
+                            value={stats?.gananciaEstimada !== undefined && stats.margenEstimadoPct !== null ? fmtMoney(stats.gananciaEstimada) : '-'}
+                            icon={TrendingUp}
+                            accent="#10B981"
+                            sub={stats?.margenEstimadoPct != null ? `margen ${stats.margenEstimadoPct.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%` : undefined}
+                            info={
+                                <>
+                                    <p style={{ margin: 0 }}>
+                                        Lo que ganarías si vendieras <strong>todo el stock que tenés hoy</strong> a los precios actuales: el <strong>precio de venta menos el costo</strong> de cada producto, por las unidades que te quedan.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Es una estimación, no plata que ya cobraste: no descuenta envíos, comisiones de cobro ni descuentos que des al vender.
+                                    </p>
+                                    <p style={{ margin: '8px 0 0' }}>
+                                        Solo cuentan los productos con stock que tienen cargado el campo <strong>Costo</strong>. El margen es la ganancia dividida por lo que cobrarías.
+                                    </p>
+                                    {!!stats?.sinCostoCargado && (
+                                        <p style={{ margin: '10px 0 0', padding: '8px 10px', borderRadius: 8, background: 'var(--color-warning-bg)', color: 'var(--color-text)' }}>
+                                            Hay <strong>{stats.sinCostoCargado} {stats.sinCostoCargado === 1 ? 'producto con stock sin costo cargado' : 'productos con stock sin costo cargado'}</strong> que no se {stats.sinCostoCargado === 1 ? 'está sumando' : 'están sumando'}: cargales el costo para que la ganancia sea más real.
                                         </p>
                                     )}
                                 </>
@@ -1181,7 +1344,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         {Array.from({ length: 8 }).map((_, i) => <ProductoGridCardSkeleton key={i} />)}
                     </div>
                 ) : filas.length === 0 && uploads.length === 0 ? (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
+                    sinFiltros
+                        ? <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>{vacioInicial}</div>
+                        : <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
                 ) : (
                     <div className="prod-grid-wrap">
                         {/* Productos en vuelo primero (recién creados, ver
@@ -1214,6 +1379,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onResenas={() => setResenasDe(p.id)}
                                 onEditarStock={() => setStockDe(p)}
                                 onContenido={() => setContenidoDe(p.id)}
+                                onPublicar={() => void publicarRapido(p)}
+                                publicando={publicandoId === p.id}
                             />
                         ))}
                     </div>
@@ -1282,8 +1449,28 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 {p.totalStock}
                             </button>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
-                            {editandoFila ? <EditandoTag e={editandoFila} /> : <ProductoEstadoBadge estado={estadoVisual(p)} />}
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative', opacity: editandoFila ? 0.4 : 1, pointerEvents: editandoFila ? 'none' : 'auto' }}>
+                            {editandoFila ? (
+                                <EditandoTag e={editandoFila} />
+                            ) : (
+                                <ProductoEstadoBadge
+                                    estado={estadoVisual(p)}
+                                    onClick={p.status === 'DRAFT' ? () => void publicarRapido(p) : undefined}
+                                    title={p.status === 'DRAFT' ? 'Hacé clic para publicar este producto' : undefined}
+                                    cargando={publicandoId === p.id}
+                                />
+                            )}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, position: 'relative', opacity: editandoFila ? 0.4 : 1, pointerEvents: editandoFila ? 'none' : 'auto' }}>
+                                {p.status === 'DRAFT' && (
+                                    <button
+                                        onClick={() => void publicarRapido(p)}
+                                        disabled={publicandoId === p.id}
+                                        className="prod-list-actbtn"
+                                        style={{ ...iconBtn, color: 'var(--color-primary)' }}
+                                        title="Publicar producto"
+                                    >
+                                        {publicandoId === p.id ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />}
+                                    </button>
+                                )}
                                 <button onClick={() => void toggleFeatured(p)} className="prod-list-actbtn" style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
                                     <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                                 </button>
@@ -1330,6 +1517,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                             style={{ position: 'fixed', inset: 0, zIndex: 19 }}
                                         />
                                         <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180, maxWidth: 'calc(100vw - 24px)' }}>
+                                            {p.status === 'DRAFT' && (
+                                                <>
+                                                    <button className="ds-hover" onClick={() => { setMenu(null); void publicarRapido(p) }} style={{ ...menuItem, color: 'var(--color-primary)' }}>
+                                                        <UploadCloud size={14} /> Publicar producto
+                                                    </button>
+                                                    <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                                                </>
+                                            )}
                                             <button className="ds-hover" onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
                                             <button className="ds-hover" onClick={() => { setMenu(null); setContenidoDe(p.id) }} style={menuItem}><Clapperboard size={14} style={{ color: 'var(--color-muted)' }} /> Contenido de la ficha</button>
@@ -1342,7 +1537,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         </div>
                     )
                 })}
-                {!cargando && filas.length === 0 && uploads.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>}
+                {!cargando && filas.length === 0 && uploads.length === 0 && (sinFiltros ? vacioInicial : <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>)}
             </div>
 
             {/* ── MOBILE: cards ── */}
@@ -1350,14 +1545,22 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 {cargando && filas.length === 0 ? (
                     Array.from({ length: 5 }).map((_, i) => <ProductoMobileCardSkeleton key={i} />)
                 ) : filas.length === 0 && uploads.length === 0 ? (
-                    <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
+                    sinFiltros ? vacioInicial : <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
                 ) : (
                     <>
                         {uploads.map(u => (
                             <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} onEditarStock={() => {}} />
                         ))}
                         {filas.map(p => (
-                            <ProductoCard key={p.id} p={p} editando={editsPorId.get(p.id)} onEditar={() => irEditar(p.id)} onEditarStock={() => setStockDe(p)} />
+                            <ProductoCard
+                                key={p.id}
+                                p={p}
+                                editando={editsPorId.get(p.id)}
+                                onEditar={() => irEditar(p.id)}
+                                onEditarStock={() => setStockDe(p)}
+                                onPublicar={() => void publicarRapido(p)}
+                                publicando={publicandoId === p.id}
+                            />
                         ))}
                     </>
                 )}

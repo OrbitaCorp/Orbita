@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { OrbiController } from '../../src/orbi/orbi.controller';
-import { CuotaDiaria } from '../../src/orbi/cuota-diaria';
+import { hmacIp } from '../../src/common/utils/hash-ip';
 import { ConversationService } from '../../src/orbi/conversation/conversation.service';
 import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 
@@ -16,56 +16,71 @@ import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 const miembro = { type: 'member', businessId: 'biz-1', memberId: 'm-1', permissions: [] } as any;
 
 function respuesta() {
-  return { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn() } as any;
+  return { setHeader: jest.fn(), flushHeaders: jest.fn(), write: jest.fn(), end: jest.fn(), on: jest.fn(), writableEnded: false } as any;
 }
 
-function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<any> } = {}) {
+function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<any>; hayCupo?: boolean } = {}) {
   const llm = {
     streamChat: jest.fn(opts.eventos ?? (async function* () { yield { type: 'text', chunk: 'hola' }; yield { type: 'done' }; })),
   };
   const conversaciones = {
-    assertPropia: jest.fn().mockResolvedValue('conv-1'),
-    getMessages: jest.fn().mockResolvedValue(Array.from({ length: opts.mensajes ?? 0 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }))),
-    getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-1' }),
+    historialSiEsPropia: jest.fn().mockResolvedValue(Array.from({ length: opts.mensajes ?? 0 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }))),
+    crear: jest.fn().mockResolvedValue({ id: 'conv-1' }),
     appendMessage: jest.fn().mockResolvedValue(undefined),
   };
   const contexto = { buildSystemPrompt: jest.fn().mockResolvedValue('system') };
   const tools = {
     getTools: jest.fn().mockReturnValue([{ name: 'listProducts' }]),
-    proponer: jest.fn().mockReturnValue(null),
+    proponer: jest.fn().mockResolvedValue(null),
+    requiereConfirmacion: jest.fn().mockReturnValue(false),
     execute: jest.fn().mockResolvedValue({ success: true, label: 'ok' }),
   };
   const analitica = { logAiTurn: jest.fn().mockResolvedValue(null) };
-  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any);
-  return { ctrl, llm, tools };
+  const cuota = { consumir: jest.fn().mockResolvedValue(opts.hayCupo ?? true) };
+  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any, cuota as any, { registrar: jest.fn().mockResolvedValue(undefined) } as any, { exigirDisponible: jest.fn().mockResolvedValue(undefined), registrarOk: jest.fn().mockResolvedValue(undefined), avisoDeFalla: jest.fn().mockResolvedValue({ code: 'ORBI_ERROR', message: 'Orbi tuvo un problema para responder. Probá de nuevo en unos minutos.' }) } as any, { motivoDeBloqueo: jest.fn().mockResolvedValue(null) } as any);
+  return { ctrl, llm, tools, cuota };
 }
 
 const chatPanel = (conversationId?: string) => ({ message: 'hola', conversationId, context: { surface: OrbiSurface.PANEL } }) as any;
 
 describe('Cuota diaria', () => {
-  afterEach(() => jest.useRealTimers());
+  // El contador en sí (tope, renovación a medianoche de Argentina) se prueba en
+  // cuota.service.unit-spec.ts; acá, que Orbi lo consulte con la clave y el
+  // límite de siempre y responda 429 al llegar al tope.
+  const previo = process.env.JWT_SECRET;
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'secreto-de-prueba-de-al-menos-32-caracteres';
+  });
+  afterAll(() => {
+    if (previo === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previo;
+  });
 
-  it('corta al llegar al máximo del día y se renueva al día siguiente (hora de Argentina)', () => {
-    jest.useFakeTimers({ now: new Date('2026-09-10T15:00:00Z') });
-    const cuota = new CuotaDiaria();
-    for (let i = 0; i < 3; i++) expect(cuota.consumir('negocio:biz-1', 3)).toBe(true);
-    expect(cuota.consumir('negocio:biz-1', 3)).toBe(false);
-    expect(cuota.consumir('negocio:biz-2', 3)).toBe(true); // otro negocio, su propia cuota
-    jest.setSystemTime(new Date('2026-09-11T03:00:01Z')); // 00:00 del 11/09 en Argentina
-    expect(cuota.consumir('negocio:biz-1', 3)).toBe(true);
+  it('el chat del panel consulta la cuota del negocio (300 por día)', async () => {
+    const { ctrl, cuota } = controlador();
+    await ctrl.chat(chatPanel(), respuesta(), miembro);
+    expect(cuota.consumir).toHaveBeenCalledWith('orbi-panel:biz-1', 300);
   });
 
   it('el chat del panel, pasado el tope del negocio, da 429 antes de llamar al modelo', async () => {
-    const { ctrl, llm } = controlador();
-    (ctrl as any).cuota = { consumir: () => false };
+    const { ctrl, llm } = controlador({ hayCupo: false });
     const err = await ctrl.chat(chatPanel(), respuesta(), miembro).catch((e) => e);
     expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    expect(err.getResponse()).toBe('Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.');
     expect(llm.streamChat).not.toHaveBeenCalled();
   });
 
-  it('el wizard, pasado el tope por IP, también', async () => {
-    const { ctrl, llm } = controlador();
-    (ctrl as any).cuota = { consumir: () => false };
+  it('el wizard consulta la cuota por IP hasheada (100 por día), sin la IP en claro', async () => {
+    const { ctrl, cuota } = controlador();
+    await ctrl.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, respuesta(), '1.2.3.4');
+    const [clave, limite] = cuota.consumir.mock.calls[0];
+    expect(clave).toBe(`orbi-wizard:${hmacIp('orbi-wizard', '1.2.3.4')}`);
+    expect(clave).not.toContain('1.2.3.4');
+    expect(limite).toBe(100);
+  });
+
+  it('el wizard, pasado el tope por IP, también da 429 antes de llamar al modelo', async () => {
+    const { ctrl, llm } = controlador({ hayCupo: false });
     const err = await ctrl.chatWizard({ message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any, respuesta(), '1.2.3.4').catch((e) => e);
     expect(err.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
     expect(llm.streamChat).not.toHaveBeenCalled();
@@ -94,12 +109,12 @@ describe('Costo por mensaje acotado', () => {
   });
 
   it('la conversación guardada se queda con los últimos 200 mensajes', async () => {
-    const guardada = { id: 'conv-1', messages: Array.from({ length: 200 }, (_, i) => ({ role: 'user', content: `m${i}`, timestamp: '' })) };
-    const prisma = { orbiConversation: { findFirst: jest.fn().mockResolvedValue(guardada), update: jest.fn() } };
+    // El recorte lo hace el UPDATE en la base, en el mismo statement que agrega
+    // el mensaje (spec §3.3; el SQL completo se prueba en
+    // orbi.conversation.aislamiento.unit-spec.ts). Acá, que el tope siga en 200.
+    const prisma = { $executeRaw: jest.fn().mockResolvedValue(1) };
     await new ConversationService(prisma as any).appendMessage('conv-1', 'biz-1', 'm-1', { role: 'user', content: 'nuevo', timestamp: '' });
-    const { messages } = prisma.orbiConversation.update.mock.calls[0][0].data;
-    expect(messages).toHaveLength(200);
-    expect(messages[199].content).toBe('nuevo');
-    expect(messages[0].content).toBe('m1');
+    const [partes] = prisma.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(partes.join('?').replace(/\s+/g, ' ')).toContain('WHERE i > jsonb_array_length(messages || ?::jsonb) - 200');
   });
 });

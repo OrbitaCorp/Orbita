@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -33,12 +33,12 @@ import { EstudioFondoModal, type ImagenParaFondo, type ResultadoFondo } from './
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
-    panelPresignProductVideo,
+    panelPresignProductVideo, panelUpdateProductContent,
     panelGetTags, panelCreateTag, panelAiAssist, panelAiVariants, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
     panelGetBusiness, panelGetVariantHistory,
     ApiError,
     panelGenerateProductBackground,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption, type ApiVariantHistory,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption, type ApiVariantHistory, type ApiProductContentBlock,
 } from '@/lib/api'
 import { specsDelNegocio, type PresetVariantes } from './presetsVariantes'
 import {
@@ -297,6 +297,8 @@ async function subirVideoProducto(file: File, onProgress?: (pct: number) => void
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
     const [contenidoAbierto, setContenidoAbierto] = useState(false)
+    const [bloquesContenido, setBloquesContenido] = useState<ApiProductContentBlock[]>([])
+    const [bloquesContenidoModificado, setBloquesContenidoModificado] = useState(false)
     const router = useRouter()
     const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
@@ -322,7 +324,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const subidas = useProductUploads()
     const [orbiGen, setOrbiGen] = useState(false)
     const [orbiScanGen, setOrbiScanGen] = useState(false)
-    const [orbiScanSuccess, setOrbiScanSuccess] = useState(false)
+    // Key de la foto que Orbi ya escaneó. Antes era un booleano suelto: si el
+    // vendedor borraba esa foto y subía otra, seguía en true y "Completar con
+    // esta foto" no volvía a aparecer para la nueva.
+    const [orbiScanKey, setOrbiScanKey] = useState<string | null>(null)
     const fileInputScanRef = useRef<HTMLInputElement>(null)
     const nombreInputRef = useRef<HTMLTextAreaElement>(null)
     // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
@@ -563,6 +568,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 if (!vigente) return
                 const conVariantes = p.options.length > 0
                 setOpcionesGuardadas(conVariantes)
+                setBloquesContenido(p.contentBlocks ?? [])
+                setBloquesContenidoModificado(false)
                 setProd({
                     nombre: p.name,
                     descripcion: p.description ?? '',
@@ -750,14 +757,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // "Completar con Orbi" en la sección de fotos): la foto ya está en la
     // galería, así que no se vuelve a agregar, y solo se llenan los campos que
     // todavía están vacíos — lo que el vendedor ya escribió no se pisa.
-    const orbiEscanearFoto = async (file: File) => {
+    const orbiEscanearFoto = async (file: File, key: string) => {
         if (!file) return
         if (!esArchivoDeImagen(file)) {
             onToast('El archivo seleccionado no es una imagen soportada')
             return
         }
         setOrbiScanGen(true)
-        setOrbiScanSuccess(false)
+        setOrbiScanKey(null)
         try {
             const paraScan = await optimizarImagenParaScan(file)
             const result = await panelAiScanProduct(paraScan, file.name)
@@ -810,9 +817,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     })
             }
 
-            setOrbiScanSuccess(true)
+            setOrbiScanKey(key)
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            // El servidor responde 403 ADDON_REQUIRED:ADVANCED si el negocio no tiene el
+            // paquete (el botón ya no se ofrece sin él, pero el plan pudo vencer con la
+            // pantalla abierta).
+            if (err instanceof ApiError && err.message.startsWith('ADDON_REQUIRED')) {
+                onToast('Escanear productos con una foto es parte del paquete Avanzado.')
+            } else {
+                onToast(err instanceof ApiError ? err.message : 'No se pudo escanear el producto con Orbi. Probá de nuevo.')
+            }
         } finally {
             setOrbiScanGen(false)
             if (fileInputScanRef.current) {
@@ -1464,10 +1478,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setSugeridasWeb([])
         setSugeridasAgregadas(new Set())
         setBuscandoSugeridas(false)
-        setOrbiScanSuccess(false)
+        setOrbiScanKey(null)
         setIntento(null)
         setMasAbierto(false)
         setMostrarSpecs(false)
+        setBloquesContenido([])
+        setBloquesContenidoModificado(false)
         setTagInput('')
         skuAutoRef.current = true
         const contenedor = document.querySelector('.admin-main')
@@ -1507,6 +1523,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 ? crypto.randomUUID()
                 : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
             const imgsASubir = imagenes
+            const bloquesAGuardar = bloquesContenido
             beginProductCreation(tempId, {
                 name: prod.nombre,
                 basePrice: prod.tieneVariantes ? precioMinVariantes : Number(prod.precio) || 0,
@@ -1528,6 +1545,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     const payload = armarPayload(tagIds, estado)
                     const guardado = await panelCreateProduct(payload)
                     markProductCreated(tempId, guardado.id, imgsASubir.length)
+
+                    if (bloquesAGuardar.length > 0) {
+                        await panelUpdateProductContent(guardado.id, bloquesAGuardar).catch(() => {})
+                    }
 
                     if (imgsASubir.length > 0) {
                         // Recién ahora existen los ids de cada valor de
@@ -1602,6 +1623,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         const imgsASubir = imagenes
         const reemplazadas = guardadasReemplazadas
         const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
+        const bloquesAGuardar = bloquesContenido
+        const bloquesModificados = bloquesContenidoModificado
         beginProductEdit(idParaTracker)
         onToast('Guardando cambios…')
         onVolver()
@@ -1611,6 +1634,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 const tagIds = await resolverTagIds(prod.tags)
                 const payload = armarPayload(tagIds, estado)
                 const guardado = await panelUpdateProduct(idParaTracker, payload)
+
+                if (bloquesModificados) {
+                    await panelUpdateProductContent(guardado.id, bloquesAGuardar).catch(() => {})
+                }
 
                 const idPorValor = new Map<string, string>()
                 for (const opt of guardado.options) {
@@ -1766,6 +1793,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Foto que se le pasa a Orbi: la principal si hay, si no la primera general.
     // Solo una foto NUEVA (File): al editar, las ya guardadas no se pueden escanear.
     const fotoParaOrbi = imagenes.find(i => i.principal && !i.valorOpcion) ?? imagenes.find(i => !i.valorOpcion)
+    const orbiScanSuccess = !!fotoParaOrbi && orbiScanKey === fotoParaOrbi.key
+    // Si se borra la foto escaneada, las fotos web que se encontraron para ella
+    // ya no corresponden (la nueva puede ser de otro producto).
+    const fotoEscaneadaSigue = !orbiScanKey || imagenes.some(i => i.key === orbiScanKey)
+    useEffect(() => {
+        if (fotoEscaneadaSigue) return
+        setOrbiScanKey(null)
+        setSugeridasWeb([])
+        setBuscandoSugeridas(false)
+    }, [fotoEscaneadaSigue])
 
     // ── Datos para la vista previa: fotos generales (mismo orden que la
     // galería — guardadas primero, pendientes después) + una foto
@@ -1795,6 +1832,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const urlsConFondoIA = new Set([
         ...guardadas.filter(g => g.hasAiBackground).map(g => g.url),
         ...imagenes.filter(i => i.fondoIA).map(i => i.preview),
+    ])
+
+    // Fotos que se están procesando ahora (la vista previa les dibuja un spinner
+    // encima): una pendiente con fondo aplicándose o con "Quitar fondo" corriendo,
+    // y una guardada con "Quitar fondo" corriendo. url -> texto del overlay.
+    const urlsEnProceso = new Map<string, string>([
+        ...imagenes
+            .filter(i => i.aplicandoFondo || fondoEnProceso.has(i.key))
+            .map((i): [string, string] => [i.preview, i.aplicandoFondo ? 'Aplicando fondo…' : 'Quitando fondo…']),
+        ...guardadas
+            .filter(g => fondoEnProceso.has(g.id))
+            .map((g): [string, string] => [g.url, 'Quitando fondo…']),
     ])
 
     if (cargando) {
@@ -1879,7 +1928,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
-                .pn-3col    { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: start; }
+                .pn-3col    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+                .pn-3col > * { min-width: 0; }
+                /* Un <input> trae un ancho mínimo propio (~170px): sin esto, dentro de una columna
+                   angosta empuja todo el formulario más allá del borde de la pantalla. */
+                .pn-page input, .pn-page select, .pn-page textarea { min-width: 0; max-width: 100%; }
                 .pn-fondoia { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border: none; border-radius: 9999px; cursor: pointer;
                               background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
                               box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 4px 14px -4px var(--color-primary); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; }
@@ -1896,7 +1949,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 @media (max-width: 768px) {
                     .pn-page { padding: 16px 14px 48px !important; }
                     /* Precio y stock lado a lado; la categoría, a lo ancho. */
-                    .pn-3col { grid-template-columns: 1fr 1fr !important; }
+                    .pn-3col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
                     .pn-3col > :last-child { grid-column: 1 / -1; }
                     .pn-vgrid { grid-template-columns: minmax(0,1fr) 92px 64px 28px !important; gap: 6px !important; }
                     .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
@@ -2008,10 +2061,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     )}
 
                                     {/* Orbi con UN toque: mira la foto y completa lo que falte. */}
-                                    {fotoParaOrbi && !orbiScanSuccess && (
+                                    {fotoParaOrbi && !orbiScanSuccess && avanzado && (
                                         <button
                                             type="button"
-                                            onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file)}
+                                            onClick={() => void orbiEscanearFoto(fotoParaOrbi.original?.file ?? fotoParaOrbi.file, fotoParaOrbi.key)}
                                             disabled={orbiScanGen}
                                             className="ds-link"
                                             style={{ ...enlace, marginTop: 12, fontSize: 13, opacity: orbiScanGen ? 0.7 : 1, cursor: orbiScanGen ? 'default' : 'pointer' }}
@@ -2019,6 +2072,36 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             {orbiScanGen ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                             {orbiScanGen ? 'Orbi está mirando tu foto…' : 'Completar nombre, categoría y descripción con esta foto'}
                                         </button>
+                                    )}
+                                    {/* Sin el paquete Avanzado: se explica y se ofrece activarlo, en vez
+                                        de dejar un botón que el servidor va a rechazar. */}
+                                    {fotoParaOrbi && !orbiScanSuccess && !avanzado && (
+                                        <div
+                                            role="note"
+                                            style={{
+                                                marginTop: 14, padding: '11px 14px', borderRadius: 10,
+                                                border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: '1 1 260px', minWidth: 0 }}>
+                                                <Sparkles size={15} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Cargá tus productos más rápido</div>
+                                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, marginTop: 1 }}>
+                                                        Con el paquete Avanzado, Orbi completa el nombre, la categoría y la descripción a partir de una sola foto.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push({ pathname: adminPath(negocioId, 'ventas', 'configuracion'), query: { vista: 'suscripcion' } })}
+                                                className="ds-link"
+                                                style={{ ...enlace, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+                                            >
+                                                Conocer el paquete <ChevronRight size={13} strokeWidth={2.2} />
+                                            </button>
+                                        </div>
                                     )}
                                     {orbiScanSuccess && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12.5, color: 'var(--color-muted)' }}>
@@ -2519,7 +2602,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     abierto={masAbierto}
                                     onToggle={() => setMasAbierto(o => !o)}
                                     titulo="Más detalles"
-                                    resumen="Etiquetas, especificaciones, video y SKU"
+                                    resumen="Etiquetas, especificaciones, video, contenido de ficha y SKU"
                                 >
                                     <Bloque titulo="Etiquetas" ayuda="Sirven para agrupar productos.">
                                         <input
@@ -2630,9 +2713,145 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
                                     </Bloque>
 
+                                    <Bloque
+                                        titulo="Contenido de la ficha"
+                                        ayuda="Videos con texto alternado debajo de las características de la tienda."
+                                        derecha={bloquesContenido.length > 0 ? (
+                                            <button
+                                                type="button"
+                                                className="ds-link"
+                                                onClick={() => setContenidoAbierto(true)}
+                                                style={enlace}
+                                            >
+                                                Editar contenido ({bloquesContenido.length})
+                                            </button>
+                                        ) : undefined}
+                                    >
+                                        {bloquesContenido.length === 0 ? (
+                                            <div
+                                                onClick={() => setContenidoAbierto(true)}
+                                                style={{
+                                                    border: '1.5px dashed var(--color-border)',
+                                                    borderRadius: 10,
+                                                    padding: '16px 20px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    cursor: 'pointer',
+                                                    background: 'var(--color-bg)',
+                                                    transition: 'border-color 0.15s, background-color 0.15s',
+                                                }}
+                                                className="ds-hover"
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                    <div
+                                                        style={{
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius: 8,
+                                                            background: 'var(--color-surface)',
+                                                            border: '1px solid var(--color-border)',
+                                                            display: 'grid',
+                                                            placeItems: 'center',
+                                                            color: 'var(--color-primary)',
+                                                        }}
+                                                    >
+                                                        <Clapperboard size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                            Agregar contenido enriquecido
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                            Contá la historia del producto con videos cortos, títulos y detalles al costado
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="ds-link"
+                                                    style={{ ...enlace, pointerEvents: 'none' }}
+                                                >
+                                                    <Plus size={13} /> Configurar
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                <div
+                                                    style={{
+                                                        background: 'var(--color-bg)',
+                                                        border: '1px solid var(--color-border)',
+                                                        borderRadius: 10,
+                                                        padding: '10px 14px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        gap: 12,
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                                        <div
+                                                            style={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 6,
+                                                                background: 'var(--color-primary-bg)',
+                                                                display: 'grid',
+                                                                placeItems: 'center',
+                                                                color: 'var(--color-primary)',
+                                                                flexShrink: 0,
+                                                            }}
+                                                        >
+                                                            <Clapperboard size={16} />
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                                {bloquesContenido.length} bloque{bloquesContenido.length === 1 ? '' : 's'} de video y texto configurado{bloquesContenido.length === 1 ? '' : 's'}
+                                                            </div>
+                                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {bloquesContenido.map(b => b.title || b.eyebrow || 'Bloque').filter(Boolean).join(' • ') || 'Sin títulos'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setContenidoAbierto(true)}
+                                                        >
+                                                            Editar
+                                                        </Button>
+                                                        <button
+                                                            type="button"
+                                                            className="ds-hover"
+                                                            onClick={() => {
+                                                                setBloquesContenido([])
+                                                                setBloquesContenidoModificado(true)
+                                                            }}
+                                                            title="Quitar todos los bloques de contenido"
+                                                            style={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 7,
+                                                                border: 'none',
+                                                                background: 'transparent',
+                                                                color: 'var(--color-muted)',
+                                                                display: 'grid',
+                                                                placeItems: 'center',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Bloque>
+
                                     {!prod.tieneVariantes ? (
                                         <Bloque titulo="Inventario" ayuda="El código se arma solo a partir del nombre.">
-                                            <div className="pn-3col" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                            <div className="pn-3col" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
                                                 <div>
                                                     <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
                                                     <button type="button" className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ ...enlace, fontSize: 11.5, marginTop: 4 }}>Regenerar desde el nombre</button>
@@ -2671,13 +2890,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     )
                                                 })}
                                             </div>
-                                            {/* Contenido de la ficha (videos con texto): mismo editor que
-                                                Productos → ⋮ → "Contenido de la ficha"; guarda solo. */}
-                                            {editarId && (
-                                                <button type="button" className="ds-link" onClick={() => setContenidoAbierto(true)} style={{ ...enlace, marginTop: 12 }}>
-                                                    Contenido de la ficha <ChevronRight size={13} />
-                                                </button>
-                                            )}
                                         </Bloque>
                                     )}
                                 </Desplegable>
@@ -2714,9 +2926,51 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     Falta {faltasVisibles.map(f => f.texto).join(', ')}.
                                 </span>
                             )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
                                 {editando ? (
-                                    <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                    <>
+                                        {/* Selector de estado siempre visible al lado de los botones de guardado */}
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'var(--color-bg)', padding: '3px 4px', borderRadius: 8, border: '1px solid var(--color-border)', marginRight: 4 }}>
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)', padding: '0 6px', fontWeight: 500 }}>Estado:</span>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'PUBLISHED')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'PUBLISHED' ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                    background: prod.estado === 'PUBLISHED' ? 'var(--color-primary-bg)' : 'transparent',
+                                                    color: prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'PUBLISHED' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Publicado
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="ds-hover"
+                                                onClick={() => set('estado', 'DRAFT')}
+                                                style={{
+                                                    height: 32, padding: '0 12px', borderRadius: 6,
+                                                    border: prod.estado === 'DRAFT' ? '1px solid var(--color-border)' : '1px solid transparent',
+                                                    background: prod.estado === 'DRAFT' ? 'var(--color-surface)' : 'transparent',
+                                                    color: prod.estado === 'DRAFT' ? 'var(--color-text)' : 'var(--color-muted)',
+                                                    fontSize: 12.5, fontWeight: prod.estado === 'DRAFT' ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit'
+                                                }}
+                                            >
+                                                Borrador
+                                            </button>
+                                        </div>
+
+                                        {prod.estado === 'DRAFT' ? (
+                                            <>
+                                                <Button variant="ghost" size="lg" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>
+                                                <Button variant="primary" size="lg" onClick={() => intentarGuardar('PUBLISHED')}>Publicar</Button>
+                                            </>
+                                        ) : (
+                                            <Button variant="primary" size="lg" onClick={() => intentarGuardar(prod.estado)}>Guardar cambios</Button>
+                                        )}
+                                    </>
                                 ) : (
                                     <>
                                         <Button variant="ghost" onClick={() => intentarGuardar('DRAFT')}>Guardar borrador</Button>
@@ -2727,8 +2981,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         </div>
                     )}
 
-                    {contenidoAbierto && editarId && (
-                        <ContenidoFichaModal productId={editarId} onClose={() => setContenidoAbierto(false)} onGuardado={() => onToast?.('Contenido de la ficha guardado')} />
+                    {contenidoAbierto && (
+                        <ContenidoFichaModal
+                            productId={editarId}
+                            productName={prod.nombre}
+                            initialBlocks={bloquesContenido}
+                            onClose={() => setContenidoAbierto(false)}
+                            onGuardado={() => onToast?.('Contenido de la ficha guardado')}
+                            onSaveBlocks={blocks => {
+                                setBloquesContenido(blocks)
+                                setBloquesContenidoModificado(true)
+                            }}
+                        />
                     )}
                 </div>
 
@@ -2763,6 +3027,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
                             stockTotal={stockTotal}
                             urlsConFondoIA={urlsConFondoIA}
+                            urlsEnProceso={urlsEnProceso}
                         />
                     </Card>
                 </div>
@@ -2810,7 +3075,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA, urlsEnProceso,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -2826,6 +3091,9 @@ function PreviewProducto({
     // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
     // comentario largo más abajo, sigue aplicando a las fotos comunes.
     urlsConFondoIA: Set<string>
+    // URL de foto -> texto, para las que se están procesando (fondo aplicándose o
+    // quitándose): se les dibuja un spinner encima mientras dura.
+    urlsEnProceso: Map<string, string>
 }) {
     const p = Number(precio) || 0
 
@@ -2879,6 +3147,20 @@ function PreviewProducto({
                             <div style={{ fontSize: 11, marginTop: 6 }}>Sin foto todavía</div>
                         </div>
                     </div>}
+                {imagenMostrada && urlsEnProceso.has(imagenMostrada) && (
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                            position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(15, 23, 42, 0.6)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: 8, color: '#fff', backdropFilter: 'blur(2px)',
+                        }}
+                    >
+                        <Loader2 size={30} className="animate-spin" />
+                        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.02em' }}>{urlsEnProceso.get(imagenMostrada)}</span>
+                    </div>
+                )}
                 {estado === 'DRAFT' && (
                     <span style={{ position: 'absolute', top: 10, right: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                         BORRADOR
@@ -3382,14 +3664,15 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         {/* Controles de orden: número de posición y flechas táctiles */}
@@ -3558,14 +3841,15 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         }}
                     >
                         <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        {it.encuadrando && (
+                        {(it.encuadrando || fondoEnProceso?.has(it.id)) && (
                             <div style={{
                                 position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.72)',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                                 gap: 4, zIndex: 5, color: '#fff', backdropFilter: 'blur(2px)',
                             }}>
                                 <Loader2 size={18} className="animate-spin" />
-                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.textoProceso ?? 'Encuadrando…'}</span>
+                                {/* Sin `encuadrando` el que está corriendo es "Quitar fondo" (fondoEnProceso). */}
+                                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.02em' }}>{it.encuadrando ? (it.textoProceso ?? 'Encuadrando…') : 'Quitando fondo…'}</span>
                             </div>
                         )}
                         <ControlOrdenFoto

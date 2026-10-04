@@ -30,6 +30,7 @@ const DISALLOWED_PATHS = [
     '/tienda',
     '/propuestas',
     '/nueva-home',
+    '/turnos-demo',
 ]
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {

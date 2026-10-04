@@ -33,7 +33,7 @@ export interface SeccionCopy {
 
 export const SECCIONES: SeccionCopy[] = [
     {
-        id: 'dashboard', sidebarTexto: 'Dashboard', titulo: 'Inicio',
+        id: 'dashboard', sidebarTexto: 'Inicio', titulo: 'Inicio',
         queEs: 'El resumen del negocio: cómo venís hoy, esta semana o este mes.',
         paraQue: 'Es la primera pantalla del día: ves ventas, pedidos y alertas de un vistazo, y desde cada alerta saltás directo a resolverla.',
         claves: [
@@ -151,7 +151,7 @@ export const HERRAMIENTAS: HerramientaCopy[] = [
     { id: 'buscador', titulo: 'Búsqueda global', texto: 'Buscá un pedido, un cliente, un producto o una sección desde cualquier pantalla. Escribí y listo.' },
     { id: 'campana', titulo: 'Notificaciones', texto: 'La campana junta lo que pasó mientras no estabas: pedidos nuevos, avisos del sistema. El número es lo sin leer.' },
     { id: 'tema', titulo: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta.' },
-    { id: 'orbi', titulo: 'Orbi, el asistente', texto: 'Orbi responde preguntas sobre tu negocio y te ayuda a operar el panel. Se abre con Ctrl+K desde cualquier lado.' },
+    { id: 'orbi', titulo: 'Orbi, el asistente', texto: 'Orbi responde preguntas sobre tu negocio y te ayuda a operar el panel. Se abre con el botón Orbi AI, al lado de la búsqueda.' },
     { id: 'usuario', titulo: 'Tu cuenta', texto: 'Desde tu avatar: "Mi perfil" (tus datos, tema y contraseña), "Ir a la tienda" para verla como cliente, y "Cerrar sesión". En Mi perfil también confirmás tu email, que es lo que nos deja recuperarte la cuenta.' },
 ]
 
@@ -209,14 +209,14 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
         id: 'negocio', titulo: 'Completá los datos del negocio',
         detalle: 'Nombre, rubro y dirección del local. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.',
         destino: ['ventas', 'configuracion', { vista: 'negocio' }], destinoLabel: 'Ir a Configuración',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Negocio"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus datos se cargan acá',
     },
     {
         id: 'mp', titulo: 'Conectá Mercado Pago (opcional)',
         detalle: 'Es una sugerencia, no un requisito: con Mercado Pago tus clientes pagan con tarjeta o dinero en cuenta sin salir de la tienda. Si preferís, podés arrancar cobrando por transferencia o en efectivo y conectarlo más adelante. Está en Configuración → Pagos, botón "Conectar cuenta". Lleva dos minutos.',
         destino: ['ventas', 'configuracion', { vista: 'pagos' }], destinoLabel: 'Ir a Pagos',
-        seccionDestino: 'configuracion', anclaDestino: 'boton:Conectar cuenta || .cfg-sidebar-item[title="Pagos"]',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Conectar cuenta || .cfg-contenido h1',
         guiaLabel: 'Conectá tu cuenta desde acá',
     },
     // Categorías ANTES que el primer producto (pedido de Ale): así el producto
@@ -231,11 +231,11 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
     {
         id: 'producto', titulo: 'Creá tu primer producto',
         detalle: 'Fotos, precio, stock y su categoría.',
-        tip: 'Escribí el nombre y tocá «Generar con Orbi»: te escribe la descripción y te sugiere categoría y etiquetas al toque.',
+        tip: 'Escribí el nombre y tocá «Redactar con Orbi»: te escribe la descripción y te sugiere categoría y etiquetas al toque.',
         destino: ['ventas', 'catalogo', { vista: 'nuevo' }], destinoLabel: 'Crear producto',
         seccionDestino: 'catalogo',
         // Dos pasos (pedido de Ale): primero el nombre, recién después Orbi.
-        // Si no, la guía manda directo a "Generar con Orbi" y no se entiende
+        // Si no, la guía manda directo a "Redactar con Orbi" y no se entiende
         // que Orbi necesita el nombre para escribir la descripción.
         pasos: [
             {
@@ -243,14 +243,14 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
                 label: 'Escribí acá el nombre del producto',
                 avanzarAlEscribir: true,
             },
-            { ancla: 'boton:Generar con Orbi', label: 'Ahora tocá acá: Orbi te escribe la descripción' },
+            { ancla: 'boton:Redactar con Orbi', label: 'Ahora tocá acá: Orbi te escribe la descripción' },
         ],
     },
     {
         id: 'envios', titulo: 'Definí cómo entregás',
         detalle: 'Envío a domicilio, retiro en el local, o los dos. Configurá costos y zonas en Configuración → Envíos.',
         destino: ['ventas', 'configuracion', { vista: 'envios' }], destinoLabel: 'Ir a Envíos',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Envíos"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus envíos se definen acá',
     },
     {
@@ -276,7 +276,7 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
 //
 // Rutas, vistas y anclas verificadas contra el código real (15/09):
 // Sidebar.tsx (subs con `vista`), AdminSeccionShell.tsx (secciones válidas),
-// ConfigSidebar.tsx (title = label exacto de cada ítem), PedidoLista.tsx
+// ConfigGeneral.tsx (.cfg-contenido: el título de cada pantalla de Configuración), PedidoLista.tsx
 // (.ped-tabs-row), ReporteTabs.tsx (.mod-tabs), anclas.ts (header:*).
 // Los ids también los conoce la API (businesses.service.ts#getTutorial) para
 // el tildado automático; `herramientas`, `reportes` y `plan` son las únicas
@@ -334,7 +334,7 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
     {
         id: 'herramientas', grupo: GRUPO_DIA, titulo: 'Usá la barra de arriba',
         detalle: 'Te sigue por todo el panel: el buscador encuentra un pedido, un cliente o un producto desde cualquier pantalla; la campana junta lo que pasó mientras no estabas; y en tu avatar están "Mi perfil", el modo oscuro y "Ir a la tienda".',
-        tip: 'Orbi, el asistente, se abre con Ctrl+K desde donde estés: le preguntás por tu negocio y te ayuda a operar el panel.',
+        tip: 'Orbi, el asistente, se abre con el botón Orbi AI de la barra de arriba, estés donde estés: le preguntás por tu negocio y te ayuda a operar el panel.',
         destino: ['ventas', 'dashboard'], destinoLabel: 'Ir al Inicio',
         seccionDestino: 'dashboard', anclaDestino: 'header:buscador || header:usuario',
         guiaLabel: 'Buscá desde acá, estés donde estés',
@@ -344,21 +344,21 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         detalle: 'Logo, colores, tipografía, banner y los textos de la portada. Cambiá algo y tocá "Guardar cambios": la tienda se actualiza al instante.',
         tip: 'Con el paquete Avanzado tenés Plantillas de Home: veinte portadas distintas para tu tienda, en Avanzado → Plantillas de Home.',
         destino: ['ventas', 'configuracion', { vista: 'apariencia' }], destinoLabel: 'Ir a Apariencia',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Apariencia"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Logo, colores y textos se cambian acá',
     },
     {
         id: 'contacto', grupo: GRUPO_TIENDA, titulo: 'Cargá tus datos de contacto',
         detalle: 'WhatsApp, email y tus horarios de atención. Es por donde te escriben los que están por comprar y todavía tienen una duda.',
         destino: ['ventas', 'configuracion', { vista: 'contacto' }], destinoLabel: 'Ir a Contacto',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Contacto"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'WhatsApp, email y horarios, acá',
     },
     {
         id: 'redes', grupo: GRUPO_TIENDA, titulo: 'Sumá tus redes sociales',
         detalle: 'Instagram, TikTok y Facebook. Se muestran en tu tienda: el que te compró una vez te sigue, y el que te sigue vuelve.',
         destino: ['ventas', 'configuracion', { vista: 'redes' }], destinoLabel: 'Ir a Redes sociales',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Redes sociales"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus perfiles se cargan acá',
     },
     {
@@ -372,28 +372,28 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         id: 'dominio', grupo: GRUPO_TIENDA, titulo: 'Poné tu dirección propia',
         detalle: 'Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya (tunegocio.com), en Dominios la comprás desde el panel o conectás una que ya tengas.',
         destino: ['ventas', 'configuracion', { vista: 'dominios' }], destinoLabel: 'Ir a Dominios',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Dominios"] || .cfg-sidebar',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Comprá o conectá tu dominio acá',
     },
     {
         id: 'equipo', grupo: GRUPO_NEGOCIO, titulo: 'Invitá a alguien de tu equipo',
         detalle: 'Cada persona entra con su usuario y ve solo lo que su rol permite. Le llega un mail con la invitación.',
         destino: ['ventas', 'configuracion', { vista: 'equipo' }], destinoLabel: 'Ir a Equipo',
-        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-sidebar-item[title="Equipo"]',
+        seccionDestino: 'configuracion', anclaDestino: 'boton:Invitar miembro || .cfg-contenido h1',
         guiaLabel: 'Invitá desde acá: elegís el rol y le llega un mail',
     },
     {
         id: 'notificaciones', grupo: GRUPO_NEGOCIO, titulo: 'Elegí qué avisos recibís',
         detalle: 'Pedido nuevo, pago confirmado, stock crítico, cancelaciones: cada uno por el panel, por mail, o los dos. Ajustá la grilla y guardá.',
         destino: ['ventas', 'configuracion', { vista: 'notificaciones' }], destinoLabel: 'Ir a Notificaciones',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Notificaciones"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Cada aviso, por panel o por mail: se define acá',
     },
     {
         id: 'postventa', grupo: GRUPO_NEGOCIO, titulo: 'Definí cambios y devoluciones',
         detalle: 'Si aceptás devoluciones y cancelaciones, y con qué reembolso: nota de crédito, plata de vuelta por Mercado Pago, o los dos. Lo que elijas es lo que tu cliente puede pedir — aprobar cada caso sigue siendo tuyo.',
         destino: ['ventas', 'configuracion', { vista: 'postventa' }], destinoLabel: 'Ir a Cancelaciones',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Cancelaciones y devoluciones"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tus reglas de postventa, acá',
     },
     {
@@ -407,7 +407,7 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
         id: 'plan', grupo: GRUPO_NEGOCIO, titulo: 'Conocé tu plan',
         detalle: 'En Suscripción ves qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Justo abajo, en Soporte, está cómo escribirnos si algo no cierra.',
         destino: ['ventas', 'configuracion', { vista: 'suscripcion' }], destinoLabel: 'Ir a Suscripción',
-        seccionDestino: 'configuracion', anclaDestino: '.cfg-sidebar-item[title="Suscripción"]',
+        seccionDestino: 'configuracion', anclaDestino: '.cfg-contenido h1',
         guiaLabel: 'Tu plan y tu facturación, acá',
     },
 ]
@@ -461,7 +461,7 @@ export const TIPS_POR_SECCION: Partial<Record<string, TipSeccion[]>> = {
         { ancla: '.dl-actions', titulo: 'Cupones', texto: 'Códigos que el cliente escribe en el checkout. Se pueden limitar por usos totales o por cliente.' },
     ],
     configuracion: [
-        { ancla: '.cfg-sidebar', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. La clave de la primera semana es Negocio (tus datos). En Pagos elegís cómo cobrás; conectar Mercado Pago es opcional, pero conviene si querés aceptar tarjeta.' },
+        { ancla: 'sidebar:Configuración', titulo: 'El menú de Configuración', texto: 'Cada sección guarda por separado. La clave de la primera semana es Negocio (tus datos). En Pagos elegís cómo cobrás; conectar Mercado Pago es opcional, pero conviene si querés aceptar tarjeta.' },
     ],
     avanzado: [
         { ancla: 'centro', titulo: 'El paquete Avanzado', texto: 'Extras pagos aparte de tu suscripción: juegos con premio, modales de anuncios, plantillas de Home y countdown. Si no lo tenés, "Ver qué incluye" te muestra el detalle.' },
@@ -524,8 +524,8 @@ export const MISIONES_ASISTENTE: MisionAsistente[] = [
         explicacion: 'El paquete de extras pago: juegos con premio, modales de anuncios, plantillas de Home (veinte portadas para tu tienda) y countdown. Se contrata aparte de la suscripción.',
     },
     {
-        id: 'cierre', esperaSeccion: 'dashboard', resaltaSidebar: 'Dashboard',
-        pedido: 'Última: volvé al **Dashboard**.',
+        id: 'cierre', esperaSeccion: 'dashboard', resaltaSidebar: 'Inicio',
+        pedido: 'Última: volvé al **Inicio**.',
         explicacion: 'Listo, ya recorriste todo el panel. El Inicio es tu resumen diario: números, alertas y el botón "Publicar tienda" para salir a vender. Por acá se empieza cada mañana.',
     },
 ]

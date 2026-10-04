@@ -46,10 +46,12 @@ Cualquiera que vaya a correr `deploy/deploy.sh` necesita, en el proyecto GCP
 | `roles/cloudbuild.builds.editor` | Lanzar builds |
 | `roles/logging.viewer` | Ver logs |
 | `roles/iam.serviceAccountUser` (scoped a `681215569277-compute@developer.gserviceaccount.com`) | Necesario para desplegar "en nombre de" esa service account |
+| `roles/secretmanager.secretAccessor` **solo sobre `DATABASE_URL` y `DIRECT_URL`** | El preflight (d) y `prisma-prod.sh` las leen para mirar y migrar la base de producción |
 
-**NO hace falta** `roles/secretmanager.secretAccessor` para desplegar código nuevo
-— el deploy solo *referencia* los secrets por nombre (`--set-secrets`), no lee su
-contenido. Ese rol se lo damos solo a quien necesite ver/rotar un secret puntual.
+`gcloud run deploy` en sí no lee los secrets: solo los *referencia* por nombre
+(`--set-secrets`). El rol de arriba es para el preflight (d), que necesita conectarse a
+la base de producción. No hace falta darlo sobre el resto de los secrets; ese acceso se da solo a
+quien necesite ver o rotar uno puntual.
 
 Herramientas locales:
 - [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) instalado y autenticado
@@ -86,6 +88,56 @@ typecheck + tests unitarios de la API en cada push a `main` y en PRs), y el
 preflight del script es el puente entre las dos cosas: CI verifica, no
 despliega; el script despliega, pero solo lo que CI verificó.
 
+### Dos bases: desarrollo y producción, y cómo se migra cada una
+
+Desde el 2026-09-20 hay dos proyectos Supabase. El `.env` local de `apps/api` apunta a
+**desarrollo** (`hhaqlzrcskmwnvhgydon`, "orbitiando al backend"); Cloud Run usa
+**producción** (`dgergykdihtvsglfumsb`, "Orbita Produccion") por los secrets `DATABASE_URL` /
+`DIRECT_URL` de Secret Manager. Un `prisma migrate deploy` pelado migra dev, no producción.
+
+`deploy.sh` no aplica migraciones. El flujo, cuando el cambio trae una carpeta nueva en
+`prisma/migrations/`:
+
+```bash
+cd apps/api
+# 1. En dev, al escribir la migración (el .env es dev):
+pnpm exec prisma migrate deploy
+# 2. Con el cambio ya en main y CI verde, en PRODUCCIÓN:
+./deploy/prisma-prod.sh migrate deploy
+./deploy/prisma-prod.sh migrate status      # tiene que decir "Database schema is up to date"
+# 3. Recién ahora:
+./deploy/deploy.sh
+```
+
+`prisma-prod.sh` lee las dos URLs de Secret Manager (versión `latest`, la misma que monta
+Cloud Run), aborta si alguna apunta a dev o no es la de producción, y se las pasa solo al
+proceso de prisma por variables de entorno: no se escriben a disco ni se imprimen. Si producción
+se muda a otro proyecto Supabase hay que actualizar `PROD_REF` en el script.
+
+Hasta el 2026-09-30 el preflight (d) y esta documentación decían que "la base del `.env` es
+producción". Era falso desde el corte: el preflight miraba dev y podía dar verde con una
+migración pendiente en producción.
+
+### Correr los e2e contra dev
+
+Los e2e (`test/*.e2e-spec.ts`) crean negocios, pedidos y cuentas de verdad, y CI no los corre
+(no tiene Postgres). Se corren a mano, antes del deploy, cuando el cambio toca algo que solo
+Postgres prueba de verdad (por ejemplo `orbi-fase1`: el claim atómico de acciones, la cuota
+diaria y el historial de Orbi). `test/e2e-guard.ts` los deja arrancar **solo** si
+`E2E_DATABASE_URL` (y `E2E_DIRECT_URL`) contienen la ref de dev (`hhaqlzrcskmwnvhgydon`) y no
+la de producción: es una lista blanca, no hay escape para producción. Las URLs se leen del
+`.env` local (que es dev) dentro de `$(...)`, así no se imprimen nunca. Desde `apps/api`, en
+Git Bash:
+
+```bash
+leer() { node -e 'require("dotenv").config({quiet:true});process.stdout.write(process.env[process.argv[1]]||"")' "$1"; }
+E2E_DATABASE_URL="$(leer DATABASE_URL)" E2E_DIRECT_URL="$(leer DIRECT_URL)" pnpm test:e2e -- orbi-fase1
+```
+
+Sin el `-- orbi-fase1` corren todos. La base de dev es compartida: si dos personas corren el
+mismo e2e a la vez, el barrido inicial de uno le borra los datos al otro. Nunca apuntarlos a
+producción ni pegar las URLs en el chat.
+
 ### Preflight: qué chequea y por qué
 
 Hallazgo `deploy-manual` de la auditoría interna (10/09/2026). Hasta el 15/09
@@ -99,7 +151,7 @@ con `exit 1` (sin buildear nada) en el primero que falla:
 | a | Árbol de git limpio | `git status --porcelain` vacío | lista lo sucio; commitear o descartar |
 | b | HEAD está en `main` | `git fetch origin` + `git merge-base --is-ancestor HEAD origin/main` | mergear a `main` (ff), pushear, esperar CI |
 | c | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**) | arreglar en `main` |
-| d | Migraciones al día | `pnpm exec prisma migrate status` (solo lectura, contra la base del `.env`, que es producción) | primero `pnpm exec prisma migrate deploy` (ver § Rollback si es destructiva) |
+| d | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
 | e | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success` | esperar o arreglar; si `gh` no está o no está logueado, avisa y sigue |
 
 `Web — lint (informativo)` tiene `continue-on-error` en `ci.yml` y su check run
@@ -266,6 +318,25 @@ solo sin el arreglo).
 Editar `deploy/env-vars.yaml` (se commitea a git, no tiene secrets), llevar
 el commit a `main` como cualquier otro cambio (el preflight no deja desplegar
 con el árbol sucio ni desde una rama) y correr `deploy.sh` de nuevo.
+
+### Orbi: cupo mensual y lectura de conversaciones
+
+Cuatro variables NO sensibles (van comentadas en `deploy/env-vars.yaml` con su
+default; se prenden descomentándolas y redesplegando). **Ojo: los dos
+interruptores no usan el mismo valor para "prendido"**: uno es `true` y el
+otro es `on`. Con el valor equivocado quedan apagados sin avisar.
+
+| Variable | Default | Valores |
+|---|---|---|
+| `ORBI_CUPO_BLOQUEA` | apagado | Solo el valor exacto `true` prende el bloqueo: al 100 % del cupo del negocio (o del tope de un miembro), Orbi contesta 429 y no llama al modelo. Cualquier otra cosa (sin definir, `on`, `1`, `TRUE`) = apagado: el cupo se mide y se muestra, pero no corta. |
+| `ORBI_LECTURA_CONVERSACIONES` | apagado | Solo el valor exacto `on` deja que el superadmin abra el texto (redactado) de una conversación, con motivo y registro. Cualquier otra cosa, `true` incluido, = apagado. **Prenderla recién después de actualizar la política de privacidad publicada.** |
+| `ORBI_CREDITOS_MES_BASE` | `1500` | Créditos por mes del plan base (1 crédito = USD 0,001). Número mayor que 0 (se trunca a entero); vacío, `0` o inválido = el default. |
+| `ORBI_CREDITOS_MES_AVANZADO` | `2000` | Ídem, para los negocios con el paquete Avanzado activo. |
+
+Los rechazos quedan en `orbi_turns` con `status = 'quota'` y
+`error_category` `cupo_mensual` (cupo mensual) o `tope_diario` (los 300
+mensajes por día del negocio, que no dependen de estas variables); el
+superadmin los ve separados en Orbi → Uso.
 
 ## Ver logs
 
@@ -506,7 +577,7 @@ request como cualquier otra.
 
 | Job de Scheduler | Horario (UTC) | Llama a |
 |---|---|---|
-| `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos) |
+| `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos). También sincroniza los costos de proveedores (`CostsService.syncAll()`) para la pantalla Costos del super admin |
 | `resumen-diario` | 22:00 diario | `resumenDiario()` |
 | `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
 
@@ -692,15 +763,36 @@ de la analítica del wizard. Código:
 | `platform_admin_logs` | `PLATFORM_ADMIN_LOGS_RETENTION_DAYS` | 365 días | acciones del super admin sobre negocios y suscripciones |
 | `audit_logs` | `AUDIT_LOGS_RETENTION_DAYS` | 365 días | registro de solo agregado de cada negocio (quién cambió qué en el panel) |
 | `email_logs` | `EMAIL_LOGS_RETENTION_DAYS` | 180 días | qué mail se le mandó a quién y si salió |
+| `orbi_pending_actions` | `ORBI_PENDING_ACTIONS_RETENTION_DAYS` | 30 días | acciones que Orbi propuso al dueño, confirmadas, canceladas o vencidas |
+| `orbi_turns` | `ORBI_TURNS_RETENTION_DAYS` | 400 días | métricas de cada turno del chat de Orbi (sin texto); 400 alcanzan para comparar año contra año |
+| `daily_quota` | `DAILY_QUOTA_RETENTION_DAYS` | 30 días | contador diario compartido de Orbi, ayudas de IA y estudio de imágenes |
+| `usage_events` | `USAGE_EVENTS_RETENTION_DAYS` | 400 días | gasto de cada llamada a un proveedor (tokens y costo); se corta por `timestamp` |
+| `orbi_conversation_access` | `ORBI_CONVERSATION_ACCESS_RETENTION_DAYS` | 365 días | registro de quién leyó qué conversación de Orbi (acceso auditado) |
+| `orbi_conversations` (no archivadas) | `ORBI_SESIONES_INACTIVAS_RETENTION_DAYS` | **apagada** | sesiones sin archivar y sin actividad; ver la nota de abajo |
 | `wizard_events` / `wizard_ai_turns` | `WIZARD_ANALYTICS_RETENTION_DAYS` | 180 días | analítica del wizard (ya existía, `wizard-analytics.service.ts`) |
 
-Reglas, iguales para las tres nuevas:
+Reglas, iguales para todas (las tres primeras, de `logs-sin-retencion`; las
+de Orbi, de la fase 1 y de medición y cupos):
 
 - Se cuenta en días desde `created_at`, con el instante actual como referencia.
+  La excepción es `daily_quota`, que no tiene `created_at`: corta por su
+  columna `day` (texto `YYYY-MM-DD`, día de Argentina) y borra las filas con
+  `day` anterior al día argentino de hoy menos N días.
 - Nunca menos de **30** días: un valor menor se sube a 30. Por debajo de un
   mes se pierde la trazabilidad de cualquier reclamo reciente.
 - `0` u `off` **apaga** la purga de esa tabla sola; las otras siguen.
 - Vacía o inválida (`"un año"`) = el default.
+- `orbi_conversations` sin archivar (`ORBI_SESIONES_INACTIVAS_RETENTION_DAYS`) es
+  la única que viene **apagada**: su default es "ninguno", así que con la
+  variable vacía el log dice `apagada` y no se borra nada. Se prende poniendo
+  un número de días (mínimo 30), y entonces borra las sesiones NO archivadas
+  sin actividad en ese plazo (incluye las de miembros ya borrados). Hasta que
+  Alan fije el plazo (spec 2026-10-03, D11) queda así: las ARCHIVADAS siguen
+  yéndose a los 180 días por `ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS`.
+- `usage_events` corta por `timestamp` (no tiene `created_at`).
+- La baja definitiva de un negocio borra sus cupos y lecturas de Orbi, y deja
+  `usage_events` pero sin `memberId`, `conversationId` ni `turnId` en el
+  `metadata` (el gasto se conserva, sin datos de personas).
 - Cada corrida loguea por tabla `Retención de <tabla> (<n> días): <k> filas
   borradas` (o `apagada por <variable>`). Una tabla que falla se anota con
   `error` y no frena a las otras ni a la corrida nocturna: mañana vuelve a
@@ -709,7 +801,7 @@ Reglas, iguales para las tres nuevas:
   excepción permitida y `test/unit/audit.auditoria.unit-spec.ts` la vigila
   (borra por fecha y nada más, nunca por negocio, entidad ni acción).
 
-Las tres variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
+Las variables NO son sensibles: van en `deploy/env-vars.yaml`, donde
 están **comentadas con su default**. Para cambiar una, descomentarla, poner el
 valor y volver a desplegar (§ Actualizar variables NO sensibles).
 

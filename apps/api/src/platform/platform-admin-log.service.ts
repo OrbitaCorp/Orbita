@@ -52,6 +52,9 @@ export const ACCION_LOG_ADMIN = {
     bloqueado: 'mfa_code_blocked',
   },
   mailPrueba: 'send_mail_test',
+  orbiMantenimiento: 'orbi_maintenance',
+  orbiCupoAjuste: 'orbi_cupo_ajuste',
+  orbiConversacionAbierta: 'orbi_conversacion_abierta',
   contrasenaRestablecida: 'password_reset',
 } as const;
 
@@ -152,6 +155,43 @@ export class PlatformAdminLogService {
       targetType: 'mail_template',
       targetId: e.template,
       details: { to: e.to.trim().toLowerCase(), sent: e.sent, error: e.error },
+    });
+  }
+
+  // Orbi (IA) puesto en mantenimiento a mano, rehabilitado, o un intento de
+  // rehabilitarlo que la llamada de prueba al proveedor rechazó.
+  async orbiMantenimiento(e: { adminId: string; accion: 'activado' | 'rehabilitado' | 'rehabilitacion_rechazada'; detalle?: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiMantenimiento,
+      targetType: 'orbi',
+      targetId: 'global',
+      details: { accion: e.accion, detalle: e.detalle },
+    });
+  }
+
+  // Ajuste de créditos del cupo mensual de Orbi de un negocio (suma o resta). El
+  // rastro de quién dio de más o de menos y por qué; `ajusteId` apunta a la
+  // fila de orbi_cupo_ajustes.
+  async orbiCupoAjuste(e: { adminId: string; businessId: string; mes: string; creditos: number; motivo: string; ajusteId: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiCupoAjuste,
+      targetType: 'business',
+      targetId: e.businessId,
+      details: { mes: e.mes, creditos: e.creditos, motivo: e.motivo, ajusteId: e.ajusteId },
+    });
+  }
+
+  // Un super admin abrió el texto de una conversación de Orbi. Queda quién, cuál
+  // y con qué motivo/ticket, de qué negocio; NUNCA el contenido del chat.
+  async orbiConversacionAbierta(e: { adminId: string; conversationId: string; businessId: string; motivo: string; ticket?: string }): Promise<void> {
+    await this.registrar({
+      adminId: e.adminId,
+      action: ACCION_LOG_ADMIN.orbiConversacionAbierta,
+      targetType: 'orbi_conversation',
+      targetId: e.conversationId,
+      details: { businessId: e.businessId, motivo: e.motivo, ticket: e.ticket },
     });
   }
 

@@ -1,5 +1,5 @@
 import { useOrbiStore } from './useOrbiStore'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 
 interface Props {
   collapsed?: boolean
@@ -11,7 +11,7 @@ export function OrbiTrigger({ collapsed }: Props) {
   return (
     <button
       onClick={toggle}
-      title="Orbi AI (Ctrl+K)"
+      title="Orbi AI"
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
         width: '100%',
@@ -26,28 +26,12 @@ export function OrbiTrigger({ collapsed }: Props) {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-        display: 'grid', placeItems: 'center', flexShrink: 0,
-      }}>
-        <OrbiIcon size={15} color="white" />
-      </div>
+      {/* Sin disco: el pet suelto sobre el menú, y vivo (flota, parpadea, el
+          satélite orbita) para que se sienta presente aunque no se lo toque. */}
+      <OrbiPet size={44} animated />
 
       {!collapsed && (
-        <>
-          <span style={{ fontSize: 13, fontWeight: 600, flex: 1, textAlign: 'left' }}>Orbi AI</span>
-          <kbd style={{
-            fontSize: 10, fontWeight: 500,
-            padding: '2px 6px', borderRadius: 4,
-            background: 'var(--color-surface-alt)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-muted)',
-            fontFamily: 'inherit',
-          }}>
-            Ctrl+K
-          </kbd>
-        </>
+        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, textAlign: 'left' }}>Orbi AI</span>
       )}
     </button>
   )

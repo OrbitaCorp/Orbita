@@ -25,6 +25,7 @@ import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
 import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
+import { describeError } from '../common/utils/describe-error.util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
@@ -80,6 +81,14 @@ const FREE_SIGNUP_PREFIX = 'FREE-';
 // no hay businessId para usar como referencia (a diferencia de los cobros
 // recurrentes de un plan ya activo, que sí usan el businessId).
 const PENDING_REF_PREFIX = 'PEND-';
+
+// Una alta pagada que el barrido nocturno rescató o no pudo resolver (ver
+// rescatarAltasPagadas): lo mínimo para identificarla en el aviso interno.
+interface AltaAvisada {
+  ref: string;
+  email: string;
+  detalle: string;
+}
 
 // Exportados (no solo de uso interno): subscriptions.controller.ts los
 // necesita para validar el `?plan=` de GET /discount/:code sin duplicar la
@@ -227,6 +236,21 @@ export class SubscriptionsService {
   // entornos sin MP (dev sin credenciales).
   private get mpConfigured(): boolean {
     return !!this.config.get<string>('MP_ACCESS_TOKEN');
+  }
+
+  // URL pública del webhook que confirma altas pagadas (handleWebhook). Se
+  // deriva de MERCADOPAGO_REDIRECT_URI igual que mercadopago.service.ts arma la
+  // de pedidos, así no hay una variable más que mantener. undefined si no es
+  // https (dev local): MP no puede llegar a localhost y rechazaría la
+  // Preference entera por un notification_url inválido.
+  private get urlWebhookAltas(): string | undefined {
+    const redirect = this.config.get<string>('MERCADOPAGO_REDIRECT_URI') ?? '';
+    const url = redirect.replace('/mercadopago/oauth/callback', '/webhooks/mercadopago/preapproval');
+    // source_news=webhooks: sin esto MP manda además el aviso IPN viejo
+    // (topic=payment / merchant_order, "Feed v2.0"), que no trae firma y cae
+    // en "firma inválida" en el log por cada pago (se vio el 01/10). El aviso
+    // que sirve es el webhook firmado.
+    return url.startsWith('https://') && url !== redirect ? `${url}?source_news=webhooks` : undefined;
   }
 
   private mpConfig(): MercadoPagoConfig {
@@ -461,6 +485,12 @@ export class SubscriptionsService {
           ],
           payer: { email: dto.account.email },
           external_reference: ref,
+          // Sin esto el único camino para crear la cuenta era que el navegador
+          // volviera a /onboarding/pago-retorno. Si la persona pagaba desde la
+          // app de Mercado Pago (o cerraba la pestaña) el pago quedaba
+          // aprobado y la cuenta sin crear — caso real del 24/09 (pago
+          // 180757333764). Con el aviso, MP le pega a la API por su cuenta.
+          ...(this.urlWebhookAltas ? { notification_url: this.urlWebhookAltas } : {}),
           back_urls: {
             success: `${frontendUrl}/onboarding/pago-retorno`,
             pending: `${frontendUrl}/onboarding/pago-retorno`,
@@ -700,14 +730,12 @@ export class SubscriptionsService {
         acceptsCash: pagos.includes('efectivo'),
         acceptsTransfer: pagos.includes('transferencia'),
         // `pagos` ya no lo manda el wizard del frontend (ver comentario en
-        // startPendingCheckout()) — SIEMPRE llega vacío en el flujo real de
-        // hoy. Sin este `pagos.length > 0 ? ... : true`, este updateConfig()
-        // pisaba con `false` el `acceptsMercadopago: true` que
-        // registerBusiness() ya había dejado segundos antes, y el dueño
-        // terminaba teniendo que prender el toggle a mano en Configuración
-        // después de conectar su cuenta de Mercado Pago (RBT — pedido de
-        // Ale 16/09: que arranque activo, así conectar la cuenta alcanza).
-        acceptsMercadopago: pagos.length > 0 ? pagos.includes('mercadopago') : true,
+        // startPendingCheckout()) — SIEMPRE llega vacío en el flujo real de hoy, y
+        // la tienda nace con todos los métodos de pago apagados (registerBusiness).
+        // Este updateConfig() no los puede volver a prender: antes dejaba
+        // Mercado Pago en true cuando `pagos` venía vacío. El dueño prende lo que
+        // ofrece desde Configuración, después de conectar su cuenta.
+        acceptsMercadopago: pagos.includes('mercadopago'),
         acceptsCard: pagos.includes('tarjeta'),
         ...(pagos.includes('transferencia') ? { transferAlias: wizard.transferAlias } : {}),
       }),
@@ -921,7 +949,7 @@ export class SubscriptionsService {
   // todavía: recién se aplica cuando MP confirma la autorización (ver
   // confirmPlanActivation, idéntico criterio que confirmAndCreate — nunca se
   // confía en que el dueño "ya volvió", siempre se le vuelve a preguntar a MP).
-  async activatePlan(businessId: string, memberId: string) {
+  async activatePlan(businessId: string, memberId: string, discountCode?: string) {
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     // El email de quien está pidiendo la activación (siempre owner/admin, ver
@@ -957,12 +985,26 @@ export class SubscriptionsService {
     const { amount, frequency, frequencyType } = this.cicloDelPlan(plan);
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
+    // Código de descuento: vale SOLO para el primer cobro. La preapproval se
+    // crea con el monto rebajado y, cuando se registra ese primer cobro, se le
+    // devuelve el precio de lista (ver restaurarPrecioDeLista). Se resuelve
+    // ANTES de hablar con MP, igual que en el alta: lo que se le manda a cobrar
+    // tiene que ser exactamente el precio con descuento.
+    const descuento = await this.resolverDescuentoDeActivacion(discountCode, amount);
+    const montoACobrar = descuento ? descuento.amountFinal : amount;
+
     // Si ya había una preapproval activa (esto es un cambio de plan, no la
     // primera activación tras el beneficio de bienvenida), se cancela antes
     // de crear la nueva: MP no permite cambiarle la frecuencia a una ya
     // autorizada, así que conviven las dos hasta que ésta se cancele. Acá da
     // igual si MP no la pudo dar de baja: la nueva se crea lo mismo.
     if (sub.mpPreapprovalId) await this.cancelarPreapproval(sub.mpPreapprovalId, businessId);
+    // Un descuento de una activación anterior que quedó a medias ya no tiene a
+    // qué aplicarse: su preapproval se acaba de dar de baja (o nunca se pagó).
+    await this.prisma.subscriptionActivationDiscount.updateMany({
+      where: { businessId, status: { in: ['PENDING', 'ACTIVE', 'PAID'] } },
+      data: { status: 'CLOSED' },
+    });
 
     let response;
     try {
@@ -976,7 +1018,7 @@ export class SubscriptionsService {
           back_url: `${frontendUrl}/onboarding/plan-activado`,
           status: 'pending',
           external_reference: businessId,
-          auto_recurring: { frequency, frequency_type: frequencyType, transaction_amount: amount, currency_id: this.currency },
+          auto_recurring: { frequency, frequency_type: frequencyType, transaction_amount: montoACobrar, currency_id: this.currency },
         },
       });
     } catch (err) {
@@ -987,7 +1029,45 @@ export class SubscriptionsService {
     if (!response.id || !response.init_point) {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
+    if (descuento) {
+      await this.prisma.subscriptionActivationDiscount.create({
+        data: {
+          businessId,
+          preapprovalId: response.id,
+          codeId: descuento.codeId,
+          plan,
+          amountList: new Prisma.Decimal(amount),
+          amountFinal: new Prisma.Decimal(descuento.amountFinal),
+        },
+      });
+    }
     return { initPoint: response.init_point, plan };
+  }
+
+  // Un código del 100% es una cuenta de cortesía (alta gratis), no un descuento
+  // sobre el plan: MP no acepta una suscripción de $0 y regalar todos los meses
+  // no es lo que hace un código de activación. Se rechaza con un mensaje claro
+  // en vez de dejar que MP devuelva un error críptico.
+  private async resolverDescuentoDeActivacion(codigo: string | undefined, amountLista: number) {
+    const d = await this.resolverDescuento(codigo, amountLista);
+    if (d && d.amountFinal <= 0) {
+      throw new BadRequestException('Ese código regala la cuenta entera y solo sirve para el alta. Para activar tu plan usá uno con un descuento menor al 100%.');
+    }
+    return d;
+  }
+
+  // Previsualización en Configuración → Suscripción: el mismo cálculo que hará
+  // activatePlan, contra el plan que le toca activar a ESTE negocio (el precio
+  // de lista, no el de bienvenida del alta).
+  async previewActivationDiscount(businessId: string, code: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
+    const plan = sub.nextPlan ?? sub.plan;
+    if (!esPlanKey(plan)) throw new BadRequestException('Elegí un plan antes de aplicar un código');
+    const { amount } = this.cicloDelPlan(plan);
+    const d = await this.resolverDescuentoDeActivacion(code, amount);
+    if (!d) throw new BadRequestException('Falta el código');
+    return { code: d.code, percentOff: d.percentOff, amountBase: d.amountBase, amountFinal: d.amountFinal, currency: this.currency };
   }
 
   // Idempotente y con la misma desconfianza de siempre: vuelve a preguntarle
@@ -1017,7 +1097,16 @@ export class SubscriptionsService {
     // link del mensual y antes de autorizarlo cambiaba a anual, quedaba en
     // "anual" (12 meses por cobro) pagando $16.500 por mes (auditoría interna
     // 10/09, ítem `api.subscriptions`).
-    const plan = this.planDePreapproval(mp.auto_recurring);
+    // Con un código de descuento el monto autorizado es el rebajado, que no
+    // coincide con ningún precio de lista: se reconoce por la fila que dejó
+    // activatePlan (mismo plan, misma frecuencia y EXACTAMENTE el monto que se
+    // le mandó a cobrar a MP). Cualquier otra combinación sigue sin activarse.
+    const descuento = await this.prisma.subscriptionActivationDiscount.findUnique({ where: { preapprovalId: mpPreapprovalId } });
+    const planConDescuento =
+      descuento && esPlanKey(descuento.plan) && this.coincideConDescuento(mp.auto_recurring, descuento.plan, Number(descuento.amountFinal))
+        ? descuento.plan
+        : undefined;
+    const plan = planConDescuento ?? this.planDePreapproval(mp.auto_recurring);
     if (!plan) {
       this.logger.error(`Preapproval ${mpPreapprovalId} de ${businessId} no coincide con ningún plan (${JSON.stringify(mp.auto_recurring ?? null)}) — no se activa`);
       return { activated: false, status: 'plan_no_coincide' };
@@ -1043,12 +1132,17 @@ export class SubscriptionsService {
         nextPlan: null,
         planActive: true,
         mpPreapprovalId,
-        amount: ciclo.amount,
+        // Con descuento, lo que MP cobra este primer ciclo (después se
+        // restaura el de lista, ver restaurarPrecioDeLista).
+        amount: planConDescuento && descuento ? descuento.amountFinal : ciclo.amount,
         currency: this.currency,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
       },
     });
+    if (planConDescuento && descuento && descuento.status === 'PENDING') {
+      await this.marcarDescuentoActivado(descuento, businessId);
+    }
     await this.syncAddonAvanzado(this.prisma, businessId, plan, periodEnd);
     await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
     if (reactivar) {
@@ -1066,6 +1160,162 @@ export class SubscriptionsService {
     );
 
     return { activated: true, plan, subdomain: business?.subdomain, businessId };
+  }
+
+  // ¿Lo que MP tiene autorizado es exactamente el plan con el monto rebajado
+  // que pidió activatePlan?
+  private coincideConDescuento(
+    rec: { transaction_amount?: number; frequency?: number; frequency_type?: string; currency_id?: string } | undefined,
+    plan: PlanKey,
+    amountFinal: number,
+  ): boolean {
+    if (!rec || rec.currency_id !== this.currency) return false;
+    const ciclo = PLANES[plan];
+    return (
+      Math.abs(Number(rec.transaction_amount) - amountFinal) < 0.005 &&
+      Number(rec.frequency) === ciclo.frequency &&
+      rec.frequency_type === ciclo.frequencyType
+    );
+  }
+
+  // La preapproval con descuento quedó autorizada: pasa a ACTIVE y recién acá
+  // se consume el uso del código (si se contara al pedir el link, cada link
+  // abandonado quemaría un uso — mismo criterio que confirmAndCreate). No
+  // bloqueante: el plan ya está activo y ya se autorizó el monto rebajado, así
+  // que si esto falla se registra y sigue.
+  private async marcarDescuentoActivado(
+    descuento: { id: string; codeId: string; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal },
+    businessId: string,
+  ) {
+    await this.prisma.subscriptionActivationDiscount.update({
+      where: { id: descuento.id },
+      data: { status: 'ACTIVE', activatedAt: new Date() },
+    });
+    try {
+      const dueno = await this.prisma.member.findFirst({ where: { businessId }, orderBy: { createdAt: 'asc' }, select: { email: true } });
+      await this.prisma.$transaction(async (tx) => {
+        const consumido = await this.consumirDescuento(tx, descuento.codeId);
+        if (!consumido) {
+          this.logger.warn(`El código de la activación de ${businessId} ya no estaba disponible al confirmar; se respeta el precio autorizado en MP igual`);
+        }
+        await tx.platformDiscountRedemption.create({
+          data: {
+            codeId: descuento.codeId,
+            businessId,
+            email: dueno?.email ?? '(sin mail)',
+            amountBase: descuento.amountList,
+            amountFinal: descuento.amountFinal,
+          },
+        });
+      });
+    } catch (err) {
+      this.logger.error(`No se pudo registrar el uso del código de activación de ${businessId}: ${describeError(err)}`);
+    }
+  }
+
+  // Lleva la fila de un descuento de activación al siguiente estado que
+  // corresponda, hasta donde se pueda hoy. Idempotente: la llaman el registro
+  // de cada cobro y el barrido nocturno, en cualquier orden.
+  //   PENDING → ACTIVE   si MP ya tiene la preapproval autorizada
+  //   ACTIVE  → PAID     si ya hay un cobro aprobado posterior al link
+  //   PAID    → RESTORED devolviéndole a la preapproval el precio de lista
+  private async avanzarDescuentoDeActivacion(id: string, businessId: string): Promise<void> {
+    let fila = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id, businessId } });
+    if (!fila) return;
+
+    if (fila.status === 'PENDING') {
+      const r = await this.confirmPlanActivation(fila.preapprovalId);
+      if (!r.activated) return;
+      fila = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id, businessId } });
+      if (!fila) return;
+    }
+
+    if (fila.status === 'ACTIVE') {
+      const cobro = await this.prisma.subscriptionPayment.findFirst({
+        where: {
+          subscription: { businessId: fila.businessId },
+          status: 'APPROVED',
+          mpPaymentId: { not: null },
+          paidAt: { gte: fila.createdAt },
+        },
+        select: { id: true },
+      });
+      if (!cobro) return;
+      fila = await this.prisma.subscriptionActivationDiscount.update({ where: { id }, data: { status: 'PAID' } });
+    }
+
+    if (fila.status === 'PAID') await this.restaurarPrecioDeLista(fila);
+  }
+
+  // Devuelve a la preapproval el precio de lista: el descuento valía solo para
+  // el primer cobro. MP permite cambiar el MONTO de una preapproval ya
+  // autorizada (no la frecuencia), y el cambio rige desde el próximo cobro. Si
+  // MP falla, la fila queda en PAID y el barrido nocturno reintenta — nunca se
+  // da por restaurada sin que MP lo haya aceptado.
+  private async restaurarPrecioDeLista(fila: { id: string; businessId: string; preapprovalId: string; amountList: Prisma.Decimal }) {
+    try {
+      await this.preapproval.update({
+        id: fila.preapprovalId,
+        body: { auto_recurring: { transaction_amount: Number(fila.amountList), currency_id: this.currency } },
+      });
+    } catch (err) {
+      this.logger.error(
+        `No se pudo devolver el precio de lista a la preapproval ${fila.preapprovalId} de ${fila.businessId}: ${this.mpErrorMessage(err)} — se reintenta esta noche`,
+      );
+      return;
+    }
+    await this.prisma.subscriptionActivationDiscount.update({ where: { id: fila.id }, data: { status: 'RESTORED', restoredAt: new Date() } });
+    await this.prisma.subscription.updateMany({
+      where: { businessId: fila.businessId, mpPreapprovalId: fila.preapprovalId },
+      data: { amount: fila.amountList },
+    });
+    this.logger.log(`Descuento de activación de ${fila.businessId}: precio de lista devuelto a la preapproval ${fila.preapprovalId}`);
+  }
+
+  // Barrido nocturno de los descuentos de activación que quedaron a medias:
+  // reintenta lo que falló (sobre todo devolver el precio de lista) y cierra lo
+  // que ya no tiene sentido. Un cliente que se queda pagando el monto rebajado
+  // para siempre es plata que se pierde en silencio, así que si una fila lleva
+  // más de un día en PAID sin poder restaurarse se avisa.
+  async reconciliarDescuentosDeActivacion() {
+    if (!this.mpConfigured) return;
+    const filas = await this.prisma.subscriptionActivationDiscount.findMany({
+      where: { status: { in: ['PENDING', 'ACTIVE', 'PAID'] } },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+    const atascadas: string[] = [];
+    for (const fila of filas) {
+      try {
+        const sub = await this.prisma.subscription.findUnique({ where: { businessId: fila.businessId }, select: { status: true, mpPreapprovalId: true } });
+        const hace7dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        // Link nunca pagado, o suscripción que ya no es esta preapproval (cambio
+        // de plan, baja): no hay nada que restaurar.
+        const obsoleta =
+          !sub ||
+          sub.status === 'CANCELLED' ||
+          (fila.status !== 'PENDING' && sub.mpPreapprovalId !== fila.preapprovalId) ||
+          (fila.status === 'PENDING' && fila.createdAt.getTime() < hace7dias);
+        if (obsoleta) {
+          await this.prisma.subscriptionActivationDiscount.update({ where: { id: fila.id }, data: { status: 'CLOSED' } });
+          continue;
+        }
+        await this.avanzarDescuentoDeActivacion(fila.id, fila.businessId);
+        const despues = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id: fila.id, businessId: fila.businessId }, select: { status: true, updatedAt: true } });
+        if (despues?.status === 'PAID' && despues.updatedAt.getTime() < Date.now() - 24 * 60 * 60 * 1000) {
+          atascadas.push(`${fila.businessId} — preapproval ${fila.preapprovalId}`);
+        }
+      } catch (err) {
+        this.logger.error(`Descuento de activación ${fila.id}: ${describeError(err)}`);
+      }
+    }
+    if (atascadas.length > 0) {
+      this.logger.error(`Descuentos de activación SIN poder devolver el precio de lista: ${atascadas.join(' | ')}`);
+      await this.avisarInterno(
+        'Hay suscripciones cobrando el monto con descuento: falta devolver el precio de lista',
+        `<p>El primer cobro con código ya se registró pero no se pudo devolver el precio de lista en Mercado Pago (se reintenta todas las noches). Si nadie lo corrige, el próximo cobro sale con descuento.</p><ul>${atascadas.map((a) => `<li>${a}</li>`).join('')}</ul>`,
+      );
+    }
   }
 
   // A qué plan corresponde lo que MP tiene autorizado. undefined si no es
@@ -1382,6 +1632,26 @@ export class SubscriptionsService {
       // pedido explícito de Ale, 25/09).
       this.eventEmitter?.emit('notification.cobro_suscripcion', { businessId, amount: montoCobro });
     }
+    // Si este era el primer cobro de una activación con código de descuento,
+    // ahora corresponde devolverle a la preapproval el precio de lista.
+    // Es un paso de apoyo: el cobro ya quedó registrado arriba y ninguna falla
+    // de acá puede tumbar recordPayment (un cobro real nunca se pierde). Si
+    // algo sale mal queda en el log y lo reintenta el barrido nocturno.
+    if (aprobado && !cancelada) {
+      try {
+        const pendientes = await this.prisma.subscriptionActivationDiscount.findMany({
+          where: { businessId, status: { in: ['PENDING', 'ACTIVE', 'PAID'] } },
+          select: { id: true },
+        });
+        for (const f of pendientes) {
+          await this.avanzarDescuentoDeActivacion(f.id, businessId).catch((e) =>
+            this.logger.error(`Descuento de activación ${f.id} tras el cobro ${mpPaymentId}: ${describeError(e)}`),
+          );
+        }
+      } catch (e) {
+        this.logger.error(`Descuentos de activación de ${businessId} tras el cobro ${mpPaymentId}: ${describeError(e)}`);
+      }
+    }
     // Aviso INMEDIATO (webhook) de un cobro recurrente rechazado — tenía
     // plantilla y función armadas (sendSubscriptionPaymentFailed) pero
     // ningún llamador en todo el backend (auditoría de mails, pedido
@@ -1499,6 +1769,13 @@ export class SubscriptionsService {
 
     // El tipo distingue un cambio de la suscripción de un cobro concreto.
     const type = (body?.type ?? body?.action ?? '') as string;
+    // Con notification_url en la Preference, MP manda además un aviso de
+    // merchant_order por cada pago. No aporta nada (el pago llega aparte) y
+    // caía en la rama de preapproval, que lo buscaba como si fuera una y
+    // dejaba un error falso en el log.
+    if (type.includes('merchant_order') || String(body?.topic ?? query['topic'] ?? '').includes('merchant_order')) {
+      return { received: true };
+    }
     const data = body?.data as { id?: string } | undefined;
     const id = data?.id ?? (body?.id as string | undefined);
     if (!id) {
@@ -1538,7 +1815,15 @@ export class SubscriptionsService {
         const ref = pago.external_reference ?? '';
         if (ref.startsWith(PENDING_REF_PREFIX) || ref.startsWith(FREE_SIGNUP_PREFIX)) {
           const result = await this.confirmAndCreate(ref);
-          this.logger.log(`Webhook pago de bienvenida ${id} (ref ${ref}): ${JSON.stringify(result)}`);
+          // SIN accessToken/refreshToken: confirmAndCreate devuelve la sesión
+          // recién creada del dueño (la usa la vuelta del navegador) y
+          // loguear el resultado entero dejaba un refresh token válido en
+          // texto plano en Cloud Logging. Se vio el 01/10 en la primera alta
+          // confirmada por este webhook.
+          const { accessToken: _a, refreshToken: _r, ...seguro } = result as Record<string, unknown>;
+          void _a;
+          void _r;
+          this.logger.log(`Webhook pago de bienvenida ${id} (ref ${ref}): ${JSON.stringify(seguro)}`);
         } else {
           const result = await this.recordPayment(String(id));
           this.logger.log(`Webhook pago ${id}: ${JSON.stringify(result)}`);
@@ -1956,6 +2241,29 @@ export class SubscriptionsService {
       p.auditLog.deleteMany(delNegocio),
       p.notification.deleteMany(delNegocio),
       p.orbiConversation.deleteMany(delNegocio),
+      // Lo que Orbi guardó además de la conversación (Orbi fase 1, spec §3.11):
+      // las acciones propuestas (guardan los argumentos, con nombres y montos
+      // de la tienda) y las métricas de cada turno. La baja solo pone
+      // `deletedAt`, así que el `onDelete: Cascade` del schema no corre nunca.
+      p.orbiPendingAction.deleteMany(delNegocio),
+      p.orbiTurn.deleteMany(delNegocio),
+      // Medición y cupos de Orbi (spec 2026-10-03): los cupos y ajustes mensuales
+      // de cada miembro y el registro de quién leyó qué conversación. Las dos
+      // primeras tienen FK con cascade, pero la baja no borra la fila del negocio;
+      // orbi_conversation_access ni siquiera tiene FK.
+      p.orbiCupoAjuste.deleteMany(delNegocio),
+      p.orbiCupoMiembro.deleteMany(delNegocio),
+      p.orbiConversationAccess.deleteMany(delNegocio),
+      // usage_events se conserva (es el gasto de la plataforma), pero sin a quién
+      // ni de qué conversación (spec 2026-10-03, D12). Solo se tocan los metadata
+      // que son objeto: track() guarda JSON null cuando el evento no trae metadata,
+      // y `jsonb 'null' - 'x'` falla ("cannot delete from scalar") y tiraría abajo
+      // la transacción entera.
+      p.$executeRaw`UPDATE usage_events SET metadata = metadata - 'memberId' - 'conversationId' - 'turnId' WHERE business_id = ${businessId} AND jsonb_typeof(metadata) = 'object'`,
+      // daily_quota no tiene businessId ni relación: la clave es
+      // `<prefijo>:<negocio>` (orbi-panel:, ai-assist:, image-studio:). Los
+      // ids son uuid, así que el sufijo `:<id>` no puede confundirse con otro.
+      p.dailyQuota.deleteMany({ where: { key: { endsWith: `:${businessId}` } } }),
       p.refreshToken.deleteMany(delNegocio),
       p.passwordResetToken.deleteMany(delNegocio),
       p.emailVerificationToken.deleteMany({ where: { member: { businessId } } }),
@@ -1974,15 +2282,111 @@ export class SubscriptionsService {
   // negocios draft, esto es de bajo riesgo: la tabla no tiene ninguna relación
   // ni cascada, borrar una fila vieja no afecta nada más.
   // Ya NO es @Cron — mismo motivo que reconcileOverdueSubscriptions() arriba.
+  //
+  // ANTES de borrar, rescata las que SÍ se pagaron: el 24/09 una clienta pagó
+  // ($5.500, aprobado) y no volvió a la pantalla de retorno; el webhook tampoco
+  // llegó, y este barrido le borró el alta a las 48 h sin mirar si MP había
+  // cobrado. Quedó con la plata cobrada, sin cuenta y sin los datos del wizard.
+  // Ahora: toda alta con más de 15 min se reintenta confirmar (si MP tiene un
+  // pago aprobado se crea la cuenta; si no, no pasa nada) y solo se borran las
+  // vencidas que MP no cobró. Lo que no se pudo verificar o confirmar se
+  // CONSERVA y se avisa, para que un cobro nunca se pierda en silencio.
   async cleanupExpiredPendingSignups() {
     const hours = Number(this.config.get<string>('PENDING_SIGNUP_TTL_HOURS') ?? 48);
     const cutoff = new Date();
     cutoff.setHours(cutoff.getHours() - hours);
 
+    const conservar = await this.rescatarAltasPagadas();
+
     const { count } = await this.prisma.pendingSignup.deleteMany({
-      where: { createdAt: { lt: cutoff } },
+      where: {
+        createdAt: { lt: cutoff },
+        ...(conservar.length > 0 ? { preapprovalId: { notIn: conservar } } : {}),
+      },
     });
     if (count > 0) this.logger.log(`Altas pendientes vencidas borradas: ${count}`);
+  }
+
+  // Devuelve las refs que NO hay que borrar todavía (no se pudo verificar el
+  // pago o no se pudo crear la cuenta). Las gratis (FREE-) no se tocan: no hay
+  // pago que rescatar y las sigue limpiando el TTL.
+  private async rescatarAltasPagadas(): Promise<string[]> {
+    if (!this.mpConfigured) return [];
+
+    const hace15min = new Date(Date.now() - 15 * 60 * 1000);
+    const pendientes = await this.prisma.pendingSignup.findMany({
+      where: { createdAt: { lt: hace15min }, preapprovalId: { startsWith: PENDING_REF_PREFIX } },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+
+    const conservar: string[] = [];
+    const rescatadas: AltaAvisada[] = [];
+    const problemas: AltaAvisada[] = [];
+
+    for (const p of pendientes) {
+      const email = (p.payload as { account?: { email?: string } } | null)?.account?.email ?? '(sin mail)';
+      try {
+        const r = await this.confirmAndCreate(p.preapprovalId);
+        if (r.activated) {
+          rescatadas.push({ ref: p.preapprovalId, email, detalle: `cuenta creada (${'subdomain' in r ? r.subdomain : '?'})` });
+        } else if (r.status === 'search_failed') {
+          // MP no respondió: no sabemos si pagó. Se conserva y se reintenta mañana.
+          conservar.push(p.preapprovalId);
+        } else if (r.status === 'monto_no_coincide') {
+          conservar.push(p.preapprovalId);
+          problemas.push({ ref: p.preapprovalId, email, detalle: 'hay un pago aprobado pero el monto no coincide: revisar a mano' });
+        }
+        // Cualquier otro estado (rejected, pending, unknown...) = no pagó: sigue el TTL.
+      } catch (err) {
+        conservar.push(p.preapprovalId);
+        problemas.push({ ref: p.preapprovalId, email, detalle: `falló al crear la cuenta: ${describeError(err)}` });
+      }
+    }
+
+    if (rescatadas.length > 0 || problemas.length > 0) {
+      await this.avisarAltasPagadasSinCuenta(rescatadas, problemas);
+    }
+    return conservar;
+  }
+
+  // Aviso interno (no al cliente): un pago aprobado que quedó sin cuenta es
+  // plata cobrada, y hasta ahora nos enterábamos solo si la persona escribía.
+  // Va por log en nivel error (para poder alertar desde Cloud Logging) y por
+  // mail a ALERTAS_PLATAFORMA_EMAIL. El mail es best-effort: si falla, el log
+  // ya quedó.
+  private async avisarAltasPagadasSinCuenta(rescatadas: AltaAvisada[], problemas: AltaAvisada[]) {
+    const linea = (a: AltaAvisada) => `${a.email} — ${a.ref} — ${a.detalle}`;
+    if (rescatadas.length > 0) {
+      this.logger.error(`Altas pagadas que no se habían confirmado (se creó la cuenta ahora): ${rescatadas.map(linea).join(' | ')}`);
+    }
+    if (problemas.length > 0) {
+      this.logger.error(`ALTAS PAGADAS SIN CUENTA que no se pudieron resolver solas: ${problemas.map(linea).join(' | ')}`);
+    }
+
+    const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const bloque = (titulo: string, items: AltaAvisada[]) =>
+      items.length === 0
+        ? ''
+        : `<p><strong>${titulo}</strong></p><ul>${items.map((a) => `<li>${escapar(linea(a))}</li>`).join('')}</ul>`;
+    await this.avisarInterno(
+      problemas.length > 0 ? 'Alta pagada sin cuenta: requiere revisión' : 'Alta pagada recuperada por el barrido nocturno',
+      bloque('Requieren revisión a mano (el pago está aprobado y la cuenta no se pudo crear)', problemas) +
+        bloque('Recuperadas solas (el pago estaba aprobado y no se había confirmado)', rescatadas) +
+        '<p>Si se repite seguido, revisar que el webhook de Mercado Pago esté llegando.</p>',
+    );
+  }
+
+  // Mail interno a quien atiende la plataforma (ALERTAS_PLATAFORMA_EMAIL,
+  // default contacto@orbita-corp.com). Best-effort: si el mail falla, el log de
+  // error que se escribió antes de llamar acá ya dejó el rastro.
+  private async avisarInterno(asunto: string, cuerpoHtml: string) {
+    const to = this.config.get<string>('ALERTAS_PLATAFORMA_EMAIL') ?? 'contacto@orbita-corp.com';
+    try {
+      await this.mail.sendCustomEmail(to, asunto, cuerpoHtml);
+    } catch (err) {
+      this.logger.warn(`No se pudo mandar el aviso interno "${asunto}": ${describeError(err)}`);
+    }
   }
 
   // ── Lectura ──────────────────────────────────────────────────────────────

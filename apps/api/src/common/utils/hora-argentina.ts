@@ -45,3 +45,19 @@ export function inicioDeMesArgentina(instante: Date, meses = 0): Date {
   const primero = new Date(Date.UTC(y, m - 1 + meses, 1));
   return inicioDeDiaArgentina(primero.toISOString().slice(0, 10));
 }
+
+/** 'YYYY-MM' del mes de Argentina en que cae un instante. */
+export function mesArgentina(instante: Date): string {
+  return fechaArgentina(instante).slice(0, 7);
+}
+
+/** Inicio (incluido) y fin (excluido) de un mes 'YYYY-MM' de Argentina. */
+export function rangoDeMesArgentina(mes: string): { desde: Date; hasta: Date } {
+  const desde = inicioDeDiaArgentina(`${mes}-01`);
+  return { desde, hasta: inicioDeMesArgentina(desde, 1) };
+}
+
+/** true si `valor` es un mes con la forma AAAA-MM (mes 01 a 12). */
+export function esMes(valor: unknown): valor is string {
+  return typeof valor === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(valor);
+}

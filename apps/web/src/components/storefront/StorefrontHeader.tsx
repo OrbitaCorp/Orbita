@@ -11,6 +11,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { PromoChip } from '@/modules/ventas/_shared/components'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { MarcaVista, type Marca } from './marca'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Props = {
   tienda:  TiendaConfig
@@ -198,6 +199,10 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     await logout()
     router.push(`${base}/`)
   }
+
+  // Tienda demo: el visitante ya entra como el cliente Invitado (ver
+  // lib/auth/authClient.ts) — no hay login ni "Cerrar sesión".
+  const enDemo = tienda.slug === DEMO_SLUG
 
   // Items del menú de cuenta (dropdown desktop + drawer mobile).
   const accountLinks = [
@@ -409,7 +414,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         <span style={{
           position: 'absolute', top: 4, right: 4,
           minWidth: 15, height: 15, padding: '0 3px',
-          background: 'var(--color-primary)', color: '#fff', borderRadius: 999,
+          background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', borderRadius: 999,
           fontSize: 9, fontWeight: 700, lineHeight: 1,
           display: 'grid', placeItems: 'center',
           fontFamily: '"Geist Mono", monospace',
@@ -425,6 +430,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // sería un botón a ningún lado. Mismo criterio que cartBlock.
   const accountBlock = !esVidriera && (
     <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+      {/* Demo: saltar al panel sin volver a la página de elegir rol. */}
+      {enDemo && (
+        <a href="/panel" className="ds-hover"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', marginLeft: 6, borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          <Store size={14} strokeWidth={2} /> Ver panel admin
+        </a>
+      )}
       <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
       {status === 'loading' ? (
@@ -463,11 +475,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   <Store size={15} strokeWidth={1.5} /> Panel de administrador
                 </button>
               )}
-              <button onClick={handleLogout}
-                className="ds-hover"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
-                <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
-              </button>
+              {!enDemo && (
+                <button onClick={handleLogout}
+                  className="ds-hover"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
+                  <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -475,7 +489,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         <button
           onClick={() => router.push(`${base}/login`)}
           className="ds-hover"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
         >
           <User size={14} strokeWidth={2} /> Ingresar
         </button>
@@ -735,6 +749,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             ))}
             {/* Vidriera digital: mismo criterio que accountBlock (sin cuenta
                 de cliente, sin carrito) — no tiene sentido ofrecer login. */}
+            {enDemo && (
+              <a href="/panel" className="sf-drawer-link" style={{ color: 'var(--color-primary)', fontWeight: 600 }} onClick={() => setMenuOpen(false)}>
+                <Store size={16} strokeWidth={1.5} /> Ver panel admin
+              </a>
+            )}
             {!esVidriera && status !== 'loading' && (cliente ? (
               <>
                 {accountLinks.map(l => (
@@ -747,9 +766,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     <Store size={16} strokeWidth={1.5} /> Panel de administrador
                   </a>
                 )}
-                <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
-                  <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
-                </button>
+                {!enDemo && (
+                  <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
+                    <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
+                  </button>
+                )}
               </>
             ) : (
               <a href={`${base}/login`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
@@ -796,7 +817,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 {cartCount > 0 && (
                   <span style={{
                     height: 22, padding: '0 8px', borderRadius: 999,
-                    background: 'var(--color-primary)', color: '#fff',
+                    background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)',
                     fontSize: 11, fontWeight: 700,
                     display: 'inline-flex', alignItems: 'center',
                   }}>
@@ -822,7 +843,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 <button
                   onClick={() => { setCartOpen(false); router.push(`${base}/catalogo`) }}
                   className="ds-hover"
-                  style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', border: 'none', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   Ver catálogo <ArrowRight size={14} />
                 </button>
@@ -959,7 +980,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     style={{
                       width: '100%', height: 50, borderRadius: 10,
                       background: hayNoDisponibles ? 'var(--color-surface-alt)' : 'var(--color-primary)',
-                      color: hayNoDisponibles ? 'var(--color-muted)' : '#fff',
+                      color: hayNoDisponibles ? 'var(--color-muted)' : 'var(--color-on-primary, #fff)',
                       fontSize: 14, fontWeight: 700, border: 'none', cursor: hayNoDisponibles ? 'not-allowed' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       boxShadow: hayNoDisponibles ? 'none' : '0 6px 20px rgba(37,99,235,0.28)',

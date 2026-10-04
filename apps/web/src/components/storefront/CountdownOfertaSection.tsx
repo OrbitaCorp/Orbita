@@ -21,9 +21,9 @@
 // El banner del countdown (CountdownBanner.tsx) es independiente: se pueden
 // tener los dos, uno, o ninguno.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { storefrontBase } from '@/lib/tenant'
 import { ProdImage } from './Thumb'
 import { pedirCountdown } from './countdownCache'
@@ -98,6 +98,39 @@ export function CountdownOfertaSection({ slug, badges }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, discountId])
 
+  // Flechas de la fila (más de cuatro productos): en vez de la barra de
+  // scroll, dos botones que pasan de a una "página" — pedido 29/09. Cada una
+  // aparece solo si hay algo para ese lado. En celular se sigue deslizando
+  // con el dedo (las flechas se esconden por CSS).
+  const listaRef = useRef<HTMLUListElement>(null)
+  const [haciaAtras, setHaciaAtras] = useState(false)
+  const [haciaAdelante, setHaciaAdelante] = useState(false)
+  const medirFila = useCallback(() => {
+    const el = listaRef.current
+    if (!el) return
+    setHaciaAtras(el.scrollLeft > 4)
+    setHaciaAdelante(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+  useEffect(() => {
+    const el = listaRef.current
+    if (!el) return
+    medirFila()
+    el.addEventListener('scroll', medirFila, { passive: true })
+    window.addEventListener('resize', medirFila)
+    return () => {
+      el.removeEventListener('scroll', medirFila)
+      window.removeEventListener('resize', medirFila)
+    }
+  }, [medirFila, productos])
+  const pasar = (dir: 1 | -1) => {
+    const el = listaRef.current
+    if (!el) return
+    const suave = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Una página = lo visible menos el padding; el scroll-snap termina de
+    // alinear la primera tarjeta al borde.
+    el.scrollBy({ left: dir * (el.clientWidth - 24), behavior: suave ? 'smooth' : 'auto' })
+  }
+
   const fin = cfg ? new Date(cfg.endDate).getTime() : null
   const ahora = useAhora(!!discountId, 1000, fin ?? undefined)
   const restante = fin !== null && ahora !== null ? fin - ahora : null
@@ -151,7 +184,8 @@ export function CountdownOfertaSection({ slug, badges }: Props) {
             Al lado del cartel y no debajo, para que entren en la primera
             vista. El alto se reserva con el skeleton para que la portada no
             salte cuando llega la respuesta. */}
-        <ul className={`sf-of-lista sf-of-lista--${disposicion}`} aria-label="Productos en oferta">
+        <div className="sf-of-carril">
+        <ul ref={listaRef} className={`sf-of-lista sf-of-lista--${disposicion}`} aria-label="Productos en oferta">
           {productos === null
             ? Array.from({ length: 4 }, (_, i) => (
                 <li key={i} className="sf-of-item" aria-hidden="true">
@@ -188,6 +222,17 @@ export function CountdownOfertaSection({ slug, badges }: Props) {
                 )
               })}
         </ul>
+        {disposicion === 'fila' && (
+          <>
+            <button type="button" className="sf-of-flecha sf-of-flecha--atras" onClick={() => pasar(-1)} aria-label="Productos anteriores" hidden={!haciaAtras}>
+              <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+            <button type="button" className="sf-of-flecha sf-of-flecha--adelante" onClick={() => pasar(1)} aria-label="Más productos en oferta" hidden={!haciaAdelante}>
+              <ChevronRight size={20} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          </>
+        )}
+        </div>
       </div>
     </section>
   )
@@ -296,14 +341,32 @@ const ESTILOS = `
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   min-width: 0;
 }
-/* Más de cuatro: una fila que se desliza, con el quinto asomando. */
+/* Más de cuatro: una fila de a cuatro que se pasa con las flechas (sin barra
+   de scroll a la vista; el deslizamiento táctil sigue andando). */
+.sf-of-carril { position: relative; min-width: 0; }
 .sf-of-lista--fila {
   grid-template-columns: none; grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 3 * 16px) / 4.3);
+  grid-auto-columns: calc((100% - 40px - 3 * 16px) / 4);
   overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
-  scroll-padding-inline: 20px; scrollbar-width: thin;
+  scroll-padding-inline: 20px; scrollbar-width: none;
 }
+.sf-of-lista--fila::-webkit-scrollbar { display: none; }
 .sf-of-lista--fila .sf-of-item { scroll-snap-align: start; }
+
+/* A la altura del medio de las fotos, montadas sobre el borde de la fila. */
+.sf-of-flecha {
+  position: absolute; top: 38%; z-index: 2; transform: translateY(-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-border); box-shadow: 0 4px 14px rgba(15,23,42,0.14);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.sf-of-flecha[hidden] { display: none; }
+.sf-of-flecha:hover { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+.sf-of-flecha:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.sf-of-flecha--atras { left: 8px; }
+.sf-of-flecha--adelante { right: 8px; }
 .sf-of-lista--uno { grid-template-columns: minmax(0, 1fr); }
 .sf-of-lista--dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
@@ -348,7 +411,7 @@ const ESTILOS = `
 .sf-of-lista--dos .sf-of-precio { font-size: 20px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sf-of-cta, .sf-of-foto img { transition: none; }
+  .sf-of-cta, .sf-of-foto img, .sf-of-flecha { transition: none; }
   .sf-of-link:hover .sf-of-foto img { transform: none; }
 }
 
@@ -356,7 +419,7 @@ const ESTILOS = `
 @media (max-width: 1024px) {
   .sf-of-lista--grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sf-of-lista--grilla .sf-of-item:nth-child(n+4) { display: none; }
-  .sf-of-lista--fila { grid-auto-columns: calc((100% - 2 * 16px) / 3.3); }
+  .sf-of-lista--fila { grid-auto-columns: calc((100% - 40px - 2 * 16px) / 3); }
 }
 
 /* Celular: el cartel arriba, compacto (el % y el reloj en un renglón), y los
@@ -378,6 +441,7 @@ const ESTILOS = `
     scroll-padding-inline: 16px; scrollbar-width: none;
   }
   .sf-of-lista::-webkit-scrollbar { display: none; }
+  .sf-of-flecha { display: none; }
   .sf-of-lista .sf-of-item { scroll-snap-align: start; }
   .sf-of-lista--grilla .sf-of-item:nth-child(n+4) { display: block; }
   .sf-of-lista--dos { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; overflow: visible; }

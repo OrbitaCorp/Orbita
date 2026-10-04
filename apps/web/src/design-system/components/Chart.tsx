@@ -221,3 +221,109 @@ export function DonutChart({ data, size = 120, label }: DonutChartProps) {
     </div>
   );
 }
+
+// ─── Column Chart (vertical) ─────────────────────────────────────────────────
+// Columnas verticales para series cortas y regulares: horas del día, días de la
+// semana, o ventas por día. Con `inner` dibuja, DENTRO de cada columna, la parte
+// que se quiere destacar (ej: la ganancia dentro de las ventas).
+//
+// Hecho con divs y no con SVG: las columnas y sus etiquetas escalan con el ancho
+// sin deformar el texto (el LineChart usa preserveAspectRatio="none").
+// Accesibilidad: el gráfico es una imagen con un resumen en aria-label; el dato
+// exacto de cada columna sale en el cuadro que aparece al pasar el mouse.
+
+interface ColumnChartProps {
+  values:       number[];
+  labels:       string[];
+  inner?:       number[];
+  color?:       string;
+  innerColor?:  string;
+  height?:      number;
+  formatValue?: (v: number) => string;
+  /** Nombre de cada serie en el cuadro del hover (ej: "Ventas", "Ganancia"). */
+  valueName?:   string;
+  innerName?:   string;
+  /** Cuántas etiquetas del eje como máximo (se salta de a N si hay más columnas). */
+  maxLabels?:   number;
+}
+
+export function ColumnChart({
+  values, labels, inner, color = 'var(--color-primary)', innerColor, height = 160,
+  formatValue = (v) => String(v), valueName, innerName, maxLabels = 12,
+}: ColumnChartProps) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  if (values.length === 0 || values.every(v => v === 0)) {
+    return (
+      <div style={{ height, display: 'grid', placeItems: 'center', fontSize: 12, color: 'var(--color-muted)' }}>
+        Sin datos para este período
+      </div>
+    );
+  }
+
+  const max     = Math.max(...values, 1);
+  const paso    = Math.max(1, Math.ceil(values.length / maxLabels));
+  const tieneIn = !!inner && inner.some(v => v > 0);
+  // Con una serie interna la columna principal queda tenue y la interna sólida;
+  // con una sola serie la columna es sólida.
+  const colorMain = tieneIn ? `color-mix(in srgb, ${color} 24%, transparent)` : color;
+  const colorIn   = innerColor ?? color;
+  const resumen   = `Gráfico de columnas. ${values.map((v, i) => `${labels[i]}: ${formatValue(v)}`).join(', ')}.`;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <style>{`
+        .ds-col-bar { transition: height 380ms ease; }
+        @media (prefers-reduced-motion: reduce) { .ds-col-bar { transition: none; } }
+      `}</style>
+      <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 4 }}>
+        máx. {formatValue(max)}
+      </div>
+      <div role="img" aria-label={resumen} onMouseLeave={() => setHovered(null)}
+        style={{ display: 'flex', alignItems: 'flex-end', gap: values.length > 20 ? 2 : 4, height, borderBottom: '1px solid var(--color-border)' }}>
+        {values.map((v, i) => {
+          const hp  = (v / max) * 100;
+          const ip  = tieneIn ? ((inner![i] ?? 0) / max) * 100 : 0;
+          const act = hovered === i;
+          return (
+            <div key={i} onMouseEnter={() => setHovered(i)}
+              style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', alignItems: 'flex-end', cursor: 'default' }}>
+              <div className="ds-col-bar" style={{
+                position: 'relative', width: '100%', height: `max(${hp}%, 2px)`,
+                background: v === 0 ? 'var(--color-border)' : colorMain,
+                borderRadius: '3px 3px 0 0', opacity: hovered === null || act ? 1 : 0.55,
+              }}>
+                {tieneIn && ip > 0 && (
+                  <div className="ds-col-bar" style={{
+                    position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(100, (ip / Math.max(hp, 0.0001)) * 100)}%`,
+                    background: colorIn, borderRadius: '3px 3px 0 0',
+                  }} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: values.length > 20 ? 2 : 4, marginTop: 6 }} aria-hidden="true">
+        {labels.map((l, i) => (
+          <div key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 10, color: 'var(--color-muted)', fontFamily: '"Geist", sans-serif', whiteSpace: 'nowrap', overflow: 'visible' }}>
+            {i % paso === 0 ? l : ''}
+          </div>
+        ))}
+      </div>
+
+      {hovered !== null && (
+        <div style={{
+          position: 'absolute', top: 18, left: `${Math.min(Math.max(14, ((hovered + 0.5) / values.length) * 100), 86)}%`,
+          transform: 'translateX(-50%)', background: 'var(--color-text)', color: 'var(--color-bg)',
+          padding: '5px 9px', borderRadius: 6, fontSize: 11, pointerEvents: 'none', whiteSpace: 'nowrap',
+          fontFamily: '"Geist Mono", monospace', lineHeight: 1.5, zIndex: 5,
+        }}>
+          <div style={{ opacity: 0.75 }}>{labels[hovered]}</div>
+          <div>{valueName ? `${valueName}: ` : ''}{formatValue(values[hovered])}</div>
+          {tieneIn && <div>{innerName ? `${innerName}: ` : ''}{formatValue(inner![hovered] ?? 0)}</div>}
+        </div>
+      )}
+    </div>
+  );
+}

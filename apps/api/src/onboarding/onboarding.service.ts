@@ -13,6 +13,7 @@ import { MailService } from '../mail/mail.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 import { UpdateOnboardingBusinessDto } from './dto/update-onboarding-business.dto';
 import { motivoSubdominioInvalido } from '../common/utils/subdominio';
+import { PERMISSIONS } from '../common/permisos/catalogo';
 import * as argon2 from 'argon2';
 
 // Plazo para verificar el email desde "Mi perfil" del panel. Vive acá porque
@@ -114,44 +115,8 @@ const RUBROS = [
 ] as const;
 
 // ─── Catálogo de permisos + roles default ──────────────────────────────────
-// Duplicado deliberado de prisma/seed.ts: seed.ts no es parte del grafo de
-// Nest (y prisma/ está excluido del build — ver PENDIENTES.md, bug de
-// tsconfig.build.json), así que no se puede importar desde acá sin romper
-// la compilación. Si cambia el catálogo, actualizar los dos lugares.
-
-const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
-  { group: 'Pedidos', code: 'orders.view', label: 'Ver pedidos' },
-  { group: 'Pedidos', code: 'orders.manage', label: 'Gestionar pedidos' },
-  { group: 'Pedidos', code: 'orders.export', label: 'Exportar pedidos' },
-  { group: 'Clientes', code: 'customers.view', label: 'Ver clientes' },
-  { group: 'Clientes', code: 'customers.manage', label: 'Gestionar clientes' },
-  { group: 'Reportes', code: 'reports.view', label: 'Ver reportes' },
-  { group: 'Reportes', code: 'reports.export', label: 'Exportar reportes' },
-  // Separado de reports.view a pedido del negocio: el dashboard es LA foto
-  // de la facturación, y un rol puede necesitar reportes puntuales sin ver
-  // la caja completa (o al revés). Los negocios existentes lo reciben por
-  // la migración reports_dashboard_permission (owner y admin).
-  { group: 'Reportes', code: 'reports.dashboard', label: 'Ver dashboard' },
-  { group: 'Inventario', code: 'inventory.view', label: 'Ver inventario' },
-  { group: 'Inventario', code: 'inventory.manage', label: 'Gestionar inventario' },
-  { group: 'Descuentos', code: 'discounts.view', label: 'Ver descuentos' },
-  { group: 'Descuentos', code: 'discounts.manage', label: 'Gestionar descuentos' },
-  { group: 'Configuración', code: 'config.edit', label: 'Editar configuración' },
-  { group: 'Configuración', code: 'config.team.view', label: 'Ver equipo' },
-  { group: 'Configuración', code: 'config.team.manage', label: 'Gestionar equipo' },
-  { group: 'Configuración', code: 'config.audit.view', label: 'Ver auditoría' },
-  { group: 'Configuración', code: 'config.domains.manage', label: 'Gestionar dominios' },
-  { group: 'Catálogo', code: 'catalog.view', label: 'Ver catálogo' },
-  { group: 'Catálogo', code: 'catalog.manage', label: 'Gestionar catálogo' },
-  // Mensajes y Avanzado — antes sin permiso propio (Mensajes: abierto a
-  // cualquier miembro; Avanzado: gate de @Roles('owner','admin') a secas).
-  // Pedido explícito de Ale (17/09): poder darle Mensajes o Avanzado a un
-  // empleado puntual sin ascenderlo a Propietario. Los negocios existentes
-  // los reciben por la migración 20260917_mensajes_avanzado_permisos.
-  { group: 'Mensajes', code: 'messages.view', label: 'Ver mensajes' },
-  { group: 'Mensajes', code: 'messages.manage', label: 'Responder mensajes' },
-  { group: 'Avanzado', code: 'advanced.manage', label: 'Gestionar Avanzado' },
-];
+// El catálogo de permisos vive en common/permisos/catalogo.ts (lo comparte con
+// Orbi). prisma/seed.ts sigue con su copia deliberada: no puede importar de src/.
 
 // El negocio arranca con DOS roles nada más: Propietario (acceso total) y
 // Empleado. "admin" ya no se crea: tenía exactamente los mismos permisos que
@@ -337,13 +302,20 @@ export class OnboardingService {
           },
         });
 
+        // La tienda nace SIN ningún método de pago ni de entrega habilitado: el
+        // dueño prende en Configuración solo lo que de verdad va a ofrecer (antes
+        // arrancaban prendidos Mercado Pago, Efectivo y Retiro, y un cliente podía
+        // elegir un medio que el dueño nunca configuró). Se pasan explícitos a
+        // propósito: los @default del schema siguen en true para otras altas.
         await tx.businessConfig.create({
           data: {
             businessId: business.id,
-            acceptsMercadopago: true,
-            acceptsCash: true,
+            acceptsMercadopago: false,
+            acceptsCash: false,
             acceptsTransfer: false,
-            acceptsPickup: true,
+            acceptsPickup: false,
+            acceptsCard: false,
+            acceptsCoordinateLater: false,
           },
         });
 

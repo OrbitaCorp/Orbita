@@ -485,9 +485,13 @@ export type StorefrontCategoryItem = {
   productCount: number
 }
 
-export async function getStorefrontCategories(slug: string) {
-  const cats = await storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
-  return (cats ?? []).filter(c => (c.productCount ?? 0) > 0)
+// La API incluye también las categorías madre sin productos propios (para poder
+// armar el árbol). Por defecto se devuelven solo las que tienen productos —
+// lo que esperan el home y la página de categoría—; el filtro del catálogo
+// pide `conAncestros` para dibujar las raíces desplegables.
+export async function getStorefrontCategories(slug: string, opts?: { conAncestros?: boolean }) {
+  const cats = (await storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)) ?? []
+  return opts?.conAncestros ? cats : cats.filter(c => (c.productCount ?? 0) > 0)
 }
 
 // ─── Cupón por código ───────────────────────────────────────────────────────

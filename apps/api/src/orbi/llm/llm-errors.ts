@@ -1,4 +1,5 @@
 import { HttpException } from '@nestjs/common';
+import { APIUserAbortError } from 'groq-sdk';
 
 // Códigos de error de red de Node donde tiene sentido reintentar con otro
 // proveedor (DNS, conexión, timeout). No incluye errores de protocolo/parseo.
@@ -45,6 +46,18 @@ function es404Vacio(err: unknown, status: number | undefined): boolean {
 }
 
 /**
+ * ¿El error viene de abortar la llamada? `fetch` (lo que usa @google/genai)
+ * tira un DOMException `AbortError`, a veces como `cause` de un "fetch failed";
+ * el SDK de Groq tira su propio APIUserAbortError, que se llama `Error`.
+ */
+export function esErrorDeAborto(err: unknown, profundidad = 0): boolean {
+  if (!err || typeof err !== 'object' || profundidad > 3) return false;
+  if (err instanceof APIUserAbortError) return true;
+  if ((err as { name?: unknown }).name === 'AbortError') return true;
+  return esErrorDeAborto((err as { cause?: unknown }).cause, profundidad + 1);
+}
+
+/**
  * ¿Este error de Gemini justifica caer al proveedor de fallback (Groq)?
  *
  * SÍ: cuota agotada (429), errores del servidor (5xx), "servicio no configurado"
@@ -56,6 +69,12 @@ function es404Vacio(err: unknown, status: number | undefined): boolean {
  * configurado: son bugs nuestros que hay que ver, no indisponibilidad.
  */
 export function esErrorDeDisponibilidad(err: unknown): boolean {
+  // Un corte del cliente no es indisponibilidad (spec §3.7): va antes que todo
+  // porque un aborto puede venir envuelto en un "fetch failed" o con un código
+  // de red, y eso lo mandaría al fallback a gastar en una respuesta que nadie
+  // va a leer.
+  if (esErrorDeAborto(err)) return false;
+
   const status = statusDe(err);
   if (status !== undefined) return status === 429 || status >= 500 || es404Vacio(err, status);
 

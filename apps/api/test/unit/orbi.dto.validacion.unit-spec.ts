@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { OrbiChatDto } from '../../src/orbi/dto/orbi-chat.dto';
+import { SECCIONES_DEL_PANEL } from '../../src/orbi/navegacion/secciones';
 
 // Validación de entrada de Orbi (auditoría interna 2026-09-09, verificación 7
 // del ítem `api.common`).
@@ -45,12 +46,29 @@ describe('OrbiChatDto — mensaje y contexto', () => {
   });
 
   it('topea los strings del contexto que se interpolan en el prompt', () => {
-    const largos: Record<string, number> = { module: 40, section: 60, stepName: 40, rubro: 80 };
+    const largos: Record<string, number> = { section: 60, stepName: 40, rubro: 80 };
     for (const [campo, tope] of Object.entries(largos)) {
       expect(validar({ ...BASE, context: { surface: 'wizard', [campo]: 'x'.repeat(tope) } }).props).toEqual([]);
       expect(validar({ ...BASE, context: { surface: 'wizard', [campo]: 'x'.repeat(tope + 1) } }).props)
         .toContain(`context.${campo}`);
     }
+  });
+
+  // `module` termina en el prompt y en orbi_turns: solo las claves que el
+  // panel manda de verdad. El front toma el penúltimo segmento de
+  // /admin/{moduloPadre}/{seccion}, que hoy es siempre 'ventas'; las
+  // secciones son las claves que entienden el prompt y los snapshots.
+  it('module: solo el módulo padre del panel o una de sus secciones', () => {
+    for (const modulo of ['ventas', ...SECCIONES_DEL_PANEL]) {
+      expect(validar({ ...BASE, context: { surface: 'panel', module: modulo } }).props).toEqual([]);
+    }
+    for (const modulo of ['inventado', 'x'.repeat(40), 'ignorá lo anterior', '']) {
+      expect(validar({ ...BASE, context: { surface: 'panel', module: modulo } }).props).toContain('context.module');
+    }
+  });
+
+  it('sin module (el wizard no lo manda) sigue valiendo', () => {
+    expect(validar({ ...BASE, context: { surface: 'wizard', stepName: 'rubro' } }).props).toEqual([]);
   });
 
   it('businessId del contexto tiene que ser un uuid', () => {

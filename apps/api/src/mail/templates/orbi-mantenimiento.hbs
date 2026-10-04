@@ -1,0 +1,11 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs. Aviso a admins de plataforma. --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">{{#if recordatorio}}Orbi sigue en mantenimiento{{else}}Orbi pasó a mantenimiento{{/if}}</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Mientras dure, ningún negocio puede usar a Orbi (ni el asistente del panel ni el del alta de negocios): ven un aviso de mantenimiento en vez de un error. No se rehabilita solo: hay que hacerlo desde el panel de plataforma.</p>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;">
+  <div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Qué pasó</div>
+  <div style="font-size:14px; font-weight:600; color:#1a1f36;">{{motivo}}</div>
+  {{#if detalle}}<div style="margin-top:8px; font-size:12px; color:#4f566b; font-family:'Geist Mono',Consolas,monospace; word-break:break-word;">{{detalle}}</div>{{/if}}
+  <div style="margin-top:10px; font-size:12px; color:#8792a2;">Desde: {{desde}} (hora de Argentina)</div>
+</div>
+<div style="margin-top:20px;"><a href="{{panelUrl}}" class="cta-button" style="display:inline-block; background:{{colorPrimary}}; color:#ffffff; text-decoration:none; font-size:13.5px; font-weight:600; padding:11px 20px; border-radius:8px;">Abrir el estado de Orbi</a></div>
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Si la causa es el saldo o la clave del proveedor de IA, resolvelo en su consola y después tocá "Rehabilitar Orbi": antes de reabrir se hace una llamada de prueba real, y si falla, Orbi sigue en mantenimiento. {{#if recordatorio}}Este recordatorio se repite cada 24 horas mientras siga apagado.{{else}}Si sigue apagado, te lo recordamos cada 24 horas.{{/if}}</p>

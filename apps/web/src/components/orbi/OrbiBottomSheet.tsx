@@ -1,10 +1,13 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useOrbiChat } from './useOrbiChat'
+import { useOrbiStore } from './useOrbiStore'
 import { useOrbiContext } from './useOrbiContext'
 import { useOrbiViewport } from './useOrbiViewport'
 import { OrbiWizardCtx } from './OrbiWizardCtx'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
+import { OrbiAvisoMantenimiento } from './OrbiAvisoMantenimiento'
+import { PLACEHOLDER_EN_MANTENIMIENTO } from './types'
 import { track } from '@/lib/analytics/wizardTracker'
 
 const DRAG_CLOSE = 90
@@ -19,6 +22,8 @@ const Z_SHEET = 2_000_001
 export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
+  // La disponibilidad la pregunta OrbiPanel, que es quien monta esta hoja.
+  const mantenimiento = useOrbiStore(s => s.mantenimiento)
   useOrbiViewport() // publica --orbi-kb (alto del teclado) en <html>
 
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -166,10 +171,15 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
             lado del botón. Cuando el paso SÍ está completo se sigue mostrando
             la tarjeta de "Continuar", que es la que aporta. */}
 
+        {mantenimiento && <OrbiAvisoMantenimiento mensaje={mantenimiento} />}
+
         <OrbiInput
           onSend={(m) => send(m, context)}
-          disabled={isStreaming}
-          quickChips={context.quickChips}
+          disabled={isStreaming || mantenimiento !== null}
+          streaming={isStreaming}
+          onStop={() => useOrbiStore.getState().abortar()}
+          quickChips={mantenimiento ? undefined : context.quickChips}
+          placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
         />
       </div>
 

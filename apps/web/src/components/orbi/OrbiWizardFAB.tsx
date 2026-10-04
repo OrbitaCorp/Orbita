@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { OrbiIcon } from './OrbiIcon'
+import { OrbiPet } from './pet/OrbiPet'
 import { useOrbiStore } from './useOrbiStore'
 
 interface Props {
@@ -46,8 +46,9 @@ export function OrbiWizardFAB({ onClick }: Props) {
         width: 48,
         height: 48,
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+        background: '#0a0e1a',
         border: 'none',
+        padding: 0,
         cursor: 'pointer',
         display: 'grid',
         placeItems: 'center',
@@ -59,7 +60,8 @@ export function OrbiWizardFAB({ onClick }: Props) {
       onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
     >
-      <OrbiIcon size={22} color="white" />
+      {/* Forma base, quieta: está siempre a la vista mientras se completa el alta. */}
+      <OrbiPet modulo="dashboard" size={40} animated={false} />
     </button>
   )
 }

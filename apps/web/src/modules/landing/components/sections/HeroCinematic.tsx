@@ -137,15 +137,18 @@ export function HeroCinematic() {
                             <path d="M5 12h14M12 5l7 7-7 7" />
                         </svg>
                     </a>
+                    {/* Lleva a la vista propia de la demo (/demo, v2/DemoEntrada.tsx),
+                        donde se elige entrar a la tienda o al panel. La sección
+                        #demo del home sigue estando. Antes era "Ver cómo funciona". */}
                     <a
-                        href="#como-funciona"
+                        href="/demo"
                         className="oc-ghost inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-6 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 sm:w-auto"
                         style={{ minHeight: 48, border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
                     >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
-                        Ver cómo funciona
+                        Probá la demo
                     </a>
                 </div>
             </div>

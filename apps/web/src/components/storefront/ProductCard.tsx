@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, Check, ShoppingCart, Timer } from 'lucide-react'
+import { ArrowUpRight, Eye, Check, ShoppingCart, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
@@ -182,6 +182,27 @@ export function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchS
         </button>
       ))}
     </div>
+  )
+}
+
+// Flecha "ir a la ficha" — SOLO celular/táctil (.orb-pcard-flecha, ver
+// globals.css), en el lugar de los íconos flotantes de carrito/ojo, que ahí
+// no tienen hover que los muestre. Mismo tamaño que esos (40px) para que la
+// tarjeta se lea igual que en escritorio (pedido 29/09). Es decorativa:
+// pointer-events none, el toque cae en el enlace que cubre la tarjeta.
+function FlechaFicha({ fondo = '#fff', color = '#0F172A' }: { fondo?: string; color?: string }) {
+  return (
+    <span
+      aria-hidden
+      className="orb-pcard-flecha"
+      style={{
+        display: 'none', position: 'absolute', top: '4%', right: '4%', zIndex: 3,
+        width: 40, height: 40, borderRadius: '50%', background: fondo, color,
+        placeItems: 'center', pointerEvents: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.16)',
+      }}
+    >
+      <ArrowUpRight size={18} strokeWidth={2} />
+    </span>
   )
 }
 
@@ -402,7 +423,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             title="Agregar al carrito"
             aria-label="Agregar al carrito"
             className="ds-hover"
-            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', border: 'none', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
+            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: agregado ? '#fff' : 'var(--color-on-primary, #fff)', border: 'none', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
           >
             {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
           </button>
@@ -528,6 +549,8 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               Últimas unidades
             </span>
           )}
+
+          <FlechaFicha fondo={tema.bg} color={tema.text} />
 
           {/* Lo que la maqueta NO tiene y Órbita sí: agregar al carrito sin
               entrar al producto. Mismos íconos flotantes que la tarjeta por
@@ -818,6 +841,8 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             celular (mucho más alta). De paso, un poco más grandes (34→40px)
             — el pedido del dueño, "capaz que sea la solución": ayuda solas,
             se sienten menos como puntitos perdidos en la esquina. */}
+        <FlechaFicha />
+
         {mode !== 'SHOWCASE' && (
           <div className="orb-pcard-floating" style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <button
@@ -839,7 +864,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
                 // lado (bug real, ver el comentario en globals.css).
                 transition: 'transform 260ms ease, box-shadow 200ms ease, background 150ms, color 150ms',
               }}
-              onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
+              onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-on-primary, #fff)' } }}
               onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#0F172A' } }}
             >
               {agregado ? <Check size={17} strokeWidth={2.4} /> : <ShoppingCart size={17} strokeWidth={2} />}
@@ -914,7 +939,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               siguiente): encontrado renderizando la card a 240px de ancho,
               no leyendo el código. El precio es el dato más importante de
               la card, nunca tiene que ceder espacio. */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, flexShrink: 0 }}>
+          {/* flexWrap + rowGap: cada precio sigue siendo indivisible (nowrap), pero
+              el tachado puede bajar de línea. Sin esto, "$ 292.499,25 $ 389.999" era
+              un bloque de 226px que estiraba la columna de la grilla de 2 y ensanchaba
+              toda la página en el celular (reportado 29/09). flexShrink 1: el bloque
+              puede ceder al ancho de la tarjeta; lo que no cede son los precios. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 7, rowGap: 0, minWidth: 0, flexShrink: 1 }}>
             {producto.precioHasta != null && (
               <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>Desde</span>
             )}

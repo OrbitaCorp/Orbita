@@ -1,4 +1,5 @@
 import { Controller, Logger, Post, UseGuards } from '@nestjs/common';
+import { DemoFechasService } from '../demo/demo-fechas.service';
 import { Public } from '../common/decorators/public.decorator';
 import { InternalCronSecretGuard } from './internal-cron-secret.guard';
 import { CronRunsService } from './cron-runs.service';
@@ -9,6 +10,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { DomainExpiryService } from '../domains/domain-expiry.service';
 import { EmailVerificationService } from '../member-profile/email-verification.service';
+import { CostsService } from '../platform/costs/costs.service';
+import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -64,6 +67,15 @@ export class InternalCronController {
     // Recordatorios de verificación de correo (a los 7, 3 y 1 días restantes).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly emailVerification?: EmailVerificationService,
+    // Fechas de la demo pública al día (ver demo/demo-fechas.service.ts).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly demoFechas?: DemoFechasService,
+    // Sincronización diaria de costos de proveedores (pantalla Costos del super admin).
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly costs?: CostsService,
+    // Alertas de los límites de gasto, justo después del sync de costos.
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly alertasDeCosto?: AlertasDeCostoService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -79,6 +91,14 @@ export class InternalCronController {
         await this.subscriptions.processLifecycleNotices();
         await this.subscriptions.processCancellationWindow();
         await this.subscriptions.cleanupExpiredPendingSignups();
+        // Descuentos de activación a medias: devolver el precio de lista tras el
+        // primer cobro, o cerrar los que ya no tienen sentido. Con su propio
+        // try/catch: un fallo acá no puede voltear el resto del mantenimiento.
+        try {
+          await this.subscriptions.reconciliarDescuentosDeActivacion();
+        } catch (e) {
+          this.logger.error(`Descuentos de activación: no se pudo correr — ${describeError(e)}`);
+        }
         // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
         // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar
         // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira
@@ -113,6 +133,24 @@ export class InternalCronController {
           await this.emailVerification?.avisarRecordatorios();
         } catch (e) {
           this.logger.error(`Recordatorios de verificación de email: no se pudo correr — ${describeError(e)}`);
+        }
+        // Demo pública: las fechas de sus datos avanzan con el calendario, así
+        // sus reportes nunca se vacían. Mismo criterio: si falla, se anota.
+        try {
+          await this.demoFechas?.ponerAlDia();
+        } catch (e) {
+          this.logger.error(`Fechas de la demo: no se pudieron poner al día — ${describeError(e)}`);
+        }
+        // Costos de proveedores (Cloudflare, Gemini, Groq, Resend…): deja el snapshot del
+        // mes al día sin depender de que alguien apriete "Sincronizar". Mismo criterio:
+        // si falla, se anota sin marcar la corrida como fallida.
+        try {
+          await this.costs?.syncAll();
+          // Con el snapshot del mes recién actualizado: crea la alerta de cada
+          // umbral de los límites que se cruzó (una vez por mes).
+          await this.alertasDeCosto?.revisar();
+        } catch (e) {
+          this.logger.error(`Sincronización de costos: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

@@ -99,6 +99,7 @@ export class AuthGuard implements CanActivate {
         roleId: member.roleId,
         roleName: member.role.name,
         permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
+        readOnly: member.readOnly,
       };
     }
 
@@ -107,7 +108,7 @@ export class AuthGuard implements CanActivate {
       // el sub.
       const customer = await this.prisma.customer.findFirst({
         where: { id: payload.sub, businessId: payload.businessId },
-        include: { business: { select: { id: true, mode: true, subdomain: true } } },
+        include: { business: { select: { id: true, mode: true, subdomain: true, isDemo: true } } },
       });
       if (!customer || customer.deletedAt) throw new UnauthorizedException('Token inválido o expirado');
 
@@ -120,6 +121,8 @@ export class AuthGuard implements CanActivate {
         customerId: customer.id,
         businessId: customer.businessId,
         businessMode: customer.business.mode,
+        // En la demo no hay registro: todo cliente es el Invitado sembrado.
+        readOnly: customer.business.isDemo,
       };
     }
 

@@ -26,6 +26,25 @@ export interface ImageStudioResult {
   advertencia?: string;
 }
 
+/**
+ * 0..1 — cuánto aro de luz necesita un producto sobre fondo negro, según la
+ * luminosidad media (ponderada por alfa) de su RGBA crudo: 1 para productos
+ * oscuros (luma <= 40), 0 para claros (luma >= 150).
+ */
+export function intensidadAroSegunLuminosidad(rgba: Buffer): number {
+  let suma = 0;
+  let pesos = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const a = rgba[i + 3];
+    if (a === 0) continue;
+    suma += (0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * a;
+    pesos += a;
+  }
+  if (pesos === 0) return 1;
+  const luma = suma / pesos;
+  return Math.min(1, Math.max(0, 1 - (luma - 40) / 110));
+}
+
 const PROMPT_MODELO_DEFAULT =
   'a photorealistic person wearing this exact garment, natural studio lighting, e-commerce fashion photography, neutral background';
 
@@ -210,6 +229,15 @@ export class ImageStudioService {
     // 1. Intenta Workers AI (1 solo intento rápido con timeout estricto de 7s).
     // 2. Si falla (error, flag de contenido NSFW, cuota o timeout),
     //    aplica inmediatamente fallback al modelo local pulido (BiRefNet-Lite + sombra orgánica + composición).
+    // Fondos lisos (blanco / negro) SIN descripción personalizada: directo al
+    // modelo local, sin pasar por Workers AI. Un fondo liso no necesita
+    // generación, y Flux (feedback 01/10/2026) redibuja el producto — texto de
+    // etiquetas y letreros deformado — y con "rim light" en el prompt dibuja un
+    // resplandor ("aurora") del color de la prenda alrededor de toda la
+    // silueta. La composición local deja el producto idéntico a la foto.
+    if (!descripcion && key === BLANCO_LISO_KEY) return await this.componerFondoBlanco(origen.buffer, businessId);
+    if (!descripcion && key === NEGRO_LISO_KEY) return await this.componerFondoNegro(origen.buffer, businessId);
+
     const prompt = key === BLANCO_LISO_KEY
       ? this.promptFondoBlancoLiso(descripcion)
       : key === NEGRO_LISO_KEY
@@ -474,7 +502,15 @@ export class ImageStudioService {
   // de alfil doble capa, pero aclarando en vez de oscureciendo) para dar la
   // misma sensación de apoyo/profundidad que el contact shadow le da al fondo
   // blanco.
-  private async componerFondoNegro(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
+    // Lienzo del fondo "Negro liso". Negro puro por ahora; se aísla acá para poder
+  // probar un oscuro más suave (con viñeta) sin tocar la composición.
+  protected async lienzoOscuro(width: number, height: number): Promise<Buffer> {
+    return sharp({ create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .png()
+      .toBuffer();
+  }
+
+private async componerFondoNegro(origenBuffer: Buffer, businessId: string): Promise<ImageStudioResult> {
     const cutout = await this.backgroundRemoval.removeBackground(origenBuffer, businessId);
     const meta = await sharp(cutout, ENTRADA_IMAGEN).metadata();
     const cutoutWidth = meta.width ?? 1024;
@@ -516,40 +552,36 @@ export class ImageStudioService {
 
       const alphaAmbiente = await sharp(alphaFull, { raw: { width, height, channels: 1 } })
         .toColourspace('b-w')
-        .blur(22)
+        .blur(16)
         .toColourspace('b-w')
         .raw()
         .toBuffer();
 
       // Mismas dos capas que componerFondoBlanco(), pero con RGB claro
       // (aclara) en vez de oscuro — sobre fondo negro, oscurecer no se nota.
+      // La intensidad depende de qué tan oscuro es el producto: uno claro (una
+      // remera blanca) ya se separa solo del negro, y el aro le dibujaba un
+      // resplandor alrededor de toda la silueta (feedback 30/09/2026); uno
+      // oscuro (zapatilla negra) sí lo necesita para no fundirse con el fondo.
+      const intensidadAro = intensidadAroSegunLuminosidad(await sharp(prodFull).raw().toBuffer());
       const contactoRgba = Buffer.alloc(width * height * 4);
       const ambienteRgba = Buffer.alloc(width * height * 4);
       for (let i = 0; i < width * height; i++) {
         contactoRgba[i * 4] = 235;
         contactoRgba[i * 4 + 1] = 235;
         contactoRgba[i * 4 + 2] = 235;
-        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.18);
+        contactoRgba[i * 4 + 3] = Math.round(alphaContacto[i] * 0.18 * intensidadAro);
 
         ambienteRgba[i * 4] = 245;
         ambienteRgba[i * 4 + 1] = 245;
         ambienteRgba[i * 4 + 2] = 245;
-        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.08);
+        ambienteRgba[i * 4 + 3] = Math.round(alphaAmbiente[i] * 0.08 * intensidadAro);
       }
 
       const rimContacto = await sharp(contactoRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
       const rimAmbiente = await sharp(ambienteRgba, { raw: { width, height, channels: 4 } }).png().toBuffer();
 
-      const fondoNegro = await sharp({
-        create: {
-          width,
-          height,
-          channels: 3,
-          background: { r: 0, g: 0, b: 0 },
-        },
-      })
-        .png()
-        .toBuffer();
+      const fondoNegro = await this.lienzoOscuro(width, height);
 
       composedBuffer = await sharp(fondoNegro)
         .composite([
@@ -562,14 +594,7 @@ export class ImageStudioService {
     } catch (error) {
       this.logger.warn(`Error en aro de luz para fondo negro, aplicando composición directa: ${error}`);
       try {
-        const fondoNegro = await sharp({
-          create: {
-            width,
-            height,
-            channels: 3,
-            background: { r: 0, g: 0, b: 0 },
-          },
-        })
+        const fondoNegro = await sharp(await this.lienzoOscuro(width, height))
           .composite([{ input: cutout, left, top }])
           .png()
           .toBuffer();

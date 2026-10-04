@@ -8,10 +8,27 @@ import { InternalCronController } from '../../src/internal-cron/internal-cron.co
 // mantenimiento nocturno borra por antigüedad: 365 / 365 / 180 días por
 // defecto, cada tabla con su variable de entorno, nunca menos de 30, y "0" u
 // "off" apaga la purga de esa tabla sola.
+//
+// Orbi fase 1 (spec §3.11) sumó tres tablas: orbi_pending_actions (30 días),
+// orbi_turns (400, alcanza para comparar año contra año) y daily_quota (30).
+// Esta última corta por `day`, un string 'YYYY-MM-DD' de Argentina, no por un
+// DateTime: comparar `createdAt` no serviría porque la tabla no tiene esa columna.
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const AHORA = new Date('2026-09-14T12:00:00Z');
-const VARIABLES = ['PLATFORM_ADMIN_LOGS_RETENTION_DAYS', 'AUDIT_LOGS_RETENTION_DAYS', 'EMAIL_LOGS_RETENTION_DAYS'];
+const VARIABLES = [
+  'PLATFORM_ADMIN_LOGS_RETENTION_DAYS',
+  'AUDIT_LOGS_RETENTION_DAYS',
+  'EMAIL_LOGS_RETENTION_DAYS',
+  'ORBI_PENDING_ACTIONS_RETENTION_DAYS',
+  'ORBI_TURNS_RETENTION_DAYS',
+  'ORBI_PROVIDER_FAILURES_RETENTION_DAYS',
+  'ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS',
+  'DAILY_QUOTA_RETENTION_DAYS',
+  'USAGE_EVENTS_RETENTION_DAYS',
+  'ORBI_CONVERSATION_ACCESS_RETENTION_DAYS',
+  'ORBI_SESIONES_INACTIVAS_RETENTION_DAYS',
+];
 
 function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean } = {}) {
   const prisma = {
@@ -20,6 +37,13 @@ function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean
       deleteMany: opts.fallaAudit ? jest.fn().mockRejectedValue(new Error('db caída')) : jest.fn().mockResolvedValue({ count: 7 }),
     },
     emailLog: { deleteMany: jest.fn().mockResolvedValue({ count: 12 }) },
+    orbiPendingAction: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
+    orbiTurn: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
+    orbiProviderFailure: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+    orbiConversation: { deleteMany: jest.fn().mockResolvedValue({ count: 6 }) },
+    dailyQuota: { deleteMany: jest.fn().mockResolvedValue({ count: 9 }) },
+    usageEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 11 }) },
+    orbiConversationAccess: { deleteMany: jest.fn().mockResolvedValue({ count: 8 }) },
   };
   const original = { ...process.env };
   // Que lo que tenga el .env de quien corre los tests no cambie el resultado.
@@ -30,6 +54,10 @@ function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean
 }
 
 const corteHace = (dias: number) => ({ where: { createdAt: { lt: new Date(AHORA.getTime() - dias * DIA_MS) } } });
+// AHORA es 2026-09-14 12:00Z = 09:00 en Argentina, el mismo día. Hace 30 días: 2026-08-15.
+const corteDiaHace = (dias: number) => ({
+  where: { day: { lt: new Date(AHORA.getTime() - dias * DIA_MS).toISOString().slice(0, 10) } },
+});
 
 describe('Retención de logs y registros', () => {
   beforeEach(() => jest.useFakeTimers({ now: AHORA }));
@@ -42,7 +70,107 @@ describe('Retención de logs y registros', () => {
       expect(prisma.platformAdminLog.deleteMany).toHaveBeenCalledWith(corteHace(365));
       expect(prisma.auditLog.deleteMany).toHaveBeenCalledWith(corteHace(365));
       expect(prisma.emailLog.deleteMany).toHaveBeenCalledWith(corteHace(180));
-      expect(r).toEqual({ platform_admin_logs: 4, audit_logs: 7, email_logs: 12 });
+      expect(r).toEqual({
+        platform_admin_logs: 4,
+        audit_logs: 7,
+        email_logs: 12,
+        orbi_pending_actions: 3,
+        orbi_turns: 5,
+        orbi_provider_failures: 2,
+        orbi_conversations: 6,
+        daily_quota: 9,
+        usage_events: 11,
+        orbi_conversation_access: 8,
+        // Sin variable, esta no se purga (spec D11): queda apagada.
+        orbi_sesiones_inactivas: 'apagada',
+      });
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('las tablas de Orbi se purgan por defecto a 30 / 400 / 30 días; daily_quota corta por el string `day`', async () => {
+    const { svc, prisma, restaurar } = servicio();
+    try {
+      await svc.purgar();
+      expect(prisma.orbiPendingAction.deleteMany).toHaveBeenCalledWith(corteHace(30));
+      expect(prisma.orbiTurn.deleteMany).toHaveBeenCalledWith(corteHace(400));
+      // Las fallas del proveedor de IA (mantenimiento automático de Orbi): 30 días.
+      expect(prisma.orbiProviderFailure.deleteMany).toHaveBeenCalledWith(corteHace(30));
+      // Sesiones: solo las ARCHIVADAS, por la última actividad y no por la creación.
+      expect(prisma.orbiConversation.deleteMany).toHaveBeenCalledWith({
+        where: { archivedAt: { not: null }, lastActivityAt: { lt: new Date(AHORA.getTime() - 180 * DIA_MS) } },
+      });
+      expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledWith(corteDiaHace(30));
+      // Es un string, no un Date: la columna `day` es 'YYYY-MM-DD'.
+      expect(prisma.dailyQuota.deleteMany.mock.calls[0][0].where.day.lt).toBe('2026-08-15');
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('usage_events se purga a los 400 días por defecto y orbi_conversation_access a los 365, por su fecha', async () => {
+    const { svc, prisma, restaurar } = servicio();
+    try {
+      await svc.purgar();
+      // usage_events no tiene createdAt: su fecha es `timestamp`.
+      expect(prisma.usageEvent.deleteMany).toHaveBeenCalledWith({
+        where: { timestamp: { lt: new Date(AHORA.getTime() - 400 * DIA_MS) } },
+      });
+      expect(prisma.orbiConversationAccess.deleteMany).toHaveBeenCalledWith(corteHace(365));
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('las sesiones inactivas (no archivadas) quedan apagadas sin variable, y con ella se borran por última actividad', async () => {
+    const sin = servicio();
+    try {
+      const r = await sin.svc.purgar();
+      expect(r.orbi_sesiones_inactivas).toBe('apagada');
+      // Con la regla apagada no hay ningún borrado de sesiones NO archivadas.
+      const noArchivadas = sin.prisma.orbiConversation.deleteMany.mock.calls.filter(([a]) => a.where.archivedAt === null);
+      expect(noArchivadas).toHaveLength(0);
+    } finally {
+      sin.restaurar();
+    }
+
+    const con = servicio({ ORBI_SESIONES_INACTIVAS_RETENTION_DAYS: '365' });
+    try {
+      const r = await con.svc.purgar();
+      expect(con.prisma.orbiConversation.deleteMany).toHaveBeenCalledWith({
+        where: { archivedAt: null, lastActivityAt: { lt: new Date(AHORA.getTime() - 365 * DIA_MS) } },
+      });
+      expect(r.orbi_sesiones_inactivas).toBe(6);
+    } finally {
+      con.restaurar();
+    }
+  });
+
+  it('el corte de daily_quota usa el día de Argentina, no el de Greenwich', async () => {
+    // 01:00Z del 15/09 = 22:00 del 14/09 en Argentina: hace 30 días es el 15/08, no el 16/08.
+    jest.setSystemTime(new Date('2026-09-15T01:00:00Z'));
+    const { svc, prisma, restaurar } = servicio();
+    try {
+      await svc.purgar();
+      expect(prisma.dailyQuota.deleteMany.mock.calls[0][0].where.day.lt).toBe('2026-08-15');
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('las variables de Orbi se ajustan por separado, con el mismo piso de 30 y el mismo "off"', async () => {
+    const { svc, prisma, restaurar } = servicio({
+      ORBI_TURNS_RETENTION_DAYS: '730',
+      ORBI_PENDING_ACTIONS_RETENTION_DAYS: '7',
+      DAILY_QUOTA_RETENTION_DAYS: 'off',
+    });
+    try {
+      const r = await svc.purgar();
+      expect(prisma.orbiTurn.deleteMany).toHaveBeenCalledWith(corteHace(730));
+      expect(prisma.orbiPendingAction.deleteMany).toHaveBeenCalledWith(corteHace(30));
+      expect(prisma.dailyQuota.deleteMany).not.toHaveBeenCalled();
+      expect(r.daily_quota).toBe('apagada');
     } finally {
       restaurar();
     }
@@ -79,7 +207,7 @@ describe('Retención de logs y registros', () => {
       expect(prisma.auditLog.deleteMany).not.toHaveBeenCalled();
       expect(prisma.emailLog.deleteMany).not.toHaveBeenCalled();
       expect(prisma.platformAdminLog.deleteMany).toHaveBeenCalledWith(corteHace(365));
-      expect(r).toEqual({ platform_admin_logs: 4, audit_logs: 'apagada', email_logs: 'apagada' });
+      expect(r).toMatchObject({ platform_admin_logs: 4, audit_logs: 'apagada', email_logs: 'apagada' });
     } finally {
       restaurar();
     }
@@ -91,7 +219,9 @@ describe('Retención de logs y registros', () => {
       const r = await svc.purgar();
       expect(prisma.platformAdminLog.deleteMany).toHaveBeenCalledTimes(1);
       expect(prisma.emailLog.deleteMany).toHaveBeenCalledTimes(1);
-      expect(r).toEqual({ platform_admin_logs: 4, audit_logs: 'fallo', email_logs: 12 });
+      expect(r).toMatchObject({ platform_admin_logs: 4, audit_logs: 'fallo', email_logs: 12 });
+      // Las tablas de Orbi, que van después, también se purgan aunque audit_logs haya fallado.
+      expect(prisma.dailyQuota.deleteMany).toHaveBeenCalledTimes(1);
     } finally {
       restaurar();
     }
@@ -115,6 +245,13 @@ describe('Retención de logs y registros', () => {
       expect(d('R_JUSTA')).toBe(30);
       expect(d('R_DECIMAL')).toBe(45);
       expect(d('R_GRANDE')).toBe(1000);
+      // Con default null (regla apagada): vacía o inválida = null; con valor, el valor.
+      const n = (v: string) => RetencionLogsService.diasDeRetencion(v, null);
+      expect(n('R_NO_EXISTE')).toBeNull();
+      expect(n('R_VACIA')).toBeNull();
+      expect(n('R_BASURA')).toBeNull();
+      expect(n('R_GRANDE')).toBe(1000);
+      expect(n('R_CHICA')).toBe(30);
     } finally {
       restaurar();
     }

@@ -35,6 +35,7 @@ import NotasCredito from './NotasCredito'
 import Cancelaciones from './Cancelaciones'
 
 import type { EstadoPedido, Pedido } from './types/pedidos.types'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 // ─── Lista (V02) ────────────────────────────────────────────────────────────
 // (Fase 2 — Alex) Esta vista ya muestra los pedidos REALES del negocio: la
@@ -495,11 +496,20 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 <div style={{ padding: '10px 4px', fontSize: 13, color: 'var(--color-muted)' }}>Confirmando pedidos…</div>
             )}
 
-            {/* Vacío */}
+            {/* Vacío: sin filtros es que todavía no hay pedidos (va el pet); con
+                filtros, que no hay coincidencias. */}
             {!cargando && !errorCarga && rows.length === 0 && (
-                <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
-                    No hay pedidos que coincidan con estos filtros.
-                </div>
+                tab === 'todos' && canal === 'todos' && rango === 'todo' && !busquedaLista ? (
+                    <OrbiPetVacio
+                        modulo="pedidos"
+                        titulo="Todavía no tenés pedidos"
+                        descripcion="Cuando alguien compre en tu tienda, el pedido aparece acá."
+                    />
+                ) : (
+                    <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
+                        No hay pedidos que coincidan con estos filtros.
+                    </div>
+                )
             )}
 
             {/* Paginación real */}

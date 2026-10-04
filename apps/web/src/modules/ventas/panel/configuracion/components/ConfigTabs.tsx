@@ -9,12 +9,13 @@
 //
 // (2026-08-20) "General" dejó de ser una sola pantalla con 6 tarjetas apiladas
 // de a dos columnas — ahora cada tarjeta es su propia sub-vista independiente,
-// navegable desde el menú guía de ConfigSidebar.tsx (mismo patrón que
+// navegable desde el menú principal, Sidebar.tsx (mismo patrón que
 // Apariencia/Equipo/Notificaciones, que ya vivían aparte). `general` se
 // mantiene en el tipo solo por compatibilidad de URLs viejas sin `?vista=`
 // (ver ConfigGeneral.tsx: sin vista, cae a 'negocio').
 
-export type VistaConfig =
-    | 'general' | 'negocio' | 'contacto' | 'pagos' | 'envios' | 'redes' | 'postventa' | 'peligro'
-    | 'apariencia' | 'equipo' | 'notificaciones' | 'suscripcion' | 'dominios' | 'soporte'
-    | 'actividad'
+// Sale de VISTAS_DE_CONFIGURACION (panel/secciones.ts), que también copia la API
+// para que Orbi arme links con ?vista= válidos: una sola lista para las tres.
+import type { VistaDeConfiguracion } from '@/modules/ventas/panel/secciones'
+
+export type VistaConfig = VistaDeConfiguracion

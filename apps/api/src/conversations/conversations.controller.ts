@@ -44,7 +44,7 @@ export class ConversationsController {
   @RequirePermission('messages.view')
   messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.conversationsService.getMessages(member.businessId, id);
+    return this.conversationsService.getMessages(member.businessId, id, !member.readOnly);
   }
 
   @Post(':id/messages')

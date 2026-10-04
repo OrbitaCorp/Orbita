@@ -1,14 +1,37 @@
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
-import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
+import type { LlmToolDefinition, LlmUsage } from '../../llm/llm-adapter.interface';
 import type { ProductsService } from '../../../products/products.service';
 import type { ProductAiService } from '../../../products/product-ai.service';
+import type { CuotaService } from '../../../common/cuota/cuota.service';
+import { AI_ASSIST_DIA_NEGOCIO } from '../../../common/cuota/limites';
+import type { PrismaService } from '../../../prisma/prisma.service';
+import { CreateProductDto } from '../../../products/dto/create-product.dto';
+import { AccionInvalida, validarConDto } from '../acciones/validar-args';
+import { cantidad, entreComillas, monto, presente } from '../acciones/formato';
+
+// Lo que se le manda a ProductsService.create, armado en un solo lugar:
+// validarArgs() lo pasa por CreateProductDto (el de POST /products) y
+// execute() lo escribe, así lo validado es exactamente lo escrito. Sin
+// conversiones de tipo: un precio "5000" como texto lo rechaza el DTO, igual
+// que por HTTP.
+function aDtoProducto(args: Record<string, unknown>): CreateProductDto {
+  return {
+    name: args.name as string,
+    description: (args.description ?? undefined) as string | undefined,
+    basePrice: args.basePrice as number,
+    categoryId: args.categoryId as string,
+    tagIds: (args.tags ?? undefined) as string[] | undefined,
+    status: (args.status as 'PUBLISHED' | 'DRAFT' | undefined) ?? 'DRAFT',
+    variants: [{ price: args.basePrice as number, optionValues: [] }],
+  };
+}
 
 export class ListProductsTool implements OrbiTool {
   name = 'listProducts';
   description = 'Listar productos del negocio. Úsalo para mostrar al usuario qué productos tiene cargados, buscar uno específico, o dar contexto antes de crear uno nuevo.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  requiredPermissions = ['catalog.view'];
   parameters = {
     type: 'object',
     properties: {
@@ -56,12 +79,34 @@ export class CreateProductTool implements OrbiTool {
   name = 'createProduct';
   description = 'Crear un nuevo producto en el catálogo del negocio. Necesitás al menos nombre, precio y categoría. El producto se crea como borrador por defecto.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions = ['products:write'];
+  requiredPermissions = ['catalog.manage'];
   requiresConfirmation = true;
 
-  describirAccion(args: Record<string, unknown>): string {
-    const precio = typeof args.basePrice === 'number' ? ` a $${args.basePrice}` : '';
-    return `Crear el producto "${String(args.name ?? 'sin nombre')}"${precio}`;
+  // Además de nombre y precio: la categoría (con su nombre, no el id), si
+  // queda publicado en la tienda o como borrador, la descripción y cuántas
+  // etiquetas. Publicar es lo que lo hace visible a los clientes: la persona
+  // tiene que ver eso antes de confirmar.
+  async describirAccion(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
+    // Acotada al negocio del token: una categoría de otro negocio no existe.
+    const categoria = await this.prisma.category.findFirst({
+      where: { id: String(args.categoryId), businessId: ctx.businessId },
+      select: { name: true },
+    });
+    if (!categoria) throw new AccionInvalida('Categoría no encontrada');
+
+    const estado = (args.status ?? 'DRAFT') === 'PUBLISHED' ? 'publicado en la tienda' : 'como borrador';
+    const partes = [
+      `Crear el producto ${entreComillas(args.name ?? 'sin nombre')} a ${monto(args.basePrice)}`,
+      `en la categoría ${entreComillas(categoria.name)}`,
+      estado,
+    ];
+    if (presente(args.description)) partes.push(`con la descripción ${entreComillas(args.description)}`);
+    if (presente(args.tags)) partes.push(`con ${cantidad(args.tags, 'etiqueta', 'etiquetas')}`);
+    return partes.join(', ');
+  }
+
+  validarArgs(args: Record<string, unknown>) {
+    return validarConDto(CreateProductDto, { ...aDtoProducto(args) });
   }
 
   parameters = {
@@ -77,7 +122,10 @@ export class CreateProductTool implements OrbiTool {
     required: ['name', 'basePrice', 'categoryId'],
   };
 
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -85,15 +133,7 @@ export class CreateProductTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const product = await this.productsService.create(ctx.businessId, {
-        name: args.name as string,
-        description: args.description as string | undefined,
-        basePrice: Number(args.basePrice),
-        categoryId: args.categoryId as string,
-        tagIds: args.tags as string[] | undefined,
-        status: (args.status as 'PUBLISHED' | 'DRAFT') ?? 'DRAFT',
-        variants: [{ price: Number(args.basePrice), optionValues: [] }],
-      });
+      const product = await this.productsService.create(ctx.businessId, aDtoProducto(args));
 
       return {
         success: true,
@@ -111,7 +151,9 @@ export class GenerateDescriptionTool implements OrbiTool {
   name = 'generateDescription';
   description = 'Generar una descripción con IA para un producto, además de sugerir categoría, etiquetas y especificaciones técnicas. Útil cuando el usuario necesita ayuda redactando.';
   surfaces = [OrbiSurface.PANEL];
-  requiredPermissions: string[] = [];
+  // catalog.manage y no catalog.view: es el permiso que POST /products/ai-assist exige.
+  // Con view (el Empleado) tendría por Orbi una IA paga que por HTTP se le niega.
+  requiredPermissions = ['catalog.manage'];
   parameters = {
     type: 'object',
     properties: {
@@ -121,18 +163,40 @@ export class GenerateDescriptionTool implements OrbiTool {
     required: ['productName'],
   };
 
-  constructor(private readonly productAiService: ProductAiService) {}
+  constructor(
+    private readonly productAiService: ProductAiService,
+    private readonly cuotaService: CuotaService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
   }
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
+    // Fuera del try: si la IA respondió (y se cobró) pero la respuesta no sirvió,
+    // el consumo igual tiene que llegar a la ficha del turno.
+    let consumo: LlmUsage | undefined;
     try {
-      const result = await this.productAiService.assist(ctx.businessId, {
-        name: args.productName as string,
-        existingDescription: args.existingDescription as string | undefined,
-      });
+      // Misma cuota que POST /products/ai-assist: la IA de productos gasta plata
+      // y las dos vías (el botón del panel y Orbi) suman al mismo contador
+      // diario del negocio, con la misma clave y el mismo tope.
+      if (!(await this.cuotaService.consumir(`ai-assist:${ctx.businessId}`, AI_ASSIST_DIA_NEGOCIO))) {
+        return {
+          success: false,
+          error: 'Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.',
+          label: 'Llegaste al máximo de ayudas de IA por hoy',
+        };
+      }
+      // La IA de esta tool gasta plata propia (no es la del turno): se ata al turno
+      // y al miembro, y el consumo vuelve en el resultado para que el turno lo sume.
+      const result = await this.productAiService.assist(
+        ctx.businessId,
+        {
+          name: args.productName as string,
+          existingDescription: args.existingDescription as string | undefined,
+        },
+        { memberId: ctx.userId, turnId: ctx.turnId, alConsumir: (u) => { consumo = u; } },
+      );
 
       return {
         success: true,
@@ -143,10 +207,11 @@ export class GenerateDescriptionTool implements OrbiTool {
           suggestedSpecs: result.suggestedSpecs,
           suggestedCategoryId: result.suggestedCategoryId,
         },
+        consumo,
       };
     } catch (error: any) {
       const msg = error?.response?.message ?? error?.message ?? String(error);
-      return { success: false, error: `No pude generar la descripción: ${msg}`, label: 'Error generando descripción' };
+      return { success: false, error: `No pude generar la descripción: ${msg}`, label: 'Error generando descripción', consumo };
     }
   }
 }

@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { LLM_ADAPTER, type LlmAdapter } from '../orbi/llm/llm-adapter.interface';
+import { LLM_ADAPTER, type LlmAdapter, type LlmUsage } from '../orbi/llm/llm-adapter.interface';
+import { UsageMeteringService } from '../platform/costs/usage-metering.service';
+import { medirConsumoDeTexto } from '../platform/costs/medir-texto';
 import { IngestEventsDto } from './dto/ingest-events.dto';
 import { esEventoConocido } from './events';
 import { redact } from './redact';
@@ -32,6 +34,7 @@ export class WizardAnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(LLM_ADAPTER) private readonly llm: LlmAdapter,
+    private readonly metering: UsageMeteringService,
   ) {}
 
   // ── Escritura ──────────────────────────────────────────────────────────────
@@ -439,6 +442,7 @@ export class WizardAnalyticsService {
     ].join('\n');
 
     let salida = '';
+    let consumo: LlmUsage | undefined;
     for await (const evento of this.llm.streamChat({
       messages: [
         { role: 'system', content: system },
@@ -446,7 +450,9 @@ export class WizardAnalyticsService {
       ],
     })) {
       if (evento.type === 'text') salida += evento.chunk;
+      if (evento.type === 'usage') consumo = evento.usage;
     }
+    if (consumo) medirConsumoDeTexto(this.metering, consumo, { feature: 'wizard-classifier' });
 
     const json = salida.match(/\{[\s\S]*\}/);
     if (!json) return null;

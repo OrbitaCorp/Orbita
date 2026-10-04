@@ -3,6 +3,7 @@ import { Search, MessageCircle } from 'lucide-react'
 import type { Conversacion, FiltroBandeja } from '../mock/mensajes.mock'
 import { ConversacionItem } from './ConversacionItem'
 import { WhatsappBoton } from './WhatsappConexion'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 interface Props {
   conversaciones: Conversacion[]
@@ -93,7 +94,13 @@ export function BandejaLista({ conversaciones, activaId, onSelect, onArchivar }:
 
       {/* Lista */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filtradas.length === 0 ? (
+        {filtradas.length === 0 && !busqueda && filtro === 'todos' ? (
+          <OrbiPetVacio
+            modulo="mensajes"
+            titulo="No hay mensajes todavía"
+            descripcion="Cuando un cliente te escriba, la conversación aparece acá."
+          />
+        ) : filtradas.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '48px 24px', color: 'var(--color-muted)' }}>
             <MessageCircle size={28} strokeWidth={1.5} />
             <p style={{ margin: 0, fontSize: 13, textAlign: 'center', lineHeight: 1.5 }}>

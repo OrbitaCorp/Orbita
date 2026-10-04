@@ -61,7 +61,7 @@ export default function Categoria() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Esta categoría no existe.
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
       </StorefrontChrome>
     )
@@ -91,8 +91,8 @@ export default function Categoria() {
           .sf-catg-wrap  { padding: 16px !important; }
           .sf-catg-hero  { grid-template-columns: minmax(0,1fr) !important; padding: 24px !important; }
           .sf-catg-hero-img { display: none !important; }
-          .sf-catg-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-          .sf-catg-otras { grid-template-columns: repeat(2, 1fr) !important; }
+          .sf-catg-grid  { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .sf-catg-otras { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         }
       `}</style>
       <div className="sf-catg-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
@@ -160,7 +160,7 @@ export default function Categoria() {
           </>
         )}
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
   )

@@ -37,6 +37,17 @@ model Business {
   cancellationWarningEmailSentAt DateTime? @map("cancellation_warning_email_sent_at")
   deletedAt                      DateTime? @map("deleted_at")
 
+  // Tienda de la demo pública de Órbita (demo.orbita.site). Los visitantes
+  // entran al panel con un miembro `readOnly` y lo que "crean" vive solo en
+  // su localStorage; el servidor rechaza cualquier escritura pública sobre
+  // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
+  isDemo Boolean @default(false) @map("is_demo")
+  // Hasta qué instante están "al día" las fechas de los datos de la demo. Los
+  // pedidos, pagos, visitas, etc. se sembraron relativos a un momento; cada
+  // tanto se corren hacia adelante lo que pasó desde acá (DemoFechasService),
+  // así los reportes de la demo nunca quedan vacíos. null = no es la demo.
+  demoFechasAl DateTime? @map("demo_fechas_al")
+
   // Datos del wizard de onboarding (RBT-293) — se completan progresivamente
   // mientras isActive: false, vía PUT /onboarding/business.
   subrubros        String[] @default([]) @map("subrubros") // ej: ["indumentaria","calzado"]
@@ -104,6 +115,11 @@ model Business {
   manualFeedback       ManualFeedback[]
   usageEvents          UsageEvent[]
   visits               StoreVisit[]
+  // Orbi fase 1: acciones pendientes de confirmar y telemetría por turno.
+  orbiPendingActions   OrbiPendingAction[]
+  orbiTurns            OrbiTurn[]
+  orbiCupoAjustes      OrbiCupoAjuste[]
+  orbiCupoMiembros     OrbiCupoMiembro[]
 
   @@map("businesses")
 }
@@ -504,6 +520,10 @@ model Member {
   failedLoginAttempts      Int             @default(0) @map("failed_login_attempts")
   lockedUntil              DateTime?       @map("locked_until")
   lastAccessAt             DateTime?       @map("last_access_at")
+  // Miembro de solo lectura: el visitante anónimo de la demo pública (ver
+  // Business.isDemo). Puede leer todo lo que su rol permite, pero DemoGuard
+  // le rechaza cualquier método que no sea GET/HEAD/OPTIONS.
+  readOnly                 Boolean         @default(false) @map("read_only")
   // Preferencia de tema del panel (RBT-646) — por usuario, no por navegador
   // (antes vivía solo en localStorage, se perdía al cambiar de dispositivo).
   themePreference          ThemePreference @default(SYSTEM) @map("theme_preference")
@@ -2497,14 +2517,47 @@ model OrbiConversation {
   businessId String   @map("business_id")
   userId     String   @map("user_id")
   surface    String
+  // Sesiones v1: los mensajes van en este Json (texto solo). Las v2 (stream
+  // nuevo de la fase 3) los guardan en orbi_messages, por partes.
   messages   Json     @default("[]")
   context    Json?
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Sesiones (fase 3, spec 2026-10-01-orbi-fase-3-ui-panel §3.2). Todo con
+  // default: las conversaciones que ya existen quedan como sesiones v1.
+  title          String? // null = todavía sin título
+  titleAuto      Boolean   @default(true) @map("title_auto") // false = la persona lo renombró
+  pinnedAt       DateTime? @map("pinned_at")
+  archivedAt     DateTime? @map("archived_at") // archivadas sin actividad en 180 días se borran
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+  screen         String? // la pantalla desde donde se abrió
+  version        Int       @default(1) // 1 = mensajes en el Json, 2 = en orbi_messages
 
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orbiMessages OrbiMessage[]
+
+  @@index([businessId, userId, archivedAt, lastActivityAt(sort: Desc)])
   @@map("orbi_conversations")
+}
+
+// Mensajes de las sesiones v2, uno por fila y con sus partes (pensamiento,
+// actividad, aprobación, texto, aviso): al volver a una sesión se ve todo lo
+// que pasó, no solo el texto. Al modelo vuelven solo las partes de texto.
+model OrbiMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  role           String // user | assistant
+  parts          Json
+  turnId         String?  @map("turn_id") // orbi_turns.id, sin FK (la telemetría se purga antes)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation OrbiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("orbi_messages")
 }
 
 // ─── Corridas de los jobs de Cloud Scheduler ─────────────────────────────────
@@ -2861,3 +2914,230 @@ model StoreVisit {
   @@map("store_visits")
 }
 
+
+// Pruebas de IA de la demo pública (demo.orbita.site): cuántas veces usó cada
+// función un mismo visitante en la semana. El visitante es anónimo y todos
+// comparten el mismo miembro readOnly, así que se cuenta por IP — guardada
+// como hash con sal (ip_hash), nunca en texto plano. Ver DemoIaService.
+model DemoAiUsage {
+  id        String   @id @default(uuid())
+  ipHash    String   @map("ip_hash")
+  feature   String // orbi-producto | fondo-ia | quitar-fondo | orbi-chat | fotos-web | foto-web
+  week      String // semana ISO en hora argentina: "2026-W40"
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ipHash, feature, week])
+  @@index([week])
+  @@map("demo_ai_usage")
+}
+
+// ─── Descuento en la activación del plan (después del beneficio de bienvenida) ─
+// Un código de descuento de plataforma aplicado al activar el plan desde
+// Configuración → Suscripción vale SOLO para el primer cobro: la preapproval de
+// MP se crea con el monto rebajado y, recién registrado ese primer cobro, se
+// le devuelve el precio de lista (ver SubscriptionsService, "restaurar
+// precio"). Esta tabla recuerda ese estado entre el link de pago, la
+// autorización y el primer cobro — que llegan por caminos y en órdenes
+// distintos (vuelta del navegador, webhook del pago, barrido nocturno).
+//
+// Sin FK a propósito, y NO entra en la purga de datos personales de la baja de
+// un negocio: no guarda ningún dato de personas (solo ids y montos), igual que
+// el historial de cobros (subscription_payments). El barrido nocturno cierra
+// las filas de una suscripción cancelada.
+//
+// status: PENDING (link creado, todavía sin autorizar) → ACTIVE (autorizada,
+// cursa el ciclo con descuento) → PAID (primer cobro registrado, falta
+// devolver el precio de lista) → RESTORED (precio de lista de vuelta). CLOSED
+// = se abandonó (plan cambiado, cancelada o nunca autorizada).
+model SubscriptionActivationDiscount {
+  id            String    @id @default(uuid())
+  businessId    String    @map("business_id")
+  preapprovalId String    @unique @map("preapproval_id")
+  codeId        String    @map("code_id")
+  plan          String
+  amountList    Decimal   @map("amount_list") @db.Decimal(12, 2)
+  amountFinal   Decimal   @map("amount_final") @db.Decimal(12, 2)
+  status        String    @default("PENDING")
+  activatedAt   DateTime? @map("activated_at")
+  restoredAt    DateTime? @map("restored_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([businessId])
+  @@index([status])
+  @@map("subscription_activation_discounts")
+}
+
+// Orbi fase 1 (spec 2026-09-30 §3.4): acciones que Orbi propone y la persona
+// confirma. Viven en Postgres (no en memoria) para sobrevivir reinicios y
+// varias instancias de Cloud Run; el consumo es atómico vía updateMany.
+model OrbiPendingAction {
+  id             String    @id // token aleatorio de 32 hex, igual que hoy
+  businessId     String    @map("business_id")
+  memberId       String    @map("member_id")
+  conversationId String?   @map("conversation_id")
+  turnId         String?   @map("turn_id") // orbi_turns.id, sin FK (la acción se purga a los 30 días)
+  tool           String
+  args           Json
+  summary        String
+  status         String    @default("pending") // pending | executing | executed | failed | rejected
+  result         Json?
+  expiresAt      DateTime  @map("expires_at")
+  startedAt      DateTime? @map("started_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, memberId, status])
+  @@index([createdAt])
+  @@map("orbi_pending_actions")
+}
+
+// Orbi fase 1 (spec §3.5): cuota diaria compartida entre instancias. Sin
+// relación: la clave es un string con prefijo (`orbi-panel:<negocio>`,
+// `orbi-wizard:<ipHash>`, `ai-assist:<negocio>`...).
+model DailyQuota {
+  key   String
+  day   String // 'YYYY-MM-DD' de fechaArgentina, como `week` en demo_ai_usage
+  count Int    @default(0)
+
+  @@id([key, day])
+  @@map("daily_quota")
+}
+
+// Orbi fase 1 (spec §3.6): un registro por turno del chat del panel, solo con
+// métricas. Sin texto: la pregunta y la respuesta ya están en la conversación.
+model OrbiTurn {
+  id               String   @id @default(uuid())
+  businessId       String   @map("business_id")
+  memberId         String   @map("member_id")
+  conversationId   String?  @map("conversation_id")
+  module           String?
+  model            String? // ID que usó el adapter
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  latencyMs        Int      @map("latency_ms")
+  rounds           Int
+  toolsUsed        String[] @default([]) @map("tools_used")
+  actionsProposed  Int      @default(0) @map("actions_proposed")
+  status           String // ok | error | cancelled | max_rounds | quota
+  // Ficha ampliada (spec 2026-10-03-orbi-medicion-y-cupos §5.1). Todo admite
+  // null: los turnos anteriores no lo tienen.
+  provider         String? // gemini | groq | mixto
+  cachedTokens     Int?     @map("cached_tokens") // ya incluidos en prompt_tokens
+  thinkingTokens   Int?     @map("thinking_tokens") // ya incluidos en completion_tokens
+  ttftMs           Int?     @map("ttft_ms")
+  costUsd          Decimal? @map("cost_usd") @db.Decimal(12, 6)
+  toolsCostUsd     Decimal? @map("tools_cost_usd") @db.Decimal(12, 6)
+  credits          Int?
+  errorCategory    String?  @map("error_category")
+  section          String?
+  contextChars     Json?    @map("context_chars")
+  steps            Json?
+  writesRejected   Int      @default(0) @map("writes_rejected")
+  actionsConfirmed Int      @default(0) @map("actions_confirmed")
+  actionsRejected  Int      @default(0) @map("actions_rejected")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([memberId, createdAt])
+  @@map("orbi_turns")
+}
+
+// Estado GLOBAL de Orbi (panel y wizard): una sola fila, id = 'global'. Cuando
+// el proveedor de IA falla de forma sostenida (o se agotó el saldo), Orbi pasa
+// a MAINTENANCE para todos los negocios hasta que un admin de plataforma lo
+// rehabilite. No hay "id de negocio": es un interruptor de toda la plataforma.
+// Spec: docs/superpowers/specs/2026-10-01-orbi-mantenimiento-automatico-design.md
+model OrbiServiceState {
+  id             String    @id @default("global")
+  // 'ACTIVE' | 'MAINTENANCE' (texto, como el resto de las tablas de Orbi).
+  status         String    @default("ACTIVE")
+  // Categoría que lo disparó (PROVIDER_CREDITS, PROVIDER_AUTH, PROVIDER_DOWN…)
+  // o MANUAL si lo puso un admin.
+  reason         String?
+  // Texto corto del error del proveedor, sin datos de personas.
+  detail         String?
+  trippedAt      DateTime? @map("tripped_at")
+  // 'auto' o el id del PlatformAdmin que lo puso / lo sacó.
+  trippedBy      String?   @map("tripped_by")
+  // Último turno que el proveedor contestó bien. Los fallos se cuentan DESPUÉS
+  // de esta marca: una respuesta buena en el medio corta la racha.
+  lastOkAt       DateTime? @map("last_ok_at")
+  lastNotifiedAt DateTime? @map("last_notified_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("orbi_service_state")
+}
+
+// Cada llamada a Orbi que terminó en falla DEL PROVEEDOR (no las del usuario:
+// validación, cuota diaria, cancelaciones). Alimenta el umbral que activa el
+// mantenimiento y el detalle del mail a los admins. Sin texto de la persona.
+model OrbiProviderFailure {
+  id         String   @id @default(uuid())
+  // 'panel' | 'wizard'
+  surface    String
+  category   String
+  httpStatus Int?     @map("http_status")
+  // businessId (panel) o IP hasheada (wizard): para contar quiénes fallan, no
+  // quién es. Una sola persona reintentando no apaga Orbi para todos.
+  actor      String
+  detail     String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("orbi_provider_failures")
+}
+
+// Orbi: ajuste manual del cupo mensual de un negocio, en créditos (spec
+// 2026-10-03-orbi-medicion-y-cupos §5.3). Lo carga un admin de plataforma.
+model OrbiCupoAjuste {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  mes        String // 'YYYY-MM' de Argentina
+  creditos   Int // positivo suma cupo, negativo resta
+  motivo     String
+  adminId    String   @map("admin_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, mes])
+  @@map("orbi_cupo_ajustes")
+}
+
+// Orbi: tope por persona dentro del cupo del negocio (lo define el dueño).
+model OrbiCupoMiembro {
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  topePorcentaje Int      @map("tope_porcentaje") // 10..100 del cupo del negocio
+  updatedBy      String   @map("updated_by") // memberId del dueño
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, memberId])
+  @@map("orbi_cupo_miembros")
+}
+
+// Orbi: registro de cada vez que un admin de plataforma lee una conversación.
+// Sin relación: el registro sobrevive a la conversación, como platform_admin_logs.
+model OrbiConversationAccess {
+  id             String   @id @default(uuid())
+  adminId        String   @map("admin_id")
+  conversationId String   @map("conversation_id")
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  motivo         String // soporte | abuso | calidad
+  detalle        String
+  ticket         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@index([adminId, createdAt])
+  @@map("orbi_conversation_access")
+}

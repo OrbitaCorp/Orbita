@@ -13,7 +13,7 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 // ICON_MAP/CatIcon se movieron a catIcons.tsx (2026-08-25) para que el
 // storefront (Inicio.tsx) también pueda dibujar el ícono real de cada
 // categoría, no solo este panel.
-import { CAT_ICONS, CAT_COLORS, CatIcon, slugify, type CatIconKey } from './catIcons'
+import { CAT_ICONS, CatIcon, slugify, type CatIconKey } from './catIcons'
 import { ImgUploader } from '@/modules/ventas/panel/configuracion/components/apariencia/ImgUploader'
 import {
     panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
@@ -109,8 +109,8 @@ export default function Categorias() {
     // Mismo nodo que `sel`, pero tal cual está guardado en el backend ahora
     // mismo — la comparación de abajo determina si hay algo pendiente.
     const selGuardado = selId ? treeFind(guardado, selId) : null
-    const sucio = !!sel && !!selGuardado && JSON.stringify({ nombre: sel.cat.nombre, slug: sel.cat.slug, icono: sel.cat.icono, color: sel.cat.color, imagen: sel.cat.imagen, activa: sel.cat.activa })
-        !== JSON.stringify({ nombre: selGuardado.cat.nombre, slug: selGuardado.cat.slug, icono: selGuardado.cat.icono, color: selGuardado.cat.color, imagen: selGuardado.cat.imagen, activa: selGuardado.cat.activa })
+    const sucio = !!sel && !!selGuardado && JSON.stringify({ nombre: sel.cat.nombre, slug: sel.cat.slug, icono: sel.cat.icono, imagen: sel.cat.imagen, activa: sel.cat.activa })
+        !== JSON.stringify({ nombre: selGuardado.cat.nombre, slug: selGuardado.cat.slug, icono: selGuardado.cat.icono, imagen: selGuardado.cat.imagen, activa: selGuardado.cat.activa })
 
     const cargar = useCallback(async () => {
         setCargando(true)
@@ -153,7 +153,7 @@ export default function Categorias() {
         }
     }
 
-    // Guarda los cambios del editor lateral (nombre, ícono, color, visibilidad).
+    // Guarda los cambios del editor lateral (nombre, ícono, imagen, visibilidad).
     const guardarSeleccionada = async () => {
         if (!sel) return
         setGuardando(true)
@@ -162,7 +162,6 @@ export default function Categorias() {
                 name: sel.cat.nombre,
                 slug: sel.cat.slug,
                 icon: sel.cat.icono,
-                color: sel.cat.color,
                 imageUrl: sel.cat.imagen,
                 isActive: sel.cat.activa,
             })
@@ -220,7 +219,7 @@ export default function Categorias() {
                             <img src={c.imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         </span>
                     ) : (
-                        <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, background: c.activa ? `${c.color}22` : 'var(--color-surface-alt)', color: c.activa ? c.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 150ms' }}>
+                        <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, background: c.activa ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: c.activa ? 'var(--color-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 150ms' }}>
                             <CatIcon icono={c.icono} size={nivel === 0 ? 16 : 13} />
                         </span>
                     )}
@@ -317,7 +316,7 @@ export default function Categorias() {
                                     <img src={sel.cat.imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                 </span>
                             ) : (
-                                <span style={{ width: 36, height: 36, borderRadius: 9, background: `${sel.cat.color}22`, color: sel.cat.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                <span style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                                     <CatIcon icono={sel.cat.icono} size={16} />
                                 </span>
                             )}
@@ -331,10 +330,9 @@ export default function Categorias() {
                             <EditorField label="Nombre" value={sel.cat.nombre} onChange={v => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, nombre: v })))} />
                             <EditorField label="Slug" value={sel.cat.slug} mono onChange={v => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, slug: v })))} />
 
-                            {/* Imagen — opcional, además del ícono/color de abajo (no en
-                                vez de): con imagen cargada, la tienda la muestra a ella en
-                                vez del ícono; sin imagen, sigue con ícono+color como
-                                siempre. */}
+                            {/* Imagen — opcional, además del ícono de abajo (no en vez de):
+                                con imagen cargada, la tienda la muestra a ella en vez del
+                                ícono; sin imagen, sigue con el ícono como siempre. */}
                             <div style={{ marginBottom: 16 }}>
                                 <label style={cl}>Imagen (opcional)</label>
                                 <div style={{ marginTop: 8 }}>
@@ -357,22 +355,12 @@ export default function Categorias() {
                                     const a = sel.cat.icono === key
                                     return (
                                         <button key={key} className="ds-hover" onClick={() => setArbol(a2 => treeMap(a2, sel.cat.id, c => ({ ...c, icono: key })))}
-                                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? sel.cat.color : 'var(--color-border)'}`, background: a ? `${sel.cat.color}18` : 'var(--color-surface)', color: a ? sel.cat.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
+                                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
                                         >
                                             <CatIcon icono={key} size={14} />
                                         </button>
                                     )
                                 })}
-                            </div>
-
-                            {/* Color picker */}
-                            <label style={cl}>Color</label>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 16px' }}>
-                                {CAT_COLORS.map(col => (
-                                    <button key={col} className="ds-hover" onClick={() => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, color: col })))}
-                                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: sel.cat.color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, transition: 'outline 120ms' }}
-                                    />
-                                ))}
                             </div>
 
                             {/* Visible toggle */}
@@ -428,7 +416,6 @@ export default function Categorias() {
                             name: campos.nombre,
                             slug: campos.slug,
                             icon: campos.icono,
-                            color: campos.color,
                             imageUrl: campos.imagen,
                             isActive: campos.activa,
                         }
@@ -478,7 +465,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     )
 }
 
-type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'color' | 'imagen' | 'activa'>
+type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'imagen' | 'activa'>
 
 function CatModal({ modal, onClose, onSave, onToast }: {
     modal: ModalState
@@ -490,7 +477,6 @@ function CatModal({ modal, onClose, onSave, onToast }: {
     const parentId = modal.parentId ?? null
     const [nombre, setNombre] = useState(editing?.nombre ?? '')
     const [icono,  setIcono]  = useState<CatIconKey>((editing?.icono as CatIconKey) ?? 'shirt')
-    const [color,  setColor]  = useState(editing?.color ?? '#3B82F6')
     const [imagen, setImagen] = useState<string | null>(editing?.imagen ?? null)
     const [activa, setActiva] = useState(editing?.activa ?? true)
     const [guardando, setGuardando] = useState(false)
@@ -503,7 +489,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
         if (!nombre.trim() || guardando) return
         setGuardando(true)
         try {
-            await onSave({ nombre, slug, icono, color, imagen, activa }, parentId, editing ? editing.id : null)
+            await onSave({ nombre, slug, icono, imagen, activa }, parentId, editing ? editing.id : null)
         } finally {
             setGuardando(false)
         }
@@ -532,7 +518,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
             <EditorField label="Nombre" value={nombre} onChange={setNombre} />
             <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 16, marginTop: -10 }}>slug: {slug || '-'}</div>
 
-            {/* Imagen — opcional, además del ícono/color de abajo. Con imagen
+            {/* Imagen — opcional, además del ícono de abajo. Con imagen
                 cargada, la tienda la muestra a ella en vez del ícono. */}
             <div style={{ marginBottom: 16 }}>
                 <label style={cl}>Imagen (opcional)</label>
@@ -556,7 +542,7 @@ function CatModal({ modal, onClose, onSave, onToast }: {
                     const a = icono === key
                     return (
                         <button key={key} className="ds-hover" onClick={() => setIcono(key)}
-                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? color : 'var(--color-border)'}`, background: a ? `${color}18` : 'var(--color-surface)', color: a ? color : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
+                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
                         >
                             <CatIcon icono={key} size={14} />
                         </button>
@@ -571,21 +557,11 @@ function CatModal({ modal, onClose, onSave, onToast }: {
                         <img src={imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     </span>
                 ) : (
-                    <span style={{ width: 36, height: 36, borderRadius: 9, background: `${color}22`, color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <span style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                         <CatIcon icono={icono} size={18} />
                     </span>
                 )}
                 <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)' }}>{nombre || 'Sin nombre'}</span>
-            </div>
-
-            {/* Color picker */}
-            <label style={cl}>Color</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 16px' }}>
-                {CAT_COLORS.map(col => (
-                    <button key={col} className="ds-hover" onClick={() => setColor(col)}
-                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, transition: 'outline 120ms' }}
-                    />
-                ))}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid var(--color-border)' }}>

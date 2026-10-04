@@ -8,7 +8,7 @@
 // El contenido está escrito contra lo que el panel REALMENTE hace hoy: cada
 // label, estado y botón que se nombra acá existe con ese nombre en el código
 // (Dashboard.tsx, PedidoLista.tsx, ProductoLista.tsx, ConfigGeneral.tsx,
-// ConfigSidebar.tsx, Avanzado.tsx, LinkCompartibleModal.tsx, etc.). Si se
+// Sidebar.tsx, Avanzado.tsx, LinkCompartibleModal.tsx, etc.). Si se
 // renombra algo en una pantalla, se renombra acá también.
 //
 // Dos marcas en el texto, y nada más (las resuelve TextoRico en piezas.tsx):
@@ -55,6 +55,12 @@ export type Bloque =
 export interface Tema {
     id: string
     titulo: string
+    /** Solo para el índice de Orbi (la persona no la ve): cómo lo preguntaría
+     *  alguien cuando el título solo no alcanza. "Historial" no le dice a un
+     *  modelo que ahí están "los pedidos viejos que ya se cerraron". Una por
+     *  tema que lo necesite, no una por tema: cada una suma tokens a CADA
+     *  mensaje del chat. */
+    pista?: string
     bloques: Bloque[]
     /** Esquema de la pantalla. Solo en los temas donde la FORMA de la
      *  pantalla es parte de la explicación — no uno por tema, que convierte
@@ -140,7 +146,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'lista', items: [
                     'Arriba de todo, el **selector de espacio**: tu negocio y su rubro.',
                     'Abajo, el **buscador del menú**: escribís y te muestra pedidos, clientes, productos y secciones que coinciden, sin salir de ahí.',
-                    'El ícono de **colapsar**, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla. En Configuración se colapsa solo, porque esa sección trae su propio menú adentro.',
+                    'El ícono de **colapsar**, arriba a la derecha del menú, lo achica a una franja de íconos para ganar pantalla.',
                     'Los **puntitos y números** al lado de un módulo son cosas que te esperan: mensajes sin leer, por ejemplo.',
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'En el celular el menú está detrás del botón de las tres rayas, arriba a la izquierda.' },
@@ -154,8 +160,8 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Búsqueda global', texto: 'Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.' },
                     { label: 'Campana', texto: 'Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.' },
                     { label: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.' },
-                    { label: 'Orbi', texto: 'El asistente. Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.' },
-                    { label: 'Tu avatar', texto: 'Mi perfil, [[Ir a la tienda]] para verla como cliente, y Cerrar sesión.' },
+                    { label: 'Orbi AI', texto: 'El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. Le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.' },
+                    { label: 'Tu avatar', texto: 'El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, [[Ir a la tienda]] para verla como cliente, y Cerrar sesión.' },
                 ] },
             ],
         },
@@ -233,6 +239,26 @@ export const CAPITULOS: Capitulo[] = [
             ],
         },
         {
+            id: 'metricas-avanzadas', titulo: 'Métricas avanzadas: ganancia, conversión y cuándo te compran',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Debajo del gráfico y el top hay una barra [[Métricas avanzadas]]. Está cerrada: tocala y se despliega (queda abierta la próxima vez que entres). Se calcula con el mismo período que elegiste arriba y cada número se compara contra el período anterior.' },
+                { tipo: 'parrafo', texto: 'Cada métrica tiene un ícono de exclamación: pasale el mouse por encima (o tocalo en el celular) y te explica qué mide, cómo se calcula y qué NO incluye.' },
+                { tipo: 'campos', items: [
+                    { label: 'Ganancia estimada', texto: 'Lo que te queda de lo vendido después de restar lo que te costó la mercadería: ingresos de productos menos costo. Ya considera los descuentos y cupones, pero no resta envíos, comisiones de cobro, devoluciones ni gastos fijos. Usa el costo actual de cada producto y solo cuenta los que tienen el costo cargado.' },
+                    { label: 'Margen', texto: 'Qué parte de lo que cobrás por tus productos es ganancia: ganancia estimada dividida por los ingresos.' },
+                    { label: 'Ganancia potencial del stock', texto: 'Lo que ganarías si vendieras hoy todo el stock a los precios actuales. Es la misma «Ganancia estimada» que ves en Productos y no depende del período.' },
+                    { label: 'Conversión', texto: 'De cada 100 visitas a la tienda, cuántas terminaron en un pedido. No cuenta los pedidos cargados a mano.' },
+                    { label: 'Cancelación', texto: 'Qué porcentaje de los pedidos terminó cancelado. Acá que SUBA es malo.' },
+                    { label: 'Clientes que vuelven', texto: 'De los que compraron en el período, cuántos ya te habían comprado antes.' },
+                    { label: 'Unidades por pedido', texto: 'Cuántos productos lleva en promedio cada pedido.' },
+                    { label: 'Devoluciones', texto: 'La plata devuelta en el período por devoluciones aprobadas y qué porcentaje es de las ventas.' },
+                    { label: 'Descuentos otorgados', texto: 'El total de descuentos y cupones aplicados en los pedidos del período.' },
+                ] },
+                { tipo: 'parrafo', texto: 'Abajo hay cuatro gráficos: ventas y ganancia (por hora, por día o por semana según el largo del período), cuándo te compran (por hora del día o por día de la semana), clientes nuevos contra los que vuelven, y la rentabilidad de cada categoría.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si la ganancia sale "—" o dice que se calculó sobre una parte de lo vendido, es porque faltan productos con el costo cargado. Se carga al crear o editar el producto, en el campo Costo.' },
+            ],
+        },
+        {
             id: 'actividad', titulo: 'Actividad reciente',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista de abajo: los últimos pedidos, con número, cliente, qué compró, monto y estado. Clickeás cualquier fila y caés directo en el detalle de ese pedido.' },
@@ -280,7 +306,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'El botón [[Nuevo pedido]] sirve para todo lo que vendés por fuera de la tienda: mostrador, WhatsApp, Instagram, un pedido por teléfono.' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Buscá los productos', texto: 'Escribís en el buscador, elegís y ponés cantidades. Usa tu catálogo real, así que descuenta stock igual que una venta online.' },
-                    { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás; si no, lo creás ahí mismo y queda para siempre en tu base.' },
+                    { titulo: 'Cargá el cliente', texto: 'Si ya existe, lo encontrás en el buscador. Si no, tocás [[Cargar un comprador a mano]] y escribís su nombre y su email: con el email queda guardado en tu lista de Clientes. Sin email la venta se registra igual, pero esa persona no queda guardada.' },
                     { titulo: 'Elegí cómo se cobró y cerrá la venta', texto: 'Y el pedido entra a tus números como cualquier otro.' },
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'Cargar las ventas de mostrador acá es lo que hace que el Inicio te muestre tu negocio COMPLETO y no solo la parte online. También es lo que alimenta la pestaña "Canal" del top.' },
@@ -299,6 +325,7 @@ export const CAPITULOS: Capitulo[] = [
         },
         {
             id: 'historial', titulo: 'Historial',
+            pista: 'los pedidos viejos: ya cerrados, entregados o cancelados',
             bloques: [
                 { tipo: 'parrafo', texto: 'La lista viva muestra lo que está en juego. El **Historial** es el archivo completo: todo lo que pasó, con su fecha y su estado final, para consultar hacia atrás sin que te estorbe en el día a día.' },
             ],
@@ -371,7 +398,7 @@ export const CAPITULOS: Capitulo[] = [
     ir: { label: 'Ir a Productos', seccion: 'catalogo' },
     temas: [
         {
-            id: 'numeros-catalogo', titulo: 'Los cinco números de arriba',
+            id: 'numeros-catalogo', titulo: 'Los seis números de arriba',
             bloques: [
                 { tipo: 'campos', items: [
                     { label: 'Total', texto: 'Cuántos productos tenés cargados, publicados o no.' },
@@ -379,6 +406,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Sin stock', texto: 'Se quedaron en cero. Es tu lista de reposición.' },
                     { label: 'No publicados', texto: 'Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.' },
                     { label: 'Valor de inventario', texto: 'Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.' },
+                    { label: 'Ganancia estimada', texto: 'Lo que ganarías si vendieras todo el stock que tenés hoy a los precios actuales: el precio de venta menos el costo de cada producto, por sus unidades disponibles. Es una estimación (no descuenta envíos, comisiones ni descuentos) y solo cuenta los productos con stock que tienen el costo cargado; si hay productos sin costo, el ícono de exclamación te avisa cuántos.' },
                 ] },
             ],
         },
@@ -394,7 +422,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Categoría', texto: 'Dónde vive dentro de tu catálogo.' },
                     { titulo: 'Publicado o borrador', texto: 'Borrador lo deja invisible hasta que esté listo.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Generar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Redactar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
             ],
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
@@ -402,8 +430,8 @@ export const CAPITULOS: Capitulo[] = [
             id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
             bloques: [
                 { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
-                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[+ Agregar característica]], en el orden en que querés que aparezcan.' },
-                { tipo: 'parrafo', texto: 'En la tienda se ven bajo el título **"Características"**, al lado de los botones de compra. Si son muchas y no entran ahí, la tabla se recorta sola a lo que cabe y suma un link [[Ver más detalles →]] que abre el resto en una ventana aparte — no hay que calcular cuántas cargar, nunca queda desprolijo.' },
+                { tipo: 'parrafo', texto: 'Cada fila es un par **etiqueta / valor** (por ejemplo "Procesador" → "Snapdragon 665"). Se van agregando con [[Agregar especificación]], en el orden en que querés que aparezcan.' },
+                { tipo: 'parrafo', texto: 'En la tienda se ven en una sección propia, **"Características"**, debajo de los botones de compra y a todo el ancho: completas y en dos columnas, sin importar cuántas cargues.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Si no cargás ninguna, la sección de Características directamente no aparece en la tienda: no hay nada genérico que rellenar de más.' },
             ],
         },
@@ -599,7 +627,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.' },
                 { tipo: 'campos', items: [
                     { label: 'Ventas', texto: 'Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.' },
-                    { label: 'Productos', texto: 'Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada.' },
+                    { label: 'Productos', texto: 'Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada. Muestra también la ganancia estimada de lo vendido y la potencial del stock, y la ganancia de cada producto más vendido (los que no tienen el costo cargado no la muestran).' },
                     { label: 'Clientes', texto: 'Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.' },
                     { label: 'Inventario', texto: 'Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.' },
                     { label: 'Pagos', texto: 'Por dónde te pagan y **cuánto te queda después de comisiones**. Es el reporte que más sorprende la primera vez que se mira.' },
@@ -621,7 +649,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'como-se-navega', titulo: 'Cómo se navega',
             bloques: [
-                { tipo: 'parrafo', texto: 'Configuración tiene **su propio menú adentro**, a la izquierda. Cuando entrás, el menú principal del panel se colapsa solo a una franja de íconos para hacerle lugar. Cada ítem de ese menú es una pantalla distinta, y cada una se guarda por separado con su botón [[Guardar cambios]].' },
+                { tipo: 'parrafo', texto: 'Las pantallas de Configuración están en el **menú de la izquierda**, debajo de Configuración: al entrar se despliegan Suscripción, Negocio, Contacto, Pagos, Envíos y el resto. Cada una es una pantalla distinta, y cada una se guarda por separado con su botón [[Guardar cambios]]. Apariencia, que es la más larga, trae además un índice propio al costado para saltar de una sección a otra.' },
             ],
         },
         {
@@ -760,9 +788,15 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'cfg-peligro', titulo: 'Zona peligrosa',
             bloques: [
-                { tipo: 'parrafo', texto: 'Las acciones que no tienen vuelta atrás, como dar de baja el negocio. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada.' },
-                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, leé el botón "¿Qué pasa si...?": te explica exactamente qué se pierde.' },
+                { tipo: 'parrafo', texto: 'Lo que cambia la tienda entera. Está separada del resto y con avisos claros justamente para que nadie la toque de pasada. La ve quien tiene el permiso **Editar configuración**, pero las tres acciones las hace solo el propietario.' },
+                { tipo: 'lista', items: [
+                    '**Pausar tienda**: nadie la ve ni te compra hasta que la reactivás. Tus datos, productos y pedidos quedan intactos, y vos seguís entrando al panel. Mientras está pausada, el mismo lugar dice **Reactivar tienda**.',
+                    '**Pasar a vidriera digital**: la tienda queda como catálogo, sin carrito ni pago online; tus clientes te consultan por WhatsApp. Se vuelve con **Pasar a tienda online completa**. No se puede si tenés pedidos online sin resolver.',
+                    '**Eliminar espacio**: la tienda se pausa al instante y tenés 60 días para arrepentirte con **Reactivar espacio**. Pasado ese plazo se borra todo y no hay vuelta atrás.',
+                ] },
+                { tipo: 'nota', variante: 'aviso', texto: 'Antes de tocar algo de acá, abrí el "¿Qué pasa si…?" de cada opción: te explica exactamente qué cambia y qué se pierde.' },
             ],
+            ir: { label: 'Abrir Zona peligrosa', seccion: 'configuracion', query: { vista: 'peligro' } },
         },
     ],
 },
@@ -789,7 +823,7 @@ export const CAPITULOS: Capitulo[] = [
                     { label: 'Juegos con premio', texto: 'Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.' },
                     { label: 'Modales de anuncios', texto: 'Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.' },
                     { label: '2x1 y 3x2', texto: 'La promo "llevá X, pagá Y" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.' },
-                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar.' },
+                    { label: 'Plantillas de Home', texto: 'Diseños alternativos para la **portada** de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con [[Ver cómo queda]] antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña **Contenido** prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda y el WhatsApp, y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.' },
                     { label: 'Prueba social', texto: 'Notificaciones tipo "Fulano compró tal producto", armadas con pedidos **reales** de tu tienda. Nunca con datos inventados.' },
                     { label: 'Oferta relámpago', texto: 'Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.' },
                 ] },
@@ -836,9 +870,18 @@ export const CAPITULOS: Capitulo[] = [
     temas: [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
+            pista: 'el cupo de Orbi del mes: cuánto se usó, cuánto usó cada persona y los topes',
             bloques: [
-                { tipo: 'parrafo', texto: 'Se abre con **Ctrl+K** (Cmd+K en Mac) desde cualquier pantalla del panel, o desde el botón **Orbi AI** al pie del menú de la izquierda.' },
+                { tipo: 'parrafo', texto: 'Se abre desde cualquier pantalla del panel con el botón **Orbi AI** de la barra de arriba (al lado de la búsqueda) o con **Orbi AI** al pie del menú de la izquierda.' },
                 { tipo: 'parrafo', texto: 'No es un buscador de ayuda genérica: contesta con los datos de **tu** negocio. "¿Cuánto vendí esta semana?", "¿qué pedidos tengo pendientes?", "¿cómo creo un cupón?" son todas preguntas válidas.' },
+                { tipo: 'parrafo', texto: 'Orbi tiene un **cupo por mes**. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Muestra el cupo que se está por terminar primero: el del negocio o, si el dueño te puso un tope, tu parte.' },
+                { tipo: 'pasos', items: [
+                    { titulo: 'Abrí el uso del equipo', texto: 'Lo ven el dueño y los administradores. Con Orbi abierto, tocá [[Expandir a página]] y, en la columna de conversaciones, [[Uso del equipo]]. En pantallas angostas está en el desplegable del título del chat.' },
+                    { titulo: 'Mirá cuánto se usó', texto: 'Arriba, en **Uso de Orbi**, está el porcentaje del negocio en el mes. En **Equipo**, cada persona con el porcentaje que usó y su tope.' },
+                    { titulo: 'Repartí el cupo', texto: 'Solo el dueño: en la columna Tope de cada persona elegí Sin tope, 25%, 50%, 75% u Otro (un número entero entre 10 y 100, y después [[Aplicar]]). Con tope, el porcentaje de esa persona se cuenta sobre su parte.' },
+                    { titulo: 'Revisá lo que hizo Orbi', texto: 'En **Lo que hizo Orbi** están los cambios que Orbi aplicó en los últimos 30 días: fecha, quién se lo pidió, qué hizo y si quedó Hecho o Falló. Para volver al chat, [[Volver a la conversación]].' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'No se muestran las conversaciones: cada persona ve solo las suyas.' },
             ],
         },
         {

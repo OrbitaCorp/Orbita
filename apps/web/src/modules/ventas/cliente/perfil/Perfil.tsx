@@ -21,6 +21,7 @@ import {
   type MeProfile, type MeOrderRow, type MeSession,
 } from '@/lib/api'
 import { SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Tab = 'pedidos' | 'mensajes' | 'direcciones' | 'datos' | 'seguridad'
 
@@ -115,7 +116,11 @@ export default function Perfil() {
   // bloquea, ver FullModeOnly en conversations.controller.ts) — se saca la
   // pestaña entera en vez de dejarla y que tire error al abrirla.
   const esVidriera = config?.business?.mode === 'SHOWCASE'
-  const tabsVisibles = esVidriera ? TABS.filter(t => t.id !== 'mensajes') : TABS
+  // Tienda demo: el Invitado no tiene contraseña ni sesiones propias, y no
+  // "sale" de ningún lado (ver lib/auth/authClient.ts): sin Seguridad ni
+  // Cerrar sesión.
+  const enDemo = slug === DEMO_SLUG
+  const tabsVisibles = TABS.filter(t => !(esVidriera && t.id === 'mensajes') && !(enDemo && t.id === 'seguridad'))
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
   // de cuenta del header. `pedidos` es el default seguro mientras el query se
@@ -384,7 +389,7 @@ export default function Perfil() {
                 </button>
               </div>
             )}
-            <div style={{ borderTop: '1px solid var(--color-border)' }}>
+            {!enDemo && <div style={{ borderTop: '1px solid var(--color-border)' }}>
               <button
                 className="ds-hover"
                 onClick={handleCerrarSesion}
@@ -399,7 +404,7 @@ export default function Perfil() {
                 <LogOut size={15} strokeWidth={1.5} />
                 Cerrar sesión
               </button>
-            </div>
+            </div>}
           </div>
 
           {/* Contenido */}
@@ -566,7 +571,7 @@ export default function Perfil() {
                   <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)', marginBottom: 16 }}>{errorDatos}</div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button type="submit" className="ds-hover" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
                     {guardandoDatos ? 'Guardando…' : 'Guardar cambios'}
                   </button>
                   {guardado && (
@@ -605,7 +610,7 @@ export default function Perfil() {
                   {passMsg && (
                     <div style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: passMsg.tipo === 'ok' ? '#16A34A' : 'var(--color-error)' }}>{passMsg.texto}</div>
                   )}
-                  <button type="submit" className="ds-hover" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: 'var(--color-on-primary, #fff)', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
                     {cambiandoPass ? 'Actualizando…' : 'Actualizar contraseña'}
                   </button>
                 </form>
@@ -656,7 +661,7 @@ export default function Perfil() {
         </div>
       </div>
 
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </StorefrontChrome>
   )

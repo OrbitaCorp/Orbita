@@ -99,22 +99,26 @@ export class SearchService {
           })
         : Promise.resolve([]),
       // Descuentos y cupones comparten tabla: `code` null = descuento automático.
-      // El módulo de descuentos no pide permiso para listar (solo para editar),
-      // así que acá tampoco.
-      this.prisma.discount.findMany({
-        where: {
-          businessId,
-          // Los otros tres grupos ya lo filtraban; este se había quedado sin
-          // el filtro y los descuentos borrados seguían apareciendo en el
-          // buscador (auditoría interna 09/09, ítem `api.prisma`,
-          // verificación 4). Al abrirlos daban 404: findOne() sí filtra.
-          deletedAt: null,
-          OR: [{ name: contains }, { code: contains }],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: LIMITE_POR_GRUPO,
-        select: { id: true, name: true, code: true, isActive: true },
-      }),
+      // Sus lecturas piden `discounts.view` (discounts.controller.ts y
+      // coupons.controller.ts); acá también, si no el buscador mostraba a un
+      // Empleado sin ese permiso nombres y códigos de cupones que la pantalla
+      // le niega.
+      puede('discounts.view')
+        ? this.prisma.discount.findMany({
+            where: {
+              businessId,
+              // Los otros tres grupos ya lo filtraban; este se había quedado sin
+              // el filtro y los descuentos borrados seguían apareciendo en el
+              // buscador (auditoría interna 09/09, ítem `api.prisma`,
+              // verificación 4). Al abrirlos daban 404: findOne() sí filtra.
+              deletedAt: null,
+              OR: [{ name: contains }, { code: contains }],
+            },
+            orderBy: { createdAt: 'desc' },
+            take: LIMITE_POR_GRUPO,
+            select: { id: true, name: true, code: true, isActive: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     return {

@@ -53,6 +53,14 @@ describe('ConversationsService (unit)', () => {
       expect(prisma.conversation.update).not.toHaveBeenCalled();
     });
 
+    it('con marcarLeida en false (visitante de la demo) devuelve los mensajes sin tocar la conversación', async () => {
+      const { svc, prisma } = build({ message: { findMany: jest.fn().mockResolvedValue([MSG_CUSTOMER]) } });
+      const msgs = await svc.getMessages('biz-1', 'cv-1', false);
+      expect(msgs).toHaveLength(1);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.conversation.update).not.toHaveBeenCalled();
+    });
+
     it('no toca nada si la conversación ya estaba leída', async () => {
       const { svc, prisma } = build({
         conversation: { findFirst: jest.fn().mockResolvedValue({ ...CONV, isUnread: false }) },

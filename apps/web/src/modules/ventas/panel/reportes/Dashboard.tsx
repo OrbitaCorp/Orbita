@@ -25,12 +25,14 @@ import { LineChart, BarChart, DonutChart } from '@/design-system/components/Char
 import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
 import { adminPath, currentSlug, tenantUrl } from '@/lib/tenant'
 import { useAuth } from '@/hooks/useAuth'
+import { esTiendaDemo } from '@/lib/demo/modo'
 import {
     ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness, pauseBusiness,
     type ApiDashboardReport, type ApiOrderStatus,
 } from '@/lib/api'
 
 import { TopProductos } from './components/TopProductos'
+import { MetricasAvanzadas } from './components/MetricasAvanzadas'
 import type { Pedido } from '../pedidos/types/pedidos.types'
 
 // Misma traducción de estados que usan las pantallas de pedidos.
@@ -67,7 +69,10 @@ export default function Dashboard() {
     const { user } = useAuth()
     const nombreUsuario = user?.type === 'member' ? user.member.name.split(' ')[0] : ''
 
-    const [periodo, setPeriodo] = useState(0)
+    // En la demo pública arranca en "7 días": "Hoy" depende de la hora a la
+    // que se entre (a las 00:30 no hay casi nada) y el visitante lo leería
+    // como un panel vacío.
+    const [periodo, setPeriodo] = useState(() => (esTiendaDemo() ? 1 : 0))
     const [topView, setTopView] = useState<'productos' | 'categorias' | 'canal'>('productos')
     const [descartadas, setDescartadas] = useState<string[]>([])
     const [publicada, setPublicada] = useState(false)
@@ -250,6 +255,18 @@ export default function Dashboard() {
                     .dash-alerts { grid-template-columns: repeat(2, 1fr) !important; }
                     .dash-act-hide { display: none !important; }
                     .dash-act-row  { grid-template-columns: 90px 1fr auto !important; gap: 8px !important; }
+                    /* Los desplegables del encabezado van pegados a la derecha de su
+                       botón, pero en el celular los botones bajan a la izquierda y
+                       se salían de la pantalla (reportado con captura 29/09). El
+                       menú de la tienda se ancla a la izquierda del botón; el
+                       calendario, de 700px, pasa a una hoja centrada que ocupa el
+                       ancho de la pantalla y se desplaza si no entra en alto. */
+                    .dash-pop-tienda { right: auto !important; left: 0 !important; }
+                    .dash-pop-cal {
+                        position: fixed !important; left: 12px !important; right: 12px !important; top: 76px !important;
+                        max-height: calc(100vh - 92px); max-height: calc(100dvh - 92px);
+                        overflow-y: auto; border-radius: 16px;
+                    }
                 }
                 @media (max-width: 560px) {
                     /* Dos alertas por fila a ~170px partían el título en cuatro
@@ -318,7 +335,7 @@ export default function Dashboard() {
                         </button>
 
                         {calendarOpen && (
-                            <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 500 }}>
+                            <div className="dash-pop-cal" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 500 }}>
                                 <DateRangePicker
                                     onApply={(start, end) => {
                                         setCustomRange({ start, end })
@@ -339,7 +356,7 @@ export default function Dashboard() {
                                 ✓ Tienda online
                             </Button>
                             {tiendaMenuOpen && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 200, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
+                                <div className="dash-pop-tienda" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 200, zIndex: 200, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.12)', overflow: 'hidden' }}>
                                     <div style={{ padding: '9px 12px', borderBottom: '1px solid var(--color-border)', fontSize: 11.5, color: 'var(--color-muted)' }}>
                                         <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{k?.visitasTotal ?? k?.visitas ?? 0} visitas a la tienda</div>
                                         {(k?.visitasTotalDominio ?? 0) > 0 ? (
@@ -534,6 +551,10 @@ export default function Dashboard() {
                     )}
                 </Card>
             </div>
+
+            {/* 4b. Métricas avanzadas — desplegable, carga recién al abrirse. Usa el
+                mismo rango que el selector de período de arriba. */}
+            <MetricasAvanzadas from={rango.from} to={rango.to} onIrACatalogo={() => goSeccion('catalogo')} />
 
             {/* 5. Actividad reciente */}
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>

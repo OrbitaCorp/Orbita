@@ -12,7 +12,7 @@
 // donde empezó.
 
 import { useEffect, useRef, useState } from 'react';
-import { useTheme } from '@/modules/landing/context/ThemeContext';
+import { useThemeOpcional } from '@/modules/landing/context/ThemeContext';
 
 // Paleta de la escena por tema. En claro NO se invierte sin más: un planeta
 // negro sobre fondo blanco quedaba como un agujero. Se convierte en un amanecer
@@ -176,7 +176,8 @@ function nuevoCometa(W: number, H: number): Cometa {
  * perteneciendo al mismo mundo visual que el home.
  */
 export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
-    const { isDark } = useTheme();
+    // Sin provider (fuera de la landing) la escena va en oscuro, que es su diseño.
+    const isDark = useThemeOpcional()?.isDark ?? true;
     const paleta = PALETAS[isDark ? 'oscuro' : 'claro'];
     const [medidas, setMedidas] = useState({ W: 0, H: 0 });
     const escenaRef = useRef<HTMLDivElement>(null);

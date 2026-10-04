@@ -5,6 +5,7 @@ import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { panelGetProfile, panelUpdateProfile, panelUpdateTheme, panelChangePassword, ApiError, type MemberProfile } from '@/lib/api'
 import { VerificarEmail } from './VerificarEmail'
+import { esVisitanteDemo } from '@/lib/demo/modo'
 
 // "Propietario" en TODOS lados (header, Equipo, invitaciones): una sola palabra
 // por rol, y owner/admin son el mismo rol (acceso total) — decisión del equipo.
@@ -20,6 +21,9 @@ export default function MiPerfil() {
   const { tema, setTema } = useDarkMode()
   const { user, login } = useAuth()
   const negocio = user?.type === 'member' ? user.business : null
+  // Visitante de la demo: la cuenta es compartida y de solo lectura — los
+  // datos se ven pero no se editan, y no hay contraseña que cambiar.
+  const demo = esVisitanteDemo()
 
   const [perfil, setPerfil] = useState<MemberProfile | null>(null)
   const [nombre, setNombre] = useState('')
@@ -198,10 +202,10 @@ export default function MiPerfil() {
         <div style={tituloSeccion}>Tus datos</div>
         <div className="mperf-grid2" style={{ marginBottom: 14 }}>
           <FI label="Nombre">
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className="ds-field" style={inputStyle} />
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} readOnly={demo} disabled={demo} className="ds-field" style={inputStyle} />
           </FI>
           <FI label="Email">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="ds-field" style={inputStyle} />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} readOnly={demo} disabled={demo} className="ds-field" style={inputStyle} />
           </FI>
         </div>
         {email.trim() !== perfil.email && (
@@ -224,6 +228,9 @@ export default function MiPerfil() {
 
         {error && <div style={errorBox}>{error}</div>}
 
+        {demo ? (
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)' }}>Estás en la demo de Órbita: los datos de esta cuenta no se pueden cambiar.</p>
+        ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimario(guardando)}>
             {guardando ? 'Guardando…' : 'Guardar cambios'}
@@ -234,12 +241,15 @@ export default function MiPerfil() {
             </div>
           )}
         </div>
+        )}
       </form>
 
       {/* ── Apariencia ── */}
       <div style={cardStyle}>
         <div style={tituloSeccion}>Apariencia</div>
-        <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)' }}>Se guarda en tu cuenta — te va a acompañar en cualquier dispositivo donde entres.</p>
+        <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)' }}>
+          {demo ? 'Probá los temas: en la demo, al recargar vuelve a claro.' : 'Se guarda en tu cuenta — te va a acompañar en cualquier dispositivo donde entres.'}
+        </p>
         <div style={{ display: 'flex', gap: 10 }}>
           {/* Cada opción muestra una MINI-PREVIEW real del tema, no solo un ícono:
               claro = panelito claro, oscuro = panelito oscuro, sistema = mitad y mitad. */}
@@ -279,7 +289,8 @@ export default function MiPerfil() {
         </div>
       </div>
 
-      {/* ── Seguridad ── */}
+      {/* ── Seguridad ── (no en la demo: el visitante no tiene contraseña) */}
+      {!demo && (
       <form onSubmit={handleCambiarPassword} style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
           <Lock size={13} strokeWidth={2} style={{ color: 'var(--color-subtle)' }} />
@@ -331,6 +342,7 @@ export default function MiPerfil() {
           )}
         </div>
       </form>
+      )}
     </div>
   )
 }

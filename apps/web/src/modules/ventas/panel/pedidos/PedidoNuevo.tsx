@@ -25,7 +25,7 @@
 // solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Package, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
+import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Package, Plus, Search, ShoppingBag, Store, Trash2, User, UserCheck, UserX } from 'lucide-react'
 import { imagenParaVariante } from '@/lib/storefront/utils'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -265,7 +265,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             panelEvaluateCart(carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })), clienteIdEval)
                 .then(r => {
                     if (cancelado) return
-                    const nombres = [...new Set(r.itemDiscounts.map(d => d.discountName))]
+                    // Los de producto y el que va sobre el total de la compra: sin este
+                    // último el ticket restaba plata sin decir de qué descuento era.
+                    const delTicket = r.ticketDiscount
+                        ? [`${r.ticketDiscount.discountName}${r.ticketDiscount.type === 'PERCENT_TICKET' ? ` (${r.ticketDiscount.value}%)` : ''}`]
+                        : []
+                    const nombres = [...new Set([...r.itemDiscounts.map(d => d.discountName), ...delTicket])]
                     setDescuentoAuto({ total: r.discountTotal, nombres })
                 })
                 .catch(() => { if (!cancelado) setDescuentoAuto({ total: 0, nombres: [] }) })
@@ -613,13 +618,20 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <div style={{ marginBottom: 16 }}>
                                 <input className="ds-field" value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido *" style={{ ...inputBase, marginBottom: 8 }} />
                                 {/* Con email inválido manda el borde de error: ds-field no aplica ahí. */}
-                                <input className={emailManualValido ? 'ds-field' : undefined} value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email (opcional)" style={{ ...inputBase, marginBottom: !emailManualValido ? 4 : 8, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
+                                <input className={emailManualValido ? 'ds-field' : undefined} value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email (opcional)" style={{ ...inputBase, marginBottom: 4, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
                                 {!emailManualValido && (
                                     <div style={{ fontSize: 12, color: 'var(--color-error)', marginBottom: 8 }}>Ese email no parece válido — fijate que tenga @ y punto.</div>
                                 )}
+                                {/* El email decide si la persona queda en Clientes: se avisa al lado del campo. */}
+                                {emailManualValido && (
+                                    <div role="status" style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, lineHeight: 1.45, color: 'var(--color-body)', marginBottom: 8 }}>
+                                        {manual.email.trim() === ''
+                                            ? <><UserX size={14} aria-hidden style={{ flexShrink: 0, marginTop: 1, color: 'var(--color-warning)' }} /><span>Sin email, esta persona no queda guardada en tu lista de Clientes.</span></>
+                                            : <><UserCheck size={14} aria-hidden style={{ flexShrink: 0, marginTop: 1, color: 'var(--color-success)' }} /><span>Con este email queda guardada en tu lista de Clientes.</span></>}
+                                    </div>
+                                )}
                                 <input className="ds-field" value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono (opcional)" style={{ ...inputBase, marginBottom: 8 }} />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 11.5, color: 'var(--color-subtle)' }}>No queda registrado como cliente.</span>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
                                     <button className="ds-link" onClick={() => setModoManual(false)} style={linkBtn}>← Buscar cliente</button>
                                 </div>
                             </div>
@@ -659,7 +671,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                     </button>
                                 ))}
                                 <button onClick={() => setModoManual(true)} style={{ ...pickRow, justifyContent: 'center', gap: 8, color: 'var(--color-body)', fontSize: 12.5, fontWeight: 500, marginBottom: 0 }}>
-                                    <UserX size={14} /> Venta a un comprador sin registrar
+                                    <User size={14} /> Cargar un comprador a mano
                                 </button>
                             </div>
                         )}

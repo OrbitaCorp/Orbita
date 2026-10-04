@@ -53,6 +53,7 @@ export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCre
       </div>
       <DescuentosTabla
         datos={data?.data ?? []}
+        sinFiltros={filtros.estado === 'todos' && filtros.tipo === 'todos' && !filtros.busqueda}
         isLoading={isLoading}
         ordenColumna={filtros.ordenColumna}
         ordenDireccion={filtros.ordenDireccion}

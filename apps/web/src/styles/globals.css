@@ -398,10 +398,16 @@ html.light body { background: #eef4ff; color: #0f172a; }
    "sueltos" flotando sobre la foto — y el de agregar al carrito se reubica
    como ícono chico al lado de "Comprar ahora", abajo (ver ProductCard.tsx,
    .orb-pcard-cart-inline). Nada de esto toca desktop, donde los flotantes
-   siguen exactamente igual. */
-@media (max-width: 640px) {
+   siguen exactamente igual.
+   En su lugar arriba queda una flecha de 40px (.orb-pcard-flecha) que indica
+   que la tarjeta lleva a la ficha — pedido 29/09, también para las tarjetas
+   de las plantillas avanzadas. El segundo query agarra celulares que
+   informan un ancho mayor (modo "versión de escritorio", apaisado): táctiles
+   sin hover, donde los flotantes quedaban fijos sobre la foto. */
+@media (max-width: 640px), (hover: none) and (pointer: coarse) and (max-width: 1023px) {
   .orb-pcard-floating { display: none !important; }
   .orb-pcard-cart-inline { display: inline-flex !important; }
+  .orb-pcard-flecha { display: grid !important; }
 }
 
 .ds-hover { position: relative; isolation: isolate; }
@@ -447,6 +453,23 @@ html.light body { background: #eef4ff; color: #0f172a; }
 .ds-field:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* ─── Orbi ────────────────────────────────────────────────────────────────
+   Foco visible de los botones de Orbi (Detener, Nueva conversación, los de la
+   tarjeta de acción). Vive acá y no en el <style> de un componente: antes
+   estaba en OrbiInput y el botón de Nueva conversación dependía de que el
+   input estuviera montado para tener foco visible. */
+.orbi-foco:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+/* El ícono de "Aplicando…" de la tarjeta de acción. Sin movimiento para quien
+   lo pidió: el texto ya dice qué está pasando. */
+@keyframes orbi-girar { to { transform: rotate(360deg); } }
+.orbi-girando { animation: orbi-girar 900ms linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .orbi-girando { animation: none; }
 }
 
 /* ─── Ayuda contextual ("qué es esto") ────────────────────────────────────
@@ -747,10 +770,6 @@ html.light body { background: #eef4ff; color: #0f172a; }
   /* ElegirRubro */
   .ob-rubro-h1  { font-size: 22px !important; }
   .ob-bottom-bar { padding: 12px 16px !important; }
-
-  /* SetupUnificado: hide full progress bar, show compact step indicator */
-  .ob-inner-progress { display: none !important; }
-  .ob-mobile-step    { display: flex !important; }
 
   /* SetupUnificado: step content + nav bar padding */
   .ob-step-content { padding: 24px 16px 140px !important; }

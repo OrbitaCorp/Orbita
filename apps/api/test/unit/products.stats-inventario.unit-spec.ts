@@ -43,3 +43,25 @@ describe('ProductsService.stats — valor de inventario', () => {
     expect(r.valorInventario).toBe(0);
   });
 });
+
+describe('ProductsService.stats — ganancia estimada', () => {
+  const conPrecio = (price: number, ...cantidades: number[]) => ({ price, ...stock(...cantidades) });
+
+  it('suma (precio − costo) × stock de los productos con costo y devuelve el margen', async () => {
+    const r = await svcCon([
+      { status: 'PUBLISHED', cost: 100, variants: [conPrecio(150, 4)] }, // +50 × 4 = 200
+      { status: 'PUBLISHED', cost: 40, variants: [conPrecio(100, 1)] }, // +60
+    ]).stats('biz');
+    expect(r.gananciaEstimada).toBe(260);
+    expect(r.margenEstimadoPct).toBe(37.1); // 260 / 700
+  });
+
+  it('un producto sin costo no entra en la ganancia y se avisa en sinCostoCargado', async () => {
+    const r = await svcCon([
+      { status: 'PUBLISHED', cost: 100, variants: [conPrecio(150, 2)] },
+      { status: 'PUBLISHED', cost: null, variants: [conPrecio(500, 9)] },
+    ]).stats('biz');
+    expect(r.gananciaEstimada).toBe(100);
+    expect(r.sinCostoCargado).toBe(1);
+  });
+});

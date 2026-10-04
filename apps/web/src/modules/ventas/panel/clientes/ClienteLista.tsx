@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getCustomers, getCustomer, exportCustomers, sendCustomersEmail, type ApiCustomer, type ApiCustomersPage, type ApiCustomerDetail, type ApiOrderStatus } from '@/lib/api'
 import type { Cliente } from './types/clientes.types'
 import type { EstadoPedido } from '../pedidos/types/pedidos.types'
+import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const COLS = '24px 1.4fr 90px 110px 110px 110px 70px'
 
@@ -384,9 +385,17 @@ function ListaView({
                     <span /><span>Cliente</span><span style={{ textAlign:'right' }}>Pedidos</span><span style={{ textAlign:'right' }}>Gastado</span><span style={{ textAlign:'right' }}>Ticket prom.</span><span>Última compra</span><span />
                 </div>
                 {rows.length === 0 ? (
-                    <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>
-                        {busquedaLista ? 'Sin resultados para esa búsqueda' : 'Todavía no hay clientes: aparecen solos cuando alguien compra, o al cargarlos desde un pedido.'}
-                    </div>
+                    busquedaLista ? (
+                        <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>
+                            Sin resultados para esa búsqueda
+                        </div>
+                    ) : (
+                        <OrbiPetVacio
+                            modulo="clientes"
+                            titulo="Todavía no tenés clientes"
+                            descripcion="Aparecen solos cuando alguien compra, o al cargarlos desde un pedido."
+                        />
+                    )
                 ) : rows.map((c, i) => {
                     const open = exp === c.id
                     const det = detalles[c.id]

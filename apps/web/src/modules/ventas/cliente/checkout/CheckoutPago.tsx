@@ -22,6 +22,7 @@ import {
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 import { PromoChip } from '../../_shared/components'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 
 type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER' | 'DEBIT_CARD' | 'CREDIT_CARD'
 type Entrega = 'DELIVERY' | 'PICKUP'
@@ -42,6 +43,9 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
   DEBIT_CARD:  { Icon: CreditCard, titulo: 'Débito',  desc: 'Pagás con posnet al retirar' },
   CREDIT_CARD: { Icon: CreditCard, titulo: 'Crédito', desc: 'Pagás con posnet al retirar' },
 }
+// "Transferencia" marcada en "Medios que aceptás al retirar": opción informativa
+// (se paga por transferencia en el local). Reusa el método TRANSFER del backend.
+const METODO_TRANSFER_RETIRO = { Icon: Landmark, titulo: 'Transferencia', desc: 'Pagás por transferencia al retirar' }
 // 'Retiro en local' dejó de ser un método de pago — ahora es una forma de
 // entrega (Entrega), independiente de cómo se paga (ver checkout.dto.ts).
 const ENTREGA_META: Record<Entrega, { Icon: React.ElementType; titulo: string; desc: string }> = {
@@ -152,6 +156,14 @@ export default function CheckoutPago() {
   // comprador a una sucursal del correo.
   const [carrierModeSel, setCarrierModeSel] = useState<'DOMICILIO' | 'SUCURSAL' | null>(null)
   const [errorCarrierMode, setErrorCarrierMode] = useState('')
+  // Tienda demo: transportista y modalidad ya elegidos, para que el visitante
+  // llegue al pago sin detenerse a decidir (los puede cambiar igual). En una
+  // tienda real no se preselecciona: es una decisión del comprador.
+  useEffect(() => {
+    if (slug !== DEMO_SLUG) return
+    if (!carrierSel && carriersDisponibles.length > 0) setCarrierSel(carriersDisponibles[0])
+    if (!carrierModeSel) setCarrierModeSel('DOMICILIO')
+  }, [slug, carriersDisponibles, carrierSel, carrierModeSel])
 
   // ── Dirección de envío — dos caminos: cliente con sesión elige entre sus
   // direcciones guardadas (mismo mecanismo que antes vivía en
@@ -262,7 +274,7 @@ export default function CheckoutPago() {
       const sinRestriccion = pickup.length === 0
       return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD'] as Metodo[]).filter(m => {
         if (m === 'MERCADOPAGO') return p.mercadopagoAvailable && (sinRestriccion || pickup.includes('MERCADOPAGO'))
-        if (m === 'TRANSFER') return p.acceptsTransfer
+        if (m === 'TRANSFER') return p.acceptsTransfer || pickup.includes('TRANSFER')
         if (m === 'CASH') return p.acceptsCash && (sinRestriccion || pickup.includes('CASH'))
         if (m === 'DEBIT_CARD') return pickup.includes('DEBIT')
         return pickup.includes('CREDIT') // CREDIT_CARD
@@ -272,6 +284,7 @@ export default function CheckoutPago() {
   }, [config, envio, coordinarDespuesActivo])
 
   const [metodo, setMetodo] = useState<Metodo | null>(null)
+  const transferenciaAlRetirar = envio === 'PICKUP' && (config?.payment?.pickupPaymentMethods ?? []).includes('TRANSFER')
   useEffect(() => {
     // Si el método elegido dejó de estar disponible (ej. Efectivo al
     // cambiar a envío a domicilio), se limpia para forzar a elegir de
@@ -449,7 +462,11 @@ export default function CheckoutPago() {
       // mano después — ver el 400 "Los pagos se registran al confirmar el
       // pago online" en OrdersService.create()), así que con Transferencia o
       // Efectivo llega SIEMPRE vacío en este punto, recién creado el pedido.
-      const sufijoMetodo = coordinarDespuesActivo ? '&metodo=COORDINATE_LATER' : (metodo ? `&metodo=${metodo}` : '')
+      // La transferencia al retirar es un pago pendiente "normal" (se paga en el
+      // local): no debe caer en la pantalla de "te escribimos por WhatsApp".
+      const sufijoMetodo = coordinarDespuesActivo
+        ? '&metodo=COORDINATE_LATER'
+        : (metodo ? `&metodo=${metodo === 'TRANSFER' && transferenciaAlRetirar ? 'TRANSFER_RETIRO' : metodo}` : '')
 
       // El pedido ya existe (PENDING) más allá de lo que pase con el pago:
       // se limpia el carrito/draft acá, igual que con los demás métodos, en
@@ -1001,7 +1018,9 @@ export default function CheckoutPago() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {metodosDisponibles.map(id => {
-                  const m = METODO_META[id]
+                  // Al retirar con "Transferencia" marcada en el panel, la tarjeta
+                  // es informativa (se paga al retirar), no la de WhatsApp.
+                  const m = id === 'TRANSFER' && transferenciaAlRetirar ? METODO_TRANSFER_RETIRO : METODO_META[id]
                   const active = metodo === id
                   // RBT-692 — % configurado para ESTE método de la lista (no
                   // necesariamente el elegido — se muestra como badge en cada uno).
@@ -1042,7 +1061,7 @@ export default function CheckoutPago() {
                       </div>
 
                       {/* ── Panel Coordinar por WhatsApp ── */}
-                      {active && id === 'TRANSFER' && (
+                      {active && id === 'TRANSFER' && !transferenciaAlRetirar && (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
                           No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás (transferencia, link de pago, crédito, u otro medio), apenas confirmes el pedido.
                           {!!pctEsteMetodo && <> El total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).</>}
@@ -1050,9 +1069,9 @@ export default function CheckoutPago() {
                       )}
 
                       {/* ── Panel Efectivo / Mercado Pago con descuento ── */}
-                      {active && id !== 'TRANSFER' && !!pctEsteMetodo && (
+                      {active && (id !== 'TRANSFER' || transferenciaAlRetirar) && !!pctEsteMetodo && (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
-                          Pagando {id === 'CASH' ? 'en efectivo' : 'con Mercado Pago'}, el total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).
+                          Pagando {id === 'CASH' ? 'en efectivo' : id === 'TRANSFER' ? 'por transferencia' : 'con Mercado Pago'}, el total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).
                         </div>
                       )}
                     </div>

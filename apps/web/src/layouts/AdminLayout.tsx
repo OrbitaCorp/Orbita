@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react'
 import { ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import SubscriptionStatusBanner from './components/SubscriptionStatusBanner'
 import EmailVerificationBanner from './components/EmailVerificationBanner'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
-import { OrbiPanel } from '@/components/orbi/OrbiPanel'
-import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 import { SidebarModeProvider } from './SidebarModeContext'
+import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
+
+// El Orbi del panel (modules/orbi). Se carga aparte y solo en el navegador:
+// el primer render del panel no lo espera. El Orbi viejo (components/orbi)
+// queda solo para el alta (surface 'wizard').
+const OrbiV2 = dynamic(() => import('@/modules/orbi/vistas/OrbiV2'), { ssr: false })
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
 // y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
@@ -55,6 +61,12 @@ function AdminShell({ children }: { children: ReactNode }) {
         }
     }, [])
 
+    // Salir del panel (a la tienda, al login, a la landing) desmonta Orbi pero
+    // la navegación de Next no cierra la conexión del stream: sin cortarla, la
+    // API sigue gastando modelo en una respuesta que nadie va a ver. Entre
+    // secciones del panel no se desmonta (es una sola ruta catch-all).
+    useEffect(() => () => useOrbiStore.getState().abortar(), [])
+
     return (
         <div
             className="flex overflow-hidden admin-shell"
@@ -74,7 +86,16 @@ function AdminShell({ children }: { children: ReactNode }) {
                 @media (min-width: 769px) {
                     .admin-backdrop { display: none !important; }
                 }
+                /* El cielo del alta, detrás del contenido. Solo en oscuro: en
+                   claro el panel sigue con su fondo plano de siempre. */
+                .admin-cielo { display: none; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #05080F; }
+                .dark .admin-cielo { display: block; }
+                .dark .admin-main { background: transparent !important; }
             `}</style>
+
+            <div className="admin-cielo" aria-hidden>
+                <EscenaEspacial planeta={false} />
+            </div>
 
             {/* Overlay mobile */}
             <div
@@ -109,8 +130,9 @@ function AdminShell({ children }: { children: ReactNode }) {
                 </main>
             </div>
 
-            <OrbiPanel />
-            <OrbiWelcomeSeeder />
+            {/* Sin OrbiWelcomeSeeder: el saludo sembrado tapaba el estado
+                vacío del Orbi del panel (bienvenida y sugerencias). */}
+            <OrbiV2 />
 
             {/* Tutorial de primeros pasos: arranca solo para todo negocio que
                 nunca lo tocó y vive en la base (businesses.tutorial) hasta que

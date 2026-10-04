@@ -15,7 +15,7 @@
 
 import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import type { ContenidoSecciones, ItemPie, Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import type { ContenidoSecciones, Estante, ItemPie, Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
 import { thumbGradient, fmt, urlRedSocial } from '@/lib/storefront/utils'
 import type { StorefrontConfigResponse, StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
@@ -23,6 +23,8 @@ import type { StorefrontConfigResponse, StorefrontStatsItem, StorefrontHeroSlide
 // El bloque de contacto de la config (Instagram, horario...). Se usa para el
 // pie: las redes que el negocio cargó de verdad, no tres globitos decorativos.
 type Contacto = NonNullable<StorefrontConfigResponse['contact']>
+
+type Apariencia = NonNullable<StorefrontConfigResponse['appearance']>
 
 type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null }
 
@@ -172,10 +174,114 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
 // `Foto` en piezas.tsx (nunca un string vacío, que le pide la página entera de
 // nuevo por red y deja un recuadro roto). Sin `hue` acá (no es un producto),
 // así que es un gris neutro fijo en vez del degradé por `hue` del resto.
-const SIN_FOTO_HERO = 'linear-gradient(135deg, #E7E5E4, #D6D3D1)'
 
-function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
-  return { img: s.img ?? SIN_FOTO_HERO, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
+
+// El hero de una tienda que todavía no cargó ninguno. El fondo es un degradé
+// del primario de la plantilla hacia oscuro: los heros escriben en blanco
+// sobre la foto, y así se lee en cualquier paleta.
+const degradeDe = (base: Plantilla) =>
+  `linear-gradient(135deg, color-mix(in srgb, ${base.tema.primary} 78%, black), color-mix(in srgb, ${base.tema.primary} 38%, black))`
+
+function heroNeutro(base: Plantilla, marca?: string, tagline?: string): Slide {
+  return {
+    img: degradeDe(base),
+    titulo: marca?.trim() || 'Bienvenidos',
+    bajada: tagline?.trim() ?? '',
+    cta: 'Ver el catálogo',
+    link: '/catalogo',
+  }
+}
+
+function aSlidePlantilla(s: StorefrontHeroSlide, base: Plantilla): Slide {
+  return { img: s.img ?? degradeDe(base), fotoPropia: !!s.img, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
+}
+
+/**
+ * El anuncio de arriba del header, para una plantilla.
+ *
+ * Es el de Apariencia: el mismo texto, el mismo interruptor y el mismo modo
+ * cartelera que ve la tienda sin plantilla. Aparte de `contenidoDeApariencia`
+ * porque también lo necesita StorefrontChrome, que dibuja el header de la
+ * plantilla en el catálogo, la ficha y el carrito.
+ *
+ * Antes las recetas tenían un cintillo propio, cargado en la pestaña
+ * Secciones. Si una tienda escribió ese y todavía no lo pasó a Apariencia,
+ * sigue saliendo: no se le borra un texto que ya tenía publicado.
+ */
+export function anuncioReal(ap: Apariencia | null | undefined, secciones?: ContenidoSecciones): Plantilla['anuncio'] {
+  const viejo = secciones?.cintillo?.texto?.trim()
+  if (viejo) return { texto: viejo, cartelera: secciones?.cintillo?.cartelera === 'si' }
+  // Varios ítems, uno por línea (así los carga el editor, ver
+  // mensajesAnuncio en AnnouncementBar.tsx): en la franja van seguidos.
+  const texto = (ap?.shippingText ?? '').split('\n').map(x => x.trim()).filter(Boolean).join('  ·  ')
+  if (!texto || !(ap?.showAnnouncementBar ?? true)) return undefined
+  return { texto, cartelera: ap?.announcementScroll ?? false }
+}
+
+/**
+ * Lo que el dueño cargó y prendió en Apariencia, en la forma que entiende una
+ * plantilla (ver BLOQUES_ESTANDAR en tipos.ts).
+ *
+ * Los interruptores se resuelven ACÁ y no en cada bloque: un estante apagado
+ * llega vacío, un parallax apagado o sin foto no llega. Así el render no tiene
+ * que saber de interruptores —dibuja lo que hay— y una plantilla nueva los
+ * respeta sin escribir nada.
+ */
+function contenidoDeApariencia(
+  ap: Apariencia | null | undefined,
+  estantes: Record<Estante, Producto[]>,
+  secciones: ContenidoSecciones | undefined,
+  transferPct: number | null | undefined,
+  hayWhatsapp: boolean,
+): Partial<Plantilla> {
+  const prendido: Record<Estante, boolean> = {
+    destacados: ap?.showFeaturedSection ?? true,
+    nuevos: ap?.showNewArrivalsSection ?? true,
+    recomendados: ap?.showRecommendedSection ?? true,
+    topVentas: ap?.showBestSellersSection ?? true,
+  }
+  const estante = (e: Estante) => (prendido[e] ? estantes[e].map(p => aProductoPlantilla(p, transferPct)) : [])
+
+  // El parallax de Apariencia. Si no está, el que la tienda haya cargado en
+  // el bloque propio que tenían las recetas (mismo criterio que el cintillo).
+  const viejo = secciones?.parallax
+  const parallax: Plantilla['parallax'] =
+    (ap?.showParallaxBanner ?? false) && ap?.parallaxImageUrl
+      ? {
+          img: ap.parallaxImageUrl,
+          titulo: ap.parallaxTitle ?? '',
+          bajada: ap.parallaxSubtitle ?? '',
+          cta: ap.parallaxCtaText || 'Ver más',
+          link: ap.parallaxCtaLink ?? undefined,
+        }
+      : viejo?.foto && viejo?.titulo
+        ? { img: viejo.foto, titulo: viejo.titulo, bajada: viejo.texto ?? '', cta: viejo.cta || 'Ver el catálogo', volanta: viejo.volanta }
+        : undefined
+
+  // Las marcas sin nombre se descartan: el nombre es lo que se dibuja si no
+  // hay logo, y sin él la marca es un hueco (mismo filtro que el home clásico).
+  const marcas = (ap?.brands ?? []).filter(m => m.name.trim() !== '')
+
+  const todos = { destacados: estante('destacados'), nuevos: estante('nuevos'), recomendados: estante('recomendados'), topVentas: estante('topVentas') }
+  // Las filas propias de una plantilla con bloque propio: el primer estante
+  // con productos y el siguiente (ver `estante` en SeccionPlantilla).
+  const [principal, secundario] = (['destacados', 'nuevos', 'recomendados', 'topVentas'] as Estante[]).filter(e => todos[e].length > 0)
+
+  return {
+    estantes: todos,
+    estantePrincipal: principal,
+    estanteSecundario: secundario,
+    productos: principal ? todos[principal] : [],
+    productosSecundarios: secundario ? todos[secundario] : [],
+    ocultarCategorias: !(ap?.showCategoriesSection ?? true),
+    anuncio: anuncioReal(ap, secciones),
+    parallax,
+    marcas: (ap?.showBrands ?? false) && marcas.length > 0
+      ? { titulo: (ap?.brandsTitle ?? '').trim(), items: marcas.map(m => ({ nombre: m.name, logo: m.logoUrl })) }
+      : undefined,
+    ocultarWhatsapp: ap?.showWhatsapp === false || !hayWhatsapp,
+    ocultarBuscador: ap?.showSearch === false,
+  }
 }
 
 /**
@@ -185,9 +291,20 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
  * radios, sombras). Lo que se reemplaza es solo el contenido.
  */
 export function plantillaReal({
-  base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
+  base, productos, destacados, categorias, stats, cupon, heroSlides, transferPct,
   marca, tagline, secciones, baseUrl, contacto, mostrarPie = true,
+  apariencia, nuevos, recomendados = [], topVentas = [], hayWhatsapp = true,
 }: {
+  // Lo que el dueño configuró en Apariencia: interruptores, anuncio, parallax
+  // y marcas. Ver `contenidoDeApariencia`.
+  apariencia?: Apariencia | null
+  // Los estantes que faltaban. `nuevos` es lo último cargado; si no viene se
+  // usa `productos`, que ya llega en ese orden.
+  nuevos?: Producto[]
+  recomendados?: Producto[]
+  topVentas?: Producto[]
+  // ¿El negocio tiene un número de WhatsApp cargado?
+  hayWhatsapp?: boolean
   base: Plantilla
   // La raíz de la tienda (`/tienda/<slug>`) y el contacto del negocio: los
   // necesita el pie para armar enlaces que naveguen de verdad.
@@ -210,7 +327,8 @@ export function plantillaReal({
   secciones?: ContenidoSecciones
   productos: Producto[]
   destacados: Producto[]
-  masVendidos: Producto[]
+  /** Sin uso: "más vendidos" era la segunda tanda de lo más nuevo. Ahora es `topVentas`. */
+  masVendidos?: Producto[]
   categorias: CatReal[]
   stats: StorefrontStatsItem[]
   cupon?: { titulo: string; bajada: string; codigo: string } | null
@@ -257,27 +375,34 @@ export function plantillaReal({
 
   return {
     ...base,
+    ...contenidoDeApariencia(apariencia, { destacados, nuevos: nuevos ?? productos, recomendados, topVentas }, secciones, transferPct, hayWhatsapp),
     // La identidad es del NEGOCIO, no de la muestra — ver `marca` arriba.
     ...(marca?.trim() ? { marca: marca.trim() } : {}),
-    ...(tagline?.trim() ? { tagline: tagline.trim() } : {}),
+    // La bajada también, y sin caer a la de la muestra: un negocio que no
+    // cargó la suya mostraba "Running, fuerza y ciclismo" en el pie de una
+    // tienda de ropa. Vacía, el pie no la dibuja.
+    tagline: tagline?.trim() ?? '',
     sec: secciones,
     // Barra de confianza: los stats reales del negocio (Apariencia → statsBar),
     // con el mismo par [fuerte, apagado] que usa la plantilla.
     confianza: stats.map(s => [s.value, s.label] as [string, string]),
-    categorias: cats,
+    categorias: (apariencia?.showCategoriesSection ?? true) ? cats : [],
+    categoriasTodas: cats,
     // Sin código no hay cupón. El panel ya manda null al vaciarlo, pero un
     // negocio que lo guardó antes de esa validación podría traer strings
     // vacíos — y ahí el home dibujaría el bloque oscuro con la caja punteada
     // en blanco, que se ve peor que no tener cupón.
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
-    productos: destacados.map(p => aProductoPlantilla(p, transferPct)),
+    // `productos` y `productosSecundarios` ya vienen de `contenidoDeApariencia`:
+    // son los estantes que muestran las filas propias de la plantilla.
     catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
-    productosSecundarios: masVendidos.map(p => aProductoPlantilla(p, transferPct)),
-    // Sin slides editados, se queda con los de muestra de `base` (mismo
-    // criterio que categorías/cupón: no dejar la sección vacía si el negocio
-    // todavía no cargó nada).
-    ...(base.heroPropio && heroSlides && heroSlides.length > 0
-      ? { slides: heroSlides.map(aSlidePlantilla) }
+    // Sin slides cargados, un hero neutro armado con lo que el negocio SÍ
+    // tiene: su nombre, su bajada y un botón al catálogo. Antes se quedaba
+    // con los de muestra de `base`, y una tienda de ropa con Nocturno puesta
+    // abría con "Auriculares V-90 Pro · Driver de 50 mm". Sin hero no se puede
+    // dejar: en varias plantillas es media portada.
+    ...(base.heroPropio
+      ? { slides: heroSlides && heroSlides.length > 0 ? heroSlides.map(x => aSlidePlantilla(x, base)) : [heroNeutro(base, marca, tagline)] }
       : {}),
     // El pie: el DISEÑO sigue siendo el de la plantilla (lo pone su `tema`),
     // pero el contenido pasa a ser el real. Antes quedaba el de la maqueta:
@@ -287,14 +412,16 @@ export function plantillaReal({
     // tiendas de verdad. Las columnas son las MISMAS que el pie normal de
     // Órbita (StorefrontFooter), para que la tienda diga lo mismo esté la
     // plantilla que esté.
-    pie: pieReal({ base: baseUrl, cats, contacto }),
+    pie: pieReal({ base: baseUrl, cats, contacto, conRedes: apariencia?.showSocialFooter ?? true }),
     ocultarPie: !mostrarPie,
   }
 }
 
 // Las columnas del pie con datos reales. `Categorías` solo aparece si la
 // tienda cargó alguna: una columna vacía se ve peor que no tenerla.
-function pieReal({ base, cats, contacto }: {
+function pieReal({ base, cats, contacto, conRedes }: {
+  // "Redes sociales en el pie de página", de Apariencia.
+  conRedes: boolean
   base: string
   cats: [string, string, string?][]
   contacto?: Contacto | null
@@ -311,7 +438,9 @@ function pieReal({ base, cats, contacto }: {
   columnas.push(['Tienda', [
     { label: 'Inicio', href: `${base}/` },
     { label: 'Catálogo', href: `${base}/catalogo` },
-    { label: 'Mis pedidos', href: `${base}/pedido` },
+    // A la pestaña del perfil, como el menú de la cuenta: `/pedido` a secas
+    // no es una página (solo existe `/pedido/<id>`) y daba 404.
+    { label: 'Mis pedidos', href: `${base}/perfil?tab=pedidos` },
   ]])
 
   columnas.push(['Mi cuenta', [
@@ -321,7 +450,7 @@ function pieReal({ base, cats, contacto }: {
 
   // Solo lo que el negocio realmente cargó — si no hay Instagram, no se
   // inventa un globito que no lleva a nada.
-  const redes = [
+  const redes = !conRedes ? [] : [
     contacto?.instagram ? { label: 'Instagram', href: urlRedSocial(contacto.instagram, 'instagram') } : null,
     contacto?.facebook ? { label: 'Facebook', href: urlRedSocial(contacto.facebook, 'facebook') } : null,
     contacto?.tiktok ? { label: 'TikTok', href: urlRedSocial(contacto.tiktok, 'tiktok') } : null,
@@ -336,6 +465,7 @@ function pieReal({ base, cats, contacto }: {
     legales: [
       { label: 'Términos y condiciones', href: `${base}/legales/terminos` },
       { label: 'Política de privacidad', href: `${base}/legales/privacidad` },
+      { label: 'Política de cookies', href: `${base}/legales/cookies` },
     ],
   }
 }

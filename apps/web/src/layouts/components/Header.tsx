@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
@@ -12,6 +12,10 @@ import {
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { esVisitanteDemo } from '@/lib/demo/modo'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { OrbiPet } from '@/components/orbi/pet/OrbiPet'
+import { ID_PANEL_ORBI } from '@/components/orbi/types'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -77,6 +81,12 @@ export default function Header({ onMenuClick }: Props) {
     // (nombre, rol, email, iniciales) salen de la sesión real en vez de estar
     // hardcodeados.
     const { logout, user } = useAuth()
+
+    // Orbi en la barra, al lado de la búsqueda (en escritorio y en el celular,
+    // donde el trigger del menú lateral queda dentro del drawer cerrado). Mismo
+    // store que el del sidebar y que Ctrl+K: abren y cierran el mismo panel.
+    const orbiAbierto = useOrbiStore(s => s.isOpen)
+    const alternarOrbi = useOrbiStore(s => s.toggle)
 
     // RBT-646: al entrar al panel, si el member tiene una preferencia de tema
     // guardada distinta a la de este navegador (por ejemplo, la cambió desde
@@ -250,8 +260,10 @@ export default function Header({ onMenuClick }: Props) {
             <style>{`
                 .admin-menu-btn    { display: none; }
                 .admin-search-wrap { display: flex; }
-                .admin-user-name   { display: block; }
                 .admin-bc-full     { display: flex; }
+                .admin-header-bar button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .admin-orbi-btn { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 1px; border-radius: 9999px; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
+                .admin-orbi-btn:hover { border-color: var(--color-primary) !important; }
                 .admin-bc-mobile   { display: none; }
                 @media (max-width: 768px) {
                     .admin-header-bar {
@@ -275,11 +287,20 @@ export default function Header({ onMenuClick }: Props) {
                     }
                     .admin-notif-list { max-height: calc(100vh - 140px) !important; }
                     .admin-menu-btn    { display: flex !important; }
+                    /* En el celular: solo la mascota, con 44px de área táctil. */
+                    .admin-orbi-btn    { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 8px; }
+                    .admin-orbi-label  { display: none; }
+                    .admin-header-sep  { display: none; }
                     .admin-search-wrap { display: none !important; }
-                    .admin-user-name   { display: none !important; }
                     .admin-bc-full     { display: none !important; }
                     .admin-bc-mobile   { display: flex !important; }
                     .dcto-page-head    { display: none !important; }
+                }
+                /* Con el botón de Orbi (44px) la barra de 320px dejaba ~38px
+                   para el título de la pantalla: quedaba en "C…". Se baja el
+                   de tema, que también se cambia desde Mi perfil. */
+                @media (max-width: 360px) {
+                    .admin-theme-btn   { display: none !important; }
                 }
             `}</style>
 
@@ -357,12 +378,39 @@ export default function Header({ onMenuClick }: Props) {
                     {/* Buscador global (oculto en mobile) — Fase 4, Ale */}
                     <BusquedaGlobal />
 
+                    {/* Orbi — al lado de la búsqueda: la mascota del menú lateral, que toma
+                        la forma del módulo en el que estás. En su propia página no va: ahí
+                        el chat ya es la pantalla, y se sale con el botón del encabezado. */}
+                    {seccion !== 'orbi' && (
+                        <button
+                            type="button"
+                            onClick={alternarOrbi}
+                            aria-label={orbiAbierto ? 'Cerrar Orbi AI' : 'Abrir Orbi AI'}
+                            aria-expanded={orbiAbierto}
+                            // Solo con el panel abierto: cerrado no está en el DOM y
+                            // un aria-controls a un id inexistente es inválido.
+                            aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
+                            title="Orbi AI"
+                            className="admin-orbi-btn"
+                            style={{
+                                flexShrink: 0, fontFamily: 'inherit',
+                                background: orbiAbierto ? 'var(--color-primary-bg)' : 'transparent',
+                                border: `1px solid ${orbiAbierto ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                color: 'var(--color-text)',
+                            }}
+                        >
+                            <OrbiPet size={34} animated={false} />
+                            <span className="admin-orbi-label" style={{ fontSize: 13, fontWeight: 600 }}>Orbi AI</span>
+                        </button>
+                    )}
+
+                    <span className="admin-header-sep" aria-hidden style={{ width: 1, height: 20, background: 'var(--color-border)', flexShrink: 0, margin: '0 2px' }} />
 
                     {/* Dark mode toggle */}
                     <button
                         onClick={() => cambiarTema(isDark ? 'light' : 'dark')}
                         aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
-                        className="ds-hover grid place-items-center rounded-lg"
+                        className="admin-theme-btn ds-hover grid place-items-center rounded-lg"
                         style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0 }}
                     >
                         {isDark ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}
@@ -521,26 +569,33 @@ export default function Header({ onMenuClick }: Props) {
 
                     {/* Usuario */}
                     <div className="relative" ref={menuRef} style={{ flexShrink: 0 }}>
+                        {/* Solo el avatar: el nombre y el rol van adentro del menú. */}
                         <button
+                            type="button"
                             onClick={() => setUserMenuAbierto(!userMenuAbierto)}
-                            className="ds-hover flex items-center gap-2 rounded-lg"
-                            style={{ padding: '6px 8px', background: userMenuAbierto ? 'var(--color-surface-alt)' : 'transparent', border: '1px solid transparent', transition: 'background 150ms ease' }}
+                            aria-label={`Tu cuenta${nombreUsuario ? `: ${nombreUsuario}` : ''}`}
+                            aria-haspopup="menu"
+                            aria-expanded={userMenuAbierto}
+                            title={nombreUsuario || 'Tu cuenta'}
+                            className="grid place-items-center rounded-full"
+                            style={{
+                                width: 36, height: 36, padding: 0, cursor: 'pointer',
+                                background: 'transparent',
+                                border: `2px solid ${userMenuAbierto ? 'var(--color-primary)' : 'transparent'}`,
+                                transition: 'border-color 150ms ease',
+                            }}
                         >
-                            <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
+                            <span className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
                                 {iniciales(nombreUsuario)}
-                            </div>
-                            <div className="admin-user-name text-left">
-                                <div className="text-sm font-medium leading-none mb-0.5" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
-                                <div className="text-xs leading-none" style={{ color: 'var(--color-muted)' }}>{rolUsuario}</div>
-                            </div>
-                            <ChevronDown size={14} strokeWidth={1.5} className="admin-user-name" style={{ color: 'var(--color-subtle)', transform: userMenuAbierto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
+                            </span>
                         </button>
 
                         {userMenuAbierto && (
                             <div className="absolute right-0 mt-1 w-52 rounded-xl overflow-hidden z-50" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.10)' }}>
                                 <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
                                     <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
-                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{emailUsuario}</div>
+                                    {rolUsuario && <div className="text-xs mt-0.5" style={{ color: 'var(--color-body)' }}>{rolUsuario}</div>}
+                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emailUsuario}</div>
                                 </div>
                                 <div className="p-1">
                                     <button className="ds-hover flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
@@ -554,6 +609,8 @@ export default function Header({ onMenuClick }: Props) {
                                         <Store size={16} strokeWidth={1.5} /> Ir a la tienda
                                     </button>
                                 </div>
+                                {/* El visitante de la demo no tiene una cuenta de la que salir. */}
+                                {!esVisitanteDemo() && (
                                 <div className="p-1" style={{ borderTop: '1px solid var(--color-border)' }}>
                                     {/* El velo de .ds-hover usa currentColor: acá el texto es
                                         --color-error, así que el hover tinta rojo suave solo,
@@ -564,6 +621,7 @@ export default function Header({ onMenuClick }: Props) {
                                         <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
                                     </button>
                                 </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -581,7 +639,7 @@ export default function Header({ onMenuClick }: Props) {
 // directo. El backend ya filtra los grupos según los permisos del miembro.
 
 const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: string[] }[] = [
-    { label: 'Dashboard',            seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
+    { label: 'Inicio',               seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
     { label: 'Pedidos',              seccion: 'pedidos',       alias: ['pedidos', 'ventas', 'ordenes', 'órdenes'] },
     { label: 'Historial de pedidos', seccion: 'pedidos',       vista: 'historial', alias: ['historial'] },
     { label: 'Cancelaciones y devoluciones', seccion: 'pedidos', vista: 'devoluciones', alias: ['postventa', 'cancelaciones', 'devoluciones', 'notas de credito', 'notas de crédito'] },

@@ -1,4 +1,4 @@
-import type { LlmToolDefinition } from '../llm/llm-adapter.interface';
+import type { LlmToolDefinition, LlmUsage } from '../llm/llm-adapter.interface';
 import type { OrbiSurface } from '../dto/orbi-chat.dto';
 
 export interface ToolExecutionContext {
@@ -6,6 +6,12 @@ export interface ToolExecutionContext {
   userId: string;
   surface: OrbiSurface;
   permissions: string[];
+  /**
+   * El rol de quien pregunta (del JWT). Lo usan las tools que muestran algo
+   * que por HTTP es solo de propietario/admin (`@Roles('owner','admin')`),
+   * como el estado de la suscripción. Opcional: el wizard no tiene rol.
+   */
+  roleName?: string;
   /**
    * Las opciones reales del paso actual del wizard. Van acá para que
    * selectWizardOption pueda RECHAZAR un key que no exista, en vez de confiar
@@ -16,6 +22,8 @@ export interface ToolExecutionContext {
    * no hacía nada, y el usuario no tenía forma de saber por qué.
    */
   availableOptions?: { key: string; label: string; description?: string }[];
+  /** El turno de Orbi que corre la tool (para atribuirle la IA que dispare). */
+  turnId?: string;
 }
 
 export interface ToolResult {
@@ -23,6 +31,8 @@ export interface ToolResult {
   data?: unknown;
   error?: string;
   label: string;
+  /** Consumo de IA que hizo la tool (ej. generateDescription). Solo para la ficha del turno: el motor lo saca antes de mandarle el resultado al modelo. */
+  consumo?: LlmUsage;
 }
 
 export interface OrbiTool {
@@ -42,7 +52,7 @@ export interface OrbiTool {
   steps?: string[];
   /**
    * La tool ESCRIBE en la base, así que no se ejecuta sola: se propone y la
-   * persona confirma con un clic (ver PendingActionStore y POST /orbi/confirm).
+   * persona confirma con un clic (ver PendingActionService y POST /orbi/confirm).
    *
    * Es la defensa contra la inyección indirecta de RBT-695. Un texto malicioso
    * guardado en el nombre de un cliente puede convencer al modelo de pedir un
@@ -61,8 +71,22 @@ export interface OrbiTool {
    * Sin esto el botón diría el nombre de la función, que es justo lo que no
    * tiene que ver — y además le impediría revisar si los argumentos que armó
    * el modelo son los que ella quería.
+   *
+   * Tiene que mostrar CADA valor que se va a escribir (invariante 4 del
+   * catálogo): lo que la tarjeta no muestra, la persona lo confirma sin verlo.
+   * Recibe el ctx y puede ser async para resolver datos legibles de la base
+   * (número de pedido, cliente, nombre de categoría), SIEMPRE acotados a
+   * ctx.businessId. Si el dato no existe, tira AccionInvalida.
    */
-  describirAccion?(args: Record<string, unknown>): string;
+  describirAccion?(args: Record<string, unknown>, ctx: ToolExecutionContext): string | Promise<string>;
+  /**
+   * Valida los argumentos con el DTO del endpoint HTTP equivalente y, si el
+   * service tiene reglas que dependen de la base, con esas también, acotadas
+   * a ctx.businessId (ver acciones/validar-args.ts). Corre en proponer(),
+   * antes de armar la tarjeta: si no pasa, no se propone y el modelo recibe
+   * el motivo.
+   */
+  validarArgs?(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<{ ok: true } | { ok: false; error: string }>;
   execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult>;
   toLlmDefinition(): LlmToolDefinition;
 }

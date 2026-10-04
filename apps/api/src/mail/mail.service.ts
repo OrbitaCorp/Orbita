@@ -95,7 +95,10 @@ const CTA_BUTTON_PARTIAL = `
 // aviso al equipo del negocio (new-order-team): así los dos se ven igual y un
 // cambio de diseño se hace en un solo lugar. Se invoca como
 // `{{> order-items-table this}}` y espera `items` ({name, quantity, price}) y
-// `total` ya formateados.
+// `total` ya formateados. Si el total no es la suma de los renglones llegan
+// además `subtotal`, `discounts` ({label, amount}) y `shipping` (ver
+// orders/order-mail-breakdown.ts) y se listan antes del total: sin eso el mail
+// mostraba un total menor que los productos sin decir por qué.
 const ORDER_ITEMS_TABLE_PARTIAL = `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;">
   <tr>
@@ -108,6 +111,25 @@ const ORDER_ITEMS_TABLE_PARTIAL = `
     <td style="padding:10px 0; border-top:1px solid #e3e8ee; font-size:13.5px; color:#1a1f36; text-align:right; white-space:nowrap;">{{this.price}}</td>
   </tr>
   {{/each}}
+  {{#if subtotal}}
+  <tr>
+    <td style="padding:10px 0 0; border-top:1px solid #e3e8ee; font-size:13px; color:#4f566b;">Subtotal</td>
+    <td style="padding:10px 0 0; border-top:1px solid #e3e8ee; font-size:13px; color:#4f566b; text-align:right; white-space:nowrap;">{{subtotal}}</td>
+  </tr>
+  {{#each discounts}}
+  <tr>
+    <td style="padding:6px 0 0; font-size:13px; color:#0e7a4b;">Descuento: {{this.label}}</td>
+    <td style="padding:6px 0 0; font-size:13px; color:#0e7a4b; text-align:right; white-space:nowrap;">−{{this.amount}}</td>
+  </tr>
+  {{/each}}
+  {{#if shipping}}
+  <tr>
+    <td style="padding:6px 0 0; font-size:13px; color:#4f566b;">Envío</td>
+    <td style="padding:6px 0 0; font-size:13px; color:#4f566b; text-align:right; white-space:nowrap;">{{shipping}}</td>
+  </tr>
+  {{/if}}
+  <tr><td colspan="2" style="height:10px; line-height:10px; font-size:0;">&nbsp;</td></tr>
+  {{/if}}
   <tr>
     <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36;">Total</td>
     <td style="padding:12px 0 0; border-top:2px solid #1a1f36; font-size:14px; font-weight:700; color:#1a1f36; text-align:right;">{{total}} <span style="font-weight:400; color:#8792a2; font-size:12px;">ARS</span></td>
@@ -193,6 +215,8 @@ export class MailService {
     // Dominio comprado por vencer: lo avisa Órbita, que es quien lo gestiona.
     'domain-expiring-soon',
     'platform-admin-login-code',
+    // Aviso a los admins de plataforma: Orbi pasó a mantenimiento.
+    'orbi-mantenimiento',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
     'platform-discount-offer',
     // Formulario de Soporte (Configuración → Soporte) — lo manda un negocio
@@ -244,6 +268,10 @@ export class MailService {
     // ShieldCheck — segundo factor del login de platform admin.
     'platform-admin-login-code': this.svgIcon(
       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    ),
+    // AlertTriangle — Orbi pasó a mantenimiento (aviso a admins).
+    'orbi-mantenimiento': this.svgIcon(
+      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     ),
     // Lock — la contraseña ya se cambió (seguridad).
     'password-changed': this.svgIcon(
@@ -566,6 +594,28 @@ export class MailService {
     return env.NODE_ENV === 'production' ? `claves: ${Object.keys(context).join(', ')}` : JSON.stringify(context);
   }
 
+  // La demo pública (Business.isDemo, demo.orbita.site) no manda ningún mail:
+  // ni avisos al dueño, ni resúmenes, ni nada a sus clientes sembrados. Se
+  // corta acá, en el envío, en vez de en cada llamador. Tampoco sale nada a
+  // un dominio .invalid (RFC 2606): son las cuentas inventadas de la demo.
+  // Se responde "enviado" para que ningún flujo lo trate como un error.
+  private readonly demoCache = new Map<string, { esDemo: boolean; hasta: number }>();
+
+  private async esDeLaDemo(to: string, meta?: MailMeta): Promise<boolean> {
+    if (/\.invalid$/i.test(to.trim())) return true;
+    const businessId = meta?.businessId;
+    if (!businessId) return false;
+    const ahora = Date.now();
+    const cacheado = this.demoCache.get(businessId);
+    if (cacheado && cacheado.hasta > ahora) return cacheado.esDemo;
+    const negocio = await this.prisma.business
+      .findUnique({ where: { id: businessId }, select: { isDemo: true } })
+      .catch(() => null);
+    const esDemo = negocio?.isDemo ?? false;
+    this.demoCache.set(businessId, { esDemo, hasta: ahora + 5 * 60 * 1000 });
+    return esDemo;
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,
@@ -580,6 +630,7 @@ export class MailService {
   ): Promise<boolean> {
     subject = limpiarAsunto(subject);
     if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, template, meta);
+    if (await this.esDeLaDemo(to, meta)) return true;
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${MailService.datosDelStub(context)}`);
       await this.registrar(to, subject, template, EmailSendStatus.SIMULATED, meta);
@@ -645,6 +696,7 @@ export class MailService {
   async sendCustomEmail(to: string, subject: string, htmlBody: string, meta?: MailMeta): Promise<boolean> {
     subject = limpiarAsunto(subject);
     if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, null, meta);
+    if (await this.esDeLaDemo(to, meta)) return true;
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Body: ${htmlBody.substring(0, 200)}`);
       await this.registrar(to, subject, null, EmailSendStatus.SIMULATED, meta);
@@ -820,6 +872,9 @@ export class MailService {
       // El template los imprime tal cual: llegan ya formateados ("$12.500").
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       // "Ver mi pedido" — undefined para un comprador invitado (sin cuenta):
       // esa página exige sesión de cliente, y un invitado no tiene con qué
       // loguearse ahí. Quien llama decide (ver orders.service.ts) según si
@@ -842,6 +897,9 @@ export class MailService {
       orderNumber: number;
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       orderUrl?: string;
     },
     meta?: MailMeta,
@@ -861,6 +919,9 @@ export class MailService {
       orderNumber: number;
       total: string;
       items: Array<{ name: string; quantity: number; price: string }>;
+      subtotal?: string;
+      discounts?: Array<{ label: string; amount: string }>;
+      shipping?: string;
       // Link al pedido en el panel.
       orderUrl: string;
     },
@@ -1235,6 +1296,15 @@ export class MailService {
   }
 
   // ── Platform admin (segundo factor del login, RBT-647) ────────────────
+
+  /** Aviso a un admin de plataforma: Orbi (IA) pasó a mantenimiento, o sigue ahí (recordatorio cada 24 h). */
+  async sendOrbiMantenimiento(
+    to: string,
+    data: { motivo: string; detalle: string; desde: string; recordatorio: boolean; panelUrl: string },
+  ): Promise<boolean> {
+    const asunto = data.recordatorio ? 'Recordatorio: Orbi sigue en mantenimiento' : 'Orbi pasó a mantenimiento';
+    return this.sendOrLog(to, asunto, 'orbi-mantenimiento', data);
+  }
 
   async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
     await this.sendOrLog(to, 'Tu código de acceso a Órbita', 'platform-admin-login-code', data);

@@ -64,6 +64,7 @@ export class GroqAdapter implements LlmAdapter {
     tools?: LlmToolDefinition[];
     /** Ignorado: es un ID de Gemini. Groq usa `this.modelo`. */
     model?: string;
+    signal?: AbortSignal;
   }): AsyncGenerator<LlmEvent> {
     const client = this.getClient();
 
@@ -109,10 +110,14 @@ export class GroqAdapter implements LlmAdapter {
       temperature: this.temperatura,
       reasoning_effort: this.razonamiento,
       max_completion_tokens: 4096,
+    }, {
+      // Spec §3.7: si el cliente se fue, el SDK corta el request y la lectura
+      // del stream (tira APIUserAbortError, que no es de disponibilidad).
+      signal: params.signal,
     });
 
     let currentToolCall: { id: string; name: string; argsJson: string } | null = null;
-    let usage: { promptTokens: number; completionTokens: number } | null = null;
+    let usage: { promptTokens: number; completionTokens: number; cachedTokens: number; thinkingTokens: number } | null = null;
 
     for await (const chunk of stream) {
       // El chunk con el consumo viene SIN choices, así que tiene que leerse
@@ -122,11 +127,19 @@ export class GroqAdapter implements LlmAdapter {
       // los tipos del SDK).
       const crudo = (chunk as { usage?: unknown; x_groq?: { usage?: unknown } });
       const u = (crudo.usage ?? crudo.x_groq?.usage) as
-        { prompt_tokens?: number; completion_tokens?: number } | undefined;
+        | {
+            prompt_tokens?: number;
+            completion_tokens?: number;
+            prompt_tokens_details?: { cached_tokens?: number };
+            completion_tokens_details?: { reasoning_tokens?: number };
+          }
+        | undefined;
       if (u?.prompt_tokens !== undefined) {
         usage = {
           promptTokens: u.prompt_tokens ?? 0,
           completionTokens: u.completion_tokens ?? 0,
+          cachedTokens: u.prompt_tokens_details?.cached_tokens ?? 0,
+          thinkingTokens: u.completion_tokens_details?.reasoning_tokens ?? 0,
         };
       }
 
@@ -171,7 +184,7 @@ export class GroqAdapter implements LlmAdapter {
     }
 
     if (usage) {
-      yield { type: 'usage', usage: { model: this.modelo, ...usage } };
+      yield { type: 'usage', usage: { model: this.modelo, ...usage, provider: 'groq' } };
     }
 
     yield { type: 'done' };
