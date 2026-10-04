@@ -6,17 +6,15 @@ import Header from './components/Header'
 import SubscriptionStatusBanner from './components/SubscriptionStatusBanner'
 import EmailVerificationBanner from './components/EmailVerificationBanner'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
-import { OrbiPanel } from '@/components/orbi/OrbiPanel'
-import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 import { SidebarModeProvider } from './SidebarModeContext'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
-import { useFlagOrbiV2 } from '@/modules/orbi/estado/flag'
 
-// El Orbi nuevo (fase 3) se carga aparte y solo con el interruptor prendido:
-// apagado, el panel no baja ni un byte de él.
+// El Orbi del panel (modules/orbi). Se carga aparte y solo en el navegador:
+// el primer render del panel no lo espera. El Orbi viejo (components/orbi)
+// queda solo para el alta (surface 'wizard').
 const OrbiV2 = dynamic(() => import('@/modules/orbi/vistas/OrbiV2'), { ssr: false })
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
@@ -44,7 +42,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
 function AdminShell({ children }: { children: ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const orbiV2 = useFlagOrbiV2()
     useOrbiKeyboardShortcut()
 
     // Bloquea el scroll del body/html mientras se esté en el panel admin.
@@ -133,8 +130,9 @@ function AdminShell({ children }: { children: ReactNode }) {
                 </main>
             </div>
 
-            {orbiV2 ? <OrbiV2 /> : <OrbiPanel />}
-            <OrbiWelcomeSeeder />
+            {/* Sin OrbiWelcomeSeeder: el saludo sembrado tapaba el estado
+                vacío del Orbi del panel (bienvenida y sugerencias). */}
+            <OrbiV2 />
 
             {/* Tutorial de primeros pasos: arranca solo para todo negocio que
                 nunca lo tocó y vive en la base (businesses.tutorial) hasta que

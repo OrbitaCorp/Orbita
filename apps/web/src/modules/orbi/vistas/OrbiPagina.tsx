@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { OrbiV2Contexto } from '../piezas/contexto'
 import { agruparSesiones, horaCorta, TITULO_POR_DEFECTO } from '../estado/agrupar'
 import { abrirSesion, nuevaSesion, useAccionesDeSesion, useListaDeSesiones } from '../estado/sesiones'
-import { useFlagOrbiV2 } from '../estado/flag'
 import { rutaDeVuelta } from '../estado/vuelta'
 import { puedeVerElEquipo } from '../estado/uso'
 import type { ResumenDeSesion } from '../api/sesiones'
@@ -205,11 +204,10 @@ function ColumnaDeSesiones({ enUso, onIrAlChat, onUsoDelEquipo }: { enUso: boole
  */
 export default function OrbiPagina() {
   const router = useRouter()
-  const prendido = useFlagOrbiV2()
   const ancha = useMediaQuery('(min-width: 1024px)')
   const rutas = useRutasDeOrbi()
   const { anunciar, region } = useAnunciador()
-  useDisponibilidadOrbi('panel', prendido)
+  useDisponibilidadOrbi('panel', true)
   const { user } = useAuth()
   const veElEquipo = puedeVerElEquipo(user?.type === 'member' ? user.role : undefined)
   const enUso = router.query.vista === 'uso'
@@ -229,15 +227,6 @@ export default function OrbiPagina() {
     void router.push(rutaDeVuelta(router.query.desde, rutas.inicio))
   }, [abrirOrbi, router, rutas.inicio])
   const contexto = useMemo(() => ({ vista: 'pagina' as const, navegar, anunciar }), [navegar, anunciar])
-
-  if (!prendido) {
-    return (
-      <div className={s.vacio} style={{ minHeight: '60vh' }}>
-        <h2>Esta página todavía no está disponible</h2>
-        <p>Orbi se abre desde el botón de la barra de arriba.</p>
-      </div>
-    )
-  }
 
   return (
     <OrbiV2Contexto.Provider value={contexto}>

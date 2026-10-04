@@ -184,7 +184,7 @@ Estado de las pruebas al cierre: API `pnpm typecheck` limpio, `pnpm test` 1542 +
 9. **Cambió lo que dice el snapshot:** sin stock, ventas netas, mes argentino y pendientes de siempre. Orbi va a decir números distintos de los de hoy en producción; ahora coinciden con las pantallas.
 10. **Tool de período:** deja afuera la actividad reciente (nombres de clientes: texto de terceros), el canal (el dashboard lo suma solo en 2 semanas) y las imágenes.
 11. **Causas de pausa:** `estadoPrimerosPasos` distingue plataforma, mora, baja del espacio y pausa del dueño. A quien no es propietario o admin no le cuenta el detalle de la cuenta.
-12. **Fase 3, decisiones provisorias** (spec §11): selector de modos oculto hasta la fase 4, ruta `/admin/ventas/orbi?vista=chat`, título automático determinista, archivadas borradas a los 180 días sin actividad, flag global `NEXT_PUBLIC_ORBI_PANEL_V2`. Todas esperan a Alan.
+12. **Fase 3, decisiones provisorias** (spec §11): selector de modos oculto hasta la fase 4, ruta `/admin/ventas/orbi?vista=chat`, título automático determinista, archivadas borradas a los 180 días sin actividad, flag global `NEXT_PUBLIC_ORBI_PANEL_V2` (quitado el 2026-10-04: el Orbi nuevo es el del panel para todos). Todas esperan a Alan.
 13. **Mantenimiento del manual con regla y tests, sin hook `PostToolUse`.** Se sumaron `.claude/rules/manual.md` y una sección al `CLAUDE.md` raíz (lo lee todo el equipo).
 14. **Sin capítulo "Qué no hace Órbita":** es una decisión de producto.
 15. **`navigateTo` y la forma de las rutas, sin tocar:** en el acceso viejo por `/admin/<negocioId>` los botones de Orbi pierden el negocio, y ya pasaba antes.
