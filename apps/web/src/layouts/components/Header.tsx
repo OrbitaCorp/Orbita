@@ -264,8 +264,6 @@ export default function Header({ onMenuClick }: Props) {
                 .admin-header-bar button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
                 .admin-orbi-btn { display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px 0 1px; border-radius: 9999px; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; }
                 .admin-orbi-btn:hover { border-color: var(--color-primary) !important; }
-                .admin-orbi-kbd { font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--color-border); color: var(--color-muted); font-family: inherit; }
-                @media (max-width: 1279px) { .admin-orbi-kbd { display: none; } }
                 .admin-bc-mobile   { display: none; }
                 @media (max-width: 768px) {
                     .admin-header-bar {
@@ -387,12 +385,12 @@ export default function Header({ onMenuClick }: Props) {
                         <button
                             type="button"
                             onClick={alternarOrbi}
-                            aria-label={orbiAbierto ? 'Cerrar Orbi' : 'Abrir Orbi'}
+                            aria-label={orbiAbierto ? 'Cerrar Orbi AI' : 'Abrir Orbi AI'}
                             aria-expanded={orbiAbierto}
                             // Solo con el panel abierto: cerrado no está en el DOM y
                             // un aria-controls a un id inexistente es inválido.
                             aria-controls={orbiAbierto ? ID_PANEL_ORBI : undefined}
-                            title="Orbi (Ctrl+K)"
+                            title="Orbi AI"
                             className="admin-orbi-btn"
                             style={{
                                 flexShrink: 0, fontFamily: 'inherit',
@@ -402,8 +400,7 @@ export default function Header({ onMenuClick }: Props) {
                             }}
                         >
                             <OrbiPet size={34} animated={false} />
-                            <span className="admin-orbi-label" style={{ fontSize: 13, fontWeight: 600 }}>Orbi</span>
-                            <kbd className="admin-orbi-kbd" aria-hidden>Ctrl K</kbd>
+                            <span className="admin-orbi-label" style={{ fontSize: 13, fontWeight: 600 }}>Orbi AI</span>
                         </button>
                     )}
 

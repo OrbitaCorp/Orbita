@@ -151,7 +151,7 @@ export const HERRAMIENTAS: HerramientaCopy[] = [
     { id: 'buscador', titulo: 'Búsqueda global', texto: 'Buscá un pedido, un cliente, un producto o una sección desde cualquier pantalla. Escribí y listo.' },
     { id: 'campana', titulo: 'Notificaciones', texto: 'La campana junta lo que pasó mientras no estabas: pedidos nuevos, avisos del sistema. El número es lo sin leer.' },
     { id: 'tema', titulo: 'Modo oscuro', texto: 'Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta.' },
-    { id: 'orbi', titulo: 'Orbi, el asistente', texto: 'Orbi responde preguntas sobre tu negocio y te ayuda a operar el panel. Se abre con Ctrl+K desde cualquier lado.' },
+    { id: 'orbi', titulo: 'Orbi, el asistente', texto: 'Orbi responde preguntas sobre tu negocio y te ayuda a operar el panel. Se abre con el botón Orbi AI, al lado de la búsqueda.' },
     { id: 'usuario', titulo: 'Tu cuenta', texto: 'Desde tu avatar: "Mi perfil" (tus datos, tema y contraseña), "Ir a la tienda" para verla como cliente, y "Cerrar sesión". En Mi perfil también confirmás tu email, que es lo que nos deja recuperarte la cuenta.' },
 ]
 
@@ -334,7 +334,7 @@ export const TAREAS_CHECKLIST_ETAPA2: TareaChecklist[] = [
     {
         id: 'herramientas', grupo: GRUPO_DIA, titulo: 'Usá la barra de arriba',
         detalle: 'Te sigue por todo el panel: el buscador encuentra un pedido, un cliente o un producto desde cualquier pantalla; la campana junta lo que pasó mientras no estabas; y en tu avatar están "Mi perfil", el modo oscuro y "Ir a la tienda".',
-        tip: 'Orbi, el asistente, se abre con Ctrl+K desde donde estés: le preguntás por tu negocio y te ayuda a operar el panel.',
+        tip: 'Orbi, el asistente, se abre con el botón Orbi AI de la barra de arriba, estés donde estés: le preguntás por tu negocio y te ayuda a operar el panel.',
         destino: ['ventas', 'dashboard'], destinoLabel: 'Ir al Inicio',
         seccionDestino: 'dashboard', anclaDestino: 'header:buscador || header:usuario',
         guiaLabel: 'Buscá desde acá, estés donde estés',

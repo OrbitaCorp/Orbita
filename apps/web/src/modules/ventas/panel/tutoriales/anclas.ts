@@ -71,7 +71,7 @@ function botonPorTexto(texto: string): HTMLElement | null {
 // CSS según el ancho, así que no alcanza con "el primero que exista": hay que
 // tomar el primero que se vea, o en escritorio el tutorial apuntaría al botón
 // oculto de la barra.
-export const SELECTORES_ORBI = ['[aria-label="Abrir Orbi"]', '[title="Orbi AI (Ctrl+K)"]'] as const
+export const SELECTORES_ORBI = ['[aria-label="Abrir Orbi AI"]', '[title="Orbi AI"]'] as const
 
 /** Primer selector de la lista cuyo elemento existe Y se ve. Pura: el DOM entra por parámetro. */
 export function primeroVisible<T>(
