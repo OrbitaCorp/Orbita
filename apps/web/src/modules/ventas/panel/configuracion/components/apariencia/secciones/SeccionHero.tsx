@@ -21,10 +21,12 @@ import { moverElemento, subirImagenApariencia, type PropsSeccion } from '../util
 // explícito de que esta plantilla "permita solamente agregar/editar dos
 // imágenes". Los datos de más no se borran (siguen ahí por si se vuelve
 // a un home sin tope), solo se dejan de listar mientras el tope aplica.
-export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, onToast }: PropsSeccion & {
+export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, heroSinFoto, onToast }: PropsSeccion & {
     soloContenido: boolean
     heroMax: number | undefined
     heroNoRotativo: boolean
+    // El hero de la plantilla activa es solo texto: no se pide la foto.
+    heroSinFoto: boolean
     onToast: (m: string) => void
 }) {
     const slidersVisibles = heroMax ? ap.sliders.slice(0, heroMax) : ap.sliders
@@ -84,8 +86,10 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, o
             <FieldLabel
                 ayuda={AYUDA_SECCIONES[heroNoRotativo ? 'slidersFijos' : 'sliders']}
                 help={heroNoRotativo
-                    ? 'Las dos imágenes del hero de esta plantilla. No rotan: quedan fijas, una a cada lado.'
-                    : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}
+                    ? 'Las imágenes del hero de esta plantilla. No rotan: cada una tiene su lugar fijo en la portada.'
+                    : heroSinFoto
+                        ? 'El hero de esta plantilla es solo texto, sin foto: es parte de su diseño. Cada slide tiene su título, su bajada y su botón, y van rotando.'
+                        : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}
             >
                 {heroNoRotativo ? 'Imágenes del hero' : 'Sliders del hero'}
             </FieldLabel>
@@ -103,6 +107,7 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, o
                         index={i}
                         defaultOpen={i === 0}
                         soloTexto={soloContenido}
+                        sinFoto={heroSinFoto}
                         etiqueta={heroNoRotativo ? 'Imagen' : 'Slide'}
                         onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                         onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}

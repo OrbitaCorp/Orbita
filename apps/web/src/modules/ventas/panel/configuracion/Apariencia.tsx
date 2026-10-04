@@ -82,7 +82,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // para no llamarlo "slider"/"carrusel" en la UI de una plantilla cuyo
     // diseño no contempla eso (pedido explícito, con capturas de la maqueta
     // original: dos imágenes fijas, nunca rotando).
-    const heroNoRotativo = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.heroPropio
+    //
+    // Lo marca el tope de slides (`heroMaxSlides`), no `heroPropio`: casi
+    // todas las plantillas dibujan su propio hero y aun así lo rotan. Con
+    // `heroPropio` solo, a las veinticuatro se les decía "las dos imágenes,
+    // no rotan" arriba de un carrusel de tres.
+    const plantillaDelHero = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
+    const heroNoRotativo = !!plantillaDelHero?.heroPropio && plantillaDelHero.heroMaxSlides !== undefined
+    // El hero `minimo` de una receta es solo tipografía sobre un fondo liso
+    // (Lienzo, Sobrio, Sello): no dibuja la foto del slide. Ofrecer subirla
+    // era un campo que no movía nada (reportado con captura sobre Lienzo).
+    const heroSinFoto = !!plantillaDelHero?.receta?.bloques.some(b => b.t === 'hero' && b.estilo === 'minimo')
     // Escaparate (o cualquier plantilla que declare headerBold): el toggle
     // de "ícono de marca" solo tiene sentido ahí — las demás siempre
     // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
@@ -158,7 +168,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         </>
     )
 
-    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} onToast={onToast} />
+    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} heroSinFoto={heroSinFoto} onToast={onToast} />
     const seccionesCards = <SeccionesPlantilla ap={ap} set={set} seccionesPlantilla={seccionesPlantilla} categorias={categorias} productos={productos} onToast={onToast} />
     const headerCard = <SeccionHeaderPlantilla ap={ap} set={set} conIconoOpcional={conIconoOpcional} enlaces={enlaces} />
 

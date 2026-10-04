@@ -19,7 +19,7 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto, etiqueta = 'Slide', onToast }: {
+export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto, sinFoto, etiqueta = 'Slide', onToast }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
     canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
@@ -30,6 +30,10 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
     // dueño — mostrarlos acá invitaría a romper el diseño que la plantilla
     // ya definió. Solo imagen + texto quedan editables.
     soloTexto?: boolean
+    // La plantilla activa no dibuja la foto del slide (hero de solo texto):
+    // no se pide, y la miniatura del encabezado tampoco se muestra. La foto
+    // que ya estuviera cargada no se borra: vuelve a verse con otra plantilla.
+    sinFoto?: boolean
     // "Imagen" en vez de "Slide" para una plantilla sin rotación (Escaparate,
     // ver heroNoRotativo en Apariencia.tsx) — son dos posiciones fijas, no
     // slides de un carrusel, y llamarlas "slide" ahí sugiere algo que el
@@ -44,7 +48,7 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
             {/* Header colapsable */}
             <div className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
-                <span style={{ width: 40, height: 28, borderRadius: 6, background: SLIDE_GRADS[index % SLIDE_GRADS.length], flexShrink: 0, ...(slide.img ? { backgroundImage: `url(${slide.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }} />
+                {!sinFoto && <span style={{ width: 40, height: 28, borderRadius: 6, background: SLIDE_GRADS[index % SLIDE_GRADS.length], flexShrink: 0, ...(slide.img ? { backgroundImage: `url(${slide.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }} />}
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{etiqueta} {index + 1}: {slide.titulo || 'Sin título'}</span>
                 {/* Orden — mismas flechas que ordenan la lista, sin drag and
                     drop (no hay ninguna librería de DnD en el proyecto). */}
@@ -73,8 +77,10 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
             {/* Contenido */}
             {open && (
                 <div style={{ padding: '14px' }}>
+                    {!sinFoto && (<>
                     <FieldLabel help={`Imagen de fondo de ${etiqueta === 'Imagen' ? 'esta posición' : 'este slide'} (1440×600px recomendado)`}>Imagen{etiqueta === 'Imagen' ? '' : ' del slide'}</FieldLabel>
                     <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG o HEIC · máx 10MB" onToast={onToast} />
+                    </>)}
                     {/* Pedido explícito (24/09/2026): habilitado SOLO con "Imagen
                         centrada" — es el único estilo pensado para una foto sin
                         fondo (queda compuesta sobre el patrón decorativo). Con
@@ -180,7 +186,7 @@ export function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMo
                     )}
                     </>)}
 
-                    <Divider />
+                    {!sinFoto && <Divider />}
                     <div><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={slide.subtitulo} onChange={v => onChange({ ...slide, subtitulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Texto del botón CTA</FieldLabel><Inp value={slide.cta} onChange={v => onChange({ ...slide, cta: v })} maxLength={30} /></div>
