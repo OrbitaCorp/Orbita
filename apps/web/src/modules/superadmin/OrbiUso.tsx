@@ -9,7 +9,7 @@ import {
 } from './ui'
 import { LineSeriesChart } from './charts'
 import {
-  usd, usdEje, tokens, ms, pct, etiquetaDeTools, mesesRecientes, mesActualArgentina, etiquetaDeMes, porcentajeDe,
+  usd, usdEje, tokens, creditosTxt, avisoSinCosto, ms, pct, etiquetaDeTools, mesesRecientes, mesActualArgentina, etiquetaDeMes, porcentajeDe,
   excedido, leerCreditos, pasosDe, contextoDe, estadoDelTurno, puntosDeSerie, lecturaEmpezada,
 } from './orbiUsoFormato'
 
@@ -97,8 +97,8 @@ function Resumen({ data, onNegocio, cargando }: {
     <>
       <Grid small>
         <Kpi label="Mensajes" value={tokens(k.mensajes)} />
-        <Kpi label="Costo" value={usd(k.costoUsd)} accent />
-        <Kpi label="Créditos" value={tokens(k.creditos)} />
+        <Kpi label="Costo" value={usd(k.costoUsd)} hint={avisoSinCosto(k.mensajesSinCosto)} accent />
+        <Kpi label="Créditos" value={creditosTxt(k.creditos)} />
         <Kpi label="Tokens de entrada" value={tokens(k.promptTokens)} hint={`${pct(porcentajeDe(k.cachedTokens, k.promptTokens))} desde la caché`} />
         <Kpi label="Tokens de salida" value={tokens(k.completionTokens)} hint={`${pct(porcentajeDe(k.thinkingTokens, k.completionTokens))} de pensamiento`} />
         <Kpi label="Latencia (mediana)" value={ms(k.latenciaP50)} hint={`p95: ${ms(k.latenciaP95)} · sin los frenados por cupo`} />
@@ -163,7 +163,7 @@ function Resumen({ data, onNegocio, cargando }: {
               </button>,
               <span key="m" style={mono}>{tokens(n.mensajes)}</span>,
               <span key="c" style={mono}>{usd(n.costoUsd)}</span>,
-              <span key="cr" style={mono}>{tokens(n.creditos)} <span style={{ color: 'var(--color-muted)' }}>/ {tokens(n.cupo)}</span></span>,
+              <span key="cr" style={mono}>{creditosTxt(n.creditos)} <span style={{ color: 'var(--color-muted)' }}>/ {tokens(n.cupo)}</span></span>,
               <PorcentajeDelCupo key="p" porcentaje={n.porcentaje} />,
             ],
           }))}
@@ -198,6 +198,8 @@ function DetalleDeNegocio({ businessId, nombre, mes, lecturaHabilitada, onVolver
   const [ajustando, setAjustando] = useState(false)
   const [miembro, setMiembro] = useState<{ id: string; nombre: string } | null>(null)
   const fichasRef = useRef<HTMLDivElement>(null)
+
+  const sinCosto = avisoSinCosto(data?.miembros.reduce((t, m) => t + m.mensajesSinCosto, 0))
 
   function filtrarPorMiembro(id: string, nombreMiembro: string) {
     setMiembro({ id, nombre: nombreMiembro })
@@ -241,6 +243,8 @@ function DetalleDeNegocio({ businessId, nombre, mes, lecturaHabilitada, onVolver
             )}
           </Card>
 
+          {sinCosto && <div style={aviso}>{sinCosto[0].toUpperCase() + sinCosto.slice(1)}: el costo y los créditos de esos mensajes figuran como "Sin dato".</div>}
+
           <Card title="Miembros" subtitle="Elegí uno para ver solo sus mensajes" noPad>
             {data.miembros.length === 0 ? <Empty text="Nadie usó Orbi en este negocio este mes." /> : (
               <Table
@@ -257,7 +261,7 @@ function DetalleDeNegocio({ businessId, nombre, mes, lecturaHabilitada, onVolver
                       {m.nombre}{miembro?.id === m.memberId ? ' (filtrando)' : ''}
                     </button>,
                     <span key="me" style={mono}>{tokens(m.mensajes)}</span>,
-                    <span key="cr" style={mono}>{tokens(m.creditos)}</span>,
+                    <span key="cr" style={mono}>{creditosTxt(m.creditos)}</span>,
                     <span key="c" style={mono}>{usd(m.costoUsd)}</span>,
                     <span key="e" style={mono}>{tokens(m.promptTokens)}</span>,
                     <span key="s" style={mono}>{tokens(m.completionTokens)}</span>,
@@ -501,7 +505,7 @@ function DetalleDeFicha({ t, lecturaHabilitada, onAbrirConversacion }: {
         {dato('Modelo', t.model ?? '—')}
         {dato('Proveedor', t.provider ?? '—')}
         {dato('Módulo', t.module ?? '—')}
-        {dato('Créditos', tokens(t.credits))}
+        {dato('Créditos', creditosTxt(t.credits))}
         {dato('Costo de tools', usd(t.toolsCostUsd))}
         {dato('Acciones', `${t.actionsProposed} propuestas · ${t.actionsConfirmed} confirmadas · ${t.actionsRejected} rechazadas`)}
         {dato('Escrituras rechazadas', t.writesRejected)}

@@ -5,14 +5,24 @@ import type { OrbiCaracteresDelContexto, OrbiPasoDelTurno, OrbiToolDelPaso } fro
 // No se llama orbiUso.ts: en Windows (sistema de archivos sin mayúsculas)
 // chocaría con OrbiUso.tsx, el mismo problema que markdown.ts vs Markdown.tsx.
 
+export const SIN_DATO = 'Sin dato'
+
 // Debajo de 10 centavos se ven 4 decimales: un mensaje cuesta fracciones de
 // centavo y con 2 decimales todo daría "USD 0,00".
-export const usd = (n: number | null | undefined) => (n == null ? '—' : `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: n < 0.1 ? 4 : 2, maximumFractionDigits: n < 0.1 ? 4 : 2 })}`)
+// null = no se midió el costo (mensajes de antes del 4/10/2026): "Sin dato", nunca USD 0.
+export const usd = (n: number | null | undefined) => (n == null ? SIN_DATO : `USD ${n.toLocaleString('es-AR', { minimumFractionDigits: n < 0.1 ? 4 : 2, maximumFractionDigits: n < 0.1 ? 4 : 2 })}`)
 /** Eje Y del costo diario: corto y sin "USD" (lo dice el título), para no comerse el ancho del gráfico. */
 export const usdEje = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: Math.abs(n) < 1 ? 3 : 1 })
+/** Créditos de un mensaje o de un grupo: null = no se midieron ("Sin dato"). */
+export const creditosTxt = (n: number | null | undefined) => (n == null ? SIN_DATO : n.toLocaleString('es-AR'))
 export const tokens = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('es-AR'))
 export const ms = (n: number | null | undefined) => (n == null ? '—' : n < 1000 ? `${Math.round(n)} ms` : `${(n / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 })} s`)
 export const etiquetaDeTools = (t: string) => (t ? t : 'Charla, sin tools')
+/** Aviso de los mensajes a los que no se les midió el costo. undefined si no hay ninguno. */
+export function avisoSinCosto(n: number | null | undefined): string | undefined {
+  if (!n || n <= 0) return undefined
+  return `${n.toLocaleString('es-AR')} ${n === 1 ? 'mensaje sin dato' : 'mensajes sin dato'} de costo (anteriores al 4/10)`
+}
 export const pct = (n: number | null | undefined) => (n == null ? '—' : `${Math.round(n)} %`)
 
 /** Qué parte de `total` es `parte`, en %. Sin total no hay porcentaje (no un 0 que engañe). */
@@ -117,6 +127,6 @@ export function estadoDelTurno(status: string): { label: string; tone: Tono } {
  * pasa por `new Date()`: a medianoche UTC se dibujarían un día antes en
  * Argentina, así que van a mediodía UTC (mismo día en cualquier huso).
  */
-export function puntosDeSerie(serie: { dia: string; mensajes: number; costoUsd: number }[]): { date: string; mensajes: number; costo: number }[] {
-  return serie.map((s) => ({ date: `${s.dia}T12:00:00Z`, mensajes: s.mensajes, costo: s.costoUsd }))
+export function puntosDeSerie(serie: { dia: string; mensajes: number; costoUsd: number | null }[]): { date: string; mensajes: number; costo: number }[] {
+  return serie.map((s) => ({ date: `${s.dia}T12:00:00Z`, mensajes: s.mensajes, costo: s.costoUsd ?? 0 }))
 }

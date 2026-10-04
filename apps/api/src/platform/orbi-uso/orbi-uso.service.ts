@@ -18,8 +18,11 @@ export interface ResumenDeUso {
   lecturaHabilitada: boolean;
   kpis: {
     mensajes: number;
-    costoUsd: number;
-    creditos: number;
+    /** null = ningún mensaje del mes tiene costo medido ("Sin dato"), no "gratis": los de antes del 2026-10-04 no lo guardaban. */
+    costoUsd: number | null;
+    creditos: number | null;
+    /** Mensajes (sin contar los frenados por cupo) a los que no se les midió el costo. */
+    mensajesSinCosto: number;
     promptTokens: number;
     cachedTokens: number;
     completionTokens: number;
@@ -38,9 +41,9 @@ export interface ResumenDeUso {
     accionesRechazadas: number;
     escriturasRechazadas: number;
   };
-  serie: { dia: string; mensajes: number; costoUsd: number }[];
-  acciones: { tools: string; mensajes: number; costoPromedioUsd: number; costoTotalUsd: number; entradaPromedio: number; latenciaPromedio: number }[];
-  negocios: { businessId: string; nombre: string; mensajes: number; costoUsd: number; creditos: number; cupo: number; porcentaje: number }[];
+  serie: { dia: string; mensajes: number; costoUsd: number | null }[];
+  acciones: { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number; latenciaPromedio: number }[];
+  negocios: { businessId: string; nombre: string; mensajes: number; costoUsd: number | null; creditos: number | null; mensajesSinCosto: number; cupo: number; porcentaje: number }[];
 }
 
 export interface DetalleDeNegocio {
@@ -55,8 +58,9 @@ export interface DetalleDeNegocio {
     memberId: string;
     nombre: string;
     mensajes: number;
-    costoUsd: number;
-    creditos: number;
+    costoUsd: number | null;
+    creditos: number | null;
+    mensajesSinCosto: number;
     promptTokens: number;
     completionTokens: number;
     latenciaP50: number | null;
@@ -98,7 +102,7 @@ export interface FichaDeTurno {
 type FilaKpis = ResumenDeUso['kpis'];
 
 const KPIS_VACIOS: FilaKpis = {
-  mensajes: 0, costoUsd: 0, creditos: 0, promptTokens: 0, cachedTokens: 0, completionTokens: 0, thinkingTokens: 0,
+  mensajes: 0, costoUsd: null, creditos: null, mensajesSinCosto: 0, promptTokens: 0, cachedTokens: 0, completionTokens: 0, thinkingTokens: 0,
   latenciaP50: null, latenciaP95: null, ttftP50: null, errores: 0, frenadosPorCupoMensual: 0, frenadosPorTopeDiario: 0, conGroq: 0,
   accionesPropuestas: 0, accionesConfirmadas: 0, accionesRechazadas: 0, escriturasRechazadas: 0,
 };
@@ -136,7 +140,8 @@ export class OrbiUsoService {
     const [kpis, serie, acciones, negocios] = await Promise.all([
       this.prisma.$queryRaw<Partial<FilaKpis>[]>`
         SELECT count(*)::int AS mensajes,
-               coalesce(sum(cost_usd),0)::float AS "costoUsd", coalesce(sum(credits),0)::int AS creditos,
+               sum(cost_usd)::float AS "costoUsd", sum(credits)::int AS creditos,
+               count(*) FILTER (WHERE cost_usd IS NULL AND status <> 'quota')::int AS "mensajesSinCosto",
                coalesce(sum(prompt_tokens),0)::int AS "promptTokens", coalesce(sum(cached_tokens),0)::int AS "cachedTokens",
                coalesce(sum(completion_tokens),0)::int AS "completionTokens", coalesce(sum(thinking_tokens),0)::int AS "thinkingTokens",
                percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE status <> 'quota') AS "latenciaP50",
@@ -152,53 +157,65 @@ export class OrbiUsoService {
       // created_at es TIMESTAMP sin zona y guarda UTC: un solo AT TIME ZONE lo
       // tomaría como hora argentina y lo correría +3 h en vez de -3 h. Primero se
       // lo declara UTC y recién después se pasa a hora argentina.
-      this.prisma.$queryRaw<{ dia: string; mensajes: number; costoUsd: number }[]>`
+      this.prisma.$queryRaw<{ dia: string; mensajes: number; costoUsd: number | null }[]>`
         SELECT to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD') AS dia,
-               count(*)::int AS mensajes, coalesce(sum(cost_usd),0)::float AS "costoUsd"
+               count(*)::int AS mensajes, sum(cost_usd)::float AS "costoUsd"
         FROM orbi_turns WHERE created_at >= ${desde} AND created_at < ${hasta} GROUP BY 1 ORDER BY 1`,
       // La combinación de tools (sin repetir, ordenadas) de cada mensaje.
       this.prisma.$queryRaw<
-        { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number; entradaPromedio: number | null; latenciaPromedio: number | null }[]
+        { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number | null; latenciaPromedio: number | null }[]
       >`
         SELECT coalesce(array_to_string(ARRAY(SELECT DISTINCT unnest(tools_used) ORDER BY 1), ' + '), '') AS tools,
-               count(*)::int AS mensajes, avg(cost_usd)::float AS "costoPromedioUsd", coalesce(sum(cost_usd),0)::float AS "costoTotalUsd",
+               count(*)::int AS mensajes, avg(cost_usd)::float AS "costoPromedioUsd", sum(cost_usd)::float AS "costoTotalUsd",
                avg(prompt_tokens)::float AS "entradaPromedio", avg(latency_ms)::float AS "latenciaPromedio"
         FROM orbi_turns WHERE created_at >= ${desde} AND created_at < ${hasta} AND status <> 'quota'
-        GROUP BY 1 ORDER BY "costoTotalUsd" DESC LIMIT 20`,
-      this.prisma.$queryRaw<{ businessId: string; nombre: string; mensajes: number; costoUsd: number; creditos: number }[]>`
+        GROUP BY 1 ORDER BY coalesce(sum(cost_usd),0) DESC LIMIT 20`,
+      this.prisma.$queryRaw<
+        { businessId: string; nombre: string; mensajes: number; costoUsd: number | null; creditos: number | null; mensajesSinCosto: number }[]
+      >`
         SELECT t.business_id AS "businessId", b.name AS nombre, count(*)::int AS mensajes,
-               coalesce(sum(t.cost_usd),0)::float AS "costoUsd", coalesce(sum(t.credits),0)::int AS creditos
+               sum(t.cost_usd)::float AS "costoUsd", sum(t.credits)::int AS creditos,
+               count(*) FILTER (WHERE t.cost_usd IS NULL AND t.status <> 'quota')::int AS "mensajesSinCosto"
         FROM orbi_turns t JOIN businesses b ON b.id = t.business_id
         WHERE t.created_at >= ${desde} AND t.created_at < ${hasta}
-        GROUP BY 1, 2 ORDER BY "costoUsd" DESC LIMIT 50`,
+        GROUP BY 1, 2 ORDER BY coalesce(sum(t.cost_usd),0) DESC LIMIT 50`,
     ]);
 
     const k = { ...KPIS_VACIOS, ...(kpis[0] ?? {}) };
+    // Un mes sin mensajes no es "sin dato": no hay nada que medir, son cero.
+    const sinMensajes = k.mensajes === 0;
     const cupos = await Promise.all(negocios.map((n) => this.cupo.cupoDelNegocio(n.businessId, mes)));
 
     return {
       mes,
       lecturaHabilitada: this.config.get<string>('ORBI_LECTURA_CONVERSACIONES') === 'on',
-      kpis: { ...k, latenciaP50: aNumero(k.latenciaP50), latenciaP95: aNumero(k.latenciaP95), ttftP50: aNumero(k.ttftP50) },
-      serie: serie.map((s) => ({ dia: s.dia, mensajes: s.mensajes, costoUsd: s.costoUsd })),
+      kpis: {
+        ...k,
+        costoUsd: sinMensajes ? 0 : aNumero(k.costoUsd),
+        creditos: sinMensajes ? 0 : aNumero(k.creditos),
+        latenciaP50: aNumero(k.latenciaP50), latenciaP95: aNumero(k.latenciaP95), ttftP50: aNumero(k.ttftP50),
+      },
+      serie: serie.map((s) => ({ dia: s.dia, mensajes: s.mensajes, costoUsd: aNumero(s.costoUsd) })),
       acciones: acciones
         .map((a) => ({
           tools: a.tools === '' ? MENSAJE_SIN_TOOLS : a.tools,
           mensajes: a.mensajes,
-          costoPromedioUsd: aNumero(a.costoPromedioUsd) ?? 0,
-          costoTotalUsd: aNumero(a.costoTotalUsd) ?? 0,
+          costoPromedioUsd: aNumero(a.costoPromedioUsd),
+          costoTotalUsd: aNumero(a.costoTotalUsd),
           entradaPromedio: aNumero(a.entradaPromedio) ?? 0,
           latenciaPromedio: aNumero(a.latenciaPromedio) ?? 0,
         }))
-        .sort((x, y) => y.costoTotalUsd - x.costoTotalUsd),
+        .sort((x, y) => (y.costoTotalUsd ?? 0) - (x.costoTotalUsd ?? 0)),
       negocios: negocios.map((n, i) => ({
         businessId: n.businessId,
         nombre: n.nombre,
         mensajes: n.mensajes,
-        costoUsd: n.costoUsd,
-        creditos: n.creditos,
+        costoUsd: aNumero(n.costoUsd),
+        creditos: aNumero(n.creditos),
+        mensajesSinCosto: n.mensajesSinCosto,
         cupo: cupos[i].total,
-        porcentaje: porcentajeDe(n.creditos, cupos[i].total),
+        // Para el cupo, sin créditos medidos es 0: no consumió nada que se pueda contar.
+        porcentaje: porcentajeDe(aNumero(n.creditos) ?? 0, cupos[i].total),
       })),
     };
   }
@@ -214,15 +231,16 @@ export class OrbiUsoService {
       this.cupo.ajustesDelMes(businessId, mes),
       this.cupo.topes(businessId),
       this.prisma.$queryRaw<
-        { memberId: string; mensajes: number; costoUsd: number; creditos: number; promptTokens: number; completionTokens: number; latenciaP50: unknown }[]
+        { memberId: string; mensajes: number; costoUsd: number | null; creditos: number | null; mensajesSinCosto: number; promptTokens: number; completionTokens: number; latenciaP50: unknown }[]
       >`
         SELECT member_id AS "memberId", count(*)::int AS mensajes,
-               coalesce(sum(cost_usd),0)::float AS "costoUsd", coalesce(sum(credits),0)::int AS creditos,
+               sum(cost_usd)::float AS "costoUsd", sum(credits)::int AS creditos,
+               count(*) FILTER (WHERE cost_usd IS NULL AND status <> 'quota')::int AS "mensajesSinCosto",
                coalesce(sum(prompt_tokens),0)::int AS "promptTokens", coalesce(sum(completion_tokens),0)::int AS "completionTokens",
                percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE status <> 'quota') AS "latenciaP50"
         FROM orbi_turns
         WHERE business_id = ${businessId} AND created_at >= ${desde} AND created_at < ${hasta}
-        GROUP BY 1 ORDER BY creditos DESC`,
+        GROUP BY 1 ORDER BY coalesce(sum(credits),0) DESC`,
     ]);
 
     const adminIds = [...new Set(ajustes.map((a) => a.adminId))];
@@ -256,8 +274,9 @@ export class OrbiUsoService {
         memberId: f.memberId,
         nombre: nombreMiembro.get(f.memberId) ?? f.memberId,
         mensajes: f.mensajes,
-        costoUsd: f.costoUsd,
-        creditos: f.creditos,
+        costoUsd: aNumero(f.costoUsd),
+        creditos: aNumero(f.creditos),
+        mensajesSinCosto: f.mensajesSinCosto,
         promptTokens: f.promptTokens,
         completionTokens: f.completionTokens,
         latenciaP50: aNumero(f.latenciaP50),

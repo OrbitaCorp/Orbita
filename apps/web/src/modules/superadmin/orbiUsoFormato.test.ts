@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  usd, usdEje, tokens, ms, etiquetaDeTools, mesesRecientes, etiquetaDeMes, mesActualArgentina, pct, porcentajeDe,
+  usd, usdEje, tokens, creditosTxt, avisoSinCosto, SIN_DATO, ms, etiquetaDeTools, mesesRecientes, etiquetaDeMes, mesActualArgentina, pct, porcentajeDe,
   leerCreditos, pasosDe, contextoDe, puntosDeSerie, estadoDelTurno, excedido, lecturaEmpezada,
 } from './orbiUsoFormato'
 
@@ -8,7 +8,22 @@ describe('formato', () => {
   it('USD con 4 decimales debajo de 10 centavos y 2 arriba', () => {
     expect(usd(0.0079)).toBe('USD 0,0079')
     expect(usd(12.5)).toBe('USD 12,50')
-    expect(usd(null)).toBe('—')
+    expect(usd(null)).toBe('Sin dato')
+    expect(usd(undefined)).toBe(SIN_DATO)
+    expect(usd(0)).toBe('USD 0,0000')
+  })
+
+  it('créditos: null es Sin dato, un cero medido es 0', () => {
+    expect(creditosTxt(null)).toBe('Sin dato')
+    expect(creditosTxt(0)).toBe('0')
+    expect(creditosTxt(12345)).toBe('12.345')
+  })
+
+  it('aviso de mensajes sin costo: solo si hay alguno', () => {
+    expect(avisoSinCosto(0)).toBeUndefined()
+    expect(avisoSinCosto(undefined)).toBeUndefined()
+    expect(avisoSinCosto(1)).toBe('1 mensaje sin dato de costo (anteriores al 4/10)')
+    expect(avisoSinCosto(1500)).toBe('1.500 mensajes sin dato de costo (anteriores al 4/10)')
   })
 
   it('eje de USD corto: sin prefijo (el título de la tarjeta dice la moneda)', () => {
@@ -122,6 +137,12 @@ describe('serie diaria', () => {
   it('el día va a mediodía UTC: así se dibuja el mismo día en cualquier huso', () => {
     expect(puntosDeSerie([{ dia: '2026-10-01', mensajes: 3, costoUsd: 0.02 }])).toEqual([
       { date: '2026-10-01T12:00:00Z', mensajes: 3, costo: 0.02 },
+    ])
+  })
+
+  it('un día sin costo medido (null) se dibuja en 0, sin romper el gráfico', () => {
+    expect(puntosDeSerie([{ dia: '2026-10-01', mensajes: 3, costoUsd: null }])).toEqual([
+      { date: '2026-10-01T12:00:00Z', mensajes: 3, costo: 0 },
     ])
   })
 })

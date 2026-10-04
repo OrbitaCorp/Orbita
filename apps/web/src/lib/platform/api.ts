@@ -240,8 +240,11 @@ export interface OrbiUsoResumen {
   lecturaHabilitada: boolean
   kpis: {
     mensajes: number
-    costoUsd: number
-    creditos: number
+    /** null = ningún mensaje del mes tiene costo medido (los de antes del 4/10/2026 no lo guardaban): se muestra "Sin dato", no USD 0. */
+    costoUsd: number | null
+    creditos: number | null
+    /** Mensajes (sin contar los frenados por cupo) sin costo medido. */
+    mensajesSinCosto: number
     promptTokens: number
     cachedTokens: number
     completionTokens: number
@@ -260,9 +263,9 @@ export interface OrbiUsoResumen {
     accionesRechazadas: number
     escriturasRechazadas: number
   }
-  serie: { dia: string; mensajes: number; costoUsd: number }[]
-  acciones: { tools: string; mensajes: number; costoPromedioUsd: number; costoTotalUsd: number; entradaPromedio: number; latenciaPromedio: number }[]
-  negocios: { businessId: string; nombre: string; mensajes: number; costoUsd: number; creditos: number; cupo: number; porcentaje: number }[]
+  serie: { dia: string; mensajes: number; costoUsd: number | null }[]
+  acciones: { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number; latenciaPromedio: number }[]
+  negocios: { businessId: string; nombre: string; mensajes: number; costoUsd: number | null; creditos: number | null; mensajesSinCosto: number; cupo: number; porcentaje: number }[]
 }
 
 export interface OrbiUsoNegocio {
@@ -278,8 +281,9 @@ export interface OrbiUsoNegocio {
     memberId: string
     nombre: string
     mensajes: number
-    costoUsd: number
-    creditos: number
+    costoUsd: number | null
+    creditos: number | null
+    mensajesSinCosto: number
     promptTokens: number
     completionTokens: number
     latenciaP50: number | null
