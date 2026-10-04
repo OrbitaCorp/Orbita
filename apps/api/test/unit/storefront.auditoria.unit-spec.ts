@@ -65,6 +65,21 @@ describe('Catálogo de una tienda no publicada o pausada', () => {
     expect(res[0].productCount).toBe(3);
   });
 
+  it('conserva las madres sin productos propios cuando alguna hija sí tiene (para armar el árbol)', async () => {
+    const { svc, prisma } = tienda({ isActive: true, isPaused: false });
+    const c = (id: string, parentId: string | null, products: number) =>
+      ({ id, name: id, slug: id, icon: null, color: null, imageUrl: null, parentId, _count: { products } });
+    prisma.category.findMany.mockResolvedValue([
+      c('mujer', null, 0), c('mujer-jeans', 'mujer', 3), c('mujer-tops', 'mujer', 0),
+      c('hombre', null, 0), c('hombre-vacia', 'hombre', 0),
+      c('nieta-madre', 'mujer-tops', 0), c('nieta', 'nieta-madre', 2),
+    ]);
+    const res = await svc.listCategories('t');
+    // 'mujer-tops' no tiene productos pero es ancestra de 'nieta'; 'hombre' y su hija vacía no entran.
+    expect(res.map((x) => x.id)).toEqual(['mujer', 'mujer-jeans', 'mujer-tops', 'nieta-madre', 'nieta']);
+    expect(res.find((x) => x.id === 'mujer')).toMatchObject({ parentId: null, productCount: 0 });
+  });
+
   it('el resto de los negocios que resuelven por slug (seguimiento, arrepentimiento) no pasan por el filtro', async () => {
     const { svc } = tienda({ isActive: true, isPaused: true });
     await expect(svc.resolveBusinessId('t')).resolves.toBe('biz-1');
