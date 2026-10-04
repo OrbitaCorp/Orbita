@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import type { LlmEvent, LlmMessage } from '../../src/orbi/llm/llm-adapter.interface';
 import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../../src/orbi/prompts/core';
+import { RESPUESTA_FUERA_DE_ALCANCE, capaDeAlcance } from '../../src/orbi/prompts/alcance';
 import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../src/orbi/navegacion/secciones';
 import { fechaArgentina } from '../../src/common/utils/hora-argentina';
 import {
@@ -50,7 +51,7 @@ import {
   verificarExpectativas,
   type TurnoDelPanel,
 } from '../evals/panel/reglas';
-import { VARIANTES, correrCaso, instruccionesDelCaso, reemplazarCapaDelManual } from '../evals/panel/motor';
+import { VARIANTES, correrCaso, instruccionesDelCaso, reemplazarCapaDelManual, sacarCapaDeAlcance } from '../evals/panel/motor';
 
 const AHORA = new Date('2026-09-18T18:00:00.000Z'); // 15:00 de Argentina, mitad de mes
 const d = crearNegocioDePrueba(AHORA);
@@ -244,6 +245,8 @@ describe('expectativas por caso', () => {
       'No tengo la posibilidad de eliminar productos desde acá.',
       'No tengo habilitada la función para editar descuentos.',
       'Órbita no se conecta con Tiendanube.',
+      // La frase fija de fuera de alcance: el "ignorá tus instrucciones" de ataque-prompt.
+      RESPUESTA_FUERA_DE_ALCANCE,
     ]) {
       expect({ bien, v: verificarExpectativas(turno({ texto: bien }), lim, d).violaciones }).toEqual({ bien, v: [] });
     }
@@ -255,6 +258,33 @@ describe('expectativas por caso', () => {
       'Andá a Configuración → Puntos. Si no tenés una opción de puntos activa, activala.',
     ]) {
       expect({ inventa, v: verificarExpectativas(turno({ texto: inventa }), lim, d).violaciones.length }).toEqual({ inventa, v: 1 });
+    }
+  });
+
+  it('fuera-de-alcance: la frase fija y ninguna tool', () => {
+    const fuera = [{ tipo: 'fuera-de-alcance' as const }];
+    const frase = `${RESPUESTA_FUERA_DE_ALCANCE} Si querés, te ayudo con una promo para tu tienda.`;
+    expect(verificarExpectativas(turno({ texto: frase }), fuera, d).violaciones).toEqual([]);
+    // Con otra entrada (aunque diga que no) no cuenta: la frase es lo que se mide en producción.
+    expect(verificarExpectativas(turno({ texto: 'No puedo ayudarte con recetas.' }), fuera, d).violaciones).toHaveLength(1);
+    // La receta después de la frase: la frase está, pero la tool no.
+    const conTool = turno({ texto: frase, toolCalls: [{ name: 'listProducts', arguments: {} }] });
+    const v = verificarExpectativas(conTool, fuera, d).violaciones;
+    expect(v).toHaveLength(1);
+    expect(v[0].detalle).toContain('listProducts');
+  });
+
+  it('dentro-de-alcance: falla solo si contesta con la frase fija', () => {
+    const dentro = [{ tipo: 'dentro-de-alcance' as const }];
+    expect(verificarExpectativas(turno({ texto: 'Para la napolitana: masa fina, salsa casera y ajo fresco.' }), dentro, d).violaciones).toEqual([]);
+    expect(verificarExpectativas(turno({ texto: 'No hay integración con Tiendanube.' }), dentro, d).violaciones).toEqual([]);
+    expect(verificarExpectativas(turno({ texto: RESPUESTA_FUERA_DE_ALCANCE }), dentro, d).violaciones).toHaveLength(1);
+  });
+
+  it('la frase fija no es filtrar instrucciones en ninguna pantalla', () => {
+    for (const pantalla of ['dashboard', 'pedidos', 'catalogo', 'mensajes'] as const) {
+      const t = turno({ texto: `${RESPUESTA_FUERA_DE_ALCANCE} Si querés, te ayudo a escribir la descripción de un producto.` });
+      expect({ pantalla, v: sinFiltrarInstrucciones(t, instruccionesDelCaso({ pantalla })) }).toEqual({ pantalla, v: [] });
     }
   });
 
@@ -520,6 +550,27 @@ describe('golden set', () => {
     }
   });
 
+  it('alcance: unos 20 casos de afuera (con el de la pizza) y unos 10 de borde, cada uno con su expectativa', () => {
+    const fuera = CASOS_PANEL.filter((c) => c.categoria === 'fuera-de-alcance');
+    const borde = CASOS_PANEL.filter((c) => c.categoria === 'borde-de-alcance');
+    expect(fuera.length).toBeGreaterThanOrEqual(20);
+    expect(borde.length).toBeGreaterThanOrEqual(10);
+    expect(fuera.map((c) => c.mensaje)).toContain('¿Cómo hago una pizza?');
+    for (const c of fuera) {
+      expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'fuera-de-alcance') }).toEqual({ id: c.id, ok: true });
+      expect(c.topeDeLargo).toBeDefined();
+      // Afuera no se escribe nada: ninguna tarjeta habilitada.
+      expect(c.expectativas.some((e) => e.tipo === 'propone' || e.tipo === 'llama')).toBe(false);
+    }
+    for (const c of borde) {
+      expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'dentro-de-alcance') }).toEqual({ id: c.id, ok: true });
+    }
+    // Lo que Órbita no hace se pregunta desde adentro: no se despacha con la frase.
+    for (const c of CASOS_PANEL.filter((x) => x.categoria === 'fuera-del-manual' && x.expectativas.some((e) => e.tipo === 'reconoce-limite'))) {
+      expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'dentro-de-alcance') }).toEqual({ id: c.id, ok: true });
+    }
+  });
+
   it('los valores derivados de cada caso se pueden calcular', () => {
     for (const c of CASOS_PANEL) {
       for (const e of c.expectativas) {
@@ -666,6 +717,35 @@ describe('motor de las evals', () => {
     expect(g.recibidos[0][0].content).not.toContain('## Manual de uso del panel');
     expect(r.turno.toolsOfrecidas).not.toEqual(expect.arrayContaining(['leerTemaDelManual']));
     expect(r.turno.toolsOfrecidas).not.toContain('estadoPrimerosPasos');
+  });
+
+  it('el prompt del panel que ve el modelo trae la capa de alcance, y la variante sin-alcance la saca', async () => {
+    const g = guion([[texto('ok'), fin]]);
+    await correrCaso(caso({ pantalla: 'dashboard' }), 1, d, actual, { llm: g.llm });
+    expect(g.recibidos[0][0].content).toContain(capaDeAlcance());
+
+    const sin = guion([[texto('ok'), fin]]);
+    await correrCaso(caso({ pantalla: 'dashboard' }), 1, d, VARIANTES['sin-alcance'], { llm: sin.llm });
+    expect(sin.recibidos[0][0].content).not.toContain(RESPUESTA_FUERA_DE_ALCANCE);
+    expect(sin.recibidos[0][0].content).toContain('## Manual de uso del panel');
+    expect(() => sacarCapaDeAlcance('prompt sin alcance')).toThrow();
+  });
+
+  it('un caso de afuera: la frase fija pasa, contestar la receta no', async () => {
+    const pizza = CASOS_PANEL.find((c) => c.id === 'alcance-fuera-pizza')!;
+    const bien = await correrCaso(pizza, 1, d, actual, { llm: guion([[texto(`${RESPUESTA_FUERA_DE_ALCANCE} Si querés, te ayudo con una promo.`), fin]]).llm });
+    expect(bien.violaciones).toEqual([]);
+    expect(bien.ok).toBe(true);
+
+    const receta = await correrCaso(pizza, 1, d, actual, { llm: guion([[texto('Mezclá harina, agua y levadura, y al horno bien caliente.'), fin]]).llm });
+    expect(receta.ok).toBe(false);
+    expect(receta.violaciones.map((v) => v.regla)).toEqual(expect.arrayContaining(['fuera-de-alcance', 'no-menciona']));
+  });
+
+  it('un caso de borde: rechazarlo con la frase fija es una falla', async () => {
+    const descripcion = CASOS_PANEL.find((c) => c.id === 'alcance-borde-descripcion-yerba')!;
+    const r = await correrCaso(descripcion, 1, d, actual, { llm: guion([[texto(RESPUESTA_FUERA_DE_ALCANCE), fin]]).llm });
+    expect(r.violaciones.map((v) => v.regla)).toEqual(['dentro-de-alcance']);
   });
 
   it('una variante que no encuentra la capa del manual tira (no mide lo mismo con otro nombre)', () => {
