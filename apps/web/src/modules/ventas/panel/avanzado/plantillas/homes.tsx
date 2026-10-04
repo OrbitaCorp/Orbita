@@ -375,6 +375,20 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         case 'hero': {
           if (!s) return null
           if (b.estilo === 'minimo') {
+            // Por diseño es solo tipografía. Pero si el dueño subió una foto
+            // para este slide, se muestra: el mismo texto centrado, encima.
+            // Sin foto queda el original. (En la vitrina siempre el original:
+            // los slides de muestra traen foto para las otras variantes.)
+            if (s.fotoPropia) {
+              return (
+                <div key={i} style={{ position: 'relative', borderBottom: `1px solid ${t.border}` }}>
+                  <Foto src={s.img} alto={movil ? 380 : 520} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.62))', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: movil ? '0 16px' : '0 40px' }}>
+                    {heroTexto('centro', true)}
+                  </div>
+                </div>
+              )
+            }
             return (
               <div key={i} style={{ background: t.soft, borderBottom: `1px solid ${t.border}`, padding: movil ? '46px 16px' : '92px 40px' }}>
                 {heroTexto('centro', false)}
@@ -1180,7 +1194,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 <Foto src={s.img} alto={movil ? 330 : 540} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(9,9,11,0.72), transparent 58%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? 24 : 40 }}>
                   {s.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 12 }}>{s.kicker}</div>}
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', marginBottom: 20 }}>{s.titulo}</div>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', marginBottom: s.bajada ? 10 : 20 }}>{s.titulo}</div>
+                  {/* La bajada se carga en el editor igual que en cualquier
+                      hero: sin esto el campo no movía nada en esta plantilla. */}
+                  {s.bajada && <div style={{ fontSize: movil ? 13.5 : 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.5, maxWidth: 420, marginBottom: 20 }}>{s.bajada}</div>}
                   <div><span style={{ display: 'inline-block', background: '#fff', color: t.text, padding: '12px 26px', fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.cta}</span></div>
                 </div>
               </div>
@@ -1582,12 +1599,12 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             Avanzado → Oferta relámpago, que se dibuja sola arriba de la
             portada. Acá queda el anuncio como texto editable, y vacío no se
             dibuja. */}
-        {lanzamiento && (
+        {lanzamiento && (avisoCartelera ? <Marquee t={t} texto={lanzamiento} /> : (
           <div style={{ background: t.soft, borderBottom: `1px solid ${t.border}`, padding: '9px 16px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{lanzamiento}</span>
             {!movil && txt('lanzamiento', 'aclaracion') && <span style={{ fontSize: 12, color: t.muted }}>· {txt('lanzamiento', 'aclaracion')}</span>}
           </div>
-        )}
+        ))}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: movil ? '13px 16px' : '15px 32px', borderBottom: `1px solid ${t.border}` }}>
           <span
@@ -1789,11 +1806,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!aviso && (
+        {!!aviso && (avisoCartelera ? <Marquee t={t} texto={aviso} /> : (
           <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
             {aviso}
           </div>
-        )}
+        ))}
         <div style={{ display: 'flex', alignItems: 'center', gap: movil ? 12 : 24, padding: movil ? '13px 16px' : '16px 32px', background: t.surf, borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -1839,15 +1856,27 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
               <h1 style={{ fontFamily: t.fh, fontSize: movil ? 36 : 52, lineHeight: 1.05, margin: 0, fontWeight: 800, letterSpacing: '-0.035em' }}>{s.titulo}</h1>
               <p style={{ fontSize: 14.5, color: t.muted, margin: '14px 0 22px', lineHeight: 1.7, maxWidth: 420 }}>{s.bajada}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: t.surf, border: `2px solid ${t.primary}`, borderRadius: t.radio, padding: movil ? '10px 12px' : '13px 16px', boxShadow: t.sombra, maxWidth: 480 }}>
-                <span style={{ fontSize: 17, color: t.primary }}>⌕</span>
-                <span style={{ flex: 1, fontSize: movil ? 13 : 15, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{txt('hero', 'placeholder')}</span>
+                {/* En la tienda, el buscador de verdad: la caja es el protagonista
+                    de este hero, y dibujada no buscaba nada. */}
+                {acciones?.renderBuscador && !p.ocultarBuscador
+                  ? <span style={{ flex: 1, minWidth: 0, display: 'flex' }}>{acciones.renderBuscador({ placeholder: txt('hero', 'placeholder') })}</span>
+                  : <>
+                    <span style={{ fontSize: 17, color: t.primary }}>⌕</span>
+                    <span style={{ flex: 1, fontSize: movil ? 13 : 15, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{txt('hero', 'placeholder')}</span>
+                  </>}
                 <Boton t={t} onClick={acciones?.irACatalogo}>{s.cta}</Boton>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
                 {txt('hero', 'atajos').split(',').map((c) => c.trim()).filter(Boolean).map((c) => (
-                  <span key={c} style={{ fontSize: 12, color: t.muted, background: t.surf, border: `1px solid ${t.border}`, borderRadius: 999, padding: '6px 13px' }}>{c}</span>
+                  // Cada atajo busca eso en el catálogo.
+                  <span
+                    key={c} className="pl-nav"
+                    onClick={acciones?.irALink ? () => acciones.irALink!(`/catalogo?search=${encodeURIComponent(c)}`) : undefined}
+                    style={{ fontSize: 12, color: t.muted, background: t.surf, border: `1px solid ${t.border}`, borderRadius: 999, padding: '6px 13px', cursor: acciones?.irALink ? 'pointer' : undefined }}
+                  >{c}</span>
                 ))}
               </div>
+              {navHero({ marginTop: 20 })}
             </div>
             {!movil && <Foto src={s.img} alto={330} radio={t.radio} />}
           </div>
@@ -2146,7 +2175,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
       porCategoria(3, 3).map((c) => [c.nombre, c.slug, c.productos])
     const encabezado = (
       <>
-        {aviso && <Marquee t={t} texto={aviso} />}
+        {aviso && ((avisoCartelera || !acciones) ? <Marquee t={t} texto={aviso} /> : barraAnuncio)}
         <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '16px 34px', borderBottom: `1px solid ${t.border}` }}>
           <span
             onClick={acciones?.irAInicio}
@@ -2410,11 +2439,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!aviso && (
+        {!!aviso && (avisoCartelera ? <Marquee t={t} texto={aviso} /> : (
           <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, borderBottom: `1px solid ${t.border}` }}>
             {aviso}
           </div>
-        )}
+        ))}
         <div style={{ display: 'grid', gridTemplateColumns: movil ? 'auto 1fr auto' : '1fr auto 1fr', alignItems: 'center', padding: movil ? '15px 16px' : '24px 44px', borderBottom: `1px solid ${t.border}`, gap: 14 }}>
           {movil
             ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} color={t.primary} />
@@ -2549,11 +2578,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {!!aviso && (
+        {!!aviso && (avisoCartelera ? <Marquee t={t} texto={aviso} /> : (
           <div style={{ background: t.soft, textAlign: 'center', padding: '9px 12px', fontSize: 12, color: t.text, fontWeight: 600 }}>
             {aviso}
           </div>
-        )}
+        ))}
         <div style={{ textAlign: 'center', padding: movil ? '15px 16px' : '20px 34px 16px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
           <div
             onClick={acciones?.irAInicio}
@@ -2705,7 +2734,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     if (soloHeader) {
       return (
         <div style={marco}>
-          {aviso && <Marquee t={t} texto={aviso} />}
+          {aviso && ((avisoCartelera || !acciones) ? <Marquee t={t} texto={aviso} /> : barraAnuncio)}
           {panel}
           {buscador()}
         </div>
@@ -2714,7 +2743,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     return (
       <div style={marco}>
-        {aviso && <Marquee t={t} texto={aviso} />}
+        {aviso && ((avisoCartelera || !acciones) ? <Marquee t={t} texto={aviso} /> : barraAnuncio)}
         {/* En celular el panel deja de ser una columna al costado y pasa a
             ser una barra arriba: en fila los dos hijos no entran en 390 px y
             el marco se llenaba de scroll horizontal. */}
@@ -3013,7 +3042,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {aviso && <Marquee t={t} texto={aviso} />}
+        {aviso && ((avisoCartelera || !acciones) ? <Marquee t={t} texto={aviso} /> : barraAnuncio)}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
@@ -3154,7 +3183,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
 
     const encabezado = (
       <>
-        {aviso && <Marquee t={t} texto={aviso} />}
+        {aviso && ((avisoCartelera || !acciones) ? <Marquee t={t} texto={aviso} /> : barraAnuncio)}
         <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} acciones={acciones} />
       </>
     )
@@ -3290,11 +3319,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   // párrafos), antes y después, y galería de Instagram al pie.
   const encabezado = (
     <>
-      {!!aviso && (
+      {!!aviso && (avisoCartelera ? <Marquee t={t} texto={aviso} /> : (
         <div style={{ background: t.primary, color: '#fff', textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600 }}>
           {aviso}
         </div>
-      )}
+      ))}
       <div style={{ textAlign: 'center', padding: movil ? '14px 16px' : '18px 34px 14px', background: t.surf, borderBottom: `1px solid ${t.border}`, position: 'relative' }}>
         <div
           onClick={acciones?.irAInicio}

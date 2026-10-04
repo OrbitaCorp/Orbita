@@ -1050,7 +1050,9 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         })
         break
       case 'categorias':
-        out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', 'Ver todas →'))
+        // Las pastillas van con el encabezado centrado, que no lleva enlace a
+        // la derecha: ahí el campo no se ofrece.
+        out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', b.estilo === 'pastillas' ? undefined : 'Ver todas →'))
         break
       case 'fila': {
         // El título por defecto seguía siendo "Destacados" para CUALQUIER
@@ -1063,18 +1065,27 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         out.push(encabezado(b.id, `Fila: ${nombre}`, `El encabezado de esta fila. Se prende y se apaga en Contenido → "${nombre}".`, vol, tit, 'Ver todo →'))
         break
       }
-      case 'franja':
+      case 'franja': {
+        // Cada forma de la franja dibuja una parte: la cartelera solo el
+        // título corriendo, el filete el título y el botón, y las otras dos
+        // todo. El formulario pide lo mismo que se ve.
+        const estilo = b.estilo ?? 'plena'
         out.push({
           id: 'franja',
           nombre: 'Espacio de anuncio',
           nota: 'La franja ancha. Sin título no se dibuja: una tienda que no anuncia nada no muestra una barra vacía.',
           campos: [
             { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, afirmacion: true, help: 'Lo que querés anunciar.', porDefecto: 'Envío gratis desde $80.000' },
-            { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' },
-            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
+            ...(estilo === 'plena' || estilo === 'apilada'
+              ? [{ id: 'bajada', label: 'Bajada', tipo: 'texto' as const, max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' }]
+              : []),
+            ...(estilo !== 'cartelera'
+              ? [{ id: 'cta', label: 'Texto del botón', tipo: 'texto' as const, max: 24, porDefecto: 'Ver el catálogo' }]
+              : []),
           ],
         })
         break
+      }
       case 'campana':
         out.push({
           id: 'campana',
@@ -1118,6 +1129,18 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
 /** ¿Esa sección es una fila de productos de la plantilla? Ver `estante` en tipos.ts. */
 export function estanteDeSeccion(idPlantilla: string, seccion: string): 0 | 1 | undefined {
   return SECCIONES_POR_PLANTILLA[idPlantilla]?.find(s => s.id === seccion)?.estante
+}
+
+/**
+ * ¿Esta plantilla dibuja el cupón? Lo usa el editor para ofrecer la tarjeta.
+ *
+ * Las de bloque propio lo declaran con su cupón de muestra; las recetas lo
+ * dibujan todas (después de sus bloques). Sin esto una receta mostraba el
+ * cupón que el negocio había cargado con otra plantilla, y no había desde
+ * dónde cambiarlo ni sacarlo.
+ */
+export function dibujaCupon(p: { cupon?: unknown; receta?: unknown } | null | undefined): boolean {
+  return !!p && (!!p.cupon || !!p.receta)
 }
 
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {

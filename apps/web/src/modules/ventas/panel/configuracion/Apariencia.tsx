@@ -10,7 +10,7 @@ import { useState } from 'react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import { seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
+import { dibujaCupon, seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { AparienciaBloqueada } from './components/apariencia/AparienciaBloqueada'
@@ -89,10 +89,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // no rotan" arriba de un carrusel de tres.
     const plantillaDelHero = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
     const heroNoRotativo = !!plantillaDelHero?.heroPropio && plantillaDelHero.heroMaxSlides !== undefined
-    // El hero `minimo` de una receta es solo tipografía sobre un fondo liso
-    // (Lienzo, Sobrio, Sello): no dibuja la foto del slide. Ofrecer subirla
-    // era un campo que no movía nada (reportado con captura sobre Lienzo).
-    const heroSinFoto = !!plantillaDelHero?.receta?.bloques.some(b => b.t === 'hero' && b.estilo === 'minimo')
+    // El hero `minimo` de una receta (Lienzo, Sobrio, Sello) es solo
+    // tipografía sobre un fondo liso, y la foto del slide es OPCIONAL: sin
+    // foto queda el diseño original, con foto se muestra detrás del texto.
+    // Hay que decirlo: si no, el dueño sube la foto, no sabe que cambia el
+    // diseño, o no la sube y cree que el hero quedó a medio cargar.
+    const heroFotoOpcional = !!plantillaDelHero?.receta?.bloques.some(b => b.t === 'hero' && b.estilo === 'minimo')
     // Escaparate (o cualquier plantilla que declare headerBold): el toggle
     // de "ícono de marca" solo tiene sentido ahí — las demás siempre
     // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
@@ -154,7 +156,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const secEstadisticas = <SeccionEstadisticas ap={ap} set={set} />
     const secPie = <SeccionPie ap={ap} set={set} />
     // El cupón es contenido de la PLANTILLA: solo si la activa declara uno.
-    const secCupon = plantillaActiva?.cupon ? <SeccionCupon ap={ap} set={set} /> : null
+    const secCupon = dibujaCupon(plantillaActiva) ? <SeccionCupon ap={ap} set={set} /> : null
 
     // Usada tal cual solo en Apariencia completa (ver el único lugar que la
     // usa, más abajo en el return) — editando una plantilla, las mismas
@@ -168,7 +170,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         </>
     )
 
-    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} heroSinFoto={heroSinFoto} onToast={onToast} />
+    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} heroFotoOpcional={heroFotoOpcional} onToast={onToast} />
     const seccionesCards = <SeccionesPlantilla ap={ap} set={set} seccionesPlantilla={seccionesPlantilla} categorias={categorias} productos={productos} onToast={onToast} />
     const headerCard = <SeccionHeaderPlantilla ap={ap} set={set} conIconoOpcional={conIconoOpcional} enlaces={enlaces} />
 

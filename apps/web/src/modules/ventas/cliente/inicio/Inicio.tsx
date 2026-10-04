@@ -791,7 +791,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // "Barra de búsqueda" apagada: null, y no `undefined`
                         // — sin la función, el header dibuja el buscador de
                         // muestra de la vitrina, que no busca nada.
-                        renderBuscador: () => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} /> : null,
+                        renderBuscador: ({ placeholder }) => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} placeholder={placeholder || undefined} /> : null,
                         // La cuenta regresiva de la portada y su fila de
                         // productos en oferta: los mismos dos componentes
                         // del home clásico. Sin countdown activo no dibujan

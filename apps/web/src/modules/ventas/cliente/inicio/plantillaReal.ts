@@ -174,15 +174,17 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
 // `Foto` en piezas.tsx (nunca un string vacío, que le pide la página entera de
 // nuevo por red y deja un recuadro roto). Sin `hue` acá (no es un producto),
 // así que es un gris neutro fijo en vez del degradé por `hue` del resto.
-const SIN_FOTO_HERO = 'linear-gradient(135deg, #E7E5E4, #D6D3D1)'
+
 
 // El hero de una tienda que todavía no cargó ninguno. El fondo es un degradé
 // del primario de la plantilla hacia oscuro: los heros escriben en blanco
 // sobre la foto, y así se lee en cualquier paleta.
+const degradeDe = (base: Plantilla) =>
+  `linear-gradient(135deg, color-mix(in srgb, ${base.tema.primary} 78%, black), color-mix(in srgb, ${base.tema.primary} 38%, black))`
+
 function heroNeutro(base: Plantilla, marca?: string, tagline?: string): Slide {
-  const primario = base.tema.primary
   return {
-    img: `linear-gradient(135deg, color-mix(in srgb, ${primario} 78%, black), color-mix(in srgb, ${primario} 38%, black))`,
+    img: degradeDe(base),
     titulo: marca?.trim() || 'Bienvenidos',
     bajada: tagline?.trim() ?? '',
     cta: 'Ver el catálogo',
@@ -190,8 +192,8 @@ function heroNeutro(base: Plantilla, marca?: string, tagline?: string): Slide {
   }
 }
 
-function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
-  return { img: s.img ?? SIN_FOTO_HERO, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
+function aSlidePlantilla(s: StorefrontHeroSlide, base: Plantilla): Slide {
+  return { img: s.img ?? degradeDe(base), fotoPropia: !!s.img, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
 }
 
 /**
@@ -209,7 +211,9 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
 export function anuncioReal(ap: Apariencia | null | undefined, secciones?: ContenidoSecciones): Plantilla['anuncio'] {
   const viejo = secciones?.cintillo?.texto?.trim()
   if (viejo) return { texto: viejo, cartelera: secciones?.cintillo?.cartelera === 'si' }
-  const texto = ap?.shippingText?.trim()
+  // Varios ítems, uno por línea (así los carga el editor, ver
+  // mensajesAnuncio en AnnouncementBar.tsx): en la franja van seguidos.
+  const texto = (ap?.shippingText ?? '').split('\n').map(x => x.trim()).filter(Boolean).join('  ·  ')
   if (!texto || !(ap?.showAnnouncementBar ?? true)) return undefined
   return { texto, cartelera: ap?.announcementScroll ?? false }
 }
@@ -398,7 +402,7 @@ export function plantillaReal({
     // abría con "Auriculares V-90 Pro · Driver de 50 mm". Sin hero no se puede
     // dejar: en varias plantillas es media portada.
     ...(base.heroPropio
-      ? { slides: heroSlides && heroSlides.length > 0 ? heroSlides.map(aSlidePlantilla) : [heroNeutro(base, marca, tagline)] }
+      ? { slides: heroSlides && heroSlides.length > 0 ? heroSlides.map(x => aSlidePlantilla(x, base)) : [heroNeutro(base, marca, tagline)] }
       : {}),
     // El pie: el DISEÑO sigue siendo el de la plantilla (lo pone su `tema`),
     // pero el contenido pasa a ser el real. Antes quedaba el de la maqueta:
@@ -408,14 +412,16 @@ export function plantillaReal({
     // tiendas de verdad. Las columnas son las MISMAS que el pie normal de
     // Órbita (StorefrontFooter), para que la tienda diga lo mismo esté la
     // plantilla que esté.
-    pie: pieReal({ base: baseUrl, cats, contacto }),
+    pie: pieReal({ base: baseUrl, cats, contacto, conRedes: apariencia?.showSocialFooter ?? true }),
     ocultarPie: !mostrarPie,
   }
 }
 
 // Las columnas del pie con datos reales. `Categorías` solo aparece si la
 // tienda cargó alguna: una columna vacía se ve peor que no tenerla.
-function pieReal({ base, cats, contacto }: {
+function pieReal({ base, cats, contacto, conRedes }: {
+  // "Redes sociales en el pie de página", de Apariencia.
+  conRedes: boolean
   base: string
   cats: [string, string, string?][]
   contacto?: Contacto | null
@@ -444,7 +450,7 @@ function pieReal({ base, cats, contacto }: {
 
   // Solo lo que el negocio realmente cargó — si no hay Instagram, no se
   // inventa un globito que no lleva a nada.
-  const redes = [
+  const redes = !conRedes ? [] : [
     contacto?.instagram ? { label: 'Instagram', href: urlRedSocial(contacto.instagram, 'instagram') } : null,
     contacto?.facebook ? { label: 'Facebook', href: urlRedSocial(contacto.facebook, 'facebook') } : null,
     contacto?.tiktok ? { label: 'TikTok', href: urlRedSocial(contacto.tiktok, 'tiktok') } : null,

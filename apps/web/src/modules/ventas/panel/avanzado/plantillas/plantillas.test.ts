@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import { PLANTILLAS } from './datos'
 import { Home, LAYOUTS_CON_HEADER_PROPIO } from './homes'
-import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, seccionesDe } from './secciones'
+import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
 import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto } from '@/lib/storefront/types'
@@ -181,7 +181,7 @@ const ACCIONES: AccionesHome = {
   navLayout: 'standard',
   nav: [{ label: 'Enlace Check Uno', onClick: nada }, { label: 'Enlace Check Dos', onClick: nada }],
   renderAcciones: () => marca('acciones'),
-  renderBuscador: () => marca('buscador'),
+  renderBuscador: (o) => marca('buscador', o?.placeholder),
   renderVideo: () => marca('video'),
   renderOferta: () => marca('oferta'),
   renderProducto: (x) => marca('producto', x.nombre),
@@ -630,6 +630,121 @@ describe('una plantilla respeta lo que se configura en Apariencia', () => {
       ]
     }))
   })
+})
+
+// ─── El editor: cada control mueve algo en la portada ────────────────────────
+//
+// El editor de una plantilla (Avanzado → Plantillas) le ofrece al dueño el
+// hero, las secciones propias, el contenido de Apariencia y el pie. Cada cosa
+// que le deja cargar tiene que verse: un campo que no mueve nada es una
+// promesa del panel que la tienda no cumple.
+//
+// Salió de un caso real: en Lienzo el editor pedía la imagen de cada slide y
+// el hero de Lienzo no dibujaba ninguna. Acá se prueba al revés de como se
+// escribió ese bug: no se mira el código del editor, se cambia cada dato que
+// el editor deja cambiar y se exige que la portada cambie.
+
+describe('cada control del editor mueve algo en la portada', () => {
+  const t0 = TIENDAS.completa
+  // La portada en las dos pantallas, pegadas: alcanza con que el cambio se
+  // vea en una (la aclaración de Nocturno, por ejemplo, es solo de escritorio).
+  const portada = (p: Plantilla, extra: Partial<Tienda> = {}, ap: Partial<Apariencia> = {}) =>
+    [false, true].map(movil => dibujar({
+      p: plantillaReal({ base: p, ...t0, ...extra, apariencia: { ...APARIENCIA, ...ap } as Apariencia }),
+      movil, acciones: ACCIONES, soloCuerpo: !p.headerPropio,
+    })).join('\n')
+
+  const slide = (n: string, img: string | null = `https://fotos.check/slide-${n}.jpg`) =>
+    ({ id: n, titulo: `Titulo ${n}`, subtitulo: `Bajada ${n}`, img, cta: `Boton ${n}`, ctaLink: '/catalogo' })
+
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      const mal: string[] = []
+
+      // ── Pestaña Hero ──
+      // Vidriera no entra: su hero lo dibuja la tienda (HeroCarousel), no Home().
+      if (p.heroPropio) {
+        const h = portada(p, { heroSlides: [slide('uno'), slide('dos')] })
+        for (const [que, frase] of [['el título', 'Titulo uno'], ['la bajada', 'Bajada uno'], ['el botón', 'Boton uno'], ['la imagen', 'slide-uno.jpg']]) {
+          if (!h.includes(frase)) mal.push(`Hero: ${que} del slide se carga en el editor y no se ve en la portada`)
+        }
+        // Sin imagen la portada tiene que seguir dibujando el hero.
+        const sinFoto = portada(p, { heroSlides: [slide('uno', null)] })
+        if (!sinFoto.includes('Titulo uno')) mal.push('Hero: sin imagen el slide desaparece')
+        // Un segundo slide tiene que notarse (rota, o tiene su lugar fijo).
+        if (p.heroMaxSlides !== 1 && h === portada(p, { heroSlides: [slide('uno')] })) {
+          mal.push('Hero: agregar un segundo slide no cambia nada')
+        }
+        // Y uno más allá del tope no: el editor no lo deja cargar.
+        if (p.heroMaxSlides) {
+          const tope = Array.from({ length: p.heroMaxSlides }, (_, i) => slide(`n${i}`))
+          if (portada(p, { heroSlides: tope }) !== portada(p, { heroSlides: [...tope, slide('demas')] })) {
+            mal.push(`Hero: dice usar ${p.heroMaxSlides} slides y dibuja más`)
+          }
+        }
+      }
+
+      // ── Pestaña Secciones ──
+      // Con todos los campos de la sección cargados, cambiar uno tiene que
+      // cambiar la portada. (El cintillo no se edita ahí: es el anuncio.)
+      const valores = (c: { id: string; tipo: string; porDefecto?: string }, otro: boolean) =>
+        c.tipo === 'switch' ? (otro ? '' : 'si')
+          : c.tipo === 'imagen' ? `https://fotos.check/sec-${c.id}-${otro ? 'b' : 'a'}.jpg`
+          : c.tipo === 'seleccion' ? (otro ? 'prod:prod-ac' : 'prod:prod-ab')
+          // Un campo de posición ("72,78"): con texto libre cae a su default.
+          : /^\d+,\d+$/.test(c.porDefecto ?? '') ? (otro ? '90,90' : '10,10')
+          : `Campo ${c.id} ${otro ? 'dos' : 'uno'}`
+      for (const sec of seccionesDe(p.id).filter(x => x.id !== 'cintillo')) {
+        const base = Object.fromEntries(sec.campos.map(c => [c.id, valores(c, false)]))
+        const antes = portada(p, { secciones: { [sec.id]: base } })
+        for (const c of sec.campos) {
+          const despues = portada(p, { secciones: { [sec.id]: { ...base, [c.id]: valores(c, true) } } })
+          if (antes === despues) mal.push(`Secciones: "${sec.nombre} → ${c.label}" se edita y no cambia nada en la portada`)
+        }
+      }
+
+      // ── Pestaña Contenido ──
+      const normal = portada(p)
+      if (p.headerPropio) {
+        // El modo cartelera del anuncio.
+        if (normal === portada(p, {}, { announcementScroll: true })) mal.push('Contenido: "Mostrar como cartelera" no cambia nada')
+        // Varios ítems en el anuncio, uno por línea.
+        const varios = portada(p, {}, { shippingText: 'Aviso Uno\nAviso Dos' })
+        if (!varios.includes('Aviso Uno') || !varios.includes('Aviso Dos')) mal.push('Contenido: con dos ítems en el anuncio no se ven los dos')
+      }
+      // La barra de estadísticas, en las que el editor la ofrece.
+      if (p.usaStats !== false && !normal.includes('Dato Check')) mal.push('Contenido: el editor ofrece la barra de estadísticas y la portada no la dibuja')
+      if (p.usaStats === false && normal.includes('Dato Check')) mal.push('Contenido: dibuja las estadísticas y el editor no las ofrece (falta sacar usaStats: false)')
+      // El parallax, campo por campo.
+      for (const [que, frase] of [['el título', 'Parallax Check'], ['el subtítulo', 'Bajada del parallax'], ['la imagen', 'parallax.jpg']]) {
+        if (!normal.includes(frase)) mal.push(`Contenido: ${que} del parallax no se ve`)
+      }
+      if (normal === portada(p, {}, { parallaxCtaText: 'Otro Boton' })) mal.push('Contenido: el texto del botón del parallax no cambia nada')
+      // Las marcas: el título, y el logo cuando hay.
+      if (!normal.includes('Marcas Check')) mal.push('Contenido: el título de las marcas no se ve')
+      if (!portada(p, {}, { brands: [{ id: 'm', name: 'Marca Check', logoUrl: 'https://fotos.check/logo-marca.png' }] } as Partial<Apariencia>).includes('logo-marca.png')) {
+        mal.push('Contenido: el logo de una marca no se ve')
+      }
+
+      // ── Pestaña Pie ──
+      if (p.piePropio) {
+        if (!normal.includes('Bajada Check')) mal.push('Pie: la descripción no se ve')
+        const sinRedes = portada(p, {}, { showSocialFooter: false } as Partial<Apariencia>)
+        if (!normal.includes('instagram.com')) mal.push('Pie: las redes cargadas en Contacto no se ven')
+        if (sinRedes.includes('instagram.com')) mal.push('Pie: "Redes sociales en el pie de página" apagado y las redes siguen ahí')
+      }
+      // El cupón: el editor ofrece la tarjeta con `dibujaCupon()`.
+      if (dibujaCupon(p)) {
+        for (const [que, frase] of [['el título', 'Cupón Check'], ['la aclaración', 'Bajada check'], ['el código', 'CHECK']]) {
+          if (!normal.includes(frase)) mal.push(`Pie: ${que} del cupón no se ve`)
+        }
+      } else if (normal.includes('Cupón Check')) {
+        mal.push('Pie: dibuja el cupón y el editor no lo ofrece (ver dibujaCupon en secciones.ts)')
+      }
+
+      sinProblemas(`editor-portada > ${p.id}`, mal)
+    })
+  }
 })
 
 // El header de la plantilla se usa en el catálogo, la ficha y el carrito, no

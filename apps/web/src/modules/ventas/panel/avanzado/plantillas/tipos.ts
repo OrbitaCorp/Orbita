@@ -142,6 +142,11 @@ export interface Slide {
   // plantillas de muestra no existe y el CTA no navega — mismo criterio que
   // `Producto.slug`.
   link?: string
+  // El dueño subió una foto para este slide. Solo con datos reales: sin
+  // esto no se distingue una foto de verdad del degradé de respaldo, y un
+  // hero que por diseño es solo texto (el `minimo` de las recetas) no sabe
+  // si tiene algo que mostrar.
+  fotoPropia?: boolean
 }
 
 // ─── Secciones editables ─────────────────────────────────────────────────────
@@ -486,8 +491,12 @@ export interface AccionesHome {
 
   /** Cuenta + carrito reales (con contador y drawer). Reemplaza a `AccionesTienda`. */
   renderAcciones?: (opts: { movil?: boolean }) => ReactNode
-  /** El buscador real. `compacto` = el ícono solo, sin la caja de texto. */
-  renderBuscador?: (opts: { compacto?: boolean }) => ReactNode
+  /**
+   * El buscador real. `compacto` = el ícono solo, sin la caja de texto.
+   * `placeholder` es para la plantilla que le pone su propio texto a la caja
+   * (el hero de Papelería).
+   */
+  renderBuscador?: (opts: { compacto?: boolean; placeholder?: string }) => ReactNode
   /** Los enlaces de navegación reales del header (Apariencia → Header). */
   nav?: { label: string; onClick: () => void; activo?: boolean }[]
   /** La oferta con cuenta regresiva de la portada (Avanzado). Null si no hay ninguna activa. */

@@ -369,6 +369,36 @@ tarjeta se muestra acá, no se escribe un formulario aparte.
 Lo guardado va a `homeTemplateData.secciones[idSeccion][idCampo]`, un JSON por
 negocio: sumar un campo no necesita migración.
 
+### El editor ofrece exactamente lo que la plantilla dibuja
+
+Ni un campo de más ni uno de menos. Un campo que se carga y no se ve es una
+promesa del panel que la tienda no cumple, y es fácil de escribir sin darse
+cuenta: el editor y el bloque están en archivos distintos. Pasó en Lienzo (el
+editor pedía la imagen de cada slide y su hero no dibujaba ninguna), y la
+prueba que salió de ahí encontró 29 casos más en 20 plantillas.
+
+Lo que hay que cuidar al tocar un bloque o el editor:
+
+- **Hero:** título, bajada, botón e imagen de cada slide se ven en la portada.
+  Con más de un slide, rota y trae con qué navegarlo (`navHero`), o cada uno
+  tiene su lugar fijo y la plantilla declara `heroMaxSlides` (ahí el editor
+  dice "Imágenes del hero" y no deja cargar de más).
+- **La imagen del slide es opcional en todas.** Sin imagen el hero se dibuja
+  igual, sobre un degradé del primario. En un hero que por diseño es solo
+  texto (el `minimo` de las recetas) la foto se muestra detrás del texto si el
+  dueño subió una (`Slide.fotoPropia`), y sin foto queda el diseño original.
+- **Secciones:** cada campo del esquema cambia algo. En una receta el
+  formulario sale de la variante del bloque: una franja en `cartelera` pide
+  solo el título; unas categorías en `pastillas` no piden el enlace.
+- **Contenido:** el anuncio respeta "Mostrar como cartelera" y los varios
+  ítems; la barra de estadísticas se ofrece solo si se dibuja (`usaStats`).
+- **Pie:** la descripción y el interruptor de redes. El cupón se ofrece con
+  `dibujaCupon()`: las que declaran uno de muestra, y todas las recetas.
+
+El grupo `editor-portada` del check lo prueba al revés de como se escribe el
+bug: no mira el código del editor, cambia cada dato que el editor deja
+cambiar y exige que la portada cambie.
+
 ### Cómo se declara un campo
 
 ```ts
@@ -419,6 +449,7 @@ categorías, cuarenta productos).
 | vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
 | tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
 | estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos". En las recetas, además, que estén todos los bloques |
+| editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 
 ### Cómo leer un fallo

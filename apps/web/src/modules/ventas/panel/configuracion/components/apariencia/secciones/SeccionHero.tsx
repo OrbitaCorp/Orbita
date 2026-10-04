@@ -21,12 +21,13 @@ import { moverElemento, subirImagenApariencia, type PropsSeccion } from '../util
 // explícito de que esta plantilla "permita solamente agregar/editar dos
 // imágenes". Los datos de más no se borran (siguen ahí por si se vuelve
 // a un home sin tope), solo se dejan de listar mientras el tope aplica.
-export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, heroSinFoto, onToast }: PropsSeccion & {
+export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, heroFotoOpcional, onToast }: PropsSeccion & {
     soloContenido: boolean
     heroMax: number | undefined
     heroNoRotativo: boolean
-    // El hero de la plantilla activa es solo texto: no se pide la foto.
-    heroSinFoto: boolean
+    // El hero de la plantilla activa es solo texto por diseño, y la foto de
+    // cada slide es opcional (ver Apariencia.tsx).
+    heroFotoOpcional: boolean
     onToast: (m: string) => void
 }) {
     const slidersVisibles = heroMax ? ap.sliders.slice(0, heroMax) : ap.sliders
@@ -87,8 +88,8 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
                 ayuda={AYUDA_SECCIONES[heroNoRotativo ? 'slidersFijos' : 'sliders']}
                 help={heroNoRotativo
                     ? 'Las imágenes del hero de esta plantilla. No rotan: cada una tiene su lugar fijo en la portada.'
-                    : heroSinFoto
-                        ? 'El hero de esta plantilla es solo texto, sin foto: es parte de su diseño. Cada slide tiene su título, su bajada y su botón, y van rotando.'
+                    : heroFotoOpcional
+                        ? 'El hero de esta plantilla es solo texto por diseño. La imagen es opcional: si le subís una a un slide, se muestra detrás del texto; sin imagen queda el diseño original.'
                         : 'Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.'}
             >
                 {heroNoRotativo ? 'Imágenes del hero' : 'Sliders del hero'}
@@ -107,7 +108,6 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
                         index={i}
                         defaultOpen={i === 0}
                         soloTexto={soloContenido}
-                        sinFoto={heroSinFoto}
                         etiqueta={heroNoRotativo ? 'Imagen' : 'Slide'}
                         onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                         onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}

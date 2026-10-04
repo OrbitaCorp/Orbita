@@ -47,6 +47,8 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Doble campaña partida', 'Tira de lo nuevo', 'Comprá el look', 'Categorías', 'Envío gratis'],
     marca: 'Distrito', tagline: 'Ropa urbana, temporada tras temporada',
     layout: 'escaparate',
+    // Sin barra de estadísticas en su diseño: el editor no la ofrece.
+    usaStats: false,
     heroPropio: true,
     heroMaxSlides: 2,
     headerBold: true,
