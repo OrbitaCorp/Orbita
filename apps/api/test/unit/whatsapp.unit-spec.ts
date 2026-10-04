@@ -286,6 +286,31 @@ describe('WhatsappService (unit)', () => {
   });
 });
 
+describe('ConversationsService → lo que ve el cliente en la tienda', () => {
+  it('el cliente solo recibe los mensajes del chat de la tienda, no los de WhatsApp', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma: any = {
+      conversation: { findFirst: jest.fn().mockResolvedValue({ id: 'cv-1', businessId: BIZ, customerId: 'cli-1' }) },
+      message: { findMany },
+    };
+    const svc = new ConversationsService(prisma, {} as any);
+    await svc.myThread(BIZ, 'cli-1');
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { conversationId: 'cv-1', channel: 'STOREFRONT' } }));
+  });
+
+  it('el panel del negocio sigue viendo todos los canales', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma: any = {
+      conversation: { findFirst: jest.fn().mockResolvedValue({ id: 'cv-1', businessId: BIZ, customerId: 'cli-1', isUnread: false }) },
+      message: { findMany },
+      $executeRaw: jest.fn(),
+    };
+    const svc = new ConversationsService(prisma, {} as any);
+    await svc.getMessages(BIZ, 'cv-1');
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { conversationId: 'cv-1' } }));
+  });
+});
+
 describe('ConversationsService → WhatsApp', () => {
   function bandeja(ultimoCanal: 'WHATSAPP' | 'STOREFRONT' | null, enviarTexto: jest.Mock) {
     const prisma: any = {

@@ -23,8 +23,19 @@ export class ConversationsService {
 
   // Los últimos 500 de un hilo, en orden cronológico. Antes se devolvían
   // todos, sin tope (auditoría interna 10/09, ítem api.conversations).
-  private async ultimosMensajes(conversationId: string) {
-    const recientes = await this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'desc' }, take: 500 });
+  //
+  // `soloTienda` es para lo que ve el CLIENTE en la tienda: solo los mensajes del
+  // chat de la tienda, nunca los de WhatsApp. El teléfono que un cliente carga en
+  // su cuenta no está verificado: si alguien se registra con el número de otra
+  // persona, los WhatsApp de esa persona se vinculan a la cuenta del impostor
+  // (ver WhatsappService.resolverCliente) y, sin este filtro, los vería —con las
+  // respuestas del negocio— en su chat de la tienda.
+  private async ultimosMensajes(conversationId: string, soloTienda = false) {
+    const recientes = await this.prisma.message.findMany({
+      where: { conversationId, ...(soloTienda ? { channel: 'STOREFRONT' as const } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
     return recientes.reverse();
   }
 
@@ -150,7 +161,7 @@ export class ConversationsService {
     const conv = await this.prisma.conversation.findFirst({ where: { businessId, customerId } });
     if (!conv) return { id: null, messages: [] };
 
-    const messages = await this.ultimosMensajes(conv.id);
+    const messages = await this.ultimosMensajes(conv.id, true);
     return { id: conv.id, messages: messages.map((m) => this.aMensaje(m)) };
   }
 
