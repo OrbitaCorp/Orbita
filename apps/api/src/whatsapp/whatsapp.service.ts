@@ -2,6 +2,7 @@ import {
   BadGatewayException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -265,6 +266,29 @@ export class WhatsappService {
   }
 
   // ── Conexión del negocio ───────────────────────────────────────────────────
+
+  /**
+   * La conexión de WhatsApp todavía es manual (se pegan los datos de Meta): no
+   * es para que la vea cualquier negocio. En producción solo se habilita a los
+   * negocios listados en WHATSAPP_NEGOCIOS_HABILITADOS (subdominios separados
+   * por coma); sin la variable, ninguno. Fuera de producción, sin la variable,
+   * están todos habilitados para poder probar. Se reemplaza por el plan/Embedded
+   * Signup cuando esté listo.
+   */
+  async asegurarHabilitado(businessId: string): Promise<void> {
+    const lista = (this.config.get<string>('WHATSAPP_NEGOCIOS_HABILITADOS') ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (lista.length === 0) {
+      if (this.config.get<string>('NODE_ENV') === 'production') throw new ForbiddenException('WhatsApp todavía no está disponible para este negocio');
+      return;
+    }
+    const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
+    if (!negocio || !lista.includes(negocio.subdomain.toLowerCase())) {
+      throw new ForbiddenException('WhatsApp todavía no está disponible para este negocio');
+    }
+  }
 
   async estado(businessId: string) {
     const c = await this.prisma.whatsappConnection.findUnique({

@@ -17,21 +17,27 @@ export class WhatsappController {
   @Get('connection')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  estado(@CurrentBusiness() ctx: AuthContext) {
-    return this.whatsapp.estado(assertMemberContext(ctx).businessId);
+  async estado(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.whatsapp.asegurarHabilitado(businessId);
+    return this.whatsapp.estado(businessId);
   }
 
   @Post('connection')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  conectar(@CurrentBusiness() ctx: AuthContext, @Body() dto: ConnectWhatsappDto) {
-    return this.whatsapp.conectar(assertMemberContext(ctx).businessId, dto);
+  async conectar(@CurrentBusiness() ctx: AuthContext, @Body() dto: ConnectWhatsappDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.whatsapp.asegurarHabilitado(businessId);
+    return this.whatsapp.conectar(businessId, dto);
   }
 
   @Delete('connection')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  desconectar(@CurrentBusiness() ctx: AuthContext) {
-    return this.whatsapp.desconectar(assertMemberContext(ctx).businessId);
+  async desconectar(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.whatsapp.asegurarHabilitado(businessId);
+    return this.whatsapp.desconectar(businessId);
   }
 }

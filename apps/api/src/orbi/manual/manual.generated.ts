@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "1c3d3665347b6b83",
+  "version": "cbc3d29e443504f0",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -309,7 +309,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por WhatsApp aparecen en esta misma bandeja, con la etiqueta WhatsApp, y los respondés desde acá. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"

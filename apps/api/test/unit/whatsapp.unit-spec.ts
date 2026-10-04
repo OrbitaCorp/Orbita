@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto';
-import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { WhatsappService, WaWebhookBody } from '../../src/whatsapp/whatsapp.service';
 import { ConversationsService } from '../../src/conversations/conversations.service';
 
@@ -187,6 +187,28 @@ describe('WhatsappService (unit)', () => {
       prisma.customer.create.mockRejectedValueOnce(new Error('boom'));
       await svc.procesarWebhook(payload([TEXTO, { ...TEXTO, id: 'wamid.B' }]));
       expect(prisma.customer.create).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('negocios habilitados', () => {
+    function conLista(valores: Record<string, string>, negocio: { subdomain: string } | null = { subdomain: 'mitienda' }) {
+      const prisma: any = { business: { findUnique: jest.fn().mockResolvedValue(negocio) } };
+      return new WhatsappService(prisma, { get: (k: string) => valores[k] } as any);
+    }
+
+    it('en producción sin lista no habilita a nadie', async () => {
+      await expect(conLista({ NODE_ENV: 'production' }).asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('fuera de producción sin lista habilita a todos (para poder probar)', async () => {
+      await expect(conLista({}).asegurarHabilitado(BIZ)).resolves.toBeUndefined();
+    });
+
+    it('con lista, solo pasa el subdominio listado (sin importar mayúsculas ni espacios)', async () => {
+      const lista = { WHATSAPP_NEGOCIOS_HABILITADOS: ' Otra , MiTienda ', NODE_ENV: 'production' };
+      await expect(conLista(lista).asegurarHabilitado(BIZ)).resolves.toBeUndefined();
+      await expect(conLista(lista, { subdomain: 'ajena' }).asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(conLista(lista, null).asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
