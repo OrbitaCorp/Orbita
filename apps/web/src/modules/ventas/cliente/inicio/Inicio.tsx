@@ -647,11 +647,21 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-parallax { position:relative; min-height:440px; margin-bottom:56px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
                 .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
                 .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
-                /* iOS Safari históricamente ignora/rompe background-attachment:
-                   fixed (y en Android puede tildar en equipos de gama baja) —
-                   se apaga en mobile a propósito: el banner se ve idéntico,
-                   solo sin el efecto, en vez de arriesgar un fondo roto. */
-                @media(max-width:640px){ .sf-parallax { background-attachment:scroll; } }
+                /* iOS Safari ignora background-attachment: fixed (y en Android
+                   es poco fiable), así que en celular el efecto se hace de otra
+                   forma: una capa position:fixed del tamaño de la pantalla con
+                   la foto, y la sección la recorta con clip-path — se ve solo
+                   la franja que cae dentro del banner y la foto "queda quieta"
+                   mientras la página pasa. Sin JS, lo anima el compositor. La
+                   URL llega por la variable --sf-par-img (inline, propia de
+                   cada tienda). Con prefers-reduced-motion se queda estático. */
+                @media(max-width:640px){
+                    .sf-parallax { background-attachment:scroll; }
+                    @media (prefers-reduced-motion: no-preference) {
+                        .sf-parallax { background-image:none !important; clip-path:inset(0); }
+                        .sf-parallax::before { content:''; position:fixed; top:0; left:0; width:100%; height:100vh; height:100lvh; background:var(--sf-par-img) center/cover no-repeat; z-index:0; pointer-events:none; }
+                    }
+                }
                 @media (prefers-reduced-motion: reduce) { .sf-parallax { background-attachment:scroll; } }
 
                 /* ── Tablet (≤1024px) ── */
@@ -928,7 +938,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 (fondo fijo, texto y CTA encima, el resto de la página
                 sigue el scroll normal). */}
             {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
-                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})` }}>
+                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                     <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                         <div style={{ maxWidth: 520, padding: '56px 0' }}>

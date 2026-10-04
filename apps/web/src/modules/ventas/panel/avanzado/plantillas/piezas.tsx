@@ -67,7 +67,17 @@ export const CSS = `
    efecto. Y se respeta prefers-reduced-motion, que para mucha gente no es
    una preferencia estética sino que le marea. */
 .pl-parallax { background-size: cover; background-position: center; background-attachment: fixed; }
-@media (max-width: 640px) { .pl-parallax { background-attachment: scroll; } }
+@media (max-width: 640px) {
+  .pl-parallax { background-attachment: scroll; }
+  /* Celular: iOS ignora background-attachment: fixed, así que se usa una capa
+     position:fixed con la foto (variable --pl-par-img) recortada por el
+     clip-path de la sección. Ver el mismo recurso en Inicio.tsx (.sf-parallax). */
+  @media (prefers-reduced-motion: no-preference) {
+    .pl-parallax { background-image: none !important; clip-path: inset(0); }
+    .pl-parallax::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; height: 100lvh; background: var(--pl-par-img) center/cover no-repeat; z-index: 0; pointer-events: none; }
+    .pl-parallax > * { position: relative; z-index: 1; }
+  }
+}
 @media (prefers-reduced-motion: reduce) { .pl-parallax { background-attachment: scroll; } }
 
 .pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }

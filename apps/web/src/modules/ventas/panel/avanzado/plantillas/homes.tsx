@@ -623,7 +623,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
           return (
             <div
               key={i} className="pl-parallax"
-              style={{ backgroundImage: `url(${px.img})`, minHeight: movil ? 320 : 440, display: 'flex', alignItems: 'center', position: 'relative' }}
+              style={{ backgroundImage: `url(${px.img})`, ['--pl-par-img' as string]: `url(${px.img})`, minHeight: movil ? 320 : 440, display: 'flex', alignItems: 'center', position: 'relative' }}
             >
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(0,0,0,0.72), rgba(0,0,0,0.18))' }} />
               <div style={{ position: 'relative', padding: movil ? '38px 20px' : '60px', maxWidth: 560 }}>
