@@ -9,8 +9,9 @@ import { ApiError, connectWhatsapp, disconnectWhatsapp, getWhatsappConnection, t
 // Setup). El botón "Conectar con Facebook" (Embedded Signup) va a reemplazar
 // este formulario cuando Órbita tenga la verificación de Tech Provider.
 //
-// Conectar/desconectar es solo de propietario/admin: si el backend responde
-// 403 al consultar el estado, el botón directamente no se muestra.
+// Conectar/desconectar es solo de propietario/admin, y en producción solo de los
+// negocios habilitados: si el backend responde 403 al consultar el estado, el
+// botón directamente no se muestra.
 
 const inputStyle: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px',
@@ -34,8 +35,10 @@ export function WhatsappBoton() {
   const [visible, setVisible] = useState(true)
   const [abierto, setAbierto] = useState(false)
 
+  // 403: el negocio no está habilitado. 404: la API todavía no tiene el endpoint
+  // (el front sale unos minutos antes que la API). En ambos casos no se muestra.
   const cargar = () => getWhatsappConnection().then(setEstado).catch((e) => {
-    if (e instanceof ApiError && e.status === 403) setVisible(false)
+    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) setVisible(false)
   })
   useEffect(() => { cargar() }, [])
 
