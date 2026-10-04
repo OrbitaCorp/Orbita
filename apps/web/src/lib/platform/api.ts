@@ -262,6 +262,8 @@ export interface OrbiUsoResumen {
     accionesConfirmadas: number
     accionesRechazadas: number
     escriturasRechazadas: number
+    /** Mensajes que Orbi contestó con la frase fija de fuera de alcance. Opcional: la API de antes del 4/10/2026 no lo manda. */
+    fueraDeAlcance?: number
   }
   serie: { dia: string; mensajes: number; costoUsd: number | null }[]
   acciones: { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number; latenciaPromedio: number }[]

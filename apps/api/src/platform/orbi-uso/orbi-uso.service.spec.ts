@@ -23,7 +23,7 @@ function armar(env: Record<string, string> = {}) {
 const KPIS = {
   mensajes: 10, costoUsd: 1.5, creditos: 300, mensajesSinCosto: 0, promptTokens: 1000, cachedTokens: 400, completionTokens: 200, thinkingTokens: 50,
   latenciaP50: 1200.5, latenciaP95: null, ttftP50: null, errores: 1, frenadosPorCupoMensual: 2, frenadosPorTopeDiario: 3, conGroq: 0,
-  accionesPropuestas: 5, accionesConfirmadas: 3, accionesRechazadas: 1, escriturasRechazadas: 0,
+  accionesPropuestas: 5, accionesConfirmadas: 3, accionesRechazadas: 1, escriturasRechazadas: 0, fueraDeAlcance: 4,
 };
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe('OrbiUsoService.resumen', () => {
 
     expect(r.mes).toBe('2026-10');
     expect(r.lecturaHabilitada).toBe(true);
-    expect(r.kpis).toMatchObject({ mensajes: 10, costoUsd: 1.5, creditos: 300, latenciaP50: 1200.5, latenciaP95: null, ttftP50: null, frenadosPorCupoMensual: 2, frenadosPorTopeDiario: 3 });
+    expect(r.kpis).toMatchObject({ mensajes: 10, costoUsd: 1.5, creditos: 300, latenciaP50: 1200.5, latenciaP95: null, ttftP50: null, frenadosPorCupoMensual: 2, frenadosPorTopeDiario: 3, fueraDeAlcance: 4 });
     expect(r.serie).toEqual([{ dia: '2026-10-01', mensajes: 4, costoUsd: 0.5 }]);
     expect(r.acciones.map((a) => a.costoTotalUsd)).toEqual([0.9, 0.4, 0.2]);
     expect(r.acciones[0].tools).toBe('Charla, sin tools');
@@ -73,13 +73,20 @@ describe('OrbiUsoService.resumen', () => {
     expect(sql).not.toContain('"frenadosPorCupo"');
   });
 
+  it('cuenta los mensajes fuera de alcance con la marca de cada turno', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    await armar().resumen('2026-10');
+    const sql = (prisma.$queryRaw.mock.calls[0][0] as string[]).join('?');
+    expect(sql).toContain('count(*) FILTER (WHERE out_of_scope)::int AS "fueraDeAlcance"');
+  });
+
   it('sin la variable, la lectura de conversaciones no está habilitada, y sin datos todo da cero', async () => {
     prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const r = await armar().resumen('2026-10');
     expect(r.lecturaHabilitada).toBe(false);
     expect(r.kpis.mensajes).toBe(0);
     expect(r.kpis.latenciaP50).toBeNull();
-    expect(r.kpis).toMatchObject({ frenadosPorCupoMensual: 0, frenadosPorTopeDiario: 0 });
+    expect(r.kpis).toMatchObject({ frenadosPorCupoMensual: 0, frenadosPorTopeDiario: 0, fueraDeAlcance: 0 });
     expect(r.negocios).toEqual([]);
   });
 
