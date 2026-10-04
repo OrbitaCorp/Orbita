@@ -84,6 +84,15 @@ sale de piezas comunes de `Home()`:
 - **Su título sale del estante que le tocó** si el dueño no escribió uno
   (`txt()` lo resuelve solo con `estante`). En el editor esos dos campos van
   vacíos, con la aclaración, en vez de precargar "Top ventas".
+- **El título de cada estante se edita por estante**, no por fila: `seccionesDe()`
+  le suma a todo bloque propio cuatro secciones "Fila: Destacados / Nuevos
+  ingresos / Recomendados / Top ventas" (`est-<estante>`), con un solo campo.
+  Vale donde sea que ese estante se dibuje: en la fila propia (si el dueño no
+  le escribió un título a esa fila) o en una de las que agrega `resto()`.
+- **Una sección propia con productos que no es un estante** (el look de
+  Escaparate, los ambientes de Cobijo) los pide con `aparte(n, clave)`: salen
+  del catálogo salteando los que ya se ven en las filas. Con `p.productos` la
+  portada mostraba el mismo producto en la fila y otra vez más abajo.
 - **`{resto(n)}`** antes del cupón o del pie dibuja lo que el bloque no tiene:
   los estantes que sobran (`n` es cuántas filas propias tiene), el parallax,
   las marcas y el video, con el tema de la plantilla. `resto(n, true)` suma las
@@ -102,8 +111,7 @@ las recetas, al principio de `resto()` en las de bloque propio.
 
 **Estado:** las veintiséis cumplen el estándar y `PENDIENTES` está vacía.
 Sigue afuera la cantidad de productos de "Nuevos ingresos": con plantilla cada
-fila es de un renglón. Las filas que agrega `resto()` en un bloque propio
-salen con el nombre del estante, sin título editable.
+fila es de un renglón.
 
 ### Nada de la maqueta en una tienda real
 
@@ -448,7 +456,7 @@ categorías, cuarenta productos).
 | tema | Contraste del texto y del botón |
 | vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
 | tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
-| estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos". En las recetas, además, que estén todos los bloques |
+| estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
 | editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 

@@ -425,7 +425,9 @@ describe('el editor de cada plantilla coincide con lo que dibuja', () => {
       // no se puede saber qué campo es, así que se dan todos por usados.
       // El cintillo también: lo lee Home() una sola vez, arriba de todos los
       // bloques, para la vitrina (en la tienda el anuncio es el de Apariencia).
-      const dinamicas = new Set<string>(['cintillo'])
+      // Y el título de cada estante (ver SECCIONES_DE_ESTANTES en
+      // secciones.ts): lo resuelven `txt()` y `resto()`, fuera del bloque.
+      const dinamicas = new Set<string>(['cintillo', 'est-destacados', 'est-nuevos', 'est-recomendados', 'est-topVentas'])
       for (const [, s, c] of bloque!.matchAll(/\b(?:txt|activo)\(\s*'([\w-]+)'\s*,\s*'([\w-]+)'\s*\)/g)) usados.add(`${s}.${c}`)
       for (const [, s] of bloque!.matchAll(/\b(?:txt|activo)\(\s*'([\w-]+)'\s*,\s*[^')]/g)) dinamicas.add(s)
       for (const [, s] of bloque!.matchAll(/\blugares\(\s*[^,]+,\s*'([\w-]+)'/g)) dinamicas.add(s)
@@ -535,8 +537,10 @@ describe('una plantilla respeta lo que se configura en Apariencia', () => {
 
   // Productos que no son un estante y por eso no tienen interruptor: las
   // filas por categoría (Atleta), y las selecciones que el dueño arma a mano
-  // (los pasos de Nocturno, la lista de Papelería, la rutina de Glow).
-  const CON_PRODUCTOS_SIN_ESTANTE = new Set(['atleta', 'nocturno', 'papeleria', 'glow'])
+  // (los pasos de Nocturno, la lista de Papelería, la rutina de Glow), o que
+  // la plantilla toma del catálogo para una sección suya (el look de
+  // Escaparate, los ambientes de Cobijo).
+  const CON_PRODUCTOS_SIN_ESTANTE = new Set(['atleta', 'nocturno', 'papeleria', 'glow', 'escaparate', 'cobijo'])
   const productosSinEstante = (p: Plantilla) =>
     p.receta ? p.receta.bloques.some(b => b.t === 'porCategoria') : CON_PRODUCTOS_SIN_ESTANTE.has(p.id)
   // Sin una sección de categorías que apagar: Mosaico arranca con un muro de
@@ -613,6 +617,23 @@ describe('una plantilla respeta lo que se configura en Apariencia', () => {
       // Apagado, la tienda no le pasa a la plantilla cómo abrir el chat.
       const sinWpp = html(p, { showWhatsapp: false }, false, {}, { abrirWhatsapp: undefined })
       if (/whatsapp/i.test(texto(sinWpp).replace(/Enlace Check \w+/g, ''))) mal.push('con el WhatsApp apagado queda un texto que invita a escribir por WhatsApp')
+
+      // Con un solo estante prendido, ningún producto sale dos veces: las
+      // secciones propias (el look de Escaparate, los ambientes de Cobijo) no
+      // repiten los de la fila. Con más de uno no se puede pedir: un producto
+      // puede ser a la vez destacado y de los más vendidos.
+      for (const movil of [false, true]) {
+        const h = dibujar({
+          p: plantillaReal({ base: p, ...TIENDAS.grande, apariencia: { ...APARIENCIA, ...SIN_ESTANTES, showFeaturedSection: true } as Apariencia }),
+          movil, acciones: ACCIONES, soloCuerpo: !p.headerPropio,
+        })
+        const veces = new Map<string, number>()
+        for (const [nombre] of h.matchAll(/Articulo [a-z]{2}\b/g)) veces.set(nombre, (veces.get(nombre) ?? 0) + 1)
+        // Una tarjeta propia puede escribir el nombre dos veces (el `alt` de
+        // la foto y el texto): se cuenta contra lo que escribe en una fila sola.
+        const repetidos = [...veces].filter(([, n]) => n > 2).map(([nombre]) => nombre)
+        if (repetidos.length) mal.push(`[${movil ? 'celular' : 'escritorio'}] repite productos en la portada: ${repetidos.slice(0, 4).join(', ')}`)
+      }
 
       sinProblemas(`estándar > ${p.id}`, mal)
     })

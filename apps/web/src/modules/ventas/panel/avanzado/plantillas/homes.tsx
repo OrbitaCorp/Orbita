@@ -171,6 +171,30 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
    */
   const fila = (n: number, clave: string, base?: Producto[]) =>
     p.estantes ? (base ?? p.productos).slice(0, n) : delCatalogo(n, clave, base)
+  /**
+   * Productos para una sección propia que NO es un estante: los tres puntos
+   * del look de Escaparate, los ambientes de Cobijo.
+   *
+   * Salían de `p.productos`, que son los mismos de la fila principal: la
+   * portada mostraba un producto en la fila y otra vez, dos secciones más
+   * abajo, en el look. Acá salen del catálogo, salteando los que ya se ven en
+   * las filas de estantes; si el catálogo es chico y no alcanza, se completa
+   * con esos (repetir es mejor que dejar el ambiente sin productos).
+   */
+  const aparte = (n: number, clave: string) => {
+    if (!p.estantes) return p.productos.slice(0, n)
+    const id = (x: Producto) => x.slug ?? x.nombre
+    const enFilas = new Set<string>(p.productos.map(id))
+    for (const lista of Object.values(p.estantes)) for (const x of lista.slice(0, 5)) enFilas.add(id(x))
+    const desde = barajado.length ? Math.abs(hash(clave)) % barajado.length : 0
+    const girado = [...barajado.slice(desde), ...barajado.slice(0, desde)]
+    const salida: Producto[] = []
+    for (const x of [...girado.filter(y => !enFilas.has(id(y))), ...p.productos, ...girado]) {
+      if (salida.length < n && !salida.some(y => id(y) === id(x))) salida.push(x)
+    }
+    return salida
+  }
+
   // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
   // Contenido de una sección editable de ESTA plantilla. Si el dueño no lo
@@ -193,7 +217,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     if (acciones && p.estantes && (campo === 'volanta' || campo === 'titulo')) {
       const cual = estanteDeSeccion(p.id, seccion)
       const estante = cual === 0 ? p.estantePrincipal : cual === 1 ? p.estanteSecundario : undefined
-      if (estante) return TITULOS_ESTANTE[estante][campo === 'volanta' ? 1 : 2]
+      if (estante) {
+        // ...o el que el dueño le puso a ese estante (ver SECCIONES_DE_ESTANTES).
+        const delEstante = campo === 'titulo' ? p.sec?.[`est-${estante}`]?.titulo?.trim() : ''
+        return delEstante || TITULOS_ESTANTE[estante][campo === 'volanta' ? 1 : 2]
+      }
     }
     if (acciones && esAfirmacion(p.id, seccion, campo)) return ''
     // `!!acciones` = tienda real. Ahí, un campo escrito para el rubro de la
@@ -1279,7 +1307,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
                 ))}
               </div>
               <div>
-                {p.productos.slice(0, 3).map((x, i) => (
+                {aparte(3, 'escaparate-look').map((x, i) => (
                   <div
                     key={x.nombre} className="pl-card"
                     onClick={x.slug && acciones ? () => acciones.irAProducto(x.slug!) : undefined}
@@ -3035,9 +3063,11 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     // Los dos ambientes son lo que distingue a esta plantilla, así que su
     // título, su texto y su foto los edita el dueño. La foto cae a la de una
     // categoría suya (no a una del repo) cuando no subió ninguna.
+    // Cuatro productos para los dos ambientes, distintos de los de las filas.
+    const deAmbientes = aparte(4, 'cobijo-ambientes')
     const ambientes: [string, string, string, string, typeof p.productos][] = [
-      [txt('ambiente1', 'volanta'), txt('ambiente1', 'titulo'), txt('ambiente1', 'texto'), txt('ambiente1', 'foto') || cat[0]?.[1] || s.img, p.productos.slice(0, 2)],
-      [txt('ambiente2', 'volanta'), txt('ambiente2', 'titulo'), txt('ambiente2', 'texto'), txt('ambiente2', 'foto') || cat[2]?.[1] || s.img, p.productos.slice(2, 4)],
+      [txt('ambiente1', 'volanta'), txt('ambiente1', 'titulo'), txt('ambiente1', 'texto'), txt('ambiente1', 'foto') || cat[0]?.[1] || s.img, deAmbientes.slice(0, 2)],
+      [txt('ambiente2', 'volanta'), txt('ambiente2', 'titulo'), txt('ambiente2', 'texto'), txt('ambiente2', 'foto') || cat[2]?.[1] || s.img, deAmbientes.slice(2, 4)],
     ]
 
     const encabezado = (

@@ -1012,14 +1012,6 @@ export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
  *
  * Sumar una plantilla nueva no es escribir un editor — es elegir bloques.
  */
-// Cómo se llama cada estante en el panel, y el encabezado con el que sale si
-// el dueño no lo cambia: los mismos del home clásico.
-export const TITULOS_ESTANTE: Record<Estante, [nombre: string, volanta: string, titulo: string]> = {
-  destacados: ['Destacados', 'Destacados', 'Productos destacados'],
-  nuevos: ['Nuevos ingresos', 'Nuevos ingresos', 'Recién llegados'],
-  recomendados: ['Recomendados', 'Recomendados', 'Recomendados para vos'],
-  topVentas: ['Top ventas', 'Top ventas', 'Más vendidos'],
-}
 
 export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
   // Sin cintillo, sin parallax, sin marcas, sin video y sin estadísticas: eso
@@ -1143,10 +1135,42 @@ export function dibujaCupon(p: { cupon?: unknown; receta?: unknown } | null | un
   return !!p && (!!p.cupon || !!p.receta)
 }
 
+// Cómo se llama cada estante en el panel, y el encabezado con el que sale si
+// el dueño no lo cambia: los mismos del home clásico.
+export const TITULOS_ESTANTE: Record<Estante, [nombre: string, volanta: string, titulo: string]> = {
+  destacados: ['Destacados', 'Destacados', 'Productos destacados'],
+  nuevos: ['Nuevos ingresos', 'Nuevos ingresos', 'Recién llegados'],
+  recomendados: ['Recomendados', 'Recomendados', 'Recomendados para vos'],
+  topVentas: ['Top ventas', 'Top ventas', 'Más vendidos'],
+}
+
+/**
+ * El título de cada estante, para las plantillas con bloque propio.
+ *
+ * Una receta ya lo tiene: cada fila es un bloque con su encabezado. En un
+ * bloque propio las filas no están declaradas —la principal muestra el primer
+ * estante con productos, y las demás las agrega `resto()`—, así que el título
+ * no puede colgar de una fila: cuelga del estante. Donde sea que ese estante
+ * se dibuje, sale con este título.
+ *
+ * Un solo campo a propósito. La fila principal de cada plantilla tiene su
+ * propio diseño de encabezado (Vidriera no lleva volanta, Vera no lleva
+ * enlace), y un campo que en una plantilla se ve y en otra no es justo lo que
+ * el editor no puede ofrecer. El título lo llevan todas.
+ */
+const SECCIONES_DE_ESTANTES: SeccionPlantilla[] = (Object.keys(TITULOS_ESTANTE) as Estante[]).map(e => ({
+  id: `est-${e}`,
+  nombre: `Fila: ${TITULOS_ESTANTE[e][0]}`,
+  nota: `El título de la fila de ${TITULOS_ESTANTE[e][0].toLowerCase()}, donde sea que la plantilla la muestre. Se prende y se apaga en Contenido.`,
+  campos: [
+    { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: TITULOS_ESTANTE[e][2] },
+  ],
+}))
+
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {
   if (!idPlantilla) return []
   const propias = SECCIONES_POR_PLANTILLA[idPlantilla]
-  if (propias) return propias
+  if (propias) return [...propias, ...SECCIONES_DE_ESTANTES]
   const receta = PLANTILLAS.find(x => x.id === idPlantilla)?.receta
   return receta ? esquemaDeReceta(receta) : []
 }
