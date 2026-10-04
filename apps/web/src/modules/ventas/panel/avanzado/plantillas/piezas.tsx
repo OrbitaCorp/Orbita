@@ -111,6 +111,9 @@ const FUENTES_PLANTILLAS = [
   'Libre+Baskerville:wght@400;700',
   'Outfit:wght@400;600;700;800',
   'Manrope:wght@400;600;700;800',
+  // Bloque. Estaban en su tema y no acá: se veía con la fuente del sistema.
+  'Rubik:wght@400;500;700;800;900',
+  'Nunito+Sans:wght@400;600;700;800',
 ]
 
 export function cargarFuentes() {

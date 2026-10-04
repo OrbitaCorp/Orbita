@@ -193,7 +193,7 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           p={{
             ...plantilla,
             marca: tienda.nombre || plantilla.marca,
-            tagline: config?.appearance?.tagline || plantilla.tagline,
+            tagline: config?.appearance?.tagline?.trim() ?? '',
             links: navReal.map(l => l.label),
             sec: config?.appearance?.homeTemplateData?.secciones ?? undefined,
             // El anuncio y el buscador son del header, así que valen en

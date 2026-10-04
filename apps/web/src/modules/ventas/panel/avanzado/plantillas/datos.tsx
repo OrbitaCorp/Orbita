@@ -383,7 +383,7 @@ export const PLANTILLAS: Plantilla[] = [
     piePropio: true,
     tema: {
       bg: '#FFF9F5', surf: '#FFFFFF', soft: '#FFF0E6', text: '#2D1B12', muted: '#8B7268', border: '#F2DFD1',
-      primary: '#F97316', onPrimary: '#FFFFFF', accent: '#22C55E',
+      primary: '#EA580C', onPrimary: '#FFFFFF', accent: '#22C55E',
       fh: sans('Nunito'), fb: sans('Nunito'), radio: 20, oscuro: false,
       sombra: '0 20px 40px -22px rgba(249,115,22,0.4)',
     },
@@ -465,7 +465,7 @@ export const PLANTILLAS: Plantilla[] = [
     piePropio: true,
     tema: {
       bg: '#FFFDFB', surf: '#FFFFFF', soft: '#F4F7FA', text: '#33302E', muted: '#8A8580', border: '#EAE6E1',
-      primary: '#7FA9C9', onPrimary: '#FFFFFF', accent: '#F0B49B',
+      primary: '#7FA9C9', onPrimary: '#33302E', accent: '#F0B49B',
       fh: sans('Quicksand'), fb: sans('Quicksand'), radio: 24, oscuro: false,
       sombra: '0 22px 44px -24px rgba(127,169,201,0.45)',
     },
@@ -1048,7 +1048,7 @@ export const PLANTILLAS: Plantilla[] = [
     categorias: [['Ropa', `${IMG}/bebe-ropa.jpg`], ['Juguetes', `${IMG}/bebe-juguetes.jpg`], ['Habitación', `${IMG}/bebe-habitacion.jpg`], ['Regalos', `${IMG}/bebe-oso.jpg`]],
     tema: {
       bg: '#FFFBFC', surf: '#FFFFFF', soft: '#FDF0F3', text: '#3D2F36', muted: '#8C7A82', border: '#F3DFE5',
-      primary: '#E8899F', onPrimary: '#FFFFFF', accent: '#7FB5C4',
+      primary: '#E8899F', onPrimary: '#3D2F36', accent: '#7FB5C4',
       fh: sans('Quicksand'), fb: sans('Nunito'), radio: 24, oscuro: false,
       sombra: '0 18px 38px -20px rgba(232,137,159,0.4)',
     },

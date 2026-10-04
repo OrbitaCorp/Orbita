@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Grid, List, Tag, TrendingUp, Search, ChevronDown, ChevronLeft, ChevronRight, Check, SlidersHorizontal, X } from 'lucide-react'
+import { Grid, List, Tag, TrendingUp, Search, ChevronDown, ChevronLeft, ChevronRight, Check, Minus, SlidersHorizontal, X } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -26,28 +26,40 @@ const LIMIT = 12
 // chiquitas... hay que hacerle zoom"). El mobile sigue resolviéndose aparte
 // con el media query de abajo (2 columnas), sin importar esto.
 
-// Categoría con su profundidad en el árbol (0 = raíz) — se arma acá porque
-// el backend devuelve la lista plana con parentId (ver listCategories() en
-// storefront.service.ts), no hace falta tocar nada del lado del servidor
-// para mostrar las subcategorías anidadas bajo su categoría madre.
-type CategoriaNodo = StorefrontCategoryItem & { depth: number }
+// El backend devuelve la lista plana con parentId (ver listCategories() en
+// storefront.service.ts, que incluye también las madres sin productos propios).
+// Acá se arma el árbol: `porPadre` da los hijos directos de cada categoría
+// (la clave null son las raíces) y `padreDe` sube un nivel, para abrir las
+// ramas con algo elegido.
+type ArbolCategorias = {
+  porPadre: Map<string | null, StorefrontCategoryItem[]>
+  padreDe: Map<string, string>
+}
 
-function construirArbolCategorias(cats: StorefrontCategoryItem[]): CategoriaNodo[] {
+function construirArbolCategorias(cats: StorefrontCategoryItem[]): ArbolCategorias {
   const idsValidos = new Set(cats.map(c => c.id))
   const porPadre = new Map<string | null, StorefrontCategoryItem[]>()
+  const padreDe = new Map<string, string>()
   for (const c of cats) {
+    // Un parentId que no está en la lista (madre inactiva) cuenta como raíz.
     const key = c.parentId && idsValidos.has(c.parentId) ? c.parentId : null
+    if (key) padreDe.set(c.id, key)
     if (!porPadre.has(key)) porPadre.set(key, [])
     porPadre.get(key)!.push(c)
   }
-  const out: CategoriaNodo[] = []
-  function visitar(padreId: string | null, depth: number) {
-    for (const c of porPadre.get(padreId) ?? []) {
-      out.push({ ...c, depth })
-      visitar(c.id, depth + 1)
-    }
+  return { porPadre, padreDe }
+}
+
+// Ids que se eligen al tildar una categoría: ella (si tiene productos propios)
+// y toda su descendencia con productos. Se manda así al backend, que filtra
+// por categoría exacta — tildar "Mujer" equivale a tildar todas sus hijas.
+function idsDelNodo(arbol: ArbolCategorias, c: StorefrontCategoryItem): string[] {
+  const out: string[] = []
+  const visitar = (n: StorefrontCategoryItem) => {
+    if ((n.productCount ?? 0) > 0) out.push(n.id)
+    for (const h of arbol.porPadre.get(n.id) ?? []) visitar(h)
   }
-  visitar(null, 0)
+  visitar(c)
   return out
 }
 
@@ -91,6 +103,10 @@ export default function Catalogo() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filtrosOpen, setFiltrosOpen] = useState(false)
   const [seccionCategoria, setSeccionCategoria] = useState(true)
+  // Raíces con sus subcategorías desplegadas — arrancan plegadas (salvo las que
+  // tienen algo elegido, ver el efecto de abajo) para que el filtro no sea una
+  // lista larguísima de todas las hijas mezcladas.
+  const [catsAbiertas, setCatsAbiertas] = useState<Set<string>>(new Set())
   const [seccionPrecio, setSeccionPrecio] = useState(true)
 
   // Productos CRUDOS de la API: se convierten al dibujar (useMemo) y no al
@@ -164,7 +180,15 @@ export default function Catalogo() {
 
     if (!catQueryStr) return
 
-    const ids = resolverIdsDeCategorias(catQueryStr, categorias)
+    // Si el enlace apunta a una categoría madre ("Mujer"), se eligen también
+    // todas sus hijas: el backend filtra por categoría exacta y la madre
+    // casi nunca tiene productos propios.
+    const arbol = construirArbolCategorias(categorias)
+    const ids = [...new Set(resolverIdsDeCategorias(catQueryStr, categorias).flatMap(id => {
+      const c = categorias.find(x => x.id === id)
+      const delNodo = c ? idsDelNodo(arbol, c) : []
+      return delNodo.length > 0 ? delNodo : [id]
+    }))]
     if (ids.length > 0) setCatsActivas(ids)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, categorias, router.query.cat])
@@ -184,7 +208,7 @@ export default function Catalogo() {
     if (!slug) return
     let cancelado = false
     setCatsCargando(true)
-    Promise.all([getStorefrontConfig(slug), getStorefrontCategories(slug)])
+    Promise.all([getStorefrontConfig(slug), getStorefrontCategories(slug, { conAncestros: true })])
       .then(([cfg, cats]) => {
         if (cancelado) return
         setConfig(cfg)
@@ -290,7 +314,14 @@ export default function Catalogo() {
   useEffect(() => {
     if (!router.isReady || !urlListo) return
     const q = new URLSearchParams()
-    const slugsCat = catsActivas.map(id => categorias.find(c => c.id === id)?.slug).filter((x): x is string => !!x)
+    // Dos subcategorías de madres distintas pueden compartir slug ("remeras" en
+    // Hombre y en Mujer): en ese caso va el id, que el resolver también acepta,
+    // para que recargar la página no devuelva la otra.
+    const slugsRepetidos = new Set(categorias.map(c => c.slug).filter((s, i, a) => a.indexOf(s) !== i))
+    const slugsCat = catsActivas
+      .map(id => categorias.find(c => c.id === id))
+      .filter((c): c is StorefrontCategoryItem => !!c)
+      .map(c => (slugsRepetidos.has(c.slug) ? c.id : c.slug))
     const catStr = slugsCat.join(',')
     if (catStr) q.set('cat', catStr)
     ultimaQueryCatRef.current = catStr
@@ -320,12 +351,42 @@ export default function Catalogo() {
   const transferPct = config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
-  const arbolCategorias = construirArbolCategorias(categorias)
+  const arbolCategorias = useMemo(() => construirArbolCategorias(categorias), [categorias])
+
+  // Abre las ramas que tienen algo elegido (venga de la URL o de un click), así
+  // nunca queda una selección escondida dentro de una raíz plegada. Solo
+  // agrega: plegar a mano sigue funcionando mientras no cambie la selección.
+  useEffect(() => {
+    if (catsActivas.length === 0) return
+    setCatsAbiertas(prev => {
+      const next = new Set(prev)
+      for (const id of catsActivas) {
+        for (let p = arbolCategorias.padreDe.get(id); p; p = arbolCategorias.padreDe.get(p)) next.add(p)
+      }
+      return next.size === prev.size ? prev : next
+    })
+  }, [catsActivas, arbolCategorias])
 
   // Todos vuelven a página 1 — evita quedar en "página 4 de 1" al filtrar.
+  // Tildar una categoría con hijas elige / saca toda su rama (idsDelNodo).
   function alternarCategoria(id: string) {
     setCatsActivas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
     setPage(1)
+  }
+  function alternarRama(c: StorefrontCategoryItem) {
+    const ids = idsDelNodo(arbolCategorias, c)
+    setCatsActivas(prev => {
+      const completa = ids.length > 0 && ids.every(id => prev.includes(id))
+      return completa ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]
+    })
+    setPage(1)
+  }
+  function alternarCatAbierta(id: string) {
+    setCatsAbiertas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
   }
   function limpiarCategorias() { setCatsActivas([]); setPage(1) }
   // Mismo criterio que alternarCategoria/limpiarCategorias — un solo grupo
@@ -355,6 +416,47 @@ export default function Catalogo() {
   const cantFiltrosActivos = catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0) + (soloOferta ? 1 : 0)
   const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
   const columnas = columnasDeGrilla(config?.appearance?.gridLayout)
+
+  // Filas del filtro de Categoría. Una raíz con subcategorías muestra un
+  // chevron para desplegarlas; su checkbox elige/saca toda la rama y queda a
+  // medias ("mixed") si solo hay algunas hijas elegidas.
+  function renderCategorias(padreId: string | null, depth: number): React.ReactNode {
+    return (arbolCategorias.porPadre.get(padreId) ?? []).map(c => {
+      const hijas = arbolCategorias.porPadre.get(c.id) ?? []
+      const ids = idsDelNodo(arbolCategorias, c)
+      const elegidas = ids.filter(id => catsActivas.includes(id)).length
+      const completa = ids.length > 0 && elegidas === ids.length
+      const mixta = elegidas > 0 && !completa
+      const abierta = catsAbiertas.has(c.id)
+      return (
+        <div key={c.id}>
+          <div className="sf-catrow" onClick={() => alternarRama(c)}>
+            <span className={`sf-catchk${completa || mixta ? ' on' : ''}`}>
+              {completa && <Check size={11} strokeWidth={3} color="#fff" />}
+              {mixta && <Minus size={11} strokeWidth={3} color="#fff" />}
+            </span>
+            <span style={{ fontSize: depth > 0 ? 12.5 : 13, fontWeight: completa || mixta ? 700 : 500, color: depth > 0 ? 'var(--color-muted)' : 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {c.name.trim()}
+            </span>
+            {hijas.length > 0 && (
+              <button
+                className="ds-hover"
+                onClick={e => { e.stopPropagation(); alternarCatAbierta(c.id) }}
+                aria-expanded={abierta}
+                aria-label={`${abierta ? 'Plegar' : 'Desplegar'} ${c.name.trim()}`}
+                style={{ width: 24, height: 24, margin: '-4px -2px -4px 0', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--color-subtle)' }}
+              >
+                <ChevronDown size={14} strokeWidth={2} style={{ transform: abierta ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+              </button>
+            )}
+          </div>
+          {hijas.length > 0 && abierta && (
+            <div style={{ marginLeft: 10, paddingLeft: 8, borderLeft: '1.5px solid var(--color-border)' }}>{renderCategorias(c.id, depth + 1)}</div>
+          )}
+        </div>
+      )
+    })
+  }
 
   return (
     <StorefrontChrome tienda={tienda} config={config} anuncio>
@@ -480,7 +582,7 @@ export default function Catalogo() {
               )}
             </div>
 
-            {(catsCargando || arbolCategorias.length > 0) && (
+            {(catsCargando || categorias.length > 0) && (
               <FilterSection title="Categoría" open={seccionCategoria} onToggle={() => setSeccionCategoria(o => !o)}>
                 {catsCargando ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 4px' }}>
@@ -494,24 +596,7 @@ export default function Catalogo() {
                       </span>
                       <span style={{ fontSize: 13, fontWeight: catsActivas.length === 0 ? 700 : 500, color: 'var(--color-text)' }}>Todas las categorías</span>
                     </div>
-                    {arbolCategorias.map(c => {
-                      const activa = catsActivas.includes(c.id)
-                      return (
-                        <div
-                          key={c.id}
-                          className="sf-catrow"
-                          onClick={() => alternarCategoria(c.id)}
-                          style={{ paddingLeft: 4 + c.depth * 18, borderLeft: c.depth > 0 ? '1.5px solid var(--color-border)' : 'none', marginLeft: c.depth > 0 ? 8 : 0 }}
-                        >
-                          <span className={`sf-catchk${activa ? ' on' : ''}`}>
-                            {activa && <Check size={11} strokeWidth={3} color="#fff" />}
-                          </span>
-                          <span style={{ fontSize: c.depth > 0 ? 12.5 : 13, fontWeight: activa ? 700 : 500, color: c.depth > 0 ? 'var(--color-muted)' : 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {c.name}
-                          </span>
-                        </div>
-                      )
-                    })}
+                    {renderCategorias(null, 0)}
                   </div>
                 )}
               </FilterSection>

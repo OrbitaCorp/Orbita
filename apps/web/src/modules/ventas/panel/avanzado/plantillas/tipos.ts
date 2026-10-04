@@ -490,6 +490,8 @@ export interface AccionesHome {
   renderBuscador?: (opts: { compacto?: boolean }) => ReactNode
   /** Los enlaces de navegación reales del header (Apariencia → Header). */
   nav?: { label: string; onClick: () => void; activo?: boolean }[]
+  /** La oferta con cuenta regresiva de la portada (Avanzado). Null si no hay ninguna activa. */
+  renderOferta?: () => ReactNode
   /** "Video en tu tienda" de Apariencia, ya resuelto. Null si no hay nada que mostrar. */
   renderVideo?: () => ReactNode
   /** El pie real de la tienda, para las plantillas que no dibujan uno propio. */

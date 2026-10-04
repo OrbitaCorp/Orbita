@@ -782,6 +782,19 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // — sin la función, el header dibuja el buscador de
                         // muestra de la vitrina, que no busca nada.
                         renderBuscador: () => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} /> : null,
+                        // La cuenta regresiva de la portada y su fila de
+                        // productos en oferta: los mismos dos componentes
+                        // del home clásico. Sin countdown activo no dibujan
+                        // nada.
+                        renderOferta: () => slug ? (
+                            <>
+                                <CountdownBanner slug={slug} lugar="HOME" />
+                                <CountdownOfertaSection
+                                    slug={slug}
+                                    badges={{ showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }}
+                                />
+                            </>
+                        ) : null,
                         // "Video en tu tienda": el mismo componente del
                         // home clásico. Sin ningún link válido devuelve null
                         // y el bloque de la plantilla no se dibuja.

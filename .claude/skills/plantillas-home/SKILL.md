@@ -34,7 +34,8 @@ dueño decide cuáles se ven.
 | Bloque | Se prende y se carga en | Cuándo no se dibuja |
 |---|---|---|
 | Anuncio (fijo o cartelera) | Contenido → Textos de tu tienda | Apagado o sin texto |
-| Hero | Hero | Sin slides |
+| Hero | Hero | Nunca: sin slides, uno neutro con el nombre del negocio |
+| Oferta con cuenta regresiva | Avanzado → Oferta relámpago | Sin una activa |
 | Barra de estadísticas | Contenido → Barra de estadísticas | Apagada o sin ítems |
 | Categorías | Contenido → Sección de categorías | Apagada o sin categorías |
 | Destacados | Contenido → Filas de productos | Apagado, o ningún producto con la estrella |
@@ -95,11 +96,31 @@ sale de piezas comunes de `Home()`:
   delante de cada sección: sin productos, sin categorías o sin WhatsApp, la
   sección no se dibuja. Un título arriba de una grilla vacía es peor que nada.
 
-**Estado:** las veintiséis cumplen el estándar. Sigue afuera la oferta con
-cuenta regresiva de la portada (paquete Avanzado) y la cantidad de productos
-de "Nuevos ingresos": con plantilla cada fila es de un renglón. Las filas que
-agrega `resto()` en un bloque propio salen con el nombre del estante, sin
-título editable.
+**La oferta con cuenta regresiva** (paquete Avanzado) también entra: la dibuja
+la tienda (`acciones.renderOferta`) y la plantilla la ubica — pegada al hero en
+las recetas, al principio de `resto()` en las de bloque propio.
+
+**Estado:** las veintiséis cumplen el estándar y `PENDIENTES` está vacía.
+Sigue afuera la cantidad de productos de "Nuevos ingresos": con plantilla cada
+fila es de un renglón. Las filas que agrega `resto()` en un bloque propio
+salen con el nombre del estante, sin título editable.
+
+### Nada de la maqueta en una tienda real
+
+La marca, la bajada, los productos, las categorías y el hero de muestra son
+para la vitrina. `plantillaReal()` los pisa **siempre**, también cuando el
+negocio no cargó los suyos:
+
+- sin bajada, el pie no escribe ninguna (antes quedaba la de la maqueta);
+- sin slides, un **hero neutro** con el nombre del negocio, su bajada y un
+  botón al catálogo, sobre un degradé del primario de la plantilla
+  (`heroNeutro`). Sin hero no se deja: en varias es media portada;
+- un texto de muestra que solo tiene sentido en el rubro de la maqueta se
+  calla con `afirmacion` (los maridajes de Bodega) o se cambia con
+  `porDefectoReal`.
+
+El check busca en la portada de la tienda de prueba cada uno de esos datos de
+muestra.
 
 ## Las seis reglas que no se negocian
 
@@ -413,9 +434,9 @@ que siempre hay categorías, fotos o destacados.
 
 ### La lista de pendientes
 
-`PENDIENTES`, arriba de `plantillas.test.ts`, anota lo que el check encontró en
-plantillas que ya estaban publicadas y todavía no se arregló. Funciona como
-trinquete:
+`PENDIENTES`, arriba de `plantillas.test.ts`, es para anotar lo que el check
+encuentre en una plantilla ya publicada y no se arregle en el momento. Hoy
+está vacía. Funciona como trinquete:
 
 - Un problema que no está en la lista hace fallar el check. **Una plantilla
   nueva no suma nada ahí: se arregla.**

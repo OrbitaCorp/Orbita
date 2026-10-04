@@ -761,6 +761,10 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
      * segundo, así que acá van los que siguen. En la vitrina no dibuja nada:
      * ahí no hay Apariencia.
      */
+    // La oferta con cuenta regresiva de la portada (paquete Avanzado). La
+    // dibuja la tienda; acá se decide dónde va.
+    const oferta = acciones?.renderOferta?.() ?? null
+
     const resto = (filasPropias: number, conCategorias = false) => {
       if (!acciones || !p.estantes) return null
       const sobran = (['destacados', 'nuevos', 'recomendados', 'topVentas'] as Estante[])
@@ -768,6 +772,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         .slice(filasPropias)
       return (
         <>
+          {oferta}
           {/* Para la plantilla que no tiene una sección de categorías propia. */}
           {conCategorias && bloque({ t: 'categorias', estilo: 'pastillas', cols: 6 }, 899)}
           {sobran.map((e, k) => bloque({ t: 'fila', id: `est-${e}`, fuente: e, cols: 4 }, 900 + k))}
@@ -836,7 +841,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
     return (
       <div style={marco}>
         {encabezado}
-        {r.bloques.map(bloque)}
+        {/* La oferta va pegada al hero: es lo único de la portada que se
+            vence, y tres secciones más abajo la urgencia no se ve. */}
+        {r.bloques.flatMap((b, i) => (b.t === 'hero' && oferta ? [bloque(b, i), <div key="oferta">{oferta}</div>] : [bloque(b, i)]))}
         {p.cupon && (
           <Reveal>
             <div style={{ margin: movil ? '0 16px 26px' : '0 40px 40px', border: `1px dashed ${t.primary}`, borderRadius: t.radio, padding: movil ? 22 : '28px 32px', textAlign: 'center' }}>
@@ -2500,6 +2507,9 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
         </Reveal>
         )}
 
+        {/* Sin ninguna recomendación escrita, la sección no va: en una tienda
+            real los textos de muestra (qué vino con qué comida) no se dibujan. */}
+        {(txt('maridajes', 't1') || txt('maridajes', 't2') || txt('maridajes', 't3')) && (
         <Reveal>
           <div style={{ borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: movil ? '28px 22px' : '46px 52px' }}>
             <Titulo t={t} centrado volanta={txt('maridajes', 'volanta')} texto={txt('maridajes', 'titulo')} movil={movil} />
@@ -2517,6 +2527,7 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {resto(1)}
 

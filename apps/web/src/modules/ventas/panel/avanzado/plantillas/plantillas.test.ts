@@ -39,35 +39,16 @@ const visibles = PLANTILLAS.filter(p => !p.oculta)
 
 // ─── Lo que ya se sabe que está mal ──────────────────────────────────────────
 //
-// El check se escribió con veintiséis plantillas ya publicadas, y encontró
-// cosas en varias. Arreglarlas cambia cómo se ven tiendas que hoy están
-// andando, así que es una decisión aparte: quedan anotadas acá para que el
-// check sirva desde el primer día —una plantilla NUEVA no puede sumar nada a
-// esta lista— sin esconder lo que falta.
+// Para un problema que el check encuentra en una plantilla ya publicada y
+// que no se arregla en el momento: cambiar cómo se ve una tienda que hoy está
+// andando es una decisión aparte. Se anota acá —`'grupo > plantilla':
+// ['pedazo del texto']`— para que el check siga sirviendo sin esconder lo que
+// falta. Hoy está vacía, y una plantilla NUEVA no suma nada acá: se arregla.
 //
 // Cada renglón es un pedazo del texto del problema. Funciona como trinquete:
 // si aparece un problema que no está acá, falla; y si uno de acá deja de
 // pasar, también falla, pidiendo que se lo borre. La lista solo se achica.
-const PENDIENTES: Record<string, string[]> = {
-  // Bloque nombra dos fuentes que nadie baja: se ve con la del sistema.
-  'catálogo > tipografías': ['bloque: Rubik', 'bloque: Nunito Sans'],
-
-  // El texto blanco del botón sobre un primario claro.
-  'tema > patitas': ['texto del botón sobre el primario'],
-  'tema > crecer': ['texto del botón sobre el primario'],
-  'tema > petalo': ['texto del botón sobre el primario'],
-
-  // `plantillaReal()` deja la bajada de la maqueta ("Running, fuerza y
-  // ciclismo") cuando el negocio no cargó la suya, y los slides de muestra
-  // ("Auriculares V-90 Pro") cuando no cargó ningún hero. Es del adaptador,
-  // no de cada plantilla: por eso van una sola vez.
-  'tienda > bajada de la maqueta': ['*'],
-  'tienda > hero de la maqueta': ['*'],
-
-  // Textos de muestra escritos para el rubro de la maqueta, sin su versión
-  // neutra (`porDefectoReal`).
-  'tienda > bodega': ['categoría de muestra "Malbec"', 'categoría de muestra "Cabernet Franc"'],
-}
+const PENDIENTES: Record<string, string[]> = {}
 
 /**
  * Falla listando TODO lo que encontró, de a un renglón. Con `toEqual([])`
@@ -202,6 +183,7 @@ const ACCIONES: AccionesHome = {
   renderAcciones: () => marca('acciones'),
   renderBuscador: () => marca('buscador'),
   renderVideo: () => marca('video'),
+  renderOferta: () => marca('oferta'),
   renderProducto: (x) => marca('producto', x.nombre),
 }
 
@@ -518,9 +500,14 @@ describe('aplicada en una tienda de verdad', () => {
   })
 
   it('un negocio sin hero cargado no muestra el de la maqueta', () => {
-    sinProblemas('tienda > hero de la maqueta', PLANTILLAS
-      .filter(p => { const n = enMinima(p); return p.slides.some(s => n.includes(limpio(s.titulo))) })
-      .map(p => `${p.id}: se lee "${limpio(p.slides[0].titulo)}"`))
+    // Sin contar los títulos que también son el nombre de un estante: el
+    // segundo slide de muestra de Base se llama "Recién llegados", igual que
+    // la fila de Nuevos ingresos.
+    const deEstante = new Set(Object.values(TITULOS_ESTANTE).flat())
+    sinProblemas('tienda > hero de la maqueta', PLANTILLAS.flatMap(p => {
+      const n = enMinima(p)
+      return p.slides.map(x => limpio(x.titulo)).filter(t => !deEstante.has(t) && n.includes(t)).map(t => `${p.id}: se lee "${t}"`)
+    }))
   })
 })
 
@@ -604,6 +591,7 @@ describe('una plantilla respeta lo que se configura en Apariencia', () => {
         if (html(p, {}, movil, { stats: [] }).includes('Dato Check')) mal.push(`[${donde}] las estadísticas se ven aunque no haya ninguna`)
 
         if (!html(p, {}, movil).includes('data-check="video"')) mal.push(`[${donde}] el video de Apariencia no se ve`)
+        if (!html(p, {}, movil).includes('data-check="oferta"')) mal.push(`[${donde}] la oferta con cuenta regresiva no se ve`)
         if (html(p, {}, movil, {}, { renderVideo: () => null }).includes('data-check="video"')) mal.push(`[${donde}] dibuja el video aunque no haya ninguno`)
 
         if (propio) {

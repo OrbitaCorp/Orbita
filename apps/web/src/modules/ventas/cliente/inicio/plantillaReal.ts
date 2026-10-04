@@ -176,6 +176,20 @@ function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoP
 // así que es un gris neutro fijo en vez del degradé por `hue` del resto.
 const SIN_FOTO_HERO = 'linear-gradient(135deg, #E7E5E4, #D6D3D1)'
 
+// El hero de una tienda que todavía no cargó ninguno. El fondo es un degradé
+// del primario de la plantilla hacia oscuro: los heros escriben en blanco
+// sobre la foto, y así se lee en cualquier paleta.
+function heroNeutro(base: Plantilla, marca?: string, tagline?: string): Slide {
+  const primario = base.tema.primary
+  return {
+    img: `linear-gradient(135deg, color-mix(in srgb, ${primario} 78%, black), color-mix(in srgb, ${primario} 38%, black))`,
+    titulo: marca?.trim() || 'Bienvenidos',
+    bajada: tagline?.trim() ?? '',
+    cta: 'Ver el catálogo',
+    link: '/catalogo',
+  }
+}
+
 function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
   return { img: s.img ?? SIN_FOTO_HERO, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
 }
@@ -360,7 +374,10 @@ export function plantillaReal({
     ...contenidoDeApariencia(apariencia, { destacados, nuevos: nuevos ?? productos, recomendados, topVentas }, secciones, transferPct, hayWhatsapp),
     // La identidad es del NEGOCIO, no de la muestra — ver `marca` arriba.
     ...(marca?.trim() ? { marca: marca.trim() } : {}),
-    ...(tagline?.trim() ? { tagline: tagline.trim() } : {}),
+    // La bajada también, y sin caer a la de la muestra: un negocio que no
+    // cargó la suya mostraba "Running, fuerza y ciclismo" en el pie de una
+    // tienda de ropa. Vacía, el pie no la dibuja.
+    tagline: tagline?.trim() ?? '',
     sec: secciones,
     // Barra de confianza: los stats reales del negocio (Apariencia → statsBar),
     // con el mismo par [fuerte, apagado] que usa la plantilla.
@@ -375,11 +392,13 @@ export function plantillaReal({
     // `productos` y `productosSecundarios` ya vienen de `contenidoDeApariencia`:
     // son los estantes que muestran las filas propias de la plantilla.
     catalogo: productos.map(p => aProductoPlantilla(p, transferPct)),
-    // Sin slides editados, se queda con los de muestra de `base` (mismo
-    // criterio que categorías/cupón: no dejar la sección vacía si el negocio
-    // todavía no cargó nada).
-    ...(base.heroPropio && heroSlides && heroSlides.length > 0
-      ? { slides: heroSlides.map(aSlidePlantilla) }
+    // Sin slides cargados, un hero neutro armado con lo que el negocio SÍ
+    // tiene: su nombre, su bajada y un botón al catálogo. Antes se quedaba
+    // con los de muestra de `base`, y una tienda de ropa con Nocturno puesta
+    // abría con "Auriculares V-90 Pro · Driver de 50 mm". Sin hero no se puede
+    // dejar: en varias plantillas es media portada.
+    ...(base.heroPropio
+      ? { slides: heroSlides && heroSlides.length > 0 ? heroSlides.map(aSlidePlantilla) : [heroNeutro(base, marca, tagline)] }
       : {}),
     // El pie: el DISEÑO sigue siendo el de la plantilla (lo pone su `tema`),
     // pero el contenido pasa a ser el real. Antes quedaba el de la maqueta:
