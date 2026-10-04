@@ -271,8 +271,7 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
                 <>
                     <rect x={4.5} y={169.5} width={52} height={10} rx={5} fill={ACENTO_BG} stroke={ACENTO} strokeOpacity={0.5} />
                     <circle cx={11} cy={174.5} r={2} fill={ACENTO} />
-                    <Rotulo x={16} y={176.7} size={5.8} fuerte color={ACENTO}>Orbi</Rotulo>
-                    <Rotulo x={53} y={176.5} size={4.6} derecha>Ctrl+K</Rotulo>
+                    <Rotulo x={16} y={176.7} size={5.8} fuerte color={ACENTO}>Orbi AI</Rotulo>
                 </>
             )}
             {/* Barra de arriba */}
@@ -289,12 +288,12 @@ function Panel({ activo, abierto, sub, miga, colapsado, noLeidos, children }: {
                 ))}
             </text>
             {/* Búsqueda global, Orbi, modo oscuro, campana, avatar */}
-            <rect x={160.5} y={3.5} width={42} height={10} rx={5} fill={BLOQUE} />
-            <circle cx={166} cy={8.5} r={1.8} fill="none" stroke={SUTIL} strokeWidth={0.8} />
-            <Rotulo x={170.5} y={10.5} size={5} color={SUTIL}>Buscar...</Rotulo>
-            <rect x={205.5} y={3.5} width={21} height={10} rx={5} fill={ACENTO_BG} stroke={ACENTO} strokeOpacity={0.4} />
-            <circle cx={210.5} cy={8.5} r={2.6} fill={ACENTO} />
-            <Rotulo x={214.5} y={10.5} size={4.8} fuerte color={TEXTO}>Orbi</Rotulo>
+            <rect x={155.5} y={3.5} width={42} height={10} rx={5} fill={BLOQUE} />
+            <circle cx={161} cy={8.5} r={1.8} fill="none" stroke={SUTIL} strokeWidth={0.8} />
+            <Rotulo x={165.5} y={10.5} size={5} color={SUTIL}>Buscar...</Rotulo>
+            <rect x={200.5} y={3.5} width={27} height={10} rx={5} fill={ACENTO_BG} stroke={ACENTO} strokeOpacity={0.4} />
+            <circle cx={205.5} cy={8.5} r={2.6} fill={ACENTO} />
+            <Rotulo x={209.5} y={10.5} size={4.8} fuerte color={TEXTO}>Orbi AI</Rotulo>
             <path d="M 233 4.2 a 4 4 0 1 0 4 4.3 a 3 3 0 0 1 -4 -4.3 z" fill="none" stroke={TENUE} strokeWidth={0.9} />
             <path d="M 244.5 11 h 8 l -1.5 -2 v -2.5 a 2.5 2.5 0 0 0 -5 0 v 2.5 z" fill="none" stroke={TENUE} strokeWidth={0.9} strokeLinejoin="round" />
             <circle cx={252} cy={4.5} r={2.4} fill={TONOS.error.fg} />
@@ -1111,7 +1110,7 @@ function Perfil() {
     )
 }
 
-/** Si te trabás: Orbi (botón, Ctrl+K, sugerencias, datos de tu negocio) y el tutorial de Primeros pasos. */
+/** Si te trabás: Orbi (botón, sugerencias, datos de tu negocio) y el tutorial de Primeros pasos. */
 function Orbi() {
     return (
         <Panel activo="dashboard" miga={['Inicio']}>
@@ -1147,8 +1146,6 @@ function Orbi() {
             <circle cx={220} cy={11} r={1.5} fill={ACENTO} />
             <ellipse cx={220} cy={11} rx={6.5} ry={2.5} fill="none" stroke={ACENTO} strokeOpacity={0.5} transform="rotate(-24 220 11)" />
             <Rotulo x={228} y={13.5} size={6.5} fuerte>Orbi</Rotulo>
-            <rect x={268.5} y={6.5} width={24} height={9} rx={2} fill={BLOQUE} stroke={LINEA} />
-            <Rotulo x={280.5} y={12.7} size={4.4} centro color={TEXTO}>Ctrl+K</Rotulo>
             <path d="M 305 8 l 5 5 m 0 -5 l -5 5" fill="none" stroke={TENUE} strokeWidth={0.9} strokeLinecap="round" />
             <line x1={210.5} y1={20.5} x2={319.5} y2={20.5} stroke={LINEA} />
             <Rotulo x={216} y={31} size={6} fuerte>Hola, soy Orbi</Rotulo>
@@ -1168,7 +1165,7 @@ function Orbi() {
             <rect x={296.5} y={162.5} width={16} height={11} rx={2.5} fill={ACENTO} />
             <path d="M 301 168 h 7 m -2.5 -2.5 l 2.5 2.5 l -2.5 2.5" fill="none" stroke={SOBRE_ACENTO} strokeWidth={0.9} strokeLinecap="round" />
             <Callout n={1} x={60} y={165} />
-            <Callout n={2} x={299} y={11} />
+            <Callout n={2} x={297} y={10.5} />
             <Callout n={3} x={294} y={48} />
             <Callout n={4} x={312} y={116} />
             <Callout n={5} x={206} y={167} />
@@ -1354,10 +1351,10 @@ const ESQUEMAS: Record<IlustracionId, Esquema> = {
         dibujo: <Perfil />,
     },
     orbi: {
-        titulo: 'Orbi abierto a la derecha del Inicio: el atajo Ctrl+K, las preguntas sugeridas, una respuesta con datos del negocio y el campo para escribir; y la tarjeta de Primeros pasos.',
+        titulo: 'Orbi abierto a la derecha del Inicio: la X para cerrarlo, las preguntas sugeridas, una respuesta con datos del negocio y el campo para escribir; y la tarjeta de Primeros pasos.',
         leyenda: [
-            'El botón de Orbi, al pie del menú.',
-            'Ctrl+K (Cmd+K en Mac) lo abre desde cualquier pantalla.',
+            'El botón Orbi AI, al pie del menú (también está en la barra de arriba).',
+            'La X lo cierra; el mismo botón lo vuelve a abrir desde cualquier pantalla.',
             'Preguntas sugeridas para arrancar.',
             'Contesta con los datos de TU negocio, no con ayuda genérica.',
             'Escribile lo que quieras: un número, un pedido, cómo se hace algo.',

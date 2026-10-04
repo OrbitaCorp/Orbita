@@ -10,6 +10,7 @@ import { OrbiV2Contexto, type Vista } from '../piezas/contexto'
 import { ANCHO_MAXIMO, ANCHO_MINIMO, topeDeAncho, useOrbiV2 } from '../estado/useOrbiV2'
 import { OrbiChat } from './OrbiChat'
 import { paginaDesde } from '../estado/vuelta'
+import { usePresencia } from '../estado/presencia'
 import s from '../orbi.module.css'
 
 const PASO_TECLADO_PX = 16
@@ -71,6 +72,11 @@ export default function OrbiV2() {
   const { anunciar, region } = useAnunciador()
   const partes = Array.isArray(router.query.slug) ? router.query.slug : []
   const enLaPagina = partes[partes.length - 1] === 'orbi'
+  // Abre y cierra con animación: sigue montado mientras se va. En la página de
+  // Orbi el chat es la página, así que ahí desaparece sin animar (no "se va").
+  const sinMovimiento = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const { montado, fase } = usePresencia(isOpen && !enLaPagina, !sinMovimiento && !enLaPagina)
+  const saliendo = fase === 'saliendo'
 
   useDisponibilidadOrbi('panel', isOpen)
   useOrbiViewport()
@@ -106,7 +112,7 @@ export default function OrbiV2() {
     const ro = new ResizeObserver(() => setTope(topeDeAncho(medio.getBoundingClientRect().width + lateral.getBoundingClientRect().width)))
     ro.observe(medio)
     return () => ro.disconnect()
-  }, [vista, isOpen, enLaPagina])
+  }, [vista, montado, enLaPagina])
   const anchoEfectivo = Math.min(ancho, tope)
   const ajustarAncho = (px: number) => setAncho(Math.min(tope, px))
 
@@ -142,7 +148,7 @@ export default function OrbiV2() {
     else if (delta > 60) { if (hoja === 'completa') setHoja('media'); else close() }
   }
 
-  if (!isOpen || enLaPagina) return null
+  if (!montado || enLaPagina) return null
 
   // La página recuerda de dónde se vino, para que "Salir de la pantalla completa" vuelva ahí.
   const paginaConVuelta = rutas.pagina ? paginaDesde(rutas.pagina, router.asPath) : null
@@ -159,8 +165,14 @@ export default function OrbiV2() {
           ref={refLateral}
           id={ID_PANEL_ORBI}
           className={`${s.raiz} ${s.lateral}`}
-          style={{ width: anchoEfectivo }}
+          data-fase={fase}
+          // Cerrado (antes del primer cuadro y al irse) mide 0: la sección del
+          // medio se desliza al ancho nuevo. El chat de adentro no cambia de
+          // ancho, así no se reacomoda el texto mientras tanto.
+          style={{ width: fase === 'preparando' || saliendo ? 0 : anchoEfectivo }}
           aria-label="Orbi"
+          aria-hidden={saliendo || undefined}
+          inert={saliendo}
           onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) close() }}
         >
           <button
@@ -182,21 +194,21 @@ export default function OrbiV2() {
               if (e.key === 'ArrowRight') { e.preventDefault(); ajustarAncho(anchoEfectivo - PASO_TECLADO_PX) }
             }}
           />
-          {chat}
+          <div className={s.lateralInterior} style={{ width: anchoEfectivo }}>{chat}</div>
         </aside>
       )}
       {vista === 'superpuesto' && (
         <>
-          <div className={s.scrim} onClick={close} aria-hidden />
-          <div id={ID_PANEL_ORBI} role="dialog" aria-modal="true" aria-label="Orbi" className={`${s.raiz} ${s.superpuesto}`} onKeyDown={atraparFoco}>
+          <div className={s.scrim} data-fase={fase} onClick={saliendo ? undefined : close} aria-hidden />
+          <div id={ID_PANEL_ORBI} role="dialog" aria-modal={!saliendo} aria-label="Orbi" aria-hidden={saliendo || undefined} inert={saliendo} className={`${s.raiz} ${s.superpuesto}`} data-fase={fase} onKeyDown={atraparFoco}>
             {chat}
           </div>
         </>
       )}
       {vista === 'hoja' && (
         <>
-          <div className={s.scrim} onClick={close} aria-hidden />
-          <div id={ID_PANEL_ORBI} role="dialog" aria-modal="true" aria-label="Orbi" className={`${s.raiz} ${s.hoja}`} data-alto={hoja} onKeyDown={atraparFoco}>
+          <div className={s.scrim} data-fase={fase} onClick={saliendo ? undefined : close} aria-hidden />
+          <div id={ID_PANEL_ORBI} role="dialog" aria-modal={!saliendo} aria-label="Orbi" aria-hidden={saliendo || undefined} inert={saliendo} className={`${s.raiz} ${s.hoja}`} data-alto={hoja} data-fase={fase} onKeyDown={atraparFoco}>
             <button
               type="button"
               className={s.tiradorHoja}

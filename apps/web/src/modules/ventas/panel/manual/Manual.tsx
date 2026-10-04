@@ -331,7 +331,7 @@ export default function Manual() {
                     {sinResultados ? (
                         <p className="man-vacio">
                             No encontramos nada con “{q.trim()}”. Probá con una palabra más corta, o
-                            preguntale a Orbi con Ctrl+K: él busca sobre los datos de tu negocio, no
+                            preguntale a Orbi: él busca sobre los datos de tu negocio, no
                             sobre este texto.
                         </p>
                     ) : (

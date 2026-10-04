@@ -14,8 +14,8 @@ describe('primeroVisible con los selectores de Orbi', () => {
     const [barra, menu] = SELECTORES_ORBI
 
     it('prueba primero el aria-label del celular y después el title del menú', () => {
-        expect(barra).toBe('[aria-label="Abrir Orbi"]')
-        expect(menu).toBe('[title="Orbi AI (Ctrl+K)"]')
+        expect(barra).toBe('[aria-label="Abrir Orbi AI"]')
+        expect(menu).toBe('[title="Orbi AI"]')
     })
 
     it('en celular gana el botón de la barra', () => {
