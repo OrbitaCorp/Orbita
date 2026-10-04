@@ -1,6 +1,7 @@
 import { ContextBuilderService } from './context-builder.service';
 import { OrbiSurface, OrbiWizardFormStateDto } from '../dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
+import { RESPUESTA_FUERA_DE_ALCANCE } from '../prompts/alcance';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -742,6 +743,41 @@ describe('ContextBuilderService', () => {
       expect(prompt).toContain('buscá en el manual');
     });
   });
+  describe('capa de alcance', () => {
+    it('el panel lleva el alcance con la frase fija, entre el core y el índice del manual', async () => {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
+      } as any, CODIGOS_DEL_CATALOGO);
+
+      expect(prompt).toContain('## De qué hablás');
+      expect(prompt).toContain(`"${RESPUESTA_FUERA_DE_ALCANCE}"`);
+      // El ejemplo del borde: vender el producto sí, producirlo no.
+      expect(prompt).toContain('"¿Cómo hago una pizza?" → afuera');
+      expect(prompt).toContain('"Escribime la descripción de la napolitana" → adentro');
+      // Parte del prefijo compartido: antes del manual y de cualquier dato del negocio.
+      expect(prompt.indexOf('Sos Orbi')).toBeLessThan(prompt.indexOf('## De qué hablás'));
+      expect(prompt.indexOf('## De qué hablás')).toBeLessThan(prompt.indexOf('## Manual de uso del panel'));
+      expect(prompt.indexOf('## De qué hablás')).toBeLessThan(prompt.indexOf('Rama'));
+    });
+
+    it('va en todas las pantallas del panel, y el wizard no la lleva (tiene su propia regla)', async () => {
+      for (const mod of ['dashboard', 'pedidos', 'catalogo', 'clientes', 'descuentos', 'configuracion', 'mensajes', 'otro']) {
+        const prompt = await service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: mod, businessId: 'biz-1' },
+        } as any);
+        expect({ mod, tiene: prompt.includes(RESPUESTA_FUERA_DE_ALCANCE) }).toEqual({ mod, tiene: true });
+      }
+      const wizard = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.WIZARD, stepName: 'ubicacion' },
+      } as any);
+      expect(wizard).not.toContain(RESPUESTA_FUERA_DE_ALCANCE);
+      expect(wizard).not.toContain('## De qué hablás');
+    });
+  });
+
   it('ninguna capa del panel le enseña al modelo valores internos de la base', async () => {
     // Valores de enum (PENDING, OUT_OF_STOCK, PERCENT_TICKET…): si están en el
     // prompt, Orbi se los repite a la persona. Los nombres de las tools sí

@@ -7,6 +7,7 @@ import { CORE_PROMPT } from '../prompts/core';
 import { getWizardPrompt } from '../prompts/wizard';
 import { getPanelPrompt } from '../prompts/panel';
 import { capaDelManual } from '../prompts/manual';
+import { capaDeAlcance } from '../prompts/alcance';
 import { resolverModuloDelPanel } from '../navegacion/modulo-de-orbi';
 
 // Permiso que hace falta para meterle al prompt el snapshot de cada módulo. Es
@@ -71,9 +72,10 @@ export class ContextBuilderService {
         ? await this.moduleData.getSnapshot(dto.context.businessId, modulo)
         : {};
 
-      // El índice del manual va antes de la capa del panel: hasta acá el
-      // prompt es igual para todos los negocios (caché de Gemini). Ver
-      // prompts/manual.ts.
+      // El alcance y el índice del manual van antes de la capa del panel:
+      // hasta acá el prompt es igual para todos los negocios (caché de
+      // Gemini). Ver prompts/alcance.ts y prompts/manual.ts.
+      layers.push(capaDeAlcance());
       layers.push(capaDelManual());
       layers.push(getPanelPrompt(
         modulo,
