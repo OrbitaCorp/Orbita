@@ -151,6 +151,8 @@ function dominios(opts: { existente?: { status: string; dnsVerified: boolean } }
     addDomain: jest.fn().mockResolvedValue({}),
     isDnsConfigured: jest.fn().mockResolvedValue(true),
     getDomainInfo: jest.fn().mockResolvedValue({ verified: true }),
+    addWwwRedirect: jest.fn().mockResolvedValue(undefined),
+    tieneCertificado: jest.fn().mockResolvedValue(true),
     removeDomain: jest.fn().mockResolvedValue(undefined),
   };
   const audit = auditMock();
