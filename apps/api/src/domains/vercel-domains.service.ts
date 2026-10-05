@@ -140,6 +140,39 @@ export class VercelDomainsService {
     return !config.misconfigured;
   }
 
+  /**
+   * Agrega `www.<apex>` al proyecto con redirección 308 al dominio sin www.
+   * Sin esto, quien tipea "www.tutienda.com" cae en lo que tenga el registrador
+   * (la página de parking de Hostinger, por ejemplo) aunque el apex ande.
+   * Vercel exige que el destino del redirect ya esté en el proyecto.
+   */
+  async addWwwRedirect(apex: string): Promise<void> {
+    await this.call(`/v10/projects/${this.projectId}/domains`, {
+      method: 'POST',
+      body: JSON.stringify({ name: `www.${apex}`, redirect: apex, redirectStatusCode: 308 }),
+    });
+  }
+
+  /**
+   * ¿El dominio ya sirve HTTPS con un certificado válido? Es lo que ve el
+   * visitante, y es la única señal confiable: la API de Vercel no expone el
+   * estado del certificado, y `verified` (ownership) viene en true desde el
+   * primer segundo (ver el comentario en DomainsService#linkDomain).
+   *
+   * Cualquier respuesta HTTP —un 404 incluido— prueba que el handshake TLS
+   * anduvo; un certificado faltante o de otro nombre corta la conexión o falla
+   * la validación y `fetch` tira. Solo devuelve un booleano y se llama recién
+   * cuando Vercel ya confirmó que el DNS del dominio apunta a sus IPs.
+   */
+  async tieneCertificado(domain: string): Promise<boolean> {
+    try {
+      await fetch(`https://${domain}/`, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(5000) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async removeDomain(domain: string): Promise<void> {
     await this.call(`/v9/projects/${this.projectId}/domains/${domain}`, { method: 'DELETE' });
   }

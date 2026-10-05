@@ -164,20 +164,23 @@ describe('Checkout de compra', () => {
 });
 
 describe('Dominios vinculados', () => {
-  function dominios(opts: { existente?: unknown; create?: jest.Mock } = {}) {
+  function dominios(opts: { existente?: unknown; create?: jest.Mock; fila?: Record<string, unknown>; certificado?: boolean; apex?: string } = {}) {
     const prisma = {
       customDomain: {
         findUnique: jest.fn().mockResolvedValue(opts.existente ?? null),
-        findFirst: jest.fn().mockResolvedValue({ id: 'cd-1', businessId: BIZ, domain: 'mitienda.com' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'cd-1', businessId: BIZ, domain: 'mitienda.com', status: 'PENDING', sslStatus: 'PROVISIONING', dnsVerified: false, ...opts.fila }),
         create: opts.create ?? jest.fn().mockResolvedValue({ id: 'cd-1' }),
         update: jest.fn().mockResolvedValue({}),
         delete: jest.fn().mockResolvedValue({}),
       },
     };
     const vercel = {
-      addDomain: jest.fn().mockResolvedValue({}),
+      addDomain: jest.fn().mockResolvedValue({ apexName: opts.apex ?? 'mitienda.com' }),
+      addWwwRedirect: jest.fn().mockResolvedValue(undefined),
       isDnsConfigured: jest.fn().mockResolvedValue(true),
-      getDomainInfo: jest.fn().mockResolvedValue({ verified: true }),
+      getDomainInfo: jest.fn().mockResolvedValue({ verified: true, apexName: opts.apex ?? 'mitienda.com' }),
+      getDnsConfig: jest.fn().mockResolvedValue({ misconfigured: false, recommendedIPv4: [{ rank: 1, value: ['216.198.79.1', '64.29.17.1'] }], recommendedCNAME: [{ rank: 1, value: 'abc.vercel-dns-017.com.' }] }),
+      tieneCertificado: jest.fn().mockResolvedValue(opts.certificado ?? true),
       removeDomain: jest.fn().mockResolvedValue(undefined),
     };
     return { svc: new DomainsService(prisma as any, vercel as any), prisma, vercel };
@@ -211,6 +214,68 @@ describe('Dominios vinculados', () => {
     expect(prisma.customDomain.delete).toHaveBeenCalledWith({ where: { id: 'cd-1', businessId: BIZ } });
   });
 
+  it('con el DNS bien pero sin certificado queda "Verificando" y SSL emitiéndose, no "Activo"', async () => {
+    const { svc, prisma } = dominios({ certificado: false });
+    await svc.verifyDns(BIZ, 'cd-1');
+    expect(prisma.customDomain.update).toHaveBeenCalledWith(expect.objectContaining({ data: { dnsVerified: true, status: 'VERIFYING', sslStatus: 'PROVISIONING' } }));
+  });
+
+  it('con el DNS bien y el HTTPS respondiendo pasa a Activo con SSL activo', async () => {
+    const { svc, prisma } = dominios({ certificado: true });
+    await svc.verifyDns(BIZ, 'cd-1');
+    expect(prisma.customDomain.update).toHaveBeenCalledWith(expect.objectContaining({ data: { dnsVerified: true, status: 'ACTIVE', sslStatus: 'ACTIVE' } }));
+  });
+
+  it('un dominio que ya andaba no se degrada porque un sondeo falle (ni siquiera lo sondea)', async () => {
+    const { svc, prisma, vercel } = dominios({ certificado: false, fila: { status: 'ACTIVE', sslStatus: 'ACTIVE', dnsVerified: true } });
+    await svc.verifyDns(BIZ, 'cd-1');
+    expect(vercel.tieneCertificado).not.toHaveBeenCalled();
+    expect(prisma.customDomain.update).toHaveBeenCalledWith(expect.objectContaining({ data: { dnsVerified: true, status: 'ACTIVE', sslStatus: 'ACTIVE' } }));
+  });
+
+  it('un "Activo" sin SSL activo (filas viejas) se vuelve a medir de verdad', async () => {
+    const { svc, prisma, vercel } = dominios({ certificado: false, fila: { status: 'ACTIVE', sslStatus: 'PROVISIONING', dnsVerified: true } });
+    await svc.verifyDns(BIZ, 'cd-1');
+    expect(vercel.tieneCertificado).toHaveBeenCalledWith('mitienda.com');
+    expect(prisma.customDomain.update).toHaveBeenCalledWith(expect.objectContaining({ data: { dnsVerified: true, status: 'VERIFYING', sslStatus: 'PROVISIONING' } }));
+  });
+
+  it('si el DNS no apunta a Órbita ni se sondea el HTTPS', async () => {
+    const { svc, vercel } = dominios();
+    vercel.isDnsConfigured.mockResolvedValue(false);
+    await svc.verifyDns(BIZ, 'cd-1');
+    expect(vercel.tieneCertificado).not.toHaveBeenCalled();
+  });
+
+  it('un dominio raíz agrega también el www (con redirección) y se muestra su CNAME', async () => {
+    const { svc, vercel } = dominios();
+    await svc.linkDomain(BIZ, { domain: 'mitienda.com' });
+    expect(vercel.addWwwRedirect).toHaveBeenCalledWith('mitienda.com');
+    const { records } = await svc.getDnsInstructions(BIZ, 'cd-1');
+    expect(records).toEqual([
+      { type: 'A', domain: '@', value: '216.198.79.1' },
+      { type: 'A', domain: '@', value: '64.29.17.1' },
+      { type: 'CNAME', domain: 'www', value: 'abc.vercel-dns-017.com' },
+    ]);
+  });
+
+  it('un subdominio no agrega www; si el www falla, vincular sigue andando', async () => {
+    const sub = dominios({ apex: 'mitienda.com' });
+    await sub.svc.linkDomain(BIZ, { domain: 'tienda.mitienda.com' });
+    expect(sub.vercel.addWwwRedirect).not.toHaveBeenCalled();
+
+    const roto = dominios();
+    roto.vercel.addWwwRedirect.mockRejectedValue(new BadRequestException('ya existe'));
+    await expect(roto.svc.linkDomain(BIZ, { domain: 'mitienda.com' })).resolves.toBeDefined();
+  });
+
+  it('al quitar el dominio también se quita su www', async () => {
+    const { svc, vercel } = dominios();
+    await svc.remove(BIZ, 'cd-1');
+    expect(vercel.removeDomain).toHaveBeenCalledWith('mitienda.com');
+    expect(vercel.removeDomain).toHaveBeenCalledWith('www.mitienda.com');
+  });
+
   it('el dominio vinculado no puede traer caracteres de ruta ni pasar de 253', async () => {
     const errores = async (domain: string) => (await validate(plainToInstance(LinkDomainDto, { domain }))).length;
     expect(await errores('mitienda.com')).toBe(0);
@@ -240,6 +305,15 @@ describe('Errores de Vercel hacia el panel', () => {
     responder(409, 'Cannot add mitienda.com since it is already assigned to another project');
     const svc = new VercelDomainsService(config({ VERCEL_TOKEN: 't' }) as any);
     await expect(svc.addDomain('mitienda.com')).rejects.toThrow(/already assigned/);
+  });
+
+  it('el certificado se mide por HTTPS: cualquier respuesta es que hay, un corte de TLS es que no', async () => {
+    const svc = new VercelDomainsService(config({ VERCEL_TOKEN: 't' }) as any);
+    global.fetch = jest.fn().mockResolvedValue({ status: 404 }) as any;
+    await expect(svc.tieneCertificado('mitienda.com')).resolves.toBe(true);
+    expect(global.fetch).toHaveBeenCalledWith('https://mitienda.com/', expect.objectContaining({ method: 'HEAD', redirect: 'manual' }));
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('fetch failed')) as any;
+    await expect(svc.tieneCertificado('mitienda.com')).resolves.toBe(false);
   });
 
   it('sin VERCEL_TOKEN, 503 sin nombrar la variable', async () => {

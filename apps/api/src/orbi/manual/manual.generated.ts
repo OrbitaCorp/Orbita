@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "1c3d3665347b6b83",
+  "version": "29eab51a3c3c3edd",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -476,7 +476,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-dominios",
       "capitulo": "Configuración",
       "titulo": "Dominios",
-      "texto": "Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya propia (tunegocio.com), acá la comprás desde el panel o conectás una que ya tengas.",
+      "texto": "Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya propia (tunegocio.com), acá la comprás desde el panel o conectás una que ya tengas.\n\nSi la comprás acá no tocás nada más. Si ya la tenías en otro lado (Hostinger, GoDaddy, NIC), escribila en \"Vincular un dominio que ya tenés\", tocá \"Vincular\" y cargá en el panel de DNS de donde la compraste los registros que te mostramos: dos de tipo A para el dominio y un CNAME para el www.\n\nOjo: Si en ese panel ya hay registros con los mismos nombres (típico: un ALIAS o un A de la página de estacionamiento), borralos antes de cargar los nuestros: no se pueden tener los dos.\n\nEl estado se actualiza solo cada pocos segundos, pero también podés tocar \"Verificar\". Primero queda en \"Pendiente\" o \"Verificando\" hasta que el DNS apunta a Órbita, y después hasta que se emite el certificado HTTPS (hasta media hora). Recién cuando figura como \"Activo\" y el SSL como \"activo\" la dirección funciona con candado.",
       "destino": {
         "seccion": "configuracion",
         "vista": "dominios",
