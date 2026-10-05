@@ -23,8 +23,11 @@
  *    IA) — ninguno debería asumir que puede llenar el lienzo al 100% confiado
  *    en que el fondo generado "ya viene con margen": el margen lo pone
  *    siempre este estandarizador, un solo criterio para toda foto.
- * 4. Si la foto es de estilo de vida / exterior con fondo complejo no uniforme,
- *    la preserva sin recortar partes del sujeto.
+ * 4. Si el fondo NO es plano (una alfombra, una pared, una foto de estilo de
+ *    vida / exterior), devuelve la foto tal cual: sin recortar y sin rellenar
+ *    un lienzo, porque no hay color de relleno que no se note (se vería como un
+ *    marco liso alrededor de la foto). "Plano" se mide sobre toda la banda del
+ *    borde, no sobre unos pocos puntos: ver analizarBorde().
  */
 
 export interface EstandarizarOpciones {
@@ -34,6 +37,54 @@ export interface EstandarizarOpciones {
     fillRatio?: number
     /** Calidad JPEG de salida (0.0 a 1.0, default 0.92). */
     calidad?: number
+}
+
+// Una foto tiene fondo "plano" si casi toda la banda del borde es del mismo color. Medido
+// con las fotos reales de venustyle (05/10/2026): en un fondo de alfombra solo el 13%–32% de
+// la banda cae a menos de 16 de distancia del color mediano (nunca supera 0.32), y en un
+// fondo liso de estudio es ~100%. El criterio viejo miraba 8 puntos sueltos y la alfombra los
+// pasaba; mirar la banda entera deja un margen enorme entre una cosa y la otra.
+const BANDA_BORDE = 0.04
+const TOLERANCIA_PLANO = 12
+const FRACCION_PLANA = 0.9
+
+export interface BordeAnalizado {
+    /** Color mediano de la banda del borde. */
+    r: number
+    g: number
+    b: number
+    /** Fracción de la banda (0–1) que está a menos de TOLERANCIA_PLANO de ese color. */
+    fraccionPlana: number
+    /** ¿El fondo es liso? (si no, no hay un color con el que rellenar sin que se note). */
+    esPlano: boolean
+}
+
+/** Analiza el borde de una imagen RGBA cruda (4 bytes por píxel). Pura: no usa el DOM. */
+export function analizarBorde(data: Uint8ClampedArray | Uint8Array, w: number, h: number): BordeAnalizado {
+    const grosor = Math.max(2, Math.round(Math.min(w, h) * BANDA_BORDE))
+    const rs: number[] = []
+    const gs: number[] = []
+    const bs: number[] = []
+    for (let y = 0; y < h; y++) {
+        const enBandaY = y < grosor || y >= h - grosor
+        for (let x = 0; x < w; x++) {
+            if (!enBandaY && x >= grosor && x < w - grosor) continue
+            const i = (y * w + x) * 4
+            rs.push(data[i])
+            gs.push(data[i + 1])
+            bs.push(data[i + 2])
+        }
+    }
+    const mediana = (v: number[]) => Float64Array.from(v).sort()[v.length >> 1]
+    const r = mediana(rs)
+    const g = mediana(gs)
+    const b = mediana(bs)
+    let planos = 0
+    for (let k = 0; k < rs.length; k++) {
+        if (Math.hypot(rs[k] - r, gs[k] - g, bs[k] - b) <= TOLERANCIA_PLANO) planos++
+    }
+    const fraccionPlana = planos / rs.length
+    return { r, g, b, fraccionPlana, esPlano: fraccionPlana >= FRACCION_PLANA }
 }
 
 export async function estandarizarImagenProducto(
@@ -100,76 +151,22 @@ export async function estandarizarImagenProducto(
                 let bgB = 255
 
                 if (!tieneTransparencia) {
-                    // Muestrear píxeles del perímetro (esquinas y bordes) para detectar color de fondo
-                    const muestrasBorde: [number, number, number][] = []
-                    // Esquinas
-                    const esquinas = [
-                        [0, 0], [aW - 1, 0], [0, aH - 1], [aW - 1, aH - 1],
-                        [Math.floor(aW / 2), 0], [Math.floor(aW / 2), aH - 1],
-                        [0, Math.floor(aH / 2)], [aW - 1, Math.floor(aH / 2)]
-                    ]
-                    for (const [x, y] of esquinas) {
-                        const i = (y * aW + x) * 4
-                        muestrasBorde.push([data[i], data[i + 1], data[i + 2]])
-                    }
-
-                    // Promediar color de borde
-                    let sumR = 0, sumG = 0, sumB = 0
-                    for (const [r, g, b] of muestrasBorde) {
-                        sumR += r
-                        sumG += g
-                        sumB += b
-                    }
-                    bgR = Math.round(sumR / muestrasBorde.length)
-                    bgG = Math.round(sumG / muestrasBorde.length)
-                    bgB = Math.round(sumB / muestrasBorde.length)
-
-                    // Verificar varianza en los bordes
-                    let varTotal = 0
-                    for (const [r, g, b] of muestrasBorde) {
-                        const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2)
-                        varTotal += dist
-                    }
-                    const varPromedio = varTotal / muestrasBorde.length
-
-                    // Si la variación en los bordes es baja (<= 32), es fondo liso/estudio
-                    esFondoUniforme = varPromedio <= 32
+                    const borde = analizarBorde(data, aW, aH)
+                    esFondoUniforme = borde.esPlano
+                    bgR = borde.r
+                    bgG = borde.g
+                    bgB = borde.b
                 }
 
-                // 3. Si no es transparente ni fondo liso (es una foto compleja de exterior/lifestyle),
-                // no recortamos agresivamente para no cortar modelos o contexto.
+                // 3. Si no es transparente ni fondo PLANO (una alfombra, una pared, una foto de
+                // exterior/lifestyle), la foto se deja tal cual: no hay un color con el que
+                // rellenar el lienzo que no se note. Antes se centraba en un lienzo cuadrado
+                // blanco (o del color promedio del borde) y quedaba un marco liso alrededor de
+                // la foto — en la tarjeta del catálogo se veía como un recuadro blanco o marrón
+                // pegado a la foto (venustyle, 05/10/2026). El servidor ya la topea a 1600 px y
+                // la pasa a webp al guardarla, así que devolver el original no deja nada sin hacer.
                 if (!tieneTransparencia && !esFondoUniforme) {
-                    // Solo la centramos limpia en un lienzo 1:1 sin recortar el contenido
-                    const canvasOut = document.createElement('canvas')
-                    canvasOut.width = targetSize
-                    canvasOut.height = targetSize
-                    const ctxOut = canvasOut.getContext('2d')
-                    if (!ctxOut) {
-                        resolve(file instanceof File ? file : new File([file], nombreArchivo, { type: file.type || 'image/jpeg' }))
-                        return
-                    }
-
-                    ctxOut.fillStyle = '#ffffff'
-                    ctxOut.fillRect(0, 0, targetSize, targetSize)
-
-                    const scale = (targetSize * fillRatio) / Math.max(origW, origH)
-                    const dW = origW * scale
-                    const dH = origH * scale
-                    const dx = (targetSize - dW) / 2
-                    const dy = (targetSize - dH) / 2
-
-                    ctxOut.imageSmoothingEnabled = true
-                    ctxOut.imageSmoothingQuality = 'high'
-                    ctxOut.drawImage(img, 0, 0, origW, origH, dx, dy, dW, dH)
-
-                    canvasOut.toBlob((blob) => {
-                        if (!blob) {
-                            resolve(file instanceof File ? file : new File([file], nombreArchivo, { type: file.type || 'image/jpeg' }))
-                            return
-                        }
-                        const outName = nombreArchivo.replace(/\.[^.]+$/, '') + '.jpg'
-                        resolve(new File([blob], outName, { type: 'image/jpeg' }))
-                    }, 'image/jpeg', calidad)
+                    resolve(file instanceof File ? file : new File([file], nombreArchivo, { type: file.type || 'image/jpeg' }))
                     return
                 }
 

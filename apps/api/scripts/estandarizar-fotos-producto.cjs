@@ -1,3 +1,11 @@
+// ⚠ NO CORRER SIN PORTAR EL ARREGLO DEL 05/10/2026. Este script reimplementa el
+// criterio VIEJO del estandarizador: toma una foto con fondo de textura (una alfombra)
+// por "fondo liso" y la pega en un lienzo cuadrado con un marco de color plano que se
+// ve en la tarjeta del catálogo (caso venustyle). El panel ya usa un criterio nuevo
+// (analizarBorde en apps/web/src/lib/imageStandardizer.ts: el fondo es plano solo si
+// ≥90% de la banda del borde es del mismo color; si no, la foto no se toca). Para
+// reparar fotos que ya quedaron con marco: scripts/quitar-marco-fotos-producto.ts.
+//
 // Backfill: aplica a las fotos YA EXISTENTES de un negocio puntual el mismo
 // estandarizador de encuadre que ya corre en las subidas nuevas del panel
 // (ver apps/web/src/lib/imageStandardizer.ts) — pedido de indecisastore para
