@@ -42,6 +42,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { ReturnsModule } from './returns/returns.module';
 import { CancellationsModule } from './cancellations/cancellations.module';
 import { ConversationsModule } from './conversations/conversations.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -100,6 +101,7 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     ReturnsModule,
     CancellationsModule,
     ConversationsModule,
+    WhatsappModule,
     MessageTemplatesModule,
     NotificationsModule,
     ReviewsModule,

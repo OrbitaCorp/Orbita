@@ -6,6 +6,7 @@ import '@/styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 import Head from 'next/head'
 import { PageLoader } from '@/components/PageLoader'
+import { LoaderEmpuje, duracionLoaderLanding } from '@/components/LoaderEmpuje'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
@@ -64,11 +65,19 @@ const DEMORA_LOADER_MS = 150
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
 
+  // La landing (orbita.site, '/') tiene su propio loader, "Empuje"
+  // (components/LoaderEmpuje.tsx): la primera carga de la sesión espera a que
+  // termine su intro; después usa el mínimo de siempre. `pageProps.__storefront`
+  // descarta la raíz de una tienda (subdominio), que también es '/'.
+  const esLanding = !Boolean((pageProps as { __storefront?: boolean }).__storefront) && router.pathname === '/'
+  const [esLandingInicial] = useState(esLanding)
+
   const [minTimeDone, setMinTimeDone] = useState(false)
   useEffect(() => {
-    const timer = setTimeout(() => setMinTimeDone(true), MIN_LOADER_MS)
+    const ms = esLandingInicial ? duracionLoaderLanding(MIN_LOADER_MS) : MIN_LOADER_MS
+    const timer = setTimeout(() => setMinTimeDone(true), ms)
     return () => clearTimeout(timer)
-  }, [])
+  }, [esLandingInicial])
 
   // OJO: NO derivar esto de `router.pathname`. Confirmado en dev (y explica
   // el bug de fondo en producción): en el primer render del cliente,
@@ -370,7 +379,9 @@ export default function App({ Component, pageProps }: AppProps) {
                   todavía, se pasa `null` (no "Órbita") — PageLoader oculta
                   el texto de marca en ese caso en vez de mostrar la marca
                   equivocada. */}
-              <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} tema={temaPlantilla} />
+              {esLanding
+                ? <LoaderEmpuje visible={loading} />
+                : <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} tema={temaPlantilla} />}
               <Component {...pageProps} />
               {avisoCookies && <BannerCookies variante={avisoCookies.variante} hrefPolitica={avisoCookies.href} />}
             </>

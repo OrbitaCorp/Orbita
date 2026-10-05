@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { CustomerMessageDto } from './dto/customer-message.dto';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 // Chat cliente↔tienda. Una sola conversación por (business, customer) —
 // nace recién cuando el cliente manda su primer mensaje, no se crea una
@@ -11,21 +12,35 @@ import { CustomerMessageDto } from './dto/customer-message.dto';
 // cuando el cliente escribe, se apaga cuando el staff abre la conversación o
 // contesta. No hay un flag simétrico para "el cliente no leyó la respuesta"
 // — el schema no lo tiene, y el storefront no necesita ese detalle todavía.
-type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; createdAt: Date };
+type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date };
 
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly whatsapp: WhatsappService,
+  ) {}
 
   // Los últimos 500 de un hilo, en orden cronológico. Antes se devolvían
   // todos, sin tope (auditoría interna 10/09, ítem api.conversations).
-  private async ultimosMensajes(conversationId: string) {
-    const recientes = await this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'desc' }, take: 500 });
+  //
+  // `soloTienda` es para lo que ve el CLIENTE en la tienda: solo los mensajes del
+  // chat de la tienda, nunca los de WhatsApp. El teléfono que un cliente carga en
+  // su cuenta no está verificado: si alguien se registra con el número de otra
+  // persona, los WhatsApp de esa persona se vinculan a la cuenta del impostor
+  // (ver WhatsappService.resolverCliente) y, sin este filtro, los vería —con las
+  // respuestas del negocio— en su chat de la tienda.
+  private async ultimosMensajes(conversationId: string, soloTienda = false) {
+    const recientes = await this.prisma.message.findMany({
+      where: { conversationId, ...(soloTienda ? { channel: 'STOREFRONT' as const } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
     return recientes.reverse();
   }
 
   private aMensaje(m: MensajeRow) {
-    return { id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, createdAt: m.createdAt };
+    return { id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, channel: m.channel, deliveryStatus: m.deliveryStatus, createdAt: m.createdAt };
   }
 
   // ── Panel (staff) ──────────────────────────────────────────────────────────
@@ -47,6 +62,8 @@ export class ConversationsService {
       customerAvatar: c.customer.avatarUrl,
       isUnread: c.isUnread,
       isArchived: c.isArchived,
+      // Por dónde sigue la charla (WhatsApp o el chat de la tienda): el panel lo muestra en la lista.
+      lastChannel: c.messages[0]?.channel ?? 'STOREFRONT',
       lastMessage: c.messages[0] ? this.aMensaje(c.messages[0]) : null,
       updatedAt: c.updatedAt,
     }));
@@ -90,8 +107,27 @@ export class ConversationsService {
       if (!order) throw new NotFoundException('Pedido no encontrado');
     }
 
+    // La respuesta sale por el canal por el que el cliente escribió por última
+    // vez. Si es WhatsApp se manda PRIMERO y recién después se guarda: si Meta
+    // la rechaza (ventana de 24 h vencida, número inválido) el dueño ve el
+    // error y no queda en el hilo un mensaje que el cliente nunca recibió.
+    const ultimoDelCliente = await this.prisma.message.findFirst({
+      where: { conversationId, sender: 'CUSTOMER' },
+      orderBy: { createdAt: 'desc' },
+      select: { channel: true },
+    });
+    let externalId: string | undefined;
+    if (ultimoDelCliente?.channel === 'WHATSAPP') {
+      const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { whatsappId: true } });
+      if (!cliente?.whatsappId) throw new BadRequestException('Este cliente no tiene un número de WhatsApp asociado');
+      externalId = await this.whatsapp.enviarTexto(businessId, conversationId, cliente.whatsappId, dto.text);
+    }
+
     const msg = await this.prisma.message.create({
-      data: { conversationId, sender: 'STORE', text: dto.text, orderId: dto.orderId },
+      data: {
+        conversationId, sender: 'STORE', text: dto.text, orderId: dto.orderId,
+        ...(externalId ? { channel: 'WHATSAPP' as const, externalId, deliveryStatus: 'sent' } : {}),
+      },
     });
     // El staff acaba de contestar: la conversación queda "al día" desde su
     // propio punto de vista.
@@ -125,7 +161,7 @@ export class ConversationsService {
     const conv = await this.prisma.conversation.findFirst({ where: { businessId, customerId } });
     if (!conv) return { id: null, messages: [] };
 
-    const messages = await this.ultimosMensajes(conv.id);
+    const messages = await this.ultimosMensajes(conv.id, true);
     return { id: conv.id, messages: messages.map((m) => this.aMensaje(m)) };
   }
 
