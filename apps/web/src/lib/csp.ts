@@ -81,6 +81,16 @@ export const TEMA_SCRIPT = `
               document.documentElement.classList.add('dark');
             }
           }
+
+          // Loader de la landing (components/LoaderEmpuje.tsx): si la intro ya
+          // se vio en esta sesión, o se pidió menos movimiento, se marca antes
+          // del primer pintado para que el logo aparezca armado, sin animarse.
+          // La clave es la misma que CLAVE_INTRO de ese archivo.
+          try {
+            if (pathname === '/' && (sessionStorage.getItem('orbita-intro-landing') || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+              document.documentElement.setAttribute('data-intro-vista', '');
+            }
+          } catch (e) {}
         })();
       `
 
