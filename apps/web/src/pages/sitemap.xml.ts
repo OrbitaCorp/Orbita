@@ -26,10 +26,12 @@ export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
         let datos
         try {
             datos = await getStorefrontSitemap(tienda.slug)
-        } catch {
+        } catch (err) {
+            console.error(`[sitemap] no se pudo armar el de "${tienda.slug}":`, err instanceof Error ? err.message : err)
             // Un sitemap vacío le diría a Google "no hay nada": mejor un error
             // que reintente más tarde.
             res.statusCode = 503
+            res.setHeader('X-Sitemap-Debug', String(err instanceof Error ? err.message : err).slice(0, 180)) // TEMPORAL: diagnóstico del 503
             res.setHeader('Retry-After', '600')
             res.end()
             return { props: {} }
