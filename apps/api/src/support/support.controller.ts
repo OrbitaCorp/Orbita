@@ -8,6 +8,7 @@ import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { SupportService } from './support.service';
 import { SendSupportRequestDto } from './dto/send-support-request.dto';
 import { SendPublicSupportRequestDto } from './dto/send-public-support-request.dto';
+import { ReportStoreDto } from './dto/report-store.dto';
 import { ReplySupportRequestDto } from './dto/reply-support-request.dto';
 import { ManualFeedbackDto } from './dto/manual-feedback.dto';
 import { Public } from '../common/decorators/public.decorator';
@@ -81,5 +82,14 @@ export class SupportController {
   @Throttle({ default: { limit: 3, ttl: 600_000 } })
   sendPublic(@Body() dto: SendPublicSupportRequestDto) {
     return this.supportService.sendPublic(dto);
+  }
+
+  // "Denunciar esta tienda" (pie de cada tienda). Pública, con el mismo tope que
+  // el formulario de contacto: tres por diez minutos por IP.
+  @Post('report-store')
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 600_000 } })
+  reportStore(@Body() dto: ReportStoreDto) {
+    return this.supportService.reportStore(dto);
   }
 }

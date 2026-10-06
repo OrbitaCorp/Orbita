@@ -245,7 +245,7 @@ function basura(html: string): string[] {
 
 // Las páginas que una tienda de Órbita tiene de verdad (src/pages/tienda/[slug]).
 // Una plantilla no puede mandar a otra: sería un 404 con el diseño puesto.
-const RUTAS = /^\/tienda\/check(\/|\/catalogo(\/[\w-]+)?(\?.*)?|\/carrito|\/login|\/registro|\/perfil(\?.*)?|\/producto\/[\w-]+|\/legales\/(terminos|privacidad|cookies)|\/pedido\/[\w-]+)?$/
+const RUTAS = /^\/tienda\/check(\/|\/catalogo(\/[\w-]+)?(\?.*)?|\/carrito|\/login|\/registro|\/perfil(\?.*)?|\/producto\/[\w-]+|\/legales\/(terminos|privacidad|cookies|denunciar)|\/pedido\/[\w-]+)?$/
 const rutasInexistentes = (html: string) =>
   [...new Set([...html.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)].map(m => m[1]))]
     .filter(h => h.startsWith('/') && !RUTAS.test(h))
@@ -309,7 +309,8 @@ function enTiendaReal(base: Plantilla, nombreTienda: string, movil: boolean): st
     // Buscar es parte de cualquier tienda: en las dos pantallas.
     if (!html.includes('data-check="buscador"')) out.push('no hay buscador')
     if (base.piePropio) {
-      for (const legal of ['Términos y condiciones', 'Política de privacidad', 'Arrepentimiento / Devolución']) {
+      // "Denunciar esta tienda" es el canal de moderación de Órbita: tiene que estar en el pie de TODA tienda.
+      for (const legal of ['Términos y condiciones', 'Política de privacidad', 'Arrepentimiento / Devolución', 'Denunciar esta tienda']) {
         if (!n.includes(legal)) out.push(`al pie le falta "${legal}", que es obligatorio`)
       }
     }

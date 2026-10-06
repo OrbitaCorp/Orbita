@@ -145,6 +145,24 @@ export class PlatformController {
     return this.platformService.suspendBusiness(req.user.adminId, businessId, dto);
   }
 
+  // Moderación: sacar la tienda de Google y del directorio sin suspenderla
+  // (sigue vendiendo). Ver PlatformService#hideFromSearch.
+  @Post('businesses/:businessId/hide-from-search')
+  @SoloSuperadmin()
+  hideFromSearch(
+    @Req() req: RequestWithAdmin,
+    @Param('businessId') businessId: string,
+    @Body() dto: SuspendBusinessDto,
+  ) {
+    return this.platformService.hideFromSearch(req.user.adminId, businessId, dto);
+  }
+
+  @Post('businesses/:businessId/show-in-search')
+  @SoloSuperadmin()
+  showInSearch(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
+    return this.platformService.showInSearch(req.user.adminId, businessId);
+  }
+
   @Post('businesses/:businessId/reactivate')
   @SoloSuperadmin()
   reactivate(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {

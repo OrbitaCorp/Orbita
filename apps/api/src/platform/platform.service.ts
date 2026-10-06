@@ -259,6 +259,9 @@ export class PlatformService {
       subdomain: business.subdomain,
       mode: business.mode,
       status: !business.isActive ? 'draft' : business.isPaused ? 'paused' : 'active',
+      // Moderación: la tienda sigue en línea pero Órbita no la ofrece a Google ni al directorio.
+      hiddenFromSearch: business.hiddenFromSearch,
+      hiddenFromSearchReason: business.hiddenFromSearchReason,
       operatesPhysical: business.operatesPhysical,
       operatesOnline: business.operatesOnline,
       teamSize: business.teamSize,
@@ -528,6 +531,42 @@ export class PlatformService {
     // CONTRATO_API.md pide { ok: true } — no el negocio completo. El frontend
     // vuelve a pedir el detalle si necesita datos actualizados (mismo patrón
     // que removeAdmin más abajo).
+    return { ok: true };
+  }
+
+  /**
+   * Saca la tienda de Google y del directorio público SIN suspenderla: sigue en
+   * línea y vendiendo. Es la medida para un caso dudoso o una denuncia que se
+   * está investigando (suspender corta las ventas; esto solo corta la
+   * visibilidad). Se revierte con showInSearch. Queda registrado quién y por qué.
+   */
+  async hideFromSearch(adminId: string, businessId: string, dto: SuspendBusinessDto) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.business.update({ where: { id: businessId }, data: { hiddenFromSearch: true, hiddenFromSearchReason: dto.reason?.trim() || null } });
+      await tx.platformAdminLog.create({
+        data: {
+          adminId,
+          action: 'hide_business_from_search',
+          targetType: 'business',
+          targetId: businessId,
+          details: dto.reason ? { reason: dto.reason } : undefined,
+        },
+      });
+    });
+    return { ok: true };
+  }
+
+  async showInSearch(adminId: string, businessId: string) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.business.update({ where: { id: businessId }, data: { hiddenFromSearch: false, hiddenFromSearchReason: null } });
+      await tx.platformAdminLog.create({
+        data: { adminId, action: 'show_business_in_search', targetType: 'business', targetId: businessId },
+      });
+    });
     return { ok: true };
   }
 

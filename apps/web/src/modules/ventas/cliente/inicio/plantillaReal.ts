@@ -466,6 +466,8 @@ function pieReal({ base, cats, contacto, conRedes }: {
       { label: 'Términos y condiciones', href: `${base}/legales/terminos` },
       { label: 'Política de privacidad', href: `${base}/legales/privacidad` },
       { label: 'Política de cookies', href: `${base}/legales/cookies` },
+      // Llega al equipo de Órbita, no a la tienda (ver DenunciarTienda.tsx).
+      { label: 'Denunciar esta tienda', href: `${base}/legales/denunciar` },
     ],
   }
 }

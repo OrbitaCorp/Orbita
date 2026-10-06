@@ -162,6 +162,9 @@ export interface BusinessDetail {
   subdomain: string
   mode: string
   status: BusinessStatus
+  /** Moderación: la tienda sigue en línea, pero Órbita no la ofrece a Google ni al directorio. */
+  hiddenFromSearch: boolean
+  hiddenFromSearchReason: string | null
   createdAt: string
   team: { id: string; name: string; email: string; role: string; status: string; lastAccessAt: string | null; emailVerified: boolean }[]
   branches: { id: string; name: string; isDefault: boolean }[]
@@ -838,6 +841,8 @@ export const platformApi = {
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
+  hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),
+  showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

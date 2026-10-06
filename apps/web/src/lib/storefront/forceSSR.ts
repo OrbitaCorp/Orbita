@@ -132,7 +132,7 @@ const noEncontrado = (e: unknown) => e instanceof StorefrontApiError && (e.statu
 const TITULOS_DE_RUTA: [RegExp, string][] = [
   [/\/carrito(\/|$)/, 'Carrito'], [/\/checkout(\/|$)/, 'Finalizar compra'], [/\/login(\/|$)/, 'Ingresar'],
   [/\/registro(\/|$)/, 'Crear cuenta'], [/\/forgot-password(\/|$)/, 'Recuperar contraseña'], [/\/perfil(\/|$)/, 'Mi cuenta'],
-  [/\/pedido(\/|$)/, 'Mi pedido'], [/\/legales(\/|$)/, 'Información legal'], [/\/descuentos(\/|$)/, 'Descuento'], [/\/oferta(\/|$)/, 'Oferta'],
+  [/\/pedido(\/|$)/, 'Mi pedido'], [/\/legales\/denunciar(\/|$)/, 'Denunciar esta tienda'], [/\/legales(\/|$)/, 'Información legal'], [/\/descuentos(\/|$)/, 'Descuento'], [/\/oferta(\/|$)/, 'Oferta'],
 ]
 const tituloDeRuta = (url: string | undefined) => TITULOS_DE_RUTA.find(([re]) => re.test((url ?? '').split('?')[0]))?.[1]
 

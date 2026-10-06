@@ -289,6 +289,29 @@ export function getDirectorioTiendas(page = 1) {
   return storefrontRequest<DirectorioDeTiendas>(`/directory/stores?page=${page}`)
 }
 
+export type MotivoDenuncia = 'PRODUCTO_PROHIBIDO' | 'FALSIFICACION' | 'ESTAFA' | 'DATOS_PERSONALES' | 'OTRO'
+
+/**
+ * "Denunciar esta tienda": llega al equipo de Órbita (bandeja de soporte del
+ * superadmin + mail), no a la tienda. Pública, sin sesión. `website` es el
+ * campo trampa para bots: tiene que ir vacío.
+ */
+export async function denunciarTienda(
+  slug: string,
+  datos: { reason: MotivoDenuncia; details: string; name: string; email: string; website?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/support/report-store`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, ...datos }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const message = mensajeDeError(res.status, body)
+    throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+}
+
 /** Slug de la tienda que tiene este dominio propio, o null. Lo usa el robots/sitemap por host. */
 export async function getSlugDeDominio(dominio: string): Promise<string | null> {
   const r = await storefrontRequest<{ slug: string | null }>(`/by-domain/${encodeURIComponent(dominio)}`)

@@ -42,6 +42,14 @@ model Business {
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
   isDemo Boolean @default(false) @map("is_demo")
+  // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
+  // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
+  // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está
+  // investigando: suspender corta las ventas, esto solo corta la visibilidad.
+  // Lo prende y apaga solo el superadmin (con registro en PlatformAdminLog);
+  // el dueño no lo ve ni lo toca.
+  hiddenFromSearch       Boolean @default(false) @map("hidden_from_search")
+  hiddenFromSearchReason String? @map("hidden_from_search_reason")
   // Hasta qué instante están "al día" las fechas de los datos de la demo. Los
   // pedidos, pagos, visitas, etc. se sembraron relativos a un momento; cada
   // tanto se corren hacia adelante lo que pasó desde acá (DemoFechasService),

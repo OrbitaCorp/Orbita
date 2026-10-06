@@ -1232,8 +1232,10 @@ export class StorefrontService {
     return this.seoDe(await this.resolveBusiness(slug));
   }
 
-  private async seoDe(business: { id: string; isActive: boolean; isPaused: boolean; isDemo: boolean }) {
-    const abierta = business.isActive && !business.isPaused && !business.isDemo;
+  private async seoDe(business: { id: string; isActive: boolean; isPaused: boolean; isDemo: boolean; hiddenFromSearch: boolean }) {
+    // `hiddenFromSearch` es la moderación del equipo de Órbita: la tienda sigue
+    // en línea y vendiendo, pero no se le pide a Google que la muestre.
+    const abierta = business.isActive && !business.isPaused && !business.isDemo && !business.hiddenFromSearch;
     const [producto, dominio] = await Promise.all([
       abierta
         ? this.prisma.product.findFirst({
@@ -1265,7 +1267,7 @@ export class StorefrontService {
    * usaría quien quiera abusar de la plataforma (tiendas falsas, marcas ajenas,
    * enlaces de SEO): por eso se pide una tienda con cara de tienda y se deja
    * pasar un tiempo antes de mostrarla.
-   *   · publicada, en línea y no demo (igual que `indexable`);
+   *   · publicada, en línea, no demo y no oculta por moderación (igual que `indexable`);
    *   · al menos DIRECTORIO_MIN_PRODUCTOS productos a la venta, cada uno con foto
    *     y precio mayor a cero;
    *   · y que esos productos tengan más de DIRECTORIO_ESPERA_HORAS horas: da
@@ -1290,7 +1292,7 @@ export class StorefrontService {
         basePrice: { gt: 0 },
         images: { some: {} },
         createdAt: { lte: antesDe },
-        business: { isActive: true, isPaused: false, isDemo: false, deletedAt: null },
+        business: { isActive: true, isPaused: false, isDemo: false, hiddenFromSearch: false, deletedAt: null },
       },
       having: { id: { _count: { gte: DIRECTORIO_MIN_PRODUCTOS } } },
     });

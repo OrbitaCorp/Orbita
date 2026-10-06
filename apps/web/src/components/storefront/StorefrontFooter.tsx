@@ -189,6 +189,10 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
             <a href={`${base}/legales/cookies`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
               Política de cookies
             </a>
+            {/* Llega al equipo de Órbita, no a la tienda: ver DenunciarTienda.tsx. */}
+            <a href={`${base}/legales/denunciar`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
+              Denunciar esta tienda
+            </a>
             <button
               type="button"
               className="ds-link"

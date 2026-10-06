@@ -6,13 +6,13 @@ import { StorefrontService } from '../../src/storefront/storefront.service';
 // Una tienda aparece en Google solo si está publicada, en línea, no es la demo
 // y tiene algo a la venta. Con dominio propio ACTIVO, ese es el canónico.
 
-function tienda(opts: { isActive?: boolean; isPaused?: boolean; isDemo?: boolean; productos?: number; dominio?: string | null; categorias?: unknown[] } = {}) {
+function tienda(opts: { isActive?: boolean; isPaused?: boolean; isDemo?: boolean; hidden?: boolean; productos?: number; dominio?: string | null; categorias?: unknown[] } = {}) {
   const hayProducto = (opts.productos ?? 1) > 0;
   const prisma = {
     business: {
       findUnique: jest.fn().mockResolvedValue({
         id: 'biz-1', subdomain: 't', deletedAt: null,
-        isActive: opts.isActive ?? true, isPaused: opts.isPaused ?? false, isDemo: opts.isDemo ?? false,
+        isActive: opts.isActive ?? true, isPaused: opts.isPaused ?? false, isDemo: opts.isDemo ?? false, hiddenFromSearch: opts.hidden ?? false,
       }),
     },
     product: {
@@ -40,6 +40,7 @@ describe('getSeo: ¿aparece en Google?', () => {
     ['nunca publicada', { isActive: false }],
     ['pausada', { isPaused: true }],
     ['la demo', { isDemo: true }],
+    ['oculta por moderación (sigue en línea, pero Órbita no la ofrece a Google)', { hidden: true }],
     ['sin productos a la venta', { productos: 0 }],
   ])('%s no es indexable', async (_caso, opts) => {
     const { svc } = tienda(opts);
@@ -138,7 +139,7 @@ describe('getDirectory: el directorio público de tiendas', () => {
       status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
       basePrice: { gt: 0 },
       images: { some: {} },
-      business: { isActive: true, isPaused: false, isDemo: false, deletedAt: null },
+      business: { isActive: true, isPaused: false, isDemo: false, hiddenFromSearch: false, deletedAt: null },
     });
     // 48 horas antes de "ahora": un producto recién cargado todavía no cuenta.
     expect(arg.where.createdAt).toEqual({ lte: new Date('2026-10-04T12:00:00Z') });

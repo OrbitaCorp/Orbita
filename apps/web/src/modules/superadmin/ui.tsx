@@ -12,6 +12,8 @@ export const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administ
 export const ACTION_LABELS: Record<string, string> = {
   suspend_business: 'Suspender negocio',
   reactivate_business: 'Reactivar negocio',
+  hide_business_from_search: 'Ocultar de Google y del directorio',
+  show_business_in_search: 'Volver a mostrar en Google y el directorio',
   grant_comp: 'Ceder cortesía',
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
