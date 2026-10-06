@@ -17,7 +17,7 @@ import { subrubroPorKey } from './subrubrosTienda'
 export function importeDe(d: DatosAlta) {
   const plan = TARJETAS.find(t => t.key === d.plan) ?? TARJETAS[0]
   const pct = descuentoDe(d.codigo)
-  return { plan, pct, hoy: Math.round(plan.precioBienvenida * (1 - pct / 100)) }
+  return { plan, pct, hoy: Math.round(plan.precioLista * (1 - pct / 100)) }
 }
 
 function Resumen({ d, rubro, servicios, sena }: { d: DatosAlta; rubro: RubroTurnos | null; servicios: ServicioAlta[]; sena: number }) {
@@ -118,7 +118,7 @@ export function PasoPago({ d, poner, rubro, servicios, sena }: Pick<PropsPaso, '
               {TARJETAS.map(t => (
                 <Opcion key={t.key} grupo="tuob-plan" valor={t.key} elegido={d.plan === t.key} onElegir={() => poner('plan', t.key)} Icon={t.key === 'avanzado' ? Sparkles : Package}
                   titulo={<>{t.nombre}{t.destacada && <span className="tuo-chip tuo-chip--primario tuob-plan-chip">El más elegido</span>}</>}
-                  texto={<><span className="tuo-num tuob-plan-precio">{fmt(t.precioBienvenida)}</span> en total por los primeros 3 meses. Después, <span className="tuo-num" style={{ display: 'inline' }}>{fmt(t.precioTachado)}</span> por mes.</>} />
+                  texto={<><span className="tuo-num tuob-plan-precio">{fmt(t.precioLista)}</span> por mes. Hoy pagás el primero.</>} />
               ))}
             </div>
           </fieldset>
@@ -128,10 +128,10 @@ export function PasoPago({ d, poner, rubro, servicios, sena }: Pick<PropsPaso, '
           <div className="tuob-total">
             <div>
               <span className="tuo-rotulo">Hoy pagás</span>
-              <p>{plan.nombre} · bienvenida de 3 meses{pct ? ` · ${pct}% de descuento` : ''}</p>
+              <p>{plan.nombre} · primer mes{pct ? ` · ${pct}% de descuento` : ''}</p>
             </div>
             <div className="tuob-total-monto">
-              {pct > 0 && <s className="tuo-num">{fmt(plan.precioBienvenida)}</s>}
+              {pct > 0 && <s className="tuo-num">{fmt(plan.precioLista)}</s>}
               <b className="tuo-num">{fmt(hoy)}</b>
             </div>
           </div>

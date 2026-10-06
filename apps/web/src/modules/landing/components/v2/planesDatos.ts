@@ -1,10 +1,13 @@
 // Fuente única de los planes: la usan las dos tarjetas de precio del home
 // (Cierre.tsx#Precios) y la página de comparación (/planes).
 //
-// Los montos SON los reales (subscriptions.service.ts, BIENVENIDA_TIERS y
-// PLANES — si cambian de un lado, cambian del otro). Ya incluyen la comisión
-// real de Mercado Pago sobre Suscripciones: el número de lista es lo que
-// Órbita recibe LIMPIO, no lo que se cobra.
+// Los montos SON los reales (PLANES en subscriptions.service.ts — si cambian
+// de un lado, cambian del otro) y ya incluyen la comisión de Mercado Pago
+// sobre Suscripciones.
+//
+// Lo que NO está acá es el precio promocional: desde 2026-10 no hay un
+// "beneficio de bienvenida" fijo, sino campañas de precio congelado que se
+// prenden y editan desde el superadmin. Las pantallas lo leen con useOferta().
 
 // ─── Prestaciones ───────────────────────────────────────────────────────────
 
@@ -50,7 +53,7 @@ export const PRESTACIONES: Prestacion[] = [
 export const PRESTACIONES_BASE = PRESTACIONES.filter(p => !p.soloAvanzado);
 export const PRESTACIONES_AVANZADO = PRESTACIONES.filter(p => p.soloAvanzado);
 
-// ─── Las dos tarjetas del alta (beneficio de bienvenida) ────────────────────
+// ─── Las dos tarjetas del alta ──────────────────────────────────────────────
 
 const INCLUYE = [
     'Panel de administración completo',
@@ -62,41 +65,37 @@ const INCLUYE = [
 export interface Tarjeta {
     key: 'base' | 'avanzado';
     nombre: string;
-    /** Precio mensual regular de ESTA tarjeta — se muestra tachado, como ancla. */
-    precioTachado: number;
-    /** Lo que se cobra hoy, por 3 meses (beneficio de bienvenida). */
-    precioBienvenida: number;
+    /** Precio de lista por mes. Con una campaña prendida se muestra tachado. */
+    precioLista: number;
     incluye: string[];
     destacada?: boolean;
 }
 
-// Los montos son BIENVENIDA_TIERS/PLANES de subscriptions.service.ts.
+// Los montos son PLANES.mensual / PLANES.mensualAvanzado de subscriptions.service.ts.
 export const TARJETAS: Tarjeta[] = [
     {
         key: 'base', nombre: 'Base',
-        precioTachado: 16500, precioBienvenida: 5500,
+        precioLista: 16500,
         incluye: INCLUYE,
     },
     {
         key: 'avanzado', nombre: 'Base + Avanzado',
-        precioTachado: 21700, precioBienvenida: 10900,
+        precioLista: 21700,
         incluye: [...INCLUYE, 'Paquete Avanzado incluido'],
         destacada: true,
     },
 ];
 
-// ─── Períodos, para DESPUÉS del beneficio de bienvenida ─────────────────────
+// ─── Períodos, para después del primer mes ──────────────────────────────────
 
 // Los seis planes de PLANES en subscriptions.service.ts, cruzados: tres
 // períodos × dos planes. Semestral y Anual CON Avanzado se sumaron el
 // 2026-09-15 (antes Avanzado existía solo mes a mes).
 //
 // En el ALTA no se eligen: el checkout solo acepta 'mensual' y
-// 'mensualAvanzado' (StartPendingCheckoutDto lo valida con @IsIn), y las dos
-// arrancan con el beneficio de bienvenida de TARJETAS. El período se elige
-// después, desde el panel (Configuración → Suscripción). Por eso /planes
-// muestra estos precios como "lo que pagás después", con la bienvenida
-// aclarada arriba.
+// 'mensualAvanzado' (StartPendingCheckoutDto lo valida con @IsIn), y se paga
+// el primer mes. El período se elige después, desde el panel (Configuración →
+// Suscripción), cuando se autoriza el débito automático.
 export type PeriodoKey = 'mensual' | 'semestral' | 'anual';
 export type PlanTarjeta = 'base' | 'avanzado';
 
@@ -136,3 +135,27 @@ export const PERIODOS: Periodo[] = [
 ];
 
 export const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`;
+
+// ─── Precio de una tarjeta según la oferta vigente ──────────────────────────
+
+/** La campaña pública de precio congelado, tal como la devuelve la API. */
+export interface Campania {
+    name: string;
+    priceBase: number;
+    priceAdvanced: number;
+    months: number;
+    maxSlots: number | null;
+    slotsLeft: number | null;
+}
+
+/** Lo que paga por mes esta tarjeta si entra por la campaña. */
+export const precioCongelado = (key: PlanTarjeta, c: Campania) => (key === 'avanzado' ? c.priceAdvanced : c.priceBase);
+
+/** "3 meses" / "1 mes". */
+export const meses = (n: number) => (n === 1 ? '1 mes' : `${n} meses`);
+
+/** "Quedan 26 de 30 lugares", o null si la campaña no tiene cupo. */
+export function lugares(c: Campania): string | null {
+    if (c.maxSlots === null || c.slotsLeft === null) return null;
+    return c.slotsLeft === 1 ? `Queda 1 de ${c.maxSlots} lugares` : `Quedan ${c.slotsLeft} de ${c.maxSlots} lugares`;
+}

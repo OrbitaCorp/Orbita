@@ -1,18 +1,17 @@
 // Comparación de los dos planes — página propia (/planes), a la que se llega
 // desde el "Ver más detalle" de las tarjetas de precio del home.
 //
-// ─── Por qué NO arranca con las tarjetas de bienvenida ──────────────────────
+// ─── Por qué NO arranca con las tarjetas del home ───────────────────────────
 //
 // La primera versión de esta página abría con las mismas dos tarjetas que la
-// sección de precios del home (mismo precio grande de bienvenida, misma
-// bajada, mismo layout). Reportado con captura: "parecen iguales, da la
+// sección de precios del home. Reportado con captura: "parecen iguales, da la
 // sensación de que nunca me redirige a una vista nueva". Tenían razón — era
 // la misma pantalla dos veces.
 //
 // Ahora abre por donde el home NO puede: el SELECTOR DE PERÍODO y el precio
-// recurrente de cada plan. El home vende el arranque (3 meses de bienvenida);
-// esta página responde "¿y después, cuánto?" y "¿qué trae cada uno?". La
-// bienvenida queda como una línea de contexto arriba, no como el titular.
+// recurrente de cada plan. Esta página responde "¿cuánto sale cada período?" y
+// "¿qué trae cada uno?". Si hay una campaña de precio congelado prendida
+// (useOferta), va como una línea de contexto arriba, no como el titular.
 //
 // El período se elige desde el panel, no en el alta: el checkout solo acepta
 // 'mensual' y 'mensualAvanzado' (StartPendingCheckoutDto lo valida con @IsIn).
@@ -21,9 +20,10 @@
 import { useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 import {
-    PRESTACIONES_BASE, PRESTACIONES_AVANZADO, PERIODOS, TARJETAS, fmt,
-    type PeriodoKey, type PlanTarjeta, type Prestacion,
+    PRESTACIONES_BASE, PRESTACIONES_AVANZADO, PERIODOS, fmt, precioCongelado, meses, lugares,
+    type PeriodoKey, type Prestacion,
 } from './planesDatos';
+import { useOferta } from './useOferta';
 
 function Tilde() {
     return (
@@ -41,7 +41,8 @@ export function Planes() {
     const [periodo, setPeriodo] = useState<PeriodoKey>('mensual');
     const p = PERIODOS.find(x => x.key === periodo) ?? PERIODOS[0];
 
-    const bienvenida = (key: PlanTarjeta) => TARJETAS.find(t => t.key === key)!.precioBienvenida;
+    const campania = useOferta();
+    const cupo = campania ? lugares(campania) : null;
 
     return (
         <Seccion id="planes">
@@ -52,19 +53,25 @@ export function Planes() {
                 bajada="Los dos traen Órbita completo: el mismo panel, el mismo catálogo, los mismos cobros y 0% de comisión. Avanzado suma las herramientas para vender más."
             />
 
-            {/* Contexto: estos precios son los de DESPUÉS. Va arriba y en chico
-                a propósito — el titular de esta página es el período, no la
-                bienvenida (que ya es el titular del home). */}
-            <Reveal className="mx-auto mt-8 max-w-[560px]">
-                <p
-                    className="rounded-xl px-5 py-3.5 text-center text-[12.5px] leading-relaxed text-slate-300"
-                    style={{ background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)' }}
-                >
-                    Todos arrancan con <strong className="font-bold text-white">3 meses de bienvenida</strong>
-                    {' '}— {fmt(bienvenida('base'))} en Base o {fmt(bienvenida('avanzado'))} en Base + Avanzado.
-                    Estos son los precios de después, que elegís desde tu panel.
-                </p>
-            </Reveal>
+            {/* Solo con una campaña prendida. Va arriba y en chico a propósito:
+                el titular de esta página es el período, y estos son los precios
+                de lista que quedan cuando el congelado termina. */}
+            {campania && (
+                <Reveal className="mx-auto mt-8 max-w-[560px]">
+                    <p
+                        className="rounded-xl px-5 py-3.5 text-center text-[12.5px] leading-relaxed text-slate-300"
+                        style={{ background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)' }}
+                    >
+                        Precio congelado para los primeros comercios:{' '}
+                        <strong className="font-bold text-white">
+                            {campania.priceBase === campania.priceAdvanced
+                                ? `${fmt(precioCongelado('base', campania))}/mes en cualquiera de los dos planes`
+                                : `${fmt(precioCongelado('base', campania))}/mes en Base o ${fmt(precioCongelado('avanzado', campania))}/mes en Base + Avanzado`}
+                        </strong>
+                        {' '}durante {meses(campania.months)}.{cupo && <> {cupo}.</>} Después, el plan mensual de lista.
+                    </p>
+                </Reveal>
+            )}
 
             {/* Selector de período */}
             <Reveal className="mt-8 flex justify-center">
@@ -119,7 +126,7 @@ export function Planes() {
                         </div>
                         <p className="mt-2 text-[12.5px] text-slate-400">
                             {p.key === 'mensual'
-                                ? 'Se cobra mes a mes, sin compromiso'
+                                ? 'Se cobra mes a mes, sin permanencia'
                                 : `${fmt(p.total.base)} ${p.cada}`}
                         </p>
 
@@ -165,7 +172,7 @@ export function Planes() {
                         </div>
                         <p className="mt-2 text-[12.5px] text-slate-400">
                             {p.key === 'mensual'
-                                ? 'Se cobra mes a mes, sin compromiso'
+                                ? 'Se cobra mes a mes, sin permanencia'
                                 : `${fmt(p.total.avanzado)} ${p.cada}`}
                         </p>
 
@@ -200,8 +207,8 @@ export function Planes() {
 
             <Reveal className="mx-auto mt-8 max-w-[620px] text-center">
                 <p className="text-[12.5px] leading-relaxed text-slate-400">
-                    Sin renovación automática: cuando termina tu período te avisamos por mail y lo renovás vos.
-                    Podés cambiar de período, o sumar y sacar el paquete Avanzado, cuando quieras desde el panel.
+                    Al registrarte pagás el primer mes; después autorizás el débito automático desde tu panel y elegís el período.
+                    Podés cambiarlo, sumar o sacar el paquete Avanzado, o cancelar cuando quieras.
                 </p>
             </Reveal>
 

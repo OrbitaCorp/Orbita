@@ -366,11 +366,33 @@ export function publishBusiness() {
 
 export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado'
 
-// Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
-// (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
-// completado en el wizard. `plan` es el plan elegido para DESPUÉS del
-// beneficio — no se cobra en este paso, se activa más adelante desde el
-// panel (ver activatePlan más abajo).
+// Lo que se ofrece hoy en el alta: los precios de lista por mes y, si Órbita
+// tiene prendida una campaña pública de precio congelado, su precio, cuántos
+// meses dura y cuántos lugares quedan. La campaña se administra desde el
+// superadmin: la landing y el wizard muestran lo que diga esto, sin montos
+// escritos a mano.
+export interface OfertaCampania {
+  name: string
+  priceBase: number
+  priceAdvanced: number
+  months: number
+  maxSlots: number | null
+  slotsLeft: number | null
+  endsAt: string | null
+}
+export interface OfertaPublica {
+  currency: string
+  list: { base: number; avanzado: number }
+  campaign: OfertaCampania | null
+}
+export function getOfertaPublica() {
+  return request<OfertaPublica>('/subscription/offer')
+}
+
+// Pide el link de MercadoPago donde el dueño paga su primer mes, mandando
+// junto los datos de la cuenta + todo lo completado en el wizard. `plan` es
+// la tarjeta elegida: define cuánto se cobra acá y qué plan se activa después
+// con débito automático, desde el panel (ver activatePlan más abajo).
 export function startPendingCheckout(
   account: RegisterBusinessInput,
   wizard: WizardData,
@@ -406,11 +428,13 @@ export function startPendingCheckout(
 // Previsualiza un código de descuento antes de mandar al dueño a pagar, para
 // mostrarle el precio con descuento en vez de que se entere en MercadoPago.
 // `plan` (rediseño "Base"/"Base + Avanzado"): cada tarjeta de alta tiene su
-// propio monto de bienvenida, así que el código se calcula contra la que
+// propio monto, así que el código se calcula contra la que
 // esté eligiendo el usuario en ese momento — sin esto, se previsualizaría
 // siempre contra la tier base aunque el usuario haya elegido Avanzado.
+// `frozenMonths` viene con valor cuando el código es el de una campaña privada
+// de precio congelado: `amountFinal` se paga por mes durante esos meses.
 export function previewDiscountCode(code: string, plan: PlanKey) {
-  return request<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string }>(
+  return request<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string; frozenMonths?: number | null }>(
     `/subscription/discount/${encodeURIComponent(code)}?plan=${encodeURIComponent(plan)}`,
   )
 }
@@ -761,7 +785,7 @@ export type ApiSubscription = {
   // Plan pedido desde Configuración → Suscripción, todavía no aplicado (rige
   // recién en la próxima renovación) — null si no hay ningún cambio pendiente.
   nextPlan: string | null
-  // false mientras se cursa el beneficio de bienvenida (o el período
+  // false mientras se cursa el primer período pago del alta (o el período
   // anterior a un cambio de plan): todavía no hay ninguna preapproval real
   // cobrando `plan`. El panel usa esto para ofrecer "activar mi plan" en vez
   // de mostrarlo como si ya estuviera facturando.
@@ -772,6 +796,9 @@ export type ApiSubscription = {
   currentPeriodEnd: string | null
   gracePeriodDays: number
   grantReason: string | null
+  // Precio congelado de una campaña: cuánto paga por mes y cuántos cobros a
+  // ese precio le quedan. null si no tiene.
+  frozen?: { amount: number; chargesLeft: number } | null
 }
 
 export function panelGetSubscription() {

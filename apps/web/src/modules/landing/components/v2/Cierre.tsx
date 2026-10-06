@@ -1,32 +1,23 @@
 // Precio, preguntas frecuentes y cierre.
 //
-// Los montos de acá SON los reales (subscriptions.service.ts,
-// BIENVENIDA_TIERS y PLANES — si cambian de un lado, cambian del otro). Ya
-// incluyen la comisión real de Mercado Pago sobre Suscripciones (6,29% + IVA
-// "al instante" en la mayoría de las provincias, 7,61% efectivo — confirmado
-// contra la documentación oficial de MP el 2026-09-07): el número de lista es
-// lo que Órbita recibe LIMPIO, no lo que se cobra.
+// Los precios de lista vienen de planesDatos.ts (los mismos de PLANES en
+// subscriptions.service.ts). El precio promocional NO está escrito acá: si
+// Órbita tiene prendida una campaña de precio congelado ("los primeros N
+// comercios pagan $X por mes durante M meses"), useOferta() la trae de la API
+// y las tarjetas tachan el precio de lista y muestran los lugares que quedan.
+// Sin campaña se ve el precio de lista y nada más. La campaña se prende, se
+// edita y se apaga desde el superadmin, sin tocar este archivo.
 //
-// Rediseño "Base"/"Base + Avanzado" (RBT, 2026-09): antes había 3 planes
-// (Mensual/Semestral/Anual) más un cartel de "beneficio de bienvenida" con un
-// monto fijo que NO dependía de cuál elegías — justamente la raíz de la queja
-// de que el checkout real era confuso. Ahora hay 2 tarjetas nomás, y elegir
-// una determina DIRECTAMENTE cuánto se cobra hoy (bienvenida) y qué se activa
-// después. Semestral/Anual siguen existiendo, pero solo como cambio de plan
-// desde el panel (Configuración → Suscripción) para quien ya es cliente — ver
-// el comentario de diseño al principio de subscriptions.service.ts.
-//
-// El checkout real (pages/onboarding/plan.tsx) cobra la bienvenida de la
-// tarjeta elegida con un pago único; el plan real se activa recién cuando esa
-// bienvenida termina, desde el panel — sin renovación automática (mail +
-// botón "Activar mi plan").
+// En el alta se paga el primer mes (pages/onboarding/plan.tsx); el débito
+// automático se autoriza después, desde el panel.
 
 import { TarjetaContacto } from './Contacto';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 // Las tarjetas y sus montos viven en planesDatos.ts desde que existe /planes
 // (la comparación detallada): son los mismos datos en las dos pantallas, así
 // que se declaran una sola vez. Acá quedan solo el precio y las preguntas.
-import { TARJETAS, fmt } from './planesDatos';
+import { TARJETAS, fmt, precioCongelado, meses, lugares } from './planesDatos';
+import { useOferta } from './useOferta';
 
 const FAQS = [
     {
@@ -51,11 +42,13 @@ const FAQS = [
     },
     {
         q: '¿Qué pasa si quiero dejarlo?',
-        a: 'Cancelás cuando quieras, sin penalidad. No hay renovación automática: se abona por períodos y si no renovás, no se te cobra de nuevo.',
+        a: 'Cancelás cuando quieras desde tu panel, sin penalidad ni permanencia: se corta el débito y no se te vuelve a cobrar.',
     },
 ];
 
 export function Precios() {
+    const campania = useOferta();
+    const cupo = campania ? lugares(campania) : null;
     return (
         <Seccion id="precios">
             <Encabezado
@@ -65,7 +58,17 @@ export function Precios() {
                 bajada="Mismo panel, mismas funciones, sin comisiones por venta. Elegí si querés el paquete Avanzado desde el arranque o no."
             />
 
-            <div className="mx-auto mt-10 grid max-w-[720px] grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Solo con una campaña prendida. Es una línea de texto y no un
+                cartel: el dato que importa (cuántos lugares quedan) es lo único
+                que lleva color. */}
+            {campania && (
+                <p className="mx-auto mt-8 max-w-[640px] text-center text-[13.5px] leading-relaxed text-slate-300" aria-live="polite">
+                    Precio congelado por {meses(campania.months)} para los primeros comercios que se registren.
+                    {cupo && <> <strong className="font-bold text-blue-300">{cupo}.</strong></>}
+                </p>
+            )}
+
+            <div className={`mx-auto grid max-w-[720px] grid-cols-1 gap-4 sm:grid-cols-2 ${campania ? 'mt-6' : 'mt-10'}`}>
                 {TARJETAS.map((t, i) => (
                     <Reveal key={t.key} desde="escala" delay={i * 90}>
                         <Card destacada={!!t.destacada} className="relative flex h-full flex-col overflow-hidden p-7">
@@ -93,26 +96,28 @@ export function Precios() {
                                     {t.nombre}
                                 </span>
                                 <div className="mt-4 flex flex-wrap items-end gap-2">
-                                    <span className="text-[15px] text-slate-500 line-through">{fmt(t.precioTachado)}</span>
+                                    {campania && (
+                                        <span className="text-[15px] text-slate-500 line-through">
+                                            <span className="sr-only">Precio de lista: </span>{fmt(t.precioLista)}
+                                        </span>
+                                    )}
                                     {/* 42px fijo se veía desproporcionado en celular: en la única
                                         columna angosta (<640px) el número ocupaba casi todo el
-                                        ancho de la tarjeta ("$10.900" pegado al tachado), muy por
-                                        encima de la jerarquía del resto del contenido (bullets a
-                                        13px, botón). De sm en adelante la grilla pasa a 2 columnas
-                                        y ahí sí entra cómodo al tamaño original. */}
+                                        ancho de la tarjeta, muy por encima de la jerarquía del
+                                        resto del contenido (bullets a 13px, botón). De sm en
+                                        adelante la grilla pasa a 2 columnas y ahí sí entra cómodo
+                                        al tamaño original. */}
                                     <span className="font-black tracking-[-0.04em] text-white text-[30px] sm:text-[42px]" style={{ lineHeight: 1 }}>
-                                        {fmt(t.precioBienvenida)}
+                                        {fmt(campania ? precioCongelado(t.key, campania) : t.precioLista)}
                                     </span>
-                                    {/* "por 3 meses" solo, pegado al número grande, se leía como
-                                        una tarifa periódica ("$5.500 por [cada] 3 meses") — reportado
-                                        con captura: daba a entender que se pagaba $5.500 POR MES
-                                        durante 3 meses ($16.500 en total), exactamente lo contrario
-                                        de lo que es (un total único, bien por debajo del precio de
-                                        lista). "en total" delante mata esa lectura. */}
-                                    <span className="pb-1.5 text-[13px] text-slate-400">en total · 3 meses</span>
+                                    <span className="pb-1.5 text-[13px] text-slate-400">/mes</span>
                                 </div>
+                                {/* Misma altura con o sin campaña, para que la tarjeta no
+                                    salte cuando llega la oferta de la API. */}
                                 <p className="mt-2 text-[12.5px] text-slate-400">
-                                    Después, {fmt(t.precioTachado)}/mes
+                                    {campania
+                                        ? `por ${meses(campania.months)} · después, ${fmt(t.precioLista)}/mes`
+                                        : 'Se cobra mes a mes, sin permanencia'}
                                 </p>
 
                                 <ul className="mt-6 flex-1 space-y-2.5">
@@ -158,13 +163,10 @@ export function Precios() {
                 ))}
             </div>
 
-            {/* Reemplaza el viejo cartel de "Beneficio de bienvenida" con
-                monto fijo: ahora ese número vive en cada tarjeta, esto es
-                solo la aclaración de qué pasa DESPUÉS de los 3 meses. */}
             <Reveal className="mx-auto mt-8 max-w-[640px] text-center">
                 <p className="text-[12.5px] text-slate-400">
-                    Sin renovación automática: cuando terminan los 3 meses no te cobramos solos —
-                    te avisamos por mail y vos activás el siguiente período desde el panel, cuando quieras.
+                    Al registrarte pagás solo el primer mes. Antes de que termine te avisamos por mail
+                    y autorizás el débito automático desde tu panel. Cancelás cuando quieras.
                 </p>
             </Reveal>
         </Seccion>

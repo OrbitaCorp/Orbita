@@ -10,11 +10,12 @@ import {
   type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
-  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2, ClipboardCheck, LifeBuoy,
+  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
   Search, Plus, DollarSign, Bot,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
+import { TabCampanias } from './Campanias'
 import { TabWizard } from './Wizard'
 import { TabAuditoria } from './Auditoria'
 import { TabSoporte } from './Soporte'
@@ -89,6 +90,7 @@ export function SuperAdminDashboard() {
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
       {tab === 'descuentos' && <TabDescuentos />}
+      {tab === 'campanias' && <TabCampanias />}
       {tab === 'costos' && <TabCostos />}
       {tab === 'orbi' && <TabOrbi />}
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
@@ -99,7 +101,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -116,6 +118,9 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
+  // Al lado de Descuentos: las dos son formas de cobrarle menos a un negocio.
+  // Un código descuenta el primer cobro; una campaña congela el precio varios meses.
+  { id: 'campanias', label: 'Campañas de precio', Icono: Tag, grupo: 'Clientes' },
   // Primero de "Interno": es el tablero de trabajo del equipo, lo que más se
   // abre; admins y actividad son de consulta.
   { id: 'costos', label: 'Costos', Icono: DollarSign, grupo: 'Interno' },

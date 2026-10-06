@@ -15,6 +15,8 @@ export const ACTION_LABELS: Record<string, string> = {
   hide_business_from_search: 'Ocultar de Google y del directorio',
   show_business_in_search: 'Volver a mostrar en Google y el directorio',
   grant_comp: 'Ceder cortesía',
+  create_price_campaign: 'Crear campaña de precio',
+  update_price_campaign: 'Editar campaña de precio',
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
   deactivate_admin: 'Desactivar admin',

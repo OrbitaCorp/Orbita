@@ -1791,6 +1791,17 @@ model Subscription {
   // autorizar la nueva, ya con la frecuencia correcta.
   nextPlan String? @map("next_plan")
 
+  // Precio congelado (campañas de precio, 2026-10 — ver PriceCampaign). Lo
+  // deja el alta cuando entra por una campaña: `frozenAmount` es lo que paga
+  // por mes mientras dura, y `frozenChargesLeft` cuántos cobros a ese precio
+  // le quedan DESPUÉS del primer mes (que ya pagó en el alta). Baja con cada
+  // cobro del débito automático; en 0 paga el precio de lista. Solo aplica al
+  // plan mensual (con o sin Avanzado). Sin FK a propósito: una campaña no se
+  // borra, y lo que vale para cobrar es lo que quedó copiado acá.
+  campaignId        String?  @map("campaign_id")
+  frozenAmount      Decimal? @map("frozen_amount") @db.Decimal(12, 2)
+  frozenChargesLeft Int      @default(0) @map("frozen_charges_left")
+
   // Licencia cedida (solo si origin = comp)
   grantedBy   String? @map("granted_by") // FK → platform_admins (qué admin la otorgó)
   grantReason String? @map("grant_reason") // "Cliente beta", "Promoción lanzamiento"
@@ -2245,6 +2256,41 @@ model PlatformDiscountRedemption {
 
   @@index([codeId])
   @@map("platform_discount_redemptions")
+}
+
+// ─── Campañas de precio congelado ─────────────────────────────────────────────
+// "Los primeros N comercios pagan $X por mes durante M meses, después el precio
+// de lista." Todo lo que define la oferta es editable desde el superadmin, y
+// hay dos formas de usarla con la misma tabla:
+//   - PÚBLICA (code = null): mientras está activa y con lugares, se le aplica
+//     sola a toda alta nueva, y la landing y el wizard tachan el precio de
+//     lista y muestran cuántos lugares quedan. Una sola pública activa a la vez
+//     (lo exige platform.service.ts, no la base).
+//   - PRIVADA (code con valor): cortesía. No se muestra en ningún lado; entra
+//     solo quien escribe el código en el alta, haya o no una pública prendida,
+//     y gasta su propio cupo.
+// El precio que paga cada negocio queda copiado en su Subscription
+// (frozenAmount / frozenChargesLeft): editar o apagar la campaña no le cambia
+// nada a los que ya entraron.
+model PriceCampaign {
+  id            String    @id @default(uuid())
+  name          String
+  code          String?   @unique // siempre en MAYÚSCULAS; null = campaña pública
+  isActive      Boolean   @default(false) @map("is_active")
+  priceBase     Decimal   @map("price_base") @db.Decimal(12, 2) // por mes, plan Base
+  priceAdvanced Decimal   @map("price_advanced") @db.Decimal(12, 2) // por mes, Base + Avanzado
+  months        Int       @default(3) // cuántos meses dura el precio congelado (contando el del alta)
+  maxSlots      Int?      @map("max_slots") // cupo; null = sin límite
+  usedSlots     Int       @default(0) @map("used_slots")
+  startsAt      DateTime? @map("starts_at")
+  endsAt        DateTime? @map("ends_at")
+  note          String?
+  createdBy     String?   @map("created_by") // platform_admins.id, sin FK
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("price_campaigns")
 }
 
 model PlatformAdmin {
@@ -2962,10 +3008,16 @@ model SubscriptionActivationDiscount {
   id            String    @id @default(uuid())
   businessId    String    @map("business_id")
   preapprovalId String    @unique @map("preapproval_id")
-  codeId        String    @map("code_id")
+  // null cuando el monto rebajado no viene de un código sino del precio
+  // congelado de una campaña (ahí va campaignId).
+  codeId        String?   @map("code_id")
+  campaignId    String?   @map("campaign_id")
   plan          String
   amountList    Decimal   @map("amount_list") @db.Decimal(12, 2)
   amountFinal   Decimal   @map("amount_final") @db.Decimal(12, 2)
+  // Cuántos cobros salen al monto rebajado antes de devolver el de lista: 1
+  // con un código, los que le queden al negocio con un precio congelado.
+  chargesTotal  Int       @default(1) @map("charges_total")
   status        String    @default("PENDING")
   activatedAt   DateTime? @map("activated_at")
   restoredAt    DateTime? @map("restored_at")

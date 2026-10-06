@@ -81,14 +81,15 @@ export class StartPendingCheckoutDto {
   @Type(() => PendingWizardDto)
   wizard!: PendingWizardDto;
 
-  // Código de descuento de plataforma (opcional). Se valida en el service
-  // contra platform_discount_codes; si no existe o no está vigente, el alta se
-  // rechaza en vez de cobrar el precio lleno sin avisar.
+  // Código (opcional): de descuento de plataforma, o el de una campaña
+  // privada de precio congelado. Se valida en el service contra
+  // price_campaigns y platform_discount_codes; si no existe o no está vigente,
+  // el alta se rechaza en vez de cobrar el precio lleno sin avisar.
   @IsOptional() @IsString() @MaxLength(64) discountCode?: string;
 
-  // Tarjeta elegida en el alta — determina el monto de bienvenida que se
-  // cobra ACÁ (cada tarjeta tiene el suyo, ver BIENVENIDA_TIERS en
-  // subscriptions.service.ts) y qué plan se activa cuando termine. Acotado a
+  // Tarjeta elegida en el alta — determina el monto del primer mes que se
+  // cobra ACÁ (ver primerCobroParaPlan en subscriptions.service.ts) y qué
+  // plan se activa cuando termine. Acotado a
   // las 2 keys que se ofrecen en el checkout (RBT — rediseño "Base"/"Base +
   // Avanzado", 2026-09) — 'semestral'/'anual' siguen existiendo pero solo
   // como cambio de plan desde el panel, no en el alta (ver ChangePlanDto).

@@ -88,6 +88,44 @@ export interface DiscountCodeDetail extends DiscountCodeRow {
   redemptions: DiscountRedemptionRow[]
 }
 
+// Campañas de precio congelado (ver PriceCampaign en schema.prisma).
+export type PriceCampaignEstado = 'ACTIVA' | 'APAGADA' | 'VENCIDA' | 'AGOTADA' | 'PROGRAMADA'
+export interface PriceCampaignRow {
+  id: string
+  name: string
+  code: string | null
+  isPublic: boolean
+  isActive: boolean
+  priceBase: number
+  priceAdvanced: number
+  months: number
+  maxSlots: number | null
+  usedSlots: number
+  startsAt: string | null
+  endsAt: string | null
+  note: string | null
+  createdAt: string
+  estado: PriceCampaignEstado
+  businesses: { businessId: string; name: string; subdomain: string; plan: string; frozenAmount: number | null; frozenChargesLeft: number; createdAt: string }[]
+}
+export interface PriceCampaignList {
+  // Precios de lista por mes y el mínimo que cobra Mercado Pago: un precio
+  // congelado tiene que quedar entre los dos.
+  list: { base: number; avanzado: number; minAmount: number }
+  campaigns: PriceCampaignRow[]
+}
+export interface PriceCampaignInput {
+  name: string
+  priceBase: number
+  priceAdvanced: number
+  months: number
+  maxSlots: number | null
+  startsAt: string | null
+  endsAt: string | null
+  isActive: boolean
+  note: string | null
+}
+
 export interface CreateDiscountCodeInput {
   code: string
   percentOff: number
@@ -892,6 +930,12 @@ export const platformApi = {
   discountCode: (id: string) => getJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`),
   createDiscountCode: (input: CreateDiscountCodeInput) => sendJSON<DiscountCodeDetail>('/platform/discount-codes', 'POST', input),
   updateDiscountCode: (id: string, input: UpdateDiscountCodeInput) => sendJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`, 'PUT', input),
+
+  priceCampaigns: () => getJSON<PriceCampaignList>('/platform/price-campaigns'),
+  // El código solo va al crear: es lo que distingue una pública de una privada
+  // y no se edita.
+  createPriceCampaign: (input: PriceCampaignInput & { code: string | null }) => sendJSON<PriceCampaignList>('/platform/price-campaigns', 'POST', input),
+  updatePriceCampaign: (id: string, input: PriceCampaignInput) => sendJSON<PriceCampaignList>(`/platform/price-campaigns/${id}`, 'PUT', input),
 
   // El backend devuelve las OPEN primero y después por última actividad: lo
   // que espera respuesta nunca queda enterrado bajo lo ya contestado.

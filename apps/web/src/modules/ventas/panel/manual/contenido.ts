@@ -779,6 +779,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'cfg-suscripcion', titulo: 'Suscripción',
             bloques: [
                 { tipo: 'parrafo', texto: 'Qué plan tenés, qué incluye, cuándo se renueva y cómo cambiarlo. Acá también se activa el **paquete Avanzado**, que se paga aparte de la suscripción mensual.' },
+                { tipo: 'parrafo', texto: 'Al registrarte pagás el **primer mes**. Cuando termina, desde acá elegís el plan (mensual, semestral o anual) y autorizás el débito automático en Mercado Pago. Si entraste con un **precio congelado**, esta pantalla te dice cuánto pagás por mes y cuántos cobros a ese precio te quedan; vale para el plan mensual y después pasás al precio de lista.' },
             ],
             ir: { label: 'Abrir Suscripción', seccion: 'configuracion', query: { vista: 'suscripcion' } },
         },

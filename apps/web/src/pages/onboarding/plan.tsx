@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { Check, ChevronLeft, Shield, ShoppingBag, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
-import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
+import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, getOfertaPublica, ApiError, type PlanKey, type OfertaCampania } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
 import { borrarAlta, useAlta } from '@/modules/turnos/onboarding/estadoAlta'
@@ -58,34 +58,39 @@ const DETALLE_AVANZADO: DetalleItem[] = [
 interface CardPlan {
   key: PlanKey
   nombre: string
-  /** Precio mensual regular de ESTA tarjeta — se muestra tachado, como ancla. */
-  precioRecurrente: number
-  /** Lo que se cobra ACÁ, en este paso, por 3 meses (beneficio de bienvenida). */
-  precioBienvenida: number
+  /** Precio de lista por mes. Con una campaña de precio congelado se muestra tachado. */
+  precioLista: number
   incluye: string[]
   masDetalles: DetalleItem[]
   destacado?: boolean
 }
 
-// Dos tarjetas nomás (antes 3 planes + un monto de bienvenida fijo que no
-// dependía de cuál elegías — ahí estaba la raíz de la queja de "checkout
-// confuso"). Elegir una tarjeta determina DIRECTAMENTE cuánto se cobra hoy Y
-// qué se activa después. Mismos montos que subscriptions.service.ts
-// (BIENVENIDA_TIERS/PLANES) y la home (Cierre.tsx) — si cambian de un lado,
-// cambian del otro.
+// Dos tarjetas nomás: elegir una determina DIRECTAMENTE cuánto se cobra hoy
+// (el primer mes) Y qué plan se activa después. Los precios de lista son los
+// de PLANES en subscriptions.service.ts y la home (planesDatos.ts) — si cambian
+// de un lado, cambian del otro. El precio promocional no está acá: lo trae la
+// campaña que esté prendida (getOfertaPublica) o el código que se aplique.
 const CARDS: CardPlan[] = [
   {
     key: 'mensual', nombre: 'Base',
-    precioRecurrente: 16500, precioBienvenida: 5500,
+    precioLista: 16500,
     incluye: DETALLE_BASE.map(d => d.titulo), masDetalles: DETALLE_BASE,
   },
   {
     key: 'mensualAvanzado', nombre: 'Base + Avanzado',
-    precioRecurrente: 21700, precioBienvenida: 10900,
+    precioLista: 21700,
     incluye: [...DETALLE_BASE.map(d => d.titulo), 'Paquete Avanzado incluido'], masDetalles: DETALLE_AVANZADO,
     destacado: true,
   },
 ]
+
+/** Lo que paga por mes una tarjeta: el precio congelado de la campaña si hay una, o el de lista. */
+function precioMensual(c: CardPlan, campania: OfertaCampania | null): number {
+  if (!campania) return c.precioLista
+  return c.key === 'mensualAvanzado' ? campania.priceAdvanced : campania.priceBase
+}
+
+const mesesTxt = (n: number) => (n === 1 ? '1 mes' : `${n} meses`)
 
 const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
   day: '2-digit', month: 'long', year: 'numeric',
@@ -149,7 +154,9 @@ function Header({ terminado = false }: { terminado?: boolean }) {
 // saltearse el pago (ver PENDIENTES.md).
 const PERMITE_OMITIR_PAGO = process.env.NEXT_PUBLIC_ALLOW_SKIP_PAYMENT === 'true'
 
-interface DescuentoAplicado { code: string; percentOff: number; amountBase: number; amountFinal: number }
+// `frozenMonths` con valor = el código es el de una campaña privada de precio
+// congelado: `amountFinal` se paga por mes durante esos meses, no solo el primero.
+interface DescuentoAplicado { code: string; percentOff: number; amountBase: number; amountFinal: number; frozenMonths: number | null }
 
 function fmtPesos(n: number): string {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -177,7 +184,11 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
         <Check size={16} strokeWidth={2.5} color="var(--color-success)" />
         <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text)' }}>
           Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado:{' '}
-          {descuento.amountFinal === 0 ? 'el plan te queda gratis' : `${descuento.percentOff}% menos`}
+          {descuento.amountFinal === 0
+            ? 'el plan te queda gratis'
+            : descuento.frozenMonths
+              ? `precio congelado por ${mesesTxt(descuento.frozenMonths)}`
+              : `${descuento.percentOff}% menos en tu primer mes`}
         </span>
         <button
           type="button"
@@ -210,7 +221,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
       {/* Visible de entrada, sin link intermedio: el codigo se lo damos
           nosotros al negocio y hay que poder cargarlo sin buscarlo. */}
       <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 7 }}>
-        ¿Tenés un código de descuento?
+        ¿Tenés un código?
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
@@ -248,7 +259,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, plan, onCambiarPlan }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, plan, onCambiarPlan, campania }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
@@ -257,9 +268,11 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   onVolver: () => void
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
-  /** Plan que se activa cuando termine el beneficio de bienvenida. */
+  /** Tarjeta elegida: lo que se cobra hoy y el plan que se activa después. */
   plan: PlanKey
   onCambiarPlan: (p: PlanKey) => void
+  /** Campaña pública de precio congelado vigente, si hay una. */
+  campania: OfertaCampania | null
 }) {
   // Un código del 100% deja el plan en cero: no hay nada que cobrar, así que la
   // pantalla no puede seguir prometiendo un pago. Cambia el precio, el botón y
@@ -267,15 +280,22 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   // una pantalla de $0 sería confuso y encima MP la rechaza.
   const esGratis = !!descuento && descuento.amountFinal === 0
   const cardActual = CARDS.find(c => c.key === plan) ?? CARDS[0]
-  // "$5.500 en total" al lado de un cartel que dice "Tus primeros 3 meses"
-  // se seguía leyendo como "$5.500 por mes, durante 3 meses" (reportado con
-  // captura) a pesar del "en total" ya agregado antes — hacía falta el
-  // número dividido, no solo la palabra. Se redondea (no hay centavos acá:
-  // fmtPesos ya trunca decimales) — no es el monto real que cobra MercadoPago
-  // (eso sigue siendo precioBienvenida, un solo cargo), es solo la cuenta
-  // para que se entienda el total.
-  const precioBienvenidaMostrado = esGratis ? 0 : descuento ? descuento.amountFinal : cardActual.precioBienvenida
-  const precioPorMesDurante3 = Math.round(precioBienvenidaMostrado / 3)
+  // Tres cosas distintas pueden bajar el precio, y la pantalla tiene que decir
+  // cuál y por cuánto tiempo:
+  //   - la campaña pública (se aplica sola): precio congelado por N meses;
+  //   - el código de una campaña privada (frozenMonths): lo mismo, por código;
+  //   - un código de descuento común: un % menos, SOLO en este primer mes.
+  // `hoy` es exactamente lo que se le manda a cobrar a Mercado Pago ahora.
+  const precioDeCampania = precioMensual(cardActual, campania)
+  const hoy = esGratis ? 0 : descuento ? descuento.amountFinal : precioDeCampania
+  const mesesCongelados = esGratis ? null : descuento?.frozenMonths ?? (campania ? campania.months : null)
+  const precioCongelado = descuento?.frozenMonths ? descuento.amountFinal : precioDeCampania
+  // Un código de porcentaje encima de la campaña: el primer mes sale todavía
+  // menos, y los meses congelados que siguen van al precio de la campaña.
+  const codigoDePorcentaje = !!descuento && !esGratis && !descuento.frozenMonths
+  const cupo = campania && campania.maxSlots !== null && campania.slotsLeft !== null && !descuento?.frozenMonths
+    ? (campania.slotsLeft === 1 ? `Queda 1 de ${campania.maxSlots} lugares` : `Quedan ${campania.slotsLeft} de ${campania.maxSlots} lugares`)
+    : null
   const [detalle, setDetalle] = useState<PlanKey | null>(null)
   const nombreNegocio = useOnboardingStore(st => st.wizard.nombre)
   return (
@@ -331,67 +351,71 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
             background: 'linear-gradient(135deg, #1e3a8a 0%, #2563EB 100%)',
             position: 'relative',
           }}>
-            {/* El badge estaba en position:absolute arriba a la derecha y en
-                celular se comía "Tus primeros 3 meses", que arranca a la
-                izquierda (reportado con captura). Ahora los dos comparten una
-                fila que envuelve: cuando no entran juntos, el badge baja a su
-                propio renglón en vez de superponerse. */}
+            {/* Título y, si corresponde, el rótulo del precio congelado: comparten
+                una fila que envuelve, así en celular el rótulo baja a su propio
+                renglón en vez de superponerse al título. */}
             <div style={{
               display: 'flex', flexWrap: 'wrap', alignItems: 'center',
               justifyContent: 'space-between', gap: 8, marginBottom: 8,
             }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-                Tus primeros 3 meses
+                Tu primer mes
               </div>
-              <div style={{
-                background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)',
-                borderRadius: 999, padding: '4px 12px',
-                fontSize: 11, fontWeight: 700, color: 'white',
-                border: '1px solid rgba(255,255,255,0.25)',
-              }}>
-                ✦ BENEFICIO DE BIENVENIDA
-              </div>
+              {mesesCongelados && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)',
+                  borderRadius: 999, padding: '4px 12px',
+                  fontSize: 11.5, fontWeight: 600, color: 'white',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                }}>
+                  Precio congelado por {mesesTxt(mesesCongelados)}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
-                {fmtPesos(descuento ? descuento.amountBase : cardActual.precioRecurrente)}
-              </span>
+              {hoy < cardActual.precioLista && (
+                <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
+                  {fmtPesos(cardActual.precioLista)}
+                </span>
+              )}
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(cardActual.precioBienvenida)}
+                {esGratis ? 'Gratis' : fmtPesos(hoy)}
               </span>
               {!esGratis && (
-                // "por 3 meses" al lado de un precio grande se lee como tarifa
-                // periódica ("$X por [cada] 3 meses") — mismo hallazgo reportado
-                // en la home (Cierre.tsx): daba a entender que se pagaba este
-                // monto CADA MES durante 3 meses, no que es el total único de
-                // los 3 meses. Acá es checkout de verdad (plata real), así que
-                // el "en total" queda a propósito aunque el título de arriba
-                // ("Tus primeros 3 meses") ya dé contexto.
+                // Con un código de porcentaje el número grande vale solo para
+                // este mes, y "/mes" al lado lo haría pasar por la tarifa.
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  en total
+                  {codigoDePorcentaje ? 'este mes' : '/mes'}
                 </span>
               )}
             </div>
-            {!esGratis && (
-              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 3 }}>
-                Equivale a {fmtPesos(precioPorMesDurante3)}/mes durante los primeros 3 meses
-              </div>
-            )}
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 3 }}>
               {esGratis
                 ? `Con el código ${descuento!.code} no pagás nada`
-                : descuento
-                  ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos · después, ${fmtPesos(cardActual.precioRecurrente)}/mes`
-                  : `Después, ${fmtPesos(cardActual.precioRecurrente)}/mes`}
+                : codigoDePorcentaje
+                  ? `Con el código ${descuento!.code}: ${descuento!.percentOff}% menos en tu primer mes`
+                  : mesesCongelados
+                    ? `Pagás ${fmtPesos(precioCongelado)} por mes durante ${mesesTxt(mesesCongelados)}`
+                    : 'Hoy pagás solo el primer mes'}
             </div>
+            {!esGratis && (
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                {mesesCongelados && codigoDePorcentaje
+                  ? `Después ${fmtPesos(precioCongelado)}/mes hasta completar ${mesesTxt(mesesCongelados)}, y luego ${fmtPesos(cardActual.precioLista)}/mes`
+                  : mesesCongelados
+                    ? `Después, ${fmtPesos(cardActual.precioLista)}/mes`
+                    : codigoDePorcentaje
+                      ? `Después, ${fmtPesos(cardActual.precioLista)}/mes`
+                      : 'Se cobra mes a mes, sin permanencia'}
+                {cupo && <> · <span style={{ color: 'rgba(255,255,255,0.85)' }}>{cupo}</span></>}
+              </div>
+            )}
           </div>
 
           <div style={{ padding: '20px 28px 24px' }}>
-            {/* Elegir la tarjeta determina DIRECTAMENTE el monto de arriba
-                (antes era fijo, sea cual sea el plan — ahí estaba la raíz de
-                la queja de "checkout confuso") Y qué plan se activa cuando
-                termine el beneficio. Se puede cambiar después desde el panel
-                (Configuración → Suscripción). */}
+            {/* Elegir la tarjeta determina DIRECTAMENTE el monto de arriba Y
+                qué plan se activa después del primer mes. Se puede cambiar
+                después desde el panel (Configuración → Suscripción). */}
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 9 }}>
               Elegí tu plan
             </div>
@@ -427,22 +451,19 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                     )}
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{c.nombre}</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: 'var(--color-subtle)', textDecoration: 'line-through' }}>
-                        {fmtPesos(c.precioRecurrente)}
-                      </span>
+                      {campania && (
+                        <span style={{ fontSize: 12, color: 'var(--color-subtle)', textDecoration: 'line-through' }}>
+                          {fmtPesos(c.precioLista)}
+                        </span>
+                      )}
                       <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)' }}>
-                        {fmtPesos(c.precioBienvenida)}
+                        {fmtPesos(precioMensual(c, campania))}
                       </span>
                     </div>
-                    {/* Esta mini-card no tiene el título "Tus primeros 3 meses" de la
-                        caja grande de arriba, así que acá el "en total" es la única
-                        pista de que el precio no es una tarifa mensual — mismo
-                        hallazgo que el resto de los precios de esta pantalla. El
-                        "≈ $X/mes" es el mismo agregado que la caja grande (ver
-                        precioPorMesDurante3 más arriba): el número dividido, no
-                        solo la palabra "total". */}
                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 1 }}>
-                      en total, 3 meses (≈ {fmtPesos(Math.round(c.precioBienvenida / 3))}/mes) · después {fmtPesos(c.precioRecurrente)}/mes
+                      {campania
+                        ? `por mes, ${mesesTxt(campania.months)} · después ${fmtPesos(c.precioLista)}/mes`
+                        : 'por mes'}
                     </div>
                     <ul style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {c.incluye.slice(0, 3).map(t => (
@@ -475,12 +496,13 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
               onQuitar={onQuitarDescuento}
             />
 
-            {/* Sin renovación automática: refleja el flujo real (mail + botón
-                "Activar mi plan" en el panel, activatePlan/confirmPlanActivation
-                — no hay ningún cobro diferido automatizado). */}
+            {/* Refleja el flujo real: acá se paga un mes con un pago único, y el
+                débito automático lo autoriza el dueño después desde el panel
+                (activatePlan/confirmPlanActivation). */}
             <p style={{ fontSize: 11.5, color: 'var(--color-subtle)', margin: '0 0 16px', lineHeight: 1.5 }}>
-              Sin renovación automática: al terminar los 3 meses te avisamos por mail
-              y vos activás el siguiente período desde el panel.
+              {esGratis
+                ? 'No hay ningún cobro: tu cuenta queda activa por el período que indica el código.'
+                : 'Hoy pagás solo el primer mes. Antes de que termine te avisamos por mail y autorizás el débito automático desde tu panel.'}
             </p>
 
             {/* Sin la contraseña en memoria (pasa al recargar esta pantalla: no
@@ -716,7 +738,7 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 
 // ─── Pantalla 3: Pago exitoso ────────────────────────────────────────────────
 
-function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardComprada: CardPlan }) {
+function ExitoScreen({ irAlPanel, cardComprada, pagado }: { irAlPanel: () => void; cardComprada: CardPlan; pagado: number }) {
   // Sin N° de comprobante acá a propósito (hallazgo MEDIA "comprobante-fijo",
   // 08-09/09): esta pantalla se arma con lo que ya tenemos en memoria apenas
   // confirma MP, antes de que exista una fila de SubscriptionPayment para
@@ -724,7 +746,7 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
   // comprobante) sale de /onboarding/pago-comprobante, que sí lo pide.
   const DETALLES: [string, string][] = [
     ['Plan', cardComprada.nombre],
-    ['Beneficio', `${fmtPesos(cardComprada.precioBienvenida)} · 3 meses`],
+    ['Pagaste', `${fmtPesos(pagado)} · primer mes`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
   ]
@@ -898,6 +920,17 @@ function PlanContenido() {
   // ninguna tarjeta viene marcada de entrada.
   const [plan, setPlan] = useState<PlanKey>('mensual')
 
+  // Campaña pública de precio congelado, si Órbita tiene una prendida. Mientras
+  // carga (o si la API no responde) queda en null y se muestra el precio de
+  // lista: lo que se cobra lo decide el backend al pedir el link, así que acá
+  // lo peor que puede pasar es mostrar un precio más alto que el real.
+  const [campania, setCampania] = useState<OfertaCampania | null>(null)
+  useEffect(() => {
+    let vivo = true
+    getOfertaPublica().then(o => { if (vivo) setCampania(o.campaign) }).catch(() => undefined)
+    return () => { vivo = false }
+  }, [])
+
   // Si no vino de completar el wizard (no hay rubro/credenciales cargadas),
   // no tiene nada que pagar/guardar — volver al principio. La contraseña NO
   // se persiste en localStorage (seguridad): si el usuario recargó esta
@@ -992,10 +1025,10 @@ function PlanContenido() {
   // El código validado se guarda acá y viaja al checkout. Se valida contra el
   // backend (misma regla que usa el cobro real) para que el precio que ve el
   // dueño sea el que efectivamente se le va a cobrar. `plan` viaja porque cada
-  // tarjeta tiene su propio monto de bienvenida (ver previewDiscountCode).
+  // tarjeta tiene su propio monto (ver previewDiscountCode).
   async function aplicarDescuento(code: string) {
     const d = await previewDiscountCode(code, plan)
-    setDescuento({ code: d.code, percentOff: d.percentOff, amountBase: d.amountBase, amountFinal: d.amountFinal })
+    setDescuento({ code: d.code, percentOff: d.percentOff, amountBase: d.amountBase, amountFinal: d.amountFinal, frozenMonths: d.frozenMonths ?? null })
   }
 
   // Si cambia de tarjeta con un código ya aplicado, ese código quedó
@@ -1070,7 +1103,10 @@ function PlanContenido() {
   }
 
   if (estado === 'procesando') return <ProcesandoScreen gratis={descuento?.amountFinal === 0} />
-  if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} cardComprada={CARDS.find(c => c.key === plan) ?? CARDS[0]} />
+  if (estado === 'exito') {
+    const card = CARDS.find(c => c.key === plan) ?? CARDS[0]
+    return <ExitoScreen irAlPanel={irAlPanel} cardComprada={card} pagado={descuento ? descuento.amountFinal : precioMensual(card, campania)} />
+  }
   return (
     <PlanScreen
       onPagar={pagar}
@@ -1083,6 +1119,7 @@ function PlanContenido() {
       onQuitarDescuento={() => setDescuento(null)}
       plan={plan}
       onCambiarPlan={cambiarPlan}
+      campania={campania}
     />
   )
 }

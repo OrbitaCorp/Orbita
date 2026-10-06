@@ -48,7 +48,7 @@ export default function SubscriptionStatusBanner() {
             ? 'Tu período de cortesía terminó.'
             : sub.planActive
                 ? 'Tu plan cambió y hay que autorizarlo.'
-                : 'Tu beneficio de bienvenida terminó.'
+                : 'Tu primer período terminó: activá tu plan para seguir.'
 
     return (
         <div

@@ -29,6 +29,8 @@ function suscripciones(opts: { sub?: Record<string, unknown>; preapproval?: Reco
     platformAdminLog: { findFirst: jest.fn().mockResolvedValue(opts.suspendidaPorAdmin ? { action: 'suspend_business' } : null) },
     pendingSignup: { findUnique: jest.fn(), create: jest.fn().mockResolvedValue({}) },
     platformDiscountCode: { findUnique: jest.fn() },
+    // Sin campañas de precio: estos tests cubren el alta a precio de lista.
+    priceCampaign: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     // Descuento de activación: estos tests activan un plan SIN código.
     subscriptionActivationDiscount: { findUnique: jest.fn().mockResolvedValue(null) },
   };
@@ -87,6 +89,8 @@ describe('Alta paga', () => {
     expect(payload.passwordHash).toMatch(/^\$argon2id\$/);
   });
 
+  // Los dos que siguen usan un payload sin `primerCobro`: un alta pedida antes
+  // de las campañas de precio, que pagó la bienvenida vieja ($5.500 por 3 meses).
   it('pago de bienvenida por menos de lo esperado: no se crea la cuenta', async () => {
     const { svc, prisma, onboarding } = suscripciones();
     prisma.pendingSignup.findUnique.mockResolvedValue({ payload: { account: { email: 'ana@x.com' }, passwordHash: 'h', wizard: {}, plan: 'mensual' } });

@@ -49,6 +49,7 @@ describe('SubscriptionsService — lecturas (unit)', () => {
         currentPeriodEnd: sub.currentPeriodEnd,
         gracePeriodDays: 4,
         grantReason: null,
+        frozen: null,
       });
     });
 

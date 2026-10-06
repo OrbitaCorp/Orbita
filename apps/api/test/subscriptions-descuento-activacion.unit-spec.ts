@@ -22,7 +22,7 @@ function armar() {
       update: jest.fn().mockImplementation(({ where, data }: any) => Promise.resolve({ id: where.id, ...data })),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-    subscriptionPayment: { findFirst: jest.fn() },
+    subscriptionPayment: { count: jest.fn() },
     platformDiscountCode: { findUnique: jest.fn() },
     member: { findUnique: jest.fn().mockResolvedValue({ email: 'dueña@x.com' }), findFirst: jest.fn().mockResolvedValue({ email: 'dueña@x.com' }) },
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'tienda' }) },
@@ -194,7 +194,7 @@ describe('confirmPlanActivation con descuento', () => {
 describe('devolver el precio de lista tras el primer cobro', () => {
   const fila = (status: string) => ({
     id: 'd1', businessId: 'b1', preapprovalId: 'PRE-1', codeId: 'code1', plan: 'mensual',
-    amountList: 16500, amountFinal: 165, status, createdAt: new Date(Date.now() - 3600_000),
+    amountList: 16500, amountFinal: 165, chargesTotal: 1, status, createdAt: new Date(Date.now() - 3600_000),
   });
 
   it('con el primer cobro aprobado, le devuelve a MP el precio de lista y deja la fila en RESTORED', async () => {
@@ -202,7 +202,7 @@ describe('devolver el precio de lista tras el primer cobro', () => {
     prisma.subscriptionActivationDiscount.findFirst.mockResolvedValue(fila('ACTIVE'));
     // Prisma devuelve la fila COMPLETA tras un update, no solo lo que se cambió.
     prisma.subscriptionActivationDiscount.update.mockImplementation(({ data }: any) => Promise.resolve({ ...fila('ACTIVE'), ...data }));
-    prisma.subscriptionPayment.findFirst.mockResolvedValue({ id: 'pay1' });
+    prisma.subscriptionPayment.count.mockResolvedValue(1);
 
     await (service as any).avanzarDescuentoDeActivacion('d1', 'b1');
 
@@ -221,7 +221,7 @@ describe('devolver el precio de lista tras el primer cobro', () => {
   it('sin cobro aprobado todavía no toca el precio', async () => {
     const { service, prisma, preapproval } = armar();
     prisma.subscriptionActivationDiscount.findFirst.mockResolvedValue(fila('ACTIVE'));
-    prisma.subscriptionPayment.findFirst.mockResolvedValue(null);
+    prisma.subscriptionPayment.count.mockResolvedValue(0);
 
     await (service as any).avanzarDescuentoDeActivacion('d1', 'b1');
 

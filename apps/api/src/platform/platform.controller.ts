@@ -12,6 +12,7 @@ import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
+import { CreatePriceCampaignDto, UpdatePriceCampaignDto } from './dto/price-campaign.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -265,5 +266,24 @@ export class PlatformController {
   @SoloSuperadmin()
   updateDiscountCode(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpdateDiscountCodeDto) {
     return this.platformService.updateDiscountCode(req.user.adminId, id, dto);
+  }
+
+  // ── Campañas de precio congelado ──────────────────────────────────────────
+
+  @Get('price-campaigns')
+  listPriceCampaigns() {
+    return this.platformService.listPriceCampaigns();
+  }
+
+  @Post('price-campaigns')
+  @SoloSuperadmin()
+  createPriceCampaign(@Req() req: RequestWithAdmin, @Body() dto: CreatePriceCampaignDto) {
+    return this.platformService.createPriceCampaign(req.user.adminId, dto);
+  }
+
+  @Put('price-campaigns/:id')
+  @SoloSuperadmin()
+  updatePriceCampaign(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpdatePriceCampaignDto) {
+    return this.platformService.updatePriceCampaign(req.user.adminId, id, dto);
   }
 }

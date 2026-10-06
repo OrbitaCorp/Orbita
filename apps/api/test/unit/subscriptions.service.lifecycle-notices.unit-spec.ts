@@ -68,7 +68,7 @@ describe('SubscriptionsService.processLifecycleNotices (unit)', () => {
     expect(mail.sendSubscriptionEndingSoon).toHaveBeenCalledTimes(1);
   });
 
-  it('GRACIA_INICIO usa "Tu período de bienvenida" cuando planActive=false, y "Tu suscripción" para un plan pago activo', async () => {
+  it('GRACIA_INICIO usa "Tu primer período" cuando planActive=false, y "Tu suscripción" para un plan pago activo', async () => {
     const { svc, prisma, mail } = makeService();
     const vencidaHaceUnDia = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
     const bienvenida = { id: 'sub1', businessId: 'biz1', origin: 'PAID', planActive: false, status: 'PAST_DUE', currentPeriodEnd: vencidaHaceUnDia, gracePeriodDays: 7 };
@@ -79,7 +79,7 @@ describe('SubscriptionsService.processLifecycleNotices (unit)', () => {
 
     expect(mail.sendSubscriptionPeriodEnded).toHaveBeenCalledWith(
       'dueno@test.com',
-      expect.objectContaining({ motivo: 'Tu período de bienvenida', graceDaysLeft: 6 }),
+      expect.objectContaining({ motivo: 'Tu primer período', graceDaysLeft: 6 }),
       { businessId: 'biz1' },
     );
   });

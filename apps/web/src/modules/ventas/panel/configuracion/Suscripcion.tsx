@@ -9,9 +9,11 @@
 //
 // El bloque "Plan actual" tiene TRES estados posibles (RBT — planes múltiples,
 // 2026-09), según `sub.planActive` y `sub.currentPeriodEnd`:
-//   1. Cursando el beneficio de bienvenida (planActive=false, todavía no
-//      venció): se puede elegir/cambiar a qué plan se pasa después, pero no
-//      hay nada para activar todavía.
+//   1. Cursando el primer período pago del alta (planActive=false, todavía
+//      no venció): se puede elegir/cambiar a qué plan se pasa después, pero no
+//      hay nada para activar todavía. Hoy ese período es el primer mes; los
+//      negocios dados de alta antes de 2026-10 cursan la vieja bienvenida de 3
+//      meses (ver primerPeriodo).
 //   2. El período actual venció y no hay un plan activo (planActive=false,
 //      ya venció) o cambió de plan (nextPlan seteado, ya venció): hay que
 //      autorizar la preapproval real — "Activá tu plan" manda a MP.
@@ -102,6 +104,17 @@ function conAvanzado(plan: string | null | undefined): PlanKey {
 
 function fmtPesos(n: number): string {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+}
+
+// Cómo se llama el período que se pagó en el alta. Desde 2026-10 es un mes;
+// antes era el "beneficio de bienvenida" de 3 meses, y los negocios que
+// todavía lo están cursando lo tienen que seguir viendo con ese nombre. Se
+// distingue por la duración del período, que es lo único que cambia.
+function primerPeriodo(sub: ApiSubscription): string {
+    const dias = sub.currentPeriodStart && sub.currentPeriodEnd
+        ? (new Date(sub.currentPeriodEnd).getTime() - new Date(sub.currentPeriodStart).getTime()) / 86_400_000
+        : 0
+    return dias > 45 ? 'Beneficio de bienvenida' : 'Primer mes'
 }
 
 function formatFecha(iso: string | null): string {
@@ -337,7 +350,7 @@ export default function Suscripcion() {
                 activarPlan(codigo)
                 return
             }
-            if (activar) setAvisoPlan('Listo: cuando termine tu beneficio de bienvenida pasás al plan con Avanzado.')
+            if (activar) setAvisoPlan('Listo: cuando termine tu período actual pasás al plan con Avanzado.')
         } catch (e) {
             setErrorPlan(e instanceof ApiError ? e.message : 'No se pudo guardar el cambio de plan')
         } finally {
@@ -410,7 +423,7 @@ export default function Suscripcion() {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
-                                {esCortesia ? 'Cuenta de cortesía' : sub.planActive ? `Plan ${PLANES[sub.plan as PlanKey]?.nombre ?? sub.plan}` : 'Beneficio de bienvenida'}
+                                {esCortesia ? 'Cuenta de cortesía' : sub.planActive ? `Plan ${PLANES[sub.plan as PlanKey]?.nombre ?? sub.plan}` : primerPeriodo(sub)}
                             </div>
                             {(() => {
                                 const meta = ESTADO_META[sub.status] ?? { label: sub.status, color: 'var(--color-muted)', bg: 'var(--color-surface-alt)' }
@@ -427,6 +440,17 @@ export default function Suscripcion() {
                         <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginTop: 4 }}>
                             Período actual: {formatFecha(sub.currentPeriodStart)} — {formatFecha(sub.currentPeriodEnd)}
                         </div>
+                        {/* Precio congelado de una campaña: cuánto le queda. Vale solo
+                            para el plan mensual (ver congelamientoPendiente en
+                            subscriptions.service.ts), y se dice acá para que no lo
+                            pierda sin saberlo al elegir semestral o anual. */}
+                        {sub.frozen && !cancelada && (
+                            <p style={{ fontSize: 12.5, color: 'var(--color-body)', margin: '10px 0 0', lineHeight: 1.5 }}>
+                                Tenés el precio congelado: <strong style={{ color: 'var(--color-text)' }}>${sub.frozen.amount.toLocaleString('es-AR')} por mes</strong> en
+                                {' '}{sub.frozen.chargesLeft === 1 ? 'tu próximo cobro' : `tus próximos ${sub.frozen.chargesLeft} cobros`} del plan mensual.
+                                Después pasás al precio de lista. Con un plan semestral o anual no se aplica.
+                            </p>
+                        )}
 
                         {/* ── Caso 2: período vencido, hay que autorizar el plan ──
                             Estilo urgente (rojo) si ya está SUSPENDED — el panel
@@ -465,7 +489,7 @@ export default function Suscripcion() {
                                             ? 'Tu tienda está pausada'
                                             : sub.planActive
                                                 ? 'Tu plan cambió — hay que autorizarlo'
-                                                : 'Tu beneficio de bienvenida terminó'}
+                                                : `Tu ${primerPeriodo(sub).toLowerCase()} terminó`}
                                     </span>
                                 </div>
                                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px' }}>
@@ -483,12 +507,16 @@ export default function Suscripcion() {
                                     <SelectorPlan valor={planMostrado} onElegir={p => void elegirPlan(p)} disabled={guardandoPlan || activando} />
                                     {errorPlan && <p role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '8px 0 0' }}>{errorPlan}</p>}
                                 </div>
-                                <CodigoDescuento
-                                    descuento={descuento}
-                                    onAplicado={setDescuento}
-                                    onQuitar={() => setDescuento(null)}
-                                    disabled={activando}
-                                />
+                                {/* Con precio congelado pendiente no hay código: el plan
+                                    mensual ya sale a ese precio y el backend no los combina. */}
+                                {!(sub.frozen && planMostrado && PLANES[planMostrado].total === null) && (
+                                    <CodigoDescuento
+                                        descuento={descuento}
+                                        onAplicado={setDescuento}
+                                        onQuitar={() => setDescuento(null)}
+                                        disabled={activando}
+                                    />
+                                )}
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
                                 <Button variant="primary" size="sm" onClick={() => activarPlan(descuento?.code)} disabled={activando || guardandoPlan || !planMostrado} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
                                     {activando ? 'Abriendo Mercado Pago…' : planMostrado ? `Activar ${PLANES[planMostrado].nombre}` : 'Activar mi plan'}
@@ -598,7 +626,7 @@ export default function Suscripcion() {
                                 {guardandoPlan || activando ? 'Un momento…' : 'Activar Avanzado'}
                             </Button>
                             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '8px 0 0' }}>
-                                Se activa cuando termine tu beneficio de bienvenida.
+                                Se activa cuando termine tu período actual.
                             </p>
                         </>
                     )}

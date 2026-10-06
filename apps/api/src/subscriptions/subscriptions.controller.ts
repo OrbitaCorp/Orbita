@@ -75,13 +75,25 @@ export class SubscriptionsController {
     return this.subscriptionsService.confirmAndCreate(dto.preapprovalId);
   }
 
+  // Precios de lista y, si hay una campaña pública de precio congelado
+  // vigente, su precio y los lugares que quedan. Lo leen la landing y el
+  // wizard del alta para tachar el precio y mostrar el contador sin que haya
+  // que desplegar nada cuando la campaña se prende, se edita o se agota.
+  // Público: es lo mismo que se ve en la página de precios.
+  @Get('offer')
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  offer() {
+    return this.subscriptionsService.ofertaPublica();
+  }
+
   // Previsualiza un código de descuento ANTES de mandar al usuario a pagar,
   // para poder mostrarle cuánto va a pagar en vez de que se entere en MP.
   // Público porque en este punto del wizard todavía no hay cuenta creada; no
   // revela nada más que el porcentaje y el precio resultante.
   //
   // `plan` (RBT — rediseño "Base"/"Base + Avanzado", 2026-09): cada tarjeta
-  // de alta tiene su propio monto de bienvenida, así que el código se
+  // de alta tiene su propio monto, así que el código se
   // previsualiza contra la que esté eligiendo el usuario. Default 'mensual'
   // (tier base, la más barata) si viene ausente/inválido — mantiene el
   // endpoint retrocompatible con cualquier llamado viejo sin este query param.

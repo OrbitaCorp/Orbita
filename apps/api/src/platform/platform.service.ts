@@ -16,6 +16,7 @@ import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
+import { CreatePriceCampaignDto, UpdatePriceCampaignDto } from './dto/price-campaign.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PlatformAdminLogService } from './platform-admin-log.service';
 
@@ -1074,6 +1075,10 @@ export class PlatformService {
     const code = PlatformService.normalizarCodigo(dto.code);
     const yaExiste = await this.prisma.platformDiscountCode.findUnique({ where: { code } });
     if (yaExiste) throw new BadRequestException(`Ya existe un código ${code}`);
+    // El alta busca primero entre las campañas privadas: con el mismo texto,
+    // este código de descuento no se podría usar nunca.
+    const esDeCampania = await this.prisma.priceCampaign.findUnique({ where: { code } });
+    if (esDeCampania) throw new BadRequestException(`${code} ya es el código de la campaña "${esDeCampania.name}"`);
 
     const expiresAt = this.parseVencimiento(dto.expiresAt);
     this.validarVigenciaObligatoria(dto.percentOff, expiresAt);
@@ -1152,6 +1157,186 @@ export class PlatformService {
       },
     });
     return this.getDiscountCode(id);
+  }
+
+  // ── Campañas de precio congelado ──────────────────────────────────────────
+  // Ver el modelo PriceCampaign (schema.prisma) y "Campañas de precio
+  // congelado" en subscriptions.service.ts, que es quien las aplica en el alta.
+
+  private estadoCampania(c: { isActive: boolean; startsAt: Date | null; endsAt: Date | null; maxSlots: number | null; usedSlots: number }) {
+    const now = new Date();
+    if (!c.isActive) return 'APAGADA';
+    if (c.endsAt && c.endsAt <= now) return 'VENCIDA';
+    if (c.maxSlots !== null && c.usedSlots >= c.maxSlots) return 'AGOTADA';
+    if (c.startsAt && c.startsAt > now) return 'PROGRAMADA';
+    return 'ACTIVA';
+  }
+
+  async listPriceCampaigns() {
+    const [campanias, lista] = await Promise.all([
+      this.prisma.priceCampaign.findMany({ orderBy: { createdAt: 'desc' } }),
+      Promise.resolve(this.subscriptions.preciosDeLista()),
+    ]);
+    // Quiénes entraron por cada una: lo dice la suscripción del negocio, que es
+    // donde quedó copiado el precio congelado.
+    const ids = campanias.map((c) => c.id);
+    const subs = ids.length
+      ? await this.prisma.subscription.findMany({
+          where: { campaignId: { in: ids } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            campaignId: true,
+            plan: true,
+            frozenAmount: true,
+            frozenChargesLeft: true,
+            createdAt: true,
+            business: { select: { id: true, name: true, subdomain: true } },
+          },
+        })
+      : [];
+    return {
+      list: lista,
+      campaigns: campanias.map((c) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        isPublic: c.code === null,
+        isActive: c.isActive,
+        priceBase: Number(c.priceBase),
+        priceAdvanced: Number(c.priceAdvanced),
+        months: c.months,
+        maxSlots: c.maxSlots,
+        usedSlots: c.usedSlots,
+        startsAt: c.startsAt?.toISOString() ?? null,
+        endsAt: c.endsAt?.toISOString() ?? null,
+        note: c.note,
+        createdAt: c.createdAt.toISOString(),
+        estado: this.estadoCampania(c),
+        businesses: subs
+          .filter((s) => s.campaignId === c.id)
+          .map((s) => ({
+            businessId: s.business.id,
+            name: s.business.name,
+            subdomain: s.business.subdomain,
+            plan: s.plan,
+            frozenAmount: s.frozenAmount === null ? null : Number(s.frozenAmount),
+            frozenChargesLeft: s.frozenChargesLeft,
+            createdAt: s.createdAt.toISOString(),
+          })),
+      })),
+    };
+  }
+
+  // Un precio congelado tiene que ser un descuento de verdad (menos que la
+  // lista) y cobrable (Mercado Pago no cobra por debajo de su mínimo): si no,
+  // el alta lo ignora o revienta recién al pagar.
+  private validarPreciosDeCampania(priceBase: number, priceAdvanced: number) {
+    const { base, avanzado, minAmount } = this.subscriptions.preciosDeLista();
+    for (const [nombre, precio, lista] of [['Base', priceBase, base], ['Base + Avanzado', priceAdvanced, avanzado]] as const) {
+      if (precio < minAmount) throw new BadRequestException(`El precio de ${nombre} no puede ser menor a $${minAmount}: Mercado Pago no cobra menos que eso.`);
+      if (precio >= lista) throw new BadRequestException(`El precio congelado de ${nombre} tiene que ser menor al de lista ($${lista}).`);
+    }
+  }
+
+  private validarFechasDeCampania(startsAt: Date | null, endsAt: Date | null) {
+    if (startsAt && endsAt && endsAt <= startsAt) throw new BadRequestException('La fecha de fin tiene que ser posterior a la de inicio.');
+  }
+
+  // Una sola campaña PÚBLICA prendida a la vez: es la que se le aplica sola a
+  // toda alta y la que muestra la landing, y con dos no habría forma de saber
+  // cuál vio la persona. Las privadas (con código) no tienen este límite.
+  private async validarUnicaPublicaActiva(idPropio: string | null) {
+    const otra = await this.prisma.priceCampaign.findFirst({
+      where: { code: null, isActive: true, ...(idPropio ? { id: { not: idPropio } } : {}) },
+      select: { name: true },
+    });
+    if (otra) throw new BadRequestException(`Ya hay una campaña pública prendida ("${otra.name}"). Apagala antes de prender otra.`);
+  }
+
+  async createPriceCampaign(adminId: string, dto: CreatePriceCampaignDto) {
+    const code = dto.code?.trim() ? PlatformService.normalizarCodigo(dto.code) : null;
+    if (code !== null && code.length < 3) throw new BadRequestException('El código tiene que tener al menos 3 caracteres');
+    this.validarPreciosDeCampania(dto.priceBase, dto.priceAdvanced);
+    const startsAt = this.parseVencimiento(dto.startsAt);
+    const endsAt = this.parseVencimiento(dto.endsAt);
+    this.validarFechasDeCampania(startsAt, endsAt);
+    const isActive = dto.isActive ?? false;
+
+    if (code) {
+      const [campania, descuento] = await Promise.all([
+        this.prisma.priceCampaign.findUnique({ where: { code } }),
+        this.prisma.platformDiscountCode.findUnique({ where: { code } }),
+      ]);
+      if (campania) throw new BadRequestException(`Ya existe una campaña con el código ${code}`);
+      if (descuento) throw new BadRequestException(`${code} ya existe como código de descuento`);
+    } else if (isActive) {
+      await this.validarUnicaPublicaActiva(null);
+    }
+
+    const creada = await this.prisma.priceCampaign.create({
+      data: {
+        name: dto.name.trim(),
+        code,
+        isActive,
+        priceBase: new Prisma.Decimal(dto.priceBase),
+        priceAdvanced: new Prisma.Decimal(dto.priceAdvanced),
+        months: dto.months,
+        maxSlots: dto.maxSlots ?? null,
+        startsAt,
+        endsAt,
+        note: dto.note?.trim() || null,
+        createdBy: adminId,
+      },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'create_price_campaign',
+        targetType: 'price_campaign',
+        targetId: creada.id,
+        details: { name: creada.name, code, isActive, priceBase: dto.priceBase, priceAdvanced: dto.priceAdvanced, months: dto.months, maxSlots: dto.maxSlots ?? null },
+      },
+    });
+    return this.listPriceCampaigns();
+  }
+
+  // Editar una campaña cambia lo que pagan los que entren DESPUÉS: a los que ya
+  // entraron les quedó el precio copiado en su suscripción.
+  async updatePriceCampaign(adminId: string, id: string, dto: UpdatePriceCampaignDto) {
+    const actual = await this.prisma.priceCampaign.findUnique({ where: { id } });
+    if (!actual) throw new NotFoundException('Campaña no encontrada');
+
+    this.validarPreciosDeCampania(dto.priceBase ?? Number(actual.priceBase), dto.priceAdvanced ?? Number(actual.priceAdvanced));
+    const startsAt = dto.startsAt !== undefined ? this.parseVencimiento(dto.startsAt) : actual.startsAt;
+    const endsAt = dto.endsAt !== undefined ? this.parseVencimiento(dto.endsAt) : actual.endsAt;
+    this.validarFechasDeCampania(startsAt, endsAt);
+    const isActive = dto.isActive ?? actual.isActive;
+    if (actual.code === null && isActive) await this.validarUnicaPublicaActiva(id);
+
+    await this.prisma.priceCampaign.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.priceBase !== undefined ? { priceBase: new Prisma.Decimal(dto.priceBase) } : {}),
+        ...(dto.priceAdvanced !== undefined ? { priceAdvanced: new Prisma.Decimal(dto.priceAdvanced) } : {}),
+        ...(dto.months !== undefined ? { months: dto.months } : {}),
+        ...(dto.maxSlots !== undefined ? { maxSlots: dto.maxSlots } : {}),
+        ...(dto.startsAt !== undefined ? { startsAt } : {}),
+        ...(dto.endsAt !== undefined ? { endsAt } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.note !== undefined ? { note: dto.note?.trim() || null } : {}),
+      },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'update_price_campaign',
+        targetType: 'price_campaign',
+        targetId: id,
+        details: { name: actual.name, ...dto },
+      },
+    });
+    return this.listPriceCampaigns();
   }
 
   private parseVencimiento(valor: string | null | undefined): Date | null {

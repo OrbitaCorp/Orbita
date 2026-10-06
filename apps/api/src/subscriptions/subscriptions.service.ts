@@ -31,17 +31,20 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
 //
-// DISEÑO GENERAL (planes múltiples + beneficio de bienvenida, RBT — 2026-09):
+// DISEÑO GENERAL (planes múltiples, RBT — 2026-09; campañas de precio, 2026-10):
 //
-//   1. TODA cuenta paga arranca con el "beneficio de bienvenida": 3 meses a
-//      un precio fijo, cobrado con un PAGO ÚNICO (Preference/Checkout Pro),
-//      no con una preapproval. Elegir "no preapproval acá" fue deliberado:
-//      una preapproval con frequency=3 meses seguiría cobrando ese monto de
-//      bienvenida cada 3 meses PARA SIEMPRE si no se cancelara a tiempo — un
-//      pago único no tiene ese riesgo, simplemente no vuelve a cobrar solo.
+//   1. TODA cuenta paga arranca pagando su PRIMER MES con un PAGO ÚNICO
+//      (Preference/Checkout Pro), no con una preapproval. El monto es el
+//      precio de lista del plan mensual elegido, o el precio congelado si
+//      entra por una campaña (ver PriceCampaign y "Campañas de precio" más
+//      abajo). Hasta el 2026-10 este primer cobro era el "beneficio de
+//      bienvenida": 3 meses por $5.500 / $10.900. Ya no existe para altas
+//      nuevas; BIENVENIDA_LEGADO queda solo para confirmar los checkouts que
+//      se pidieron antes del cambio. Los negocios que lo están cursando no
+//      cambian en nada: su Subscription ya tiene el período de 3 meses.
 //   2. El plan elegido (mensual/semestral/anual) NO se factura todavía en
 //      ese momento — queda anotado (`Subscription.plan`) pero
-//      `planActive=false`. Recién se activa cuando el beneficio termina: el
+//      `planActive=false`. Recién se activa cuando ese primer período termina: el
 //      dueño entra al panel, ve que terminó y autoriza SU preapproval real
 //      (ver activatePlan/confirmPlanActivation). Por qué no queda
 //      automatizado desde el día 1 con un `start_date` futuro: se investigó
@@ -123,28 +126,21 @@ function incluyeAvanzado(plan: PlanKey): boolean {
 
 type CicloConfig = { amount: number; frequency: number; frequencyType: 'days' | 'months' };
 
-// Beneficio de bienvenida — ver punto 1 del comentario de arriba. Dos tiers
-// desde 2026-09 (RBT — rediseño "Base"/"Base + Avanzado"): antes había una
-// sola bienvenida fija sin relación con el plan elegido, que era justamente
-// la fuente de la confusión reportada en el checkout ("elegís un plan pero no
-// ves su costo reflejado"). Ahora la tarjeta elegida determina el monto.
-//
-// $5.500 en vez de $5.000, $10.900 en vez de $10.000: MP cobra una comisión
-// real de 6,29% + IVA "al instante" sobre Suscripciones en la mayoría de las
-// provincias, incluida Misiones (confirmado contra la documentación oficial
-// de MP el 2026-09-07, *no* contra el simulador genérico de "cobrar/recibir
-// dinero", que es un producto distinto) — 7,61% efectivo sobre el monto
-// cobrado. Fórmula: bruto = neto_objetivo / 0.9239, redondeado HACIA ARRIBA
-// al centenar más cercano (nunca hacia abajo, para no cobrar de menos por
-// redondeo) — así $5.500 hace que Órbita reciba al menos $5.000 limpios, y
-// $10.900 que reciba al menos $10.000 limpios.
-const BIENVENIDA_TIERS: { base: CicloConfig; avanzado: CicloConfig } = {
+// El viejo beneficio de bienvenida (3 meses por un pago único). Ya no se le
+// ofrece a nadie: se conserva SOLO para confirmar un PendingSignup creado
+// antes del cambio a campañas de precio (2026-10), que no trae `primerCobro`
+// en su payload — esa persona vio y pagó este monto, y le corresponden los 3
+// meses. Se puede borrar cuando no quede ninguna alta pendiente vieja (el TTL
+// es de 48 h).
+const BIENVENIDA_LEGADO: { base: CicloConfig; avanzado: CicloConfig } = {
   base: { amount: 5500, frequency: 3, frequencyType: 'months' },
   avanzado: { amount: 10900, frequency: 3, frequencyType: 'months' },
 };
 
-// Los planes reales. Igual que BIENVENIDA_TIERS, ya incluyen la comisión real
-// de MP: el monto de lista es lo que Órbita recibe LIMPIO, no lo que se cobra.
+// Los planes reales. Ya incluyen la comisión real de MP sobre Suscripciones
+// (6,29% + IVA, 7,61% efectivo — confirmado contra la documentación oficial
+// de MP el 2026-09-07): el neto de la tabla es lo que Órbita recibe LIMPIO,
+// y el monto es lo que se cobra (neto / 0.9239, redondeado hacia arriba).
 //   Mensual:            $15.000 netos/mes  -> $16.500/mes
 //   Semestral:          $13.500 netos/mes  -> $88.000 cada 6 meses (~$14.667/mes)
 //   Anual:               $12.000 netos/mes  -> $156.000/año ($13.000/mes)
@@ -188,6 +184,15 @@ type PendingPayload = {
   // arriba), pero queda guardado desde el día 1 para saber qué activar
   // cuando termine el beneficio de bienvenida.
   plan: PlanKey;
+  // Lo que se le mandó a cobrar a MP por el primer período, ANTES de cualquier
+  // código de descuento, y cuánto dura ese período. Se resuelve una vez, al
+  // pedir el link, por el mismo motivo que `discount`: si entre el checkout y
+  // la confirmación se apaga la campaña o se le acaba el cupo, vale lo que la
+  // persona vio y pagó. Ausente en las altas pedidas antes de 2026-10 (ver
+  // BIENVENIDA_LEGADO).
+  primerCobro?: CicloConfig & { currency: string };
+  // Campaña de precio por la que entra esta alta, si hay una.
+  campaign?: { id: string; name: string; frozenAmount: number; months: number };
   // Descuento de plataforma aplicado en el checkout. Se resuelve UNA vez, al
   // pedir el link de pago, y viaja acá hasta la confirmación: así el monto que
   // se guarda en Subscription es exactamente el que autorizó el cliente en MP,
@@ -289,52 +294,62 @@ export class SubscriptionsService {
     return this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
   }
 
-  // El precio de verdad NO sale de env, sale de BIENVENIDA_TIERS/PLANES.
+  // El precio de verdad NO sale de env: sale de PLANES o de la campaña.
   //
   // Antes salía de MP_SUBSCRIPTION_AMOUNT/FREQUENCY/FREQUENCY_TYPE, y un valor
   // de prueba olvidado en el hosting (15 cada 3 días, que es el minimo que
-  // acepta MP) estuvo cobrandole eso a los negocios reales en vez de $5.000
-  // cada 3 meses. Un precio que se puede pisar sin querer desde un panel, y sin
-  // que nada avise, no puede ser la fuente de verdad de lo que se le cobra a la
-  // gente.
+  // acepta MP) estuvo cobrandole eso a los negocios reales. Un precio que se
+  // puede pisar sin querer desde un panel, y sin que nada avise, no puede ser
+  // la fuente de verdad de lo que se le cobra a la gente.
   //
-  // Las env siguen sirviendo para probar el beneficio de bienvenida con
-  // montos y ciclos cortos, pero hay que pedirlo EXPRESAMENTE con
-  // MP_PLAN_OVERRIDE=true. Así el override es una decisión explícita y no
-  // algo que quedó prendido. El override es GENÉRICO, no por tier: pisa el
-  // monto/ciclo de la tier que hubiese correspondido según el plan, para
-  // poder probar cualquiera de las dos con montos cortos sin tocar código.
-  // Los planes reales (recurrentes) no tienen override — son precios fijos,
-  // probar su activación se hace con el flujo real.
-  private bienvenidaParaPlan(plan: PlanKey): CicloConfig & { currency: string } {
+  // Las env siguen sirviendo para probar el alta con montos y ciclos cortos,
+  // pero hay que pedirlo EXPRESAMENTE con MP_PLAN_OVERRIDE=true. Así el
+  // override es una decisión explícita y no algo que quedó prendido. Pisa el
+  // primer cobro que hubiese correspondido (de lista o de campaña). Los
+  // planes recurrentes no tienen override — son precios fijos, probar su
+  // activación se hace con el flujo real.
+  private primerCobroParaPlan(
+    plan: PlanKey,
+    campania?: { priceBase: Prisma.Decimal | number; priceAdvanced: Prisma.Decimal | number },
+  ): CicloConfig & { currency: string } {
     const currency = this.currency;
-    const tier = incluyeAvanzado(plan) ? BIENVENIDA_TIERS.avanzado : BIENVENIDA_TIERS.base;
+    // El alta solo acepta los dos planes mensuales (StartPendingCheckoutDto):
+    // el primer período es siempre UN mes, al precio de lista o al congelado.
+    const lista = PLANES[incluyeAvanzado(plan) ? 'mensualAvanzado' : 'mensual'];
+    const base: CicloConfig = campania
+      ? { ...lista, amount: Number(incluyeAvanzado(plan) ? campania.priceAdvanced : campania.priceBase) }
+      : lista;
     if (this.config.get<string>('MP_PLAN_OVERRIDE') !== 'true') {
-      return { ...tier, currency };
+      return { ...base, currency };
     }
 
-    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? tier.frequencyType;
+    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? base.frequencyType;
     if (frequencyType !== 'days' && frequencyType !== 'months') {
       throw new BadRequestException('MP_SUBSCRIPTION_FREQUENCY_TYPE debe ser "days" o "months"');
     }
     const ciclo: CicloConfig & { currency: string } = {
-      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? tier.amount),
-      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? tier.frequency),
+      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? base.amount),
+      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? base.frequency),
       frequencyType,
       currency,
     };
     this.logger.warn(
-      `MP_PLAN_OVERRIDE activo: el beneficio de bienvenida (tier ${incluyeAvanzado(plan) ? 'avanzado' : 'base'}) cobra ${ciclo.amount} ${ciclo.currency} cada ${ciclo.frequency} ${ciclo.frequencyType} en vez del monto real. Que esto NO quede prendido en produccion.`,
+      `MP_PLAN_OVERRIDE activo: el primer cobro del alta (plan ${plan}) sale por ${ciclo.amount} ${ciclo.currency} cada ${ciclo.frequency} ${ciclo.frequencyType} en vez del monto real. Que esto NO quede prendido en produccion.`,
     );
     return ciclo;
   }
 
-  // Conveniencia para lugares que necesitan "la bienvenida" sin tener un plan
-  // concreto a mano (ej. limitesDescuento(), que calcula un tope de % válido
-  // para un código genérico, no para un checkout puntual) — siempre resuelve
-  // a la tier base, la más barata y por lo tanto la más conservadora.
-  private get bienvenidaBase(): CicloConfig & { currency: string } {
-    return this.bienvenidaParaPlan('mensual');
+  // Lo que pagó un alta pedida antes de las campañas de precio — ver
+  // BIENVENIDA_LEGADO.
+  private bienvenidaLegado(plan: PlanKey): CicloConfig & { currency: string } {
+    return { ...(incluyeAvanzado(plan) ? BIENVENIDA_LEGADO.avanzado : BIENVENIDA_LEGADO.base), currency: this.currency };
+  }
+
+  // Precios de lista por mes y el mínimo de MP: lo que necesita el superadmin
+  // para validar una campaña (un precio congelado tiene que quedar por debajo
+  // del de lista y por encima del mínimo cobrable).
+  preciosDeLista(): { base: number; avanzado: number; minAmount: number } {
+    return { base: PLANES.mensual.amount, avanzado: PLANES.mensualAvanzado.amount, minAmount: this.montoMinimo };
   }
 
   private cicloDelPlan(plan: string): CicloConfig {
@@ -352,9 +367,9 @@ export class SubscriptionsService {
 
   // Hasta que porcentaje se puede descontar sin que el cobro caiga por debajo
   // del minimo de MP. Lo usa el panel para no dejar crear un codigo que despues
-  // va a reventar recien al pagar. Solo aplica al beneficio de bienvenida: es
-  // lo único que se paga en el checkout, los 3 planes se activan después y no
-  // pasan por códigos de descuento.
+  // va a reventar recien al pagar. Se calcula contra el primer mes de Base a
+  // precio de lista; un alta que entra por una campaña paga menos, pero ahí
+  // resolverDescuento vuelve a chequear el mínimo contra el monto real.
   //
   // El 100% NO entra en este limite y siempre esta permitido: ese camino no
   // habla con MP (ver startCheckoutPending), asi que ningun minimo lo afecta.
@@ -362,7 +377,7 @@ export class SubscriptionsService {
   // Si el plan cuesta lo mismo que el minimo, maxPercentOff da 0: ahi no existe
   // ningun descuento parcial posible y el 100% es la unica opcion.
   limitesDescuento(): { amountBase: number; minAmount: number; maxPercentOff: number } {
-    const { amount } = this.bienvenidaBase;
+    const { amount } = this.primerCobroParaPlan('mensual');
     const minAmount = this.montoMinimo;
     const maxPercentOff = amount <= minAmount ? 0 : Math.floor((1 - minAmount / amount) * 100);
     return { amountBase: amount, minAmount, maxPercentOff };
@@ -423,7 +438,7 @@ export class SubscriptionsService {
 
   // ── Alta pendiente (todavía sin cuenta creada) ───────────────────────────
 
-  // Pide el link de MP para pagar el beneficio de bienvenida, SIN crear nada
+  // Pide el link de MP para pagar el primer mes, SIN crear nada
   // en Business ni Member — los datos de la cuenta y el wizard quedan en
   // PendingSignup hasta que MP confirma (ver confirmAndCreate). Rechaza
   // temprano si el email ya está en uso, para no generar un link que después
@@ -434,13 +449,24 @@ export class SubscriptionsService {
       throw new ConflictException('Este email ya tiene un negocio registrado en Orbita');
     }
 
-    const { amount, currency } = this.bienvenidaParaPlan(dto.plan);
+    // Lo que la persona escribió en "código" puede ser el de una campaña
+    // privada (cortesía de precio congelado) o un código de descuento común.
+    // Sin código, o con uno de descuento, entra por la campaña pública si hay
+    // una prendida y con lugares.
+    const { campania, codigoDescuento } = await this.resolverCampania(dto.discountCode);
+    const primerCobro = this.primerCobroParaPlan(dto.plan, campania);
+    const { amount, currency } = primerCobro;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
     // El descuento se resuelve ANTES de hablar con MP: lo que se le manda a
     // cobrar tiene que ser exactamente el precio con descuento, no el de lista.
-    const discount = await this.resolverDescuento(dto.discountCode, amount);
+    // Un código de porcentaje se aplica sobre lo que toque pagar ese primer mes,
+    // sea el precio de lista o el congelado de la campaña pública.
+    const discount = await this.resolverDescuento(codigoDescuento, amount);
     const montoACobrar = discount ? discount.amountFinal : amount;
+    const campaign = campania
+      ? { id: campania.id, name: campania.name, frozenAmount: amount, months: campania.months }
+      : undefined;
 
     // Código del 100%: no hay nada que cobrar, así que no se habla con MP —
     // una Preference con unit_price 0 la rechaza. Se guarda el mismo
@@ -454,7 +480,9 @@ export class SubscriptionsService {
     // 100% de por medio, un precio invalido sigue fallando contra MP y se nota.
     if (discount && discount.amountFinal === 0) {
       const ref = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
-      const payload = await this.armarPayload(dto, discount);
+      // Un alta gratis no entra a ninguna campaña: es una cortesía completa,
+      // no paga ningún mes y no tiene por qué gastar un lugar del cupo.
+      const payload = await this.armarPayload(dto, discount, primerCobro, undefined);
       await this.prisma.pendingSignup.create({
         data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
       });
@@ -476,8 +504,8 @@ export class SubscriptionsService {
         body: {
           items: [
             {
-              id: 'bienvenida',
-              title: 'Órbita — beneficio de bienvenida (3 meses)',
+              id: 'primer-mes',
+              title: campaign ? 'Órbita — primer mes (precio congelado)' : 'Órbita — primer mes',
               quantity: 1,
               unit_price: montoACobrar,
               currency_id: currency,
@@ -504,7 +532,7 @@ export class SubscriptionsService {
       // Crudo y completo: `mpErrorMessage` resume, pero si MP suma un campo
       // nuevo esto es lo unico que lo deja ver sin volver a desplegar.
       this.logger.warn(
-        `MP rechazó la creación de la preference de bienvenida (monto ${montoACobrar} ${currency}, payer ${dto.account.email}): ${motivo} — crudo: ${JSON.stringify(err, Object.getOwnPropertyNames(Object(err))).slice(0, 1500)}`,
+        `MP rechazó la creación de la preference del primer mes (monto ${montoACobrar} ${currency}, payer ${dto.account.email}): ${motivo} — crudo: ${JSON.stringify(err, Object.getOwnPropertyNames(Object(err))).slice(0, 1500)}`,
       );
       throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
     }
@@ -513,7 +541,7 @@ export class SubscriptionsService {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
 
-    const payload = await this.armarPayload(dto, discount);
+    const payload = await this.armarPayload(dto, discount, primerCobro, campaign);
     await this.prisma.pendingSignup.create({
       data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
     });
@@ -527,11 +555,95 @@ export class SubscriptionsService {
 
   // El payload del alta pendiente, con la contraseña ya hasheada (ver el
   // comentario de PendingPayload).
-  private async armarPayload(dto: StartPendingCheckoutDto, discount: PendingPayload['discount']): Promise<PendingPayload> {
+  private async armarPayload(
+    dto: StartPendingCheckoutDto,
+    discount: PendingPayload['discount'],
+    primerCobro: NonNullable<PendingPayload['primerCobro']>,
+    campaign: PendingPayload['campaign'],
+  ): Promise<PendingPayload> {
     const passwordHash = await argon2.hash(dto.account.password, { type: argon2.argon2id });
     const { password: _sinGuardar, ...cuenta } = dto.account;
     void _sinGuardar;
-    return { account: cuenta as RegisterBusinessDto, passwordHash, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
+    return {
+      account: cuenta as RegisterBusinessDto,
+      passwordHash,
+      wizard: dto.wizard,
+      plan: dto.plan,
+      primerCobro,
+      ...(campaign ? { campaign } : {}),
+      ...(discount ? { discount } : {}),
+    };
+  }
+
+  // ── Campañas de precio congelado ─────────────────────────────────────────
+
+  // Por qué una campaña no se puede usar AHORA, o null si está disponible. El
+  // texto es el que ve quien escribió el código de una campaña privada.
+  private motivoCampaniaNoDisponible(c: {
+    isActive: boolean;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    maxSlots: number | null;
+    usedSlots: number;
+  }): string | null {
+    const now = new Date();
+    if (!c.isActive) return 'Ese código está desactivado';
+    if (c.startsAt && c.startsAt > now) return 'Ese código todavía no está vigente';
+    if (c.endsAt && c.endsAt <= now) return 'Ese código venció';
+    if (c.maxSlots !== null && c.usedSlots >= c.maxSlots) return 'Ese código ya se usó todas las veces permitidas';
+    return null;
+  }
+
+  // La campaña pública que se le aplica sola a un alta nueva: activa, dentro
+  // de sus fechas y con lugares. platform.service.ts no deja prender dos
+  // públicas a la vez; si igual hubiera más de una, gana la más vieja.
+  private async campaniaPublicaVigente() {
+    const publicas = await this.prisma.priceCampaign.findMany({
+      where: { code: null, isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return publicas.find((c) => this.motivoCampaniaNoDisponible(c) === null);
+  }
+
+  // Decide por qué campaña entra un alta y qué queda para tratar como código
+  // de descuento. Un código que coincide con una campaña privada se consume
+  // acá (tira 400 si esa campaña no está disponible: cobrar el precio de lista
+  // callado sería peor que fallar); cualquier otro sigue a resolverDescuento.
+  private async resolverCampania(codigo: string | undefined) {
+    const code = codigo?.trim().toUpperCase();
+    if (code) {
+      const privada = await this.prisma.priceCampaign.findUnique({ where: { code } });
+      if (privada) {
+        const motivo = this.motivoCampaniaNoDisponible(privada);
+        if (motivo) throw new BadRequestException(motivo);
+        return { campania: privada, codigoDescuento: undefined };
+      }
+    }
+    return { campania: await this.campaniaPublicaVigente(), codigoDescuento: codigo };
+  }
+
+  // Lo que muestran la landing y el wizard del alta: los precios de lista y,
+  // si hay una campaña pública vigente, el precio congelado y cuántos lugares
+  // quedan. Es la ÚNICA fuente de eso para el frontend: prender, apagar o
+  // editar la campaña desde el superadmin cambia lo que se ve sin desplegar.
+  async ofertaPublica() {
+    const { base, avanzado } = this.preciosDeLista();
+    const c = await this.campaniaPublicaVigente();
+    return {
+      currency: this.currency,
+      list: { base, avanzado },
+      campaign: c
+        ? {
+            name: c.name,
+            priceBase: Number(c.priceBase),
+            priceAdvanced: Number(c.priceAdvanced),
+            months: c.months,
+            maxSlots: c.maxSlots,
+            slotsLeft: c.maxSlots === null ? null : Math.max(c.maxSlots - c.usedSlots, 0),
+            endsAt: c.endsAt ? c.endsAt.toISOString() : null,
+          }
+        : null,
+    };
   }
 
   // Valida un código de descuento de plataforma y devuelve el monto ya
@@ -586,11 +698,27 @@ export class SubscriptionsService {
   // real, pero sin efectos. Reusa resolverDescuento para que no puedan
   // divergir (que la preview diga una cosa y el cobro haga otra). Necesita
   // `plan` desde 2026-09 (rediseño "Base"/"Base + Avanzado"): cada tarjeta
-  // tiene su propio monto de bienvenida, así que el código se previsualiza
-  // contra la que esté eligiendo el usuario en ese momento, no una fija.
+  // tiene su propio monto, así que el código se previsualiza contra la que
+  // esté eligiendo el usuario en ese momento, no una fija.
+  //
+  // `frozenMonths` viene con valor cuando el código es el de una campaña
+  // privada: ahí no es "X% sobre el primer mes" sino "este precio durante N
+  // meses", y el wizard lo muestra distinto.
   async previewDiscount(code: string, plan: PlanKey) {
-    const { amount, currency } = this.bienvenidaParaPlan(plan);
-    const d = await this.resolverDescuento(code, amount);
+    const { campania, codigoDescuento } = await this.resolverCampania(code);
+    const { amount, currency } = this.primerCobroParaPlan(plan, campania);
+    if (campania && !codigoDescuento) {
+      const lista = this.primerCobroParaPlan(plan).amount;
+      return {
+        code: campania.code ?? code,
+        percentOff: lista > 0 ? Math.round((1 - amount / lista) * 100) : 0,
+        amountBase: lista,
+        amountFinal: amount,
+        currency,
+        frozenMonths: campania.months,
+      };
+    }
+    const d = await this.resolverDescuento(codigoDescuento, amount);
     if (!d) throw new BadRequestException('Falta el código');
     return {
       code: d.code,
@@ -598,6 +726,7 @@ export class SubscriptionsService {
       amountBase: d.amountBase,
       amountFinal: d.amountFinal,
       currency,
+      frozenMonths: null,
     };
   }
 
@@ -643,7 +772,10 @@ export class SubscriptionsService {
     // vencido y con usos disponibles) y quedó registrado en el PendingSignup,
     // que es de un solo uso — así que llegar acá con este id ES la autorización.
     const esGratis = ref.startsWith(FREE_SIGNUP_PREFIX);
-    const { account, passwordHash, wizard, plan, discount } = pending.payload as unknown as PendingPayload;
+    const { account, passwordHash, wizard, plan, discount, primerCobro, campaign } = pending.payload as unknown as PendingPayload;
+    // Lo que se mandó a cobrar al pedir el link. Un alta pedida antes de las
+    // campañas de precio no lo trae: pagó la bienvenida vieja de 3 meses.
+    const cobro = primerCobro ?? this.bienvenidaLegado(plan);
     if (!esGratis) {
       // A diferencia de la preapproval vieja (un GET por id alcanzaba), acá no
       // tenemos el id del pago — solo nuestra propia referencia. Se busca por
@@ -653,7 +785,7 @@ export class SubscriptionsService {
       try {
         busqueda = await this.payment.search({ options: { external_reference: ref } });
       } catch (err) {
-        this.logger.warn(`No se pudo buscar el pago de bienvenida para ${ref}: ${this.mpErrorMessage(err)}`);
+        this.logger.warn(`No se pudo buscar el pago del alta para ${ref}: ${this.mpErrorMessage(err)}`);
         return { activated: false, status: 'search_failed' };
       }
       const aprobado = (busqueda.results ?? []).find((p) => p.status === 'approved');
@@ -668,11 +800,11 @@ export class SubscriptionsService {
       // hubo) y en la moneda del plan — mismo control que el webhook de
       // pedidos (auditoría interna 10/09, ítem `api.subscriptions`). Si no,
       // no se crea la cuenta y queda en el log para revisarlo a mano.
-      const { amount: montoLista, currency: monedaPlan } = this.bienvenidaParaPlan(plan);
+      const { amount: montoLista, currency: monedaPlan } = cobro;
       const esperado = discount ? discount.amountFinal : montoLista;
       if (aprobado.currency_id !== monedaPlan || Number(aprobado.transaction_amount ?? 0) + 0.01 < esperado) {
         this.logger.error(
-          `Pago de bienvenida ${aprobado.id} (${ref}): MP cobró ${aprobado.currency_id ?? '?'} ${aprobado.transaction_amount ?? 0} y se esperaban ${monedaPlan} ${esperado} — no se crea la cuenta`,
+          `Pago del alta ${aprobado.id} (${ref}): MP cobró ${aprobado.currency_id ?? '?'} ${aprobado.transaction_amount ?? 0} y se esperaban ${monedaPlan} ${esperado} — no se crea la cuenta`,
         );
         return { activated: false, status: 'monto_no_coincide' };
       }
@@ -782,10 +914,10 @@ export class SubscriptionsService {
       : business.subdomain;
 
     const now = new Date();
-    const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenidaParaPlan(plan);
+    const { frequency, frequencyType, amount: montoBienvenida, currency } = cobro;
     // Un alta gratis (código del 100%) usa la vigencia que el superadmin le
-    // puso al código como currentPeriodEnd — no el período de bienvenida por
-    // defecto: la cortesía dura lo que el código diga, no 3 meses fijos (ver
+    // puso al código como currentPeriodEnd — no el primer mes por
+    // defecto: la cortesía dura lo que el código diga (ver
     // validarVigenciaObligatoria en platform.service.ts, que exige esta fecha
     // al crear un código del 100%). Fallback al período por defecto solo para
     // códigos viejos, creados antes de que la vigencia fuera obligatoria.
@@ -795,6 +927,16 @@ export class SubscriptionsService {
     // El monto que se guarda es el que MP realmente autorizó, no el de lista:
     // si hubo descuento, se cobra el rebajado.
     const montoSuscripcion = discount ? discount.amountFinal : montoBienvenida;
+    // Precio congelado: el primer mes ya se pagó recién, así que quedan
+    // `months - 1` cobros a ese precio para cuando autorice el débito
+    // automático (ver activatePlan). Un alta gratis nunca trae campaña.
+    const congelado = !esGratis && campaign
+      ? {
+          campaignId: campaign.id,
+          frozenAmount: new Prisma.Decimal(campaign.frozenAmount),
+          frozenChargesLeft: Math.max(campaign.months - 1, 0),
+        }
+      : {};
     // Un alta gratis se guarda como cortesía (origin COMP), no como paga: no
     // hay pago ni preapproval en MP, así que dejarla en PAID haría que el cron
     // de mora la persiguiera buscando cobros que nunca van a existir y
@@ -821,9 +963,22 @@ export class SubscriptionsService {
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
         mpPreapprovalId: null,
+        ...congelado,
       },
     });
     void subscription;
+
+    // Ocupa un lugar de la campaña. Sin tope en el UPDATE a propósito: el cupo
+    // se chequea al pedir el link (resolverCampania), y a quien ya pagó el
+    // precio congelado se le respeta aunque el último lugar se haya ido
+    // mientras pagaba — mismo criterio que con los códigos de descuento. Con
+    // varios checkouts abiertos a la vez sobre el último lugar, la campaña
+    // puede cerrar uno o dos por encima del cupo. No bloqueante.
+    if (!esGratis && campaign) {
+      await this.prisma.priceCampaign
+        .update({ where: { id: campaign.id }, data: { usedSlots: { increment: 1 } } })
+        .catch((err) => this.logger.error(`No se pudo contar el lugar de la campaña ${campaign.name} para ${business.id}: ${describeError(err)}`));
+    }
 
     // Sin condicionar a esGratis: una cortesía con plan 'mensualAvanzado'
     // también recibe el addon — ver el comentario de syncAddonAvanzado. El
@@ -871,9 +1026,12 @@ export class SubscriptionsService {
       // legacy (/admin/{id}/...) en los entornos donde la sesion no viaja al
       // subdominio — en dev, con ROOT_DOMAIN=localhost, la cookie es host-only.
       businessId: business.id,
-      // La pantalla de vuelta habla de "beneficio de bienvenida activo", que en
+      // La pantalla de vuelta habla del primer mes pago, que en
       // un alta gratis sería mentira: no hay nada cobrado ni agendado en MP.
       free: esGratis,
+      // Para que la pantalla de vuelta pueda decir "entraste con precio
+      // congelado por N meses".
+      frozen: !esGratis && campaign ? { amount: campaign.frozenAmount, months: campaign.months } : null,
       accessToken: session.token,
       refreshToken: session.refreshToken,
     };
@@ -990,8 +1148,16 @@ export class SubscriptionsService {
     // devuelve el precio de lista (ver restaurarPrecioDeLista). Se resuelve
     // ANTES de hablar con MP, igual que en el alta: lo que se le manda a cobrar
     // tiene que ser exactamente el precio con descuento.
-    const descuento = await this.resolverDescuentoDeActivacion(discountCode, amount);
-    const montoACobrar = descuento ? descuento.amountFinal : amount;
+    //
+    // Precio congelado de una campaña: mismo mecanismo, pero por los cobros
+    // que le queden al negocio en vez de uno solo. No se combina con un código
+    // (ya está pagando menos que la lista).
+    const congelado = this.congelamientoPendiente(sub, plan);
+    if (congelado && discountCode?.trim()) {
+      throw new BadRequestException('Ya tenés el precio congelado en tu plan: no se combina con un código de descuento.');
+    }
+    const descuento = congelado ? undefined : await this.resolverDescuentoDeActivacion(discountCode, amount);
+    const montoACobrar = congelado ? congelado.amount : descuento ? descuento.amountFinal : amount;
 
     // Si ya había una preapproval activa (esto es un cambio de plan, no la
     // primera activación tras el beneficio de bienvenida), se cancela antes
@@ -1029,19 +1195,40 @@ export class SubscriptionsService {
     if (!response.id || !response.init_point) {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
-    if (descuento) {
+    if (descuento || congelado) {
       await this.prisma.subscriptionActivationDiscount.create({
         data: {
           businessId,
           preapprovalId: response.id,
-          codeId: descuento.codeId,
+          codeId: descuento?.codeId ?? null,
+          campaignId: congelado ? sub.campaignId : null,
           plan,
           amountList: new Prisma.Decimal(amount),
-          amountFinal: new Prisma.Decimal(descuento.amountFinal),
+          amountFinal: new Prisma.Decimal(montoACobrar),
+          chargesTotal: congelado?.charges ?? 1,
         },
       });
     }
     return { initPoint: response.init_point, plan };
+  }
+
+  // ¿A este negocio le quedan cobros a precio congelado para el plan que está
+  // por activar? Solo vale para los planes de cobro mensual: el congelamiento
+  // es "pagás $X por mes", y un semestral o un anual ya traen su propio
+  // descuento por período. Si el dueño elige uno de esos, los meses congelados
+  // que tenga no se usan (siguen ahí si después vuelve al mensual).
+  private congelamientoPendiente(
+    sub: { frozenAmount: Prisma.Decimal | null; frozenChargesLeft: number },
+    plan: PlanKey,
+  ): { amount: number; charges: number } | undefined {
+    if (!sub.frozenAmount || sub.frozenChargesLeft <= 0) return undefined;
+    const ciclo = PLANES[plan];
+    if (ciclo.frequency !== 1 || ciclo.frequencyType !== 'months') return undefined;
+    const amount = Number(sub.frozenAmount);
+    // Un "congelado" que no baja el precio (subió la lista por debajo, dato
+    // corrupto) o que MP no puede cobrar no es un congelamiento: se cobra lista.
+    if (amount >= ciclo.amount || amount < this.montoMinimo) return undefined;
+    return { amount, charges: sub.frozenChargesLeft };
   }
 
   // Un código del 100% es una cuenta de cortesía (alta gratis), no un descuento
@@ -1064,6 +1251,9 @@ export class SubscriptionsService {
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     const plan = sub.nextPlan ?? sub.plan;
     if (!esPlanKey(plan)) throw new BadRequestException('Elegí un plan antes de aplicar un código');
+    if (this.congelamientoPendiente(sub, plan)) {
+      throw new BadRequestException('Ya tenés el precio congelado en tu plan: no se combina con un código de descuento.');
+    }
     const { amount } = this.cicloDelPlan(plan);
     const d = await this.resolverDescuentoDeActivacion(code, amount);
     if (!d) throw new BadRequestException('Falta el código');
@@ -1184,23 +1374,27 @@ export class SubscriptionsService {
   // bloqueante: el plan ya está activo y ya se autorizó el monto rebajado, así
   // que si esto falla se registra y sigue.
   private async marcarDescuentoActivado(
-    descuento: { id: string; codeId: string; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal },
+    descuento: { id: string; codeId: string | null; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal },
     businessId: string,
   ) {
     await this.prisma.subscriptionActivationDiscount.update({
       where: { id: descuento.id },
       data: { status: 'ACTIVE', activatedAt: new Date() },
     });
+    // Precio congelado de una campaña: no hay código que consumir (el lugar de
+    // la campaña ya se contó en el alta).
+    const codeId = descuento.codeId;
+    if (!codeId) return;
     try {
       const dueno = await this.prisma.member.findFirst({ where: { businessId }, orderBy: { createdAt: 'asc' }, select: { email: true } });
       await this.prisma.$transaction(async (tx) => {
-        const consumido = await this.consumirDescuento(tx, descuento.codeId);
+        const consumido = await this.consumirDescuento(tx, codeId);
         if (!consumido) {
           this.logger.warn(`El código de la activación de ${businessId} ya no estaba disponible al confirmar; se respeta el precio autorizado en MP igual`);
         }
         await tx.platformDiscountRedemption.create({
           data: {
-            codeId: descuento.codeId,
+            codeId,
             businessId,
             email: dueno?.email ?? '(sin mail)',
             amountBase: descuento.amountList,
@@ -1217,7 +1411,8 @@ export class SubscriptionsService {
   // corresponda, hasta donde se pueda hoy. Idempotente: la llaman el registro
   // de cada cobro y el barrido nocturno, en cualquier orden.
   //   PENDING → ACTIVE   si MP ya tiene la preapproval autorizada
-  //   ACTIVE  → PAID     si ya hay un cobro aprobado posterior al link
+  //   ACTIVE  → PAID     si ya se cobraron `chargesTotal` veces desde el link
+  //                      (1 con un código, varios con un precio congelado)
   //   PAID    → RESTORED devolviéndole a la preapproval el precio de lista
   private async avanzarDescuentoDeActivacion(id: string, businessId: string): Promise<void> {
     let fila = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id, businessId } });
@@ -1231,16 +1426,24 @@ export class SubscriptionsService {
     }
 
     if (fila.status === 'ACTIVE') {
-      const cobro = await this.prisma.subscriptionPayment.findFirst({
+      const cobros = await this.prisma.subscriptionPayment.count({
         where: {
           subscription: { businessId: fila.businessId },
           status: 'APPROVED',
           mpPaymentId: { not: null },
           paidAt: { gte: fila.createdAt },
         },
-        select: { id: true },
       });
-      if (!cobro) return;
+      // Precio congelado: se va descontando en la suscripción lo que queda,
+      // que es lo que muestra el panel y lo que usa activatePlan si el dueño
+      // vuelve a pedir el link (por ejemplo tras un cambio de plan).
+      if (!fila.codeId && cobros > 0) {
+        await this.prisma.subscription.updateMany({
+          where: { businessId: fila.businessId, mpPreapprovalId: fila.preapprovalId },
+          data: { frozenChargesLeft: Math.max(fila.chargesTotal - cobros, 0) },
+        });
+      }
+      if (cobros < fila.chargesTotal) return;
       fila = await this.prisma.subscriptionActivationDiscount.update({ where: { id }, data: { status: 'PAID' } });
     }
 
@@ -1248,11 +1451,11 @@ export class SubscriptionsService {
   }
 
   // Devuelve a la preapproval el precio de lista: el descuento valía solo para
-  // el primer cobro. MP permite cambiar el MONTO de una preapproval ya
+  // el primer cobro (o para los meses congelados de una campaña). MP permite cambiar el MONTO de una preapproval ya
   // autorizada (no la frecuencia), y el cambio rige desde el próximo cobro. Si
   // MP falla, la fila queda en PAID y el barrido nocturno reintenta — nunca se
   // da por restaurada sin que MP lo haya aceptado.
-  private async restaurarPrecioDeLista(fila: { id: string; businessId: string; preapprovalId: string; amountList: Prisma.Decimal }) {
+  private async restaurarPrecioDeLista(fila: { id: string; businessId: string; preapprovalId: string; amountList: Prisma.Decimal; codeId: string | null }) {
     try {
       await this.preapproval.update({
         id: fila.preapprovalId,
@@ -1267,7 +1470,7 @@ export class SubscriptionsService {
     await this.prisma.subscriptionActivationDiscount.update({ where: { id: fila.id }, data: { status: 'RESTORED', restoredAt: new Date() } });
     await this.prisma.subscription.updateMany({
       where: { businessId: fila.businessId, mpPreapprovalId: fila.preapprovalId },
-      data: { amount: fila.amountList },
+      data: { amount: fila.amountList, ...(fila.codeId ? {} : { frozenChargesLeft: 0 }) },
     });
     this.logger.log(`Descuento de activación de ${fila.businessId}: precio de lista devuelto a la preapproval ${fila.preapprovalId}`);
   }
@@ -2003,7 +2206,7 @@ export class SubscriptionsService {
 
         const { business, emails } = await this.destinatarios(sub.businessId);
         if (!business || emails.length === 0) continue;
-        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu período de bienvenida' : 'Tu suscripción';
+        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu primer período' : 'Tu suscripción';
         const endDate = sub.currentPeriodEnd.toLocaleDateString('es-AR', {
           day: '2-digit',
           month: '2-digit',
@@ -2048,7 +2251,7 @@ export class SubscriptionsService {
         const graceDaysLeft = Math.max(sub.gracePeriodDays - diasEnGracia, 0);
         // null = plan pago ya activo cuyo cobro automático falló (no es fin
         // de bienvenida ni de cortesía) — motivo genérico en ese caso.
-        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu período de bienvenida' : 'Tu suscripción';
+        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu primer período' : 'Tu suscripción';
         const manageUrl = this.manageUrl(business.subdomain);
 
         if (await this.reservarAviso(sub.id, 'GRACIA_INICIO', sub.currentPeriodEnd)) {
@@ -2410,6 +2613,12 @@ export class SubscriptionsService {
       currentPeriodEnd: sub.currentPeriodEnd,
       gracePeriodDays: sub.gracePeriodDays,
       grantReason: sub.grantReason,
+      // Precio congelado de una campaña: cuánto paga por mes y cuántos cobros
+      // a ese precio le quedan. null si no tiene (o ya los usó todos).
+      frozen:
+        sub.frozenAmount && sub.frozenChargesLeft > 0
+          ? { amount: Number(sub.frozenAmount), chargesLeft: sub.frozenChargesLeft }
+          : null,
     };
   }
 

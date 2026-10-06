@@ -98,6 +98,7 @@ describe('Códigos de descuento de plataforma — el 100% necesita tope', () => 
         update: jest.fn(),
       },
       platformAdminLog: { create: jest.fn() },
+      priceCampaign: { findUnique: jest.fn().mockResolvedValue(null) },
     } as never;
     const subscriptions = { limitesDescuento: () => ({ amountBase: 10000, minAmount: 100, maxPercentOff: 99 }) } as never;
     return new PlatformService(prisma, {} as never, subscriptions, {} as never);
