@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
+import { useDeslizar } from '@/hooks/useDeslizar'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
 // se ven salen del catálogo del negocio, de sus categorías, o de una sección
 // editable cuyo `porDefecto` vive en secciones.ts.
@@ -52,7 +53,67 @@ export const LAYOUTS_CON_HEADER_PROPIO = new Set<string>([
 // solo existe cuando es un producto — una categoría no tiene precio.
 type Elegido = { nombre: string; img: string; ir?: () => void; producto?: Producto }
 
-export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
+/**
+ * El bloque entero del hero: el hijo directo de la portada que contiene la
+ * flecha/puntos (`data-pl-hero-nav`). Es lo único donde un deslizamiento cambia
+ * de slide — un gesto sobre las filas de productos de más abajo no puede
+ * mover el hero. Si la portada no tiene navegación (un solo slide) o no hay una
+ * única raíz, devuelve null y no se escucha nada: falla del lado seguro.
+ */
+export function regionDelHero(envoltorio: Element | null): Element | null {
+  const nav = envoltorio?.querySelector('[data-pl-hero-nav]')
+  const portada = envoltorio?.firstElementChild
+  if (!nav || !portada) return null
+  let el: Element | null = nav
+  while (el && el.parentElement !== portada) el = el.parentElement
+  // Hay plantillas (Circuito, con su panel lateral) donde ese bloque es toda la
+  // columna de contenido: hero, filas, categorías. Mientras abarque más de
+  // `FRACCION_MAXIMA_HERO` de la portada se baja al hijo que contiene la
+  // navegación, hasta quedar en algo del tamaño de un hero. Se mide en
+  // elementos del DOM, que es barato y no depende del alto en pantalla.
+  const tamano = (e: Element) => e.getElementsByTagName('*').length
+  const total = tamano(portada)
+  while (el && tamano(el) > total * FRACCION_MAXIMA_HERO) {
+    const hijo: Element | undefined = Array.from(el.children).find((c) => c.contains(nav))
+    if (!hijo || hijo === nav) break
+    el = hijo
+  }
+  return el
+}
+
+/** Lo máximo de la portada (en elementos) que puede abarcar el bloque del hero. */
+export const FRACCION_MAXIMA_HERO = 0.6
+
+// Los tipos de las props de la portada, sin el cable interno del gesto.
+type HomeProps = Omit<Parameters<typeof HomeInterno>[0], 'giroRef'>
+
+/**
+ * La portada de una plantilla (vitrina del panel y tienda real). Es
+ * `HomeInterno` más el deslizar con el dedo sobre el hero: el hero de cada
+ * plantilla es un bloque distinto dentro de `HomeInterno`, así que el gesto se
+ * escucha acá, una sola vez, en vez de repetirlo en los quince heros.
+ *
+ * El `div` es `display: contents`: no genera caja, así que no cambia el
+ * diseño de nada. Los eventos táctiles igual le llegan por burbujeo.
+ */
+export function Home(props: HomeProps) {
+  const envoltorio = useRef<HTMLDivElement>(null)
+  const girar = useRef<((direccion: 1 | -1) => void) | null>(null)
+  const deslizar = useDeslizar(
+    (dir) => girar.current?.(dir),
+    (e) => !!regionDelHero(envoltorio.current)?.contains(e.target as Node),
+  )
+  return (
+    <div ref={envoltorio} {...deslizar} style={{ display: 'contents' }}>
+      <HomeInterno {...props} giroRef={girar} />
+    </div>
+  )
+}
+
+function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
+  // Solo para `Home`: acá se deja el "girá el hero" del slide, para que el
+  // gesto táctil (que se escucha afuera, en el envoltorio) lo pueda llamar.
+  giroRef?: React.MutableRefObject<((direccion: 1 | -1) => void) | null>
   p: Plantilla
   movil: boolean
   // Solo la tienda real las pasa: con esto el mismo render deja de ser una
@@ -83,18 +144,26 @@ export function Home({ p, movil, acciones, soloCuerpo, soloHeader }: {
   const [iHero, setIHero] = useState(0)
   const nSlides = p.slides.length
   // Quieto en la vista previa del panel (ver HeroCarousel en Inicio.tsx).
+  // `iHero` en las dependencias: cualquier cambio de slide (flecha, punto o
+  // deslizar con el dedo) reinicia la cuenta, así el que acaba de deslizar no
+  // ve cambiar el slide solo medio segundo después.
   useEffect(() => {
     if (nSlides < 2 || esPreview()) return
     const id = setInterval(() => setIHero((v) => (v + 1) % nSlides), 5200)
     return () => clearInterval(id)
-  }, [nSlides])
+  }, [nSlides, iHero])
   const iActual = nSlides > 0 ? iHero % nSlides : 0
   const irASlide = (i: number) => setIHero((nSlides + i) % Math.max(nSlides, 1))
+  // Sin dependencias a propósito: tiene que ver siempre el `iActual` de este render.
+  useEffect(() => {
+    if (giroRef) giroRef.current = nSlides > 1 ? (dir) => irASlide(iActual + dir) : null
+  })
 
   // Flechas + puntos, pintados con el tema de la plantilla. Solo se dibujan
-  // con más de un slide: con uno no hay a dónde ir.
+  // con más de un slide: con uno no hay a dónde ir. El `data-pl-hero-nav` es
+  // la marca con la que `Home` encuentra el bloque del hero (ver regionDelHero).
   const navHero = (estilo?: React.CSSProperties) => nSlides < 2 ? null : (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, ...estilo }}>
+    <div data-pl-hero-nav="" style={{ display: 'flex', alignItems: 'center', gap: 14, ...estilo }}>
       <button
         onClick={() => irASlide(iActual - 1)} aria-label="Anterior"
         style={{ width: 34, height: 34, borderRadius: t.radio === 0 ? 0 : '50%', border: `1px solid ${t.primary}`, background: 'transparent', color: t.primary, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1 }}

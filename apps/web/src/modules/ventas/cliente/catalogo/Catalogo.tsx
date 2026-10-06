@@ -388,6 +388,16 @@ export default function Catalogo() {
       return next
     })
   }
+  // Los botones de paginación están al pie de la lista. Al tocar uno, el
+  // listado se recarga y por un momento la página se acorta: sin esto el
+  // navegador deja el scroll clavado abajo y se ve el footer en vez de la
+  // página nueva (reportado en celular). Se sube en el mismo toque, antes de
+  // que cambie el alto. `instant` y no `smooth`: una animación de scroll se
+  // pisaría con el cambio de alto de la página.
+  function cambiarPagina(n: number) {
+    setPage(n)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }
   function limpiarCategorias() { setCatsActivas([]); setPage(1) }
   // Mismo criterio que alternarCategoria/limpiarCategorias — un solo grupo
   // plano de ids elegidos, sea cual sea la faceta (Talle, Color, o lo que
@@ -701,7 +711,7 @@ export default function Catalogo() {
               </div>
             )}
 
-            {totalPages > 1 && <Paginacion page={page} total={totalPages} onChange={setPage} />}
+            {totalPages > 1 && <Paginacion page={page} total={totalPages} onChange={cambiarPagina} />}
           </div>
         </div>
       </div>

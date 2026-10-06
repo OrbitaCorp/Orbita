@@ -6,7 +6,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { PLANTILLAS } from './datos'
-import { Home, LAYOUTS_CON_HEADER_PROPIO } from './homes'
+import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
+import { itemsMenuMovil } from './piezas'
 import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
 import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
@@ -785,4 +786,106 @@ describe('el header suelto, para el resto de la tienda', () => {
       sinProblemas(`header > ${p.id}`, mal)
     })
   }
+})
+
+// ─── Celular: deslizar el hero con el dedo y volver al inicio desde el menú ──
+
+const sinLinksYEstilos = (h: string) => h.replace(/<style[\s\S]*?<\/style>/g, '').replace(/<link\b[^>]*>/g, '')
+
+/**
+ * El bloque del hero dentro del HTML de la portada, resuelto igual que
+ * `regionDelHero` en el navegador: el hijo directo de la raíz que contiene la
+ * flecha/puntos (`data-pl-hero-nav`), y si abarca demasiado de la portada,
+ * bajando al hijo que la contiene. Acá se recorre el HTML estático con una pila
+ * porque los tests no tienen DOM. Los estilos y los `<link rel="preload">` (que
+ * React saca al `<head>`) no cuentan. Devuelve `null` si no hay navegación y
+ * `'sin-bloque'` si la flecha no cuelga de un bloque propio de la raíz.
+ */
+function regionDelHeroEnHtml(htmlCompleto: string): { html: string; tags: number; total: number } | null | 'sin-bloque' {
+  const html = sinLinksYEstilos(htmlCompleto)
+  const VACIAS = new Set(['img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'wbr', 'area', 'col', 'embed', 'track', 'base', 'param'])
+  const els: { inicio: number; fin: number; padre: number }[] = []
+  const pila: number[] = []
+  let nav = -1
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const [tag, cierra, nombre, attrs, autocierre] = m
+    if (cierra) {
+      const i = pila.pop()
+      if (i !== undefined) els[i].fin = m.index! + tag.length
+      continue
+    }
+    const i = els.push({ inicio: m.index!, fin: m.index! + tag.length, padre: pila.length ? pila[pila.length - 1] : -1 }) - 1
+    if (nav < 0 && attrs.includes('data-pl-hero-nav')) nav = i
+    if (!autocierre && !VACIAS.has(nombre.toLowerCase())) pila.push(i)
+  }
+  if (nav < 0) return null
+
+  // Los ancestros de la flecha, de afuera hacia adentro: [0] el envoltorio,
+  // [1] la raíz de la portada, [2] el bloque, y de ahí para abajo.
+  const cadena: number[] = []
+  for (let i = els[nav].padre; i >= 0; i = els[i].padre) cadena.unshift(i)
+  if (cadena.length < 3) return 'sin-bloque'
+
+  const tamano = (i: number) => (html.slice(els[i].inicio, els[i].fin).match(/<[a-zA-Z]/g) ?? []).length - 1
+  const total = tamano(cadena[1])
+  let k = 2
+  while (k + 1 < cadena.length && tamano(cadena[k]) > total * FRACCION_MAXIMA_HERO) k++
+  return { html: html.slice(els[cadena[k]].inicio, els[cadena[k]].fin), tags: tamano(cadena[k]), total }
+}
+
+describe('en celular, el hero se desliza con el dedo', () => {
+  for (const p of visibles) {
+    it(p.id, () => {
+      const mal: string[] = []
+      const html = dibujar({ p: plantillaReal({ base: p, ...TIENDAS.completa }), movil: true, acciones: ACCIONES, soloCuerpo: !p.headerPropio })
+      if (!sinLinksYEstilos(html).startsWith('<div style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
+
+      const region = regionDelHeroEnHtml(html)
+      if (region === null) {
+        // Sin flecha ni puntos no hay a dónde deslizar: solo vale para un hero
+        // de slides fijos (`heroMaxSlides`, como Escaparate) o para el que
+        // dibuja la tienda afuera (`!heroPropio`, con su propio HeroCarousel).
+        if (p.heroPropio && p.heroMaxSlides === undefined) mal.push('con varios slides, el hero no trae navegación y no se puede deslizar')
+      } else if (region === 'sin-bloque') {
+        mal.push('la navegación del hero no cuelga de un bloque propio de la portada: el gesto no sabría dónde escuchar')
+      } else {
+        // El título del hero de la tienda de prueba: si el bloque no lo tiene, el gesto se escucha en otro lado.
+        if (!region.html.includes('Hero Check')) mal.push('el bloque donde se escucha el gesto no es el hero (no tiene el título del slide)')
+        if (region.tags > region.total * FRACCION_MAXIMA_HERO) mal.push('el gesto se escucharía sobre más de la mitad de la portada, no solo sobre el hero')
+      }
+      sinProblemas(`deslizar > ${p.id}`, mal)
+    })
+  }
+})
+
+describe('el menú de celular vuelve al inicio', () => {
+  const con = (over: Partial<AccionesHome>): AccionesHome => ({ ...ACCIONES, ...over })
+
+  it('"Inicio" va primero, antes de los enlaces del header', () => {
+    expect(itemsMenuMovil([], ACCIONES).map(i => i.label)).toEqual(['Inicio', 'Enlace Check Uno', 'Enlace Check Dos'])
+  })
+
+  it('"Inicio" navega a la portada', () => {
+    let fue = 0
+    const items = itemsMenuMovil([], con({ irAInicio: () => { fue++ } }))
+    items[0].onClick?.()
+    expect(fue).toBe(1)
+  })
+
+  it('si el dueño ya cargó un enlace "Inicio", no se duplica', () => {
+    const items = itemsMenuMovil([], con({ nav: [{ label: ' inicio ', onClick: nada }, { label: 'Otro', onClick: nada }] }))
+    expect(items.map(i => i.label)).toEqual([' inicio ', 'Otro'])
+  })
+
+  it('sin enlaces de header (pero no minimal) el menú igual tiene "Inicio"', () => {
+    expect(itemsMenuMovil([], con({ nav: [] })).map(i => i.label)).toEqual(['Inicio'])
+  })
+
+  it('con el header en "minimal" no hay menú, como antes', () => {
+    expect(itemsMenuMovil([], con({ navLayout: 'minimal' }))).toEqual([])
+  })
+
+  it('en la vitrina del panel (sin acciones) la hamburguesa queda como estaba', () => {
+    expect(itemsMenuMovil(['Uno', 'Dos'], undefined).map(i => i.label)).toEqual(['Uno', 'Dos'])
+  })
 })

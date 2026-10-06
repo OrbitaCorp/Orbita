@@ -365,10 +365,10 @@ export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; mov
  */
 export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: string[]; acciones?: AccionesHome; color?: string }) {
   const [abierto, setAbierto] = useState(false)
-  const nav = navDe(links, acciones)
+  const items = itemsMenuMovil(links, acciones)
   const glifo = <span style={{ fontSize: 18, lineHeight: 1, color: color ?? t.text }}>☰</span>
 
-  if (!acciones || nav.length === 0) return glifo
+  if (!acciones || items.length === 0) return glifo
 
   return (
     <>
@@ -398,7 +398,7 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
                 style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, color: t.muted, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >×</button>
             </div>
-            {nav.map((l) => (
+            {items.map((l) => (
               <button
                 key={l.label} type="button"
                 onClick={() => { setAbierto(false); l.onClick?.() }}
@@ -415,6 +415,21 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
       )}
     </>
   )
+}
+
+/**
+ * Lo que lista el menú de celular: los enlaces del header con "Inicio"
+ * adelante. Los enlaces de Apariencia son del catálogo y ninguno vuelve a la
+ * portada. Solo la hamburguesa lo lleva; la barra de escritorio no. Si el
+ * dueño ya cargó un enlace que se llama "Inicio", no se duplica. Con el
+ * header en "minimal" (sin navegación) no hay menú, como antes. Pura, para
+ * poder probarla sin abrir el menú.
+ */
+export function itemsMenuMovil(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+  const nav = navDe(links, acciones)
+  const sinNavegacion = acciones?.navLayout === 'minimal'
+  if (!acciones?.irAInicio || sinNavegacion || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
+  return [{ label: 'Inicio', onClick: acciones.irAInicio, activo: false }, ...nav]
 }
 
 export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {

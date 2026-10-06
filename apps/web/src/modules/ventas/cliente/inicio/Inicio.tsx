@@ -6,6 +6,7 @@ import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
+import { useDeslizar } from '@/hooks/useDeslizar'
 import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -1294,13 +1295,18 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
 
     // En la vista previa del panel no rota: el dueño está editando un slide y
     // que se le vaya a otro a los pocos segundos no deja ver el cambio.
+    // `idx` en las dependencias: cualquier cambio de slide (flecha, punto o
+    // deslizar con el dedo) reinicia la cuenta, así el que acaba de deslizar
+    // no ve cambiar el slide solo medio segundo después.
     useEffect(() => {
         if (paused || n <= 1 || esPreview()) return
         const id = setInterval(() => setIdx(i => (i + 1) % n), 4000)
         return () => clearInterval(id)
-    }, [paused, n])
+    }, [paused, n, idx])
 
     const goSlide = (i: number) => setIdx((i + n) % n)
+    // Deslizar con el dedo, además de las flechas (celular).
+    const deslizar = useDeslizar(dir => goSlide(idx + dir))
 
     // El link del CTA es texto libre cargado en Apariencia: puede ser un path
     // interno ("/catalogo/camperas") o una URL completa. Vacío = /catalogo.
@@ -1311,7 +1317,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     }
 
     return (
-        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
             {/* alignItems:'stretch' + el `flex:1` de cada caja de fondo (abajo)
                 son lo que hace que TODOS los slides midan lo mismo: la pista

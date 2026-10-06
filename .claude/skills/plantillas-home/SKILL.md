@@ -309,7 +309,15 @@ el corte es a 768px; en la tienda sale de `useMovilPlantilla()`.
 - **Las grillas bajan a dos columnas** (`cols(d, 2)`), o a una si la tarjeta
   es horizontal. Las tiras se quedan como tiras.
 - **Se puede navegar.** Si los enlaces del header no entran, va `MenuMovil`.
-  Nunca un `☰` dibujado.
+  Nunca un `☰` dibujado. El menú lista **"Inicio" primero** y después los
+  enlaces del header (`itemsMenuMovil` en `piezas.tsx`; no se duplica si el
+  dueño ya cargó uno llamado "Inicio", y con el header en "minimal" no hay menú).
+- **El hero con varios slides se desliza con el dedo**, además de las flechas.
+  No hay que hacer nada por plantilla: `Home()` es un envoltorio
+  (`display: contents`) que escucha el gesto y rota el hero. Solo hace falta
+  que el hero dibuje `navHero(...)`, que lleva la marca `data-pl-hero-nav`: con
+  ella `regionDelHero()` encuentra el bloque del hero. Un hero de slides fijos
+  (`heroMaxSlides`) no rota ni desliza.
 - **Se puede buscar, entrar a la cuenta y ver el carrito**, igual que en
   computadora. El buscador va en un renglón propio debajo de la barra si no
   entra al lado de la marca.
@@ -459,6 +467,8 @@ categorías, cuarenta productos).
 | estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
 | editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
+| deslizar | En celular, el gesto del hero se escucha sobre el bloque del hero y no sobre toda la portada (contiene el título del slide y abarca ≤60% de los elementos), o el hero es de slides fijos |
+| menú de celular | "Inicio" va primero, no se duplica, no hay menú en "minimal" |
 
 ### Cómo leer un fallo
 
