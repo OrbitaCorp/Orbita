@@ -1,9 +1,10 @@
 # Borrador: cláusulas nuevas para los Términos de Órbita
 
-**Estado: BORRADOR para revisión legal. No está publicado.** Los Términos vigentes
-(actualización del 16 de septiembre de 2026) viven en
-`apps/web/src/modules/landing/components/ui/LegalModal.tsx` (`LEGAL_CONTENT.terminos`).
-Nada de lo de abajo está en el sitio todavía.
+**Estado: PUBLICADO el 6 de octubre de 2026, sin revisión de un abogado** (decisión del equipo,
+igual que el resto de los Términos). Las propuestas A, B, C y D de abajo están aplicadas en
+`apps/web/src/modules/landing/components/ui/LegalModal.tsx` (`LEGAL_CONTENT.terminos`, cláusulas
+2, 5 bis, 5 ter y 10) y la Política de Privacidad (§ 3) menciona el directorio y los datos de
+quien denuncia. Este archivo queda como registro y como guía para quien los revise después.
 
 ## Por qué hace falta
 
