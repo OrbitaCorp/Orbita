@@ -137,6 +137,16 @@ const FUENTES_PLANTILLAS = [
   // Bloque. Estaban en su tema y no acá: se veía con la fuente del sistema.
   'Rubik:wght@400;500;700;800;900',
   'Nunito+Sans:wght@400;600;700;800',
+  // Granel, Horno, Brote, Voltio, Pistón y Confeti.
+  'Lora:wght@400;600;700',
+  'Cabin:wght@400;600;700',
+  'Fraunces:wght@400;600;700;800',
+  'DM+Serif+Display:wght@400',
+  'DM+Sans:wght@400;500;700',
+  'Sora:wght@400;600;700;800',
+  'Barlow+Condensed:wght@500;600;700;800',
+  'Barlow:wght@400;500;600;700',
+  'Fredoka:wght@400;500;600;700',
 ]
 
 export function cargarFuentes() {

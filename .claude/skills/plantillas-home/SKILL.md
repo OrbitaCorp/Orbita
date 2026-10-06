@@ -6,7 +6,7 @@ description: "Plantillas de Home de Órbita (paquete Avanzado): crear, modificar
 # Plantillas de Home
 
 Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las
-elige desde el panel: Avanzado → Plantillas de Home. Hay **veintiséis**, todas
+elige desde el panel: Avanzado → Plantillas de Home. Hay **treinta y dos**, todas
 del módulo tienda, y todas se aplican de verdad en un negocio.
 
 ## El modelo, en cuatro líneas
@@ -109,7 +109,7 @@ sale de piezas comunes de `Home()`:
 la tienda (`acciones.renderOferta`) y la plantilla la ubica — pegada al hero en
 las recetas, al principio de `resto()` en las de bloque propio.
 
-**Estado:** las veintiséis cumplen el estándar y `PENDIENTES` está vacía.
+**Estado:** las treinta y dos cumplen el estándar y `PENDIENTES` está vacía.
 Sigue afuera la cantidad de productos de "Nuevos ingresos": con plantilla cada
 fila es de un renglón.
 
@@ -403,7 +403,7 @@ dueño edita desde Avanzado → Plantillas de Home:
 | Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
 | Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
 | Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
-| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las veintiséis. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las treinta y dos. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
 | Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
 
 Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`
@@ -493,7 +493,7 @@ categorías, cuarenta productos).
 | tema | Contraste del texto y del botón |
 | vitrina | Dibuja en las dos pantallas, sin `undefined`/`NaN`, sin fotos que no existen, sin enlaces sin destino |
 | tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
-| estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
+| estándar | En las treinta y dos: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
 | editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
 | esqueleto | El esqueleto de carga de cada plantilla no dibuja imágenes ni deja nada de la maqueta en el HTML |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
@@ -536,7 +536,7 @@ Celular:
 - que todo lo que parece clickeable lo sea. En el código: `grep` de
   `accion="` sin `onAccion`, de `<Boton` sin `onClick`, y de un `☰` dibujado
   sin `MenuMovil`;
-- que se distinga de las otras veinticinco.
+- que se distinga de las otras treinta y una.
 
 Las pruebas con el navegador las hace el dueño: decirle qué plantilla mirar y
 qué probar, en vez de abrir el navegador integrado. Si hace falta medir
