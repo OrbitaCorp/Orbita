@@ -48,6 +48,7 @@ import { useOnboardingHidratado, useOnboardingStore } from '@/modules/onboarding
 import { CSS_ONBOARDING } from './estilo'
 import { useAlta } from './estadoAlta'
 import { OrbitaPasos } from './OrbitaPasos'
+import { OrbiAlta } from './OrbiAlta'
 import { PasoModulo } from './PasoModulo'
 import { PasoTipo } from './PasoTipo'
 import { PasoRubro } from './PasoRubro'
@@ -88,6 +89,8 @@ const CON_PREVIA: PasoId[] = ['rubro', 'pagina']
 // Cómo se llama cada paso en el embudo (analytics): los mismos nombres que usaba
 // el alta anterior, para que los gráficos sigan comparando lo mismo.
 const NOMBRE_EMBUDO: Partial<Record<PasoId, string>> = { modulo: 'rubro', tipo: 'subrubros', negocio: 'tu-negocio', ubicacion: 'ubicacion', cuenta: 'cuenta' }
+// Cómo se llama cada campo en la analítica de Orbi (los nombres del alta anterior): los gráficos siguen comparando lo mismo.
+const NOMBRE_ORBI: Record<string, string> = { negocio: 'nombre', slug: 'subdominio' }
 // El pago es el de siempre: la pantalla de plan de Tienda.
 const PANTALLA_DE_PAGO = '/onboarding/plan?next=/onboarding/tienda/success'
 
@@ -110,6 +113,8 @@ export default function Alta({ real = false }: { real?: boolean }) {
   const [tocados, setTocados] = useState<string[]>([])
   const [pago, setPago] = useState<'no' | 'conectando' | 'creando'>('no')
   const raiz = useRef<HTMLDivElement>(null)
+  // La botonera fija: Orbi se acomoda arriba de ella (ver OrbiAlta).
+  const pie = useRef<HTMLDivElement>(null)
   const esperas = useRef<number[]>([])
   useEffect(() => () => esperas.current.forEach(x => window.clearTimeout(x)), [])
 
@@ -223,6 +228,18 @@ export default function Alta({ real = false }: { real?: boolean }) {
   const intentado = intentados.includes(id)
 
   const poner = <K extends keyof DatosAlta>(campo: K, valor: DatosAlta[K]) => cambiar(e => ({ ...e, datos: { ...e.datos, [campo]: valor } }))
+  // Campos que completó Orbi (alta real): se ven marcados hasta que la persona los edita a mano.
+  const [sugeridos, setSugeridos] = useState<ReadonlySet<string>>(() => new Set())
+  const marcarSugerido = (campo: string) => setSugeridos(s => (s.has(campo) ? s : new Set(s).add(campo)))
+  // Lo que escribe la persona: si el campo venía sugerido por Orbi, deja de estarlo.
+  const ponerAMano = <K extends keyof DatosAlta>(campo: K, valor: DatosAlta[K]) => {
+    poner(campo, valor)
+    if (!sugeridos.has(campo)) return
+    // Pisó a mano lo que Orbi había puesto: la sugerencia no le sirvió. Es la
+    // señal de calidad más honesta que hay, porque no depende de que nadie vote.
+    track('orbi_suggestion_overridden', { field: NOMBRE_ORBI[campo] ?? campo })
+    setSugeridos(s => { const sin = new Set(s); sin.delete(campo); return sin })
+  }
   const tocar = (campo: string) => setTocados(t => (t.includes(campo) ? t : [...t, campo]))
   const error = (campo: string) => (intentado || tocados.includes(campo) ? errores[campo] : undefined)
   const marcar = (p: PasoId) => setIntentados(x => (x.includes(p) ? x : [...x, p]))
@@ -370,17 +387,23 @@ export default function Alta({ real = false }: { real?: boolean }) {
               <PasoServicios rubro={rubro} servicios={servicios} onCambio={cambiarServicios} sena={sena}
                 onSena={p => cambiar(e => ({ ...e, senas: { ...e.senas, [rubro.key]: p } }))} errores={errores} intentado={intentado} />
             )}
-            {id === 'negocio' && <PasoNegocio d={datos} poner={poner} error={error} tocar={tocar} sub={ctx.sub} />}
-            {id === 'ubicacion' && <PasoUbicacion d={datos} poner={poner} error={error} tocar={tocar} rubro={turnos ? rubro : null} />}
-            {id === 'pagina' && rubro && <PasoPagina d={datos} poner={poner} rubro={rubro} servicios={servicios} />}
-            {id === 'cuenta' && <PasoCuenta d={datos} poner={poner} error={error} tocar={tocar} mail={ctx.mail} />}
-            {id === 'pago' && <PasoPago d={datos} poner={poner} rubro={turnos ? rubro : null} servicios={servicios} sena={sena} />}
+            {id === 'negocio' && <PasoNegocio d={datos} poner={ponerAMano} error={error} tocar={tocar} sub={ctx.sub} sugeridos={sugeridos} />}
+            {id === 'ubicacion' && <PasoUbicacion d={datos} poner={ponerAMano} error={error} tocar={tocar} rubro={turnos ? rubro : null} />}
+            {id === 'pagina' && rubro && <PasoPagina d={datos} poner={ponerAMano} rubro={rubro} servicios={servicios} />}
+            {id === 'cuenta' && <PasoCuenta d={datos} poner={ponerAMano} error={error} tocar={tocar} mail={ctx.mail} />}
+            {id === 'pago' && <PasoPago d={datos} poner={ponerAMano} rubro={turnos ? rubro : null} servicios={servicios} sena={sena} />}
           </>
         )}
       </main>
 
+      {/* Orbi, el asistente del alta: solo en el alta real (la demo no llama a la API). */}
+      {real && !terminado && (
+        <OrbiAlta id={id} paso={paso} total={n} datos={datos} errores={errores} pie={pie}
+          onElegirModulo={elegirModulo} onPoner={poner} onSugerido={marcarSugerido} onContinuar={continuar} />
+      )}
+
       {!terminado && (
-        <div className="tuob-pie" role="region" aria-label="Avanzar en el alta">
+        <div ref={pie} className="tuob-pie" role="region" aria-label="Avanzar en el alta">
           <div className="tuob-ancho tuob-pie-in">
             <div className="tuob-pie-resumen">
               <span aria-hidden>{IconoPie ? <IconoPie size={19} strokeWidth={1.75} /> : <OrbitaLogo size={20} animated={false} />}</span>
