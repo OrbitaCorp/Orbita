@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MovilSSR } from '@/hooks/useMovilPlantilla'
 import { useRouter } from 'next/router'
 import type { AppProps } from 'next/app'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -382,7 +383,12 @@ export default function App({ Component, pageProps }: AppProps) {
               {esLanding
                 ? <LoaderEmpuje visible={loading} />
                 : <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} tema={temaPlantilla} />}
-              <Component {...pageProps} />
+              {/* La pista de pantalla para las plantillas de Home (ver
+                  useMovilPlantilla). Fuera de la tienda no viene y queda en
+                  false, como siempre. */}
+              <MovilSSR.Provider value={!!(pageProps as { __movil?: boolean }).__movil}>
+                <Component {...pageProps} />
+              </MovilSSR.Provider>
               {avisoCookies && <BannerCookies variante={avisoCookies.variante} hrefPolitica={avisoCookies.href} />}
             </>
           )}

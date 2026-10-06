@@ -1400,7 +1400,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                 {/* "Agregar los 3" es un combo (agregar tres productos, cada
                     uno con su propia variante, de un solo tilde) que Órbita
                     no arma — se muestra solo en la maqueta. */}
-                {!acciones && <div style={{ marginTop: 14 }}><Boton t={t} ancho>Agregar los 3 · $446.000</Boton></div>}
+                {!acciones && <div style={{ marginTop: 14 }}><Boton t={t} ancho>Agregar los 3</Boton></div>}
               </div>
             </div>
           </div>

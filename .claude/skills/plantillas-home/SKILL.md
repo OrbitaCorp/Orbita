@@ -160,6 +160,7 @@ apps/web/src/modules/ventas/panel/avanzado/plantillas/
   datos.tsx            PLANTILLAS[]: tema, receta y datos de muestra de cada una
   homes.tsx            Home(): el render. Rama `if (p.receta)` + un bloque por layout propio
   piezas.tsx           CSS, componentes compartidos, FUENTES_PLANTILLAS, marcos Notebook/Celular
+  esqueleto.tsx        El esqueleto de carga: la misma plantilla, sin su contenido
   secciones.ts         El editor: esquemaDeReceta() y SECCIONES_POR_PLANTILLA
   plantillas.test.ts   El modo check
   PlantillasConfig.tsx Galería y detalle en el panel
@@ -339,6 +340,34 @@ mirando. Por eso cada plantilla nueva o modificada se mira en **Celular** en la
 vitrina (Avanzado → Plantillas → Ver cómo queda) y aplicada en una tienda desde
 un teléfono de verdad, no solo achicando la ventana.
 
+## La carga
+
+Tres cosas hacen que una portada con plantilla no pegue saltos al cargar. Las
+tres son automáticas: una plantilla nueva las tiene sin escribir nada.
+
+- **El esqueleto es la propia plantilla** (`esqueleto.tsx`). Mientras llegan
+  los datos se dibuja el mismo `Home()` con la estructura de muestra, y la
+  clase `.pl-esq` (en el `CSS` de `piezas.tsx`) convierte cada texto en una
+  barra y cada foto en un bloque. Tiene la forma exacta de esa portada. No se
+  escribe un esqueleto por plantilla: cada retoque al bloque obligaría a
+  retocarlo, y la próxima nacería sin uno.
+- **Sale en el primer HTML del servidor**, así que `paraEsqueleto()` le saca
+  todo lo de la maqueta: las fotos (un fondo que `Foto` no dibuja como `<img>`,
+  para que el navegador no baje nada) y los textos (cambiados por blancos del
+  mismo largo, para que no los lea un buscador). Un texto escrito a mano en el
+  bloque no pasa por ahí: por eso los textos van por `txt()` o salen de `p`.
+- **La portada se acuerda de lo último que cargó** (`PORTADAS` en
+  `Inicio.tsx`): al volver al inicio desde un producto se dibuja al toque con
+  lo que había y se actualiza por atrás, sin esqueleto.
+- **El primer HTML ya sabe si es un teléfono** (`__movil` en `forceSSR.ts` →
+  `MovilSSR` → `useMovilPlantilla`). Las plantillas eligen con un booleano y
+  no con CSS fluido; sin esa pista el teléfono recibía la portada de
+  escritorio y la veía acomodarse después.
+
+El grupo `esqueleto` del check exige que el de cada plantilla no dibuje
+ninguna `<img>`, no nombre una foto de muestra y no deje a la vista la marca,
+los productos, las categorías ni los textos de la maqueta.
+
 ## Modificar una plantilla
 
 | Qué se quiere cambiar | Dónde |
@@ -466,6 +495,7 @@ categorías, cuarenta productos).
 | tienda | Lo mismo, y además: nada de la marca, los productos ni las categorías de muestra; ninguna afirmación que el dueño no escribió; cuenta, carrito y **buscador** reales en el header, en las dos pantallas; enlaces reales del menú (o menú en celular); **todo enlace va a una página que existe**; Términos, Privacidad y Arrepentimiento en el pie; si hay productos, alguno se ve |
 | estándar | En las veintiséis: cada estante, el anuncio, el parallax, las marcas, el video, las categorías, el buscador y el WhatsApp se ven prendidos y desaparecen apagados, sin dejar un título suelto; una tienda sin ventas muestra sus productos bajo "Recién llegados" y no un "Más vendidos"; con un solo estante prendido ningún producto sale dos veces. En las recetas, además, que estén todos los bloques |
 | editor-portada | Cada cosa que el editor deja cargar cambia la portada: los campos de cada slide, cada campo de Secciones, la cartelera y los ítems del anuncio, estadísticas, parallax, marcas, la descripción, las redes y el cupón. Y al revés: no dibuja lo que el editor no ofrece |
+| esqueleto | El esqueleto de carga de cada plantilla no dibuja imágenes ni deja nada de la maqueta en el HTML |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 | deslizar | En celular, el gesto del hero se escucha sobre el bloque del hero y no sobre toda la portada (contiene el título del slide y abarca ≤60% de los elementos), o el hero es de slides fijos |
 | menú de celular | "Inicio" va primero, no se duplica, no hay menú en "minimal" |

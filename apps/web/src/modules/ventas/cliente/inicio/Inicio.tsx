@@ -42,6 +42,7 @@ import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { definicionPlantilla, plantillaReal } from './plantillaReal'
+import { EsqueletoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/esqueleto'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -65,7 +66,27 @@ function estadoJuegos(games: ActiveGame[]): string {
 // forceSSR.ts): la plantilla activa, ya resuelta del lado del server, para
 // que el skeleton de más abajo (branch `cargando`) no tenga que asumir "sin
 // plantilla" hasta que el fetch del cliente responda.
-export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: string | null } = {}) {
+// Lo último que se cargó de cada portada, en la memoria de la pestaña.
+//
+// Volver al inicio desde un producto o desde el catálogo pedía todo de nuevo
+// —seis pedidos— y mostraba el esqueleto otra vez, aunque esos mismos datos
+// se habían visto hacía diez segundos. Ahora la portada se dibuja al toque
+// con lo que había y se actualiza por atrás: si algo cambió, se nota cuando
+// llega la respuesta, sin pantalla de carga en el medio.
+//
+// Es una variable del módulo: vive mientras la pestaña no se recargue, y del
+// lado del servidor no se escribe nunca (solo la llenan los efectos).
+type PortadaCargada = {
+    config: StorefrontConfigResponse
+    categorias: StorefrontCategoryItem[]
+    productos: Producto[]
+    destacados: Producto[]
+    recomendados?: StorefrontProductItem[]
+    topVentas?: StorefrontProductItem[]
+}
+const PORTADAS = new Map<string, PortadaCargada>()
+
+export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { __homeTemplate?: string | null; __storeMeta?: { nombre?: string | null } | null } = {}) {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
@@ -139,6 +160,18 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     useEffect(() => {
         if (!slug) return
         let cancelado = false
+        // Lo de la visita anterior, al toque (ver PORTADAS); el pedido de
+        // abajo sale igual y lo pisa.
+        const previa = PORTADAS.get(slug)
+        if (previa) {
+            setConfig(previa.config)
+            setCategorias(previa.categorias)
+            setProductos(previa.productos)
+            setDestacados(previa.destacados)
+            if (previa.recomendados) setRecomendados(previa.recomendados)
+            if (previa.topVentas) setTopVentas(previa.topVentas)
+            setCargando(false)
+        }
         Promise.all([
             getStorefrontConfig(slug),
             getStorefrontCategories(slug),
@@ -149,8 +182,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             setConfig(cfg)
             setCategorias(cats)
             const badges = { showNew: cfg.appearance?.showNewBadge, showOffer: cfg.appearance?.showOfferBadge, showLowStock: cfg.appearance?.showLowStock }
-            setProductos(general.data.map(p => toProducto(p, badges)))
-            setDestacados(feat.data.map(p => toProducto(p, badges)))
+            const productosNuevos = general.data.map(p => toProducto(p, badges))
+            const destacadosNuevos = feat.data.map(p => toProducto(p, badges))
+            setProductos(productosNuevos)
+            setDestacados(destacadosNuevos)
+            PORTADAS.set(slug, { ...PORTADAS.get(slug), config: cfg, categorias: cats, productos: productosNuevos, destacados: destacadosNuevos })
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
@@ -165,10 +201,20 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
         if (!slug) return
         let cancelado = false
         getStorefrontProducts(slug, { sort: 'recommended', limit: 8 })
-            .then(r => { if (!cancelado) setRecomendados(r.data) })
+            .then(r => {
+                if (cancelado) return
+                setRecomendados(r.data)
+                const previa = PORTADAS.get(slug)
+                if (previa) previa.recomendados = r.data
+            })
             .catch(() => { /* sin estante */ })
         getStorefrontProducts(slug, { sort: 'bestselling', soldOnly: true, limit: 8 })
-            .then(r => { if (!cancelado) setTopVentas(r.data) })
+            .then(r => {
+                if (cancelado) return
+                setTopVentas(r.data)
+                const previa = PORTADAS.get(slug)
+                if (previa) previa.topVentas = r.data
+            })
             .catch(() => { /* sin estante */ })
         return () => { cancelado = true }
     }, [slug])
@@ -399,6 +445,21 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // secciones, tarjetas, footer) y el modo oscuro del visitante las aplica
     // StorefrontChrome más abajo — ver variablesDeTema() en plantillaReal.ts
     // para el porqué.
+
+    // Con una plantilla puesta, el esqueleto es el de ESA plantilla (ver
+    // esqueleto.tsx): la misma portada con barras en vez de texto. Se sabe
+    // cuál es desde el servidor (`__homeTemplate`), así que sale en el primer
+    // HTML. El header va adentro del esqueleto en las que dibujan el suyo —
+    // por eso `sinHeader`, igual que en la portada ya cargada.
+    if (cargando && plantilla) {
+        return (
+            <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate} sinHeader={!!plantilla.headerPropio}>
+                {/* Vidriera: su hero lo dibuja la tienda (HeroCarousel), no la plantilla. */}
+                {!plantilla.heroPropio && <Skeleton width="100%" height={movil ? 420 : 470} radius={0} />}
+                <EsqueletoPlantilla p={plantilla} movil={movil} soloCuerpo={!plantilla.headerPropio} marca={__storeMeta?.nombre ?? undefined} />
+            </StorefrontChrome>
+        )
+    }
 
     if (cargando) {
         return (

@@ -2,6 +2,7 @@ import type { GetServerSideProps } from 'next'
 import { getStorefrontConfig, StorefrontApiError } from './api'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -176,5 +177,10 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const temaPlantilla: Tema | null = temaDePlantilla(homeTemplate) ?? null
 
   // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla } }
+  // De qué lado del corte dibujar el primer HTML de una plantilla (ver
+  // useMovilPlantilla): las plantillas no usan CSS fluido, eligen con un
+  // booleano, y sin esta pista el teléfono recibía la portada de escritorio.
+  const movil = esNavegadorMovil(ctx.req.headers['user-agent'])
+
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil } }
 }

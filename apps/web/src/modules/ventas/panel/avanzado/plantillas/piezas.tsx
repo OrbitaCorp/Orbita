@@ -80,6 +80,19 @@ export const CSS = `
 }
 @media (prefers-reduced-motion: reduce) { .pl-parallax { background-attachment: scroll; } }
 
+/* El esqueleto de carga (ver esqueleto.tsx): la misma portada, con cada texto
+   hecho una barra y cada foto un bloque. Los fondos de color de la plantilla
+   quedan —son parte de su forma—; lo que se va son los degradés, las sombras
+   y todo lo que se mueve. */
+.pl-esq { pointer-events: none; user-select: none; animation: plEsq 1.5s ease-in-out infinite; }
+.pl-esq * { color: transparent !important; background-image: none !important; box-shadow: none !important; text-shadow: none !important; animation: none !important; transition: none !important; }
+.pl-esq :is(h1, h2, h3, p, span, div, button, a, li):not(:has(*)):not(:empty) { background-color: var(--pl-esq) !important; border-color: transparent !important; border-radius: 5px; }
+.pl-esq .pl-media { background: var(--pl-esq) !important; }
+.pl-esq .pl-reveal { opacity: 1 !important; transform: none !important; }
+.pl-esq svg, .pl-esq input { visibility: hidden; }
+@keyframes plEsq { 0%, 100% { opacity: 1 } 50% { opacity: .62 } }
+@media (prefers-reduced-motion: reduce) { .pl-esq { animation: none; } }
+
 .pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes plMenuIn { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 `

@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { PLANTILLAS } from './datos'
+import { EsqueletoPlantilla } from './esqueleto'
 import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
 import { itemsMenuMovil } from './piezas'
 import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
@@ -765,6 +766,45 @@ describe('cada control del editor mueve algo en la portada', () => {
       }
 
       sinProblemas(`editor-portada > ${p.id}`, mal)
+    })
+  }
+})
+
+// ─── El esqueleto de carga ───────────────────────────────────────────────────
+//
+// Mientras la portada espera sus datos se dibuja la misma plantilla con barras
+// en vez de texto (ver esqueleto.tsx). Sale en el primer HTML del servidor,
+// así que no puede llevar nada de la maqueta: ni sus fotos (el navegador las
+// bajaría para un esqueleto) ni sus textos (los leería un buscador).
+
+describe('el esqueleto de carga de cada plantilla', () => {
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      const mal: string[] = []
+      for (const movil of [false, true]) {
+        const donde = movil ? 'celular' : 'escritorio'
+        const html = renderToStaticMarkup(createElement(EsqueletoPlantilla, { p, movil, soloCuerpo: !p.headerPropio, marca: 'Negocio Check' }))
+        const n = nodos(html)
+        if (html.length < 2000) mal.push(`[${donde}] casi no dibuja nada`)
+        if (!html.includes('class="pl-esq"') || !html.includes('aria-hidden="true"')) mal.push(`[${donde}] no está marcado como esqueleto`)
+        if (html.includes('<img')) mal.push(`[${donde}] dibuja una <img>: el navegador la baja para un esqueleto`)
+        if (html.includes('/plantillas/')) mal.push(`[${donde}] nombra una foto de muestra`)
+        if (/\$\s?\d/.test(n.join(' '))) mal.push(`[${donde}] se lee un precio de muestra`)
+
+        // Nada de lo que la plantilla trae escrito como muestra.
+        const deMuestra = [
+          p.marca, p.tagline, p.cartel ?? '',
+          ...p.slides.flatMap(x => [x.titulo, x.bajada, x.kicker ?? '']),
+          ...p.productos.map(x => x.nombre),
+          ...(p.categorias ?? []).map(([nombre]) => nombre),
+          ...(p.links ?? []),
+          ...seccionesDe(p.id).flatMap(sec => sec.campos.filter(c => c.tipo === 'texto' || c.tipo === 'parrafo').map(c => c.porDefecto ?? '')),
+        ].map(limpio).filter(x => x.length >= 6)
+        for (const frase of new Set(deMuestra)) {
+          if (n.some(x => x.includes(frase))) mal.push(`[${donde}] se lee "${frase.slice(0, 40)}", de la maqueta`)
+        }
+      }
+      sinProblemas(`esqueleto > ${p.id}`, mal)
     })
   }
 })
