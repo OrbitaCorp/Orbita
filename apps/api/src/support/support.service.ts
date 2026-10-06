@@ -15,6 +15,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { SendSupportRequestDto, type SupportCategory } from './dto/send-support-request.dto';
 import { SendPublicSupportRequestDto } from './dto/send-public-support-request.dto';
+import { ReportStoreDto, type MotivoDenuncia } from './dto/report-store.dto';
 import { ReplySupportRequestDto } from './dto/reply-support-request.dto';
 import { SupportAttachmentDto } from './dto/support-attachment.dto';
 import { ManualFeedbackDto } from './dto/manual-feedback.dto';
@@ -85,6 +86,14 @@ type DetalleDb = Prisma.SupportRequestGetPayload<{ include: typeof INCLUDE_DETAL
 export class SupportService {
   private readonly logger = new Logger(SupportService.name);
   private readonly SUPPORT_EMAIL = 'soporte@orbita.site';
+
+  private readonly MOTIVO_DENUNCIA: Record<MotivoDenuncia, string> = {
+    PRODUCTO_PROHIBIDO: 'Vende productos prohibidos o ilegales',
+    FALSIFICACION: 'Falsificaciones o uso de una marca ajena',
+    ESTAFA: 'Estafa o publicidad engañosa',
+    DATOS_PERSONALES: 'Uso indebido de datos personales',
+    OTRO: 'Otro motivo',
+  };
 
   private readonly CATEGORY_LABEL: Record<SupportCategory, string> = {
     DOMINIO: 'Dominios',
@@ -642,6 +651,68 @@ export class SupportService {
       if (!ok) this.logger.warn(`El aviso de la consulta #${creada.number} (landing) no salió (ver email_logs); la consulta quedó guardada`);
     } catch (e) {
       this.logger.error(`No se pudo mandar el aviso de la consulta #${creada.number} (landing, quedó guardada igual): ${e instanceof Error ? e.message : e}`);
+    }
+    return { ok: true, number: creada.number };
+  }
+
+  /**
+   * "Denunciar esta tienda" (link en el pie de cada tienda). Entra a la misma
+   * bandeja de soporte que el resto, para que el equipo la vea y la conteste
+   * desde el superadmin, y avisa por mail a soporte. Va como consulta de
+   * categoría "Otra" con el asunto "Denuncia: <tienda>" (no hay una categoría
+   * propia a propósito: sumarla toca el enum y seis pantallas, y no aporta nada
+   * que el asunto no diga). La tienda denunciada NO se guarda como el
+   * `businessId` de la consulta: ese campo es el negocio de quien escribe, y
+   * quien denuncia no tiene cuenta.
+   *
+   * La medida (ocultarla de Google, suspenderla) la decide una persona del
+   * equipo con la denuncia a la vista: acá no se actúa solo, porque una
+   * denuncia falsa no tiene que poder bajar una tienda.
+   */
+  async reportStore(dto: ReportStoreDto): Promise<{ ok: true; number?: number }> {
+    if (dto.website?.trim()) return { ok: true };
+    const tienda = await this.prisma.business.findUnique({
+      where: { subdomain: dto.slug.trim().toLowerCase() },
+      select: { name: true, subdomain: true, deletedAt: true },
+    });
+    if (!tienda || tienda.deletedAt) throw new NotFoundException('Tienda no encontrada');
+
+    const email = dto.email.trim().toLowerCase();
+    const motivo = this.MOTIVO_DENUNCIA[dto.reason];
+    const mensaje = `Tienda denunciada: ${tienda.name} (${tienda.subdomain})
+Motivo: ${motivo}
+
+${dto.details.trim()}`;
+    const asunto = `Denuncia: ${tienda.name}`.slice(0, 120);
+    const creada = await this.prisma.supportRequest.create({
+      data: {
+        source: 'LANDING',
+        businessId: null,
+        memberId: null,
+        contactName: dto.name.trim(),
+        contactEmail: email,
+        hasAccount: false,
+        category: 'OTRO',
+        subject: asunto,
+        lastMessageAt: new Date(),
+        messages: { create: { author: 'MEMBER', memberId: null, body: mensaje, attachments: [] } },
+      },
+    });
+
+    try {
+      const ok = await this.mail.sendPublicSupportRequest(this.SUPPORT_EMAIL, {
+        number: creada.number,
+        name: dto.name.trim(),
+        email,
+        category: 'Denuncia de tienda',
+        subject: asunto,
+        message: mensaje,
+        hasAccount: false,
+        adminUrl: this.urlDelSuperadmin(),
+      });
+      if (!ok) this.logger.warn(`El aviso de la denuncia #${creada.number} no salió (ver email_logs); quedó guardada`);
+    } catch (e) {
+      this.logger.error(`No se pudo mandar el aviso de la denuncia #${creada.number} (quedó guardada igual): ${e instanceof Error ? e.message : String(e)}`);
     }
     return { ok: true, number: creada.number };
   }

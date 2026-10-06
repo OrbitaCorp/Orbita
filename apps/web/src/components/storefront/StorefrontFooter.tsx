@@ -133,8 +133,11 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
               {[
                 ['Ingresar', `${base}/login`],
                 ['Crear cuenta', `${base}/registro`],
-                ['Mis pedidos', `${base}/pedido`],
-                ['Iniciar cambio', `${base}/pedido`],
+                // A la pestaña del perfil, como el menú de la cuenta: `/pedido`
+                // a secas no es una página (solo existe `/pedido/<id>`) y daba
+                // 404. Un cambio se inicia desde el pedido, así que va al mismo lugar.
+                ['Mis pedidos', `${base}/perfil?tab=pedidos`],
+                ['Iniciar cambio', `${base}/perfil?tab=pedidos`],
               ].map(([label, href]) => (
                 <a key={label} href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none' }}>
                   {label}
@@ -185,6 +188,10 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
             </a>
             <a href={`${base}/legales/cookies`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
               Política de cookies
+            </a>
+            {/* Llega al equipo de Órbita, no a la tienda: ver DenunciarTienda.tsx. */}
+            <a href={`${base}/legales/denunciar`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
+              Denunciar esta tienda
             </a>
             <button
               type="button"

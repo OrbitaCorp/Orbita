@@ -16,7 +16,22 @@ Lo único que funcionó, probado:
 | `picsum.photos` | bloqueado, timeout |
 | `source.unsplash.com` | 503 |
 
-**Conseguir los ids**: abrir `https://unsplash.com/s/photos/{búsqueda}` en el
+**La forma más rápida de conseguir ids** es la búsqueda interna de Unsplash,
+desde la consola de cualquier página de unsplash.com abierta en el Browser
+pane: devuelve varias búsquedas de una y ya dice cuáles son de pago.
+
+```js
+const r = await fetch('/napi/search/photos?query=' + encodeURIComponent('cafetera') + '&per_page=10&orientation=landscape')
+;(await r.json()).results
+  .filter(x => !x.premium && !x.plus && x.urls.raw.includes('images.unsplash.com/photo-'))
+  .map(x => [(x.urls.raw.match(/photo-([0-9a-f-]+)/) || [])[1], x.alt_description])
+```
+
+Para la hoja de contactos alcanza con Pillow (`ImageOps.fit` de cada foto a
+250×188 pegada en una grilla, con el nombre debajo): se mira con Read, sin
+levantar el servidor.
+
+**Conseguir los ids a mano**: abrir `https://unsplash.com/s/photos/{búsqueda}` en el
 navegador del Browser pane y leerlos del DOM. El `alt` viene traducido y dice
 qué es cada foto, así que se elige antes de bajar en vez de después:
 
@@ -44,7 +59,8 @@ reemplazo. Sale barato — pasó con 7 de 48 en la última tanda.
 `tech-teclado.jpg`, `moda-mujer-invierno.jpg`.
 
 Prefijos en uso: `vidriera- casa- tech- moda- belleza- comida- joya- local-
-editorial- relato- libre- ferre- dep- masc- vino- bebe-`
+editorial- relato- libre- ferre- dep- masc- vino- bebe- almacen- pan- planta-
+electro- motor- regalo-`
 
 (Los prefijos `diet- boutique- cafe- auto-` fueron de cuatro plantillas —
 Semilla, Lunar, Tueste, Piñón— que se dieron de baja por parecerse demasiado a

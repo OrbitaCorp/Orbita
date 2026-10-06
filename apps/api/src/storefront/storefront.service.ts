@@ -59,6 +59,18 @@ function normalizarBloques(raw: Prisma.JsonValue | null): BloqueContenido[] {
 // antifraude por línea de pedido.
 const MAX_QTY_PUBLICO = 20;
 
+// Tope de productos que entran al sitemap de una tienda. El protocolo admite
+// 50.000 URLs por archivo; una tienda de Órbita está muy lejos de eso, y el
+// tope evita que una consulta se descontrole si algún día pasa.
+const MAX_URLS_SITEMAP = 10_000;
+
+// Cuántas tiendas lista cada página del directorio público (orbita.site/tiendas).
+const TIENDAS_POR_PAGINA = 48;
+
+// Lo que pide el directorio para mostrar una tienda (ver getDirectory).
+const DIRECTORIO_MIN_PRODUCTOS = 3;
+const DIRECTORIO_ESPERA_HORAS = 48;
+
 // El precio que se muestra en la card/listado tiene que ser SIEMPRE el que
 // realmente se cobra al agregar al carrito — nunca `Product.basePrice` como
 // un número aparte que puede desincronizarse del precio real de la variante
@@ -1168,8 +1180,23 @@ export class StorefrontService {
       include: { _count: { select: { products: { where: { deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } } } } },
     });
 
+    // Una categoría madre casi nunca tiene productos propios (viven en las
+    // hijas), así que filtrar solo por conteo la sacaba de la lista y el
+    // storefront veía todas las subcategorías como raíces. Se conservan los
+    // ancestros de toda categoría con productos; su `productCount` sigue siendo
+    // el propio (0), el front decide cómo mostrarlas.
+    const porId = new Map(categories.map((c) => [c.id, c]));
+    const visibles = new Set(categories.filter((c) => (c._count?.products ?? 0) > 0).map((c) => c.id));
+    for (const id of [...visibles]) {
+      let padreId = porId.get(id)?.parentId ?? null;
+      while (padreId && !visibles.has(padreId) && porId.has(padreId)) {
+        visibles.add(padreId);
+        padreId = porId.get(padreId)!.parentId;
+      }
+    }
+
     return categories
-      .filter((c) => (c._count?.products ?? 0) > 0)
+      .filter((c) => visibles.has(c.id))
       .map((c) => ({
         id: c.id,
         name: c.name,
@@ -1180,6 +1207,164 @@ export class StorefrontService {
         parentId: c.parentId,
         productCount: c._count.products,
       }));
+  }
+
+  // ── SEO público: qué le dice la tienda a Google ─────────────────────────────
+  // El frontend arma el <head>, el sitemap y el robots.txt de cada tienda, pero
+  // dos datos solo los sabe el backend: si la tienda corresponde que aparezca
+  // en Google, y con qué dominio (el propio, si lo tiene).
+
+  /**
+   * ¿Debe aparecer en Google, y bajo qué dominio?
+   *
+   * `indexable` es verdadero solo con una tienda publicada y en línea, que no
+   * sea la demo y tenga al menos un producto a la venta: una tienda vacía o en
+   * pausa en el índice es una página sin nada que ofrecer, y la demo no es de
+   * ningún comerciante. Se sigue pudiendo entrar a todas; solo se le pide a
+   * Google que no las indexe.
+   *
+   * `primaryDomain` es el dominio propio ACTIVO (con DNS verificado y, desde
+   * que "Activo" exige HTTPS, con certificado funcionando): ese es el que el
+   * dueño quiere posicionar, y al que apuntan los canonical. Sin uno, la
+   * tienda se queda con su subdominio de Órbita.
+   */
+  async getSeo(slug: string) {
+    return this.seoDe(await this.resolveBusiness(slug));
+  }
+
+  private async seoDe(business: { id: string; isActive: boolean; isPaused: boolean; isDemo: boolean; hiddenFromSearch: boolean }) {
+    // `hiddenFromSearch` es la moderación del equipo de Órbita: la tienda sigue
+    // en línea y vendiendo, pero no se le pide a Google que la muestre.
+    const abierta = business.isActive && !business.isPaused && !business.isDemo && !business.hiddenFromSearch;
+    const [producto, dominio] = await Promise.all([
+      abierta
+        ? this.prisma.product.findFirst({
+            where: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.customDomain.findFirst({
+        where: { businessId: business.id, status: 'ACTIVE', dnsVerified: true },
+        select: { domain: true },
+        orderBy: { createdAt: 'asc' }, // si hubiera más de uno, siempre el mismo
+      }),
+    ]);
+    return { indexable: abierta && !!producto, primaryDomain: dominio?.domain ?? null };
+  }
+
+  /**
+   * El directorio público de tiendas (orbita.site/tiendas): las tiendas que
+   * Órbita muestra como suyas, con el dominio al que hay que mandar al visitante.
+   *
+   * Es la forma de que una tienda nueva llegue sola a Google: el sitemap y el
+   * robots.txt de cada tienda solo los lee Google DESPUÉS de haber llegado al
+   * sitio, y llegar requiere un link desde algún lado. Esta lista es ese link, y
+   * se arma sola: una tienda aparece cuando cumple los requisitos y deja de
+   * aparecer si se pausa o se suspende.
+   *
+   * Es más exigente que `indexable` a propósito. Cada tienda de acá queda
+   * enlazada desde orbita.site, y un directorio automático es lo primero que
+   * usaría quien quiera abusar de la plataforma (tiendas falsas, marcas ajenas,
+   * enlaces de SEO): por eso se pide una tienda con cara de tienda y se deja
+   * pasar un tiempo antes de mostrarla.
+   *   · publicada, en línea, no demo y no oculta por moderación (igual que `indexable`);
+   *   · al menos DIRECTORIO_MIN_PRODUCTOS productos a la venta, cada uno con foto
+   *     y precio mayor a cero;
+   *   · y que esos productos tengan más de DIRECTORIO_ESPERA_HORAS horas: da
+   *     tiempo a que alguien del equipo vea una alta sospechosa antes de que
+   *     aparezca enlazada.
+   * Para Google la tienda sigue apareciendo por su cuenta (sitemap y robots).
+   *
+   * `domain` es el dominio propio ACTIVO, si lo tiene; si no, queda en null y el
+   * frontend arma el subdominio de Órbita.
+   *
+   * Las tiendas se buscan en dos pasos (primero cuáles cumplen, después sus
+   * datos): "tener 3 productos así" no se puede decir en un filtro simple. Con
+   * miles de tiendas habría que pasarlo a una consulta propia.
+   */
+  async getDirectory(pagina = 1, porPagina = TIENDAS_POR_PAGINA, ahora = new Date()) {
+    const antesDe = new Date(ahora.getTime() - DIRECTORIO_ESPERA_HORAS * 3_600_000);
+    const grupos = await this.prisma.product.groupBy({
+      by: ['businessId'],
+      where: {
+        deletedAt: null,
+        status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
+        basePrice: { gt: 0 },
+        images: { some: {} },
+        createdAt: { lte: antesDe },
+        business: { isActive: true, isPaused: false, isDemo: false, hiddenFromSearch: false, deletedAt: null },
+      },
+      having: { id: { _count: { gte: DIRECTORIO_MIN_PRODUCTOS } } },
+    });
+    const ids = grupos.map((g) => g.businessId);
+    if (ids.length === 0) return { total: 0, page: pagina, perPage: porPagina, stores: [] };
+
+    const filas = await this.prisma.business.findMany({
+      where: { id: { in: ids } },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }], // orden estable: la misma tienda no salta de página
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+      select: {
+        name: true,
+        subdomain: true,
+        storefrontConfig: { select: { storeName: true, tagline: true, logoUrl: true } },
+        customDomains: {
+          where: { status: 'ACTIVE', dnsVerified: true },
+          select: { domain: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+    return {
+      total: ids.length,
+      page: pagina,
+      perPage: porPagina,
+      stores: filas.map((b) => ({
+        name: b.storefrontConfig?.storeName?.trim() || b.name,
+        subdomain: b.subdomain,
+        domain: b.customDomains[0]?.domain ?? null,
+        description: b.storefrontConfig?.tagline?.trim() || null,
+        logoUrl: b.storefrontConfig?.logoUrl ?? null,
+      })),
+    };
+  }
+
+  /**
+   * Lo que va al sitemap.xml de la tienda: sus categorías con productos y sus
+   * productos a la venta, con la fecha de la última modificación. Una tienda
+   * que no debe indexarse devuelve las listas vacías.
+   *
+   * Dos categorías con el mismo slug (una "remeras" en Hombre y otra en Mujer,
+   * el slug es único por padre) se dejan afuera: la ruta /catalogo/:slug no
+   * sabría cuál mostrar, y es mejor no listar una URL ambigua que listarla mal.
+   */
+  async getSitemap(slug: string) {
+    const business = await this.resolveBusiness(slug);
+    const seo = await this.seoDe(business);
+    if (!seo.indexable) return { ...seo, categories: [], products: [] };
+
+    const publicos = { deletedAt: null, status: { in: ['PUBLISHED' as const, 'OUT_OF_STOCK' as const] } };
+    const [categorias, productos] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { businessId: business.id, isActive: true },
+        select: { slug: true, updatedAt: true, _count: { select: { products: { where: publicos } } } },
+      }),
+      this.prisma.product.findMany({
+        where: { businessId: business.id, ...publicos },
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: MAX_URLS_SITEMAP,
+      }),
+    ]);
+    const repetidos = new Set(categorias.map((c) => c.slug).filter((s, i, todos) => todos.indexOf(s) !== i));
+    return {
+      ...seo,
+      categories: categorias
+        .filter((c) => c._count.products > 0 && !repetidos.has(c.slug))
+        .map((c) => ({ slug: c.slug, updatedAt: c.updatedAt.toISOString() })),
+      products: productos.map((p) => ({ id: p.id, updatedAt: p.updatedAt.toISOString() })),
+    };
   }
 
   // ── Cupones públicos (RBT-615/616 — vista del cliente) ─────────────────────

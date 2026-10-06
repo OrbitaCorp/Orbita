@@ -11,6 +11,7 @@ import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.ser
 import { DomainExpiryService } from '../domains/domain-expiry.service';
 import { EmailVerificationService } from '../member-profile/email-verification.service';
 import { CostsService } from '../platform/costs/costs.service';
+import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -72,6 +73,9 @@ export class InternalCronController {
     // Sincronización diaria de costos de proveedores (pantalla Costos del super admin).
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly costs?: CostsService,
+    // Alertas de los límites de gasto, justo después del sync de costos.
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly alertasDeCosto?: AlertasDeCostoService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -142,6 +146,9 @@ export class InternalCronController {
         // si falla, se anota sin marcar la corrida como fallida.
         try {
           await this.costs?.syncAll();
+          // Con el snapshot del mes recién actualizado: crea la alerta de cada
+          // umbral de los límites que se cruzó (una vez por mes).
+          await this.alertasDeCosto?.revisar();
         } catch (e) {
           this.logger.error(`Sincronización de costos: no se pudo correr — ${describeError(e)}`);
         }

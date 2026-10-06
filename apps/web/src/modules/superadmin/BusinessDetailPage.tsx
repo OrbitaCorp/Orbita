@@ -55,6 +55,8 @@ function Detalle({ businessId }: { businessId: string }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [suspendiendo, setSuspendiendo] = useState(false)
   const [reactivando, setReactivando] = useState(false)
+  const [ocultando, setOcultando] = useState(false)
+  const [mostrando, setMostrando] = useState(false)
   const [cediendo, setCediendo] = useState(false)
   const [range, setRange] = useRange(30)
 
@@ -74,7 +76,13 @@ function Detalle({ businessId }: { businessId: string }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0, letterSpacing: '-0.01em' }}>{d.name}</h1>
           <StatusBadge status={d.status} />
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* Moderación suave: la tienda sigue vendiendo, solo deja de ofrecerse a Google y al directorio. */}
+            {d.hiddenFromSearch ? (
+              <button onClick={() => setMostrando(true)} className="ds-hover" style={btnGhostSm}>Volver a mostrar en Google</button>
+            ) : (
+              <button onClick={() => setOcultando(true)} className="ds-hover" style={btnGhostSm}>Ocultar de Google y del directorio</button>
+            )}
             {d.status === 'paused' ? (
               <button onClick={() => setReactivando(true)} className="ds-hover" style={btnGhostSm}>Reactivar negocio</button>
             ) : (
@@ -91,6 +99,11 @@ function Detalle({ businessId }: { businessId: string }) {
         >
           {d.subdomain}.orbita.site ↗
         </a>
+        {d.hiddenFromSearch && (
+          <div style={{ fontSize: 13, color: 'var(--color-warning, #B45309)', marginTop: 8 }}>
+            Oculta de Google y del directorio (sigue en línea y vendiendo){d.hiddenFromSearchReason ? `: ${d.hiddenFromSearchReason}` : '.'}
+          </div>
+        )}
         {/* Se arman las partes y recién después se unen: un negocio sin rubro
             dejaba la línea empezando con un "·" suelto. */}
         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 6 }}>
@@ -307,6 +320,30 @@ function Detalle({ businessId }: { businessId: string }) {
           }}
         />
       )}
+      {ocultando && (
+        <OcultarModal
+          businessName={d.name}
+          onCancel={() => setOcultando(false)}
+          onConfirm={async (reason) => {
+            await platformApi.hideBusinessFromSearch(d.id, reason)
+            setOcultando(false)
+            onChanged()
+          }}
+        />
+      )}
+      {mostrando && (
+        <ConfirmModal
+          title={`¿Volver a mostrar ${d.name}?`}
+          body="La tienda vuelve a poder aparecer en Google y en el directorio de Órbita (en el directorio, si cumple los requisitos)."
+          confirmLabel="Volver a mostrar"
+          onCancel={() => setMostrando(false)}
+          onConfirm={async () => {
+            await platformApi.showBusinessInSearch(d.id)
+            setMostrando(false)
+            onChanged()
+          }}
+        />
+      )}
       {reactivando && (
         <ConfirmModal
           title={`¿Reactivar ${d.name}?`}
@@ -380,6 +417,49 @@ function GrantCompModal({ businessName, onCancel, onConfirm }: { businessName: s
           style={btnPrimary}
         >
           {enviando ? 'Cediendo…' : 'Ceder licencia'}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+// Ocultar una tienda de Google y del directorio SIN suspenderla: sigue en línea y
+// vendiendo. Es la medida para un caso dudoso o una denuncia que se está
+// investigando; suspender corta las ventas, esto solo corta la visibilidad.
+function OcultarModal({ businessName, onCancel, onConfirm }: { businessName: string; onCancel: () => void; onConfirm: (reason?: string) => Promise<void> }) {
+  const [reason, setReason] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+  return (
+    <ModalShell onClose={onCancel} title={`¿Ocultar ${businessName} de Google y del directorio?`}>
+      <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--color-body)' }}>
+        La tienda deja de aparecer en orbita.site/tiendas y se le pide a Google que no la muestre. Sigue en línea y
+        puede seguir vendiendo: los clientes que tengan el link la ven igual. Si Google ya la tenía indexada, puede
+        tardar días en sacarla (para una urgencia, usá "Retirada de URLs" en Search Console).
+      </p>
+      <Field label="Motivo (opcional, queda en el log de auditoría)">
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: denuncia por marca ajena, en revisión…" className="ds-field" style={inputStyle} />
+      </Field>
+      {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button type="button" onClick={onCancel} className="ds-hover" style={btnGhost}>Cancelar</button>
+        <button
+          type="button"
+          className="ds-hover"
+          disabled={enviando}
+          onClick={async () => {
+            setEnviando(true)
+            setError('')
+            try {
+              await onConfirm(reason.trim() || undefined)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'No se pudo ocultar la tienda.')
+              setEnviando(false)
+            }
+          }}
+          style={btnPrimary}
+        >
+          {enviando ? 'Ocultando…' : 'Ocultar'}
         </button>
       </div>
     </ModalShell>

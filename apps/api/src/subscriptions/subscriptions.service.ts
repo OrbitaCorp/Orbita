@@ -2247,6 +2247,19 @@ export class SubscriptionsService {
       // `deletedAt`, así que el `onDelete: Cascade` del schema no corre nunca.
       p.orbiPendingAction.deleteMany(delNegocio),
       p.orbiTurn.deleteMany(delNegocio),
+      // Medición y cupos de Orbi (spec 2026-10-03): los cupos y ajustes mensuales
+      // de cada miembro y el registro de quién leyó qué conversación. Las dos
+      // primeras tienen FK con cascade, pero la baja no borra la fila del negocio;
+      // orbi_conversation_access ni siquiera tiene FK.
+      p.orbiCupoAjuste.deleteMany(delNegocio),
+      p.orbiCupoMiembro.deleteMany(delNegocio),
+      p.orbiConversationAccess.deleteMany(delNegocio),
+      // usage_events se conserva (es el gasto de la plataforma), pero sin a quién
+      // ni de qué conversación (spec 2026-10-03, D12). Solo se tocan los metadata
+      // que son objeto: track() guarda JSON null cuando el evento no trae metadata,
+      // y `jsonb 'null' - 'x'` falla ("cannot delete from scalar") y tiraría abajo
+      // la transacción entera.
+      p.$executeRaw`UPDATE usage_events SET metadata = metadata - 'memberId' - 'conversationId' - 'turnId' WHERE business_id = ${businessId} AND jsonb_typeof(metadata) = 'object'`,
       // daily_quota no tiene businessId ni relación: la clave es
       // `<prefijo>:<negocio>` (orbi-panel:, ai-assist:, image-studio:). Los
       // ids son uuid, así que el sufijo `:<id>` no puede confundirse con otro.

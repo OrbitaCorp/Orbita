@@ -39,6 +39,12 @@ export const HOME_TEMPLATES_DISPONIBLES = [
   'roble',
   'petalo',
   'sello',
+  'granel',
+  'horno',
+  'brote',
+  'voltio',
+  'piston',
+  'confeti',
 ] as const;
 
 export class SetHomeTemplateDto {

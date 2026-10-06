@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -33,12 +33,12 @@ import { EstudioFondoModal, type ImagenParaFondo, type ResultadoFondo } from './
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelSetProductImageBackground, panelReorderProductImages,
-    panelPresignProductVideo,
+    panelPresignProductVideo, panelUpdateProductContent,
     panelGetTags, panelCreateTag, panelAiAssist, panelAiVariants, panelAiScanProduct, panelGetSuggestedImages, panelProxyImage, panelGetAddons,
     panelGetBusiness, panelGetVariantHistory,
     ApiError,
     panelGenerateProductBackground,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption, type ApiVariantHistory,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag, type SuggestedProductImage, type AiVariantOption, type ApiVariantHistory, type ApiProductContentBlock,
 } from '@/lib/api'
 import { specsDelNegocio, type PresetVariantes } from './presetsVariantes'
 import {
@@ -297,6 +297,8 @@ async function subirVideoProducto(file: File, onProgress?: (pct: number) => void
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
     const [contenidoAbierto, setContenidoAbierto] = useState(false)
+    const [bloquesContenido, setBloquesContenido] = useState<ApiProductContentBlock[]>([])
+    const [bloquesContenidoModificado, setBloquesContenidoModificado] = useState(false)
     const router = useRouter()
     const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
@@ -566,6 +568,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 if (!vigente) return
                 const conVariantes = p.options.length > 0
                 setOpcionesGuardadas(conVariantes)
+                setBloquesContenido(p.contentBlocks ?? [])
+                setBloquesContenidoModificado(false)
                 setProd({
                     nombre: p.name,
                     descripcion: p.description ?? '',
@@ -1478,6 +1482,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setIntento(null)
         setMasAbierto(false)
         setMostrarSpecs(false)
+        setBloquesContenido([])
+        setBloquesContenidoModificado(false)
         setTagInput('')
         skuAutoRef.current = true
         const contenedor = document.querySelector('.admin-main')
@@ -1517,6 +1523,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 ? crypto.randomUUID()
                 : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
             const imgsASubir = imagenes
+            const bloquesAGuardar = bloquesContenido
             beginProductCreation(tempId, {
                 name: prod.nombre,
                 basePrice: prod.tieneVariantes ? precioMinVariantes : Number(prod.precio) || 0,
@@ -1538,6 +1545,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     const payload = armarPayload(tagIds, estado)
                     const guardado = await panelCreateProduct(payload)
                     markProductCreated(tempId, guardado.id, imgsASubir.length)
+
+                    if (bloquesAGuardar.length > 0) {
+                        await panelUpdateProductContent(guardado.id, bloquesAGuardar).catch(() => {})
+                    }
 
                     if (imgsASubir.length > 0) {
                         // Recién ahora existen los ids de cada valor de
@@ -1612,6 +1623,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         const imgsASubir = imagenes
         const reemplazadas = guardadasReemplazadas
         const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
+        const bloquesAGuardar = bloquesContenido
+        const bloquesModificados = bloquesContenidoModificado
         beginProductEdit(idParaTracker)
         onToast('Guardando cambios…')
         onVolver()
@@ -1621,6 +1634,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 const tagIds = await resolverTagIds(prod.tags)
                 const payload = armarPayload(tagIds, estado)
                 const guardado = await panelUpdateProduct(idParaTracker, payload)
+
+                if (bloquesModificados) {
+                    await panelUpdateProductContent(guardado.id, bloquesAGuardar).catch(() => {})
+                }
 
                 const idPorValor = new Map<string, string>()
                 for (const opt of guardado.options) {
@@ -2585,7 +2602,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     abierto={masAbierto}
                                     onToggle={() => setMasAbierto(o => !o)}
                                     titulo="Más detalles"
-                                    resumen="Etiquetas, especificaciones, video y SKU"
+                                    resumen="Etiquetas, especificaciones, video, contenido de ficha y SKU"
                                 >
                                     <Bloque titulo="Etiquetas" ayuda="Sirven para agrupar productos.">
                                         <input
@@ -2696,6 +2713,142 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         <VideoUploader value={prod.videoUrl} onChange={v => set('videoUrl', v)} onUpload={subirVideoProducto} maxMB={500} />
                                     </Bloque>
 
+                                    <Bloque
+                                        titulo="Contenido de la ficha"
+                                        ayuda="Videos con texto alternado debajo de las características de la tienda."
+                                        derecha={bloquesContenido.length > 0 ? (
+                                            <button
+                                                type="button"
+                                                className="ds-link"
+                                                onClick={() => setContenidoAbierto(true)}
+                                                style={enlace}
+                                            >
+                                                Editar contenido ({bloquesContenido.length})
+                                            </button>
+                                        ) : undefined}
+                                    >
+                                        {bloquesContenido.length === 0 ? (
+                                            <div
+                                                onClick={() => setContenidoAbierto(true)}
+                                                style={{
+                                                    border: '1.5px dashed var(--color-border)',
+                                                    borderRadius: 10,
+                                                    padding: '16px 20px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    cursor: 'pointer',
+                                                    background: 'var(--color-bg)',
+                                                    transition: 'border-color 0.15s, background-color 0.15s',
+                                                }}
+                                                className="ds-hover"
+                                            >
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                    <div
+                                                        style={{
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius: 8,
+                                                            background: 'var(--color-surface)',
+                                                            border: '1px solid var(--color-border)',
+                                                            display: 'grid',
+                                                            placeItems: 'center',
+                                                            color: 'var(--color-primary)',
+                                                        }}
+                                                    >
+                                                        <Clapperboard size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                            Agregar contenido enriquecido
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                            Contá la historia del producto con videos cortos, títulos y detalles al costado
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="ds-link"
+                                                    style={{ ...enlace, pointerEvents: 'none' }}
+                                                >
+                                                    <Plus size={13} /> Configurar
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                <div
+                                                    style={{
+                                                        background: 'var(--color-bg)',
+                                                        border: '1px solid var(--color-border)',
+                                                        borderRadius: 10,
+                                                        padding: '10px 14px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        gap: 12,
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                                        <div
+                                                            style={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 6,
+                                                                background: 'var(--color-primary-bg)',
+                                                                display: 'grid',
+                                                                placeItems: 'center',
+                                                                color: 'var(--color-primary)',
+                                                                flexShrink: 0,
+                                                            }}
+                                                        >
+                                                            <Clapperboard size={16} />
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                                                                {bloquesContenido.length} bloque{bloquesContenido.length === 1 ? '' : 's'} de video y texto configurado{bloquesContenido.length === 1 ? '' : 's'}
+                                                            </div>
+                                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {bloquesContenido.map(b => b.title || b.eyebrow || 'Bloque').filter(Boolean).join(' • ') || 'Sin títulos'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setContenidoAbierto(true)}
+                                                        >
+                                                            Editar
+                                                        </Button>
+                                                        <button
+                                                            type="button"
+                                                            className="ds-hover"
+                                                            onClick={() => {
+                                                                setBloquesContenido([])
+                                                                setBloquesContenidoModificado(true)
+                                                            }}
+                                                            title="Quitar todos los bloques de contenido"
+                                                            style={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 7,
+                                                                border: 'none',
+                                                                background: 'transparent',
+                                                                color: 'var(--color-muted)',
+                                                                display: 'grid',
+                                                                placeItems: 'center',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Bloque>
+
                                     {!prod.tieneVariantes ? (
                                         <Bloque titulo="Inventario" ayuda="El código se arma solo a partir del nombre.">
                                             <div className="pn-3col" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
@@ -2737,13 +2890,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     )
                                                 })}
                                             </div>
-                                            {/* Contenido de la ficha (videos con texto): mismo editor que
-                                                Productos → ⋮ → "Contenido de la ficha"; guarda solo. */}
-                                            {editarId && (
-                                                <button type="button" className="ds-link" onClick={() => setContenidoAbierto(true)} style={{ ...enlace, marginTop: 12 }}>
-                                                    Contenido de la ficha <ChevronRight size={13} />
-                                                </button>
-                                            )}
                                         </Bloque>
                                     )}
                                 </Desplegable>
@@ -2835,8 +2981,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         </div>
                     )}
 
-                    {contenidoAbierto && editarId && (
-                        <ContenidoFichaModal productId={editarId} onClose={() => setContenidoAbierto(false)} onGuardado={() => onToast?.('Contenido de la ficha guardado')} />
+                    {contenidoAbierto && (
+                        <ContenidoFichaModal
+                            productId={editarId}
+                            productName={prod.nombre}
+                            initialBlocks={bloquesContenido}
+                            onClose={() => setContenidoAbierto(false)}
+                            onGuardado={() => onToast?.('Contenido de la ficha guardado')}
+                            onSaveBlocks={blocks => {
+                                setBloquesContenido(blocks)
+                                setBloquesContenidoModificado(true)
+                            }}
+                        />
                     )}
                 </div>
 

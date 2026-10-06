@@ -1,6 +1,6 @@
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
-import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
+import type { LlmToolDefinition, LlmUsage } from '../../llm/llm-adapter.interface';
 import type { ProductsService } from '../../../products/products.service';
 import type { ProductAiService } from '../../../products/product-ai.service';
 import type { CuotaService } from '../../../common/cuota/cuota.service';
@@ -173,6 +173,9 @@ export class GenerateDescriptionTool implements OrbiTool {
   }
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
+    // Fuera del try: si la IA respondió (y se cobró) pero la respuesta no sirvió,
+    // el consumo igual tiene que llegar a la ficha del turno.
+    let consumo: LlmUsage | undefined;
     try {
       // Misma cuota que POST /products/ai-assist: la IA de productos gasta plata
       // y las dos vías (el botón del panel y Orbi) suman al mismo contador
@@ -184,10 +187,16 @@ export class GenerateDescriptionTool implements OrbiTool {
           label: 'Llegaste al máximo de ayudas de IA por hoy',
         };
       }
-      const result = await this.productAiService.assist(ctx.businessId, {
-        name: args.productName as string,
-        existingDescription: args.existingDescription as string | undefined,
-      });
+      // La IA de esta tool gasta plata propia (no es la del turno): se ata al turno
+      // y al miembro, y el consumo vuelve en el resultado para que el turno lo sume.
+      const result = await this.productAiService.assist(
+        ctx.businessId,
+        {
+          name: args.productName as string,
+          existingDescription: args.existingDescription as string | undefined,
+        },
+        { memberId: ctx.userId, turnId: ctx.turnId, alConsumir: (u) => { consumo = u; } },
+      );
 
       return {
         success: true,
@@ -198,10 +207,11 @@ export class GenerateDescriptionTool implements OrbiTool {
           suggestedSpecs: result.suggestedSpecs,
           suggestedCategoryId: result.suggestedCategoryId,
         },
+        consumo,
       };
     } catch (error: any) {
       const msg = error?.response?.message ?? error?.message ?? String(error);
-      return { success: false, error: `No pude generar la descripción: ${msg}`, label: 'Error generando descripción' };
+      return { success: false, error: `No pude generar la descripción: ${msg}`, label: 'Error generando descripción', consumo };
     }
   }
 }

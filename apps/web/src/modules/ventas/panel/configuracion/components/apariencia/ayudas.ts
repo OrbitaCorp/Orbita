@@ -91,9 +91,9 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
         afecta: 'Apagar algo no borra nada: los datos quedan guardados y vuelven a mostrarse cuando lo prendés de nuevo.',
     },
     visibilidadPlantilla: {
-        que: 'Los interruptores de las dos franjas que tu plantilla toma de acá: el anuncio de arriba y la barra de confianza.',
-        donde: 'El anuncio, arriba del header, en todas las páginas. La barra de confianza, debajo del hero de la portada.',
-        afecta: 'Apagar una no borra su contenido: los datos quedan guardados y vuelven a mostrarse cuando la prendés otra vez. El resto de la portada lo define la plantilla, no esta pantalla.',
+        que: 'Qué partes de la portada ven tus clientes. La plantilla decide cómo se ve cada una y dónde va; vos decidís cuáles se muestran.',
+        donde: 'En la portada de tu tienda. El anuncio y el buscador, además, en todas las páginas.',
+        afecta: 'Apagar una no borra su contenido: los datos quedan guardados y vuelven a mostrarse cuando la prendés otra vez. Una fila de productos sin nada para mostrar no aparece aunque esté prendida.',
     },
     textos: {
         que: 'El aviso de la franja finita de arriba, y el mensaje con el que arranca una charla de WhatsApp.',

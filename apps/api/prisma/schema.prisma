@@ -42,6 +42,14 @@ model Business {
   // su localStorage; el servidor rechaza cualquier escritura pública sobre
   // este negocio (ver DemoGuard). Se marca a mano, nunca desde la app.
   isDemo Boolean @default(false) @map("is_demo")
+  // Moderación (06/10/2026): el equipo de Órbita saca la tienda de Google y del
+  // directorio (orbita.site/tiendas) SIN suspenderla, así que la tienda sigue
+  // vendiendo. Es la palanca para un caso dudoso o una denuncia que se está
+  // investigando: suspender corta las ventas, esto solo corta la visibilidad.
+  // Lo prende y apaga solo el superadmin (con registro en PlatformAdminLog);
+  // el dueño no lo ve ni lo toca.
+  hiddenFromSearch       Boolean @default(false) @map("hidden_from_search")
+  hiddenFromSearchReason String? @map("hidden_from_search_reason")
   // Hasta qué instante están "al día" las fechas de los datos de la demo. Los
   // pedidos, pagos, visitas, etc. se sembraron relativos a un momento; cada
   // tanto se corren hacia adelante lo que pasó desde acá (DemoFechasService),
@@ -87,6 +95,7 @@ model Business {
   orders               Order[]
   payments             Payment[]
   mpCredentials        MpCredentials?
+  whatsappConnection   WhatsappConnection?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -117,6 +126,8 @@ model Business {
   // Orbi fase 1: acciones pendientes de confirmar y telemetría por turno.
   orbiPendingActions   OrbiPendingAction[]
   orbiTurns            OrbiTurn[]
+  orbiCupoAjustes      OrbiCupoAjuste[]
+  orbiCupoMiembros     OrbiCupoMiembro[]
 
   @@map("businesses")
 }
@@ -610,6 +621,7 @@ model Customer {
   dni                 String? // facturación
   birthDate           DateTime? @map("birth_date")
   avatarUrl           String?   @map("avatar_url")
+  whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -630,6 +642,7 @@ model Customer {
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
+  @@unique([businessId, whatsappId])
   @@index([businessId])
   @@index([phone])
   @@map("customers")
@@ -1575,6 +1588,9 @@ model Message {
   sender         MessageSender // enum unificado (antes 'cli'/'me' vs 'cliente'/'tienda')
   text           String
   orderId        String?       @map("order_id") // mención opcional a un pedido
+  channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
+  externalId     String?       @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
+  deliveryStatus String?       @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
   createdAt      DateTime      @default(now()) @map("created_at") // timestamp real (antes string display)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -1586,6 +1602,35 @@ model Message {
 enum MessageSender {
   CUSTOMER
   STORE
+}
+
+enum MessageChannel {
+  STOREFRONT
+  WHATSAPP
+}
+
+// Conexión de un negocio con WhatsApp Business (Cloud API de Meta). Una por
+// negocio. `accessToken` va CIFRADO con pgp_sym_encrypt (mismo criterio que
+// MpCredentials): el texto plano solo existe dentro de la query.
+model WhatsappConnection {
+  id            String                   @id @default(uuid())
+  businessId    String                   @unique @map("business_id")
+  wabaId        String                   @map("waba_id") // WhatsApp Business Account
+  phoneNumberId String                   @unique @map("phone_number_id") // con esto el webhook único resuelve a qué negocio pertenece el mensaje
+  displayPhone  String?                  @map("display_phone") // número legible, solo para mostrar en el panel
+  accessToken   String                   @map("access_token") // CIFRADO (pgp_sym_encrypt)
+  status        WhatsappConnectionStatus @default(ACTIVE)
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("whatsapp_connections")
+}
+
+enum WhatsappConnectionStatus {
+  ACTIVE
+  DISCONNECTED
 }
 
 model MessageTemplate {
@@ -2940,6 +2985,7 @@ model OrbiPendingAction {
   businessId     String    @map("business_id")
   memberId       String    @map("member_id")
   conversationId String?   @map("conversation_id")
+  turnId         String?   @map("turn_id") // orbi_turns.id, sin FK (la acción se purga a los 30 días)
   tool           String
   args           Json
   summary        String
@@ -2984,7 +3030,23 @@ model OrbiTurn {
   rounds           Int
   toolsUsed        String[] @default([]) @map("tools_used")
   actionsProposed  Int      @default(0) @map("actions_proposed")
-  status           String // ok | error | cancelled | max_rounds
+  status           String // ok | error | cancelled | max_rounds | quota
+  // Ficha ampliada (spec 2026-10-03-orbi-medicion-y-cupos §5.1). Todo admite
+  // null: los turnos anteriores no lo tienen.
+  provider         String? // gemini | groq | mixto
+  cachedTokens     Int?     @map("cached_tokens") // ya incluidos en prompt_tokens
+  thinkingTokens   Int?     @map("thinking_tokens") // ya incluidos en completion_tokens
+  ttftMs           Int?     @map("ttft_ms")
+  costUsd          Decimal? @map("cost_usd") @db.Decimal(12, 6)
+  toolsCostUsd     Decimal? @map("tools_cost_usd") @db.Decimal(12, 6)
+  credits          Int?
+  errorCategory    String?  @map("error_category")
+  section          String?
+  contextChars     Json?    @map("context_chars")
+  steps            Json?
+  writesRejected   Int      @default(0) @map("writes_rejected")
+  actionsConfirmed Int      @default(0) @map("actions_confirmed")
+  actionsRejected  Int      @default(0) @map("actions_rejected")
   createdAt        DateTime @default(now()) @map("created_at")
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -3037,4 +3099,53 @@ model OrbiProviderFailure {
 
   @@index([createdAt])
   @@map("orbi_provider_failures")
+}
+
+// Orbi: ajuste manual del cupo mensual de un negocio, en créditos (spec
+// 2026-10-03-orbi-medicion-y-cupos §5.3). Lo carga un admin de plataforma.
+model OrbiCupoAjuste {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  mes        String // 'YYYY-MM' de Argentina
+  creditos   Int // positivo suma cupo, negativo resta
+  motivo     String
+  adminId    String   @map("admin_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, mes])
+  @@map("orbi_cupo_ajustes")
+}
+
+// Orbi: tope por persona dentro del cupo del negocio (lo define el dueño).
+model OrbiCupoMiembro {
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  topePorcentaje Int      @map("tope_porcentaje") // 10..100 del cupo del negocio
+  updatedBy      String   @map("updated_by") // memberId del dueño
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, memberId])
+  @@map("orbi_cupo_miembros")
+}
+
+// Orbi: registro de cada vez que un admin de plataforma lee una conversación.
+// Sin relación: el registro sobrevive a la conversación, como platform_admin_logs.
+model OrbiConversationAccess {
+  id             String   @id @default(uuid())
+  adminId        String   @map("admin_id")
+  conversationId String   @map("conversation_id")
+  businessId     String   @map("business_id")
+  memberId       String   @map("member_id")
+  motivo         String // soporte | abuso | calidad
+  detalle        String
+  ticket         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@index([adminId, createdAt])
+  @@map("orbi_conversation_access")
 }

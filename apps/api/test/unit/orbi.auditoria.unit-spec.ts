@@ -37,7 +37,7 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
   };
   const analitica = { logAiTurn: jest.fn().mockResolvedValue(null) };
   const cuota = { consumir: jest.fn().mockResolvedValue(opts.hayCupo ?? true) };
-  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any, cuota as any, { registrar: jest.fn().mockResolvedValue(undefined) } as any, { exigirDisponible: jest.fn().mockResolvedValue(undefined), registrarOk: jest.fn().mockResolvedValue(undefined), avisoDeFalla: jest.fn().mockResolvedValue({ code: 'ORBI_ERROR', message: 'Orbi tuvo un problema para responder. Probá de nuevo en unos minutos.' }) } as any);
+  const ctrl = new OrbiController(llm as any, { get: () => undefined } as any, conversaciones as any, contexto as any, tools as any, analitica as any, {} as any, { track: jest.fn() } as any, cuota as any, { registrar: jest.fn().mockResolvedValue(undefined) } as any, { exigirDisponible: jest.fn().mockResolvedValue(undefined), registrarOk: jest.fn().mockResolvedValue(undefined), avisoDeFalla: jest.fn().mockResolvedValue({ code: 'ORBI_ERROR', message: 'Orbi tuvo un problema para responder. Probá de nuevo en unos minutos.' }) } as any, { motivoDeBloqueo: jest.fn().mockResolvedValue(null) } as any);
   return { ctrl, llm, tools, cuota };
 }
 

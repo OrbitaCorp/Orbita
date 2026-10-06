@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { ArrowUp, Square, X } from 'lucide-react'
+import { AVISO_PRIVACIDAD, URL_PRIVACIDAD } from '@/components/orbi/avisoPrivacidad'
 import s from '../orbi.module.css'
 
 /**
@@ -8,7 +9,7 @@ import s from '../orbi.module.css'
  * pasa a Detener. El texto es el borrador de la sesión: cambiar de vista o de
  * sesión no lo pierde.
  */
-export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitado, placeholder, contexto, onQuitarContexto, enfocar }: {
+export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitado, placeholder, contexto, onQuitarContexto, enfocar, conAviso = true }: {
   texto: string
   onTexto: (t: string) => void
   onEnviar: (t: string) => void
@@ -21,6 +22,8 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
   onQuitarContexto?: () => void
   /** Enfocar al montar (no en pantallas táctiles: abriría el teclado sin que nadie lo pida). */
   enfocar?: boolean
+  /** La línea de privacidad de abajo. Se apaga en la demo: ahí las conversaciones no se guardan. */
+  conAviso?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -60,6 +63,7 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
   }
 
   return (
+    <>
     <div className={s.caja}>
       {contexto && (
         <span className={s.contexto}>
@@ -102,5 +106,12 @@ export function Caja({ texto, onTexto, onEnviar, onDetener, enVivo, deshabilitad
         )}
       </div>
     </div>
+    {conAviso && (
+      <p className={s.avisoPrivacidad}>
+        {AVISO_PRIVACIDAD}{' '}
+        <a href={URL_PRIVACIDAD} target="_blank" rel="noreferrer">Privacidad</a>
+      </p>
+    )}
+    </>
   )
 }

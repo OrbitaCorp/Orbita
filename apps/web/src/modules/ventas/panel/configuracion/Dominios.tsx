@@ -12,7 +12,7 @@
 // del módulo, sin snapshot de "cambios sin guardar" porque acá cada acción
 // es su propia mutación, no un formulario con botón Guardar).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Globe, Copy, Check, RefreshCw, Trash2, ShoppingBag, Link2, Loader2, AlertCircle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
@@ -84,15 +84,39 @@ function DnsRecordsTable({ records }: { records: ApiDnsRecord[] }) {
                     <CopyField value={r.value} />
                 </div>
             ))}
+            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--color-border)', fontSize: 11.5, lineHeight: 1.5, color: 'var(--color-subtle)' }}>
+                Si ya tenés registros con estos mismos nombres (un ALIAS, un A o un CNAME de la página de estacionamiento del proveedor), borralos antes: no se pueden tener los dos.
+            </div>
         </div>
     )
 }
 
-function DomainRow({ d, onChange }: { d: ApiDomain; onChange: () => void }) {
+// Mientras el dominio no esté andando de punta a punta (DNS + certificado
+// HTTPS) el panel lo vuelve a medir solo: el certificado tarda en salir y no
+// hay nada que el dueño pueda hacer más que esperar.
+const SONDEO_MS = 20_000
+const sinTerminar = (d: ApiDomain) =>
+    d.status === 'PENDING' || d.status === 'VERIFYING' || (d.status === 'ACTIVE' && d.sslStatus !== 'ACTIVE')
+
+function DomainRow({ d, onUpdate, onChange }: { d: ApiDomain; onUpdate: (d: ApiDomain) => void; onChange: () => void }) {
     const [records, setRecords] = useState<ApiDnsRecord[] | null>(null)
     const [busy, setBusy] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [modalBorrar, setModalBorrar] = useState(false)
+
+    const onUpdateRef = useRef(onUpdate)
+    onUpdateRef.current = onUpdate
+    const pendiente = sinTerminar(d)
+    useEffect(() => {
+        if (!pendiente) return
+        let vivo = true
+        const medir = () => {
+            panelVerifyDomainDns(d.id).then(r => { if (vivo) onUpdateRef.current(r) }).catch(() => {})
+        }
+        const primera = setTimeout(medir, 1500)
+        const t = setInterval(medir, SONDEO_MS)
+        return () => { vivo = false; clearTimeout(primera); clearInterval(t) }
+    }, [pendiente, d.id])
 
     async function toggleRecords() {
         if (records) { setRecords(null); return }
@@ -112,8 +136,7 @@ function DomainRow({ d, onChange }: { d: ApiDomain; onChange: () => void }) {
         setBusy('verify')
         setError(null)
         try {
-            await panelVerifyDomainDns(d.id)
-            onChange()
+            onUpdate(await panelVerifyDomainDns(d.id))
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'No se pudo verificar el DNS')
         } finally {
@@ -149,15 +172,24 @@ function DomainRow({ d, onChange }: { d: ApiDomain; onChange: () => void }) {
                             <span style={{ fontSize: 11.5, color: ssl.color }}>{ssl.label}</span>
                             <span style={{ fontSize: 11, color: 'var(--color-subtle)' }}>{d.source === 'LINKED' ? 'Vinculado' : 'Comprado'}</span>
                         </div>
+                        {pendiente && (
+                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5 }}>
+                                {d.dnsVerified
+                                    ? 'El DNS ya apunta a Órbita. Falta que se emita el certificado HTTPS (puede tardar hasta media hora); esta pantalla se actualiza sola.'
+                                    : d.source === 'LINKED'
+                                        ? 'Todavía no vemos el DNS apuntando a Órbita. Cargá los registros y esperá unos minutos: se verifica solo.'
+                                        : 'Estamos terminando de configurar tu dominio. Se verifica solo.'}
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {d.status !== 'ACTIVE' && d.source === 'LINKED' && (
+                    {d.source === 'LINKED' && (
                         <Button size="sm" variant="secondary" loading={busy === 'records'} onClick={toggleRecords}>
                             {records ? 'Ocultar DNS' : 'Ver registros DNS'}
                         </Button>
                     )}
-                    {d.status !== 'ACTIVE' && (
+                    {pendiente && (
                         <Button size="sm" variant="outline" loading={busy === 'verify'} onClick={verificar}>
                             <RefreshCw size={13} strokeWidth={2.2} /> Verificar
                         </Button>
@@ -349,7 +381,14 @@ export default function Dominios() {
                         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}>Todavía no tenés ningún dominio propio vinculado — usás el subdominio de Órbita.</div>
                     ) : (
                         <div style={{ marginTop: 6 }}>
-                            {domains.map(d => <DomainRow key={d.id} d={d} onChange={cargar} />)}
+                            {domains.map(d => (
+                                <DomainRow
+                                    key={d.id}
+                                    d={d}
+                                    onUpdate={nuevo => setDomains(ds => ds && ds.map(x => (x.id === nuevo.id ? nuevo : x)))}
+                                    onChange={cargar}
+                                />
+                            ))}
                         </div>
                     )}
                 </Card>

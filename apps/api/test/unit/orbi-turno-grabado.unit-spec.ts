@@ -133,6 +133,7 @@ async function porElController(caso: CasoPanel, g: Grabado, forma: Forma, d: Neg
       registrarOk: async () => undefined,
       avisoDeFalla: async () => ({ code: 'ORBI_ERROR', message: 'falla' }),
     } as never,
+    { motivoDeBloqueo: async () => null } as never,
   );
   const chunks: string[] = [];
   const res = {

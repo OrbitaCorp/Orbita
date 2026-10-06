@@ -11,7 +11,7 @@ export function OrbiTrigger({ collapsed }: Props) {
   return (
     <button
       onClick={toggle}
-      title="Orbi AI (Ctrl+K)"
+      title="Orbi AI"
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
         width: '100%',
@@ -31,19 +31,7 @@ export function OrbiTrigger({ collapsed }: Props) {
       <OrbiPet size={44} animated />
 
       {!collapsed && (
-        <>
-          <span style={{ fontSize: 13, fontWeight: 600, flex: 1, textAlign: 'left' }}>Orbi AI</span>
-          <kbd style={{
-            fontSize: 10, fontWeight: 500,
-            padding: '2px 6px', borderRadius: 4,
-            background: 'var(--color-surface-alt)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-muted)',
-            fontFamily: 'inherit',
-          }}>
-            Ctrl+K
-          </kbd>
-        </>
+        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, textAlign: 'left' }}>Orbi AI</span>
       )}
     </button>
   )

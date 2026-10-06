@@ -6,6 +6,7 @@ import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { useMovilPlantilla } from '@/hooks/useMovilPlantilla'
+import { useDeslizar } from '@/hooks/useDeslizar'
 import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { AccionesPlantilla, BuscadorPlantilla } from '@/components/storefront/AccionesPlantilla'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -41,6 +42,7 @@ import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { definicionPlantilla, plantillaReal } from './plantillaReal'
+import { EsqueletoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/esqueleto'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -64,7 +66,27 @@ function estadoJuegos(games: ActiveGame[]): string {
 // forceSSR.ts): la plantilla activa, ya resuelta del lado del server, para
 // que el skeleton de más abajo (branch `cargando`) no tenga que asumir "sin
 // plantilla" hasta que el fetch del cliente responda.
-export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: string | null } = {}) {
+// Lo último que se cargó de cada portada, en la memoria de la pestaña.
+//
+// Volver al inicio desde un producto o desde el catálogo pedía todo de nuevo
+// —seis pedidos— y mostraba el esqueleto otra vez, aunque esos mismos datos
+// se habían visto hacía diez segundos. Ahora la portada se dibuja al toque
+// con lo que había y se actualiza por atrás: si algo cambió, se nota cuando
+// llega la respuesta, sin pantalla de carga en el medio.
+//
+// Es una variable del módulo: vive mientras la pestaña no se recargue, y del
+// lado del servidor no se escribe nunca (solo la llenan los efectos).
+type PortadaCargada = {
+    config: StorefrontConfigResponse
+    categorias: StorefrontCategoryItem[]
+    productos: Producto[]
+    destacados: Producto[]
+    recomendados?: StorefrontProductItem[]
+    topVentas?: StorefrontProductItem[]
+}
+const PORTADAS = new Map<string, PortadaCargada>()
+
+export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { __homeTemplate?: string | null; __storeMeta?: { nombre?: string | null } | null } = {}) {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
@@ -138,6 +160,18 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     useEffect(() => {
         if (!slug) return
         let cancelado = false
+        // Lo de la visita anterior, al toque (ver PORTADAS); el pedido de
+        // abajo sale igual y lo pisa.
+        const previa = PORTADAS.get(slug)
+        if (previa) {
+            setConfig(previa.config)
+            setCategorias(previa.categorias)
+            setProductos(previa.productos)
+            setDestacados(previa.destacados)
+            if (previa.recomendados) setRecomendados(previa.recomendados)
+            if (previa.topVentas) setTopVentas(previa.topVentas)
+            setCargando(false)
+        }
         Promise.all([
             getStorefrontConfig(slug),
             getStorefrontCategories(slug),
@@ -148,8 +182,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
             setConfig(cfg)
             setCategorias(cats)
             const badges = { showNew: cfg.appearance?.showNewBadge, showOffer: cfg.appearance?.showOfferBadge, showLowStock: cfg.appearance?.showLowStock }
-            setProductos(general.data.map(p => toProducto(p, badges)))
-            setDestacados(feat.data.map(p => toProducto(p, badges)))
+            const productosNuevos = general.data.map(p => toProducto(p, badges))
+            const destacadosNuevos = feat.data.map(p => toProducto(p, badges))
+            setProductos(productosNuevos)
+            setDestacados(destacadosNuevos)
+            PORTADAS.set(slug, { ...PORTADAS.get(slug), config: cfg, categorias: cats, productos: productosNuevos, destacados: destacadosNuevos })
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
@@ -164,10 +201,20 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
         if (!slug) return
         let cancelado = false
         getStorefrontProducts(slug, { sort: 'recommended', limit: 8 })
-            .then(r => { if (!cancelado) setRecomendados(r.data) })
+            .then(r => {
+                if (cancelado) return
+                setRecomendados(r.data)
+                const previa = PORTADAS.get(slug)
+                if (previa) previa.recomendados = r.data
+            })
             .catch(() => { /* sin estante */ })
         getStorefrontProducts(slug, { sort: 'bestselling', soldOnly: true, limit: 8 })
-            .then(r => { if (!cancelado) setTopVentas(r.data) })
+            .then(r => {
+                if (cancelado) return
+                setTopVentas(r.data)
+                const previa = PORTADAS.get(slug)
+                if (previa) previa.topVentas = r.data
+            })
             .catch(() => { /* sin estante */ })
         return () => { cancelado = true }
     }, [slug])
@@ -368,8 +415,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     }
     const nuevosIngresos = productos.slice(0, limiteNuevos)
     const badgesEstante = { showNew: ap?.showNewBadge, showOffer: ap?.showOfferBadge, showLowStock: ap?.showLowStock }
-    const estanteRecomendados = recomendados.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
-    const estanteTopVentas = topVentas.slice(0, porEstante).map(p => toProducto(p, badgesEstante))
+    // Enteros (hasta 8) para las plantillas: cada una corta por el ancho de SU
+    // grilla, que puede ser de tres, de cinco o una tira de seis. El home
+    // clásico se queda con una fila de la grilla de Apariencia.
+    const todosRecomendados = recomendados.map(p => toProducto(p, badgesEstante))
+    const todosTopVentas = topVentas.map(p => toProducto(p, badgesEstante))
+    const estanteRecomendados = todosRecomendados.slice(0, porEstante)
+    const estanteTopVentas = todosTopVentas.slice(0, porEstante)
     // Las plantillas de Home siguen recibiendo su "más vendidos" como antes
     // (la segunda tanda de lo más nuevo): sus filas se configuran en la
     // pestaña Secciones de cada plantilla, no con estos interruptores.
@@ -393,6 +445,21 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
     // secciones, tarjetas, footer) y el modo oscuro del visitante las aplica
     // StorefrontChrome más abajo — ver variablesDeTema() en plantillaReal.ts
     // para el porqué.
+
+    // Con una plantilla puesta, el esqueleto es el de ESA plantilla (ver
+    // esqueleto.tsx): la misma portada con barras en vez de texto. Se sabe
+    // cuál es desde el servidor (`__homeTemplate`), así que sale en el primer
+    // HTML. El header va adentro del esqueleto en las que dibujan el suyo —
+    // por eso `sinHeader`, igual que en la portada ya cargada.
+    if (cargando && plantilla) {
+        return (
+            <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate} sinHeader={!!plantilla.headerPropio}>
+                {/* Vidriera: su hero lo dibuja la tienda (HeroCarousel), no la plantilla. */}
+                {!plantilla.heroPropio && <Skeleton width="100%" height={movil ? 420 : 470} radius={0} />}
+                <EsqueletoPlantilla p={plantilla} movil={movil} soloCuerpo={!plantilla.headerPropio} marca={__storeMeta?.nombre ?? undefined} />
+            </StorefrontChrome>
+        )
+    }
 
     if (cargando) {
         return (
@@ -642,11 +709,21 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 .sf-parallax { position:relative; min-height:440px; margin-bottom:56px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
                 .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
                 .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
-                /* iOS Safari históricamente ignora/rompe background-attachment:
-                   fixed (y en Android puede tildar en equipos de gama baja) —
-                   se apaga en mobile a propósito: el banner se ve idéntico,
-                   solo sin el efecto, en vez de arriesgar un fondo roto. */
-                @media(max-width:640px){ .sf-parallax { background-attachment:scroll; } }
+                /* iOS Safari ignora background-attachment: fixed (y en Android
+                   es poco fiable), así que en celular el efecto se hace de otra
+                   forma: una capa position:fixed del tamaño de la pantalla con
+                   la foto, y la sección la recorta con clip-path — se ve solo
+                   la franja que cae dentro del banner y la foto "queda quieta"
+                   mientras la página pasa. Sin JS, lo anima el compositor. La
+                   URL llega por la variable --sf-par-img (inline, propia de
+                   cada tienda). Con prefers-reduced-motion se queda estático. */
+                @media(max-width:640px){
+                    .sf-parallax { background-attachment:scroll; }
+                    @media (prefers-reduced-motion: no-preference) {
+                        .sf-parallax { background-image:none !important; clip-path:inset(0); }
+                        .sf-parallax::before { content:''; position:fixed; top:0; left:0; width:100%; height:100vh; height:100lvh; background:var(--sf-par-img) center/cover no-repeat; z-index:0; pointer-events:none; }
+                    }
+                }
                 @media (prefers-reduced-motion: reduce) { .sf-parallax { background-attachment:scroll; } }
 
                 /* ── Tablet (≤1024px) ── */
@@ -732,6 +809,13 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         marca: tienda.nombre,
                         tagline: config?.appearance?.tagline ?? undefined,
                         secciones: config?.appearance?.homeTemplateData?.secciones ?? undefined,
+                        // Lo de Apariencia: interruptores, anuncio, parallax,
+                        // marcas, y los estantes con lo que dice su nombre.
+                        apariencia: config?.appearance,
+                        nuevos: productos,
+                        recomendados: todosRecomendados,
+                        topVentas: todosTopVentas,
+                        hayWhatsapp: !!tienda.wpp,
                     })}
                     movil={movil}
                     // `soloCuerpo` recorta header, hero y pie de la maqueta
@@ -745,7 +829,10 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irACatalogo: () => go('/catalogo'),
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),
-                        abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
+                        // Con el interruptor de WhatsApp apagado no hay a
+                        // quién escribirle: los botones de la plantilla que
+                        // abren el chat no se dibujan.
+                        abrirWhatsapp: tienda.wpp && config?.appearance?.showWhatsapp !== false ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
                         irALink: irACtaParallax,
                         // Arrepentimiento/devolucion: el pie normal de Orbita
                         // lo muestra por obligacion legal, asi que el pie de
@@ -763,7 +850,36 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                                 esVidriera={config?.business?.mode === 'SHOWCASE'}
                             />
                         ),
-                        renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+                        // "Barra de búsqueda" apagada: null, y no `undefined`
+                        // — sin la función, el header dibuja el buscador de
+                        // muestra de la vitrina, que no busca nada.
+                        renderBuscador: ({ placeholder }) => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} placeholder={placeholder || undefined} /> : null,
+                        // La cuenta regresiva de la portada y su fila de
+                        // productos en oferta: los mismos dos componentes
+                        // del home clásico. Sin countdown activo no dibujan
+                        // nada.
+                        renderOferta: () => slug ? (
+                            <>
+                                <CountdownBanner slug={slug} lugar="HOME" />
+                                <CountdownOfertaSection
+                                    slug={slug}
+                                    badges={{ showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }}
+                                />
+                            </>
+                        ) : null,
+                        // "Video en tu tienda": el mismo componente del
+                        // home clásico. Sin ningún link válido devuelve null
+                        // y el bloque de la plantilla no se dibuja.
+                        renderVideo: () => (config?.appearance?.showVideo ?? false) ? (
+                            <SeccionVideos
+                                titulo={tituloVideo}
+                                subtitulo={subtituloVideo}
+                                layout={config?.appearance?.videoLayout}
+                                videos={config?.appearance?.videos}
+                                videoUrlLegado={config?.appearance?.videoUrl}
+                                go={go}
+                            />
+                        ) : null,
                         // "Estilo de header" de Apariencia: con plantilla
                         // activa antes se ignoraba del todo.
                         navLayout: (config?.appearance?.headerLayout ?? undefined) as 'full' | 'standard' | 'centered' | 'minimal' | undefined,
@@ -781,7 +897,11 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         // de quedar siempre con el look por defecto de Órbita
                         // adentro de una grilla pensada para otra cosa.
                         renderProducto: (x, _i, opts) => {
-                            const real = productos.find(pr => pr.id === x.slug) ?? destacados.find(pr => pr.id === x.slug)
+                            // En todos los estantes: Recomendados y Top
+                            // ventas vienen de pedidos aparte y pueden traer
+                            // un producto que no está entre los últimos 16.
+                            const real = [productos, destacados, todosRecomendados, todosTopVentas]
+                                .map(lista => lista.find(pr => pr.id === x.slug)).find(Boolean)
                             return real ? (
                                 <ProductCard
                                     producto={real}
@@ -880,7 +1000,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 (fondo fijo, texto y CTA encima, el resto de la página
                 sigue el scroll normal). */}
             {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
-                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})` }}>
+                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})`, ['--sf-par-img' as string]: `url(${config.appearance.parallaxImageUrl})` }}>
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                     <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                         <div style={{ maxWidth: 520, padding: '56px 0' }}>
@@ -1236,13 +1356,18 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
 
     // En la vista previa del panel no rota: el dueño está editando un slide y
     // que se le vaya a otro a los pocos segundos no deja ver el cambio.
+    // `idx` en las dependencias: cualquier cambio de slide (flecha, punto o
+    // deslizar con el dedo) reinicia la cuenta, así el que acaba de deslizar
+    // no ve cambiar el slide solo medio segundo después.
     useEffect(() => {
         if (paused || n <= 1 || esPreview()) return
         const id = setInterval(() => setIdx(i => (i + 1) % n), 4000)
         return () => clearInterval(id)
-    }, [paused, n])
+    }, [paused, n, idx])
 
     const goSlide = (i: number) => setIdx((i + n) % n)
+    // Deslizar con el dedo, además de las flechas (celular).
+    const deslizar = useDeslizar(dir => goSlide(idx + dir))
 
     // El link del CTA es texto libre cargado en Apariencia: puede ser un path
     // interno ("/catalogo/camperas") o una URL completa. Vacío = /catalogo.
@@ -1253,7 +1378,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     }
 
     return (
-        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+        <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} {...deslizar}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
             {/* alignItems:'stretch' + el `flex:1` de cada caja de fondo (abajo)
                 son lo que hace que TODOS los slides midan lo mismo: la pista

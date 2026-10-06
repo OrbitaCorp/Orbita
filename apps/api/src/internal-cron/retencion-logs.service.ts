@@ -16,7 +16,10 @@ export type TablaConRetencion =
   | 'orbi_turns'
   | 'orbi_provider_failures'
   | 'orbi_conversations'
-  | 'daily_quota';
+  | 'daily_quota'
+  | 'usage_events'
+  | 'orbi_conversation_access'
+  | 'orbi_sesiones_inactivas';
 
 /** Por tabla: cuántas filas se borraron, o por qué no se borró nada. */
 export type ResultadoPurga = Record<TablaConRetencion, number | 'apagada' | 'fallo'>;
@@ -24,7 +27,8 @@ export type ResultadoPurga = Record<TablaConRetencion, number | 'apagada' | 'fal
 interface Regla {
   tabla: TablaConRetencion;
   variable: string;
-  porDefecto: number;
+  /** null = apagada mientras la variable esté vacía (hay que prenderla a propósito). */
+  porDefecto: number | null;
   borrar: (corte: Date) => Promise<{ count: number }>;
 }
 
@@ -61,6 +65,17 @@ interface Regla {
  *    Corta por `day`, que es un string 'YYYY-MM-DD' de Argentina, no un
  *    DateTime: se compara contra la fecha argentina del corte.
  *
+ * Medición y cupos de Orbi (spec 2026-10-03) sumó otras tres:
+ *  - usage_events, 400 días: el gasto de cada llamada a un proveedor (con sus
+ *    tokens y costo); mismos 400 que orbi_turns, para comparar año contra año.
+ *    Corta por `timestamp`, que es su fecha (no tiene createdAt).
+ *  - orbi_conversation_access, 365 días: el registro de quién leyó qué
+ *    conversación de un miembro (acceso auditado, spec D9/D10).
+ *  - orbi_sesiones_inactivas: sesiones NO archivadas sin actividad (incluye las
+ *    de miembros borrados, que nadie puede abrir). APAGADA por defecto: hasta
+ *    que Alan fije el plazo (spec D11) solo se purgan las archivadas. Se prende
+ *    poniendo ORBI_SESIONES_INACTIVAS_RETENTION_DAYS.
+ *
  * Lo corre el mantenimiento nocturno (internal-cron.controller), después de la
  * purga del wizard. deleteMany directo, sin lotes: hoy son cientos de filas
  * por tabla y el corte avanza un día por corrida, así que cada noche se van
@@ -77,11 +92,12 @@ export class RetencionLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Días de retención según la variable: vacía o inválida → el default; "off",
+   * Días de retención según la variable: vacía o inválida → el default (que puede
+   * ser null: regla apagada hasta que alguien ponga la variable); "off",
    * "0" o negativo → null (esa tabla no se purga); cualquier otro número, nunca
    * menos de RETENCION_MINIMA_DIAS.
    */
-  static diasDeRetencion(variable: string, porDefecto: number): number | null {
+  static diasDeRetencion(variable: string, porDefecto: number | null): number | null {
     const crudo = (process.env[variable] ?? '').trim().toLowerCase();
     if (crudo === '') return porDefecto;
     if (crudo === 'off') return null;
@@ -177,6 +193,26 @@ export class RetencionLogsService {
         // texto, que ordena igual que las fechas, contra el día argentino del
         // corte (el mismo criterio con el que CuotaService escribe la fila).
         borrar: (corte) => this.prisma.dailyQuota.deleteMany({ where: { day: { lt: fechaArgentina(corte) } } }),
+      },
+      {
+        tabla: 'usage_events',
+        variable: 'USAGE_EVENTS_RETENTION_DAYS',
+        porDefecto: 400,
+        borrar: (corte) => this.prisma.usageEvent.deleteMany({ where: { timestamp: { lt: corte } } }),
+      },
+      {
+        tabla: 'orbi_conversation_access',
+        variable: 'ORBI_CONVERSATION_ACCESS_RETENTION_DAYS',
+        porDefecto: 365,
+        borrar: (corte) => this.prisma.orbiConversationAccess.deleteMany({ where: { createdAt: { lt: corte } } }),
+      },
+      {
+        // Sesiones NO archivadas sin actividad (incluye las de miembros borrados,
+        // que nadie puede abrir). Apagada hasta que Alan fije un plazo (spec D11).
+        tabla: 'orbi_sesiones_inactivas',
+        variable: 'ORBI_SESIONES_INACTIVAS_RETENTION_DAYS',
+        porDefecto: null,
+        borrar: (corte) => this.prisma.orbiConversation.deleteMany({ where: { archivedAt: null, lastActivityAt: { lt: corte } } }),
       },
     ];
   }

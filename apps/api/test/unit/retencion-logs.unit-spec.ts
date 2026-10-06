@@ -25,6 +25,9 @@ const VARIABLES = [
   'ORBI_PROVIDER_FAILURES_RETENTION_DAYS',
   'ORBI_SESIONES_ARCHIVADAS_RETENTION_DAYS',
   'DAILY_QUOTA_RETENTION_DAYS',
+  'USAGE_EVENTS_RETENTION_DAYS',
+  'ORBI_CONVERSATION_ACCESS_RETENTION_DAYS',
+  'ORBI_SESIONES_INACTIVAS_RETENTION_DAYS',
 ];
 
 function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean } = {}) {
@@ -39,6 +42,8 @@ function servicio(env: Record<string, string> = {}, opts: { fallaAudit?: boolean
     orbiProviderFailure: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
     orbiConversation: { deleteMany: jest.fn().mockResolvedValue({ count: 6 }) },
     dailyQuota: { deleteMany: jest.fn().mockResolvedValue({ count: 9 }) },
+    usageEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 11 }) },
+    orbiConversationAccess: { deleteMany: jest.fn().mockResolvedValue({ count: 8 }) },
   };
   const original = { ...process.env };
   // Que lo que tenga el .env de quien corre los tests no cambie el resultado.
@@ -74,6 +79,10 @@ describe('Retención de logs y registros', () => {
         orbi_provider_failures: 2,
         orbi_conversations: 6,
         daily_quota: 9,
+        usage_events: 11,
+        orbi_conversation_access: 8,
+        // Sin variable, esta no se purga (spec D11): queda apagada.
+        orbi_sesiones_inactivas: 'apagada',
       });
     } finally {
       restaurar();
@@ -97,6 +106,44 @@ describe('Retención de logs y registros', () => {
       expect(prisma.dailyQuota.deleteMany.mock.calls[0][0].where.day.lt).toBe('2026-08-15');
     } finally {
       restaurar();
+    }
+  });
+
+  it('usage_events se purga a los 400 días por defecto y orbi_conversation_access a los 365, por su fecha', async () => {
+    const { svc, prisma, restaurar } = servicio();
+    try {
+      await svc.purgar();
+      // usage_events no tiene createdAt: su fecha es `timestamp`.
+      expect(prisma.usageEvent.deleteMany).toHaveBeenCalledWith({
+        where: { timestamp: { lt: new Date(AHORA.getTime() - 400 * DIA_MS) } },
+      });
+      expect(prisma.orbiConversationAccess.deleteMany).toHaveBeenCalledWith(corteHace(365));
+    } finally {
+      restaurar();
+    }
+  });
+
+  it('las sesiones inactivas (no archivadas) quedan apagadas sin variable, y con ella se borran por última actividad', async () => {
+    const sin = servicio();
+    try {
+      const r = await sin.svc.purgar();
+      expect(r.orbi_sesiones_inactivas).toBe('apagada');
+      // Con la regla apagada no hay ningún borrado de sesiones NO archivadas.
+      const noArchivadas = sin.prisma.orbiConversation.deleteMany.mock.calls.filter(([a]) => a.where.archivedAt === null);
+      expect(noArchivadas).toHaveLength(0);
+    } finally {
+      sin.restaurar();
+    }
+
+    const con = servicio({ ORBI_SESIONES_INACTIVAS_RETENTION_DAYS: '365' });
+    try {
+      const r = await con.svc.purgar();
+      expect(con.prisma.orbiConversation.deleteMany).toHaveBeenCalledWith({
+        where: { archivedAt: null, lastActivityAt: { lt: new Date(AHORA.getTime() - 365 * DIA_MS) } },
+      });
+      expect(r.orbi_sesiones_inactivas).toBe(6);
+    } finally {
+      con.restaurar();
     }
   });
 
@@ -198,6 +245,13 @@ describe('Retención de logs y registros', () => {
       expect(d('R_JUSTA')).toBe(30);
       expect(d('R_DECIMAL')).toBe(45);
       expect(d('R_GRANDE')).toBe(1000);
+      // Con default null (regla apagada): vacía o inválida = null; con valor, el valor.
+      const n = (v: string) => RetencionLogsService.diasDeRetencion(v, null);
+      expect(n('R_NO_EXISTE')).toBeNull();
+      expect(n('R_VACIA')).toBeNull();
+      expect(n('R_BASURA')).toBeNull();
+      expect(n('R_GRANDE')).toBe(1000);
+      expect(n('R_CHICA')).toBe(30);
     } finally {
       restaurar();
     }

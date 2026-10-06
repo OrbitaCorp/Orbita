@@ -32,13 +32,22 @@ export function SeccionesPlantilla({ ap, set, seccionesPlantilla, categorias, pr
     const valorSeccion = (seccion: string, campo: CampoSeccion) => {
         const guardado = ap.seccionesPlantilla?.[seccion]?.[campo.id]
         if (guardado !== undefined) return guardado
-        if (campo.afirmacion) return ''
+        if (campo.afirmacion || tituloSegunFila(seccion, campo)) return ''
         // La versión neutra cuando existe: el editor edita la TIENDA, no la
         // vitrina, así que tiene que mostrar el mismo texto que el cliente ve.
         return campo.porDefectoReal ?? campo.porDefecto ?? ''
     }
-    const pistaSeccion = (campo: CampoSeccion) =>
-        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '') : undefined
+    // El título de una fila de productos de la plantilla no tiene un texto
+    // fijo: la fila muestra el primer estante que tenga productos, y vacío
+    // sale el nombre de ese (ver `estante` en plantillas/tipos.ts). Precargar
+    // "Top ventas" acá era mostrar un título que la tienda no está usando.
+    const tituloSegunFila = (seccion: string, campo: CampoSeccion) =>
+        (campo.id === 'volanta' || campo.id === 'titulo')
+        && seccionesPlantilla.find(x => x.id === seccion)?.estante !== undefined
+    const pistaSeccion = (campo: CampoSeccion, seccion: string) =>
+        campo.afirmacion ? (campo.porDefecto ? `Ej: ${campo.porDefecto}` : '')
+            : tituloSegunFila(seccion, campo) ? 'Vacío: el nombre de la fila que se muestre'
+            : undefined
     const setSeccion = (seccion: string, campo: string, valor: string) => {
         const actual = ap.seccionesPlantilla ?? {}
         set('seccionesPlantilla', {
@@ -86,7 +95,7 @@ export function SeccionesPlantilla({ ap, set, seccionesPlantilla, categorias, pr
                                         value={valorSeccion(sec.id, campo)}
                                         onChange={e => setSeccion(sec.id, campo.id, e.target.value)}
                                         maxLength={campo.max}
-                                        placeholder={pistaSeccion(campo)}
+                                        placeholder={pistaSeccion(campo, sec.id)}
                                         rows={3}
                                         style={{
                                             width: '100%', borderRadius: 8, border: '1px solid var(--color-border)',
@@ -123,7 +132,7 @@ export function SeccionesPlantilla({ ap, set, seccionesPlantilla, categorias, pr
                                         )}
                                     </select>
                                 ) : (
-                                    <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo)} />
+                                    <Inp value={valorSeccion(sec.id, campo)} onChange={v => setSeccion(sec.id, campo.id, v)} maxLength={campo.max} placeholder={pistaSeccion(campo, sec.id)} />
                                 )}
                             </div>
                         ))}

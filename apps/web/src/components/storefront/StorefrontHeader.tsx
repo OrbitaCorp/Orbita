@@ -742,6 +742,15 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           <nav className="sf-drawer">
             {/* "Minimal" (sinNav): tampoco acá — es "no se muestra
                 navegación" en todo el sitio, no solo en desktop. */}
+            {/* "Inicio" primero: los enlaces de abajo son del catálogo y
+                ninguno vuelve a la portada (en celular no hay otra forma que
+                tocar el logo). Mismo destino que el logo. Si el negocio ya
+                cargó un enlace que se llama "Inicio", no se duplica. */}
+            {!sinNav && !navLinks.some(s => s.label.trim().toLowerCase() === 'inicio') && (
+              <a href={base} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
+                Inicio
+              </a>
+            )}
             {!sinNav && navLinks.map(s => (
               <a key={s.label} href={`${base}${s.path}`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 {s.label}

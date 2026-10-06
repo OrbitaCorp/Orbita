@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "db40613d3c66822d",
+  "version": "cc2769060b4aa5c9",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -47,7 +47,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "barra-superior",
       "capitulo": "Moverte por el panel",
       "titulo": "La barra de arriba",
-      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi: El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. También se abre con Ctrl+K (Cmd+K en Mac) desde cualquier lado: le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
+      "texto": "Te sigue por todo el panel, estés en la pantalla que estés.\n\n- Búsqueda global: Encontrá un pedido por número, un cliente por nombre o email, un producto, o una sección del panel. Escribís y los resultados aparecen en vivo.\n- Campana: Junta lo que pasó mientras no estabas: pedidos nuevos, pagos acreditados, stock crítico, avisos del sistema. El número es lo que falta leer. Qué llega acá y qué llega por mail se elige en Configuración → Notificaciones.\n- Modo oscuro: Un toque y el panel entero cambia de claro a oscuro. Queda guardado en tu cuenta, así que te sigue a cualquier dispositivo.\n- Orbi AI: El asistente, al lado de la búsqueda: el botón con la mascota, que toma la forma de la pantalla en la que estás. Le preguntás por tus números, por un pedido, o cómo se hace algo, y contesta con datos de TU negocio.\n- Tu avatar: El círculo con tus iniciales, a la derecha de todo: tu nombre y tu rol, Mi perfil, \"Ir a la tienda\" para verla como cliente, y Cerrar sesión."
     },
     {
       "id": "permisos",
@@ -105,6 +105,16 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "capitulo": "Inicio",
       "titulo": "Top: productos, categorías y canal",
       "texto": "Al lado del gráfico hay una tarjeta con tres pestañas.\n\n- Productos: Lo más vendido del período, con su barra de participación. Lo que aparece acá es lo que conviene tener siempre con stock y destacado en la portada.\n- Categorías: Lo mismo pero agrupado por categoría: te dice qué rubro tuyo tracciona de verdad.\n- Canal: Una torta que separa las ventas que entraron solas por la tienda online de las que cargaste vos a mano (mostrador, WhatsApp). Es la forma de medir cuánto te está aportando la tienda además de lo de siempre.\n\nDato: Si el período elegido no tuvo ventas, cada pestaña te lo dice en vez de mostrar un gráfico vacío.",
+      "destino": {
+        "seccion": "dashboard",
+        "label": "Ir al Inicio"
+      }
+    },
+    {
+      "id": "metricas-avanzadas",
+      "capitulo": "Inicio",
+      "titulo": "Métricas avanzadas: ganancia, conversión y cuándo te compran",
+      "texto": "Debajo del gráfico y el top hay una barra \"Métricas avanzadas\". Está cerrada: tocala y se despliega (queda abierta la próxima vez que entres). Se calcula con el mismo período que elegiste arriba y cada número se compara contra el período anterior.\n\nCada métrica tiene un ícono de exclamación: pasale el mouse por encima (o tocalo en el celular) y te explica qué mide, cómo se calcula y qué NO incluye.\n\n- Ganancia estimada: Lo que te queda de lo vendido después de restar lo que te costó la mercadería: ingresos de productos menos costo. Ya considera los descuentos y cupones, pero no resta envíos, comisiones de cobro, devoluciones ni gastos fijos. Usa el costo actual de cada producto y solo cuenta los que tienen el costo cargado.\n- Margen: Qué parte de lo que cobrás por tus productos es ganancia: ganancia estimada dividida por los ingresos.\n- Ganancia potencial del stock: Lo que ganarías si vendieras hoy todo el stock a los precios actuales. Es la misma «Ganancia estimada» que ves en Productos y no depende del período.\n- Conversión: De cada 100 visitas a la tienda, cuántas terminaron en un pedido. No cuenta los pedidos cargados a mano.\n- Cancelación: Qué porcentaje de los pedidos terminó cancelado. Acá que SUBA es malo.\n- Clientes que vuelven: De los que compraron en el período, cuántos ya te habían comprado antes.\n- Unidades por pedido: Cuántos productos lleva en promedio cada pedido.\n- Devoluciones: La plata devuelta en el período por devoluciones aprobadas y qué porcentaje es de las ventas.\n- Descuentos otorgados: El total de descuentos y cupones aplicados en los pedidos del período.\n\nAbajo hay cuatro gráficos: ventas y ganancia (por hora, por día o por semana según el largo del período), cuándo te compran (por hora del día o por día de la semana), clientes nuevos contra los que vuelven, y la rentabilidad de cada categoría.\n\nConsejo: Si la ganancia sale \"—\" o dice que se calculó sobre una parte de lo vendido, es porque faltan productos con el costo cargado. Se carga al crear o editar el producto, en el campo Costo.",
       "destino": {
         "seccion": "dashboard",
         "label": "Ir al Inicio"
@@ -217,8 +227,8 @@ export const MANUAL_GENERADO: ManualGenerado = {
     {
       "id": "numeros-catalogo",
       "capitulo": "Productos",
-      "titulo": "Los cinco números de arriba",
-      "texto": "- Total: Cuántos productos tenés cargados, publicados o no.\n- Publicados: Los que tu cliente ve en la tienda ahora mismo.\n- Sin stock: Se quedaron en cero. Es tu lista de reposición.\n- No publicados: Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.\n- Valor de inventario: Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.",
+      "titulo": "Los seis números de arriba",
+      "texto": "- Total: Cuántos productos tenés cargados, publicados o no.\n- Publicados: Los que tu cliente ve en la tienda ahora mismo.\n- Sin stock: Se quedaron en cero. Es tu lista de reposición.\n- No publicados: Todo lo que NO está publicado: los borradores de verdad más los que se quedaron sin stock.\n- Valor de inventario: Cuánta plata tenés invertida en la mercadería que hay en stock: el costo de cada producto por sus unidades disponibles. Solo suma los productos que tienen el costo cargado.\n- Ganancia estimada: Lo que ganarías si vendieras todo el stock que tenés hoy a los precios actuales: el precio de venta menos el costo de cada producto, por sus unidades disponibles. Es una estimación (no descuenta envíos, comisiones ni descuentos) y solo cuenta los productos con stock que tienen el costo cargado; si hay productos sin costo, el ícono de exclamación te avisa cuántos.",
       "destino": {
         "seccion": "catalogo",
         "label": "Ir a Productos"
@@ -299,7 +309,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por WhatsApp aparecen en esta misma bandeja, con la etiqueta WhatsApp, y los respondés desde acá. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"
@@ -391,7 +401,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "las-cinco-pestanas",
       "capitulo": "Reportes",
       "titulo": "Las cinco pestañas",
-      "texto": "El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.\n\n- Ventas: Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.\n- Productos: Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada.\n- Clientes: Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.\n- Inventario: Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.\n- Pagos: Por dónde te pagan y cuánto te queda después de comisiones. Es el reporte que más sorprende la primera vez que se mira.\n\nConsejo: Los reportes de Productos y de Clientes también se abren directo desde el menú de la izquierda, adentro de Productos y de Clientes.",
+      "texto": "El Inicio te dice cómo venís hoy. Los Reportes te dicen cómo viene el negocio. Cada pestaña se filtra por el período que elijas.\n\n- Ventas: Tu facturación en el tiempo, con su evolución. Es el reporte del cierre de mes.\n- Productos: Qué se vende de verdad y qué está ahí sin moverse. Lo que no aparece nunca es plata parada. Muestra también la ganancia estimada de lo vendido y la potencial del stock, y la ganancia de cada producto más vendido (los que no tienen el costo cargado no la muestran).\n- Clientes: Quiénes compran, cuánto y cada cuánto. Separa al que vuelve del que compró una sola vez.\n- Inventario: Cómo está parado tu stock: qué se está por acabar y cuánta plata tenés en mercadería.\n- Pagos: Por dónde te pagan y cuánto te queda después de comisiones. Es el reporte que más sorprende la primera vez que se mira.\n\nConsejo: Los reportes de Productos y de Clientes también se abren directo desde el menú de la izquierda, adentro de Productos y de Clientes.",
       "destino": {
         "seccion": "reportes",
         "label": "Ir a Reportes"
@@ -466,7 +476,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-dominios",
       "capitulo": "Configuración",
       "titulo": "Dominios",
-      "texto": "Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya propia (tunegocio.com), acá la comprás desde el panel o conectás una que ya tengas.",
+      "texto": "Tu tienda ya tiene su dirección de Órbita y funciona igual. Si querés la tuya propia (tunegocio.com), acá la comprás desde el panel o conectás una que ya tengas.\n\nSi la comprás acá no tocás nada más. Si ya la tenías en otro lado (Hostinger, GoDaddy, NIC), escribila en \"Vincular un dominio que ya tenés\", tocá \"Vincular\" y cargá en el panel de DNS de donde la compraste los registros que te mostramos: dos de tipo A para el dominio y un CNAME para el www.\n\nOjo: Si en ese panel ya hay registros con los mismos nombres (típico: un ALIAS o un A de la página de estacionamiento), borralos antes de cargar los nuestros: no se pueden tener los dos.\n\nEl estado se actualiza solo cada pocos segundos, pero también podés tocar \"Verificar\". Primero queda en \"Pendiente\" o \"Verificando\" hasta que el DNS apunta a Órbita, y después hasta que se emite el certificado HTTPS (hasta media hora). Recién cuando figura como \"Activo\" y el SSL como \"activo\" la dirección funciona con candado.",
       "destino": {
         "seccion": "configuracion",
         "vista": "dominios",
@@ -575,7 +585,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "funciones-avanzado",
       "capitulo": "Avanzado",
       "titulo": "Qué trae",
-      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
+      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda y el WhatsApp, y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
       "destino": {
         "seccion": "avanzado",
         "label": "Ir a Avanzado"
@@ -605,7 +615,8 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "orbi",
       "capitulo": "Si te trabás",
       "titulo": "Preguntale a Orbi",
-      "texto": "Se abre con Ctrl+K (Cmd+K en Mac) desde cualquier pantalla del panel, desde el botón Orbi de la barra de arriba (al lado de la búsqueda) o desde Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas."
+      "pista": "el cupo de Orbi del mes: cuánto se usó, cuánto usó cada persona y los topes",
+      "texto": "Se abre desde cualquier pantalla del panel con el botón Orbi AI de la barra de arriba (al lado de la búsqueda) o con Orbi AI al pie del menú de la izquierda.\n\nNo es un buscador de ayuda genérica: contesta con los datos de tu negocio. \"¿Cuánto vendí esta semana?\", \"¿qué pedidos tengo pendientes?\", \"¿cómo creo un cupón?\" son todas preguntas válidas.\n\nOrbi tiene un cupo por mes. Cuando se usó la mitad, aparece una barra finita debajo del título del chat; desde el 80% también dice en texto cuánto va, siempre en porcentaje. Muestra el cupo que se está por terminar primero: el del negocio o, si el dueño te puso un tope, tu parte.\n\n1. Abrí el uso del equipo: Lo ven el dueño y los administradores. Con Orbi abierto, tocá \"Expandir a página\" y, en la columna de conversaciones, \"Uso del equipo\". En pantallas angostas está en el desplegable del título del chat.\n2. Mirá cuánto se usó: Arriba, en Uso de Orbi, está el porcentaje del negocio en el mes. En Equipo, cada persona con el porcentaje que usó y su tope.\n3. Repartí el cupo: Solo el dueño: en la columna Tope de cada persona elegí Sin tope, 25%, 50%, 75% u Otro (un número entero entre 10 y 100, y después \"Aplicar\"). Con tope, el porcentaje de esa persona se cuenta sobre su parte.\n4. Revisá lo que hizo Orbi: En Lo que hizo Orbi están los cambios que Orbi aplicó en los últimos 30 días: fecha, quién se lo pidió, qué hizo y si quedó Hecho o Falló. Para volver al chat, \"Volver a la conversación\".\n\nDato: No se muestran las conversaciones: cada persona ve solo las suyas."
     },
     {
       "id": "tutorial",

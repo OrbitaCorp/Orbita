@@ -6,9 +6,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { PLANTILLAS } from './datos'
-import { Home, LAYOUTS_CON_HEADER_PROPIO } from './homes'
-import { SECCIONES_POR_PLANTILLA, seccionesDe } from './secciones'
-import type { AccionesHome, Plantilla } from './tipos'
+import { EsqueletoPlantilla } from './esqueleto'
+import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
+import { itemsMenuMovil } from './piezas'
+import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
+import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto } from '@/lib/storefront/types'
 
@@ -39,56 +41,16 @@ const visibles = PLANTILLAS.filter(p => !p.oculta)
 
 // ─── Lo que ya se sabe que está mal ──────────────────────────────────────────
 //
-// El check se escribió con veintiséis plantillas ya publicadas, y encontró
-// cosas en varias. Arreglarlas cambia cómo se ven tiendas que hoy están
-// andando, así que es una decisión aparte: quedan anotadas acá para que el
-// check sirva desde el primer día —una plantilla NUEVA no puede sumar nada a
-// esta lista— sin esconder lo que falta.
+// Para un problema que el check encuentra en una plantilla ya publicada y
+// que no se arregla en el momento: cambiar cómo se ve una tienda que hoy está
+// andando es una decisión aparte. Se anota acá —`'grupo > plantilla':
+// ['pedazo del texto']`— para que el check siga sirviendo sin esconder lo que
+// falta. Hoy está vacía, y una plantilla NUEVA no suma nada acá: se arregla.
 //
 // Cada renglón es un pedazo del texto del problema. Funciona como trinquete:
 // si aparece un problema que no está acá, falla; y si uno de acá deja de
 // pasar, también falla, pidiendo que se lo borre. La lista solo se achica.
-const PENDIENTES: Record<string, string[]> = {
-  // Bloque nombra dos fuentes que nadie baja: se ve con la del sistema.
-  'catálogo > tipografías': ['bloque: Rubik', 'bloque: Nunito Sans'],
-
-  // El texto blanco del botón sobre un primario claro.
-  'tema > patitas': ['texto del botón sobre el primario'],
-  'tema > crecer': ['texto del botón sobre el primario'],
-  'tema > petalo': ['texto del botón sobre el primario'],
-
-  // `plantillaReal()` deja la bajada de la maqueta ("Running, fuerza y
-  // ciclismo") cuando el negocio no cargó la suya, y los slides de muestra
-  // ("Auriculares V-90 Pro") cuando no cargó ningún hero. Es del adaptador,
-  // no de cada plantilla: por eso van una sola vez.
-  'tienda > bajada de la maqueta': ['*'],
-  'tienda > hero de la maqueta': ['*'],
-
-  // `esAfirmacion()` mira solo SECCIONES_POR_PLANTILLA, y el esquema de una
-  // receta sale de `esquemaDeReceta()`: sus afirmaciones nunca se callan.
-  'tienda > lienzo': ['promete "Envío gratis'],
-  'tienda > pulso': ['promete "Envío gratis'],
-  'tienda > terracota': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > base': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > carbon': ['promete "Envío gratis'],
-  'tienda > bloque': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > sobrio': ['promete "Envío gratis'],
-  'tienda > roble': ['promete "Envío gratis'],
-  'tienda > petalo': ['promete "Envío gratis', 'promete "A todo el país'],
-  'tienda > sello': ['promete "Envío gratis'],
-
-  // Textos de muestra escritos para el rubro de la maqueta, sin su versión
-  // neutra (`porDefectoReal`).
-  'tienda > bodega': ['categoría de muestra "Malbec"', 'categoría de muestra "Cabernet Franc"'],
-
-  // Solo dibujan destacados: una tienda con productos y ninguno destacado
-  // queda con la portada sin un solo producto.
-  'tienda > vidriera': ['la portada no muestra ninguno'],
-  'tienda > escaparate': ['la portada no muestra ninguno'],
-  'tienda > vera': ['la portada no muestra ninguno'],
-  'tienda > corralon': ['la portada no muestra ninguno'],
-  'tienda > cobijo': ['la portada no muestra ninguno'],
-}
+const PENDIENTES: Record<string, string[]> = {}
 
 /**
  * Falla listando TODO lo que encontró, de a un renglón. Con `toEqual([])`
@@ -150,6 +112,27 @@ const categoria = (i: number, conFoto: boolean) => ({
 })
 
 type Tienda = Omit<Parameters<typeof plantillaReal>[0], 'base'>
+type Apariencia = NonNullable<Tienda['apariencia']>
+
+// Lo que el dueño carga en Apariencia. Los textos llevan "Check" para poder
+// buscarlos en la portada sin confundirlos con nada de la plantilla.
+const APARIENCIA = {
+  showFeaturedSection: true, showNewArrivalsSection: true, showRecommendedSection: true, showBestSellersSection: true,
+  showCategoriesSection: true, showSearch: true, showWhatsapp: true,
+  showAnnouncementBar: true, shippingText: 'Anuncio Check', announcementScroll: false,
+  showParallaxBanner: true, parallaxImageUrl: 'https://fotos.check/parallax.jpg',
+  parallaxTitle: 'Parallax Check', parallaxSubtitle: 'Bajada del parallax', parallaxCtaText: 'Ver', parallaxCtaLink: '/catalogo',
+  showBrands: true, brandsTitle: 'Marcas Check', brands: [{ id: 'm', name: 'Marca Check' }],
+  showVideo: true,
+} as unknown as Apariencia
+
+// Recién creada: Apariencia tal como viene, sin nada cargado.
+const APARIENCIA_NUEVA = {
+  showFeaturedSection: true, showNewArrivalsSection: true, showRecommendedSection: true, showBestSellersSection: true,
+  showCategoriesSection: true, showSearch: true, showWhatsapp: true,
+  showAnnouncementBar: true, shippingText: null, announcementScroll: false,
+  showParallaxBanner: false, parallaxImageUrl: null, showBrands: false, brands: [], showVideo: false,
+} as unknown as Apariencia
 
 function tienda(nCats: number, nProductos: number, conFoto: boolean, completa: boolean): Tienda {
   const categorias = Array.from({ length: nCats }, (_, i) => categoria(i, conFoto))
@@ -161,8 +144,13 @@ function tienda(nCats: number, nProductos: number, conFoto: boolean, completa: b
     tagline: completa ? 'Bajada Check' : undefined,
     productos,
     categorias,
+    apariencia: completa ? APARIENCIA : APARIENCIA_NUEVA,
+    // Una tienda sin armar no marcó destacados ni vendió nada: lo único que
+    // tiene para mostrar es lo que cargó ("Nuevos ingresos").
     destacados: completa ? productos.slice(0, 5) : [],
-    masVendidos: completa ? productos.slice(5, 10) : [],
+    masVendidos: [],
+    recomendados: completa ? productos.slice(4, 9) : [],
+    topVentas: completa ? productos.slice(7, 12) : [],
     stats: completa ? [{ id: 's', value: 'Dato Check', label: 'etiqueta check' }] : [],
     cupon: completa ? { titulo: 'Cupón Check', bajada: 'Bajada check', codigo: 'CHECK' } : null,
     heroSlides: completa
@@ -195,7 +183,9 @@ const ACCIONES: AccionesHome = {
   navLayout: 'standard',
   nav: [{ label: 'Enlace Check Uno', onClick: nada }, { label: 'Enlace Check Dos', onClick: nada }],
   renderAcciones: () => marca('acciones'),
-  renderBuscador: () => marca('buscador'),
+  renderBuscador: (o) => marca('buscador', o?.placeholder),
+  renderVideo: () => marca('video'),
+  renderOferta: () => marca('oferta'),
   renderProducto: (x) => marca('producto', x.nombre),
 }
 
@@ -213,6 +203,8 @@ const nodos = (html: string) =>
     .split(/<[^>]+>/)
     .map(n => limpio(n.replace(/&(amp|lt|gt|quot|#x27);/g, (e) => ENTIDADES[e])))
     .filter(Boolean)
+
+const texto = (html: string) => nodos(html).join(' ')
 
 const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -251,6 +243,14 @@ function basura(html: string): string[] {
   return [...new Set(out)]
 }
 
+// Las páginas que una tienda de Órbita tiene de verdad (src/pages/tienda/[slug]).
+// Una plantilla no puede mandar a otra: sería un 404 con el diseño puesto.
+const RUTAS = /^\/tienda\/check(\/|\/catalogo(\/[\w-]+)?(\?.*)?|\/carrito|\/login|\/registro|\/perfil(\?.*)?|\/producto\/[\w-]+|\/legales\/(terminos|privacidad|cookies|denunciar)|\/pedido\/[\w-]+)?$/
+const rutasInexistentes = (html: string) =>
+  [...new Set([...html.matchAll(/<a\b[^>]*\shref="([^"]+)"/g)].map(m => m[1]))]
+    .filter(h => h.startsWith('/') && !RUTAS.test(h))
+    .map(h => `un enlace a ${h}, que no es una página de la tienda`)
+
 // Lo que la maqueta escribe en su hero y en su bajada. Se revisa aparte (ver
 // "lo que el adaptador deja pasar", más abajo), así que acá se saca del medio:
 // si no, "Oro 18k y piedras seleccionadas a mano" del hero de muestra de
@@ -270,7 +270,7 @@ function enTiendaReal(base: Plantilla, nombreTienda: string, movil: boolean): st
   const html = dibujar({ p, movil, acciones: ACCIONES, soloCuerpo })
   const maqueta = deLaMaqueta(base)
   const n = nodos(html).filter(x => !maqueta.has(x))
-  const out = basura(html)
+  const out = [...basura(html), ...rutasInexistentes(html)]
 
   if (!html) out.push('no dibuja nada')
 
@@ -306,8 +306,11 @@ function enTiendaReal(base: Plantilla, nombreTienda: string, movil: boolean): st
         ? 'en celular no hay forma de llegar al catálogo: ni enlaces ni MenuMovil'
         : 'el header no muestra los enlaces reales de Apariencia (acciones.nav)')
     }
+    // Buscar es parte de cualquier tienda: en las dos pantallas.
+    if (!html.includes('data-check="buscador"')) out.push('no hay buscador')
     if (base.piePropio) {
-      for (const legal of ['Términos y condiciones', 'Política de privacidad', 'Arrepentimiento / Devolución']) {
+      // "Denunciar esta tienda" es el canal de moderación de Órbita: tiene que estar en el pie de TODA tienda.
+      for (const legal of ['Términos y condiciones', 'Política de privacidad', 'Arrepentimiento / Devolución', 'Denunciar esta tienda']) {
         if (!n.includes(legal)) out.push(`al pie le falta "${legal}", que es obligatorio`)
       }
     }
@@ -423,7 +426,11 @@ describe('el editor de cada plantilla coincide con lo que dibuja', () => {
       const usados = new Set<string>()
       // Las secciones leídas con una clave armada (`i${n}`, `n${k}v`): ahí
       // no se puede saber qué campo es, así que se dan todos por usados.
-      const dinamicas = new Set<string>()
+      // El cintillo también: lo lee Home() una sola vez, arriba de todos los
+      // bloques, para la vitrina (en la tienda el anuncio es el de Apariencia).
+      // Y el título de cada estante (ver SECCIONES_DE_ESTANTES en
+      // secciones.ts): lo resuelven `txt()` y `resto()`, fuera del bloque.
+      const dinamicas = new Set<string>(['cintillo', 'est-destacados', 'est-nuevos', 'est-recomendados', 'est-topVentas'])
       for (const [, s, c] of bloque!.matchAll(/\b(?:txt|activo)\(\s*'([\w-]+)'\s*,\s*'([\w-]+)'\s*\)/g)) usados.add(`${s}.${c}`)
       for (const [, s] of bloque!.matchAll(/\b(?:txt|activo)\(\s*'([\w-]+)'\s*,\s*[^')]/g)) dinamicas.add(s)
       for (const [, s] of bloque!.matchAll(/\blugares\(\s*[^,]+,\s*'([\w-]+)'/g)) dinamicas.add(s)
@@ -498,10 +505,309 @@ describe('aplicada en una tienda de verdad', () => {
   })
 
   it('un negocio sin hero cargado no muestra el de la maqueta', () => {
-    sinProblemas('tienda > hero de la maqueta', PLANTILLAS
-      .filter(p => { const n = enMinima(p); return p.slides.some(s => n.includes(limpio(s.titulo))) })
-      .map(p => `${p.id}: se lee "${limpio(p.slides[0].titulo)}"`))
+    // Sin contar los títulos que también son el nombre de un estante: el
+    // segundo slide de muestra de Base se llama "Recién llegados", igual que
+    // la fila de Nuevos ingresos.
+    const deEstante = new Set(Object.values(TITULOS_ESTANTE).flat())
+    sinProblemas('tienda > hero de la maqueta', PLANTILLAS.flatMap(p => {
+      const n = enMinima(p)
+      return p.slides.map(x => limpio(x.titulo)).filter(t => !deEstante.has(t) && n.includes(t)).map(t => `${p.id}: se lee "${t}"`)
+    }))
   })
+})
+
+// ─── El estándar: lo de Apariencia vale con plantilla ────────────────────────
+//
+// Toda plantilla ubica todo lo de Apariencia, y el dueño lo prende y lo apaga
+// con los mismos interruptores que sin plantilla. Acá se prueba de los dos
+// lados: prendido se ve, apagado no.
+
+describe('una plantilla respeta lo que se configura en Apariencia', () => {
+  const t0 = TIENDAS.completa
+  const html = (p: Plantilla, ap: Partial<Apariencia>, movil = false, extra: Partial<Tienda> = {}, acc: Partial<AccionesHome> = {}) =>
+    dibujar({
+      p: plantillaReal({ base: p, ...t0, ...extra, apariencia: { ...APARIENCIA, ...ap } as Apariencia }),
+      movil, acciones: { ...ACCIONES, ...acc }, soloCuerpo: !p.headerPropio,
+    })
+  const ver = (p: Plantilla, ap: Partial<Apariencia>, movil = false) => nodos(html(p, ap, movil))
+  const tiene = (n: string[], frase: string) => n.some(x => x.includes(frase))
+  // El primer producto de cada estante (ver `tienda()`): es el que entra en
+  // cualquier fila, por angosta que sea. Se prueba con un estante prendido
+  // por vez, así que no importa que dos arranquen con el mismo.
+  const PRIMERO = { destacados: 'Articulo aa', nuevos: 'Articulo aa', recomendados: 'Articulo ae', topVentas: 'Articulo ah' } as const
+  const INTERRUPTOR = { destacados: 'showFeaturedSection', nuevos: 'showNewArrivalsSection', recomendados: 'showRecommendedSection', topVentas: 'showBestSellersSection' } as const
+  const SIN_ESTANTES = { showFeaturedSection: false, showNewArrivalsSection: false, showRecommendedSection: false, showBestSellersSection: false }
+
+  // Productos que no son un estante y por eso no tienen interruptor: las
+  // filas por categoría (Atleta), y las selecciones que el dueño arma a mano
+  // (los pasos de Nocturno, la lista de Papelería, la rutina de Glow), o que
+  // la plantilla toma del catálogo para una sección suya (el look de
+  // Escaparate, los ambientes de Cobijo).
+  const CON_PRODUCTOS_SIN_ESTANTE = new Set(['atleta', 'nocturno', 'papeleria', 'glow', 'escaparate', 'cobijo'])
+  const productosSinEstante = (p: Plantilla) =>
+    p.receta ? p.receta.bloques.some(b => b.t === 'porCategoria') : CON_PRODUCTOS_SIN_ESTANTE.has(p.id)
+  // Sin una sección de categorías que apagar: Mosaico arranca con un muro de
+  // categorías que es su hero, y Atleta las muestra como filas de productos.
+  const SIN_SECCION_DE_CATEGORIAS = new Set(['mosaico', 'atleta'])
+
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      const mal: string[] = []
+      const propio = !!p.headerPropio
+
+      // Una receta ubica todos los bloques, una vez cada uno. (Un bloque
+      // propio dibuja los suyos con su diseño y el resto con `resto()`: eso
+      // se prueba abajo, mirando la portada.)
+      if (p.receta) {
+        const bloques = p.receta.bloques
+        for (const b of BLOQUES_ESTANDAR) {
+          const n = bloques.filter(x => x.t === b || (b === 'categorias' && x.t === 'porCategoria')).length
+          if (n === 0) mal.push(`no ubica el bloque '${b}': el dueño lo prende en Apariencia y no aparece`)
+          if (n > 1 && b !== 'categorias') mal.push(`ubica ${n} veces el bloque '${b}'`)
+        }
+        for (const e of ESTANTES) {
+          const n = bloques.filter(x => x.t === 'fila' && x.fuente === e).length
+          if (n !== 1) mal.push(`tiene ${n} filas de '${e}' (tiene que ser una)`)
+        }
+      }
+
+      for (const movil of [false, true]) {
+        const donde = movil ? 'celular' : 'escritorio'
+        const todo = ver(p, {}, movil)
+        const nada = ver(p, { ...SIN_ESTANTES, showAnnouncementBar: false, showParallaxBanner: false, showBrands: false }, movil)
+
+        for (const e of ESTANTES) {
+          if (!tiene(ver(p, { ...SIN_ESTANTES, [INTERRUPTOR[e]]: true }, movil), PRIMERO[e])) mal.push(`[${donde}] el estante '${e}' prendido no se ve`)
+        }
+        // Con todo prendido se ven los cuatro: el título de cada uno está.
+        for (const e of ESTANTES) {
+          if (!todo.includes(TITULOS_ESTANTE[e][2])) mal.push(`[${donde}] con los cuatro estantes prendidos falta "${TITULOS_ESTANTE[e][2]}"`)
+        }
+        if (!productosSinEstante(p) && tiene(nada, 'Articulo ')) mal.push(`[${donde}] con los cuatro estantes apagados sigue mostrando productos`)
+        for (const e of ESTANTES) {
+          if (nada.includes(TITULOS_ESTANTE[e][2])) mal.push(`[${donde}] con los estantes apagados queda el título "${TITULOS_ESTANTE[e][2]}" sin productos`)
+        }
+
+        // El anuncio de las que no dibujan su header lo pone la tienda (AnnouncementBar).
+        const pares: [string, string][] = [['el parallax', 'Parallax Check'], ['las marcas', 'Marca Check'], ...(propio ? [['el anuncio', 'Anuncio Check'] as [string, string]] : [])]
+        for (const [que, frase] of pares) {
+          if (!tiene(todo, frase)) mal.push(`[${donde}] ${que} de Apariencia no se ve`)
+          if (tiene(nada, frase)) mal.push(`[${donde}] ${que} se ve aunque esté apagado en Apariencia`)
+        }
+        if (p.receta && !tiene(todo, 'Dato Check')) mal.push(`[${donde}] las estadísticas de Apariencia no se ven`)
+        if (html(p, {}, movil, { stats: [] }).includes('Dato Check')) mal.push(`[${donde}] las estadísticas se ven aunque no haya ninguna`)
+
+        if (!html(p, {}, movil).includes('data-check="video"')) mal.push(`[${donde}] el video de Apariencia no se ve`)
+        if (!html(p, {}, movil).includes('data-check="oferta"')) mal.push(`[${donde}] la oferta con cuenta regresiva no se ve`)
+        if (html(p, {}, movil, {}, { renderVideo: () => null }).includes('data-check="video"')) mal.push(`[${donde}] dibuja el video aunque no haya ninguno`)
+
+        if (propio) {
+          // Apagado, la tienda le pasa un buscador que no dibuja nada (ver Inicio.tsx).
+          const sinBuscar = html(p, { showSearch: false }, movil, {}, { renderBuscador: () => null })
+          if (sinBuscar.includes('data-check="buscador"')) mal.push(`[${donde}] el buscador se ve aunque esté apagado en Apariencia`)
+          if (/buscar…|Buscar…|¿Qué estás buscando\?/.test(sinBuscar)) mal.push(`[${donde}] con el buscador apagado dibuja el de muestra, que no busca nada`)
+        }
+      }
+
+      // Las categorías y el WhatsApp se prueban contra la portada entera: sus
+      // textos son de la plantilla, no de la tienda de prueba.
+      const con = html(p, {})
+      const veces = (h: string) => h.split('Rubro Alfa').length
+      const sinSeccion = p.receta ? !p.receta.bloques.some(b => b.t === 'categorias') : SIN_SECCION_DE_CATEGORIAS.has(p.id)
+      if (!sinSeccion && !(veces(con) > veces(html(p, { showCategoriesSection: false })))) {
+        mal.push('la sección de categorías se ve aunque esté apagada en Apariencia')
+      }
+      // Apagado, la tienda no le pasa a la plantilla cómo abrir el chat.
+      const sinWpp = html(p, { showWhatsapp: false }, false, {}, { abrirWhatsapp: undefined })
+      if (/whatsapp/i.test(texto(sinWpp).replace(/Enlace Check \w+/g, ''))) mal.push('con el WhatsApp apagado queda un texto que invita a escribir por WhatsApp')
+
+      // Con un solo estante prendido, ningún producto sale dos veces: las
+      // secciones propias (el look de Escaparate, los ambientes de Cobijo) no
+      // repiten los de la fila. Con más de uno no se puede pedir: un producto
+      // puede ser a la vez destacado y de los más vendidos.
+      for (const movil of [false, true]) {
+        const h = dibujar({
+          p: plantillaReal({ base: p, ...TIENDAS.grande, apariencia: { ...APARIENCIA, ...SIN_ESTANTES, showFeaturedSection: true } as Apariencia }),
+          movil, acciones: ACCIONES, soloCuerpo: !p.headerPropio,
+        })
+        const veces = new Map<string, number>()
+        for (const [nombre] of h.matchAll(/Articulo [a-z]{2}\b/g)) veces.set(nombre, (veces.get(nombre) ?? 0) + 1)
+        // Una tarjeta propia puede escribir el nombre dos veces (el `alt` de
+        // la foto y el texto): se cuenta contra lo que escribe en una fila sola.
+        const repetidos = [...veces].filter(([, n]) => n > 2).map(([nombre]) => nombre)
+        if (repetidos.length) mal.push(`[${movil ? 'celular' : 'escritorio'}] repite productos en la portada: ${repetidos.slice(0, 4).join(', ')}`)
+      }
+
+      sinProblemas(`estándar > ${p.id}`, mal)
+    })
+  }
+
+  // El caso por el que existe todo esto: una plantilla que traía una sola
+  // fila, "Top ventas", en una tienda que todavía no vendió nada.
+  it('una tienda que recién empieza muestra sus productos, y no un "Más vendidos" vacío', () => {
+    sinProblemas('estándar > tienda nueva', PLANTILLAS.flatMap(p => {
+      const n = nodos(dibujar({ p: plantillaReal({ base: p, ...TIENDAS.minima }), movil: false, acciones: ACCIONES, soloCuerpo: !p.headerPropio }))
+      return [
+        ...(tiene(n, 'Articulo aa') ? [] : [`${p.id}: no muestra los productos que la tienda cargó`]),
+        ...(n.includes('Recién llegados') ? [] : [`${p.id}: sus productos no salen bajo "Recién llegados", que es lo único que tiene`]),
+        ...(['Más vendidos', 'Recomendados para vos', 'Productos destacados'].filter(t => n.includes(t)).map(t => `${p.id}: dibuja "${t}" sin productos`)),
+      ]
+    }))
+  })
+})
+
+// ─── El editor: cada control mueve algo en la portada ────────────────────────
+//
+// El editor de una plantilla (Avanzado → Plantillas) le ofrece al dueño el
+// hero, las secciones propias, el contenido de Apariencia y el pie. Cada cosa
+// que le deja cargar tiene que verse: un campo que no mueve nada es una
+// promesa del panel que la tienda no cumple.
+//
+// Salió de un caso real: en Lienzo el editor pedía la imagen de cada slide y
+// el hero de Lienzo no dibujaba ninguna. Acá se prueba al revés de como se
+// escribió ese bug: no se mira el código del editor, se cambia cada dato que
+// el editor deja cambiar y se exige que la portada cambie.
+
+describe('cada control del editor mueve algo en la portada', () => {
+  const t0 = TIENDAS.completa
+  // La portada en las dos pantallas, pegadas: alcanza con que el cambio se
+  // vea en una (la aclaración de Nocturno, por ejemplo, es solo de escritorio).
+  const portada = (p: Plantilla, extra: Partial<Tienda> = {}, ap: Partial<Apariencia> = {}) =>
+    [false, true].map(movil => dibujar({
+      p: plantillaReal({ base: p, ...t0, ...extra, apariencia: { ...APARIENCIA, ...ap } as Apariencia }),
+      movil, acciones: ACCIONES, soloCuerpo: !p.headerPropio,
+    })).join('\n')
+
+  const slide = (n: string, img: string | null = `https://fotos.check/slide-${n}.jpg`) =>
+    ({ id: n, titulo: `Titulo ${n}`, subtitulo: `Bajada ${n}`, img, cta: `Boton ${n}`, ctaLink: '/catalogo' })
+
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      const mal: string[] = []
+
+      // ── Pestaña Hero ──
+      // Vidriera no entra: su hero lo dibuja la tienda (HeroCarousel), no Home().
+      if (p.heroPropio) {
+        const h = portada(p, { heroSlides: [slide('uno'), slide('dos')] })
+        for (const [que, frase] of [['el título', 'Titulo uno'], ['la bajada', 'Bajada uno'], ['el botón', 'Boton uno'], ['la imagen', 'slide-uno.jpg']]) {
+          if (!h.includes(frase)) mal.push(`Hero: ${que} del slide se carga en el editor y no se ve en la portada`)
+        }
+        // Sin imagen la portada tiene que seguir dibujando el hero.
+        const sinFoto = portada(p, { heroSlides: [slide('uno', null)] })
+        if (!sinFoto.includes('Titulo uno')) mal.push('Hero: sin imagen el slide desaparece')
+        // Un segundo slide tiene que notarse (rota, o tiene su lugar fijo).
+        if (p.heroMaxSlides !== 1 && h === portada(p, { heroSlides: [slide('uno')] })) {
+          mal.push('Hero: agregar un segundo slide no cambia nada')
+        }
+        // Y uno más allá del tope no: el editor no lo deja cargar.
+        if (p.heroMaxSlides) {
+          const tope = Array.from({ length: p.heroMaxSlides }, (_, i) => slide(`n${i}`))
+          if (portada(p, { heroSlides: tope }) !== portada(p, { heroSlides: [...tope, slide('demas')] })) {
+            mal.push(`Hero: dice usar ${p.heroMaxSlides} slides y dibuja más`)
+          }
+        }
+      }
+
+      // ── Pestaña Secciones ──
+      // Con todos los campos de la sección cargados, cambiar uno tiene que
+      // cambiar la portada. (El cintillo no se edita ahí: es el anuncio.)
+      const valores = (c: { id: string; tipo: string; porDefecto?: string }, otro: boolean) =>
+        c.tipo === 'switch' ? (otro ? '' : 'si')
+          : c.tipo === 'imagen' ? `https://fotos.check/sec-${c.id}-${otro ? 'b' : 'a'}.jpg`
+          : c.tipo === 'seleccion' ? (otro ? 'prod:prod-ac' : 'prod:prod-ab')
+          // Un campo de posición ("72,78"): con texto libre cae a su default.
+          : /^\d+,\d+$/.test(c.porDefecto ?? '') ? (otro ? '90,90' : '10,10')
+          : `Campo ${c.id} ${otro ? 'dos' : 'uno'}`
+      for (const sec of seccionesDe(p.id).filter(x => x.id !== 'cintillo')) {
+        const base = Object.fromEntries(sec.campos.map(c => [c.id, valores(c, false)]))
+        const antes = portada(p, { secciones: { [sec.id]: base } })
+        for (const c of sec.campos) {
+          const despues = portada(p, { secciones: { [sec.id]: { ...base, [c.id]: valores(c, true) } } })
+          if (antes === despues) mal.push(`Secciones: "${sec.nombre} → ${c.label}" se edita y no cambia nada en la portada`)
+        }
+      }
+
+      // ── Pestaña Contenido ──
+      const normal = portada(p)
+      if (p.headerPropio) {
+        // El modo cartelera del anuncio.
+        if (normal === portada(p, {}, { announcementScroll: true })) mal.push('Contenido: "Mostrar como cartelera" no cambia nada')
+        // Varios ítems en el anuncio, uno por línea.
+        const varios = portada(p, {}, { shippingText: 'Aviso Uno\nAviso Dos' })
+        if (!varios.includes('Aviso Uno') || !varios.includes('Aviso Dos')) mal.push('Contenido: con dos ítems en el anuncio no se ven los dos')
+      }
+      // La barra de estadísticas, en las que el editor la ofrece.
+      if (p.usaStats !== false && !normal.includes('Dato Check')) mal.push('Contenido: el editor ofrece la barra de estadísticas y la portada no la dibuja')
+      if (p.usaStats === false && normal.includes('Dato Check')) mal.push('Contenido: dibuja las estadísticas y el editor no las ofrece (falta sacar usaStats: false)')
+      // El parallax, campo por campo.
+      for (const [que, frase] of [['el título', 'Parallax Check'], ['el subtítulo', 'Bajada del parallax'], ['la imagen', 'parallax.jpg']]) {
+        if (!normal.includes(frase)) mal.push(`Contenido: ${que} del parallax no se ve`)
+      }
+      if (normal === portada(p, {}, { parallaxCtaText: 'Otro Boton' })) mal.push('Contenido: el texto del botón del parallax no cambia nada')
+      // Las marcas: el título, y el logo cuando hay.
+      if (!normal.includes('Marcas Check')) mal.push('Contenido: el título de las marcas no se ve')
+      if (!portada(p, {}, { brands: [{ id: 'm', name: 'Marca Check', logoUrl: 'https://fotos.check/logo-marca.png' }] } as Partial<Apariencia>).includes('logo-marca.png')) {
+        mal.push('Contenido: el logo de una marca no se ve')
+      }
+
+      // ── Pestaña Pie ──
+      if (p.piePropio) {
+        if (!normal.includes('Bajada Check')) mal.push('Pie: la descripción no se ve')
+        const sinRedes = portada(p, {}, { showSocialFooter: false } as Partial<Apariencia>)
+        if (!normal.includes('instagram.com')) mal.push('Pie: las redes cargadas en Contacto no se ven')
+        if (sinRedes.includes('instagram.com')) mal.push('Pie: "Redes sociales en el pie de página" apagado y las redes siguen ahí')
+      }
+      // El cupón: el editor ofrece la tarjeta con `dibujaCupon()`.
+      if (dibujaCupon(p)) {
+        for (const [que, frase] of [['el título', 'Cupón Check'], ['la aclaración', 'Bajada check'], ['el código', 'CHECK']]) {
+          if (!normal.includes(frase)) mal.push(`Pie: ${que} del cupón no se ve`)
+        }
+      } else if (normal.includes('Cupón Check')) {
+        mal.push('Pie: dibuja el cupón y el editor no lo ofrece (ver dibujaCupon en secciones.ts)')
+      }
+
+      sinProblemas(`editor-portada > ${p.id}`, mal)
+    })
+  }
+})
+
+// ─── El esqueleto de carga ───────────────────────────────────────────────────
+//
+// Mientras la portada espera sus datos se dibuja la misma plantilla con barras
+// en vez de texto (ver esqueleto.tsx). Sale en el primer HTML del servidor,
+// así que no puede llevar nada de la maqueta: ni sus fotos (el navegador las
+// bajaría para un esqueleto) ni sus textos (los leería un buscador).
+
+describe('el esqueleto de carga de cada plantilla', () => {
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      const mal: string[] = []
+      for (const movil of [false, true]) {
+        const donde = movil ? 'celular' : 'escritorio'
+        const html = renderToStaticMarkup(createElement(EsqueletoPlantilla, { p, movil, soloCuerpo: !p.headerPropio, marca: 'Negocio Check' }))
+        const n = nodos(html)
+        if (html.length < 2000) mal.push(`[${donde}] casi no dibuja nada`)
+        if (!html.includes('class="pl-esq"') || !html.includes('aria-hidden="true"')) mal.push(`[${donde}] no está marcado como esqueleto`)
+        if (html.includes('<img')) mal.push(`[${donde}] dibuja una <img>: el navegador la baja para un esqueleto`)
+        if (html.includes('/plantillas/')) mal.push(`[${donde}] nombra una foto de muestra`)
+        if (/\$\s?\d/.test(n.join(' '))) mal.push(`[${donde}] se lee un precio de muestra`)
+
+        // Nada de lo que la plantilla trae escrito como muestra.
+        const deMuestra = [
+          p.marca, p.tagline, p.cartel ?? '',
+          ...p.slides.flatMap(x => [x.titulo, x.bajada, x.kicker ?? '']),
+          ...p.productos.map(x => x.nombre),
+          ...(p.categorias ?? []).map(([nombre]) => nombre),
+          ...(p.links ?? []),
+          ...seccionesDe(p.id).flatMap(sec => sec.campos.filter(c => c.tipo === 'texto' || c.tipo === 'parrafo').map(c => c.porDefecto ?? '')),
+        ].map(limpio).filter(x => x.length >= 6)
+        for (const frase of new Set(deMuestra)) {
+          if (n.some(x => x.includes(frase))) mal.push(`[${donde}] se lee "${frase.slice(0, 40)}", de la maqueta`)
+        }
+      }
+      sinProblemas(`esqueleto > ${p.id}`, mal)
+    })
+  }
 })
 
 // El header de la plantilla se usa en el catálogo, la ficha y el carrito, no
@@ -521,4 +827,106 @@ describe('el header suelto, para el resto de la tienda', () => {
       sinProblemas(`header > ${p.id}`, mal)
     })
   }
+})
+
+// ─── Celular: deslizar el hero con el dedo y volver al inicio desde el menú ──
+
+const sinLinksYEstilos = (h: string) => h.replace(/<style[\s\S]*?<\/style>/g, '').replace(/<link\b[^>]*>/g, '')
+
+/**
+ * El bloque del hero dentro del HTML de la portada, resuelto igual que
+ * `regionDelHero` en el navegador: el hijo directo de la raíz que contiene la
+ * flecha/puntos (`data-pl-hero-nav`), y si abarca demasiado de la portada,
+ * bajando al hijo que la contiene. Acá se recorre el HTML estático con una pila
+ * porque los tests no tienen DOM. Los estilos y los `<link rel="preload">` (que
+ * React saca al `<head>`) no cuentan. Devuelve `null` si no hay navegación y
+ * `'sin-bloque'` si la flecha no cuelga de un bloque propio de la raíz.
+ */
+function regionDelHeroEnHtml(htmlCompleto: string): { html: string; tags: number; total: number } | null | 'sin-bloque' {
+  const html = sinLinksYEstilos(htmlCompleto)
+  const VACIAS = new Set(['img', 'input', 'br', 'hr', 'meta', 'link', 'source', 'wbr', 'area', 'col', 'embed', 'track', 'base', 'param'])
+  const els: { inicio: number; fin: number; padre: number }[] = []
+  const pila: number[] = []
+  let nav = -1
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const [tag, cierra, nombre, attrs, autocierre] = m
+    if (cierra) {
+      const i = pila.pop()
+      if (i !== undefined) els[i].fin = m.index! + tag.length
+      continue
+    }
+    const i = els.push({ inicio: m.index!, fin: m.index! + tag.length, padre: pila.length ? pila[pila.length - 1] : -1 }) - 1
+    if (nav < 0 && attrs.includes('data-pl-hero-nav')) nav = i
+    if (!autocierre && !VACIAS.has(nombre.toLowerCase())) pila.push(i)
+  }
+  if (nav < 0) return null
+
+  // Los ancestros de la flecha, de afuera hacia adentro: [0] el envoltorio,
+  // [1] la raíz de la portada, [2] el bloque, y de ahí para abajo.
+  const cadena: number[] = []
+  for (let i = els[nav].padre; i >= 0; i = els[i].padre) cadena.unshift(i)
+  if (cadena.length < 3) return 'sin-bloque'
+
+  const tamano = (i: number) => (html.slice(els[i].inicio, els[i].fin).match(/<[a-zA-Z]/g) ?? []).length - 1
+  const total = tamano(cadena[1])
+  let k = 2
+  while (k + 1 < cadena.length && tamano(cadena[k]) > total * FRACCION_MAXIMA_HERO) k++
+  return { html: html.slice(els[cadena[k]].inicio, els[cadena[k]].fin), tags: tamano(cadena[k]), total }
+}
+
+describe('en celular, el hero se desliza con el dedo', () => {
+  for (const p of visibles) {
+    it(p.id, () => {
+      const mal: string[] = []
+      const html = dibujar({ p: plantillaReal({ base: p, ...TIENDAS.completa }), movil: true, acciones: ACCIONES, soloCuerpo: !p.headerPropio })
+      if (!sinLinksYEstilos(html).startsWith('<div style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
+
+      const region = regionDelHeroEnHtml(html)
+      if (region === null) {
+        // Sin flecha ni puntos no hay a dónde deslizar: solo vale para un hero
+        // de slides fijos (`heroMaxSlides`, como Escaparate) o para el que
+        // dibuja la tienda afuera (`!heroPropio`, con su propio HeroCarousel).
+        if (p.heroPropio && p.heroMaxSlides === undefined) mal.push('con varios slides, el hero no trae navegación y no se puede deslizar')
+      } else if (region === 'sin-bloque') {
+        mal.push('la navegación del hero no cuelga de un bloque propio de la portada: el gesto no sabría dónde escuchar')
+      } else {
+        // El título del hero de la tienda de prueba: si el bloque no lo tiene, el gesto se escucha en otro lado.
+        if (!region.html.includes('Hero Check')) mal.push('el bloque donde se escucha el gesto no es el hero (no tiene el título del slide)')
+        if (region.tags > region.total * FRACCION_MAXIMA_HERO) mal.push('el gesto se escucharía sobre más de la mitad de la portada, no solo sobre el hero')
+      }
+      sinProblemas(`deslizar > ${p.id}`, mal)
+    })
+  }
+})
+
+describe('el menú de celular vuelve al inicio', () => {
+  const con = (over: Partial<AccionesHome>): AccionesHome => ({ ...ACCIONES, ...over })
+
+  it('"Inicio" va primero, antes de los enlaces del header', () => {
+    expect(itemsMenuMovil([], ACCIONES).map(i => i.label)).toEqual(['Inicio', 'Enlace Check Uno', 'Enlace Check Dos'])
+  })
+
+  it('"Inicio" navega a la portada', () => {
+    let fue = 0
+    const items = itemsMenuMovil([], con({ irAInicio: () => { fue++ } }))
+    items[0].onClick?.()
+    expect(fue).toBe(1)
+  })
+
+  it('si el dueño ya cargó un enlace "Inicio", no se duplica', () => {
+    const items = itemsMenuMovil([], con({ nav: [{ label: ' inicio ', onClick: nada }, { label: 'Otro', onClick: nada }] }))
+    expect(items.map(i => i.label)).toEqual([' inicio ', 'Otro'])
+  })
+
+  it('sin enlaces de header (pero no minimal) el menú igual tiene "Inicio"', () => {
+    expect(itemsMenuMovil([], con({ nav: [] })).map(i => i.label)).toEqual(['Inicio'])
+  })
+
+  it('con el header en "minimal" no hay menú, como antes', () => {
+    expect(itemsMenuMovil([], con({ navLayout: 'minimal' }))).toEqual([])
+  })
+
+  it('en la vitrina del panel (sin acciones) la hamburguesa queda como estaba', () => {
+    expect(itemsMenuMovil(['Uno', 'Dos'], undefined).map(i => i.label)).toEqual(['Uno', 'Dos'])
+  })
 })

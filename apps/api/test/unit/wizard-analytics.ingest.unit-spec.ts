@@ -13,7 +13,7 @@ describe('WizardAnalyticsService.ingest', () => {
   beforeEach(() => {
     createMany = jest.fn().mockResolvedValue({ count: 0 });
     const prisma = { wizardEvent: { createMany } } as unknown as PrismaService;
-    service = new WizardAnalyticsService(prisma, {} as LlmAdapter);
+    service = new WizardAnalyticsService(prisma, {} as LlmAdapter, { track: jest.fn() } as never);
   });
 
   const lote = (events: Record<string, unknown>[]) =>

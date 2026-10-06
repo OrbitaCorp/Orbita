@@ -40,6 +40,7 @@ function aConversacion(c: ConversationRow): Conversacion {
     tiempo: tiempoCorto(c.lastMessage?.createdAt ?? c.updatedAt),
     unread: c.isUnread,
     archivado: c.isArchived,
+    canal: c.lastChannel,
     // La lista no resuelve "de qué pedido se está hablando" — hace falta leer
     // los mensajes para eso, y no vale la pena traerlos todos solo para el
     // preview. El chip de pedido SÍ es real dentro del chat (ChatHeader).

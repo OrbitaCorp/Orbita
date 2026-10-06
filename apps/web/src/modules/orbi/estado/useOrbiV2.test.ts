@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { anchoValido, claveDeBorrador, topeDeAncho, tituloProvisorio } from './useOrbiV2'
-import { orbiV2Prendido } from './flag'
 
 describe('ancho del lateral', () => {
   it('queda entre 320 y 560; lo inválido vuelve a 400', () => {
@@ -39,18 +38,5 @@ describe('borradores y títulos', () => {
     const largo = tituloProvisorio('Necesito armar un descuento del veinte por ciento para todos los mates de calabaza')
     expect(Array.from(largo).length).toBeLessThanOrEqual(60)
     expect(largo.endsWith('…')).toBe(true)
-  })
-})
-
-describe('interruptor del Orbi nuevo', () => {
-  it('apagado por defecto; se prende por env, por navegador o por la URL', () => {
-    expect(orbiV2Prendido(undefined, null, null)).toBe(false)
-    expect(orbiV2Prendido('1', null, null)).toBe(true)
-    expect(orbiV2Prendido(undefined, '1', null)).toBe(true)
-    expect(orbiV2Prendido(undefined, null, '1')).toBe(true)
-  })
-
-  it('?orbiV2=0 lo apaga aunque esté prendido para todos', () => {
-    expect(orbiV2Prendido('1', '1', '0')).toBe(false)
   })
 })

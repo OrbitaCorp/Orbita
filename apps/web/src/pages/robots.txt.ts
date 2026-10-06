@@ -12,7 +12,10 @@
 // individuales no tienen todavía su propio robots.txt/sitemap: queda fuera
 // del alcance de esto, que es sobre el sitio de marketing.
 import type { GetServerSideProps } from 'next'
-import { SEO_CANONICAL_HOST } from '@/lib/tenant'
+import { SEO_CANONICAL_HOST, ROOT_DOMAIN } from '@/lib/tenant'
+import { getStorefrontSeo } from '@/lib/storefront/api'
+import { esHostPrincipal, tiendaDeHost } from '@/lib/storefront/hostTienda'
+import { origenDeTienda, robotsDeTienda } from '@/lib/storefront/seo'
 
 const DISALLOWED_PATHS = [
     '/panel',
@@ -33,7 +36,25 @@ const DISALLOWED_PATHS = [
     '/turnos-demo',
 ]
 
-export const getServerSideProps: GetServerSideProps = async ({ res }) => {
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+    // Una tienda (por subdominio o dominio propio) tiene su propio robots.txt:
+    // el de la plataforma le declararía el sitemap de Órbita, no el suyo.
+    const tienda = await tiendaDeHost(req.headers.host)
+    if (tienda) {
+        const seo = await getStorefrontSeo(tienda.slug).catch(() => null)
+        const origen = origenDeTienda(tienda.slug, seo?.primaryDomain, ROOT_DOMAIN)
+        // Si la API no contestó no se cierra el sitio entero (Google tarda en
+        // volver a mirar un robots.txt que prohíbe todo): se deja abierto, y
+        // cada página lleva su propio noindex si corresponde.
+        const cuerpo = robotsDeTienda(origen, seo ? seo.indexable : true, seo ? esHostPrincipal(tienda, seo.primaryDomain) : false)
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+        // Sin variación por navegador: se puede cachear en el borde unos minutos.
+        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600')
+        res.write(cuerpo)
+        res.end()
+        return { props: {} }
+    }
+
     const lines = [
         'User-agent: *',
         'Allow: /',

@@ -46,6 +46,32 @@ export class StorefrontController {
     return { slug };
   }
 
+  // SEO de la tienda (ver getSeo/getSitemap en el servicio): el frontend arma
+  // con esto el <head>, el robots.txt y el sitemap.xml de cada tienda.
+  @Get(':slug/seo')
+  @Public()
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  seo(@Param('slug') slug: string) {
+    return this.storefrontService.getSeo(slug);
+  }
+
+  @Get(':slug/sitemap')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  sitemap(@Param('slug') slug: string) {
+    return this.storefrontService.getSitemap(slug);
+  }
+
+  // Directorio público de tiendas (orbita.site/tiendas): ver getDirectory.
+  // `directory/stores` (2 segmentos) no choca con ninguna ruta `:slug/<algo>`.
+  @Get('directory/stores')
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  directory(@Query('page') page?: string) {
+    const n = Math.min(Math.max(parseInt(page ?? '1', 10) || 1, 1), 1000);
+    return this.storefrontService.getDirectory(n);
+  }
+
   @Get(':slug/products')
   @Public()
   products(@Param('slug') slug: string, @Query() query: StorefrontProductsQueryDto) {

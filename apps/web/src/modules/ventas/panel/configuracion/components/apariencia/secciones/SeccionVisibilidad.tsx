@@ -14,8 +14,11 @@ const ESTANTES: [keyof Ap, string][] = [
 // "¿Qué ven tus clientes?": los interruptores de visibilidad (`toggles` los
 // arma Apariencia.tsx, según haya o no una plantilla activa) y las filas de
 // productos del inicio.
-export function SeccionVisibilidad({ ap, set, soloContenido, toggles }: PropsSeccion & {
+export function SeccionVisibilidad({ ap, set, soloContenido, conEstantes, toggles }: PropsSeccion & {
     soloContenido: boolean
+    // Los cuatro estantes: en Apariencia completa y editando una plantilla,
+    // que los ubica todos en su portada.
+    conEstantes: boolean
     toggles: [keyof Ap, string][]
 }) {
     return (
@@ -25,11 +28,11 @@ export function SeccionVisibilidad({ ap, set, soloContenido, toggles }: PropsSec
                     <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                 ))}
             </div>
-            {/* Los estantes de productos del home clásico (Ale, 19/09): cada
-                uno muestra lo que dice su nombre, y cada uno se puede apagar.
-                Con plantilla activa no aplican — las filas de productos las
-                define la plantilla (pestaña Secciones). */}
-            {!soloContenido && (
+            {/* Los estantes de productos (Ale, 19/09): cada uno muestra lo que
+                dice su nombre, y cada uno se puede apagar. Valen igual con
+                una plantilla activa: ella decide dónde va cada fila y cómo se
+                ve, no cuáles se muestran. */}
+            {conEstantes && (
                 <>
                     <Divider />
                     <FieldLabel help="Las filas de productos del inicio. Cada una se arma sola con datos reales; si no hay productos para mostrar, no aparece.">Filas de productos en el inicio</FieldLabel>
@@ -38,7 +41,7 @@ export function SeccionVisibilidad({ ap, set, soloContenido, toggles }: PropsSec
                             <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} ayuda={AYUDA_OPCIONES[k]} />
                         ))}
                     </div>
-                    {ap.mostrarNuevos && (
+                    {ap.mostrarNuevos && !soloContenido && (
                         <div style={{
                             marginTop: 14,
                             padding: '12px 14px',

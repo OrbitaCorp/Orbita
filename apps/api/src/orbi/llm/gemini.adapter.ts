@@ -152,7 +152,7 @@ export class GeminiAdapter implements LlmAdapter {
       },
     });
 
-    let usage: { promptTokens: number; completionTokens: number } | null = null;
+    let usage: { promptTokens: number; completionTokens: number; cachedTokens: number; thinkingTokens: number } | null = null;
     let toolCallSeq = 0;
 
     for await (const chunk of stream) {
@@ -186,6 +186,8 @@ export class GeminiAdapter implements LlmAdapter {
           promptTokens: um.promptTokenCount ?? 0,
           // El thinking cuenta como tokens de salida y se factura como tal.
           completionTokens: (um.candidatesTokenCount ?? 0) + (um.thoughtsTokenCount ?? 0),
+          cachedTokens: um.cachedContentTokenCount ?? 0,
+          thinkingTokens: um.thoughtsTokenCount ?? 0,
         };
       }
     }

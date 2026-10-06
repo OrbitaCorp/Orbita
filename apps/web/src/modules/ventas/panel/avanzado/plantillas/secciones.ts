@@ -25,7 +25,7 @@
 //  4. `max` es un tope de DISEÑO (el texto desborda la caja a ese tamaño),
 //     no de seguridad.
 
-import type { Receta, SeccionPlantilla } from './tipos'
+import type { Estante, Receta, SeccionPlantilla } from './tipos'
 import { PLANTILLAS } from './datos'
 import { IMG } from './tipos'
 
@@ -118,6 +118,7 @@ const PREMIUM: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de piezas',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -169,6 +170,7 @@ const MOSAICO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de destacados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -216,6 +218,7 @@ const ATLETA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de la temporada',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -258,6 +261,7 @@ const PATITAS: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de recomendados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -293,20 +297,21 @@ const BODEGA: SeccionPlantilla[] = [
   {
     id: 'maridajes',
     nombre: 'Maridajes',
-    nota: 'Los tres bloques de texto del final. Uno sin título no se dibuja.',
+    nota: 'Tres recomendaciones al final de la portada. Una sin título no se dibuja, y sin ninguna la sección no aparece.',
     campos: [
       { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24, porDefecto: 'Para acompañar' },
-      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Maridajes que funcionan' },
-      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 40, porDefecto: 'Asado y achuras' },
-      { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Malbec joven o Bonarda. Fruta y poca madera para no tapar la carne.' },
-      { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 40, porDefecto: 'Pastas con salsa roja' },
-      { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 160, porDefecto: 'Sangiovese o un blend liviano. Acidez que corte el tomate.' },
-      { id: 't3', label: 'Tercero — título', tipo: 'texto', max: 40, porDefecto: 'Quesos duros' },
-      { id: 'b3', label: 'Tercero — texto', tipo: 'parrafo', max: 160, porDefecto: 'Cabernet Franc con guarda, o un espumante nature bien frío.' },
+      { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: 'Maridajes que funcionan', porDefectoReal: 'Recomendaciones' },
+      { id: 't1', label: 'Primero — título', tipo: 'texto', max: 40, afirmacion: true, porDefecto: 'Asado y achuras' },
+      { id: 'b1', label: 'Primero — texto', tipo: 'parrafo', max: 160, afirmacion: true, porDefecto: 'Malbec joven o Bonarda. Fruta y poca madera para no tapar la carne.' },
+      { id: 't2', label: 'Segundo — título', tipo: 'texto', max: 40, afirmacion: true, porDefecto: 'Pastas con salsa roja' },
+      { id: 'b2', label: 'Segundo — texto', tipo: 'parrafo', max: 160, afirmacion: true, porDefecto: 'Sangiovese o un blend liviano. Acidez que corte el tomate.' },
+      { id: 't3', label: 'Tercero — título', tipo: 'texto', max: 40, afirmacion: true, porDefecto: 'Quesos duros' },
+      { id: 'b3', label: 'Tercero — texto', tipo: 'parrafo', max: 160, afirmacion: true, porDefecto: 'Cabernet Franc con guarda, o un espumante nature bien frío.' },
     ],
   },
   {
     id: 'seleccion',
+    estante: 0,
     nombre: 'Selección del mes',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -353,6 +358,7 @@ const CRECER: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de recomendados',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -440,6 +446,7 @@ const NOCTURNO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de accesorios',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -479,6 +486,7 @@ const VERA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de piezas',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -584,6 +592,7 @@ const NITIDA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de esenciales',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -665,6 +674,7 @@ const PAPELERIA: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más vendidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -738,6 +748,7 @@ const CORRALON: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más pedidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -829,6 +840,7 @@ const GLOW: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más elegidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -862,6 +874,7 @@ const CIRCUITO: SeccionPlantilla[] = [
   },
   {
     id: 'fila',
+    estante: 0,
     nombre: 'Fila de más vendidos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -880,6 +893,7 @@ const CIRCUITO: SeccionPlantilla[] = [
   },
   {
     id: 'fila2',
+    estante: 1,
     nombre: 'Fila de nuevos ingresos',
     nota: 'El encabezado de la fila de productos. Los productos salen de tu catálogo.',
     campos: [
@@ -896,6 +910,7 @@ const CIRCUITO: SeccionPlantilla[] = [
 const VIDRIERA: SeccionPlantilla[] = [
   {
     id: 'destacados',
+    estante: 0,
     nombre: 'Fila de destacados',
     nota: 'La primera fila de productos, a sangre.',
     campos: [
@@ -913,6 +928,7 @@ const VIDRIERA: SeccionPlantilla[] = [
   },
   {
     id: 'masVendidos',
+    estante: 1,
     nombre: 'Fila de más vendidos',
     nota: 'La segunda fila de productos.',
     campos: [
@@ -939,6 +955,7 @@ const VIDRIERA: SeccionPlantilla[] = [
 const ESCAPARATE: SeccionPlantilla[] = [
   {
     id: 'tira',
+    estante: 0,
     nombre: 'Tira de lo nuevo',
     nota: 'La fila que se arrastra, debajo de las dos campañas.',
     campos: [
@@ -995,16 +1012,13 @@ export const SECCIONES_POR_PLANTILLA: Record<string, SeccionPlantilla[]> = {
  *
  * Sumar una plantilla nueva no es escribir un editor — es elegir bloques.
  */
+
 export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
-  const out: SeccionPlantilla[] = [{
-    id: 'cintillo',
-    nombre: 'Cintillo superior',
-    nota: 'La línea de arriba de todo. Vacía, no se dibuja.',
-    campos: [
-      { id: 'texto', label: 'Texto', tipo: 'texto', max: 90, afirmacion: true, help: 'Ej: envío gratis desde cierto monto, o una promo vigente.', porDefecto: 'Envío gratis en compras superiores a $80.000' },
-      { id: 'cartelera', label: 'Mostrar como cartelera (se desliza)', tipo: 'switch', help: 'En vez de quedarse fijo, el texto corre en loop.' },
-    ],
-  }]
+  // Sin cintillo, sin parallax, sin marcas, sin video y sin estadísticas: eso
+  // se carga en Apariencia y vale igual con cualquier plantilla (ver
+  // BLOQUES_ESTANDAR en tipos.ts). Acá queda solo lo que es de la plantilla:
+  // los encabezados de sus filas y sus bloques propios.
+  const out: SeccionPlantilla[] = []
 
   const encabezado = (id: string, nombre: string, nota: string, vol: string, tit: string, accion?: string): SeccionPlantilla => ({
     id, nombre, nota,
@@ -1028,7 +1042,9 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         })
         break
       case 'categorias':
-        out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', 'Ver todas →'))
+        // Las pastillas van con el encabezado centrado, que no lleva enlace a
+        // la derecha: ahí el campo no se ofrece.
+        out.push(encabezado('categorias', 'Grilla de categorías', 'El encabezado. Las categorías son las tuyas.', 'Por categoría', 'Comprá por categoría', b.estilo === 'pastillas' ? undefined : 'Ver todas →'))
         break
       case 'fila': {
         // El título por defecto seguía siendo "Destacados" para CUALQUIER
@@ -1037,38 +1053,31 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         // aunque los productos de cada una fueran distintos (reportado con
         // captura). Distingue por `fuente`, no por posición: una plantilla
         // con una sola fila (sin fuente) se queda con el default de siempre.
-        const [vol, tit] =
-          b.fuente === 'masVendidos' ? ['Recién llegado', 'Nuevo lanzamiento']
-            : ['Lo más elegido', 'Destacados']
-        out.push(encabezado(b.id, 'Fila de productos', 'El encabezado de esta fila. Los productos salen de tu catálogo.', vol, tit, 'Ver todo →'))
+        const [nombre, vol, tit] = TITULOS_ESTANTE[b.fuente]
+        out.push(encabezado(b.id, `Fila: ${nombre}`, `El encabezado de esta fila. Se prende y se apaga en Contenido → "${nombre}".`, vol, tit, 'Ver todo →'))
         break
       }
-      case 'franja':
+      case 'franja': {
+        // Cada forma de la franja dibuja una parte: la cartelera solo el
+        // título corriendo, el filete el título y el botón, y las otras dos
+        // todo. El formulario pide lo mismo que se ve.
+        const estilo = b.estilo ?? 'plena'
         out.push({
           id: 'franja',
           nombre: 'Espacio de anuncio',
           nota: 'La franja ancha. Sin título no se dibuja: una tienda que no anuncia nada no muestra una barra vacía.',
           campos: [
             { id: 'titulo', label: 'Título', tipo: 'texto', max: 60, afirmacion: true, help: 'Lo que querés anunciar.', porDefecto: 'Envío gratis desde $80.000' },
-            { id: 'bajada', label: 'Bajada', tipo: 'texto', max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' },
-            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
+            ...(estilo === 'plena' || estilo === 'apilada'
+              ? [{ id: 'bajada', label: 'Bajada', tipo: 'texto' as const, max: 90, afirmacion: true, porDefecto: 'A todo el país, con seguimiento.' }]
+              : []),
+            ...(estilo !== 'cartelera'
+              ? [{ id: 'cta', label: 'Texto del botón', tipo: 'texto' as const, max: 24, porDefecto: 'Ver el catálogo' }]
+              : []),
           ],
         })
         break
-      case 'parallax':
-        out.push({
-          id: 'parallax',
-          nombre: 'Banner con parallax',
-          nota: 'Foto ancha que se queda quieta mientras la página scrollea. Sin foto o sin título no se dibuja.',
-          campos: [
-            { id: 'foto', label: 'Foto', tipo: 'imagen', help: 'Bien apaisada, 1600px de ancho o más: se ve a pantalla completa.' },
-            { id: 'volanta', label: 'Volanta', tipo: 'texto', max: 24 },
-            { id: 'titulo', label: 'Título', tipo: 'texto', max: 50 },
-            { id: 'texto', label: 'Texto', tipo: 'parrafo', max: 140 },
-            { id: 'cta', label: 'Texto del botón', tipo: 'texto', max: 24, porDefecto: 'Ver el catálogo' },
-          ],
-        })
-        break
+      }
       case 'campana':
         out.push({
           id: 'campana',
@@ -1096,18 +1105,72 @@ export function esquemaDeReceta(receta: Receta): SeccionPlantilla[] {
         })
         break
       // `porCategoria` no lleva formulario: sus títulos son los nombres de las
-      // categorías del negocio, que ya se editan en Categorías.
+      // categorías del negocio, que ya se editan en Categorías. Y los otros
+      // cuatro se cargan en Apariencia.
       case 'porCategoria':
+      case 'stats':
+      case 'parallax':
+      case 'marcas':
+      case 'video':
         break
     }
   }
   return out
 }
 
+/** ¿Esa sección es una fila de productos de la plantilla? Ver `estante` en tipos.ts. */
+export function estanteDeSeccion(idPlantilla: string, seccion: string): 0 | 1 | undefined {
+  return SECCIONES_POR_PLANTILLA[idPlantilla]?.find(s => s.id === seccion)?.estante
+}
+
+/**
+ * ¿Esta plantilla dibuja el cupón? Lo usa el editor para ofrecer la tarjeta.
+ *
+ * Las de bloque propio lo declaran con su cupón de muestra; las recetas lo
+ * dibujan todas (después de sus bloques). Sin esto una receta mostraba el
+ * cupón que el negocio había cargado con otra plantilla, y no había desde
+ * dónde cambiarlo ni sacarlo.
+ */
+export function dibujaCupon(p: { cupon?: unknown; receta?: unknown } | null | undefined): boolean {
+  return !!p && (!!p.cupon || !!p.receta)
+}
+
+// Cómo se llama cada estante en el panel, y el encabezado con el que sale si
+// el dueño no lo cambia: los mismos del home clásico.
+export const TITULOS_ESTANTE: Record<Estante, [nombre: string, volanta: string, titulo: string]> = {
+  destacados: ['Destacados', 'Destacados', 'Productos destacados'],
+  nuevos: ['Nuevos ingresos', 'Nuevos ingresos', 'Recién llegados'],
+  recomendados: ['Recomendados', 'Recomendados', 'Recomendados para vos'],
+  topVentas: ['Top ventas', 'Top ventas', 'Más vendidos'],
+}
+
+/**
+ * El título de cada estante, para las plantillas con bloque propio.
+ *
+ * Una receta ya lo tiene: cada fila es un bloque con su encabezado. En un
+ * bloque propio las filas no están declaradas —la principal muestra el primer
+ * estante con productos, y las demás las agrega `resto()`—, así que el título
+ * no puede colgar de una fila: cuelga del estante. Donde sea que ese estante
+ * se dibuje, sale con este título.
+ *
+ * Un solo campo a propósito. La fila principal de cada plantilla tiene su
+ * propio diseño de encabezado (Vidriera no lleva volanta, Vera no lleva
+ * enlace), y un campo que en una plantilla se ve y en otra no es justo lo que
+ * el editor no puede ofrecer. El título lo llevan todas.
+ */
+const SECCIONES_DE_ESTANTES: SeccionPlantilla[] = (Object.keys(TITULOS_ESTANTE) as Estante[]).map(e => ({
+  id: `est-${e}`,
+  nombre: `Fila: ${TITULOS_ESTANTE[e][0]}`,
+  nota: `El título de la fila de ${TITULOS_ESTANTE[e][0].toLowerCase()}, donde sea que la plantilla la muestre. Se prende y se apaga en Contenido.`,
+  campos: [
+    { id: 'titulo', label: 'Título', tipo: 'texto', max: 44, porDefecto: TITULOS_ESTANTE[e][2] },
+  ],
+}))
+
 export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlantilla[] {
   if (!idPlantilla) return []
   const propias = SECCIONES_POR_PLANTILLA[idPlantilla]
-  if (propias) return propias
+  if (propias) return [...propias, ...SECCIONES_DE_ESTANTES]
   const receta = PLANTILLAS.find(x => x.id === idPlantilla)?.receta
   return receta ? esquemaDeReceta(receta) : []
 }
@@ -1122,8 +1185,12 @@ export function seccionesDe(idPlantilla: string | null | undefined): SeccionPlan
  * cantidad) en vez de ser una etiqueta? Ver `afirmacion` en tipos.ts.
  */
 export function esAfirmacion(idPlantilla: string, seccion: string, campo: string): boolean {
-  return !!SECCIONES_POR_PLANTILLA[idPlantilla]
-    ?.find(s => s.id === seccion)
+  // `seccionesDe` y no SECCIONES_POR_PLANTILLA: el esquema de una receta no
+  // está en ese registro (se arma desde sus bloques), y mirando solo ahí sus
+  // afirmaciones nunca se callaban — diez plantillas prometían "Envío gratis
+  // desde $80.000" en tiendas que no lo habían escrito.
+  return !!seccionesDe(idPlantilla)
+    .find(s => s.id === seccion)
     ?.campos.find(c => c.id === campo)
     ?.afirmacion
 }

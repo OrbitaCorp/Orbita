@@ -31,6 +31,10 @@ export interface LlmUsage {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  /** De `promptTokens`, cuántos vinieron de la caché del proveedor (se cobran más barato). Ya incluidos en promptTokens. */
+  cachedTokens?: number;
+  /** De `completionTokens`, cuántos fueron pensamiento. Ya incluidos en completionTokens. */
+  thinkingTokens?: number;
   /**
    * Quién respondió de verdad esta llamada. Lo pone cada adapter (mismo
    * criterio que generarTexto en text-generation.ts): el nombre del modelo no

@@ -246,6 +246,78 @@ export async function getStorefrontConfig(slug: string) {
   return conOverrides(cfg, overridesPreview())
 }
 
+// ─── SEO (qué le decimos a Google de la tienda) ────────────────────────────
+
+export type StorefrontSeo = {
+  /** Publicada, en línea, no es la demo y tiene productos a la venta. */
+  indexable: boolean
+  /** Dominio propio activo — el canónico. null = se queda el subdominio de Órbita. */
+  primaryDomain: string | null
+}
+
+export type StorefrontSitemap = StorefrontSeo & {
+  categories: { slug: string; updatedAt: string }[]
+  products: { id: string; updatedAt: string }[]
+}
+
+export function getStorefrontSeo(slug: string) {
+  return storefrontRequest<StorefrontSeo>(`/${slug}/seo`)
+}
+
+export function getStorefrontSitemap(slug: string) {
+  return storefrontRequest<StorefrontSitemap>(`/${slug}/sitemap`)
+}
+
+export type TiendaDelDirectorio = {
+  name: string
+  subdomain: string
+  /** Dominio propio activo; null = la tienda vive en su subdominio de Órbita. */
+  domain: string | null
+  description: string | null
+  logoUrl: string | null
+}
+
+export type DirectorioDeTiendas = {
+  total: number
+  page: number
+  perPage: number
+  stores: TiendaDelDirectorio[]
+}
+
+/** Las tiendas que corresponde mostrar en Google (orbita.site/tiendas). */
+export function getDirectorioTiendas(page = 1) {
+  return storefrontRequest<DirectorioDeTiendas>(`/directory/stores?page=${page}`)
+}
+
+export type MotivoDenuncia = 'PRODUCTO_PROHIBIDO' | 'FALSIFICACION' | 'ESTAFA' | 'DATOS_PERSONALES' | 'OTRO'
+
+/**
+ * "Denunciar esta tienda": llega al equipo de Órbita (bandeja de soporte del
+ * superadmin + mail), no a la tienda. Pública, sin sesión. `website` es el
+ * campo trampa para bots: tiene que ir vacío.
+ */
+export async function denunciarTienda(
+  slug: string,
+  datos: { reason: MotivoDenuncia; details: string; name: string; email: string; website?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/support/report-store`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, ...datos }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const message = mensajeDeError(res.status, body)
+    throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+}
+
+/** Slug de la tienda que tiene este dominio propio, o null. Lo usa el robots/sitemap por host. */
+export async function getSlugDeDominio(dominio: string): Promise<string | null> {
+  const r = await storefrontRequest<{ slug: string | null }>(`/by-domain/${encodeURIComponent(dominio)}`)
+  return r.slug ?? null
+}
+
 // ─── Productos ──────────────────────────────────────────────────────────────
 
 export type StorefrontProductItem = {
@@ -485,9 +557,13 @@ export type StorefrontCategoryItem = {
   productCount: number
 }
 
-export async function getStorefrontCategories(slug: string) {
-  const cats = await storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
-  return (cats ?? []).filter(c => (c.productCount ?? 0) > 0)
+// La API incluye también las categorías madre sin productos propios (para poder
+// armar el árbol). Por defecto se devuelven solo las que tienen productos —
+// lo que esperan el home y la página de categoría—; el filtro del catálogo
+// pide `conAncestros` para dibujar las raíces desplegables.
+export async function getStorefrontCategories(slug: string, opts?: { conAncestros?: boolean }) {
+  const cats = (await storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)) ?? []
+  return opts?.conAncestros ? cats : cats.filter(c => (c.productCount ?? 0) > 0)
 }
 
 // ─── Cupón por código ───────────────────────────────────────────────────────

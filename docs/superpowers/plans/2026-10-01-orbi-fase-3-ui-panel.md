@@ -19,7 +19,8 @@
   responde, borrador por sesión, página dedicada con sesiones agrupadas y menú por fila. Usa el stream de hoy
   (`POST /orbi/chat`): el **pensamiento** y el **detalle de la tarjeta en filas** esperan T6/T7. Se prende con
   `NEXT_PUBLIC_ORBI_PANEL_V2=1` o, en un solo navegador, con `?orbiV2=1` en cualquier URL del panel
-  (`?orbiV2=0` lo apaga). Verificado con Playwright sobre una página de prueba temporal: 19 capturas (claro,
+  (`?orbiV2=0` lo apaga). **Actualización 2026-10-04:** el interruptor ya no existe; el Orbi nuevo es el
+  único del panel para todos (el viejo queda solo en el alta). Verificado con Playwright sobre una página de prueba temporal: 19 capturas (claro,
   oscuro, 1440/1024/390 px) y 23 interacciones; **no** contra la API real (sin base en la sesión).
   Decisiones propias: tokens del panel y no los nuevos de Claude Design para los chips en oscuro; números con
   Geist y cifras tabulares (Geist Mono no se carga en la app); markdown con un parser propio del subconjunto que
@@ -128,7 +129,7 @@ para el subagente: opus donde dice "sensible".
 - La hoja reusa la lógica de teclado y bordes seguros de `components/orbi/OrbiBottomSheet.tsx`
   (extraerla a un hook compartido sin cambiar el wizard).
 
-**T13. Montaje detrás del flag**
+**T13. Montaje detrás del flag** (2026-10-04: flag quitado, `AdminLayout` monta siempre el nuevo)
 - `AdminLayout` monta el módulo nuevo si `NEXT_PUBLIC_ORBI_PANEL_V2 === '1'`; si no, el
   `OrbiPanel` de hoy. El botón de la barra y Ctrl+K abren el que esté montado.
 

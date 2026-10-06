@@ -1,3 +1,3 @@
 export { default } from '@/modules/ventas/cliente/catalogo/Categoria'
 
-export { getServerSideProps } from '@/lib/storefront/forceSSR'
+export { getServerSidePropsCategoria as getServerSideProps } from '@/lib/storefront/forceSSR'

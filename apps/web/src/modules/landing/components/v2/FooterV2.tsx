@@ -32,6 +32,7 @@ const COLUMNAS = [
             { label: 'Probá la demo', href: '#demo'          },
             { label: 'Qué vendés',    href: '#rubros'        },
             { label: 'Paquete avanzado', href: '#avanzado'   },
+            { label: 'Tiendas en Órbita', href: '/tiendas'   },
             { label: 'Sobre nosotros', href: '/nosotros'    },
         ],
     },

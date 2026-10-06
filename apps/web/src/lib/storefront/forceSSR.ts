@@ -1,7 +1,14 @@
 import type { GetServerSideProps } from 'next'
-import { getStorefrontConfig, StorefrontApiError } from './api'
+import { getStorefrontConfig, getStorefrontSeo, getStorefrontProduct, getStorefrontCategories, StorefrontApiError, type StorefrontSeo, type StorefrontProductDetail, type StorefrontCategoryItem } from './api'
+import {
+  origenDeTienda, parametrosRelevantes, seoNoIndexable, seoInicio, seoCatalogo, seoCategoria, seoProducto,
+  type ContextoSeo, type SeoPagina, type TipoPagina,
+} from './seo'
+import { ROOT_DOMAIN } from '@/lib/tenant'
+import { DEMO_SLUG } from '@/lib/demo/modo'
 import { temaDePlantilla } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import { esNavegadorMovil } from '@/hooks/useMovilPlantilla'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -87,6 +94,126 @@ async function getConfigConMemoria(slug: string) {
   return cfg
 }
 
+// ─── SEO ───────────────────────────────────────────────────────────────────
+//
+// Cada página de la tienda sale con su <head> (título, descripción, canonical,
+// robots, Open Graph, datos estructurados) en el PRIMER HTML, que es el que
+// leen Google y los previews de WhatsApp/Instagram/Facebook: ninguno espera a
+// que corra el JavaScript. Por defecto una página sale con noindex; solo las
+// que declaran un tipo (inicio, catálogo, categoría, producto) se indexan.
+
+const TTL_SEO_MS = 60_000
+const TIMEOUT_SEO_MS = 3500
+
+/** Memoria corta por clave: un rastreador o un link compartido pega varias veces seguidas. */
+function conMemoria<T>(ttlMs: number, max = 300) {
+  const guardado = new Map<string, { hasta: number; valor: T }>()
+  return async (clave: string, pedir: () => Promise<T>): Promise<T> => {
+    const previo = guardado.get(clave)
+    if (previo && previo.hasta > Date.now()) return previo.valor
+    const valor = await pedir()
+    guardado.set(clave, { hasta: Date.now() + ttlMs, valor })
+    if (guardado.size > max) guardado.delete(guardado.keys().next().value as string)
+    return valor
+  }
+}
+const seoConMemoria = conMemoria<StorefrontSeo>(TTL_SEO_MS)
+const productoConMemoria = conMemoria<StorefrontProductDetail>(30_000)
+const categoriasConMemoria = conMemoria<StorefrontCategoryItem[]>(TTL_SEO_MS)
+
+/** El resultado, o null si tardó más de `ms` o falló. Nada de esto puede colgar ni romper la tienda. */
+async function conTimeout<T>(pedido: Promise<T>, ms = TIMEOUT_SEO_MS): Promise<T | null> {
+  return Promise.race([pedido.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), ms))])
+}
+
+const noEncontrado = (e: unknown) => e instanceof StorefrontApiError && (e.status === 404 || e.status === 400)
+
+// El título de pestaña de las páginas que no se indexan.
+const TITULOS_DE_RUTA: [RegExp, string][] = [
+  [/\/carrito(\/|$)/, 'Carrito'], [/\/checkout(\/|$)/, 'Finalizar compra'], [/\/login(\/|$)/, 'Ingresar'],
+  [/\/registro(\/|$)/, 'Crear cuenta'], [/\/forgot-password(\/|$)/, 'Recuperar contraseña'], [/\/perfil(\/|$)/, 'Mi cuenta'],
+  [/\/pedido(\/|$)/, 'Mi pedido'], [/\/legales\/denunciar(\/|$)/, 'Denunciar esta tienda'], [/\/legales(\/|$)/, 'Información legal'], [/\/descuentos(\/|$)/, 'Descuento'], [/\/oferta(\/|$)/, 'Oferta'],
+]
+const tituloDeRuta = (url: string | undefined) => TITULOS_DE_RUTA.find(([re]) => re.test((url ?? '').split('?')[0]))?.[1]
+
+type DatosSeo = {
+  tipo: TipoPagina | null
+  slug: string
+  nombre: string
+  cfg: Awaited<ReturnType<typeof getStorefrontConfig>> | null
+  estado: StoreStatusSSR
+  /** Navegación dentro de la tienda (/_next/data/…): no es lo que lee un rastreador. */
+  esNavegacion: boolean
+}
+
+async function armarSeo(ctx: Parameters<GetServerSideProps>[0], d: DatosSeo): Promise<SeoPagina> {
+  const { tipo, slug, nombre, cfg, estado, esNavegacion } = d
+  const titulo = tituloDeRuta(ctx.resolvedUrl ?? ctx.req.url)
+
+  if (estado === 'not_found') {
+    ctx.res.statusCode = 404
+    return seoNoIndexable(nombre, 'Tienda no encontrada')
+  }
+  // Sin tipo (carrito, checkout, perfil…), tienda pausada o sin config: no se indexa.
+  if (!tipo || estado !== 'ok' || !cfg) return seoNoIndexable(nombre, titulo)
+
+  // Al navegar dentro de la tienda el HTML no lo lee nadie más que la persona:
+  // alcanza con un título, sin esperar a los pedidos de SEO. (Si no, cada click
+  // del cliente se demoraría lo que tarda la API.)
+  if (esNavegacion) return seoNoIndexable(nombre, tipo === 'catalogo' ? 'Catálogo' : undefined, 'noindex, follow')
+
+  // ¿Corresponde mostrarla en Google, y con qué dominio? Si la API no contesta
+  // (o es una versión anterior sin este dato), se decide con lo que ya se sabe.
+  const seoApi = await conTimeout(seoConMemoria(slug, () => getStorefrontSeo(slug)))
+  const indexable = seoApi ? seoApi.indexable : cfg.business.isActive && !cfg.business.isPaused && slug !== DEMO_SLUG
+  const contexto: ContextoSeo = {
+    slug,
+    nombre,
+    tagline: cfg.appearance?.tagline ?? null,
+    logo: cfg.appearance?.logoUrl ?? null,
+    origen: origenDeTienda(slug, seoApi?.primaryDomain, ROOT_DOMAIN),
+    indexable,
+    instagram: cfg.contact?.instagram ?? null,
+    facebook: cfg.contact?.facebook ?? null,
+    tiktok: cfg.contact?.tiktok ?? null,
+  }
+
+  if (tipo === 'inicio') return seoInicio(contexto)
+  if (tipo === 'catalogo') return seoCatalogo(contexto, parametrosRelevantes(ctx.query))
+
+  if (tipo === 'categoria') {
+    const categoria = typeof ctx.params?.categoria === 'string' ? ctx.params.categoria : ''
+    const categorias = await conTimeout(categoriasConMemoria(slug, () => getStorefrontCategories(slug)))
+    const cat = categorias?.find((c) => c.slug === categoria)
+    if (categorias && !cat) {
+      ctx.res.statusCode = 404
+      return seoNoIndexable(nombre, 'Categoría no encontrada', 'noindex, follow')
+    }
+    // Sin poder confirmar la categoría (la API tardó) no se indexa: un título genérico no sirve.
+    return cat ? seoCategoria(contexto, { slug: cat.slug, nombre: cat.name }) : seoNoIndexable(nombre, 'Catálogo', 'noindex, follow')
+  }
+
+  // producto
+  const id = typeof ctx.params?.id === 'string' ? ctx.params.id : ''
+  try {
+    const producto = await Promise.race([
+      productoConMemoria(`${slug}/${id}`, () => getStorefrontProduct(slug, id)),
+      new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_SEO_MS)),
+    ])
+    // Tardó de más: se sirve igual, sin indexar (un título genérico no sirve).
+    return producto ? seoProducto(contexto, producto) : seoNoIndexable(nombre, undefined, 'noindex, follow')
+  } catch (e) {
+    // Un producto borrado o inexistente es un 404 de verdad: antes la página
+    // respondía 200 con un "no encontrado" armado en el navegador, y Google lo
+    // toma por una página rota que sí existe (un "soft 404").
+    if (noEncontrado(e)) {
+      ctx.res.statusCode = 404
+      return seoNoIndexable(nombre, 'Producto no encontrado', 'noindex, follow')
+    }
+    return seoNoIndexable(nombre, undefined, 'noindex, follow')
+  }
+}
+
 // Fuerza SSR en las páginas del storefront en vez de dejar que Next.js las
 // optimice automáticamente como estáticas (comportamiento default de un
 // page sin getServerSideProps/getStaticProps), y de paso resuelve el
@@ -109,7 +236,8 @@ async function getConfigConMemoria(slug: string) {
 // un fetch del lado del cliente. Trayéndolo acá, el HTML que sale del server
 // ya viene con el logo/nombre/color correctos: se ven desde el primer byte,
 // sin depender de que el JS haya corrido.
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
+export function crearGetServerSideProps(tipo: TipoPagina | null = null): GetServerSideProps {
+  return async (ctx) => {
   const slug = typeof ctx.params?.slug === 'string' ? ctx.params.slug : null
 
   let storeMeta: StoreMetaSSR | null = null
@@ -122,6 +250,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   // comparten este getServerSideProps) pero no lo usan — una plantilla
   // solo cambia el home, nunca el resto de la tienda.
   let homeTemplate: string | null = null
+  let cfgOk: Awaited<ReturnType<typeof getStorefrontConfig>> | null = null
   if (slug) {
     try {
       // Carrera contra un timeout: si el backend está frío, la tienda igual
@@ -131,6 +260,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         new Promise<null>(resolve => setTimeout(() => resolve(null), SSR_CONFIG_TIMEOUT_MS)),
       ])
       if (cfg) {
+        cfgOk = cfg
         homeTemplate = cfg.appearance?.homeTemplate ?? null
         storeMeta = {
           nombre: cfg.appearance?.storeName ?? cfg.business.name,
@@ -176,5 +306,25 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const temaPlantilla: Tema | null = temaDePlantilla(homeTemplate) ?? null
 
   // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla } }
+  // De qué lado del corte dibujar el primer HTML de una plantilla (ver
+  // useMovilPlantilla): las plantillas no usan CSS fluido, eligen con un
+  // booleano, y sin esta pista el teléfono recibía la portada de escritorio.
+  const movil = esNavegadorMovil(ctx.req.headers['user-agent'])
+
+  const esNavegacion = typeof ctx.req.headers['x-nextjs-data'] === 'string' || (ctx.req.url ?? '').startsWith('/_next/data/')
+  const seo = await armarSeo(ctx, {
+    tipo, slug: slug ?? '', nombre: storeMeta?.nombre ?? slug ?? 'Tienda', cfg: cfgOk, estado: storeStatus, esNavegacion,
+  })
+
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate, __temaPlantilla: temaPlantilla, __movil: movil, __seo: seo } }
+  }
 }
+
+// Sin tipo: la página no se indexa (carrito, checkout, perfil, login, legales…).
+// Es el valor por defecto a propósito: una página nueva de la tienda no aparece
+// en Google hasta que alguien decida que tiene que aparecer.
+export const getServerSideProps = crearGetServerSideProps()
+export const getServerSidePropsInicio = crearGetServerSideProps('inicio')
+export const getServerSidePropsCatalogo = crearGetServerSideProps('catalogo')
+export const getServerSidePropsCategoria = crearGetServerSideProps('categoria')
+export const getServerSidePropsProducto = crearGetServerSideProps('producto')

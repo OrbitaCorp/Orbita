@@ -32,6 +32,7 @@ import {
 } from '@/lib/api'
 
 import { TopProductos } from './components/TopProductos'
+import { MetricasAvanzadas } from './components/MetricasAvanzadas'
 import type { Pedido } from '../pedidos/types/pedidos.types'
 
 // Misma traducción de estados que usan las pantallas de pedidos.
@@ -550,6 +551,10 @@ export default function Dashboard() {
                     )}
                 </Card>
             </div>
+
+            {/* 4b. Métricas avanzadas — desplegable, carga recién al abrirse. Usa el
+                mismo rango que el selector de período de arriba. */}
+            <MetricasAvanzadas from={rango.from} to={rango.to} onIrACatalogo={() => goSeccion('catalogo')} />
 
             {/* 5. Actividad reciente */}
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>

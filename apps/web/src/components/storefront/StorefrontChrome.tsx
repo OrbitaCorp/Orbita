@@ -39,7 +39,7 @@ import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avan
 import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
-import { definicionPlantilla, variablesDeTema, headerCentrado, headerBold } from '@/modules/ventas/cliente/inicio/plantillaReal'
+import { definicionPlantilla, variablesDeTema, headerCentrado, headerBold, anuncioReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import type { StorefrontConfigResponse } from '@/lib/storefront/api'
 
@@ -193,9 +193,13 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
           p={{
             ...plantilla,
             marca: tienda.nombre || plantilla.marca,
-            tagline: config?.appearance?.tagline || plantilla.tagline,
+            tagline: config?.appearance?.tagline?.trim() ?? '',
             links: navReal.map(l => l.label),
             sec: config?.appearance?.homeTemplateData?.secciones ?? undefined,
+            // El anuncio y el buscador son del header, así que valen en
+            // todas las vistas y no solo en la portada.
+            anuncio: anuncioReal(config?.appearance, config?.appearance?.homeTemplateData?.secciones ?? undefined),
+            ocultarBuscador: config?.appearance?.showSearch === false,
           }}
           movil={movil}
           soloHeader
@@ -209,7 +213,7 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
             renderAcciones: ({ movil: m }) => (
               <AccionesPlantilla t={plantilla.tema} movil={m} esVidriera={config?.business?.mode === 'SHOWCASE'} />
             ),
-            renderBuscador: () => <BuscadorPlantilla t={plantilla.tema} />,
+            renderBuscador: ({ placeholder }) => (config?.appearance?.showSearch ?? true) ? <BuscadorPlantilla t={plantilla.tema} placeholder={placeholder || undefined} /> : null,
           }}
         />
         {lateral && <div style={{ flex: 1, minWidth: 0 }}>{children}</div>}

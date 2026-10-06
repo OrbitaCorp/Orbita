@@ -1,3 +1,3 @@
 export { default } from '@/modules/ventas/cliente/inicio/Inicio'
 
-export { getServerSideProps } from '@/lib/storefront/forceSSR'
+export { getServerSidePropsInicio as getServerSideProps } from '@/lib/storefront/forceSSR'

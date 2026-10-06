@@ -74,8 +74,32 @@ TRUST_PROXY_HOPS: "2"
 # ORBI_PENDING_ACTIONS_RETENTION_DAYS: "30"
 # ORBI_TURNS_RETENTION_DAYS: "400"
 # DAILY_QUOTA_RETENTION_DAYS: "30"
+# USAGE_EVENTS_RETENTION_DAYS: "400"
+# ORBI_CONVERSATION_ACCESS_RETENTION_DAYS: "365"
+# ORBI_SESIONES_INACTIVAS_RETENTION_DAYS: ""  # apagada por defecto; con un número borra sesiones sin archivar inactivas
 # Mails a clientes (individuales y masivos) por negocio y por día de Argentina, contando email_logs (hallazgo mail-masivo-sin-tope). Mínimo 50; comentada = el default de customers.service.ts.
 # MAIL_MASIVO_TOPE_DIARIO: "500"
+# Cupo mensual de Orbi en créditos (1 crédito = USD 0,001; ver DEPLOYMENT.md
+# § Orbi: cupo mensual y lectura de conversaciones). Comentadas = el default.
+# OJO: los dos interruptores NO se prenden con el mismo valor.
+# ORBI_CUPO_BLOQUEA: solo el valor exacto "true" hace que Orbi deje de
+# contestar al 100 % del cupo; cualquier otra cosa (sin definir, "on", "1",
+# "TRUE") = apagado: el cupo solo se muestra.
+# ORBI_CUPO_BLOQUEA: "true"
+# ORBI_LECTURA_CONVERSACIONES: solo el valor exacto "on" deja que el
+# superadmin abra el texto de una conversación (con motivo y registro);
+# cualquier otra cosa ("true" incluido) = apagado. Prenderla RECIÉN cuando la
+# política de privacidad publicada diga que esto puede pasar.
+# ORBI_LECTURA_CONVERSACIONES: "on"
+# Créditos por mes de cada plan: número mayor que 0 (se trunca a entero); vacío, 0 o inválido = el default.
+# ORBI_CREDITOS_MES_BASE: "1500"
+# ORBI_CREDITOS_MES_AVANZADO: "2000"
 # Estudio de Fondo con IA activo en producción
 FONDO_IA_MANTENIMIENTO: "false"
 FONDO_IA_MOTOR: "workers"
+# WhatsApp Business en la bandeja de Mensajes (whatsapp.service.ts). La conexión es
+# manual todavía: solo se ve y se usa en los negocios listados acá (subdominios
+# separados por coma). Sin esta variable, en producción no la ve ninguno.
+# WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN y WHATSAPP_TOKEN_KEY son secretos:
+# viven en Secret Manager (ver SECRETS en deploy.sh).
+WHATSAPP_NEGOCIOS_HABILITADOS: "negocio"

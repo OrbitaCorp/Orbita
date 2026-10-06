@@ -204,6 +204,8 @@ apps/web/src/modules/orbi/
 - Detrás de un flag: `NEXT_PUBLIC_ORBI_PANEL_V2`. Con el flag apagado, el panel sigue con el Orbi
   de hoy. **Provisorio**: si Alan prefiere un flag por negocio (para probar en su tienda en
   producción antes que el resto), hace falta un lugar donde guardarlo (no existe hoy).
+  **Actualización 2026-10-04:** el flag se quitó. El Orbi nuevo es el del panel para todos, sin
+  variable ni `?orbiV2`; el viejo (`components/orbi`) queda solo para el alta.
 
 ## 5. Vistas
 

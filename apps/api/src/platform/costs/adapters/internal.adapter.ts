@@ -1,31 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CostAdapter, CostBreakdown } from './adapter.interface';
-
-export const PRICING: Record<string, Record<string, number>> = {
-  gemini: {
-    // gemini-3.6-flash: $0.10/1M input, $0.40/1M output (blended ~$0.25/1M)
-    'prompt_tokens': 0.10 / 1_000_000,
-    'completion_tokens': 0.40 / 1_000_000,
-  },
-  groq: {
-    // llama-3.3-70b: $0.59/1M input, $0.79/1M output
-    'prompt_tokens': 0.59 / 1_000_000,
-    'completion_tokens': 0.79 / 1_000_000,
-  },
-  resend: {
-    // Resend: free tier 100/day, $0.001/email after (rough estimate)
-    'email_sent': 0,
-  },
-  serper: {
-    // Serper: 2,500 free tier queries, then $0.001/query
-    'search_query': 0.001,
-  },
-  tavily: {
-    // Tavily: 1,000 free tier queries/mo, then $0.008/query
-    'search_query': 0.008,
-  },
-};
+import { costoDelEvento, PROVEEDORES_INTERNOS } from '../precios';
 
 @Injectable()
 export class InternalCostAdapter implements CostAdapter {
@@ -47,18 +23,14 @@ export class InternalCostAdapter implements CostAdapter {
         providerId: provider.id,
         timestamp: { gte: start, lt: end },
       },
-      select: { category: true, quantity: true, estimatedCostUsd: true },
+      select: { category: true, quantity: true, estimatedCostUsd: true, metadata: true, timestamp: true },
     });
 
     let total = 0;
     const breakdown: Record<string, number> = {};
 
-    const prices = PRICING[slug] ?? {};
-
     for (const e of events) {
-      const cost = e.estimatedCostUsd
-        ? Number(e.estimatedCostUsd)
-        : Number(e.quantity) * (prices[e.category] ?? 0);
+      const cost = costoDelEvento(slug, e);
       total += cost;
       breakdown[e.category] = (breakdown[e.category] ?? 0) + cost;
     }
@@ -76,7 +48,7 @@ export class InternalCostAdapter implements CostAdapter {
 
   async syncAllInternal(month: string): Promise<Map<string, CostBreakdown>> {
     const results = new Map<string, CostBreakdown>();
-    for (const slug of Object.keys(PRICING)) {
+    for (const slug of PROVEEDORES_INTERNOS) {
       const result = await this.fetchMonthlyCostForSlug(slug, month);
       if (result.amountUsd > 0 || Object.keys(result.breakdown).length > 0) {
         results.set(slug, result);

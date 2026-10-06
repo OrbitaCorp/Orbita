@@ -101,6 +101,7 @@ describe('Orbi fase 1 contra Postgres (e2e)', () => {
       businessId,
       memberId,
       conversationId: null,
+      turnId: null,
       resumen: 'Crear el cupón E2EORBI10 de 10%',
     });
   }

@@ -621,8 +621,12 @@ export class OrdersService {
     // negocio (Ale, 03/10). Antes el pedido guardaba nombre y email solo como
     // texto y esa persona nunca aparecía en Clientes. El checkout público no
     // pasa por acá: al invitado se lo invita a crear su cuenta.
-    if (!customer && !opts?.publicCheckout && dto.buyer?.email) {
-      customer = await this.clienteDelComprador(businessId, dto.buyer);
+    // Acá solo se BUSCA al que ya tiene ese email; el alta del nuevo espera a
+    // que la venta pase todas las validaciones (más abajo, antes de guardar):
+    // si falla por stock, producto o cobro, no queda un cliente sin venta.
+    const clienteDelEmail = !customer && !opts?.publicCheckout && dto.buyer?.email;
+    if (clienteDelEmail) {
+      customer = await this.buscarClientePorEmail(businessId, dto.buyer!.email!);
     }
 
     // Si se pasa una dirección de envío, tiene que ser de ESTE negocio (y del
@@ -856,6 +860,12 @@ export class OrdersService {
       where: { businessId },
       select: { ivaRate: true, ivaDisabled: true },
     });
+
+    // Ya pasó todo lo que puede rechazar la venta: ahora sí, el comprador
+    // tipeado con un email que el negocio no tenía pasa a ser cliente.
+    if (clienteDelEmail && !customer) {
+      customer = await this.altaClienteDelComprador(businessId, dto.buyer!);
+    }
 
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
@@ -1159,23 +1169,24 @@ export class OrdersService {
   // NotificationsModule en OrdersModule (mismo criterio que notifications.service.ts
   // evita depender de ReportsModule: menos import circular, no más). Nunca rompe
   // el alta ni la confirmación: si el mail falla queda en el log.
-  // El cliente que corresponde a un comprador cargado a mano: el que ya tiene
-  // ese email en el negocio (misma regla anti-duplicados que el alta de
-  // Clientes) o uno nuevo. Nunca frena la venta: si el alta choca y no hay a
-  // quién vincular (un cliente borrado conserva su email), el pedido sale sin
-  // cliente, como antes.
-  private async clienteDelComprador(
+  // El cliente que ya tiene ese email en el negocio (misma regla anti-duplicados
+  // que el alta de Clientes: sin distinguir mayúsculas, ignorando los borrados).
+  private buscarClientePorEmail(businessId: string, email: string) {
+    return this.prisma.customer.findFirst({
+      where: { businessId, deletedAt: null, email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
+    });
+  }
+
+  // Alta del cliente para un comprador cargado a mano con un email nuevo.
+  // Nunca frena la venta: si el alta choca y no hay a quién vincular (un
+  // cliente borrado conserva su email), el pedido sale sin cliente, como antes.
+  private async altaClienteDelComprador(
     businessId: string,
     buyer: { name: string; email?: string; phone?: string; dni?: string },
   ) {
     const email = buyer.email?.trim().toLowerCase();
     if (!email || !buyer.name.trim()) return null;
-    const buscar = () =>
-      this.prisma.customer.findFirst({
-        where: { businessId, deletedAt: null, email: { equals: email, mode: 'insensitive' } },
-      });
-    const existente = await buscar();
-    if (existente) return existente;
+    const buscar = () => this.buscarClientePorEmail(businessId, email);
 
     const [firstName, ...resto] = buyer.name.trim().split(/\s+/);
     const lastName = resto.join(' ') || null;

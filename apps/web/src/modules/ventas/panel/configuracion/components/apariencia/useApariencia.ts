@@ -5,8 +5,47 @@ import { useEffect, useState } from 'react'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelGetCategoriesFlat, panelGetProducts, type ApiCategory, type ApiProductListItem } from '@/lib/api'
 import { AP_DEFAULTS, loadFont, type Apariencia as Ap } from '../../mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from '../../mock/apariencia.mapper'
+import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
 
-export function useApariencia(onToast: (m: string) => void) {
+// Las plantillas tenían un cintillo PROPIO (y las recetas, además, un
+// parallax), cargados en la pestaña Secciones, aparte del anuncio y el
+// parallax de Apariencia: el dueño cargaba lo mismo dos veces. Ahora usan los
+// de Apariencia, y esos campos ya no tienen formulario.
+//
+// La tienda sigue mostrando lo que estaba guardado en ellos (ver
+// plantillaReal.ts), así que acá se pasa a los campos de Apariencia al abrir
+// el editor: el dueño lo ve donde ahora se edita, y al guardar queda en un
+// solo lugar. Sin esto quedaba publicado un texto que no se podía cambiar ni
+// borrar desde ninguna pantalla.
+function pasarAApariencia(ap: Ap, homeTemplate: string | null): Ap {
+    const plantilla = PLANTILLAS.find(x => x.id === homeTemplate)
+    if (!plantilla) return ap
+    const { cintillo, ...sinCintillo } = ap.seccionesPlantilla
+    // El parallax propio era solo de las recetas.
+    const parallax = plantilla.receta ? sinCintillo.parallax : undefined
+    if (!cintillo && !parallax) return ap
+    const resto = { ...sinCintillo }
+    if (parallax) delete resto.parallax
+    const out: Ap = { ...ap, seccionesPlantilla: resto }
+    if (cintillo?.texto?.trim()) {
+        out.textoEnvio = cintillo.texto.trim()
+        out.mostrarBannerEnvio = true
+        out.bannerDesplazable = cintillo.cartelera === 'si'
+    }
+    // Solo si el de Apariencia no se está mostrando: ese gana en la tienda.
+    if (parallax?.foto && parallax?.titulo && !(ap.mostrarParallax && ap.parallaxImagen)) {
+        out.mostrarParallax = true
+        out.parallaxImagen = parallax.foto
+        out.parallaxTitulo = parallax.titulo
+        out.parallaxSubtitulo = parallax.texto ?? ''
+        out.parallaxCtaTexto = parallax.cta || 'Ver el catálogo'
+    }
+    return out
+}
+
+// `editandoPlantilla` es el modo de Avanzado → Plantillas (ver soloContenido
+// en Apariencia.tsx).
+export function useApariencia(onToast: (m: string) => void, editandoPlantilla = false) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
     // Lo que la tienda muestra HOY (lo último cargado o guardado). La vista
@@ -57,7 +96,10 @@ export function useApariencia(onToast: (m: string) => void) {
         ])
             .then(([dto, biz]) => {
                 if (cancelado) return
-                const cargado = dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda })
+                const cargado = pasarAApariencia(
+                    dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }),
+                    editandoPlantilla ? dto.homeTemplate : null,
+                )
                 setApRaw(cargado)
                 setPublicado(cargado)
                 setHomeTemplateLocal(dto.homeTemplate)

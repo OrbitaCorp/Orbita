@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Archive, ArchiveRestore, MoreHorizontal, Pencil, Pin, PinOff, Search, SquarePen, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, ChartColumn, MoreHorizontal, Pencil, Pin, PinOff, Search, SquarePen, Trash2 } from 'lucide-react'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useMediaQuery } from '@/components/orbi/useMediaQuery'
 import { useDisponibilidadOrbi } from '@/components/orbi/useDisponibilidadOrbi'
+import { useAuth } from '@/hooks/useAuth'
 import { OrbiV2Contexto } from '../piezas/contexto'
 import { agruparSesiones, horaCorta, TITULO_POR_DEFECTO } from '../estado/agrupar'
 import { abrirSesion, nuevaSesion, useAccionesDeSesion, useListaDeSesiones } from '../estado/sesiones'
-import { useFlagOrbiV2 } from '../estado/flag'
 import { rutaDeVuelta } from '../estado/vuelta'
+import { puedeVerElEquipo } from '../estado/uso'
 import type { ResumenDeSesion } from '../api/sesiones'
 import { OrbiChat } from './OrbiChat'
+import { OrbiUsoPagina } from './OrbiUsoPagina'
 import { useAnunciador, useRutasDeOrbi } from './OrbiV2'
 import s from '../orbi.module.css'
 
@@ -74,7 +76,7 @@ function MenuDeSesion({ sesion, onRenombrar, onBorrar }: { sesion: ResumenDeSesi
   )
 }
 
-function ItemDeSesion({ sesion, actual, ahora, onBorrar }: { sesion: ResumenDeSesion; actual: boolean; ahora: Date; onBorrar: () => void }) {
+function ItemDeSesion({ sesion, actual, ahora, onBorrar, onElegir }: { sesion: ResumenDeSesion; actual: boolean; ahora: Date; onBorrar: () => void; onElegir: () => void }) {
   const [renombrando, setRenombrando] = useState(false)
   const [titulo, setTitulo] = useState(sesion.titulo ?? '')
   const { editar } = useAccionesDeSesion()
@@ -100,7 +102,7 @@ function ItemDeSesion({ sesion, actual, ahora, onBorrar }: { sesion: ResumenDeSe
           }}
         />
       ) : (
-        <button type="button" className={s.filaSesion} aria-current={actual} onClick={() => { if (!actual) void abrirSesion(sesion.id) }}>
+        <button type="button" className={s.filaSesion} aria-current={actual} onClick={() => { if (!actual) void abrirSesion(sesion.id); onElegir() }}>
           <span>{sesion.titulo ?? TITULO_POR_DEFECTO}</span>
           {sesion.esperandoAprobacion && <span className={s.puntoEspera} title="Orbi espera tu aprobación" aria-label="Orbi espera tu aprobación" />}
           <span className={s.hora}>{horaCorta(sesion.ultimaActividad, ahora)}</span>
@@ -129,7 +131,12 @@ function ConfirmarBorrado({ onCancelar, onBorrar }: { onCancelar: () => void; on
   )
 }
 
-function ColumnaDeSesiones() {
+/**
+ * `enUso`: está abierta la vista "Uso del equipo"; elegir o empezar una
+ * conversación vuelve al chat (`onIrAlChat`). `onUsoDelEquipo` solo llega para
+ * el dueño y los administradores.
+ */
+function ColumnaDeSesiones({ enUso, onIrAlChat, onUsoDelEquipo }: { enUso: boolean; onIrAlChat: () => void; onUsoDelEquipo?: () => void }) {
   const [q, setQ] = useState('')
   const [buscado, setBuscado] = useState('')
   const [archivadas, setArchivadas] = useState(false)
@@ -148,7 +155,7 @@ function ColumnaDeSesiones() {
   return (
     <nav className={s.columnaSesiones} aria-label="Conversaciones con Orbi">
       <div className={s.columnaArriba}>
-        <button type="button" className={`${s.nueva} ${s.foco}`} onClick={nuevaSesion}><SquarePen aria-hidden />Nueva conversación</button>
+        <button type="button" className={`${s.nueva} ${s.foco}`} onClick={() => { nuevaSesion(); onIrAlChat() }}><SquarePen aria-hidden />Nueva conversación</button>
         <label className={s.buscar} style={{ marginBottom: 0 }}>
           <Search aria-hidden />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar conversaciones" aria-label="Buscar conversaciones" />
@@ -168,7 +175,7 @@ function ColumnaDeSesiones() {
         {grupos.map(g => (
           <section key={g.grupo} aria-label={g.grupo}>
             <div className={s.grupo}>{g.grupo}</div>
-            {g.sesiones.map(x => <ItemDeSesion key={x.id} sesion={x} actual={x.id === actual} ahora={ahora} onBorrar={() => setABorrar(x.id)} />)}
+            {g.sesiones.map(x => <ItemDeSesion key={x.id} sesion={x} actual={x.id === actual} ahora={ahora} onBorrar={() => setABorrar(x.id)} onElegir={onIrAlChat} />)}
           </section>
         ))}
         {lista.hayMas && (
@@ -177,6 +184,13 @@ function ColumnaDeSesiones() {
           </button>
         )}
       </div>
+      {onUsoDelEquipo && (
+        <div className={s.columnaAbajo}>
+          <button type="button" className={`${s.filaSesion} ${s.verTodas}`} aria-current={enUso ? 'page' : undefined} onClick={onUsoDelEquipo}>
+            <ChartColumn aria-hidden />Uso del equipo
+          </button>
+        </div>
+      )}
       {aBorrar && <ConfirmarBorrado onCancelar={() => setABorrar(null)} onBorrar={() => { const id = aBorrar; setABorrar(null); void borrar(id) }} />}
     </nav>
   )
@@ -185,15 +199,24 @@ function ColumnaDeSesiones() {
 /**
  * Página dedicada de Orbi (/admin/ventas/orbi?vista=chat). Desde 1024 px, las
  * sesiones a la izquierda; abajo de eso, el desplegable del título. El chat se
- * lee a 760 px como máximo.
+ * lee a 760 px como máximo. Con `?vista=uso`, en el lugar del chat va "Uso del
+ * equipo" (dueño y administradores).
  */
 export default function OrbiPagina() {
   const router = useRouter()
-  const prendido = useFlagOrbiV2()
   const ancha = useMediaQuery('(min-width: 1024px)')
   const rutas = useRutasDeOrbi()
   const { anunciar, region } = useAnunciador()
-  useDisponibilidadOrbi('panel', prendido)
+  useDisponibilidadOrbi('panel', true)
+  const { user } = useAuth()
+  const veElEquipo = puedeVerElEquipo(user?.type === 'member' ? user.role : undefined)
+  const enUso = router.query.vista === 'uso'
+  // Cambiar de vista conserva el resto de la URL (`desde`, para salir a la pantalla de antes).
+  const irAVista = useCallback((vista: 'chat' | 'uso') => {
+    if (router.query.vista !== vista) void router.push({ query: { ...router.query, vista } })
+  }, [router])
+  const irAlChat = useCallback(() => irAVista('chat'), [irAVista])
+  const irAlUso = useCallback(() => irAVista('uso'), [irAVista])
 
   const abrirOrbi = useOrbiStore(st => st.open)
   const navegar = useCallback((ruta: string) => { void router.push(ruta) }, [router])
@@ -205,23 +228,23 @@ export default function OrbiPagina() {
   }, [abrirOrbi, router, rutas.inicio])
   const contexto = useMemo(() => ({ vista: 'pagina' as const, navegar, anunciar }), [navegar, anunciar])
 
-  if (!prendido) {
-    return (
-      <div className={s.vacio} style={{ minHeight: '60vh' }}>
-        <h2>Esta página todavía no está disponible</h2>
-        <p>Orbi se abre desde el botón de la barra de arriba.</p>
-      </div>
-    )
-  }
-
   return (
     <OrbiV2Contexto.Provider value={contexto}>
       {region}
       <div className={`${s.raiz} ${s.pagina}`} style={{ height: '100%' }}>
-        {ancha && <ColumnaDeSesiones />}
-        <div className={s.chatPagina}>
-          <OrbiChat conSelector={!ancha} onSalir={salir} onAbrirManual={rutas.manual ? () => navegar(rutas.manual!) : undefined} />
-        </div>
+        {ancha && <ColumnaDeSesiones enUso={enUso} onIrAlChat={irAlChat} onUsoDelEquipo={veElEquipo ? irAlUso : undefined} />}
+        {enUso ? (
+          <OrbiUsoPagina onVolver={irAlChat} />
+        ) : (
+          <div className={s.chatPagina}>
+            <OrbiChat
+              conSelector={!ancha}
+              onSalir={salir}
+              onAbrirManual={rutas.manual ? () => navegar(rutas.manual!) : undefined}
+              onUsoDelEquipo={!ancha && veElEquipo ? irAlUso : undefined}
+            />
+          </div>
+        )}
       </div>
     </OrbiV2Contexto.Provider>
   )

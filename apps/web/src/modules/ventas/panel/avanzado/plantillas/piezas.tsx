@@ -67,8 +67,31 @@ export const CSS = `
    efecto. Y se respeta prefers-reduced-motion, que para mucha gente no es
    una preferencia estética sino que le marea. */
 .pl-parallax { background-size: cover; background-position: center; background-attachment: fixed; }
-@media (max-width: 640px) { .pl-parallax { background-attachment: scroll; } }
+@media (max-width: 640px) {
+  .pl-parallax { background-attachment: scroll; }
+  /* Celular: iOS ignora background-attachment: fixed, así que se usa una capa
+     position:fixed con la foto (variable --pl-par-img) recortada por el
+     clip-path de la sección. Ver el mismo recurso en Inicio.tsx (.sf-parallax). */
+  @media (prefers-reduced-motion: no-preference) {
+    .pl-parallax { background-image: none !important; clip-path: inset(0); }
+    .pl-parallax::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; height: 100lvh; background: var(--pl-par-img) center/cover no-repeat; z-index: 0; pointer-events: none; }
+    .pl-parallax > * { position: relative; z-index: 1; }
+  }
+}
 @media (prefers-reduced-motion: reduce) { .pl-parallax { background-attachment: scroll; } }
+
+/* El esqueleto de carga (ver esqueleto.tsx): la misma portada, con cada texto
+   hecho una barra y cada foto un bloque. Los fondos de color de la plantilla
+   quedan —son parte de su forma—; lo que se va son los degradés, las sombras
+   y todo lo que se mueve. */
+.pl-esq { pointer-events: none; user-select: none; animation: plEsq 1.5s ease-in-out infinite; }
+.pl-esq * { color: transparent !important; background-image: none !important; box-shadow: none !important; text-shadow: none !important; animation: none !important; transition: none !important; }
+.pl-esq :is(h1, h2, h3, p, span, div, button, a, li):not(:has(*)):not(:empty) { background-color: var(--pl-esq) !important; border-color: transparent !important; border-radius: 5px; }
+.pl-esq .pl-media { background: var(--pl-esq) !important; }
+.pl-esq .pl-reveal { opacity: 1 !important; transform: none !important; }
+.pl-esq svg, .pl-esq input { visibility: hidden; }
+@keyframes plEsq { 0%, 100% { opacity: 1 } 50% { opacity: .62 } }
+@media (prefers-reduced-motion: reduce) { .pl-esq { animation: none; } }
 
 .pl-menu-panel { animation: plMenuIn .26s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes plMenuIn { from { transform: translateX(-100%) } to { transform: translateX(0) } }
@@ -111,6 +134,19 @@ const FUENTES_PLANTILLAS = [
   'Libre+Baskerville:wght@400;700',
   'Outfit:wght@400;600;700;800',
   'Manrope:wght@400;600;700;800',
+  // Bloque. Estaban en su tema y no acá: se veía con la fuente del sistema.
+  'Rubik:wght@400;500;700;800;900',
+  'Nunito+Sans:wght@400;600;700;800',
+  // Granel, Horno, Brote, Voltio, Pistón y Confeti.
+  'Lora:wght@400;600;700',
+  'Cabin:wght@400;600;700',
+  'Fraunces:wght@400;600;700;800',
+  'DM+Serif+Display:wght@400',
+  'DM+Sans:wght@400;500;700',
+  'Sora:wght@400;600;700;800',
+  'Barlow+Condensed:wght@500;600;700;800',
+  'Barlow:wght@400;500;600;700',
+  'Fredoka:wght@400;500;600;700',
 ]
 
 export function cargarFuentes() {
@@ -352,10 +388,10 @@ export function AccionesTienda({ t, movil, items = 2, acciones }: { t: Tema; mov
  */
 export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: string[]; acciones?: AccionesHome; color?: string }) {
   const [abierto, setAbierto] = useState(false)
-  const nav = navDe(links, acciones)
+  const items = itemsMenuMovil(links, acciones)
   const glifo = <span style={{ fontSize: 18, lineHeight: 1, color: color ?? t.text }}>☰</span>
 
-  if (!acciones || nav.length === 0) return glifo
+  if (!acciones || items.length === 0) return glifo
 
   return (
     <>
@@ -385,7 +421,7 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
                 style={{ background: 'none', border: 'none', fontSize: 22, lineHeight: 1, color: t.muted, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >×</button>
             </div>
-            {nav.map((l) => (
+            {items.map((l) => (
               <button
                 key={l.label} type="button"
                 onClick={() => { setAbierto(false); l.onClick?.() }}
@@ -402,6 +438,21 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
       )}
     </>
   )
+}
+
+/**
+ * Lo que lista el menú de celular: los enlaces del header con "Inicio"
+ * adelante. Los enlaces de Apariencia son del catálogo y ninguno vuelve a la
+ * portada. Solo la hamburguesa lo lleva; la barra de escritorio no. Si el
+ * dueño ya cargó un enlace que se llama "Inicio", no se duplica. Con el
+ * header en "minimal" (sin navegación) no hay menú, como antes. Pura, para
+ * poder probarla sin abrir el menú.
+ */
+export function itemsMenuMovil(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
+  const nav = navDe(links, acciones)
+  const sinNavegacion = acciones?.navLayout === 'minimal'
+  if (!acciones?.irAInicio || sinNavegacion || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
+  return [{ label: 'Inicio', onClick: acciones.irAInicio, activo: false }, ...nav]
 }
 
 export function navDe(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {

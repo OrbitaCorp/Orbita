@@ -86,9 +86,51 @@ describe('correrTurno', () => {
     const t = turno({ llm: guion([[llamada('listOrders'), uso('gemini', 10), { type: 'done' }], [uso('groq', 5), uso('gemini', 3), { type: 'done' }]]), registry: registry(), emisor: e });
     await correrTurno(t);
     expect(Object.fromEntries(t.progreso.consumo)).toEqual({
-      gemini: { model: 'gemini', promptTokens: 13, completionTokens: 2 },
-      groq: { model: 'groq', promptTokens: 5, completionTokens: 1 },
+      gemini: { model: 'gemini', promptTokens: 13, completionTokens: 2, cachedTokens: 0, thinkingTokens: 0 },
+      groq: { model: 'groq', promptTokens: 5, completionTokens: 1, cachedTokens: 0, thinkingTokens: 0 },
     });
     expect(t.progreso.modeloReportado).toBe('gemini');
+  });
+});
+
+describe('pasos del turno', () => {
+  const reloj = () => { let t = 1000; return () => (t += 10); };
+
+  it('anota una entrada por vuelta con su consumo y sus tools', async () => {
+    const { e } = emisor();
+    const t = turno({
+      llm: guion([
+        [llamada('listOrders'), { type: 'usage', usage: { model: 'm', provider: 'gemini', promptTokens: 5000, completionTokens: 30, cachedTokens: 0, thinkingTokens: 10 } }, { type: 'done' }],
+        [{ type: 'text', chunk: 'Hay 4.' }, { type: 'usage', usage: { model: 'm', provider: 'gemini', promptTokens: 5600, completionTokens: 20, cachedTokens: 4096, thinkingTokens: 5 } }, { type: 'done' }],
+      ]),
+      registry: registry(), emisor: e, reloj: reloj(), inicio: 1000,
+    });
+    await correrTurno(t);
+    expect(t.progreso.pasos).toHaveLength(2);
+    expect(t.progreso.pasos[0]).toMatchObject({ n: 1, provider: 'gemini', promptTokens: 5000, thinkingTokens: 10, tools: [{ name: 'listOrders', tipo: 'lectura', ok: true }] });
+    expect(t.progreso.pasos[1]).toMatchObject({ n: 2, cachedTokens: 4096, tools: [] });
+    expect(t.progreso.consumo.get('gemini')).toMatchObject({ promptTokens: 10600, cachedTokens: 4096, thinkingTokens: 15 });
+    expect(t.progreso.ttftMs).toBeGreaterThan(0);
+  });
+
+  it('cuenta las escrituras rechazadas', async () => {
+    const { e } = emisor();
+    const reg = { proponer: jest.fn(async () => ({ error: 'falta la categoría' })), requiereConfirmacion: jest.fn(() => true), execute: jest.fn() };
+    const t = turno({ llm: guion([[llamada('createProduct'), { type: 'done' }], [{ type: 'text', chunk: 'No pude.' }, { type: 'done' }]]), registry: reg, emisor: e });
+    await correrTurno(t);
+    expect(t.progreso.escriturasRechazadas).toBe(1);
+    expect(t.progreso.pasos[0].tools[0]).toMatchObject({ tipo: 'rechazada', ok: false });
+  });
+
+  it('el consumo de IA de una tool se suma aparte y no viaja al modelo', async () => {
+    const { e } = emisor();
+    const reg = registry();
+    reg.execute.mockResolvedValue({ success: true, label: 'ok', data: { d: 1 }, consumo: { model: 'm', provider: 'gemini', promptTokens: 800, completionTokens: 500 } } as never);
+    const messages: any[] = [];
+    const t = turno({ llm: guion([[llamada('generateDescription'), { type: 'done' }], [{ type: 'text', chunk: 'Listo' }, { type: 'done' }]]), registry: reg, emisor: e, messages });
+    await correrTurno(t);
+    expect(t.progreso.consumoDeTools.get('gemini')).toMatchObject({ promptTokens: 800, completionTokens: 500 });
+    const resultadoAlModelo = messages.find(m => m.role === 'tool').content;
+    expect(resultadoAlModelo).not.toContain('consumo');
   });
 });

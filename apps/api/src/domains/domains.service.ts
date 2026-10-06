@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DomainStatus, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DomainStatus, Prisma, SslStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelDomainsService } from './vercel-domains.service';
 import { AuditService } from '../audit/audit.service';
@@ -8,6 +8,8 @@ import { LinkDomainDto } from './dto/link-domain.dto';
 
 @Injectable()
 export class DomainsService {
+  private readonly logger = new Logger(DomainsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly vercelDomains: VercelDomainsService,
@@ -48,7 +50,8 @@ export class DomainsService {
     // Vercel" es `isDnsConfigured` (misconfigured:false), el mismo que usa
     // `verifyDns()` — por eso acá SIEMPRE arranca en PENDING sin verificar,
     // nunca se confía en el `verified` de la respuesta de addDomain.
-    await this.vercelDomains.addDomain(normalized);
+    const info = await this.vercelDomains.addDomain(normalized);
+    await this.asegurarWww(normalized, info?.apexName);
 
     // Dos negocios vinculando el mismo dominio a la vez pasan los dos el
     // chequeo de arriba; el @unique de `domain` decide, y el segundo recibe un
@@ -91,20 +94,51 @@ export class DomainsService {
       this.vercelDomains.getDomainInfo(domain.domain),
       this.vercelDomains.getDnsConfig(domain.domain),
     ]);
-    return { domain: domain.domain, verified: info.verified, records: this.armarRecords(domain.domain, info.apexName, dnsConfig) };
+    const esApex = domain.domain === info.apexName;
+    // Los dominios vinculados antes de que existiera el www no lo tienen en
+    // Vercel: se les agrega la primera vez que piden sus registros.
+    // Mejor esfuerzo: si el www falla, el apex igual se puede configurar.
+    let wwwCname: string | undefined;
+    if (esApex) {
+      await this.asegurarWww(domain.domain, info.apexName);
+      wwwCname = (await this.vercelDomains.getDnsConfig(`www.${domain.domain}`).catch(() => null))?.recommendedCNAME[0]?.value;
+    }
+    return { domain: domain.domain, verified: info.verified, records: this.armarRecords(domain.domain, info.apexName, dnsConfig, wwwCname) };
   }
 
-  // Dominio raíz (ej. "tefaltacalleok.com") → A record(s) en "@" — un DNS
-  // estándar no permite CNAME en la raíz. Subdominio (ej. "tienda.mi.com")
-  // → CNAME, con el nombre siendo la parte antes del apex ("tienda"). Se
-  // toma siempre la recomendación de mejor rank (`[0]`) — Vercel devuelve
-  // varias alternativas pero mostrar una sola es más claro para alguien
-  // cargando esto por primera vez en el panel de su registrador.
-  private armarRecords(domain: string, apexName: string, config: { recommendedIPv4: { value: string[] }[]; recommendedCNAME: { value: string }[] }) {
+  /**
+   * Un dominio raíz también recibe `www.` con redirección al raíz (ver
+   * VercelDomainsService#addWwwRedirect). Mejor esfuerzo: que el www ya
+   * exista (409) o que Vercel lo rechace no debe tumbar el vincular ni los
+   * registros del apex; se deja en el log y el panel sigue con lo principal.
+   */
+  private async asegurarWww(domain: string, apexName: string | undefined) {
+    if (!apexName || domain !== apexName) return;
+    await this.vercelDomains.addWwwRedirect(domain).catch((err: unknown) => {
+      this.logger.warn(`No se pudo agregar www.${domain} a Vercel: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
+
+  // Dominio raíz (ej. "tefaltacalleok.com") → A record(s) en "@" (un DNS
+  // estándar no permite CNAME en la raíz) más un CNAME para "www", que
+  // redirige al raíz. Subdominio (ej. "tienda.mi.com") → CNAME, con el nombre
+  // siendo la parte antes del apex ("tienda"). Se toma siempre la
+  // recomendación de mejor rank (`[0]`) — Vercel devuelve varias
+  // alternativas pero mostrar una sola es más claro para alguien cargando
+  // esto por primera vez en el panel de su registrador.
+  private armarRecords(
+    domain: string,
+    apexName: string,
+    config: { recommendedIPv4: { value: string[] }[]; recommendedCNAME: { value: string }[] },
+    wwwCname?: string,
+  ) {
     const limpiar = (v: string) => v.replace(/\.$/, ''); // Vercel devuelve el CNAME con punto final (sintaxis de zonefile) — confunde copiado a mano en otros paneles
     if (domain === apexName) {
       const ips = config.recommendedIPv4[0]?.value ?? ['76.76.21.21'];
-      return ips.map((ip) => ({ type: 'A', domain: '@', value: ip }));
+      return [
+        ...ips.map((ip) => ({ type: 'A', domain: '@', value: ip })),
+        { type: 'CNAME', domain: 'www', value: limpiar(wwwCname ?? 'cname.vercel-dns.com.') },
+      ];
     }
     const nombre = domain.slice(0, domain.length - apexName.length - 1); // "tienda.mi.com" - ".mi.com" = "tienda"
     const cname = config.recommendedCNAME[0]?.value ?? 'cname.vercel-dns.com.';
@@ -117,12 +151,20 @@ export class DomainsService {
     const info = configured ? await this.vercelDomains.getDomainInfo(domain.domain) : null;
     const verified = configured && !!info?.verified;
 
-    const status: DomainStatus = verified ? 'ACTIVE' : 'VERIFYING';
+    // "Activo" = el visitante entra por HTTPS. Que el DNS apunte a Vercel no
+    // alcanza: el certificado se emite recién después y hasta entonces el
+    // navegador muestra ERR_CONNECTION_CLOSED. Un dominio que ya andaba (activo
+    // y con SSL activo) no se degrada por un sondeo que falla una vez: el
+    // timeout de un request no debe cortarle la tienda ni el CORS.
+    const yaAndaba = domain.status === 'ACTIVE' && domain.sslStatus === 'ACTIVE';
+    const conCertificado = verified && (yaAndaba || (await this.vercelDomains.tieneCertificado(domain.domain)));
+    const sslStatus: SslStatus = conCertificado ? 'ACTIVE' : 'PROVISIONING';
+    const status: DomainStatus = conCertificado ? 'ACTIVE' : 'VERIFYING';
     // businessId también en el where de la escritura: el aislamiento lo tiene
     // que garantizar la consulta misma, no el findOwned() de arriba.
     const actualizado = await this.prisma.customDomain.update({
       where: { id, businessId },
-      data: { dnsVerified: verified, status },
+      data: { dnsVerified: verified, status, sslStatus },
     });
     // Solo cuando cambia algo: "verificar" se aprieta muchas veces mientras
     // el DNS propaga y no vale la pena una fila por cada intento sin novedad.
@@ -140,14 +182,13 @@ export class DomainsService {
     return actualizado;
   }
 
-  async sslStatus(businessId: string, id: string) {
-    const domain = await this.findOwned(businessId, id);
-    // El certificado lo emite Vercel automáticamente una vez que el DNS
-    // verifica — no hay un endpoint de "estado de SSL" separado en su API,
-    // se infiere de si el dominio ya verificó.
-    const info = await this.vercelDomains.getDomainInfo(domain.domain);
-    const sslStatus = info.verified ? 'ACTIVE' : 'PROVISIONING';
-    return this.prisma.customDomain.update({ where: { id, businessId }, data: { sslStatus } });
+  // El certificado lo emite Vercel solo cuando el DNS ya apunta; su API no
+  // expone un estado de SSL y `verified` es de ownership (ver linkDomain), así
+  // que el estado se mide de verdad en verifyDns(). Antes se deducía de
+  // `verified` (true desde el primer segundo, daba "activo" sin certificado) y
+  // el panel ni siquiera llamaba a este endpoint.
+  sslStatus(businessId: string, id: string) {
+    return this.verifyDns(businessId, id);
   }
 
   async remove(businessId: string, id: string, actorId?: string) {
@@ -155,6 +196,8 @@ export class DomainsService {
     // Best-effort en Vercel — igual que el borrado de imágenes en products.service.ts,
     // un error de red ahí no debería trabar que el negocio se saque el dominio de encima.
     await this.vercelDomains.removeDomain(domain.domain).catch(() => {});
+    // El www que se agregó junto al dominio raíz (si no existe, Vercel dice 404 y se ignora).
+    await this.vercelDomains.removeDomain(`www.${domain.domain}`).catch(() => {});
     await this.prisma.customDomain.delete({ where: { id, businessId } });
     // Un dominio borrado deja la tienda sin esa dirección: queda quién lo hizo
     // (hallazgo `auditoria-acciones-sin-registro`).

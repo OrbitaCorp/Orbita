@@ -1886,6 +1886,11 @@ export type ApiProductStats = {
   sinStock: number
   valorInventario: number
   sinCostoCargado?: number
+  // Ganancia que dejaría vender todo el stock actual a los precios de hoy:
+  // (precio − costo) × unidades, de los productos con costo. Opcionales porque
+  // un backend sin desplegar todavía no los manda.
+  gananciaEstimada?: number
+  margenEstimadoPct?: number | null
 }
 
 // Opciones de variante (Color, Talle…) y valores (Crudo, XL…) que el negocio ya
@@ -2338,8 +2343,17 @@ export function panelCreateTag(name: string) {
 
 export type ApiProductsReport = {
   periodoDias: number
-  resumen: { productosVendidos: number; unidadesVendidas: number; importeVendido: number; variantesConVenta: number }
-  masVendidos: { id: string; name: string; categoryName: string | null; primaryImageUrl: string | null; unidades: number; importe: number }[]
+  resumen: {
+    productosVendidos: number; unidadesVendidas: number; importeVendido: number; variantesConVenta: number
+    // Ganancia estimada. Todo opcional: un backend sin desplegar no lo manda.
+    gananciaVendida?: number                 // ingresos − costo de lo vendido, solo productos con costo
+    margenVendidoPct?: number | null
+    importeSinCosto?: number                 // lo vendido de productos sin costo (queda fuera de la ganancia)
+    gananciaInventario?: number              // (precio − costo) × stock actual
+    margenInventarioPct?: number | null
+    productosSinCosto?: number               // con stock pero sin costo cargado
+  }
+  masVendidos: { id: string; name: string; categoryName: string | null; primaryImageUrl: string | null; unidades: number; importe: number; ganancia?: number | null }[]
   sinRotacion: { id: string; name: string; categoryName: string | null; primaryImageUrl: string | null; stock: number }[]
   stockCritico: {
     productId: string; productName: string; variantId: string; sku: string | null
@@ -2428,6 +2442,61 @@ export function panelGetDashboardReport(from?: string, to?: string) {
   if (to) q.set('to', to)
   const qs = q.toString()
   return panelRequest<ApiDashboardReport>(`/reports/dashboard${qs ? `?${qs}` : ''}`)
+}
+
+// ── Dashboard avanzado ──────────────────────────────────────────────────────
+// Las métricas del desplegable "Métricas avanzadas" del inicio. Se piden recién
+// al abrirlo (GET /reports/dashboard/advanced). Cada métrica viene para el
+// período elegido (`actual`) y el anterior de igual largo (`anterior`). Los
+// porcentajes son `null` cuando no hay base para calcularlos (ej: conversión sin
+// visitas, margen sin ningún producto con costo cargado) — no se muestra un 0.
+
+export type ApiMetricasPeriodo = {
+  pedidos: number
+  cancelados: number
+  tasaCancelacionPct: number | null
+  ventas: number
+  /** Ingreso neto de productos (con todos los descuentos aplicados), sin envío. */
+  ingresos: number
+  costo: number
+  /** Ingresos − costo, solo de lo que tiene costo cargado. Estimación. */
+  ganancia: number
+  margenPct: number | null
+  /** % de los ingresos que entra en la ganancia (el resto no tiene costo cargado). */
+  coberturaCostoPct: number | null
+  unidades: number
+  unidadesPorPedido: number
+  descuentos: number
+  visitas: number
+  conversionPct: number | null
+  devuelto: number
+  tasaDevolucionPct: number | null
+  compradores: number
+  recurrentes: number
+  recurrentesPct: number | null
+}
+
+export type ApiDashboardAvanzado = {
+  desde: string
+  hasta: string
+  actual: ApiMetricasPeriodo
+  anterior: ApiMetricasPeriodo
+  clientes: { compradores: number; recurrentes: number; nuevos: number; sinRegistrar: number }
+  porFranja: { granularidad: 'hora' | 'dia' | 'semana'; labels: string[]; ventas: number[]; ganancia: number[] }
+  /** Pedidos por hora del día (24 posiciones, hora de Argentina). */
+  porHora: number[]
+  /** Pedidos por día de la semana, 0 = domingo … 6 = sábado. */
+  porDiaSemana: number[]
+  porCategoria: { label: string; ingresos: number; ganancia: number | null; margenPct: number | null }[]
+  inventario: { valorCosto: number; valorVenta: number; gananciaPotencial: number; margenPct: number | null; sinCosto: number }
+}
+
+export function panelGetDashboardAvanzado(from?: string, to?: string) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return panelRequest<ApiDashboardAvanzado>(`/reports/dashboard/advanced${qs ? `?${qs}` : ''}`)
 }
 
 // ── Reporte de pagos (RBT-619) ───────────────────────────────────────────────
@@ -3170,7 +3239,9 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // ── Mensajes: chat cliente↔tienda ────────────────────────────────────────────
 // Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo
 // usan el cliente (storefront) y el panel (dueño/staff).
-export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; createdAt: string }
+// `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
+export type ChatChannel = 'STOREFRONT' | 'WHATSAPP'
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
 
 // Storefront (cliente logueado)
 export type MeConversation = { id: string | null; messages: ChatMessage[] }
@@ -3182,7 +3253,7 @@ export function meSendConversationMessage(text: string) {
 // Panel (dueño/staff) — bandeja de todas las conversaciones del negocio
 export type ConversationRow = {
   id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
-  isUnread: boolean; isArchived: boolean; lastMessage: ChatMessage | null; updatedAt: string
+  isUnread: boolean; isArchived: boolean; lastChannel?: ChatChannel; lastMessage: ChatMessage | null; updatedAt: string
 }
 export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
 export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
@@ -3197,6 +3268,14 @@ export function updateConversation(id: string, input: { isUnread?: boolean; isAr
 export function getUnreadConversationsCount() {
   return panelRequest<{ count: number }>('/conversations/unread-count')
 }
+
+// WhatsApp Business — conexión del negocio (solo propietario/admin)
+export type WhatsappEstado = { connected: false } | { connected: true; displayPhone: string | null; phoneNumberId: string; connectedAt: string }
+export function getWhatsappConnection() { return panelRequest<WhatsappEstado>('/whatsapp/connection') }
+export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; accessToken: string }) {
+  return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
+}
+export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)
 export type MessageTemplateRow = { id: string; name: string; text: string; category: string; createdAt: string; updatedAt: string }

@@ -10,7 +10,7 @@ import { useState } from 'react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import { seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
+import { dibujaCupon, seccionesDe } from '@/modules/ventas/panel/avanzado/plantillas/secciones'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { AparienciaBloqueada } from './components/apariencia/AparienciaBloqueada'
@@ -69,7 +69,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const {
         ap, set, actualizar, dirty, publicado, cargando, errorCarga, categorias, productos,
         guardando, errorGuardado, homeTemplate, setHomeTemplateLocal, subdomain, guardar, descartar,
-    } = useApariencia(onToast)
+    } = useApariencia(onToast, soloContenido)
     const [fullPreview, setFullPreview] = useState(false)
 
     // Tope de slides del hero de la plantilla activa (ver heroMaxSlides en
@@ -82,14 +82,29 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // para no llamarlo "slider"/"carrusel" en la UI de una plantilla cuyo
     // diseño no contempla eso (pedido explícito, con capturas de la maqueta
     // original: dos imágenes fijas, nunca rotando).
-    const heroNoRotativo = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.heroPropio
+    //
+    // Lo marca el tope de slides (`heroMaxSlides`), no `heroPropio`: casi
+    // todas las plantillas dibujan su propio hero y aun así lo rotan. Con
+    // `heroPropio` solo, a las veinticuatro se les decía "las dos imágenes,
+    // no rotan" arriba de un carrusel de tres.
+    const plantillaDelHero = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
+    const heroNoRotativo = !!plantillaDelHero?.heroPropio && plantillaDelHero.heroMaxSlides !== undefined
+    // El hero `minimo` de una receta (Lienzo, Sobrio, Sello) es solo
+    // tipografía sobre un fondo liso, y la foto del slide es OPCIONAL: sin
+    // foto queda el diseño original, con foto se muestra detrás del texto.
+    // Hay que decirlo: si no, el dueño sube la foto, no sabe que cambia el
+    // diseño, o no la sube y cree que el hero quedó a medio cargar.
+    const heroFotoOpcional = !!plantillaDelHero?.receta?.bloques.some(b => b.t === 'hero' && b.estilo === 'minimo')
     // Escaparate (o cualquier plantilla que declare headerBold): el toggle
     // de "ícono de marca" solo tiene sentido ahí — las demás siempre
     // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
     const conIconoOpcional = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.headerBold
     // Las secciones propias de la plantilla activa, en el orden en que se ven
     // en la portada (lo define cada plantilla en secciones.ts).
-    const seccionesPlantilla = soloContenido ? seccionesDe(homeTemplate) : []
+    // Sin el cintillo: el anuncio de arriba es el de Apariencia (pestaña
+    // Contenido), y el texto que cada esquema declara ahí es solo la muestra
+    // que se ve en la vitrina.
+    const seccionesPlantilla = soloContenido ? seccionesDe(homeTemplate).filter(x => x.id !== 'cintillo') : []
     // Pestaña activa del editor de plantilla (ver TABS_PLANTILLA) — sin uso
     // fuera de soloContenido.
     const [tabPlantilla, setTabPlantilla] = useState<TabPlantilla>('hero')
@@ -104,14 +119,25 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // Premium, los números de Nocturno, los sellos de Glow). Ofrecerlos igual
     // era prometer un interruptor que no mueve nada (reportado con captura
     // sobre Premium).
+    //
+    // Lo demás es de todas: una plantilla ubica TODO lo de Apariencia en su
+    // portada (ver § El estándar en la skill plantillas-home), así que se le
+    // ofrecen los mismos interruptores y las mismas tarjetas de contenido que
+    // a una tienda sin plantilla. Lo único que no se toca es el diseño.
     const plantillaActiva = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate) : undefined
-    const usaAnuncio = soloContenido ? !plantillaActiva?.headerPropio : true
+    const esEstandar = !!plantillaActiva
+    const usaAnuncio = true
     const usaStats = soloContenido ? plantillaActiva?.usaStats !== false : true
 
     const toggles: [keyof Ap, string][] = soloContenido
         ? ([
             ...(usaAnuncio ? [['mostrarBannerEnvio', 'Anuncio arriba del header'] as [keyof Ap, string]] : []),
-            ...(usaStats ? [['mostrarStats', 'Barra de confianza debajo del hero'] as [keyof Ap, string]] : []),
+            ...(usaStats ? [['mostrarStats', 'Barra de estadísticas'] as [keyof Ap, string]] : []),
+            ...(esEstandar ? [
+                ['mostrarCategorias', 'Sección de categorías'],
+                ['mostrarBuscador', 'Barra de búsqueda'],
+                ['mostrarWhatsapp', 'WhatsApp (flotante y banner)'],
+            ] as [keyof Ap, string][] : []),
         ])
         // `mostrarFooter`/`mostrarRedesFooter` viven en la nueva sección
         // "Pie de página" (tienen su propia tarjeta ahí, con la descripción
@@ -125,12 +151,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // (ver `tarjetasSecundarias` más abajo); editando una plantilla activa
     // cada una vive en la pestaña que le corresponde (ver TABS_PLANTILLA),
     // para no volver a apilarlas todas de una en una sola columna larga.
-    const secVisibilidad = <SeccionVisibilidad ap={ap} set={set} soloContenido={soloContenido} toggles={toggles} />
+    const secVisibilidad = <SeccionVisibilidad ap={ap} set={set} soloContenido={soloContenido} conEstantes={!soloContenido || esEstandar} toggles={toggles} />
     const secTextos = <SeccionTextos ap={ap} set={set} soloContenido={soloContenido} />
     const secEstadisticas = <SeccionEstadisticas ap={ap} set={set} />
     const secPie = <SeccionPie ap={ap} set={set} />
     // El cupón es contenido de la PLANTILLA: solo si la activa declara uno.
-    const secCupon = plantillaActiva?.cupon ? <SeccionCupon ap={ap} set={set} /> : null
+    const secCupon = dibujaCupon(plantillaActiva) ? <SeccionCupon ap={ap} set={set} /> : null
 
     // Usada tal cual solo en Apariencia completa (ver el único lugar que la
     // usa, más abajo en el return) — editando una plantilla, las mismas
@@ -144,7 +170,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         </>
     )
 
-    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} onToast={onToast} />
+    const heroCard = <SeccionHero ap={ap} set={set} soloContenido={soloContenido} heroMax={heroMax} heroNoRotativo={heroNoRotativo} heroFotoOpcional={heroFotoOpcional} onToast={onToast} />
     const seccionesCards = <SeccionesPlantilla ap={ap} set={set} seccionesPlantilla={seccionesPlantilla} categorias={categorias} productos={productos} onToast={onToast} />
     const headerCard = <SeccionHeaderPlantilla ap={ap} set={set} conIconoOpcional={conIconoOpcional} enlaces={enlaces} />
 
@@ -153,7 +179,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // algún interruptor que de verdad mueva algo en su portada.
     const tabsVisibles = TABS_PLANTILLA.filter(([k]) => {
         if (k === 'secciones') return seccionesPlantilla.length > 0
-        if (k === 'contenido') return usaAnuncio || usaStats
+        if (k === 'contenido') return usaAnuncio || usaStats || esEstandar
         return true
     })
     // Si la pestaña elegida no está entre las visibles (cambió la plantilla
@@ -227,6 +253,14 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             {toggles.length > 0 && secVisibilidad}
                             {usaAnuncio && secTextos}
                             {usaStats && secEstadisticas}
+                            {/* Parallax, marcas y video: las mismas tarjetas que
+                                en Apariencia completa. La plantilla decide
+                                dónde van en su portada. */}
+                            {esEstandar && <>
+                                <SeccionParallax ap={ap} set={set} onToast={onToast} />
+                                <SeccionMarcas ap={ap} set={set} onToast={onToast} />
+                                <SeccionVideo ap={ap} set={set} onToast={onToast} />
+                            </>}
                         </>}
                         {tabActiva === 'pie' && <>{secPie}{secCupon}</>}
                     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
+import Head from 'next/head'
 import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag, Play } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -7,6 +8,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { useDeslizar } from '@/hooks/useDeslizar'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp, parseVideoEmbed } from '@/lib/storefront/utils'
@@ -145,6 +147,15 @@ export default function ProductoDetalle() {
 
   const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
   const [imgIdx, setImgIdx] = useState(0)
+  // Deslizar con el dedo entre las piezas de la galería (celular), además de
+  // las flechas. El total se calcula más abajo, después de los `return`
+  // tempranos de carga y de producto inexistente, y un hook no puede ir
+  // después de ellos: por eso se lee por una referencia.
+  const totalPiezasRef = useRef(0)
+  const deslizarGaleria = useDeslizar(dir => setImgIdx(i => {
+    const n = totalPiezasRef.current
+    return n > 1 ? (i + dir + n) % n : i
+  }))
   // Swatch de variante visual (Color) bajo el mouse — sin click, preview
   // temporal nomás. Ver `valorMostrado` más abajo.
   const [hoverValorId, setHoverValorId] = useState<string | null>(null)
@@ -434,6 +445,7 @@ export default function ProductoDetalle() {
   const videoEmbed = parseVideoEmbed(producto.videoUrl)
   const cantFotos = imagenes?.length ?? 0
   const totalSlides = cantFotos + (videoEmbed ? 1 : 0)
+  totalPiezasRef.current = totalSlides
   const esSlideVideo = !!videoEmbed && idxHover < 0 && idxMostrado === cantFotos
 
   // La tira de miniaturas (76px + 12px de gap) solo ocupa lugar cuando hay
@@ -479,6 +491,14 @@ export default function ProductoDetalle() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
+      {/* Al entrar a la ficha navegando dentro de la tienda (sin recargar), el
+          <head> que llegó es el genérico: acá, que ya tenemos el producto, la
+          pestaña pasa a decir cuál es. Con la página recién cargada ya vino
+          con el título y el resto de las etiquetas desde el servidor (ver
+          forceSSR.ts); esta tiene la misma `key` y no se duplica. */}
+      <Head>
+        <title key="title">{tienda.nombre ? `${producto?.name} | ${tienda.nombre}` : producto?.name}</title>
+      </Head>
       <style>{CSS_FICHA}</style>
       <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
@@ -555,7 +575,9 @@ export default function ProductoDetalle() {
                 </div>
               )}
 
-              <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
+              {/* Con el video en pantalla no se desliza: arrastrar la barra de
+                  avance del reproductor con el dedo cambiaría de pieza. */}
+              <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }} {...(esSlideVideo ? {} : deslizarGaleria)}>
                 {esSlideVideo && videoEmbed ? (
                   // Mismo contenedor cuadrado (aspectRatio 1/1) que ProdImage
                   // acá abajo, para que el salto entre foto y video no mueva

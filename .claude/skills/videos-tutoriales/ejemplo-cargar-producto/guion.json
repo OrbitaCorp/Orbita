@@ -1,0 +1,162 @@
+{
+  "voz": "Achird",
+  "idioma": "es-AR",
+  "_nota": "Cada frase se ancla a una marca (desde) y el editor estira el paso hasta (hasta) si no entra. Referencias: marca | toma:marca | clic:x | foco:x | scroll:x | hl:x | cap:N (placa N), con +/- segundos. Si una marca coincide con el borde de un clip (p. ej. sD = quitar-fondo-fin), sumale +0.1. Nada de instrucciones de estilo en el texto: el TTS las lee.",
+  "frases": [
+    {
+      "id": "intro",
+      "desde": "intro",
+      "offset": 0.55,
+      "texto": "Te muestro cómo cargar un producto en Órbita, paso a paso."
+    },
+    {
+      "id": "categoria",
+      "desde": "sA",
+      "hasta": "modal",
+      "texto": "Primero, armá una categoría: andá a Productos, Categorías, y tocá Nueva categoría."
+    },
+    {
+      "id": "cat-modal",
+      "desde": "modal",
+      "hasta": "sA-fin",
+      "texto": "Ponele un nombre, elegí un ícono y tocá Crear. Listo: ya está en tu catálogo."
+    },
+    {
+      "id": "crear",
+      "desde": "sB",
+      "hasta": "form",
+      "texto": "Ahora sí: Productos, Crear producto."
+    },
+    {
+      "id": "fotos",
+      "desde": "sC+0.1",
+      "hasta": "sD+0.05",
+      "texto": "Arrancá por las fotos. Tocá el recuadro y elegí todas las que quieras de una vez. La primera es la portada."
+    },
+    {
+      "id": "datos",
+      "desde": "sD+0.1",
+      "hasta": "precio-fin",
+      "texto": "Después, el nombre, el precio y el costo. El costo lo ves solo vos, y te calcula el margen."
+    },
+    {
+      "id": "cat-elegir",
+      "desde": "sE",
+      "hasta": "categoria-fin",
+      "texto": "Elegí la categoría que acabás de crear."
+    },
+    {
+      "id": "talles",
+      "desde": "sF",
+      "hasta": "variantes-fin",
+      "texto": "Si viene en talles, activá las opciones, usá los habituales y cargá el stock de todos a la vez."
+    },
+    {
+      "id": "orbi",
+      "desde": "sG",
+      "hasta": "clic:mas-detalles-0.3",
+      "texto": "Para la descripción, tocá Redactar con Orbi: la escribe por vos y te sugiere las etiquetas."
+    },
+    {
+      "id": "mas",
+      "desde": "clic:mas-detalles-0.3",
+      "hasta": "hl:etiquetas",
+      "texto": "En Más detalles está todo lo opcional."
+    },
+    {
+      "id": "etiquetas",
+      "desde": "hl:etiquetas",
+      "hasta": "clic:spec-agregar-0.25",
+      "texto": "Las etiquetas agrupan tus productos y ayudan a encontrarlos."
+    },
+    {
+      "id": "specs",
+      "desde": "clic:spec-agregar-0.25",
+      "hasta": "scroll:a-video",
+      "texto": "En especificaciones cargás datos como la composición: tocás una sugerencia y completás el valor."
+    },
+    {
+      "id": "video",
+      "desde": "scroll:a-video",
+      "hasta": "hl:contenido-0.05",
+      "texto": "Acá podés sumar un video de YouTube, o subir uno, y se ve junto a las fotos."
+    },
+    {
+      "id": "contenido",
+      "desde": "hl:contenido-0.05",
+      "hasta": "scroll:a-sku",
+      "texto": "El contenido de la ficha agrega bloques de video y texto debajo de las características."
+    },
+    {
+      "id": "sku",
+      "desde": "scroll:a-sku",
+      "hasta": "detalles-fin",
+      "texto": "Y los códigos SKU se arman solos, con un stock mínimo para avisarte cuando quede poco."
+    },
+    {
+      "id": "publicar",
+      "desde": "sI",
+      "hasta": "toma1b:fin",
+      "texto": "Tocá Publicar, y aparece al instante en tu catálogo."
+    },
+    {
+      "id": "tienda",
+      "desde": "tienda",
+      "offset": 0.3,
+      "hasta": "tienda-fin",
+      "texto": "Así lo ven tus clientes: con sus fotos, sus talles y sus características."
+    },
+    {
+      "id": "cap-avz",
+      "desde": "cap:1",
+      "texto": "Y si tenés el paquete Avanzado, Orbi lo hace por vos."
+    },
+    {
+      "id": "orbi-foto",
+      "desde": "toma-orbi:oA",
+      "hasta": "toma-orbi:oB",
+      "texto": "Subí una foto del producto."
+    },
+    {
+      "id": "orbi-completar",
+      "desde": "toma-orbi:oB",
+      "hasta": "toma-orbi:scan-fin",
+      "texto": "Tocá Completar con esta foto, y Orbi la reconoce en segundos."
+    },
+    {
+      "id": "orbi-resultado",
+      "desde": "toma-orbi:scan-fin",
+      "hasta": "toma-orbi:oC",
+      "texto": "Te completa el nombre, la categoría y la descripción, y hasta te busca fotos."
+    },
+    {
+      "id": "orbi-revisar",
+      "desde": "toma-orbi:oC",
+      "hasta": "toma-orbi:oD",
+      "texto": "Revisá lo que completó: también te sugiere talles y colores."
+    },
+    {
+      "id": "orbi-precio",
+      "desde": "toma-orbi:oD",
+      "hasta": "toma-orbi:fin",
+      "texto": "Vos solo ponés el precio y el stock, y publicás."
+    },
+    {
+      "id": "fondo-avz",
+      "desde": "clic:quitar-fondo-0.4",
+      "hasta": "quitar-fondo-fin-0.02",
+      "texto": "Y además, le quitás el fondo a tus fotos con un solo toque."
+    },
+    {
+      "id": "cta",
+      "desde": "cap:2",
+      "texto": "Activalo cuando quieras desde Configuración, en Suscripción."
+    },
+    {
+      "id": "cierre",
+      "desde": "cierre",
+      "offset": 1.5,
+      "texto": "Listo. Tu producto ya está a la venta."
+    }
+  ]
+}

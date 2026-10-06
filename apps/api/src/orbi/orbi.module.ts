@@ -40,7 +40,10 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { CostsModule } from '../platform/costs/costs.module';
+import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { OrbiSaludModule } from './salud/orbi-salud.module';
+import { CupoOrbiModule } from './cupo/cupo-orbi.module';
+import { OrbiUsoController } from './cupo/orbi-uso.controller';
 import { CuotaService } from '../common/cuota/cuota.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -57,8 +60,9 @@ import { PrismaService } from '../prisma/prisma.service';
     OnboardingModule,
     CostsModule,
     OrbiSaludModule,
+    CupoOrbiModule,
   ],
-  controllers: [OrbiController, SesionesController],
+  controllers: [OrbiController, SesionesController, OrbiUsoController],
   providers: [
     llmAdapterProvider,
     ConversationService,
@@ -89,6 +93,8 @@ export class OrbiModule {
     // armar la tarjeta con datos legibles (categoría, pedido y cliente),
     // siempre acotados al negocio del token.
     private readonly prisma: PrismaService,
+    // CostsModule exporta el medidor de consumo: lo usan las tools del alta que llaman al LLM.
+    private readonly usageMetering: UsageMeteringService,
   ) {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
@@ -123,8 +129,8 @@ export class OrbiModule {
     this.toolRegistry.register(new EstadoPrimerosPasosTool(this.businessesService, this.prisma));
     this.toolRegistry.register(new AccesoDelEquipoTool(this.prisma));
 
-    this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService));
-    this.toolRegistry.register(new SuggestDescriptionTool(this.config));
+    this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService, this.usageMetering));
+    this.toolRegistry.register(new SuggestDescriptionTool(this.config, this.usageMetering));
     this.toolRegistry.register(new SuggestSubdomainTool(this.onboardingService));
     this.toolRegistry.register(new SelectWizardOptionTool());
     this.toolRegistry.register(new FillWizardFieldTool());
