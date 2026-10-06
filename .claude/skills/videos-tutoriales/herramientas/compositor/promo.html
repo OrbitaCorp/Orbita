@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Órbita · compositor de promos</title>
+<style>
+@font-face{font-family:'Geist';font-style:normal;font-weight:100 900;src:url(fonts/geist-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Geist';font-style:normal;font-weight:100 900;src:url(fonts/geist-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Sora';font-style:normal;font-weight:100 900;src:url(fonts/sora-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Sora';font-style:normal;font-weight:100 900;src:url(fonts/sora-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+*{box-sizing:border-box}
+html,body{margin:0;overflow:hidden;background:#060B1E}
+#stage{position:relative;overflow:hidden;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+canvas{position:absolute;left:0;top:0}
+.tx{position:absolute;color:#fff;pointer-events:none;will-change:transform,opacity}
+.tx .w{display:inline-block;white-space:pre;will-change:transform,opacity}
+#gancho{font:800 92px/1.06 'Sora';letter-spacing:-.04em;text-shadow:0 10px 44px rgba(2,6,23,.55)}
+#gancho .enfg{display:inline-block;background:linear-gradient(135deg,#3B82F6,#2563EB);border-radius:.16em;padding:0 .16em .04em;box-shadow:0 14px 40px rgba(37,99,235,.45);text-shadow:none;transform-origin:50% 60%;white-space:nowrap}
+#sub{font:700 64px/1.12 'Sora';letter-spacing:-.03em;text-shadow:0 6px 30px rgba(2,6,23,.7),0 2px 6px rgba(2,6,23,.5)}
+#sub .enfg{color:#7DD3FC}
+.banda{display:flex;flex-wrap:wrap;justify-content:center;align-content:center;column-gap:.26em}
+#rubro{font:800 120px/1 'Sora';letter-spacing:-.045em;text-shadow:0 12px 50px rgba(2,6,23,.6)}
+#chip{padding:12px 24px;border-radius:999px;background:rgba(59,130,246,.22);border:1px solid rgba(147,197,253,.55);color:#DBEAFE;font:700 24px/1 'Geist';letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;backdrop-filter:blur(6px)}
+#marca{display:flex;align-items:center;gap:14px;font:700 40px/1 'Geist';letter-spacing:-.02em;color:#fff}
+#marca svg{width:52px;height:52px}
+/* cierre */
+#veil{position:absolute;left:0;top:0;background:#fff;display:none}
+#veil .glow{position:absolute;inset:0;background:radial-gradient(ellipse 900px 900px at 50% 42%, rgba(59,130,246,.10) 0%, transparent 70%)}
+#logo{position:absolute;left:50%;top:0;width:0;height:0}
+#logoSpin{position:absolute;left:-110px;top:-110px;width:220px;height:220px}
+.ring{position:absolute;left:-110px;top:-110px;width:220px;height:220px;border-radius:50%}
+#endT{position:absolute;left:0;text-align:center;font:600 56px/1.12 'Sora';letter-spacing:-.035em;color:#0F172A;padding:0 70px}
+#endS{position:absolute;left:0;text-align:center;font:700 40px/1.1 'Geist';letter-spacing:-.02em;color:#2563EB}
+#site{position:absolute;left:50%;transform:translateX(-50%);padding:14px 30px;border-radius:999px;background:#EFF6FF;color:#1D4ED8;font:600 32px/1 'Geist';letter-spacing:-.01em;border:1px solid #DBEAFE;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="marca" class="tx"><svg viewBox="0 0 88 88" fill="none"><circle cx="44" cy="44" r="32" stroke="#60A5FA" stroke-width="5" stroke-linecap="round" stroke-dasharray="151 50" transform="rotate(-50 44 44)"/><circle cx="44" cy="44" r="11" fill="#fff"/><circle cx="66" cy="20" r="6.5" fill="#3B82F6"/></svg><span>Órbita</span></div>
+  <div id="chip" class="tx"></div>
+  <div id="gancho" class="tx"></div>
+  <div id="rubro" class="tx"></div>
+  <div id="sub" class="tx"></div>
+  <div id="veil">
+    <div class="glow"></div>
+    <div id="logo">
+      <div class="ring" id="ring1"></div>
+      <div class="ring" id="ring2"></div>
+      <svg id="logoSpin" viewBox="0 0 88 88" fill="none">
+        <circle id="hubHalo" cx="44" cy="44" r="18" fill="rgba(59,130,246,.10)"/>
+        <g id="spinG">
+          <circle id="arc" cx="44" cy="44" r="32" stroke-width="3" stroke="#3B82F6" stroke-linecap="round" stroke-dasharray="151 50" transform="rotate(-90 44 44)"/>
+          <circle id="satHalo" cx="44" cy="12" r="9" fill="rgba(37,99,235,.22)"/>
+          <circle id="sat" cx="44" cy="12" r="5.5" fill="#2563EB"/>
+        </g>
+        <circle id="hub" cx="44" cy="44" r="10" fill="#0F172A"/>
+      </svg>
+    </div>
+    <div id="endT"></div>
+    <div id="endS"></div>
+    <div id="site">orbita.site</div>
+  </div>
+</div>
+<script>
+// ── utilidades ────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const lerp = (a, b, u) => a + (b - a) * u
+const prog = (t, a, b) => clamp((t - a) / (b - a), 0, 1)
+const eio = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2
+const eo = u => 1 - Math.pow(1 - u, 3)
+const eo5 = u => 1 - Math.pow(1 - u, 5)
+const smooth = u => u * u * u * (u * (u * 6 - 15) + 10)
+const spring = (u, k = 1) => u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.exp(-6 * u) * Math.cos(9.5 * u * k)
+let TL, W, H, LY, ctx
+const rr = (c, x, y, w, h, r) => { c.beginPath(); c.roundRect(x, y, w, h, r) }
+
+// ── diseño según el formato ───────────────────────────────────────────────
+function diseno() {
+  if (TL.formato === 'reel') return {
+    // minTop: el celular nunca sube por encima de esto (la franja de arriba es del texto)
+    cel: { cx: 540, top: 600, sw: 590, minTop: 582 }, celR: { x: 540, y: 1300 },
+    banda: { top: 196, h: 392 },
+    nav: { x: 34, y: 624, w: 1012, h: 1150, ch: 54, sBase: 1.26 }, navR: { x: 540, y: 1200 },
+    gancho: { left: 56, top: 236, width: 968, size: 90, align: 'center' },
+    sub: { left: 56, top: 262, width: 968, size: 64, align: 'center' },
+    rubro: { left: 40, top: 300, width: 1000, size: 122, align: 'center' },
+    chip: { top: 520, cx: 540 }, marca: { top: 150, cx: 540 },
+    rings: { cx: 930, cy: 300, k: 1.15 }, end: { logoY: 700, size: 60, sub: 42 },
+  }
+  return {
+    cel: { cx: 1390, top: 78, sw: 392, minTop: 40 }, celR: { x: 1390, y: 540 },
+    banda: { top: 230, h: 620 },
+    // la página ENTERA (1440×900) adentro de la ventana, sin recortes: contenido 1300×812 (escala 0,903)
+    nav: { x: 560, y: 112, w: 1300, h: 858, ch: 46, sBase: 1300 / 1440 }, navR: { x: 1210, y: 541 },
+    gancho: { left: 110, top: 330, width: 780, size: 66, align: 'left' },
+    sub: { left: 96, top: 420, width: 430, size: 50, align: 'left' },
+    rubro: { left: 110, top: 400, width: 640, size: 104, align: 'left' },
+    chip: { top: 250, left: 110 }, marca: { top: 92, left: 110 },
+    rings: { cx: 1500, cy: 120, k: 1 }, end: { logoY: 400, size: 52, sub: 36 },
+  }
+}
+
+// ── fondo: degradé + halos + ruido (fijo, se pinta una vez) + anillos ─────
+let FONDO
+function prepararFondo() {
+  const c = document.createElement('canvas'); c.width = W; c.height = H
+  const x = c.getContext('2d')
+  const a = 158 * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a), L = Math.abs(W * dx) + Math.abs(H * dy)
+  const g = x.createLinearGradient(W / 2 - dx * L / 2, H / 2 - dy * L / 2, W / 2 + dx * L / 2, H / 2 + dy * L / 2)
+  g.addColorStop(0, '#0C1A3D'); g.addColorStop(.48, '#0A1432'); g.addColorStop(1, '#060B1E')
+  x.fillStyle = g; x.fillRect(0, 0, W, H)
+  const halo = (cx, cy, rx, col) => { const r = x.createRadialGradient(cx, cy, 0, cx, cy, rx); r.addColorStop(0, col); r.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = r; x.fillRect(0, 0, W, H) }
+  halo(W * .12, H * .06, Math.max(W, H) * .62, 'rgba(37,99,235,.50)')
+  halo(W * .96, H * 1.04, Math.max(W, H) * .52, 'rgba(59,130,246,.38)')
+  // ruido fino (evita bandas al comprimir)
+  const n = x.getImageData(0, 0, W, H), d = n.data
+  let s = 12345; const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296
+  for (let i = 0; i < d.length; i += 4) { const v = (rnd() - .5) * 9; d[i] += v; d[i + 1] += v; d[i + 2] += v }
+  x.putImageData(n, 0, 0)
+  FONDO = c
+}
+function dibujarFondo(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1
+  ctx.drawImage(FONDO, 0, 0)
+  const { cx, cy, k } = LY.rings, rot = -18 * Math.PI / 180
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot)
+  ;[260, 470, 700, 960, 1240].forEach((r, i) => { ctx.beginPath(); ctx.ellipse(0, 0, r * k, r * .62 * k, 0, 0, Math.PI * 2); ctx.strokeStyle = `rgba(147,197,253,${.10 - i * .012})`; ctx.lineWidth = 1.2; ctx.stroke() })
+  ;[[470, .035, 0], [960, .018, 2.1]].forEach(([r, w, ph]) => {
+    const an = ph + t * w * Math.PI * 2, x = Math.cos(an) * r * k, y = Math.sin(an) * r * .62 * k
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(147,197,253,.10)'; ctx.fill()
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fillStyle = 'rgba(191,219,254,.55)'; ctx.fill()
+  })
+  ctx.restore()
+}
+
+// ── cuadros de las tomas ──────────────────────────────────────────────────
+const imgCache = new Map()
+function img(src) {
+  let e = imgCache.get(src)
+  if (!e) {
+    const im = new Image(); im.src = src
+    e = { im, p: im.decode().catch(() => {}) }
+    imgCache.set(src, e)
+    if (imgCache.size > 36) imgCache.delete(imgCache.keys().next().value)
+  }
+  return e
+}
+function frameEn(toma, s) {
+  const F = TL.tomas[toma].frames; let lo = 0, hi = F.length - 1, i = 0
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (F[m].s <= s + 1e-6) { i = m; lo = m + 1 } else hi = m - 1 }
+  return F[i].f
+}
+function urlEn(toma, s) { const U = TL.tomas[toma].urls; let u = U[0]?.u ?? ''; for (const e of U) if (e.s <= s) u = e.u; return u }
+const srcEn = (p, t) => p.s0 + (p.s1 - p.s0) * clamp((t - p.o0) / (p.o1 - p.o0), 0, 1)
+// scroll suave por compensación de movimiento (ver tutorial: scrolls.mjs)
+function scrollEn(toma, s) {
+  const sc = TL.tomas[toma].scrolls.find(x => s > x.sStart && s < x.sEnd)
+  if (!sc) return null
+  const F = sc.frames, P = sc.Y * smooth((s - sc.sStart) / (sc.sEnd - sc.sStart))
+  let lo = 0, hi = F.length - 1, i1 = 0
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (F[m].P <= P) { i1 = m; lo = m + 1 } else hi = m - 1 }
+  const f1 = F[i1], f2 = F[Math.min(F.length - 1, i1 + 1)].P >= P ? F[Math.min(F.length - 1, i1 + 1)] : f1
+  return { f1, f2, d1: Math.max(0, P - f1.P), d2: Math.max(0, f2.P - P), zona: sc.zona }
+}
+// Dibuja la página (px CSS) con la transformación página→lienzo (a, e, f)
+async function dibujarPagina(toma, s, a, e, f) {
+  const v = TL.tomas[toma].vista, plan = scrollEn(toma, s)
+  if (!plan) {
+    const A = img(frameEn(toma, s)); await A.p
+    ctx.setTransform(a, 0, 0, a, e, f); ctx.drawImage(A.im, 0, 0, v.w, v.h); return
+  }
+  const I1 = img(plan.f1.f), I2 = img(plan.f2.f); await I1.p; await I2.p
+  const base = plan.d1 <= plan.d2 ? I1 : I2
+  ctx.setTransform(a, 0, 0, a, e, f); ctx.drawImage(base.im, 0, 0, v.w, v.h)
+  if (plan.d1 > .01 || plan.d2 > .01) {
+    const z = plan.zona
+    ctx.save(); ctx.beginPath(); ctx.rect(z.x, z.y, z.w, z.h); ctx.clip()
+    ctx.drawImage(I2.im, 0, plan.d2, v.w, v.h)
+    ctx.beginPath(); ctx.rect(z.x, z.y, z.w, plan.d2 + 1); ctx.clip()
+    ctx.drawImage(I1.im, 0, -plan.d1, v.w, v.h)
+    ctx.restore()
+  }
+}
+
+// ── cámara del celular: la imagen entera crece alrededor de un foco ───────
+// estado {z, F (foco en lienzo base), A (dónde queda el foco en pantalla)}
+function celGeo(p) {
+  const v = TL.tomas[p.toma].vista, L = LY.cel, k = L.sw / v.w, sb = 47 * k
+  const sx = L.cx - L.sw / 2, sy = L.top
+  return { v, k, sb, sx, sy, sw: L.sw, sh: sb + v.h * k, b: L.sw * .03, r: L.sw * .15 }
+}
+function estadoCel(p, key) {
+  const g = celGeo(p), z = key.z ?? 1
+  const F = { x: g.sx + key.x * g.k, y: g.sy + g.sb + key.y * g.k }
+  const b = smooth(clamp((z - 1) / .5, 0, 1))
+  return { z, F, A: { x: lerp(F.x, LY.celR.x, b), y: lerp(F.y, LY.celR.y, b) } }
+}
+function camCel(p, t) {
+  let st = p.cam0 ? estadoCel(p, p.cam0) : { z: 1, F: { x: 0, y: 0 }, A: { x: 0, y: 0 } }
+  for (const k of p.cam) {
+    if (t < k.t) break
+    const to = estadoCel(p, k), u = smooth(prog(t, k.t, k.t + k.d))
+    if (u >= 1) { st = to; continue }
+    const z = st.z * Math.pow(to.z / st.z, u), g = Math.abs(to.z - st.z) > .01 ? (z - st.z) / (to.z - st.z) : u
+    st = { z, F: { x: lerp(st.F.x, to.F.x, g), y: lerp(st.F.y, to.F.y, g) }, A: { x: lerp(st.A.x, to.A.x, g), y: lerp(st.A.y, to.A.y, g) } }
+  }
+  return st
+}
+function barraEstado(g) {
+  const k = g.k, y0 = g.sy
+  ctx.fillStyle = '#fff'; ctx.fillRect(g.sx, y0, g.sw, g.sb + 1)
+  ctx.fillStyle = '#0F172A'; ctx.font = `600 ${15.5 * k}px Geist`; ctx.textBaseline = 'middle'
+  ctx.fillText('9:41', g.sx + 30 * k, y0 + 25 * k)
+  // señal, wifi, batería
+  const rx = g.sx + g.sw - 30 * k, cy = y0 + 25 * k
+  rr(ctx, rx - 25 * k, cy - 6 * k, 22 * k, 12 * k, 3.5 * k); ctx.lineWidth = 1.2 * k; ctx.strokeStyle = 'rgba(15,23,42,.45)'; ctx.stroke()
+  rr(ctx, rx - 23.5 * k, cy - 4.5 * k, 16 * k, 9 * k, 2 * k); ctx.fill()
+  ctx.fillRect(rx - 2.4 * k, cy - 2.5 * k, 1.6 * k, 5 * k)
+  const wx = rx - 40 * k
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(wx, cy + 5 * k, (3 + i * 3.3) * k, -Math.PI * .75, -Math.PI * .25); ctx.lineWidth = 1.9 * k; ctx.strokeStyle = '#0F172A'; ctx.stroke() }
+  const bx = rx - 66 * k
+  for (let i = 0; i < 4; i++) { rr(ctx, bx + i * 4.6 * k, cy + 5 * k - (4 + i * 2.4) * k, 3 * k, (4 + i * 2.4) * k, 1 * k); ctx.fill() }
+  // isla
+  rr(ctx, g.sx + g.sw / 2 - 58 * k, y0 + 11 * k, 116 * k, 32 * k, 16 * k); ctx.fillStyle = '#05070D'; ctx.fill()
+}
+async function dibujarCelular(p, t, { dx = 0, alpha = 1, esc = 1 } = {}) {
+  const g = celGeo(p), c = camCel(p, t), s = srcEn(p, t)
+  // transformación lienzo base → lienzo (cámara + transición)
+  let z = c.z * esc, ge = c.A.x - c.F.x * c.z, gf = c.A.y - c.F.y * c.z
+  if (esc !== 1) { const ox = LY.celR.x, oy = LY.celR.y; ge = ox + (ge - ox) * esc; gf = oy + (gf - oy) * esc }
+  ge += dx
+  const ox = g.sx - g.b, oy = g.sy - g.b, ow = g.sw + g.b * 2, oh = g.sh + g.b * 2
+  // con zoom, el celular crece hacia abajo: no invade la franja del texto
+  if (oy * z + gf < LY.cel.minTop) gf = LY.cel.minTop - oy * z
+  const T = (x, y) => [x * z + ge, y * z + gf]
+  ctx.save(); ctx.globalAlpha = alpha
+  ctx.setTransform(z, 0, 0, z, ge, gf)
+  // sombra
+  ctx.save(); ctx.shadowColor = 'rgba(2,6,23,.65)'; ctx.shadowBlur = 90 * z; ctx.shadowOffsetY = 40 * z
+  rr(ctx, ox, oy, ow, oh, g.r + g.b); ctx.fillStyle = '#0A0F1E'; ctx.fill(); ctx.restore()
+  // marco: metal oscuro con brillo en el borde
+  const mg = ctx.createLinearGradient(ox, oy, ox + ow, oy + oh); mg.addColorStop(0, '#2A3247'); mg.addColorStop(.5, '#0D1220'); mg.addColorStop(1, '#262D40')
+  rr(ctx, ox, oy, ow, oh, g.r + g.b); ctx.fillStyle = mg; ctx.fill()
+  rr(ctx, ox + 3, oy + 3, ow - 6, oh - 6, g.r + g.b - 3); ctx.fillStyle = '#05070D'; ctx.fill()
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.14)'; rr(ctx, ox + .75, oy + .75, ow - 1.5, oh - 1.5, g.r + g.b); ctx.stroke()
+  // botones laterales
+  ctx.fillStyle = '#1E2536'
+  rr(ctx, ox - 4, oy + oh * .17, 5, oh * .05, 2); ctx.fill(); rr(ctx, ox - 4, oy + oh * .25, 5, oh * .085, 2); ctx.fill(); rr(ctx, ox - 4, oy + oh * .35, 5, oh * .085, 2); ctx.fill()
+  rr(ctx, ox + ow - 1, oy + oh * .27, 5, oh * .12, 2); ctx.fill()
+  // pantalla
+  rr(ctx, g.sx, g.sy, g.sw, g.sh, g.r); ctx.clip()
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  await dibujarPagina(p.toma, s, g.k * z, ge + g.sx * z, gf + (g.sy + g.sb) * z)
+  ctx.setTransform(z, 0, 0, z, ge, gf)
+  barraEstado(g)
+  ctx.restore()
+  return { tipo: 'celular', pagina: (x, y) => T(g.sx + x * g.k, g.sy + g.sb + y * g.k), escala: g.k * z, alpha }
+}
+
+// ── navegador: ventana fija; la cámara recorre la página adentro ──────────
+function navGeo(p) {
+  const L = LY.nav, v = TL.tomas[p.toma].vista
+  return { ...L, v, cw: L.w, chh: L.h - L.ch, w0: L.w / L.sBase }
+}
+function vistaNav(p, key) {
+  const g = navGeo(p), z = key.z ?? 1, w = g.w0 / z, h = w * g.chh / g.cw
+  let cx = key.x ?? g.v.w / 2, cy = key.y ?? g.v.h / 2
+  cx = w >= g.v.w ? g.v.w / 2 : clamp(cx, w / 2, g.v.w - w / 2)
+  cy = h >= g.v.h ? h / 2 : clamp(cy, h / 2, g.v.h - h / 2)
+  return { cx, cy, w }
+}
+function camNav(p, t) {
+  let r = vistaNav(p, p.cam0 ?? {})
+  for (const k of p.cam) {
+    if (t < k.t) break
+    const to = vistaNav(p, k), u = smooth(prog(t, k.t, k.t + k.d))
+    if (u >= 1) { r = to; continue }
+    const w = r.w * Math.pow(to.w / r.w, u), gg = Math.abs(to.w - r.w) > .5 ? (w - r.w) / (to.w - r.w) : u
+    r = { cx: lerp(r.cx, to.cx, gg), cy: lerp(r.cy, to.cy, gg), w }
+  }
+  return r
+}
+const chromeCache = new Map()
+function barraNav(url, w, h) {
+  const key = url + '|' + w + '|' + h
+  if (chromeCache.has(key)) return chromeCache.get(key)
+  const S = 2, c = document.createElement('canvas'); c.width = w * S; c.height = h * S
+  const x = c.getContext('2d'); x.scale(S, S); const k = h / 44
+  x.fillStyle = '#F8FAFC'; x.fillRect(0, 0, w, h); x.fillStyle = '#E2E8F0'; x.fillRect(0, h - 1, w, 1)
+  ;[['#FF5F57', 24], ['#FEBC2E', 44], ['#28C840', 64]].forEach(([col, cx]) => { x.beginPath(); x.arc(cx * k, h / 2, 6 * k, 0, Math.PI * 2); x.fillStyle = col; x.fill() })
+  x.font = `500 ${14 * k}px Geist`
+  const tw = x.measureText(url).width, pw = clamp(tw + 60 * k, w * .42, w * .62), px = w / 2 - pw / 2
+  x.fillStyle = '#EEF2F7'; x.beginPath(); x.roundRect(px, 8 * k, pw, 28 * k, 8 * k); x.fill()
+  const gx = w / 2 - (tw + 21 * k) / 2
+  x.strokeStyle = '#64748B'; x.lineWidth = 1.5 * k; x.lineCap = 'round'; x.lineJoin = 'round'
+  x.beginPath(); x.roundRect(gx, 17.5 * k, 10 * k, 8 * k, 1.5 * k); x.stroke()
+  x.beginPath(); x.moveTo(gx + 2.5 * k, 17.5 * k); x.lineTo(gx + 2.5 * k, 15 * k); x.arc(gx + 5 * k, 15 * k, 2.5 * k, Math.PI, 0); x.lineTo(gx + 7.5 * k, 17.5 * k); x.stroke()
+  x.fillStyle = '#475569'; x.textBaseline = 'middle'; x.fillText(url, gx + 19 * k, 22.5 * k)
+  chromeCache.set(key, c); return c
+}
+async function dibujarNavegador(p, t, { dx = 0, alpha = 1, esc = 1 } = {}) {
+  const g = navGeo(p), r = camNav(p, t), s = srcEn(p, t)
+  let wx = g.x, wy = g.y, ww = g.w, wh = g.h
+  if (esc !== 1) { const ox = LY.navR.x, oy = LY.navR.y; wx = ox + (wx - ox) * esc; wy = oy + (wy - oy) * esc; ww *= esc; wh *= esc }
+  wx += dx
+  const ch = g.ch * esc, cw = ww, chh = wh - ch
+  ctx.save(); ctx.globalAlpha = alpha
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.save(); ctx.shadowColor = 'rgba(2,6,23,.62)'; ctx.shadowBlur = 110; ctx.shadowOffsetY = 46
+  rr(ctx, wx, wy, ww, wh, 16 * esc); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore()
+  rr(ctx, wx, wy, ww, wh, 16 * esc); ctx.clip()
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(barraNav(urlEn(p.toma, s), Math.round(g.w), Math.round(g.ch)), wx, wy, ww, ch)
+  ctx.beginPath(); ctx.rect(wx, wy + ch, cw, chh); ctx.clip()
+  const a = cw / r.w, h = r.w * g.chh / g.cw
+  const e = wx - (r.cx - r.w / 2) * a, f = wy + ch - (r.cy - h / 2) * a
+  await dibujarPagina(p.toma, s, a, e, f)
+  ctx.restore()
+  ctx.save(); ctx.globalAlpha = alpha; ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1; rr(ctx, wx + .5, wy + .5, ww - 1, wh - 1, 16 * esc); ctx.stroke(); ctx.restore()
+  return { tipo: 'navegador', pagina: (x, y) => [x * a + e, y * a + f], escala: a, alpha, clip: [wx, wy + ch, cw, chh] }
+}
+
+// ── toques (celular) y cursor (navegador) ─────────────────────────────────
+const CURSOR = new Path2D('M5 3 L5 26 L10.6 20.8 L14.4 29.6 L18.6 27.8 L14.9 19.2 L22.6 19.2 Z')
+function dibujarToques(p, t, geo) {
+  if (!geo || geo.alpha < .3) return
+  for (const q of TL.toques) {
+    if (q.p !== p.id) continue
+    const dt = t - q.t
+    if (dt < -.32 || dt > .6) continue
+    const [x, y] = geo.pagina(q.x, q.y)
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0)
+    if (geo.clip) { ctx.beginPath(); ctx.rect(...geo.clip); ctx.clip() }
+    if (q.disp === 'celular') {
+      const R = 30 * clamp(geo.escala / 1.5, .8, 1.5)
+      const a = dt < 0 ? eo(prog(dt, -.32, -.12)) : 1 - eo(prog(dt, .12, .42))
+      const pr = dt >= 0 && dt < .12 ? .86 : 1
+      ctx.globalAlpha = a * geo.alpha
+      ctx.beginPath(); ctx.arc(x, y, R * pr, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,.38)'; ctx.fill()
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.shadowColor = 'rgba(2,6,23,.35)'; ctx.shadowBlur = 12; ctx.stroke()
+      if (dt >= 0) { const u = prog(dt, 0, .55), rr2 = lerp(R * .9, R * 2.6, eo(u)); ctx.globalAlpha = (1 - u) * .9 * geo.alpha; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(x, y, rr2, 0, Math.PI * 2); ctx.lineWidth = 3.5; ctx.strokeStyle = '#93C5FD'; ctx.stroke() }
+    } else if (dt >= 0) {
+      const u = prog(dt, 0, .55), R = lerp(8, 40, eo(u)) * clamp(geo.escala, .9, 1.7)
+      ctx.globalAlpha = (1 - u) * .95 * geo.alpha
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fillStyle = 'rgba(59,130,246,.18)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#3B82F6'; ctx.stroke()
+    }
+    ctx.restore()
+  }
+}
+function cursorEn(p, t) {
+  const c = TL.cursores.find(c => c.p === p.id); if (!c) return null
+  let pos = { x: c.keys[0].x, y: c.keys[0].y }
+  for (const k of c.keys) {
+    if (t < k.t) break
+    const u = eio(prog(t, k.t, k.t + k.d)), from = { ...pos }, ddx = k.x - from.x, ddy = k.y - from.y, dist = Math.hypot(ddx, ddy)
+    const bow = Math.sin(Math.PI * u) * Math.min(60, dist * .1), nx = dist ? -ddy / dist : 0, ny = dist ? ddx / dist : 0
+    pos = u >= 1 ? { x: k.x, y: k.y } : { x: lerp(from.x, k.x, u) + nx * bow, y: lerp(from.y, k.y, u) + ny * bow }
+  }
+  return pos
+}
+function dibujarCursor(p, t, geo) {
+  if (!geo || geo.tipo !== 'navegador') return
+  const pos = cursorEn(p, t); if (!pos) return
+  const [x, y] = geo.pagina(pos.x, pos.y)
+  let press = 0
+  for (const q of TL.toques) if (q.p === p.id) { const dt = t - q.t; if (dt >= -.08 && dt < .18) press = Math.max(press, 1 - Math.abs(dt - .03) / .15) }
+  const s = clamp(geo.escala, .95, 1.8) * 1.15 * (1 - .14 * clamp(press, 0, 1))
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = geo.alpha * clamp(prog(t, p.o0 + .05, p.o0 + .3), 0, 1)
+  ctx.beginPath(); ctx.rect(...geo.clip); ctx.clip()
+  ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-4, -3)
+  ctx.shadowColor = 'rgba(0,0,0,.28)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3
+  ctx.fillStyle = '#0F172A'; ctx.fill(CURSOR); ctx.shadowColor = 'transparent'
+  ctx.lineJoin = 'round'; ctx.lineWidth = 2.2; ctx.strokeStyle = '#fff'; ctx.stroke(CURSOR); ctx.fill(CURSOR)
+  ctx.restore()
+}
+
+// ── planos y transiciones ─────────────────────────────────────────────────
+function planoEn(t) { const P = TL.planos; let i = 0; for (let k = 0; k < P.length; k++) if (P[k].o0 <= t + 1e-6) i = k; return i }
+async function dibujarPlano(p, t, op) {
+  const geo = p.disp === 'celular' ? await dibujarCelular(p, t, op) : await dibujarNavegador(p, t, op)
+  dibujarToques(p, t, geo); dibujarCursor(p, t, geo)
+  return geo
+}
+async function dibujarPlanos(t) {
+  const i = planoEn(t), p = TL.planos[i], prev = TL.planos[i - 1]
+  if (t > TL.fin + 1.4) return
+  const d = p.entra?.d ?? 0, u = d > 0 ? prog(t, p.o0, p.o0 + d) : 1
+  if (prev && u < 1) {
+    const tp = Math.min(t, prev.o1 - 1e-3)
+    if (p.entra.tipo === 'desliza') {
+      const e = eio(u), dist = W * .9
+      await dibujarPlano(prev, tp, { dx: -e * dist, esc: lerp(1, .94, Math.sin(Math.PI * u)) })
+      await dibujarPlano(p, t, { dx: (1 - e) * dist, esc: lerp(1, .94, Math.sin(Math.PI * u)) })
+      return
+    }
+    if (p.entra.tipo === 'fundido') { await dibujarPlano(prev, tp, {}); await dibujarPlano(p, t, { alpha: smooth(u) }); return }
+    if (p.entra.tipo === 'escala') { await dibujarPlano(prev, tp, { alpha: 1 - smooth(u) }); await dibujarPlano(p, t, { alpha: smooth(u), esc: lerp(1.07, 1, eo5(u)) }); return }
+  }
+  await dibujarPlano(p, t, {})
+}
+function dibujarFlash(t) {
+  let a = 0
+  for (const f of TL.flashes) { const dt = t - f; if (dt > -.06 && dt < .5) a = Math.max(a, dt < 0 ? (dt + .06) / .06 * .8 : .8 * Math.exp(-dt / .11)) }
+  if (a > .002) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = a; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1 }
+}
+
+// ── textos ────────────────────────────────────────────────────────────────
+function posicionar(el, L, centrar = false) {
+  el.style.top = L.top + 'px'
+  if (centrar) {
+    // el bloque de texto queda centrado en la franja de texto (alto variable según las líneas)
+    el.classList.add('banda'); el.style.justifyContent = L.align === 'left' ? 'flex-start' : 'center'
+    el.style.left = L.left + 'px'; el.style.width = L.width + 'px'; el.style.fontSize = L.size + 'px'
+    el.style.top = (LY.banda.top + (LY.banda.h - el.offsetHeight) / 2) + 'px'
+    return
+  }
+  if (L.cx != null) { el.style.left = L.cx + 'px'; el.style.transformOrigin = '50% 50%' } else { el.style.left = L.left + 'px'; el.style.width = L.width ? L.width + 'px' : '' }
+  if (L.width) el.style.width = L.width + 'px'
+  if (L.align) el.style.textAlign = L.align
+  if (L.size) el.style.fontSize = L.size + 'px'
+}
+const armado = { gancho: null, sub: null, rubro: null }
+function htmlPalabras(ws) {
+  const esc = x => x.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  let h = '', enf = false
+  ws.forEach((w, i) => {
+    if (w.enf && !enf) { h += '<span class="enfg">'; enf = true }
+    if (!w.enf && enf) { h += '</span> '; enf = false }
+    h += `<span class="w" data-i="${i}">${esc(w.w)}</span>` + (i < ws.length - 1 && !(enf && !ws[i + 1].enf) ? ' ' : '')
+  })
+  if (enf) h += '</span>'
+  return h
+}
+function activo(tipo, t) {
+  const X = TL.textos.filter(x => x.tipo === tipo && t >= x.o0 - .02 && t < x.o1 + .3)
+  return X.length ? X[X.length - 1] : null
+}
+function animarPalabras(el, ws, t, salida) {
+  el.querySelectorAll('.w').forEach(sp => {
+    const w = ws[+sp.dataset.i], u = prog(t, w.t - .06, w.t + .28), s = spring(u, 1.05)
+    sp.style.opacity = clamp(u * 3, 0, 1)
+    sp.style.transform = `translateY(${(1 - eo(u)) * 26}px) scale(${lerp(.72, 1, s)})`
+  })
+  // el bloque resaltado aparece con su primera palabra (no antes)
+  el.querySelectorAll('.enfg').forEach(b => {
+    const w = ws[+b.querySelector('.w').dataset.i], u = prog(t, w.t - .08, w.t + .22)
+    b.style.opacity = clamp(u * 2.5, 0, 1); b.style.transform = `scale(${lerp(.8, 1, spring(u, 1.1))}) rotate(${lerp(-3, -1, eo(u))}deg)`
+  })
+  el.style.opacity = 1 - salida
+  el.style.transform = `translateY(${-salida * 22}px)`
+}
+function dibujarTextos(t) {
+  // gancho: todas las palabras de la frase, apareciendo con la voz
+  const g = activo('gancho', t), eg = $('gancho')
+  if (!g) { eg.style.opacity = 0; armado.gancho = null }
+  else {
+    if (armado.gancho !== g) { eg.innerHTML = htmlPalabras(g.palabras); armado.gancho = g; posicionar(eg, LY.gancho, true) }
+    const sig = TL.textos.find(x => x.tipo === 'gancho' && x.o0 > g.o0 && x.o0 <= g.o1 + .3)
+    const fin = sig ? sig.o0 : g.o1
+    animarPalabras(eg, g.palabras, t, eio(prog(t, fin - .18, fin + .02)))
+  }
+  // subtítulos: un grupo de palabras a la vez
+  const s = activo('sub', t), es = $('sub')
+  if (!s || TL.textos.some(x => x.tipo === 'gancho' && t >= x.o0 && t < x.o1)) { es.style.opacity = 0; armado.sub = null }
+  else {
+    let gi = 0; s.grupos.forEach((gr, i) => { if (gr.t <= t + .05) gi = i })
+    const gr = s.grupos[gi]
+    if (armado.sub !== gr) { es.innerHTML = htmlPalabras(gr.palabras); armado.sub = gr; posicionar(es, LY.sub, true) }
+    const ultimo = gi === s.grupos.length - 1
+    animarPalabras(es, gr.palabras, t, ultimo ? eio(prog(t, s.o1 - .15, s.o1 + .1)) : 0)
+  }
+  // rubro: una palabra gigante por tramo de voz
+  const r = activo('rubro', t), er = $('rubro')
+  if (!r) { er.style.opacity = 0; armado.rubro = null }
+  else {
+    let gi = 0; r.grupos.forEach((gr, i) => { if (gr.t <= t + .04) gi = i })
+    const gr = r.grupos[gi]
+    if (armado.rubro !== gr) { er.textContent = gr.texto; armado.rubro = gr; posicionar(er, LY.rubro) }
+    const u = prog(t, gr.t - .04, gr.t + .26)
+    er.style.opacity = Math.min(clamp(u * 2.5, 0, 1), 1 - prog(t, r.o1 - .15, r.o1 + .05))
+    er.style.transform = `scale(${lerp(1.35, 1, eo5(u))})`
+  }
+  // chip
+  const c = TL.chips.find(x => t >= x.o0 && t < x.o1 + .3), ec = $('chip')
+  if (!c) ec.style.opacity = 0
+  else {
+    ec.textContent = '✦ ' + c.texto
+    const L = LY.chip; ec.style.top = L.top + 'px'
+    const w = ec.offsetWidth
+    ec.style.left = (L.cx != null ? L.cx - w / 2 : L.left) + 'px'
+    const a = Math.min(eo(prog(t, c.o0, c.o0 + .3)), 1 - eio(prog(t, c.o1, c.o1 + .3)))
+    ec.style.opacity = a; ec.style.transform = `translateY(${(1 - a) * 14}px) scale(${lerp(.92, 1, a)})`
+  }
+  // marca (logo chico durante el gancho)
+  const em = $('marca'), M = TL.marca
+  if (!M) em.style.opacity = 0
+  else {
+    const L = LY.marca; em.style.top = L.top + 'px'
+    const w = em.offsetWidth; em.style.left = (L.cx != null ? L.cx - w / 2 : L.left) + 'px'
+    em.style.opacity = Math.min(eo(prog(t, M.o0, M.o0 + .35)), 1 - eio(prog(t, M.o1 - .3, M.o1)))
+  }
+}
+
+// ── logo del loader (cierre) ──────────────────────────────────────────────
+function drawLogo(a, cy, alpha) {
+  const L = $('logo'); L.style.top = cy + 'px'; L.style.opacity = alpha
+  $('hub').setAttribute('r', (10 * spring(prog(a, 0, .55))).toFixed(3))
+  $('hubHalo').setAttribute('r', (18 * spring(prog(a, .08, .65))).toFixed(3))
+  const arcU = eo(prog(a, .12, .85)), C = 2 * Math.PI * 32
+  $('arc').setAttribute('stroke-dasharray', `${(151 * arcU).toFixed(2)} ${(C - 151 * arcU).toFixed(2)}`)
+  $('arc').style.opacity = arcU > 0 ? 1 : 0
+  const satU = eo(prog(a, .35, .7))
+  $('sat').setAttribute('r', (5.5 * satU).toFixed(3)); $('satHalo').setAttribute('r', (9 * satU).toFixed(3))
+  const ang = (a < .9 ? 360 * (a * a / 1.8) : 360 * (.45 + (a - .9))) % 360
+  $('spinG').setAttribute('transform', `rotate(${ang.toFixed(2)} 44 44)`)
+  const on = prog(a, .55, 1)
+  ;[['ring1', 0, .35], ['ring2', .75, .20]].forEach(([id, d, op]) => {
+    const el = $(id), k = a - .55 - d
+    if (k < 0) { el.style.opacity = 0; return }
+    const u = (k % 2) / 2, e = 1 - Math.pow(1 - u, 2)
+    el.style.border = `3.75px solid rgba(59,130,246,${op})`; el.style.transform = `scale(${lerp(.85, 2.2, e)})`; el.style.opacity = (1 - e) * on
+  })
+}
+function fadeUp(el, t, a, dur = .6, dist = 34) { const u = eo5(prog(t, a, a + dur)); el.style.opacity = u; return (1 - u) * dist }
+function circlePath(cx, cy, r) { return `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z` }
+function dibujarCierre(t) {
+  const veil = $('veil'), F = TL.fin
+  if (t < F + .3) { veil.style.display = 'none'; return }
+  veil.style.display = 'block'
+  const R = Math.hypot(W, H)
+  veil.style.clipPath = `path("${circlePath(W / 2, H / 2, lerp(0, R, eio(prog(t, F + .3, F + 1.1))))}")`
+  const a0 = F + .85, E = LY.end
+  drawLogo(t - a0, E.logoY, 1)
+  const tY = E.logoY + 170
+  $('endT').textContent = TL.endTitle; $('endT').style.width = W + 'px'; $('endT').style.fontSize = E.size + 'px'
+  $('endT').style.top = (tY + fadeUp($('endT'), t, a0 + .55, .6, 30)) + 'px'
+  const hT = $('endT').offsetHeight
+  $('endS').textContent = TL.endSub; $('endS').style.width = W + 'px'; $('endS').style.fontSize = E.sub + 'px'
+  $('endS').style.top = (tY + hT + 26 + fadeUp($('endS'), t, a0 + .9, .6, 26)) + 'px'
+  $('site').style.top = (tY + hT + 26 + E.sub * 1.1 + 40 + fadeUp($('site'), t, a0 + 1.2, .6, 24)) + 'px'
+}
+
+// ── seek ──────────────────────────────────────────────────────────────────
+async function seek(t) {
+  dibujarFondo(t)
+  await dibujarPlanos(t)
+  dibujarFlash(t)
+  dibujarTextos(t)
+  dibujarCierre(t)
+  return true
+}
+async function load(tl) {
+  TL = tl; W = tl.W; H = tl.H
+  const st = $('stage'); st.style.width = W + 'px'; st.style.height = H + 'px'
+  document.body.style.width = W + 'px'; document.body.style.height = H + 'px'
+  $('veil').style.width = W + 'px'; $('veil').style.height = H + 'px'
+  const c = $('c'); c.width = W; c.height = H; ctx = c.getContext('2d')
+  LY = diseno()
+  await document.fonts.ready
+  await Promise.all([document.fonts.load('800 90px Sora'), document.fonts.load('700 64px Sora'), document.fonts.load('600 56px Sora'), document.fonts.load('600 15px Geist'), document.fonts.load('700 24px Geist'), document.fonts.load('500 14px Geist')])
+  prepararFondo()
+  return { W, H, planos: TL.planos.length, D: TL.duration }
+}
+window.seek = seek; window.load = load
+</script>
+</body>
+</html>

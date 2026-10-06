@@ -1,0 +1,60 @@
+{
+  "voz": "Achird",
+  "idioma": "es-AR",
+  "_nota": "Cada frase se ancla a una marca (desde) y el editor estira el paso hasta (hasta) si no entra. Referencias: marca | toma:marca | clic:x | foco:x | scroll:x | hl:x | cap:N (placa N), con +/- segundos. Si una marca coincide con el borde de un clip (p. ej. sD = quitar-fondo-fin), sumale +0.1. Nada de instrucciones de estilo en el texto: el TTS las lee.",
+  "frases": [
+    {
+      "id": "intro-avz",
+      "desde": "intro",
+      "offset": 0.55,
+      "texto": "Mirá cómo cargar un producto con una sola foto."
+    },
+    {
+      "id": "orbi-foto",
+      "desde": "toma-orbi:oA",
+      "hasta": "toma-orbi:oB",
+      "texto": "Subí una foto del producto."
+    },
+    {
+      "id": "orbi-completar",
+      "desde": "toma-orbi:oB",
+      "hasta": "toma-orbi:scan-fin",
+      "texto": "Tocá Completar con esta foto, y Orbi la reconoce en segundos."
+    },
+    {
+      "id": "orbi-resultado",
+      "desde": "toma-orbi:scan-fin",
+      "hasta": "toma-orbi:oC",
+      "texto": "Te completa el nombre, la categoría y la descripción, y hasta te busca fotos."
+    },
+    {
+      "id": "orbi-revisar",
+      "desde": "toma-orbi:oC",
+      "hasta": "toma-orbi:oD",
+      "texto": "Revisá lo que completó: también te sugiere talles y colores."
+    },
+    {
+      "id": "orbi-precio",
+      "desde": "toma-orbi:oD",
+      "hasta": "toma-orbi:fin",
+      "texto": "Vos solo ponés el precio y el stock, y publicás."
+    },
+    {
+      "id": "fondo-avz",
+      "desde": "clic:quitar-fondo-0.4",
+      "hasta": "quitar-fondo-fin-0.02",
+      "texto": "Y además, le quitás el fondo a tus fotos con un solo toque."
+    },
+    {
+      "id": "cta",
+      "desde": "cap:1",
+      "texto": "Activalo cuando quieras desde Configuración, en Suscripción."
+    },
+    {
+      "id": "cierre-avz",
+      "desde": "cierre",
+      "offset": 1.5,
+      "texto": "Con el paquete Avanzado, Orbi lo hace por vos."
+    }
+  ]
+}
