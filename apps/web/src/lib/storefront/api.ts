@@ -268,6 +268,29 @@ export function getStorefrontSitemap(slug: string) {
   return storefrontRequest<StorefrontSitemap>(`/${slug}/sitemap`)
 }
 
+export type TiendaDelDirectorio = {
+  name: string
+  subdomain: string
+  /** Dominio propio activo; null = la tienda vive en su subdominio de Órbita. */
+  domain: string | null
+  description: string | null
+  logoUrl: string | null
+}
+
+export type DirectorioDeTiendas = {
+  total: number
+  page: number
+  perPage: number
+  /** Cuándo se sumó la última tienda (para el sitemap), o null si no hay ninguna. */
+  lastChange: string | null
+  stores: TiendaDelDirectorio[]
+}
+
+/** Las tiendas que corresponde mostrar en Google (orbita.site/tiendas). */
+export function getDirectorioTiendas(page = 1) {
+  return storefrontRequest<DirectorioDeTiendas>(`/directory/stores?page=${page}`)
+}
+
 /** Slug de la tienda que tiene este dominio propio, o null. Lo usa el robots/sitemap por host. */
 export async function getSlugDeDominio(dominio: string): Promise<string | null> {
   const r = await storefrontRequest<{ slug: string | null }>(`/by-domain/${encodeURIComponent(dominio)}`)

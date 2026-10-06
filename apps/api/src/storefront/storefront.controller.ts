@@ -62,6 +62,16 @@ export class StorefrontController {
     return this.storefrontService.getSitemap(slug);
   }
 
+  // Directorio público de tiendas (orbita.site/tiendas): ver getDirectory.
+  // `directory/stores` (2 segmentos) no choca con ninguna ruta `:slug/<algo>`.
+  @Get('directory/stores')
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  directory(@Query('page') page?: string) {
+    const n = Math.min(Math.max(parseInt(page ?? '1', 10) || 1, 1), 1000);
+    return this.storefrontService.getDirectory(n);
+  }
+
   @Get(':slug/products')
   @Public()
   products(@Param('slug') slug: string, @Query() query: StorefrontProductsQueryDto) {

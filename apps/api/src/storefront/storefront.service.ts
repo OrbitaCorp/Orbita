@@ -64,6 +64,9 @@ const MAX_QTY_PUBLICO = 20;
 // tope evita que una consulta se descontrole si algún día pasa.
 const MAX_URLS_SITEMAP = 10_000;
 
+// Cuántas tiendas lista cada página del directorio público (orbita.site/tiendas).
+const TIENDAS_POR_PAGINA = 48;
+
 // El precio que se muestra en la card/listado tiene que ser SIEMPRE el que
 // realmente se cobra al agregar al carrito — nunca `Product.basePrice` como
 // un número aparte que puede desincronizarse del precio real de la variante
@@ -1241,6 +1244,66 @@ export class StorefrontService {
       }),
     ]);
     return { indexable: abierta && !!producto, primaryDomain: dominio?.domain ?? null };
+  }
+
+  /**
+   * El directorio público de tiendas (orbita.site/tiendas): las que corresponde
+   * mostrar en Google, con el dominio al que hay que mandar al visitante.
+   *
+   * Es la forma de que una tienda nueva llegue sola a Google: el sitemap y el
+   * robots.txt de cada tienda solo los lee Google DESPUÉS de haber llegado al
+   * sitio, y llegar requiere un link desde algún lado. Esta lista es ese link:
+   * se arma sola con el mismo criterio que `indexable` (publicada, en línea, no
+   * es la demo y con al menos un producto a la venta), así que una tienda
+   * aparece cuando empieza a vender y deja de aparecer si se pausa.
+   *
+   * `domain` es el dominio propio ACTIVO, si lo tiene; si no, queda en null y
+   * el frontend arma el subdominio de Órbita. `lastChange` es cuándo se sumó la
+   * última tienda: la fecha que se declara en el sitemap, que solo cambia cuando
+   * de verdad hay algo nuevo para rastrear.
+   */
+  async getDirectory(pagina = 1, porPagina = TIENDAS_POR_PAGINA) {
+    const where = {
+      isActive: true,
+      isPaused: false,
+      isDemo: false,
+      deletedAt: null,
+      products: { some: { deletedAt: null, status: { in: ['PUBLISHED' as const, 'OUT_OF_STOCK' as const] } } },
+    };
+    const [total, ultima, filas] = await Promise.all([
+      this.prisma.business.count({ where }),
+      this.prisma.business.aggregate({ where, _max: { createdAt: true } }),
+      this.prisma.business.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }], // orden estable: la misma tienda no salta de página
+        skip: (pagina - 1) * porPagina,
+        take: porPagina,
+        select: {
+          name: true,
+          subdomain: true,
+          storefrontConfig: { select: { storeName: true, tagline: true, logoUrl: true } },
+          customDomains: {
+            where: { status: 'ACTIVE', dnsVerified: true },
+            select: { domain: true },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+        },
+      }),
+    ]);
+    return {
+      total,
+      page: pagina,
+      perPage: porPagina,
+      lastChange: ultima._max.createdAt?.toISOString() ?? null,
+      stores: filas.map((b) => ({
+        name: b.storefrontConfig?.storeName?.trim() || b.name,
+        subdomain: b.subdomain,
+        domain: b.customDomains[0]?.domain ?? null,
+        description: b.storefrontConfig?.tagline?.trim() || null,
+        logoUrl: b.storefrontConfig?.logoUrl ?? null,
+      })),
+    };
   }
 
   /**

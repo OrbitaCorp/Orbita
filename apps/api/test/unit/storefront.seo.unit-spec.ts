@@ -110,3 +110,66 @@ describe('getSitemap', () => {
     }));
   });
 });
+
+describe('getDirectory: el directorio público de tiendas', () => {
+  const fila = (over: Record<string, unknown> = {}) => ({
+    name: 'Venus Style', subdomain: 'venustyle',
+    storefrontConfig: { storeName: null, tagline: 'Ropa deportiva', logoUrl: 'https://x/logo.webp' },
+    customDomains: [], ...over,
+  });
+
+  function directorio(filas: unknown[], total = filas.length, ultima: Date | null = new Date('2026-10-02T12:00:00Z')) {
+    const prisma = {
+      business: {
+        count: jest.fn().mockResolvedValue(total),
+        aggregate: jest.fn().mockResolvedValue({ _max: { createdAt: ultima } }),
+        findMany: jest.fn().mockResolvedValue(filas),
+      },
+    };
+    return { svc: new StorefrontService(prisma as any, {} as any, {} as any), prisma };
+  }
+
+  it('lista solo tiendas publicadas, en línea, no demo y con productos a la venta (el mismo criterio que indexable)', async () => {
+    const { svc, prisma } = directorio([fila()]);
+    await svc.getDirectory();
+    const donde = prisma.business.findMany.mock.calls[0][0].where;
+    expect(donde).toMatchObject({ isActive: true, isPaused: false, isDemo: false, deletedAt: null });
+    expect(donde.products).toEqual({ some: { deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } });
+    // La cuenta y la fecha usan exactamente el mismo filtro que la lista.
+    expect(prisma.business.count).toHaveBeenCalledWith({ where: donde });
+    expect(prisma.business.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: donde }));
+  });
+
+  it('arma cada tienda con su nombre, su descripción y su dominio propio activo', async () => {
+    const { svc } = directorio([
+      fila(),
+      fila({ name: 'TeFaltaCalle', subdomain: 'tefaltacalle', customDomains: [{ domain: 'tefaltacalleok.com' }], storefrontConfig: { storeName: 'Te Falta Calle', tagline: '  ', logoUrl: null } }),
+    ]);
+    const d = await svc.getDirectory();
+    expect(d.stores).toEqual([
+      { name: 'Venus Style', subdomain: 'venustyle', domain: null, description: 'Ropa deportiva', logoUrl: 'https://x/logo.webp' },
+      { name: 'Te Falta Calle', subdomain: 'tefaltacalle', domain: 'tefaltacalleok.com', description: null, logoUrl: null },
+    ]);
+  });
+
+  it('solo cuenta un dominio propio ACTIVO y con el DNS verificado', async () => {
+    const { svc, prisma } = directorio([fila()]);
+    await svc.getDirectory();
+    const sel = prisma.business.findMany.mock.calls[0][0].select;
+    expect(sel.customDomains.where).toEqual({ status: 'ACTIVE', dnsVerified: true });
+    expect(sel.customDomains.take).toBe(1);
+  });
+
+  it('pagina con orden estable', async () => {
+    const { svc, prisma } = directorio([fila()], 100);
+    const d = await svc.getDirectory(3, 48);
+    const args = prisma.business.findMany.mock.calls[0][0];
+    expect(args).toMatchObject({ skip: 96, take: 48, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    expect(d).toMatchObject({ total: 100, page: 3, perPage: 48 });
+  });
+
+  it('lastChange es la fecha de la última tienda sumada (null si no hay ninguna)', async () => {
+    expect((await directorio([fila()]).svc.getDirectory()).lastChange).toBe('2026-10-02T12:00:00.000Z');
+    expect((await directorio([], 0, null).svc.getDirectory()).lastChange).toBeNull();
+  });
+});

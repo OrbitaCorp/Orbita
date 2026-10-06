@@ -82,26 +82,29 @@ export function Seccion({ id, children, className = '' }: { id?: string; childre
 }
 
 export function Encabezado({
-    eyebrow, titulo, resalte, bajada, centrado = true,
+    eyebrow, titulo, resalte, bajada, centrado = true, nivel = 'h2',
 }: {
     eyebrow: string;
     titulo: string;
     resalte?: string;
     bajada?: string;
     centrado?: boolean;
+    /** El nivel del título: 'h1' en las páginas propias (una sola vez por página), 'h2' en las secciones del home. */
+    nivel?: 'h1' | 'h2';
 }) {
+    const Titulo = nivel;
     return (
         <Reveal className={centrado ? 'text-center' : ''}>
             <span className="inline-flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.22em] text-blue-300/70">
                 <span aria-hidden="true" style={{ width: 18, height: 1, background: 'var(--oc-linea)' }} />
                 {eyebrow}
             </span>
-            <h2
+            <Titulo
                 className="mt-4 font-black tracking-[-0.035em] text-white"
                 style={{ fontSize: 'clamp(28px, 4.6vw, 52px)', lineHeight: 1.04 }}
             >
                 {titulo}{resalte && <> <span style={{ color: 'var(--oc-title-2)' }}>{resalte}</span></>}
-            </h2>
+            </Titulo>
             {bajada && (
                 <p className={`mt-5 text-[15px] leading-relaxed text-slate-400 sm:text-base ${centrado ? 'mx-auto max-w-[620px]' : 'max-w-[620px]'}`}>
                     {bajada}
