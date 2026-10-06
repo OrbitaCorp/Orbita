@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
+import Head from 'next/head'
 import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag, Play } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -490,6 +491,14 @@ export default function ProductoDetalle() {
 
   return (
     <StorefrontChrome tienda={tienda} config={config}>
+      {/* Al entrar a la ficha navegando dentro de la tienda (sin recargar), el
+          <head> que llegó es el genérico: acá, que ya tenemos el producto, la
+          pestaña pasa a decir cuál es. Con la página recién cargada ya vino
+          con el título y el resto de las etiquetas desde el servidor (ver
+          forceSSR.ts); esta tiene la misma `key` y no se duplica. */}
+      <Head>
+        <title key="title">{tienda.nombre ? `${producto?.name} | ${tienda.nombre}` : producto?.name}</title>
+      </Head>
       <style>{CSS_FICHA}</style>
       <div className="sf-pd-wrap" style={{ maxWidth: 1420, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[

@@ -10,11 +10,38 @@
 //   - /tienda/*, /panel, /admin, etc.: no son contenido de marketing, ver
 //     robots.txt.ts.
 import type { GetServerSideProps } from 'next'
-import { SEO_CANONICAL_HOST } from '@/lib/tenant'
+import { SEO_CANONICAL_HOST, ROOT_DOMAIN } from '@/lib/tenant'
+import { getStorefrontSitemap } from '@/lib/storefront/api'
+import { esHostPrincipal, tiendaDeHost } from '@/lib/storefront/hostTienda'
+import { origenDeTienda, sitemapDeTienda } from '@/lib/storefront/seo'
 
 const STATIC_PATHS = ['/', '/demo', '/nosotros', '/planes', '/terminos', '/privacidad', '/cookies', '/eliminacion-de-datos']
 
-export const getServerSideProps: GetServerSideProps = async ({ res }) => {
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+    // Una tienda (por subdominio o dominio propio) sirve su propio sitemap, con
+    // sus productos y categorías: antes cualquier subdominio devolvía el de la
+    // plataforma, con las páginas de Órbita.
+    const tienda = await tiendaDeHost(req.headers.host)
+    if (tienda) {
+        let datos
+        try {
+            datos = await getStorefrontSitemap(tienda.slug)
+        } catch {
+            // Un sitemap vacío le diría a Google "no hay nada": mejor un error
+            // que reintente más tarde.
+            res.statusCode = 503
+            res.setHeader('Retry-After', '600')
+            res.end()
+            return { props: {} }
+        }
+        const origen = origenDeTienda(tienda.slug, datos.primaryDomain, ROOT_DOMAIN)
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600')
+        res.write(sitemapDeTienda(origen, datos, esHostPrincipal(tienda, datos.primaryDomain)))
+        res.end()
+        return { props: {} }
+    }
+
     const urlEntries = STATIC_PATHS.map(
         (path) => `  <url>\n    <loc>https://${SEO_CANONICAL_HOST}${path}</loc>\n  </url>`,
     ).join('\n')

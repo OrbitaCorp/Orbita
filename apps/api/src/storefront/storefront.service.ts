@@ -59,6 +59,11 @@ function normalizarBloques(raw: Prisma.JsonValue | null): BloqueContenido[] {
 // antifraude por línea de pedido.
 const MAX_QTY_PUBLICO = 20;
 
+// Tope de productos que entran al sitemap de una tienda. El protocolo admite
+// 50.000 URLs por archivo; una tienda de Órbita está muy lejos de eso, y el
+// tope evita que una consulta se descontrole si algún día pasa.
+const MAX_URLS_SITEMAP = 10_000;
+
 // El precio que se muestra en la card/listado tiene que ser SIEMPRE el que
 // realmente se cobra al agregar al carrito — nunca `Product.basePrice` como
 // un número aparte que puede desincronizarse del precio real de la variante
@@ -1195,6 +1200,84 @@ export class StorefrontService {
         parentId: c.parentId,
         productCount: c._count.products,
       }));
+  }
+
+  // ── SEO público: qué le dice la tienda a Google ─────────────────────────────
+  // El frontend arma el <head>, el sitemap y el robots.txt de cada tienda, pero
+  // dos datos solo los sabe el backend: si la tienda corresponde que aparezca
+  // en Google, y con qué dominio (el propio, si lo tiene).
+
+  /**
+   * ¿Debe aparecer en Google, y bajo qué dominio?
+   *
+   * `indexable` es verdadero solo con una tienda publicada y en línea, que no
+   * sea la demo y tenga al menos un producto a la venta: una tienda vacía o en
+   * pausa en el índice es una página sin nada que ofrecer, y la demo no es de
+   * ningún comerciante. Se sigue pudiendo entrar a todas; solo se le pide a
+   * Google que no las indexe.
+   *
+   * `primaryDomain` es el dominio propio ACTIVO (con DNS verificado y, desde
+   * que "Activo" exige HTTPS, con certificado funcionando): ese es el que el
+   * dueño quiere posicionar, y al que apuntan los canonical. Sin uno, la
+   * tienda se queda con su subdominio de Órbita.
+   */
+  async getSeo(slug: string) {
+    return this.seoDe(await this.resolveBusiness(slug));
+  }
+
+  private async seoDe(business: { id: string; isActive: boolean; isPaused: boolean; isDemo: boolean }) {
+    const abierta = business.isActive && !business.isPaused && !business.isDemo;
+    const [producto, dominio] = await Promise.all([
+      abierta
+        ? this.prisma.product.findFirst({
+            where: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.customDomain.findFirst({
+        where: { businessId: business.id, status: 'ACTIVE', dnsVerified: true },
+        select: { domain: true },
+        orderBy: { createdAt: 'asc' }, // si hubiera más de uno, siempre el mismo
+      }),
+    ]);
+    return { indexable: abierta && !!producto, primaryDomain: dominio?.domain ?? null };
+  }
+
+  /**
+   * Lo que va al sitemap.xml de la tienda: sus categorías con productos y sus
+   * productos a la venta, con la fecha de la última modificación. Una tienda
+   * que no debe indexarse devuelve las listas vacías.
+   *
+   * Dos categorías con el mismo slug (una "remeras" en Hombre y otra en Mujer,
+   * el slug es único por padre) se dejan afuera: la ruta /catalogo/:slug no
+   * sabría cuál mostrar, y es mejor no listar una URL ambigua que listarla mal.
+   */
+  async getSitemap(slug: string) {
+    const business = await this.resolveBusiness(slug);
+    const seo = await this.seoDe(business);
+    if (!seo.indexable) return { ...seo, categories: [], products: [] };
+
+    const publicos = { deletedAt: null, status: { in: ['PUBLISHED' as const, 'OUT_OF_STOCK' as const] } };
+    const [categorias, productos] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { businessId: business.id, isActive: true },
+        select: { slug: true, updatedAt: true, _count: { select: { products: { where: publicos } } } },
+      }),
+      this.prisma.product.findMany({
+        where: { businessId: business.id, ...publicos },
+        select: { id: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: MAX_URLS_SITEMAP,
+      }),
+    ]);
+    const repetidos = new Set(categorias.map((c) => c.slug).filter((s, i, todos) => todos.indexOf(s) !== i));
+    return {
+      ...seo,
+      categories: categorias
+        .filter((c) => c._count.products > 0 && !repetidos.has(c.slug))
+        .map((c) => ({ slug: c.slug, updatedAt: c.updatedAt.toISOString() })),
+      products: productos.map((p) => ({ id: p.id, updatedAt: p.updatedAt.toISOString() })),
+    };
   }
 
   // ── Cupones públicos (RBT-615/616 — vista del cliente) ─────────────────────

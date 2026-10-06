@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 import Head from 'next/head'
+import { SeoHead } from '@/components/storefront/SeoHead'
+import type { SeoPagina } from '@/lib/storefront/seo'
 import { PageLoader } from '@/components/PageLoader'
 import { LoaderEmpuje, duracionLoaderLanding } from '@/components/LoaderEmpuje'
 import { AuthProvider } from '@/lib/auth/AuthContext'
@@ -271,6 +273,11 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
       </Head>
+
+      {/* El <head> de SEO de cada página de la tienda: título, descripción,
+          canonical, robots, Open Graph y datos estructurados. Lo arma
+          lib/storefront/forceSSR.ts. */}
+      {isStorefront && <SeoHead seo={(pageProps as { __seo?: SeoPagina | null }).__seo} />}
 
       {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody || ssrFontScale) && (
         <Head>

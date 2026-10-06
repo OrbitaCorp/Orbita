@@ -246,6 +246,34 @@ export async function getStorefrontConfig(slug: string) {
   return conOverrides(cfg, overridesPreview())
 }
 
+// ─── SEO (qué le decimos a Google de la tienda) ────────────────────────────
+
+export type StorefrontSeo = {
+  /** Publicada, en línea, no es la demo y tiene productos a la venta. */
+  indexable: boolean
+  /** Dominio propio activo — el canónico. null = se queda el subdominio de Órbita. */
+  primaryDomain: string | null
+}
+
+export type StorefrontSitemap = StorefrontSeo & {
+  categories: { slug: string; updatedAt: string }[]
+  products: { id: string; updatedAt: string }[]
+}
+
+export function getStorefrontSeo(slug: string) {
+  return storefrontRequest<StorefrontSeo>(`/${slug}/seo`)
+}
+
+export function getStorefrontSitemap(slug: string) {
+  return storefrontRequest<StorefrontSitemap>(`/${slug}/sitemap`)
+}
+
+/** Slug de la tienda que tiene este dominio propio, o null. Lo usa el robots/sitemap por host. */
+export async function getSlugDeDominio(dominio: string): Promise<string | null> {
+  const r = await storefrontRequest<{ slug: string | null }>(`/by-domain/${encodeURIComponent(dominio)}`)
+  return r.slug ?? null
+}
+
 // ─── Productos ──────────────────────────────────────────────────────────────
 
 export type StorefrontProductItem = {
