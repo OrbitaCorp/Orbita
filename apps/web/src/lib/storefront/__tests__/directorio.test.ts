@@ -36,7 +36,7 @@ describe('inicialDe', () => {
 
 describe('jsonLdDirectorio', () => {
   const dir: DirectorioDeTiendas = {
-    total: 60, page: 2, perPage: 48, lastChange: null,
+    total: 60, page: 2, perPage: 48,
     stores: [{ name: 'Venus Style', subdomain: 'venustyle', domain: null, description: null, logoUrl: null }],
   }
   it('lista las tiendas con su posición dentro del total, no de la página', () => {

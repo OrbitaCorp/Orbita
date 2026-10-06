@@ -11,7 +11,7 @@
 //     robots.txt.ts.
 import type { GetServerSideProps } from 'next'
 import { SEO_CANONICAL_HOST, ROOT_DOMAIN } from '@/lib/tenant'
-import { getStorefrontSitemap, getDirectorioTiendas } from '@/lib/storefront/api'
+import { getStorefrontSitemap } from '@/lib/storefront/api'
 import { esHostPrincipal, tiendaDeHost } from '@/lib/storefront/hostTienda'
 import { origenDeTienda, sitemapDeTienda } from '@/lib/storefront/seo'
 
@@ -43,13 +43,8 @@ export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
         return { props: {} }
     }
 
-    // /tiendas cambia cuando se suma una tienda: su fecha es la de la última
-    // que se sumó. Una fecha que cambia siempre ("ahora") no sirve: Google la
-    // deja de tomar en serio. Sin la API, va sin fecha.
-    const ultimaTienda = await getDirectorioTiendas(1).then((d) => d.lastChange).catch(() => null)
     const urlEntries = STATIC_PATHS.map(
-        (path) =>
-            `  <url>\n    <loc>https://${SEO_CANONICAL_HOST}${path}</loc>${path === '/tiendas' && ultimaTienda ? `\n    <lastmod>${ultimaTienda}</lastmod>` : ''}\n  </url>`,
+        (path) => `  <url>\n    <loc>https://${SEO_CANONICAL_HOST}${path}</loc>\n  </url>`,
     ).join('\n')
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>`

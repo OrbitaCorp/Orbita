@@ -22,7 +22,7 @@ import { serializarJsonLd } from '@/lib/storefront/seo';
 
 type Props = { directorio: DirectorioDeTiendas; error: boolean };
 
-const VACIO: DirectorioDeTiendas = { total: 0, page: 1, perPage: 48, lastChange: null, stores: [] };
+const VACIO: DirectorioDeTiendas = { total: 0, page: 1, perPage: 48, stores: [] };
 
 export const getServerSideProps: GetServerSideProps<Props> = async ({ query, res }) => {
     const pedida = Math.min(Math.max(parseInt(String(query.pagina ?? '1'), 10) || 1, 1), 1000);

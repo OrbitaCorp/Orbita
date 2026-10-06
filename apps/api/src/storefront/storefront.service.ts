@@ -67,6 +67,10 @@ const MAX_URLS_SITEMAP = 10_000;
 // Cuántas tiendas lista cada página del directorio público (orbita.site/tiendas).
 const TIENDAS_POR_PAGINA = 48;
 
+// Lo que pide el directorio para mostrar una tienda (ver getDirectory).
+const DIRECTORIO_MIN_PRODUCTOS = 3;
+const DIRECTORIO_ESPERA_HORAS = 48;
+
 // El precio que se muestra en la card/listado tiene que ser SIEMPRE el que
 // realmente se cobra al agregar al carrito — nunca `Product.basePrice` como
 // un número aparte que puede desincronizarse del precio real de la variante
@@ -1247,55 +1251,73 @@ export class StorefrontService {
   }
 
   /**
-   * El directorio público de tiendas (orbita.site/tiendas): las que corresponde
-   * mostrar en Google, con el dominio al que hay que mandar al visitante.
+   * El directorio público de tiendas (orbita.site/tiendas): las tiendas que
+   * Órbita muestra como suyas, con el dominio al que hay que mandar al visitante.
    *
    * Es la forma de que una tienda nueva llegue sola a Google: el sitemap y el
    * robots.txt de cada tienda solo los lee Google DESPUÉS de haber llegado al
-   * sitio, y llegar requiere un link desde algún lado. Esta lista es ese link:
-   * se arma sola con el mismo criterio que `indexable` (publicada, en línea, no
-   * es la demo y con al menos un producto a la venta), así que una tienda
-   * aparece cuando empieza a vender y deja de aparecer si se pausa.
+   * sitio, y llegar requiere un link desde algún lado. Esta lista es ese link, y
+   * se arma sola: una tienda aparece cuando cumple los requisitos y deja de
+   * aparecer si se pausa o se suspende.
    *
-   * `domain` es el dominio propio ACTIVO, si lo tiene; si no, queda en null y
-   * el frontend arma el subdominio de Órbita. `lastChange` es cuándo se sumó la
-   * última tienda: la fecha que se declara en el sitemap, que solo cambia cuando
-   * de verdad hay algo nuevo para rastrear.
+   * Es más exigente que `indexable` a propósito. Cada tienda de acá queda
+   * enlazada desde orbita.site, y un directorio automático es lo primero que
+   * usaría quien quiera abusar de la plataforma (tiendas falsas, marcas ajenas,
+   * enlaces de SEO): por eso se pide una tienda con cara de tienda y se deja
+   * pasar un tiempo antes de mostrarla.
+   *   · publicada, en línea y no demo (igual que `indexable`);
+   *   · al menos DIRECTORIO_MIN_PRODUCTOS productos a la venta, cada uno con foto
+   *     y precio mayor a cero;
+   *   · y que esos productos tengan más de DIRECTORIO_ESPERA_HORAS horas: da
+   *     tiempo a que alguien del equipo vea una alta sospechosa antes de que
+   *     aparezca enlazada.
+   * Para Google la tienda sigue apareciendo por su cuenta (sitemap y robots).
+   *
+   * `domain` es el dominio propio ACTIVO, si lo tiene; si no, queda en null y el
+   * frontend arma el subdominio de Órbita.
+   *
+   * Las tiendas se buscan en dos pasos (primero cuáles cumplen, después sus
+   * datos): "tener 3 productos así" no se puede decir en un filtro simple. Con
+   * miles de tiendas habría que pasarlo a una consulta propia.
    */
-  async getDirectory(pagina = 1, porPagina = TIENDAS_POR_PAGINA) {
-    const where = {
-      isActive: true,
-      isPaused: false,
-      isDemo: false,
-      deletedAt: null,
-      products: { some: { deletedAt: null, status: { in: ['PUBLISHED' as const, 'OUT_OF_STOCK' as const] } } },
-    };
-    const [total, ultima, filas] = await Promise.all([
-      this.prisma.business.count({ where }),
-      this.prisma.business.aggregate({ where, _max: { createdAt: true } }),
-      this.prisma.business.findMany({
-        where,
-        orderBy: [{ name: 'asc' }, { id: 'asc' }], // orden estable: la misma tienda no salta de página
-        skip: (pagina - 1) * porPagina,
-        take: porPagina,
-        select: {
-          name: true,
-          subdomain: true,
-          storefrontConfig: { select: { storeName: true, tagline: true, logoUrl: true } },
-          customDomains: {
-            where: { status: 'ACTIVE', dnsVerified: true },
-            select: { domain: true },
-            orderBy: { createdAt: 'asc' },
-            take: 1,
-          },
+  async getDirectory(pagina = 1, porPagina = TIENDAS_POR_PAGINA, ahora = new Date()) {
+    const antesDe = new Date(ahora.getTime() - DIRECTORIO_ESPERA_HORAS * 3_600_000);
+    const grupos = await this.prisma.product.groupBy({
+      by: ['businessId'],
+      where: {
+        deletedAt: null,
+        status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
+        basePrice: { gt: 0 },
+        images: { some: {} },
+        createdAt: { lte: antesDe },
+        business: { isActive: true, isPaused: false, isDemo: false, deletedAt: null },
+      },
+      having: { id: { _count: { gte: DIRECTORIO_MIN_PRODUCTOS } } },
+    });
+    const ids = grupos.map((g) => g.businessId);
+    if (ids.length === 0) return { total: 0, page: pagina, perPage: porPagina, stores: [] };
+
+    const filas = await this.prisma.business.findMany({
+      where: { id: { in: ids } },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }], // orden estable: la misma tienda no salta de página
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+      select: {
+        name: true,
+        subdomain: true,
+        storefrontConfig: { select: { storeName: true, tagline: true, logoUrl: true } },
+        customDomains: {
+          where: { status: 'ACTIVE', dnsVerified: true },
+          select: { domain: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
         },
-      }),
-    ]);
+      },
+    });
     return {
-      total,
+      total: ids.length,
       page: pagina,
       perPage: porPagina,
-      lastChange: ultima._max.createdAt?.toISOString() ?? null,
       stores: filas.map((b) => ({
         name: b.storefrontConfig?.storeName?.trim() || b.name,
         subdomain: b.subdomain,

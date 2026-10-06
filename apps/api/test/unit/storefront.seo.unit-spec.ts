@@ -117,27 +117,45 @@ describe('getDirectory: el directorio público de tiendas', () => {
     storefrontConfig: { storeName: null, tagline: 'Ropa deportiva', logoUrl: 'https://x/logo.webp' },
     customDomains: [], ...over,
   });
+  const AHORA = new Date('2026-10-06T12:00:00Z');
 
-  function directorio(filas: unknown[], total = filas.length, ultima: Date | null = new Date('2026-10-02T12:00:00Z')) {
+  /** `ids` son las tiendas que cumplen las guardas (lo que devuelve el groupBy). */
+  function directorio(filas: unknown[], ids: string[] = filas.map((_, i) => `b-${i}`)) {
     const prisma = {
-      business: {
-        count: jest.fn().mockResolvedValue(total),
-        aggregate: jest.fn().mockResolvedValue({ _max: { createdAt: ultima } }),
-        findMany: jest.fn().mockResolvedValue(filas),
-      },
+      product: { groupBy: jest.fn().mockResolvedValue(ids.map((businessId) => ({ businessId }))) },
+      business: { findMany: jest.fn().mockResolvedValue(filas) },
     };
     return { svc: new StorefrontService(prisma as any, {} as any, {} as any), prisma };
   }
 
-  it('lista solo tiendas publicadas, en línea, no demo y con productos a la venta (el mismo criterio que indexable)', async () => {
+  it('pide tiendas en línea y no demo con al menos 3 productos a la venta, con foto y precio, de más de 48 horas', async () => {
     const { svc, prisma } = directorio([fila()]);
-    await svc.getDirectory();
-    const donde = prisma.business.findMany.mock.calls[0][0].where;
-    expect(donde).toMatchObject({ isActive: true, isPaused: false, isDemo: false, deletedAt: null });
-    expect(donde.products).toEqual({ some: { deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } });
-    // La cuenta y la fecha usan exactamente el mismo filtro que la lista.
-    expect(prisma.business.count).toHaveBeenCalledWith({ where: donde });
-    expect(prisma.business.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: donde }));
+    await svc.getDirectory(1, 48, AHORA);
+    const arg = prisma.product.groupBy.mock.calls[0][0];
+    expect(arg.by).toEqual(['businessId']);
+    expect(arg.where).toMatchObject({
+      deletedAt: null,
+      status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
+      basePrice: { gt: 0 },
+      images: { some: {} },
+      business: { isActive: true, isPaused: false, isDemo: false, deletedAt: null },
+    });
+    // 48 horas antes de "ahora": un producto recién cargado todavía no cuenta.
+    expect(arg.where.createdAt).toEqual({ lte: new Date('2026-10-04T12:00:00Z') });
+    expect(arg.having).toEqual({ id: { _count: { gte: 3 } } });
+  });
+
+  it('muestra solo las tiendas que cumplen (y busca sus datos por id)', async () => {
+    const { svc, prisma } = directorio([fila()], ['b-1', 'b-7']);
+    const d = await svc.getDirectory(1, 48, AHORA);
+    expect(prisma.business.findMany.mock.calls[0][0].where).toEqual({ id: { in: ['b-1', 'b-7'] } });
+    expect(d.total).toBe(2);
+  });
+
+  it('si ninguna cumple, devuelve vacío sin buscar nada más', async () => {
+    const { svc, prisma } = directorio([], []);
+    expect(await svc.getDirectory(1, 48, AHORA)).toEqual({ total: 0, page: 1, perPage: 48, stores: [] });
+    expect(prisma.business.findMany).not.toHaveBeenCalled();
   });
 
   it('arma cada tienda con su nombre, su descripción y su dominio propio activo', async () => {
@@ -145,7 +163,7 @@ describe('getDirectory: el directorio público de tiendas', () => {
       fila(),
       fila({ name: 'TeFaltaCalle', subdomain: 'tefaltacalle', customDomains: [{ domain: 'tefaltacalleok.com' }], storefrontConfig: { storeName: 'Te Falta Calle', tagline: '  ', logoUrl: null } }),
     ]);
-    const d = await svc.getDirectory();
+    const d = await svc.getDirectory(1, 48, AHORA);
     expect(d.stores).toEqual([
       { name: 'Venus Style', subdomain: 'venustyle', domain: null, description: 'Ropa deportiva', logoUrl: 'https://x/logo.webp' },
       { name: 'Te Falta Calle', subdomain: 'tefaltacalle', domain: 'tefaltacalleok.com', description: null, logoUrl: null },
@@ -154,22 +172,17 @@ describe('getDirectory: el directorio público de tiendas', () => {
 
   it('solo cuenta un dominio propio ACTIVO y con el DNS verificado', async () => {
     const { svc, prisma } = directorio([fila()]);
-    await svc.getDirectory();
+    await svc.getDirectory(1, 48, AHORA);
     const sel = prisma.business.findMany.mock.calls[0][0].select;
     expect(sel.customDomains.where).toEqual({ status: 'ACTIVE', dnsVerified: true });
     expect(sel.customDomains.take).toBe(1);
   });
 
   it('pagina con orden estable', async () => {
-    const { svc, prisma } = directorio([fila()], 100);
-    const d = await svc.getDirectory(3, 48);
-    const args = prisma.business.findMany.mock.calls[0][0];
-    expect(args).toMatchObject({ skip: 96, take: 48, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    const ids = Array.from({ length: 100 }, (_, i) => `b-${i}`);
+    const { svc, prisma } = directorio([fila()], ids);
+    const d = await svc.getDirectory(3, 48, AHORA);
+    expect(prisma.business.findMany.mock.calls[0][0]).toMatchObject({ skip: 96, take: 48, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
     expect(d).toMatchObject({ total: 100, page: 3, perPage: 48 });
-  });
-
-  it('lastChange es la fecha de la última tienda sumada (null si no hay ninguna)', async () => {
-    expect((await directorio([fila()]).svc.getDirectory()).lastChange).toBe('2026-10-02T12:00:00.000Z');
-    expect((await directorio([], 0, null).svc.getDirectory()).lastChange).toBeNull();
   });
 });

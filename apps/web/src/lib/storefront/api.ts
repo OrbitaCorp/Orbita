@@ -281,8 +281,6 @@ export type DirectorioDeTiendas = {
   total: number
   page: number
   perPage: number
-  /** Cuándo se sumó la última tienda (para el sitemap), o null si no hay ninguna. */
-  lastChange: string | null
   stores: TiendaDelDirectorio[]
 }
 
