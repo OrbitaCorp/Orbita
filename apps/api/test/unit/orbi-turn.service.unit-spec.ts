@@ -49,6 +49,17 @@ describe('OrbiTurnService', () => {
     });
   });
 
+  it('la marca de fuera de alcance se guarda, y si no vino queda en false', async () => {
+    const prisma = { orbiTurn: { create: jest.fn().mockResolvedValue({ id: 't-1' }) } };
+    const svc = new OrbiTurnService(prisma as any);
+
+    await svc.registrar({ ...turno, outOfScope: true });
+    await svc.registrar(turno);
+
+    expect(prisma.orbiTurn.create.mock.calls[0][0].data.outOfScope).toBe(true);
+    expect(prisma.orbiTurn.create.mock.calls[1][0].data.outOfScope).toBe(false);
+  });
+
   it('si la base falla no lanza, y el log no trae el mensaje del error', async () => {
     const prisma = { orbiTurn: { create: jest.fn().mockRejectedValue(new Error('connect failed postgres://usuario:clave@host/db')) } };
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

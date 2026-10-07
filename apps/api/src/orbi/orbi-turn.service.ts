@@ -46,6 +46,8 @@ export interface TurnoDeOrbi {
   section?: string;
   contextChars?: CaracteresDelContexto;
   steps?: PasoDelTurno[];
+  /** Contestó con la frase fija de fuera de alcance (prompts/alcance.ts). */
+  outOfScope?: boolean;
 }
 
 /**
@@ -98,6 +100,7 @@ export class OrbiTurnService {
           section: t.section ?? null,
           contextChars: t.contextChars ? (t.contextChars as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
           steps: t.steps ? (t.steps as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+          outOfScope: t.outOfScope ?? false,
         },
       });
     } catch (e) {

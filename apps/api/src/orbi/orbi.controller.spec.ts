@@ -1315,8 +1315,28 @@ describe('OrbiController', () => {
         contextChars: { system: 'Sos Orbi, el asistente de IA.'.length, tools: 0, history: 0, message: 'PREGUNTA-PRIVADA'.length },
         // 10 de entrada y 5 de salida de gemini-3.6-flash: (10 × 0,75 + 5 × 3,75) / 1M = USD 0,00002625 → 1 crédito.
         costUsd: 0.000026, toolsCostUsd: 0, credits: 1,
+        outOfScope: false,
       });
       expect(JSON.stringify(t)).not.toContain('PRIVADA');
+    });
+
+    it('una respuesta con la frase fija de fuera de alcance marca el turno, sin guardar el texto', async () => {
+      mockLlm.streamChat = async function* () {
+        yield { type: 'text' as const, chunk: 'Eso queda fuera de lo que puedo hacer: ' };
+        yield { type: 'text' as const, chunk: 'estoy para ayudarte con tu negocio y con Órbita. RESPUESTA-PRIVADA' };
+        yield { type: 'done' as const };
+      } as any;
+
+      await controller.chat(
+        { message: '¿Cómo hago una pizza?', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard' } } as any,
+        createMockResponse() as any,
+        duenio as any,
+      );
+
+      const t = turnos.registrar.mock.calls[0][0];
+      expect(t.outOfScope).toBe(true);
+      expect(JSON.stringify(t)).not.toContain('PRIVADA');
+      expect(JSON.stringify(t)).not.toContain('pizza');
     });
 
     it('guarda el módulo resuelto desde la pantalla, no el "ventas" que manda siempre el front', async () => {

@@ -3169,6 +3169,8 @@ model OrbiTurn {
   writesRejected   Int      @default(0) @map("writes_rejected")
   actionsConfirmed Int      @default(0) @map("actions_confirmed")
   actionsRejected  Int      @default(0) @map("actions_rejected")
+  // Contestó con la frase fija de fuera de alcance (prompts/alcance.ts).
+  outOfScope       Boolean  @default(false) @map("out_of_scope")
   createdAt        DateTime @default(now()) @map("created_at")
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

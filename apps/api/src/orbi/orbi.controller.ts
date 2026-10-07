@@ -31,6 +31,7 @@ import { costoDeConsumoUsd, redondearUsd } from '../platform/costs/precios';
 import { costoDelTurno } from './turno/costo-del-turno';
 import { caracteresDelContexto, proveedorDelTurno, totalesDelConsumo, type CaracteresDelContexto } from './turno/ficha-del-turno';
 import { clasificarError } from './salud/clasificar-error';
+import { esFueraDeAlcance } from './prompts/alcance';
 import { DemoIa } from '../demo/demo-ia';
 import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
 
@@ -510,6 +511,8 @@ export class OrbiController {
           rounds: progreso.llamadasAlModelo,
           toolsUsed: progreso.toolsPedidas,
           actionsProposed: progreso.propuestas,
+          // Sale del texto que vio la persona: la frase fija de prompts/alcance.ts.
+          outOfScope: esFueraDeAlcance(progreso.texto),
           status: estado,
         });
       }

@@ -40,6 +40,8 @@ export interface ResumenDeUso {
     accionesConfirmadas: number;
     accionesRechazadas: number;
     escriturasRechazadas: number;
+    /** Mensajes que Orbi contestó con la frase fija de fuera de alcance (orbi_turns.out_of_scope). */
+    fueraDeAlcance: number;
   };
   serie: { dia: string; mensajes: number; costoUsd: number | null }[];
   acciones: { tools: string; mensajes: number; costoPromedioUsd: number | null; costoTotalUsd: number | null; entradaPromedio: number; latenciaPromedio: number }[];
@@ -104,7 +106,7 @@ type FilaKpis = ResumenDeUso['kpis'];
 const KPIS_VACIOS: FilaKpis = {
   mensajes: 0, costoUsd: null, creditos: null, mensajesSinCosto: 0, promptTokens: 0, cachedTokens: 0, completionTokens: 0, thinkingTokens: 0,
   latenciaP50: null, latenciaP95: null, ttftP50: null, errores: 0, frenadosPorCupoMensual: 0, frenadosPorTopeDiario: 0, conGroq: 0,
-  accionesPropuestas: 0, accionesConfirmadas: 0, accionesRechazadas: 0, escriturasRechazadas: 0,
+  accionesPropuestas: 0, accionesConfirmadas: 0, accionesRechazadas: 0, escriturasRechazadas: 0, fueraDeAlcance: 0,
 };
 
 // Los percentiles y promedios de Postgres vuelven null sin filas (o como
@@ -152,7 +154,8 @@ export class OrbiUsoService {
                count(*) FILTER (WHERE status = 'quota' AND error_category IS DISTINCT FROM 'cupo_mensual')::int AS "frenadosPorTopeDiario",
                count(*) FILTER (WHERE provider IN ('groq','mixto'))::int AS "conGroq",
                coalesce(sum(actions_proposed),0)::int AS "accionesPropuestas", coalesce(sum(actions_confirmed),0)::int AS "accionesConfirmadas",
-               coalesce(sum(actions_rejected),0)::int AS "accionesRechazadas", coalesce(sum(writes_rejected),0)::int AS "escriturasRechazadas"
+               coalesce(sum(actions_rejected),0)::int AS "accionesRechazadas", coalesce(sum(writes_rejected),0)::int AS "escriturasRechazadas",
+               count(*) FILTER (WHERE out_of_scope)::int AS "fueraDeAlcance"
         FROM orbi_turns WHERE created_at >= ${desde} AND created_at < ${hasta}`,
       // created_at es TIMESTAMP sin zona y guarda UTC: un solo AT TIME ZONE lo
       // tomaría como hora argentina y lo correría +3 h en vez de -3 h. Primero se

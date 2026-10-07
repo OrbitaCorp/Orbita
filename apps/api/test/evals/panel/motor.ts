@@ -18,6 +18,7 @@ import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from '../../
 import { OrbiSurface } from '../../../src/orbi/dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../../../src/orbi/prompts/core';
 import { getPanelPrompt } from '../../../src/orbi/prompts/panel';
+import { capaDeAlcance } from '../../../src/orbi/prompts/alcance';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
@@ -102,6 +103,16 @@ Cómo usarlo:
 
 const TOOLS_DE_LA_FASE_6 = ['leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo'];
 
+/**
+ * Saca la capa de alcance (prompts/alcance.ts). Si no está, tira: igual que
+ * con el manual, una variante que no cambia nada mediría lo mismo que 'actual'.
+ */
+export function sacarCapaDeAlcance(systemPrompt: string): string {
+  const capa = `${capaDeAlcance()}${SEPARADOR_DE_CAPAS}`;
+  if (!systemPrompt.includes(capa)) throw new Error('El prompt no tiene la capa de alcance: la variante no aplica');
+  return systemPrompt.replace(capa, '');
+}
+
 export const VARIANTES: Record<string, Variante> = {
   actual: { descripcion: 'El prompt y las tools de producción, tal cual', ajustar: (p) => p },
   'manual-entero': {
@@ -117,6 +128,10 @@ export const VARIANTES: Record<string, Variante> = {
       systemPrompt: reemplazarCapaDelManual(systemPrompt, null),
       tools: tools.filter((t) => !TOOLS_DE_LA_FASE_6.includes(t.name)),
     }),
+  },
+  'sin-alcance': {
+    descripcion: 'Sin la capa de alcance (el prompt de antes del 2026-10-04): aísla su efecto en la misma rama',
+    ajustar: ({ systemPrompt, tools }) => ({ systemPrompt: sacarCapaDeAlcance(systemPrompt), tools }),
   },
 };
 
@@ -154,7 +169,9 @@ export type Resultado = {
  * Las instrucciones que NO se pueden filtrar en ESTE caso: el CORE_PROMPT
  * (sin la presentación, que Orbi dice de sí mismo con todo derecho) y la capa
  * de la pantalla del caso, sin datos de ningún negocio. El índice del manual
- * no cuenta: citarlo no es filtrar nada.
+ * no cuenta: citarlo no es filtrar nada. La capa de alcance tampoco: decir de
+ * qué habla Orbi no es filtrar nada, y la frase fija de fuera de alcance
+ * (17 palabras) se dice tal cual a propósito.
  */
 export function instruccionesDelCaso(caso: Pick<CasoPanel, 'pantalla'>): string {
   const sinPresentacion = CORE_PROMPT.split('\n\n').slice(1).join('\n\n');

@@ -113,6 +113,11 @@ function Resumen({ data, onNegocio, cargando }: {
           hint={`${tokens(k.accionesConfirmadas)} confirmadas · ${tokens(k.accionesRechazadas)} rechazadas`}
         />
         <Kpi label="Escrituras rechazadas" value={tokens(k.escriturasRechazadas)} hint="El modelo las pidió y no se pudieron proponer (permiso, demo, datos)" />
+        <Kpi
+          label="Preguntas fuera de alcance"
+          value={tokens(k.fueraDeAlcance ?? 0)}
+          hint={`${pct(porcentajeDe(k.fueraDeAlcance ?? 0, k.mensajes))} de los mensajes · nada que ver con el negocio ni con Órbita`}
+        />
       </Grid>
 
       <Row2>
