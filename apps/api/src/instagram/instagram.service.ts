@@ -304,8 +304,12 @@ export class InstagramService {
       throw new BadRequestException('signed_request inválido');
     }
     if (!userId) return;
-    await this.prisma.instagramConnection.updateMany({
-      where: { igUserId: userId },
+    // Primero se resuelve a qué negocio pertenece la cuenta (igUserId es único) y
+    // recién ahí se corta, filtrando por ese negocio como el resto de las consultas.
+    const c = await this.prisma.instagramConnection.findUnique({ where: { igUserId: userId }, select: { businessId: true } });
+    if (!c) return;
+    await this.prisma.instagramConnection.update({
+      where: { businessId: c.businessId },
       data: { status: 'DISCONNECTED', accessToken: '' },
     });
   }

@@ -303,8 +303,9 @@ describe('InstagramService (unit)', () => {
     it('con firma válida corta la conexión y borra el token', async () => {
       const { svc, prisma } = build();
       await svc.desautorizar(signed({ user_id: IG_CUENTA }));
-      expect(prisma.instagramConnection.updateMany).toHaveBeenCalledWith({
-        where: { igUserId: IG_CUENTA },
+      expect(prisma.instagramConnection.findUnique).toHaveBeenCalledWith({ where: { igUserId: IG_CUENTA }, select: { businessId: true } });
+      expect(prisma.instagramConnection.update).toHaveBeenCalledWith({
+        where: { businessId: BIZ },
         data: { status: 'DISCONNECTED', accessToken: '' },
       });
     });
@@ -313,7 +314,7 @@ describe('InstagramService (unit)', () => {
       const { svc, prisma } = build();
       await expect(svc.desautorizar(signed({ user_id: IG_CUENTA }, 'otro'))).rejects.toBeInstanceOf(ForbiddenException);
       await expect(svc.desautorizar('basura')).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.instagramConnection.updateMany).not.toHaveBeenCalled();
+      expect(prisma.instagramConnection.update).not.toHaveBeenCalled();
     });
   });
 
