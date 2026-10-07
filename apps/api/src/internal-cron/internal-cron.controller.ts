@@ -13,6 +13,7 @@ import { EmailVerificationService } from '../member-profile/email-verification.s
 import { CostsService } from '../platform/costs/costs.service';
 import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
 import { SearchConsoleService } from '../search-console/search-console.service';
+import { InstagramService } from '../instagram/instagram.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -80,6 +81,9 @@ export class InternalCronController {
     // Search Console: reintenta verificar dominios propios y envía los sitemaps de las tiendas.
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly searchConsole?: SearchConsoleService,
+    // Renovación del token de Instagram (dura 60 días). Opcional por la misma razón de
+    // compatibilidad con specs unitarios.
+    private readonly instagram?: InstagramService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -163,6 +167,14 @@ export class InternalCronController {
           await this.searchConsole?.mantenimientoNocturno();
         } catch (e) {
           this.logger.error(`Search Console: no se pudo correr — ${describeError(e)}`);
+        }
+        // Tokens de Instagram por vencer: se renuevan antes de los 60 días; si no, todas
+        // las conexiones se cortarían a la vez. Mismo criterio: si falla, se anota.
+        try {
+          const r = await this.instagram?.renovarTokens();
+          if (r && (r.renovadas || r.desconectadas || r.fallidas)) this.logger.log(`Tokens de Instagram: ${JSON.stringify(r)}`);
+        } catch (e) {
+          this.logger.error(`Tokens de Instagram: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

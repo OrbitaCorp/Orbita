@@ -112,7 +112,8 @@ async function bootstrap(): Promise<void> {
     json({
       limit: '10mb',
       verify: (req, _res, buf) => {
-        if ((req as { url?: string }).url?.includes('/webhooks/whatsapp')) {
+        const url = (req as { url?: string }).url;
+        if (url?.includes('/webhooks/whatsapp') || url?.includes('/webhooks/instagram')) {
           (req as { rawBody?: Buffer }).rawBody = buf;
         }
       },

@@ -3,9 +3,10 @@ import { ConversationsController } from './conversations.controller';
 import { MeConversationController } from './me-conversation.controller';
 import { ConversationsService } from './conversations.service';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { InstagramModule } from '../instagram/instagram.module';
 
 @Module({
-  imports: [WhatsappModule], // responder por WhatsApp desde la bandeja
+  imports: [WhatsappModule, InstagramModule], // responder por WhatsApp e Instagram desde la bandeja
   controllers: [ConversationsController, MeConversationController],
   providers: [ConversationsService],
 })

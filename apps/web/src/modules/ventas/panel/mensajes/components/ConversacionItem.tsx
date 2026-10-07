@@ -58,7 +58,7 @@ export function ConversacionItem({ cv, activa, onSelect, onArchivar }: Props) {
             {cv.cliente}
           </span>
           <span style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
-            {cv.canal === 'WHATSAPP' ? `WhatsApp · ${cv.tiempo}` : cv.tiempo}
+            {cv.canal === 'WHATSAPP' ? `WhatsApp · ${cv.tiempo}` : cv.canal === 'INSTAGRAM' ? `Instagram · ${cv.tiempo}` : cv.tiempo}
           </span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>

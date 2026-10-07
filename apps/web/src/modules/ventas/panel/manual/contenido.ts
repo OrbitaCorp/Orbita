@@ -506,7 +506,7 @@ export const CAPITULOS: Capitulo[] = [
             bloques: [
                 { tipo: 'parrafo', texto: 'Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.' },
                 { tipo: 'parrafo', texto: 'Cuando hay algo sin leer, aparece un punto rojo en **Mensajes** en el menú de la izquierda: no hace falta entrar a chequear.' },
-                { tipo: 'nota', variante: 'tip', texto: 'Si tu negocio tiene WhatsApp conectado, los mensajes que te lleguen por WhatsApp aparecen en esta misma bandeja, con la etiqueta WhatsApp, y los respondés desde acá. WhatsApp solo permite responder dentro de las 24 horas del último mensaje del cliente.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.' },
             ],
         },
         {

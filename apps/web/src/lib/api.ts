@@ -3270,7 +3270,7 @@ export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api
 // Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo
 // usan el cliente (storefront) y el panel (dueño/staff).
 // `channel`/`deliveryStatus` son de WhatsApp: los mensajes del chat de la tienda vienen como STOREFRONT y sin estado.
-export type ChatChannel = 'STOREFRONT' | 'WHATSAPP'
+export type ChatChannel = 'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
 export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; channel?: ChatChannel; deliveryStatus?: string | null; createdAt: string }
 
 // Storefront (cliente logueado)
@@ -3306,6 +3306,14 @@ export function connectWhatsapp(input: { phoneNumberId: string; wabaId: string; 
   return panelRequest<{ connected: true; displayPhone: string | null; suscripta: boolean }>('/whatsapp/connection', { method: 'POST', body: JSON.stringify(input) })
 }
 export function disconnectWhatsapp() { return panelRequest<{ connected: false }>('/whatsapp/connection', { method: 'DELETE' }) }
+
+// Instagram — conexión del negocio (solo propietario/admin). Conectar devuelve la
+// dirección del login de Instagram: el panel redirige al dueño ahí y Instagram lo
+// devuelve a la API, que lo manda de vuelta a Mensajes con ?ig=conectado.
+export type InstagramEstado = { connected: false } | { connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string }
+export function getInstagramConnection() { return panelRequest<InstagramEstado>('/instagram/connection') }
+export function startInstagramConnect() { return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST' }) }
+export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)
 export type MessageTemplateRow = { id: string; name: string; text: string; category: string; createdAt: string; updatedAt: string }

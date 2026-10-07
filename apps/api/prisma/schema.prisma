@@ -100,6 +100,7 @@ model Business {
   payments             Payment[]
   mpCredentials        MpCredentials?
   whatsappConnection   WhatsappConnection?
+  instagramConnection  InstagramConnection?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -626,6 +627,7 @@ model Customer {
   birthDate           DateTime? @map("birth_date")
   avatarUrl           String?   @map("avatar_url")
   whatsappId          String?   @map("whatsapp_id") // wa_id de Meta (dígitos, con código de país): identifica al cliente en el canal WhatsApp
+  instagramId         String?   @map("instagram_id") // IGSID: id de la persona en Instagram, propio de cada cuenta de negocio (no es un teléfono)
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -647,6 +649,7 @@ model Customer {
   @@unique([businessId, email])
   @@unique([businessId, googleId])
   @@unique([businessId, whatsappId])
+  @@unique([businessId, instagramId])
   @@index([businessId])
   @@index([phone])
   @@map("customers")
@@ -1611,6 +1614,33 @@ enum MessageSender {
 enum MessageChannel {
   STOREFRONT
   WHATSAPP
+  INSTAGRAM
+}
+
+// Conexión de un negocio con Instagram (Business Login: el dueño inicia sesión
+// con su cuenta profesional de Instagram, sin Página de Facebook). Una por
+// negocio. `accessToken` es el token de larga duración (60 días) y va CIFRADO
+// con pgp_sym_encrypt, igual que WhatsappConnection: renovarlo antes de
+// `tokenExpiresAt` es lo que lo mantiene vivo (ver InstagramService.renovarTokens).
+model InstagramConnection {
+  id             String                    @id @default(uuid())
+  businessId     String                    @unique @map("business_id")
+  igUserId       String                    @unique @map("ig_user_id") // id de la cuenta profesional: con esto el webhook único resuelve el negocio
+  username       String?                   @map("username") // @usuario, solo para mostrar en el panel
+  accessToken    String                    @map("access_token") // CIFRADO (pgp_sym_encrypt)
+  tokenExpiresAt DateTime                  @map("token_expires_at")
+  status         InstagramConnectionStatus @default(ACTIVE)
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_connections")
+}
+
+enum InstagramConnectionStatus {
+  ACTIVE
+  DISCONNECTED
 }
 
 // Conexión de un negocio con WhatsApp Business (Cloud API de Meta). Una por

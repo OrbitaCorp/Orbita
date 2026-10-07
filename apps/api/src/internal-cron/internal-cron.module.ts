@@ -10,9 +10,10 @@ import { DomainsModule } from '../domains/domains.module';
 import { MemberProfileModule } from '../member-profile/member-profile.module';
 import { CostsModule } from '../platform/costs/costs.module';
 import { SearchConsoleModule } from '../search-console/search-console.module';
+import { InstagramModule } from '../instagram/instagram.module';
 
 @Module({
-  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule, CostsModule, SearchConsoleModule],
+  imports: [SubscriptionsModule, NotificationsModule, WizardAnalyticsModule, DomainsModule, MemberProfileModule, CostsModule, SearchConsoleModule, InstagramModule],
   controllers: [InternalCronController],
   providers: [InternalCronSecretGuard, CronRunsService, RetencionLogsService],
 })
