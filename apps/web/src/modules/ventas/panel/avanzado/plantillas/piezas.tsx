@@ -567,7 +567,7 @@ export function Carrusel({ t, slides, movil, alto }: { t: Tema; slides: Slide[];
         {s.kicker && (
           <div style={{ fontSize: movil ? 11 : 14, letterSpacing: '0.3em', textTransform: 'uppercase', color: movil ? 'rgba(255,255,255,0.9)' : t.text, fontWeight: 700, marginBottom: 8 }}>{s.kicker}</div>
         )}
-        <div style={{ fontFamily: t.fh, fontSize: movil ? 62 : 132, lineHeight: 0.88, fontWeight: 800, color: movil ? '#fff' : t.text, letterSpacing: '-0.045em', whiteSpace: 'pre-line' }}>{s.titulo}</div>
+        <h1 style={{ fontFamily: t.fh, fontSize: movil ? 62 : 132, lineHeight: 0.88, fontWeight: 800, color: movil ? '#fff' : t.text, letterSpacing: '-0.045em', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
         <div style={{ fontFamily: t.fh, fontSize: movil ? 20 : 40, fontWeight: 600, color: movil ? 'rgba(255,255,255,0.95)' : t.text, letterSpacing: '-0.02em', marginTop: 6 }}>{s.bajada}</div>
         <div style={{ marginTop: movil ? 18 : 28 }}>
           <span style={{ fontSize: movil ? 13 : 15, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: movil ? '#fff' : t.text, borderBottom: `2px solid ${movil ? '#fff' : t.text}`, paddingBottom: 4 }}>{s.cta}</span>

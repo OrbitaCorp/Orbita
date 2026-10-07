@@ -483,6 +483,22 @@ describe('la vitrina del panel', () => {
   }
 })
 
+// ─── Un solo título principal (h1) ───────────────────────────────────────────
+// El título del hero es lo primero que lee Google de la portada. Tiene que ser un
+// `h1` (y uno solo): en 6 plantillas era un `div`/`span` y la portada salía sin
+// encabezado principal.
+
+describe('el título del hero es el h1 de la portada', () => {
+  for (const p of PLANTILLAS) {
+    it(p.id, () => {
+      sinProblemas(`h1 > ${p.id}`, [false, true].flatMap(movil => {
+        const n = (dibujar({ p, movil }).match(/<h1[\s>]/g) ?? []).length
+        return n === 1 ? [] : [`[${movil ? 'celular' : 'escritorio'}] tiene ${n} h1 y tiene que tener exactamente 1`]
+      }))
+    })
+  }
+})
+
 // ─── Aplicada en una tienda ──────────────────────────────────────────────────
 
 describe('aplicada en una tienda de verdad', () => {

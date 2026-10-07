@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useEffect, useMemo, useRef, useState } from 'react'
 import { esPreview } from '@/lib/storefront/previewBridge'
 import { useDeslizar } from '@/hooks/useDeslizar'
 // Sin `IMG`: ya no queda ninguna foto del repo clavada en un bloque. Las que
@@ -1291,7 +1291,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
                 <Foto src={s.img} alto={movil ? 330 : 540} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(9,9,11,0.72), transparent 58%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? 24 : 40 }}>
                   {s.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 12 }}>{s.kicker}</div>}
-                  <div style={{ fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', marginBottom: s.bajada ? 10 : 20 }}>{s.titulo}</div>
+                  {createElement(i === 0 ? 'h1' : 'h2', { style: { fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', margin: 0, marginBottom: s.bajada ? 10 : 20 } }, s.titulo)}
                   {/* La bajada se carga en el editor igual que en cualquier
                       hero: sin esto el campo no movía nada en esta plantilla. */}
                   {s.bajada && <div style={{ fontSize: movil ? 13.5 : 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.5, maxWidth: 420, marginBottom: 20 }}>{s.bajada}</div>}
@@ -2854,7 +2854,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? '0 20px 26px' : '0 44px 42px', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 12%, rgba(0,0,0,0.5) 52%, transparent 86%)' }}>
                 {s.kicker && <div style={{ fontSize: movil ? 10.5 : 12, letterSpacing: '0.26em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 10 }}>{s.kicker}</div>}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: movil ? 12 : 20, flexWrap: 'wrap' }}>
-                  <span style={{ fontFamily: t.fh, fontSize: movil ? 58 : 96, lineHeight: 0.86, fontWeight: 700, color: '#fff', letterSpacing: '-0.05em' }}>{s.titulo}</span>
+                  <h1 style={{ fontFamily: t.fh, fontSize: movil ? 58 : 96, lineHeight: 0.86, fontWeight: 700, color: '#fff', letterSpacing: '-0.05em', margin: 0 }}>{s.titulo}</h1>
                   <span style={{ fontSize: movil ? 15 : 21, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{s.bajada}</span>
                 </div>
                 <div style={{ marginTop: movil ? 18 : 24 }}>
@@ -3013,7 +3013,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
             <div>
               <div style={{ width: 34, height: 1, background: t.primary, margin: '0 auto 16px' }} />
               {s.kicker && <div style={{ fontSize: movil ? 10 : 11.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 64 : 104, lineHeight: 1, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', margin: '14px 0 6px' }}>{s.titulo}</div>
+              <h1 style={{ fontFamily: t.fh, fontSize: movil ? 64 : 104, lineHeight: 1, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', margin: '14px 0 6px' }}>{s.titulo}</h1>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 24, color: t.text }}>{s.bajada}</div>
               <div style={{ marginTop: movil ? 20 : 28 }}>
                 <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
@@ -3158,7 +3158,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: movil ? '0 16px 20px' : '0 44px 40px' }}>
             <div style={{ background: t.surf, borderRadius: t.radio, padding: movil ? '20px 22px' : '30px 34px', maxWidth: movil ? '100%' : 430, boxShadow: t.sombra }}>
               {s.kicker && <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
-              <div style={{ fontFamily: t.fh, fontSize: movil ? 46 : 64, lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', margin: '10px 0 4px' }}>{s.titulo}</div>
+              <h1 style={{ fontFamily: t.fh, fontSize: movil ? 46 : 64, lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', margin: '10px 0 4px' }}>{s.titulo}</h1>
               <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 22, color: t.muted, fontWeight: 500 }}>{s.bajada}</div>
               <div style={{ marginTop: 18 }}>
                 <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
@@ -3297,7 +3297,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
         <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
           <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {s.kicker && <div style={{ fontSize: 11, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>}
-            <div style={{ fontFamily: t.fh, fontSize: movil ? 56 : 88, lineHeight: 0.9, fontWeight: 800, letterSpacing: '-0.045em', margin: '14px 0 8px' }}>{s.titulo}</div>
+            <h1 style={{ fontFamily: t.fh, fontSize: movil ? 56 : 88, lineHeight: 0.9, fontWeight: 800, letterSpacing: '-0.045em', margin: '14px 0 8px' }}>{s.titulo}</h1>
             <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 26, color: t.muted, fontWeight: 600 }}>{s.bajada}</div>
             <div style={{ marginTop: 22, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Boton t={t} grande={!movil} onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}>{s.cta}</Boton>
