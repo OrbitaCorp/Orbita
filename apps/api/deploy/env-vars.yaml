@@ -109,3 +109,9 @@ WHATSAPP_NEGOCIOS_HABILITADOS: "negocio"
 # roles/iam.serviceAccountTokenCreator solo sobre ella). Ver DEPLOYMENT.md. Sin esta variable
 # (local, tests) todo el modulo queda apagado.
 SEARCH_CONSOLE_SERVICE_ACCOUNT: "search-console@orbita-api-corp.iam.gserviceaccount.com"
+# Instagram en la bandeja de Mensajes (instagram.service.ts). INSTAGRAM_APP_ID es el
+# identificador de la app de Instagram (no es secreto); INSTAGRAM_APP_SECRET,
+# INSTAGRAM_VERIFY_TOKEN e INSTAGRAM_TOKEN_KEY son secretos en Secret Manager (ver SECRETS
+# en deploy.sh). Solo se ve y se usa en los negocios listados (subdominios, coma).
+INSTAGRAM_APP_ID: "1821127815727257"
+INSTAGRAM_NEGOCIOS_HABILITADOS: "negocio"
