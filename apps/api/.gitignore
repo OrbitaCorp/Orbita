@@ -34,3 +34,9 @@ backups/
 # ya lo cubren `.env*` en el .gitignore de la raíz (git) y `.env.*` en el
 # .gcloudignore de esta carpeta (Cloud Build).
 src/background-removal/models/birefnet*.onnx
+
+# Evals del panel: el libro de gasto (cuánto se lleva gastado de la key de
+# evals, entre todas las corridas) y las corridas parciales que guarda el freno
+# del tope. Son de cada máquina; ver test/evals/panel/run.ts.
+test/evals/panel/gasto.json
+test/evals/panel/parcial-*.json

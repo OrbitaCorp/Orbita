@@ -2,11 +2,15 @@
  * Corre el golden set del panel contra Orbi de verdad (Gemini) y aplica las
  * reglas (spec 2026-10-01-orbi-fase-2).
  *
- *   pnpm test:evals:panel                              # todo
+ *   pnpm test:evals:panel -- --tope=4                  # la primera vez: fija el tope TOTAL en USD
+ *   pnpm test:evals:panel                              # todo (el tope sale del libro de gasto)
+ *   pnpm test:evals:panel -- --ensayo                  # qué correría y cuánto costaría, SIN llamar a nada
+ *   pnpm test:evals:panel -- --etiqueta=linea-base     # nombre de la corrida en el libro de gasto
+ *   pnpm test:evals:panel -- --gasto=otro.json         # otro libro de gasto (default: gasto.json, al lado de este archivo)
  *   pnpm test:evals:panel -- --caso=cupon              # ids que contengan "cupon"
  *   pnpm test:evals:panel -- --categoria=ataque        # una categoría (o varias: accion,permisos)
  *   pnpm test:evals:panel -- --repeticiones=3          # cada caso N veces, marca inestables
- *   pnpm test:evals:panel -- --salida=base.json        # guarda la corrida
+ *   pnpm test:evals:panel -- --salida=base.json        # guarda la corrida (con el reporte de gasto)
  *   pnpm test:evals:panel -- --comparar=base.json      # compara contra una corrida guardada
  *   pnpm test:evals:panel -- --variante=<nombre>       # otra configuración (ver VARIANTES en motor.ts)
  *   pnpm test:evals:panel -- --ahora=2026-09-18T18:00:00Z  # fija el "ahora" del dataset
@@ -24,26 +28,58 @@
  * vuelven al historial juntas (tools paralelas de Gemini 3). Lo que se juzga es
  * lo que se ve: el texto de la vuelta final más tarjetas y botones.
  *
- * OJO: llama a Gemini de verdad. Cuesta plata (del orden de USD 0,5 la tanda
- * completa con flash) y tarda. No corre en CI.
+ * OJO: llama a Gemini de verdad. Cuesta plata y tarda. No corre en CI.
+ *
+ * TOPE DE GASTO (presupuesto.ts): las evals corren con una key aparte, con
+ * plata contada. El libro de gasto (gasto.json, ignorado por git) suma lo que
+ * costaron TODAS las corridas. Antes de cada caso se estima lo que va a costar
+ * (el promedio de los casos ya corridos; el primero, USD 0,03): si con eso se
+ * pasa del tope, la corrida para sin llamar, guarda lo que tiene (en --salida
+ * o en parcial-<fecha>.json) y sale con código 2. Sin libro y sin --tope no
+ * corre. El costo es un techo (precio de lista, sin el descuento de la caché):
+ * lo que cobre Google debería ser menos, no más. No borres gasto.json para
+ * "resetear": lo gastado no vuelve; si hace falta margen, subí el tope a
+ * conciencia con --tope. Antes de una corrida grande, --ensayo.
  */
 
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { config as cargarDotenv } from 'dotenv';
 import { ConfigService } from '@nestjs/config';
 import { GeminiAdapter } from '../../../src/orbi/llm/gemini.adapter';
+import { DEFAULT_MODEL } from '../../../src/orbi/llm/gemini-client';
+import { tienePrecioPropio } from '../../../src/platform/costs/precios';
 import { crearNegocioDePrueba } from './negocio-de-prueba';
 import { CASOS_PANEL, CATEGORIAS_DE_CASOS, type CasoPanel } from './casos';
-import { VARIANTES, correrCaso, type Resultado } from './motor';
+import { VARIANTES, correrCaso, type Modelo, type Resultado } from './motor';
 import { correrRelojA } from './reloj';
+import {
+  correrConTope,
+  ensayar,
+  guardarLibro,
+  imprimirReporteDeGasto,
+  leerLibro,
+  reporteDeGasto,
+  resolverTope,
+  usd,
+  type Ensayo,
+  type Libro,
+  type ReporteDeGasto,
+} from './presupuesto';
 
-// dotenv NO pisa lo que ya está en el entorno: `ORBI_MODEL_PANEL=x pnpm …` manda.
-cargarDotenv({ path: resolve(__dirname, '../../../.env') });
+/** Dónde vive el libro de gasto si no viene --gasto. */
+export const LIBRO_POR_DEFECTO = join(__dirname, 'gasto.json');
 
-const config = new ConfigService();
-const llm = new GeminiAdapter(config);
-const modelo = process.env.ORBI_MODEL_PANEL ?? process.env.ORBI_MODEL ?? llm.modelo;
+/** El nombre del modelo sin construir el adapter (lo usa --ensayo). */
+function nombreDelModelo(): string {
+  return process.env.ORBI_MODEL_PANEL ?? process.env.ORBI_MODEL ?? DEFAULT_MODEL;
+}
+
+/** El modelo de verdad. Solo se construye cuando la corrida va en serio (nunca con --ensayo). */
+function modeloDeVerdad(): Required<Modelo> {
+  const llm = new GeminiAdapter(new ConfigService());
+  return { llm, nombre: process.env.ORBI_MODEL_PANEL ?? process.env.ORBI_MODEL ?? llm.modelo };
+}
 
 // ─── Reporte ─────────────────────────────────────────────────────────────────
 
@@ -77,7 +113,7 @@ function imprimir(resultados: Resultado[], casos: Map<string, CasoPanel>): void 
   }
 }
 
-function resumen(resultados: Resultado[], variante: string): void {
+function resumen(resultados: Resultado[], variante: string, modelo: string): void {
   const validos = resultados.filter((r) => !r.infra);
   const limpias = validos.filter((r) => r.ok).length;
 
@@ -121,6 +157,21 @@ function resumen(resultados: Resultado[], variante: string): void {
   console.log(`\n${color}${limpias}/${validos.length} corridas limpias${FIN}\n`);
 }
 
+function imprimirEnsayo(e: Ensayo, rutaLibro: string, libro: Libro | null, modelo: string): void {
+  console.log(`Ensayo (no se llama a nada): ${e.casos} caso(s) x ${e.repeticiones} = ${e.corridas} corrida(s) con ${modelo}.`);
+  console.log(`Costo estimado: entre ${usd(e.desdeUsd, 2)} y ${usd(e.hastaUsd, 2)} (techo: precio de lista, sin descuento de caché).`);
+  if (!libro) console.log(`Libro de gasto: no existe todavía (${rutaLibro}).`);
+  else console.log(`Libro de gasto: ${usd(libro.gastadoUsd)} gastados en ${libro.corridas.length} corrida(s) (${rutaLibro}).`);
+  if (e.topeUsd === null) {
+    console.log(`${ROJO}Sin tope: una corrida de verdad se negaría a arrancar. Pasá --tope=<USD>.${FIN}`);
+    return;
+  }
+  console.log(`Tope: ${usd(e.topeUsd, 2)}; quedan ${usd(e.disponibleUsd ?? 0)}.`);
+  if (e.entranConElTecho !== null && e.entranConElTecho < e.corridas) {
+    console.log(`${AMARILLO}Con el techo de la estimación entran ~${e.entranConElTecho} de ${e.corridas}: el freno cortaría antes de terminar.${FIN}`);
+  }
+}
+
 type CorridaGuardada = {
   fecha: string;
   /** El "ahora" del dataset de esa corrida (ver --ahora). */
@@ -129,7 +180,11 @@ type CorridaGuardada = {
   razonamiento: string;
   temperatura: string;
   variante: string;
+  /** La etiqueta de la corrida en el libro de gasto (desde 2026-10-07). */
+  etiqueta?: string;
   resultados: Resultado[];
+  /** Gasto, tokens y latencia de la corrida (desde 2026-10-07). */
+  gasto?: ReporteDeGasto;
 };
 
 /** Compara contra una corrida guardada: qué casos se arreglaron, cuáles se rompieron, y por regla. */
@@ -170,8 +225,13 @@ function comparar(actual: Resultado[], archivo: string): void {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export type Dependencias = {
+  /** Cómo se arma el modelo. Solo se llama si la corrida va en serio. */
+  crearModelo: () => Required<Modelo>;
+};
+
+/** Devuelve el código de salida: 0 todo limpio, 1 fallas o error de uso, 2 frenada por el tope. */
+export async function main(args: string[], deps: Dependencias = { crearModelo: modeloDeVerdad }): Promise<number> {
   const arg = (nombre: string) => args.find((a) => a.startsWith(`--${nombre}=`))?.slice(nombre.length + 3);
   const filtro = arg('caso');
   const categoria = arg('categoria');
@@ -179,6 +239,9 @@ async function main(): Promise<void> {
   const salida = arg('salida');
   const contra = arg('comparar');
   const nombreVariante = arg('variante') ?? 'actual';
+  const ensayo = args.includes('--ensayo');
+  const rutaLibro = arg('gasto') ?? LIBRO_POR_DEFECTO;
+  const etiqueta = arg('etiqueta') ?? 'sin-etiqueta';
   // El "ahora" del dataset. Al comparar contra una corrida guardada se reusa
   // el suyo: si no, el día 1 del mes "ventas del mes" vale casi nada y la
   // comparación mide el calendario, no el modelo. El prompt no tiene la
@@ -188,17 +251,13 @@ async function main(): Promise<void> {
   const ahora = ahoraIso ? new Date(ahoraIso) : new Date();
   if (isNaN(ahora.getTime())) {
     console.error(`--ahora inválido: ${ahoraIso}`);
-    process.exit(1);
+    return 1;
   }
 
   const variante = VARIANTES[nombreVariante];
   if (!variante) {
     console.error(`No existe la variante "${nombreVariante}". Hay: ${Object.keys(VARIANTES).join(', ')}`);
-    process.exit(1);
-  }
-  if (!process.env.GEMINI_API_KEY) {
-    console.error('Falta GEMINI_API_KEY (sale de apps/api/.env). Estas evals llaman a la API de verdad.');
-    process.exit(1);
+    return 1;
   }
 
   const casos = CASOS_PANEL
@@ -206,7 +265,34 @@ async function main(): Promise<void> {
     .filter((c) => !categoria || categoria.split(',').includes(c.categoria));
   if (!casos.length) {
     console.error('Ningún caso matchea ese filtro.');
-    process.exit(1);
+    return 1;
+  }
+
+  const libroPrevio = leerLibro(rutaLibro);
+  const tope = resolverTope(libroPrevio, arg('tope'));
+
+  // El ensayo no construye el adapter, no pide la key y no escribe nada.
+  if (ensayo) {
+    if ('error' in tope && arg('tope') !== undefined) console.error(tope.error);
+    const topeUsd = 'topeUsd' in tope ? tope.topeUsd : null;
+    imprimirEnsayo(ensayar({ casos: casos.length, repeticiones, libro: libroPrevio, topeUsd }), rutaLibro, libroPrevio, nombreDelModelo());
+    return 0;
+  }
+
+  if ('error' in tope) {
+    console.error(tope.error);
+    return 1;
+  }
+  if (!process.env.GEMINI_API_KEY) {
+    console.error('Falta GEMINI_API_KEY (sale de apps/api/.env). Estas evals llaman a la API de verdad.');
+    return 1;
+  }
+
+  const libro: Libro = { ...(libroPrevio ?? { gastadoUsd: 0, corridas: [] }), topeUsd: tope.topeUsd };
+
+  const modelo = deps.crearModelo();
+  if (!tienePrecioPropio('gemini', modelo.nombre)) {
+    console.log(`${AMARILLO}${modelo.nombre} no está en la tabla de precios: se cobra como el modelo más caro de Gemini.${FIN}`);
   }
 
   // Un solo "ahora" para toda la corrida: los números esperados y los que
@@ -215,37 +301,73 @@ async function main(): Promise<void> {
   // misma fecha que el dataset.
   if (ahoraIso) correrRelojA(ahora);
   const d = crearNegocioDePrueba(ahora);
-  console.log(`Corriendo ${casos.length} caso(s) x ${repeticiones} con ${modelo}, variante ${nombreVariante}, ahora ${ahora.toISOString()}…`);
+  console.log(`Corriendo ${casos.length} caso(s) x ${repeticiones} con ${modelo.nombre}, variante ${nombreVariante}, ahora ${ahora.toISOString()}…`);
+  console.log(`Gasto: ${usd(libro.gastadoUsd)} de ${usd(libro.topeUsd, 2)} (libro ${rutaLibro}, etiqueta ${etiqueta}).`);
 
-  const resultados: Resultado[] = [];
-  for (let intento = 1; intento <= repeticiones; intento++) {
-    // En serie a propósito: en paralelo los 429 se leerían como fallas del modelo.
-    for (const caso of casos) resultados.push(await correrCaso(caso, intento, d, variante, { llm, nombre: modelo }));
-  }
+  // Ctrl+C a mitad de un caso: ese caso ya puede estar facturado y su costo
+  // real no se llega a saber. Se anota lo estimado, para no quedarse corto.
+  let enVuelo = 0;
+  const alCortar = () => {
+    const entrada = libro.corridas[libro.corridas.length - 1];
+    if (entrada?.estado === 'corriendo') {
+      entrada.estado = 'interrumpida';
+      entrada.usd += enVuelo;
+      libro.gastadoUsd += enVuelo;
+      guardarLibro(rutaLibro, libro);
+    }
+    console.error(`\nInterrumpida. Libro: ${usd(libro.gastadoUsd)} de ${usd(libro.topeUsd, 2)} (el caso en vuelo se anotó con lo estimado, ${usd(enVuelo)}).`);
+    process.exit(130);
+  };
+  process.once('SIGINT', alCortar);
+
+  // En serie a propósito: en paralelo los 429 se leerían como fallas del modelo.
+  const trabajos: { caso: CasoPanel; intento: number }[] = [];
+  for (let intento = 1; intento <= repeticiones; intento++) for (const caso of casos) trabajos.push({ caso, intento });
+  const { resultados, frenada } = await correrConTope({
+    trabajos,
+    correr: ({ caso, intento }) => correrCaso(caso, intento, d, variante, modelo),
+    libro,
+    rutaLibro,
+    etiqueta,
+    alEmpezarCaso: (estimado) => { enVuelo = estimado; },
+  });
+  process.removeListener('SIGINT', alCortar);
 
   imprimir(resultados, new Map(CASOS_PANEL.map((c) => [c.id, c])));
-  resumen(resultados, nombreVariante);
+  if (resultados.length) resumen(resultados, nombreVariante, modelo.nombre);
+  const gasto = reporteDeGasto(resultados, libro, frenada);
+  imprimirReporteDeGasto(gasto);
+  if (frenada) console.error(`\n${ROJO}${frenada.mensaje}${FIN}`);
 
   // Se guarda ANTES de comparar: comparar relee el archivo de la base al final
   // y, si se movió mientras corría (2026-10-01), tiraba y la corrida pagada se
-  // perdía sin escribirse.
-  if (salida) {
+  // perdía sin escribirse. Si el freno cortó, lo pagado se guarda igual.
+  const parcial = frenada && resultados.length ? join(__dirname, `parcial-${new Date().toISOString().replace(/[:.]/g, '-')}.json`) : undefined;
+  const destino = salida ?? parcial;
+  if (destino) {
     const corrida: CorridaGuardada = {
       fecha: new Date().toISOString(),
       ahora: ahora.toISOString(),
-      modelo,
+      modelo: modelo.nombre,
       razonamiento: process.env.ORBI_REASONING_EFFORT ?? 'low',
       temperatura: process.env.ORBI_TEMPERATURE ?? '0.3',
       variante: nombreVariante,
+      etiqueta,
       resultados,
+      gasto,
     };
-    writeFileSync(salida, JSON.stringify(corrida, null, 2));
-    console.log(`Guardado en ${salida}`);
+    writeFileSync(destino, JSON.stringify(corrida, null, 2));
+    console.log(`Guardado en ${destino}`);
   }
 
+  if (frenada) return 2;
   if (contra) comparar(resultados, contra);
 
-  process.exit(resultados.some((r) => !r.ok) ? 1 : 0);
+  return resultados.some((r) => !r.ok) ? 1 : 0;
 }
 
-void main();
+if (require.main === module) {
+  // dotenv NO pisa lo que ya está en el entorno: `ORBI_MODEL_PANEL=x pnpm …` manda.
+  cargarDotenv({ path: resolve(__dirname, '../../../.env') });
+  void main(process.argv.slice(2)).then((codigo) => process.exit(codigo));
+}

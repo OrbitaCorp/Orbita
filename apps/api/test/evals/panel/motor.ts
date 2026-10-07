@@ -24,6 +24,7 @@ import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interfac
 import { correrTurno, nuevoProgresoDelTurno, type EmisorDelTurno } from '../../../src/orbi/turno/motor-de-turno';
 import { resolverModuloDelPanel } from '../../../src/orbi/navegacion/modulo-de-orbi';
 import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
+import { costoTechoUsd } from './presupuesto';
 import {
   armarContextBuilder,
   armarFakes,
@@ -134,6 +135,17 @@ export type Resultado = {
   turno: TurnoDelPanel;
   ms: number;
   tokens: { entrada: number; salida: number };
+  // Lo que sigue es desde 2026-10-07: las corridas guardadas antes no lo traen.
+  // Va fuera de `tokens` a propósito: los turnos grabados
+  // (orbi-turno-grabado.unit-spec.ts) comparan `tokens` tal cual.
+  /** Techo de lo que costó: precio de lista sin descuento de caché (presupuesto.ts). */
+  costoUsd?: number;
+  /** Llamadas al modelo del caso. */
+  llamadas?: number;
+  /** De `tokens.entrada`, cuántos salieron de la caché del proveedor (lo real, no se descuenta del costo). */
+  cachedTokens?: number;
+  /** De `tokens.salida`, cuántos fueron pensamiento. */
+  thinkingTokens?: number;
 };
 
 // ─── Armado ──────────────────────────────────────────────────────────────────
@@ -202,7 +214,7 @@ export async function correrCaso(
   variante: Variante,
   modelo: Modelo,
 ): Promise<Resultado> {
-  const arrancoEn = Date.now();
+  const arrancoEn = new Date();
   faltasDelFake.length = 0;
 
   const fakes = armarFakes(d);
@@ -258,6 +270,21 @@ export async function correrCaso(
     }
     return t;
   };
+  // Lo que costó, aunque el caso termine en error: lo consumido se paga igual.
+  const gasto = () => {
+    let cachedTokens = 0;
+    let thinkingTokens = 0;
+    for (const c of progreso.consumo.values()) {
+      cachedTokens += c.cachedTokens;
+      thinkingTokens += c.thinkingTokens;
+    }
+    return {
+      costoUsd: costoTechoUsd(progreso.consumo, arrancoEn) + costoTechoUsd(progreso.consumoDeTools, arrancoEn),
+      llamadas: progreso.llamadasAlModelo,
+      cachedTokens,
+      thinkingTokens,
+    };
+  };
 
   // Lo que se ve: el emisor anota tarjetas, botones y el texto final, en el
   // mismo orden en que el controller los escribe por SSE.
@@ -307,7 +334,7 @@ export async function correrCaso(
     const mensaje = error instanceof Error ? error.message : String(error);
     return {
       id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
-      ms: Date.now() - arrancoEn, tokens: tokens(),
+      ms: Date.now() - arrancoEn.getTime(), tokens: tokens(), ...gasto(),
       error: faltasDelFake.length ? `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}` : `Proveedor: ${mensaje}`,
       infra: true,
     };
@@ -316,7 +343,7 @@ export async function correrCaso(
   if (faltasDelFake.length) {
     return {
       id: caso.id, categoria: caso.categoria, intento, ok: false, violaciones: [], noAplica: [], turno,
-      ms: Date.now() - arrancoEn, tokens: tokens(),
+      ms: Date.now() - arrancoEn.getTime(), tokens: tokens(), ...gasto(),
       error: `Falta en el fake: ${[...new Set(faltasDelFake)].join(', ')}`,
       infra: true,
     };
@@ -333,6 +360,6 @@ export async function correrCaso(
 
   return {
     id: caso.id, categoria: caso.categoria, intento, ok: todas.length === 0,
-    violaciones: todas, noAplica, turno, ms: Date.now() - arrancoEn, tokens: tokens(),
+    violaciones: todas, noAplica, turno, ms: Date.now() - arrancoEn.getTime(), tokens: tokens(), ...gasto(),
   };
 }
