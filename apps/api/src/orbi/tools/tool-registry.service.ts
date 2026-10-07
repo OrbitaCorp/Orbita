@@ -2,7 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from './tool.interface';
 import type { OrbiSurface } from '../dto/orbi-chat.dto';
 import type { LlmToolDefinition } from '../llm/llm-adapter.interface';
-import { AccionInvalida } from './acciones/validar-args';
+import { AccionInvalida, type Invalido } from './acciones/validar-args';
+
+/** Por qué no se propuso: el motivo y, si es por los datos, qué falta y qué no sirve. */
+export type PropuestaFallida = { error: string; faltan?: string[]; invalidos?: Invalido[] };
+
+function fallida(error: string, detalle?: { faltan?: string[]; invalidos?: Invalido[] }): PropuestaFallida {
+  return {
+    error,
+    ...(detalle?.faltan?.length ? { faltan: detalle.faltan } : {}),
+    ...(detalle?.invalidos?.length ? { invalidos: detalle.invalidos } : {}),
+  };
+}
 
 @Injectable()
 export class ToolRegistryService {
@@ -36,9 +47,10 @@ export class ToolRegistryService {
    *   pedirle a nadie que confirme algo que va a fallar. El chat distingue los
    *   dos casos con requiereConfirmacion() y a la escritura NO la ejecuta: le
    *   devuelve el fallo al modelo.
-   * - `{ error }`: los argumentos no pasan el DTO del endpoint, o un dato de
-   *   la base no existe (el pedido, la categoría). No hay tarjeta: el
-   *   controller le devuelve el motivo al modelo como resultado de la tool.
+   * - `{ error, faltan?, invalidos? }`: faltan datos, los argumentos no pasan
+   *   el DTO del endpoint, o un dato de la base no existe (el pedido, la
+   *   categoría). No hay tarjeta: el motor le devuelve todo al modelo como
+   *   resultado de la tool, para que pregunte lo que falta de una vez.
    * - `{ resumen }`: se propone, con la tarjeta que muestra cada valor.
    *
    * `soloLectura` es el visitante de la demo pública: tiene rol owner, así que
@@ -52,7 +64,7 @@ export class ToolRegistryService {
     ctx: ToolExecutionContext,
     stepName?: string,
     opciones?: { soloLectura?: boolean },
-  ): Promise<{ resumen: string } | { error: string } | null> {
+  ): Promise<{ resumen: string } | PropuestaFallida | null> {
     const tool = this.tools.get(name);
     if (!tool?.requiresConfirmation) return null;
     if (opciones?.soloLectura) return null;
@@ -76,12 +88,12 @@ export class ToolRegistryService {
     try {
       if (tool.validarArgs) {
         const validacion = await tool.validarArgs(args, ctx);
-        if (!validacion.ok) return { error: validacion.error };
+        if (!validacion.ok) return fallida(validacion.error, validacion);
       }
       const resumen = tool.describirAccion ? await tool.describirAccion(args, ctx) : `Ejecutar: ${tool.name}`;
       return { resumen };
     } catch (e) {
-      if (e instanceof AccionInvalida) return { error: e.message };
+      if (e instanceof AccionInvalida) return fallida(e.message, e.detalle);
       // Un error inesperado (la base no respondió) no puede tumbar el chat
       // entero. Se loguea sin argumentos ni mensaje: pueden traer datos de
       // clientes.

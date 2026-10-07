@@ -206,7 +206,8 @@ export async function correrTurno(t: TurnoACorrer): Promise<void> {
           progreso.escriturasRechazadas++;
           paso.tools.push({ name: event.call.name, tipo: 'rechazada', ms: reloj() - arrancoLaTool, ok: false });
           emisor.escrituraRechazada?.({ call: event.call });
-          vuelta.responder(event.call, JSON.stringify({ success: false, error: propuesta.error }));
+          // Con lo que falta y lo que no sirve (si vino): el modelo pregunta todo junto.
+          vuelta.responder(event.call, JSON.stringify({ success: false, ...propuesta }));
           continueLoop = true;
           continue;
         }

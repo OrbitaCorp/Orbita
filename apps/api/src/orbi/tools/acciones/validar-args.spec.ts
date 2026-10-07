@@ -21,7 +21,7 @@ describe('validarConDto', () => {
 
   it('rechaza con el primer motivo, en un texto corto y sin volcar el objeto', async () => {
     const r = await validarConDto(UpsertCouponDto, { ...cuponValido, code: 'NO VALE!' });
-    expect(r).toEqual({ ok: false, error: expect.stringContaining('El código solo puede tener letras') });
+    expect(r).toEqual(expect.objectContaining({ ok: false, error: expect.stringContaining('El código solo puede tener letras') }));
     if (!r.ok) {
       expect(r.error).not.toContain('{');
       expect(r.error.length).toBeLessThan(200);
@@ -35,7 +35,7 @@ describe('validarConDto', () => {
 
   it('rechaza propiedades que el DTO no declara', async () => {
     const r = await validarConDto(UpsertCouponDto, { ...cuponValido, businessId: 'otro' });
-    expect(r).toEqual({ ok: false, error: expect.stringContaining('businessId') });
+    expect(r).toEqual(expect.objectContaining({ ok: false, error: expect.stringContaining('businessId') }));
   });
 
   it('valida también los objetos anidados (las variantes del producto)', async () => {

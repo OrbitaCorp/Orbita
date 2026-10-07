@@ -122,6 +122,16 @@ describe('pasos del turno', () => {
     expect(t.progreso.pasos[0].tools[0]).toMatchObject({ tipo: 'rechazada', ok: false });
   });
 
+  it('a una escritura rechazada por datos, el modelo recibe qué falta y qué no sirve para preguntar todo junto', async () => {
+    const { e } = emisor();
+    const rechazo = { error: 'Faltan datos: precio. …', faltan: ['precio'], invalidos: [{ campo: 'categoría', motivo: 'no existe', opciones: ['Mates'] }] };
+    const reg = { proponer: jest.fn(async () => rechazo), requiereConfirmacion: jest.fn(() => true), execute: jest.fn() };
+    const messages: any[] = [];
+    const t = turno({ llm: guion([[llamada('createProduct'), { type: 'done' }], [{ type: 'text', chunk: '¿Precio y categoría?' }, { type: 'done' }]]), registry: reg, emisor: e, messages });
+    await correrTurno(t);
+    expect(JSON.parse(messages.find(m => m.role === 'tool').content)).toEqual({ success: false, ...rechazo });
+  });
+
   it('el consumo de IA de una tool se suma aparte y no viaja al modelo', async () => {
     const { e } = emisor();
     const reg = registry();

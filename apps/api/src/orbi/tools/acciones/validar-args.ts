@@ -1,6 +1,19 @@
 import { HttpException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, type ValidationError } from 'class-validator';
+import type { Invalido } from './resolver-nombres';
+
+export type { Invalido } from './resolver-nombres';
+
+/**
+ * Por qué no se puede proponer una acción, en castellano y con estructura
+ * (`faltan`, `invalidos`), para que el modelo le pida a la persona TODO lo
+ * que falta en un solo mensaje en vez de reintentar a ciegas o rendirse.
+ * `error` es el mismo texto de siempre (lo que leía el modelo antes): los
+ * campos nuevos son opcionales y se suman al resultado de la tool.
+ */
+export type ArgsInvalidos = { ok: false; error: string; faltan?: string[]; invalidos?: Invalido[] };
+export type ResultadoDeValidacion = { ok: true } | ArgsInvalidos;
 
 /**
  * Valida los argumentos de una tool de escritura con el MISMO DTO que usa su
@@ -25,24 +38,28 @@ import { validate, type ValidationError } from 'class-validator';
 export async function validarConDto<T extends object>(
   Dto: new () => T,
   args: Record<string, unknown>,
-): Promise<{ ok: true; valor: T } | { ok: false; error: string }> {
+): Promise<{ ok: true; valor: T } | { ok: false; error: string; campo?: string; motivo?: string }> {
   const valor = plainToInstance(Dto, args, { enableImplicitConversion: false });
   const errores = await validate(valor, { whitelist: true, forbidNonWhitelisted: true });
   if (errores.length === 0) return { ok: true, valor };
-  return { ok: false, error: primerMotivo(errores) };
+  const primero = primerMotivo(errores);
+  if (!primero) return { ok: false, error: 'Argumentos inválidos' };
+  // `campo` es la propiedad del DTO (la raíz, sin las anidadas): la tool la
+  // traduce a su parámetro para el `invalidos` que ve el modelo.
+  return { ok: false, error: `Argumento inválido (${primero.donde}): ${primero.motivo}`, campo: primero.donde.split('.')[0], motivo: primero.motivo };
 }
 
 // El primer error con motivo, bajando por los anidados (las variantes de un
 // producto). Los mensajes de class-validator nombran la propiedad y el tope,
 // no el valor: no hay riesgo de devolver el texto que se rechazó.
-function primerMotivo(errores: ValidationError[], ruta = ''): string {
+function primerMotivo(errores: ValidationError[], ruta = ''): { donde: string; motivo: string } | null {
   for (const e of errores) {
     const donde = ruta ? `${ruta}.${e.property}` : e.property;
     const motivo = e.constraints ? Object.values(e.constraints)[0] : undefined;
-    if (motivo) return `Argumento inválido (${donde}): ${motivo}`;
+    if (motivo) return { donde, motivo };
     if (e.children?.length) return primerMotivo(e.children, donde);
   }
-  return 'Argumentos inválidos';
+  return null;
 }
 
 /**
@@ -71,4 +88,12 @@ export async function validarConServicio(chequeo: () => Promise<unknown>): Promi
  * registry lo convierte en `{ error }`: el modelo recibe el motivo y no se
  * arma tarjeta.
  */
-export class AccionInvalida extends Error {}
+export class AccionInvalida extends Error {
+  constructor(
+    message: string,
+    /** Lo que falta o no existe, con estructura: el registry lo suma al `{ error }` que recibe el modelo. */
+    readonly detalle?: { faltan?: string[]; invalidos?: Invalido[] },
+  ) {
+    super(message);
+  }
+}

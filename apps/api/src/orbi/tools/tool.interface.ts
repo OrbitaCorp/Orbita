@@ -1,5 +1,6 @@
 import type { LlmToolDefinition, LlmUsage } from '../llm/llm-adapter.interface';
 import type { OrbiSurface } from '../dto/orbi-chat.dto';
+import type { ResultadoDeValidacion } from './acciones/validar-args';
 
 export interface ToolExecutionContext {
   businessId: string;
@@ -84,9 +85,10 @@ export interface OrbiTool {
    * service tiene reglas que dependen de la base, con esas también, acotadas
    * a ctx.businessId (ver acciones/validar-args.ts). Corre en proponer(),
    * antes de armar la tarjeta: si no pasa, no se propone y el modelo recibe
-   * el motivo.
+   * el motivo, con lo que falta y lo que no sirve (`faltan`, `invalidos`)
+   * para preguntarle todo junto a la persona (ver acciones/requisitos.ts).
    */
-  validarArgs?(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<{ ok: true } | { ok: false; error: string }>;
+  validarArgs?(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ResultadoDeValidacion>;
   execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult>;
   toLlmDefinition(): LlmToolDefinition;
 }
