@@ -290,7 +290,7 @@ export function TabCorreo({ puedeEnviar }: { puedeEnviar: boolean }) {
 
 // ─── Casillas y firmas ───────────────────────────────────────────────────────
 
-const VACIA: CasillaCorreoInput = { email: '', name: '', jobTitle: '', phone: '', signatureImageUrl: null }
+const VACIA: CasillaCorreoInput = { email: '', name: '', jobTitle: '', phone: '', signatureImageUrl: null, signatureBanner: false }
 
 function ModalCasillas({ casillas, puedeEditar, onClose, onCambio }: {
   casillas: CasillaCorreo[]
@@ -367,7 +367,7 @@ function ModalCasillas({ casillas, puedeEditar, onClose, onCambio }: {
 
 function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo | null; onVolver: () => void; onGuardada: () => void }) {
   const [v, setV] = useState<CasillaCorreoInput>(() => casilla
-    ? { email: casilla.email, name: casilla.name, jobTitle: casilla.jobTitle ?? '', phone: casilla.phone ?? '', signatureImageUrl: casilla.signatureImageUrl }
+    ? { email: casilla.email, name: casilla.name, jobTitle: casilla.jobTitle ?? '', phone: casilla.phone ?? '', signatureImageUrl: casilla.signatureImageUrl, signatureBanner: casilla.signatureBanner }
     : VACIA)
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -430,19 +430,27 @@ function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {v.signatureImageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={v.signatureImageUrl} alt="Imagen de la firma" style={{ height: 48, width: 'auto', maxWidth: 140, border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }} />
+            <img src={v.signatureImageUrl} alt="Imagen de la firma" style={{ ...(v.signatureBanner ? { width: '100%', height: 'auto' } : { height: 48, width: 'auto', maxWidth: 140 }), border: '1px solid var(--color-border)', borderRadius: 8, background: '#fff' }} />
           )}
-          <input ref={archivo} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void subir(e)} style={{ display: 'none' }} />
+          <input ref={archivo} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => void subir(e)} style={{ display: 'none' }} />
           <button type="button" onClick={() => archivo.current?.click()} disabled={subiendo} className="ds-hover" style={btnGhostSm}>
             {subiendo ? 'Subiendo…' : v.signatureImageUrl ? 'Cambiar' : 'Subir imagen'}
           </button>
           {v.signatureImageUrl && (
-            <button type="button" onClick={() => setV((x) => ({ ...x, signatureImageUrl: null }))} className="ds-hover" style={btnGhostSm}>Quitar</button>
+            <button type="button" onClick={() => setV((x) => ({ ...x, signatureImageUrl: null, signatureBanner: false }))} className="ds-hover" style={btnGhostSm}>Quitar</button>
           )}
         </div>
         <p style={{ margin: '7px 0 0', fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>
-          Un logo o tu firma escaneada. Va a la izquierda del nombre, a 48 px de alto.
+          {v.signatureBanner
+            ? 'La imagen se muestra a todo el ancho del correo y reemplaza al nombre, el cargo y el teléfono de arriba.'
+            : 'Un logo o tu firma escaneada. Va a la izquierda del nombre, a 48 px de alto.'}
         </p>
+        {v.signatureImageUrl && (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 10, fontSize: 13, color: 'var(--color-body)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={v.signatureBanner} onChange={(e) => setV((x) => ({ ...x, signatureBanner: e.target.checked }))} />
+            Usar la imagen como firma completa
+          </label>
+        )}
       </div>
 
       {error && <p role="alert" style={{ margin: 0, fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}

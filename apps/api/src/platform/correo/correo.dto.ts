@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 
 export class UpsertCasillaDto {
   @IsEmail({}, { message: 'El email de la casilla no es válido' })
@@ -25,6 +25,11 @@ export class UpsertCasillaDto {
   @Length(0, 500)
   @Matches(/^(https:\/\/\S+)?$/i, { message: 'La imagen de la firma tiene que ser un link https' })
   signatureImageUrl?: string | null;
+
+  // La imagen es la firma completa (una tarjeta) y reemplaza a la de texto.
+  @IsOptional()
+  @IsBoolean()
+  signatureBanner?: boolean;
 }
 
 export class VistaPreviaCorreoDto {

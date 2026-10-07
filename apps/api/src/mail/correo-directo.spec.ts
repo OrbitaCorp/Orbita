@@ -33,6 +33,16 @@ describe('correo directo del super panel', () => {
     expect(firmaAHtml({ name: 'Órbita', email: 'contacto@orbita-corp.com' })).toContain('>Órbita</div>');
   });
 
+  it('con firma completa la imagen reemplaza al texto y los datos van en el alt', () => {
+    const base = { name: 'Mateo Rojas', email: 'mateo@orbita.site', jobTitle: 'CEO & Founder', banner: true };
+    const html = firmaAHtml({ ...base, imageUrl: 'https://cdn.orbita.site/firma.gif' });
+    expect(html).toContain('max-width:460px');
+    expect(html).toContain('alt="Mateo Rojas · CEO &amp; Founder · Órbita · mateo@orbita.site"');
+    expect(html).not.toContain('<table');
+    // Sin imagen no hay tarjeta que mostrar: vuelve a la firma de texto.
+    expect(firmaAHtml(base)).toContain('<table');
+  });
+
   it('el nombre del remitente no puede colar otro encabezado', () => {
     expect(remitenteParaFrom('Mateo "CEO" <x@y.com>\r\nBcc: z@z.com', 'mateo@orbita.site')).toBe(
       '"Mateo CEO x@y.com Bcc: z@z.com" <mateo@orbita.site>',

@@ -11,6 +11,8 @@ export type FirmaCorreo = {
   jobTitle?: string | null;
   phone?: string | null;
   imageUrl?: string | null;
+  // La imagen es la firma completa (una tarjeta ya diseñada) y reemplaza al texto.
+  banner?: boolean;
 };
 
 const ES_ITEM = /^\s*[-•]\s+/;
@@ -41,8 +43,19 @@ export function cuerpoAHtml(texto: string): string {
 // La imagen de la firma solo sale si es https: la URL la guarda un admin, pero
 // termina en el HTML de un correo que lee un tercero.
 export function firmaAHtml(firma: FirmaCorreo): string {
-  const imagen = firma.imageUrl && /^https:\/\//i.test(firma.imageUrl)
-    ? `<td style="padding-right:14px; vertical-align:middle;"><img src="${escaparHtml(firma.imageUrl)}" alt="" height="48" style="height:48px; width:auto; max-width:140px; display:block; border:0;"></td>`
+  const url = firma.imageUrl && /^https:\/\//i.test(firma.imageUrl) ? firma.imageUrl : null;
+  if (firma.banner && url) {
+    // El alt lleva los datos de la tarjeta: es lo que se lee si el cliente de
+    // correo bloquea las imágenes. 460 px es el ancho útil de la plantilla.
+    const alt = [firma.name, firma.jobTitle?.trim(), 'Órbita', firma.email].filter(Boolean).join(' · ');
+    return (
+      '<div style="margin-top:26px;">' +
+      `<img src="${escaparHtml(url)}" alt="${escaparHtml(alt)}" width="460" style="display:block; width:100%; max-width:460px; height:auto; border:0; font-size:12.5px; color:#4f566b;">` +
+      '</div>'
+    );
+  }
+  const imagen = url
+    ? `<td style="padding-right:14px; vertical-align:middle;"><img src="${escaparHtml(url)}" alt="" height="48" style="height:48px; width:auto; max-width:140px; display:block; border:0;"></td>`
     : '';
   const cargo = firma.jobTitle?.trim();
   const telefono = firma.phone?.trim();

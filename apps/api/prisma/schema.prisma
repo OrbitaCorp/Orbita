@@ -2398,6 +2398,8 @@ model PlatformMailSender {
   jobTitle          String?  @map("job_title")
   phone             String?
   signatureImageUrl String?  @map("signature_image_url")
+  // true: la imagen ES la firma (tarjeta completa) y reemplaza al texto.
+  signatureBanner   Boolean  @default(false) @map("signature_banner")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

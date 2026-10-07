@@ -49,6 +49,8 @@ export type CasillaCorreo = {
   jobTitle: string | null
   phone: string | null
   signatureImageUrl: string | null
+  // La imagen es la firma completa (una tarjeta) y reemplaza a la de texto.
+  signatureBanner: boolean
   // Si el dominio está verificado en Resend. null = no se pudo consultar.
   verified?: boolean | null
 }
