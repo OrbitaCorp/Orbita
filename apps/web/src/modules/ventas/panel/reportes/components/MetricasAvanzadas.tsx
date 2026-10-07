@@ -20,7 +20,7 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 import { ColumnChart } from '@/design-system/components/Chart'
 import { InfoTip } from '../../_shared/InfoTip'
 import { fmtMoney } from '@/lib/utils'
-import { ApiError, panelGetDashboardAvanzado, type ApiDashboardAvanzado } from '@/lib/api'
+import { ApiError, panelGetDashboardAvanzado, panelGetDashboardGoogle, type ApiDashboardAvanzado, type ApiDashboardGoogle } from '@/lib/api'
 
 const CLAVE_ABIERTO = 'orbita-dash-metricas-avanzadas'
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
@@ -105,6 +105,10 @@ export function MetricasAvanzadas({ from, to, onIrACatalogo }: { from: string; t
     const [error, setError] = useState<string | null>(null)
     const [reintento, setReintento] = useState(0)
     const [cuando, setCuando] = useState<'hora' | 'semana'>('hora')
+    // "Cómo te encuentran en Google": se pide aparte de lo de ventas, así que si Google no responde
+    // (o la tienda todavía no está conectada) el resto de las métricas se ven igual.
+    const [google, setGoogle] = useState<ApiDashboardGoogle | null>(null)
+    const [googleCargando, setGoogleCargando] = useState(false)
 
     // Recuerda si el dueño la dejó abierta. Se lee después de montar (no en el
     // useState) para que el HTML del servidor y el del cliente coincidan.
@@ -136,6 +140,17 @@ export function MetricasAvanzadas({ from, to, onIrACatalogo }: { from: string; t
         return () => { vigente = false }
     }, [abierto, from, to, reintento])
 
+    useEffect(() => {
+        if (!abierto) return
+        let vigente = true
+        setGoogleCargando(true)
+        panelGetDashboardGoogle(from, to)
+            .then(r => { if (vigente) setGoogle(r) })
+            .catch(() => { if (vigente) setGoogle({ disponible: false, motivo: 'no_disponible' }) })
+            .finally(() => { if (vigente) setGoogleCargando(false) })
+        return () => { vigente = false }
+    }, [abierto, from, to, reintento])
+
     const m = datos?.actual
     const a = datos?.anterior
     const inv = datos?.inventario
@@ -148,16 +163,19 @@ export function MetricasAvanzadas({ from, to, onIrACatalogo }: { from: string; t
         <div className="dav" style={{ marginBottom: 16 }}>
             <style>{`
                 .dav-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+                .dav-tiles-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
                 .dav-row   { display: grid; gap: 16px; margin-bottom: 16px; }
                 .dav-row-a { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
                 .dav-row-b { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
                 .dav-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
                 @media (max-width: 960px) {
                     .dav-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .dav-tiles-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
                     .dav-row-a, .dav-row-b { grid-template-columns: minmax(0, 1fr); }
                 }
                 @media (max-width: 460px) {
                     .dav-tiles { gap: 8px; }
+                    .dav-tiles-4 { gap: 8px; }
                     .dav-value { font-size: 19px !important; }
                 }
             `}</style>
@@ -437,8 +455,156 @@ export function MetricasAvanzadas({ from, to, onIrACatalogo }: { from: string; t
                             </div>
                         </>
                     )}
+
+                    <SeccionGoogle google={google} cargando={googleCargando} />
                 </div>
             )}
+        </div>
+    )
+}
+
+// ─── Cómo te encuentran en Google ──────────────────────────────────────────────
+// Lo que Google Search Console sabe de la tienda: cuánta gente llegó desde una búsqueda, con qué
+// palabras y a qué páginas. Viene de GET /reports/dashboard/google, que solo devuelve datos de la
+// tienda de quien pregunta. Si la tienda no está conectada o no hay datos, no se muestra un error.
+function SeccionGoogle({ google, cargando }: { google: ApiDashboardGoogle | null; cargando: boolean }) {
+    if (!google) {
+        return cargando ? (
+            <div className="dav-tiles-4" style={{ marginTop: 8 }}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <Card key={i} padding="sm">
+                        <Skeleton width="55%" height={11} delay={i * 50} />
+                        <div style={{ marginTop: 12 }}><Skeleton width="70%" height={22} delay={i * 50 + 40} /></div>
+                    </Card>
+                ))}
+            </div>
+        ) : null
+    }
+    if (!google.disponible) {
+        if (google.motivo !== 'conectando') return null
+        return (
+            <Card padding="sm" style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Cómo te encuentran en Google</div>
+                <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    Estamos conectando tu dominio propio con Google. En cuanto termine, vas a ver acá cuánta gente te encuentra por ahí. Suele quedar listo en un día.
+                </div>
+            </Card>
+        )
+    }
+
+    const r = google.rendimiento
+    const a = google.anterior
+    const sinDatos = !r || (r.clics === 0 && r.impresiones === 0)
+    const pct = (n: number) => Math.round(n * 1000) / 10
+    const nombreRuta = (ruta: string) => (ruta === '/' ? 'Inicio' : ruta === '/catalogo' ? 'Catálogo' : ruta)
+
+    return (
+        <div style={{ marginTop: 8, opacity: cargando ? 0.6 : 1, transition: 'opacity 150ms' }} aria-busy={cargando}>
+            <div style={{ margin: '4px 2px 12px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Cómo te encuentran en Google</div>
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                    Personas que llegaron a tu tienda desde una búsqueda
+                    {google.portadaEnGoogle === true && ' · tu portada ya está en Google'}
+                    {google.portadaEnGoogle === false && ' · tu portada todavía no está en Google'}
+                </div>
+            </div>
+
+            {sinDatos ? (
+                <Card padding="sm">
+                    <div style={{ fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+                        Google todavía no mostró tu tienda en las búsquedas de este período. Es normal en una tienda nueva: puede tardar semanas, y ayuda tener productos con buenas fotos y una descripción en cada uno.
+                    </div>
+                </Card>
+            ) : (
+                <>
+                    <div className="dav-tiles-4">
+                        <Tile
+                            label="Visitas desde Google"
+                            value={r!.clics.toLocaleString('es-AR')}
+                            variacion={a ? variacion(r!.clics, a.clics) : null}
+                            info={<P primero>Cuántas veces alguien tocó el resultado de tu tienda en una búsqueda de Google y entró.</P>}
+                        />
+                        <Tile
+                            label="Veces que apareciste"
+                            value={r!.impresiones.toLocaleString('es-AR')}
+                            variacion={a ? variacion(r!.impresiones, a.impresiones) : null}
+                            info={<P primero>Cuántas veces tu tienda se mostró en los resultados de una búsqueda, aunque la persona no la tocara.</P>}
+                        />
+                        <Tile
+                            label="Clics sobre apariciones"
+                            value={fmtPct(pct(r!.ctr))}
+                            variacion={a ? variacionPuntos(pct(r!.ctr), pct(a.ctr)) : null}
+                            info={<>
+                                <P primero>De cada 100 veces que apareciste, cuántas te tocaron: <strong>visitas ÷ apariciones</strong>.</P>
+                                <P>Un número alto quiere decir que el título y la descripción de tu tienda convencen a quien los ve.</P>
+                            </>}
+                        />
+                        <Tile
+                            label="Posición media"
+                            value={fmtNum(r!.posicion)}
+                            variacion={a && a.posicion > 0 ? variacion(r!.posicion, a.posicion, true) : null}
+                            info={<>
+                                <P primero>En qué lugar aparecés, en promedio, entre los resultados de Google. El <strong>1</strong> es el primero y el <strong>10</strong> cierra la primera página.</P>
+                                <P>Acá menos es mejor: si baja el número, estás subiendo en los resultados.</P>
+                            </>}
+                        />
+                    </div>
+
+                    <div className="dav-row dav-row-b">
+                        <Panel
+                            titulo="Qué buscan para llegar a vos"
+                            info={<>
+                                <P primero>Las palabras que escribió la gente en Google cuando apareció tu tienda, de las más vistas a las menos.</P>
+                                <P>Google oculta las búsquedas poco frecuentes por privacidad, por eso la lista puede ser corta.</P>
+                            </>}
+                        >
+                            {google.consultas.length === 0 ? (
+                                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todavía no hay búsquedas para mostrar.</div>
+                            ) : (
+                                <FilasGoogle filas={google.consultas.map(c => ({ clave: c.consulta, texto: c.consulta, clics: c.clics, apariciones: c.impresiones }))} />
+                            )}
+                        </Panel>
+                        <Panel
+                            titulo="Páginas que más aparecen"
+                            info={<P primero>Las páginas de tu tienda que más veces mostró Google, con cuántas visitas te trajo cada una.</P>}
+                        >
+                            {google.paginas.length === 0 ? (
+                                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todavía no hay páginas para mostrar.</div>
+                            ) : (
+                                <FilasGoogle filas={google.paginas.map(p => ({ clave: p.ruta, texto: nombreRuta(p.ruta), clics: p.clics, apariciones: p.impresiones }))} />
+                            )}
+                        </Panel>
+                    </div>
+                </>
+            )}
+
+            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 4 }}>
+                Datos de Google Search Console del {fechaCorta(google.periodo.desde)} al {fechaCorta(google.periodo.hasta)}. Google los publica con 2 o 3 días de demora.
+            </div>
+        </div>
+    )
+}
+
+const fechaCorta = (iso: string) => {
+    const [, mes, dia] = iso.split('-')
+    return `${Number(dia)}/${Number(mes)}`
+}
+
+function FilasGoogle({ filas }: { filas: { clave: string; texto: string; clics: number; apariciones: number }[] }) {
+    return (
+        <div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 11.5, color: 'var(--color-muted)', padding: '0 0 6px', borderBottom: '1px solid var(--color-border)' }}>
+                <span style={{ flex: 1 }} />
+                <span style={{ width: 64, textAlign: 'right' }}>Visitas</span>
+                <span style={{ width: 84, textAlign: 'right' }}>Apariciones</span>
+            </div>
+            {filas.map((f, i) => (
+                <div key={f.clave} style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 0', borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', fontSize: 13 }}>
+                    <span style={{ flex: 1, minWidth: 0, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.texto}</span>
+                    <span style={{ width: 64, textAlign: 'right', fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600 }}>{f.clics.toLocaleString('es-AR')}</span>
+                    <span style={{ width: 84, textAlign: 'right', fontFamily: '"Geist Mono", monospace', color: 'var(--color-muted)' }}>{f.apariciones.toLocaleString('es-AR')}</span>
+                </div>
+            ))}
         </div>
     )
 }

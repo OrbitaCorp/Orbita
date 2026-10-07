@@ -4,10 +4,15 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ReportsService } from './reports.service';
+import { SearchConsoleService } from '../search-console/search-console.service';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    // Opcional por compatibilidad con specs unitarios que construyen el controller a mano.
+    private readonly searchConsole?: SearchConsoleService,
+  ) {}
 
   // (Fase 4 — Alex) La pantalla de inicio del panel. Pide su PROPIO permiso
   // (reports.dashboard, tildable por rol): el dashboard ES facturación
@@ -37,6 +42,20 @@ export class ReportsController {
   ) {
     const member = assertMemberContext(ctx);
     return this.reportsService.dashboardAvanzado(member.businessId, from, to);
+  }
+
+  // Cómo encuentran a la tienda en Google (clics, veces que apareció, búsquedas): lo que muestra
+  // "Cómo te encuentran en Google" dentro de las métricas avanzadas del inicio. Siempre de la tienda
+  // del que pregunta (sale del contexto, no de la URL). Mismo permiso que el resto del inicio.
+  @Get('dashboard/google')
+  @RequirePermission('reports.dashboard')
+  async dashboardGoogle(
+    @CurrentBusiness() ctx: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.searchConsole?.resumenParaDueno(member.businessId, from, to) ?? { disponible: false, motivo: 'no_disponible' };
   }
 
   // El resumen del mes para el historial de pedidos. Pide el mismo permiso que

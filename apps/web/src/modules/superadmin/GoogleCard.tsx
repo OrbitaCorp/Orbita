@@ -55,12 +55,21 @@ export function GoogleCard({ businessId }: { businessId: string }) {
       title="Cómo te ve Google"
       subtitle="Search Console: dirección verificada, sitemap y búsquedas de los últimos 28 días"
       action={g?.configurado ? (
-        <button onClick={enviar} disabled={enviando} className="ds-hover" style={{ ...btnGhostSm, opacity: enviando ? 0.6 : 1 }}>
-          {enviando ? 'Enviando…' : 'Enviar a Google'}
-        </button>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          {loading && !enviando && <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Actualizando…</span>}
+          <button onClick={enviar} disabled={enviando} className="ds-hover" style={{ ...btnGhostSm, opacity: enviando ? 0.6 : 1 }}>
+            {enviando ? 'Enviando…' : 'Enviar a Google'}
+          </button>
+        </span>
       ) : undefined}
     >
-      {loading && !g ? <Loader /> : error || !g ? <Empty text="No se pudo consultar Search Console." /> : <Contenido g={g} resultado={resultado} />}
+      {loading && !g ? <Loader /> : error || !g ? <Empty text="No se pudo consultar Search Console." /> : (
+        // Mientras recarga después de enviar, los datos que se ven son los de antes: se atenúan para no
+        // mostrar un "Sin verificar" viejo al lado de un "verificado" nuevo.
+        <div style={{ opacity: loading ? 0.45 : 1, transition: 'opacity 0.2s' }}>
+          <Contenido g={g} resultado={resultado} />
+        </div>
+      )}
     </Card>
   )
 }

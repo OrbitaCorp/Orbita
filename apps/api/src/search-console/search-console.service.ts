@@ -56,6 +56,52 @@ export function explicarErrorDeGoogle(e: unknown): string {
 
 const fechaISO = (d: Date) => d.toISOString().slice(0, 10);
 
+// ── Lo que ve el dueño de la tienda (Inicio del panel → Métricas avanzadas) ──
+
+type Totales = { clics: number; impresiones: number; ctr: number; posicion: number };
+
+/** Lo que el dueño puede ver de Google: solo de su tienda y sin detalles técnicos de nuestra conexión. */
+export type ResumenParaDueno =
+  | { disponible: false; motivo: 'conectando' | 'no_disponible' }
+  | {
+      disponible: true;
+      periodo: { desde: string; hasta: string };
+      rendimiento: Totales | null;
+      /** El período anterior de igual largo, para mostrar cuánto subió o bajó. */
+      anterior: Totales | null;
+      consultas: { consulta: string; clics: number; impresiones: number; posicion: number }[];
+      paginas: { ruta: string; clics: number; impresiones: number }[];
+      /** ¿La portada está en el índice de Google? null = no se pudo saber. */
+      portadaEnGoogle: boolean | null;
+    };
+
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const DIA_MS = 86_400_000;
+const MAX_DIAS = 90;
+const TTL_DUENO_MS = 10 * 60_000;
+
+/**
+ * El período que se le pide a Google: el mismo que el selector del panel, pero sin pasar de
+ * hace 2 días (Search Console todavía no publicó nada más reciente) ni de 90 días, y con
+ * el período anterior de igual largo pegado atrás para comparar.
+ */
+export function periodoParaGoogle(from: string | undefined, to: string | undefined, ahora: Date) {
+  const dia = (iso: string) => new Date(iso + 'T00:00:00Z');
+  const tope = dia(fechaISO(new Date(ahora.getTime() - DIAS_DE_RETRASO * DIA_MS)));
+  let hasta = to && ISO.test(to) ? dia(to) : tope;
+  if (Number.isNaN(hasta.getTime()) || hasta > tope) hasta = tope;
+  let desde = from && ISO.test(from) ? dia(from) : new Date(hasta.getTime() - (DIAS_DE_DATOS - 1) * DIA_MS);
+  if (Number.isNaN(desde.getTime()) || desde > hasta) desde = new Date(hasta.getTime() - (DIAS_DE_DATOS - 1) * DIA_MS);
+  if (hasta.getTime() - desde.getTime() > (MAX_DIAS - 1) * DIA_MS) desde = new Date(hasta.getTime() - (MAX_DIAS - 1) * DIA_MS);
+  const dias = Math.round((hasta.getTime() - desde.getTime()) / DIA_MS) + 1;
+  const anteriorHasta = new Date(desde.getTime() - DIA_MS);
+  const anteriorDesde = new Date(anteriorHasta.getTime() - (dias - 1) * DIA_MS);
+  return {
+    desde: fechaISO(desde), hasta: fechaISO(hasta),
+    anteriorDesde: fechaISO(anteriorDesde), anteriorHasta: fechaISO(anteriorHasta),
+  };
+}
+
 @Injectable()
 export class SearchConsoleService {
   private readonly logger = new Logger(SearchConsoleService.name);
@@ -281,5 +327,71 @@ export class SearchConsoleService {
       errores: [...new Set(errores)], // si falló todo por lo mismo (sin permiso), se dice una sola vez
     };
     return resultado;
+  }
+
+  private readonly cacheDueno = new Map<string, { hasta: number; valor: ResumenParaDueno }>();
+
+  /**
+   * Lo mismo que resumenDeTienda pero para el dueño: sin errores técnicos, sin saber de
+   * verificaciones ni cuentas de servicio, y nada si la tienda está oculta por moderación
+   * (el dueño no tiene por qué enterarse por acá). Se guarda 10 minutos por tienda y período:
+   * abrir y cerrar el desplegable no tiene que gastar la cuota diaria de Google.
+   */
+  async resumenParaDueno(businessId: string, from?: string, to?: string, ahora = new Date()): Promise<ResumenParaDueno> {
+    const noDisponible: ResumenParaDueno = { disponible: false, motivo: 'no_disponible' };
+    if (!this.google.habilitado()) return noDisponible;
+    const b = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: {
+        subdomain: true,
+        hiddenFromSearch: true,
+        customDomains: { where: { status: 'ACTIVE', dnsVerified: true }, orderBy: { createdAt: 'asc' }, take: 1, select: { domain: true, gscStatus: true } },
+      },
+    });
+    if (!b || b.hiddenFromSearch) return noDisponible;
+    const dom = b.customDomains[0] ?? null;
+    if (dom && dom.gscStatus !== 'VERIFICADO') return { disponible: false, motivo: 'conectando' };
+
+    const p = periodoParaGoogle(from, to, ahora);
+    const clave = `${businessId}|${p.desde}|${p.hasta}`;
+    const guardado = this.cacheDueno.get(clave);
+    if (guardado && guardado.hasta > ahora.getTime()) return guardado.valor;
+
+    const origen = dom ? `https://${dom.domain}` : `https://${b.subdomain}.${DOMINIO_RAIZ}`;
+    const propiedad = dom ? `${origen}/` : PROPIEDAD_DE_ORBITA;
+    const filtro = dom ? undefined : ({ dimension: 'page', operator: 'contains', expression: `${origen}/` } as const);
+    const [total, anterior, consultas, paginas, inicio] = await Promise.allSettled([
+      this.google.rendimiento(propiedad, p.desde, p.hasta, { filtro }),
+      this.google.rendimiento(propiedad, p.anteriorDesde, p.anteriorHasta, { filtro }),
+      this.google.rendimiento(propiedad, p.desde, p.hasta, { filtro, dimensiones: ['query'], limite: 8 }),
+      this.google.rendimiento(propiedad, p.desde, p.hasta, { filtro, dimensiones: ['page'], limite: 8 }),
+      this.google.inspeccionar(`${origen}/`, propiedad),
+    ]);
+
+    let valor: ResumenParaDueno;
+    if (total.status === 'rejected') {
+      // Sin los totales no hay nada que mostrar. Se anota para el equipo y el dueño ve que no está disponible.
+      this.logger.warn(`Search Console: no se pudo leer el rendimiento de ${businessId} — ${explicarErrorDeGoogle(total.reason)}`);
+      valor = noDisponible;
+    } else {
+      const aTotales = (f?: { clicks: number; impressions: number; ctr: number; position: number }): Totales | null =>
+        f ? { clics: f.clicks, impresiones: f.impressions, ctr: f.ctr, posicion: f.position } : null;
+      valor = {
+        disponible: true,
+        periodo: { desde: p.desde, hasta: p.hasta },
+        rendimiento: aTotales(total.value[0]),
+        anterior: anterior.status === 'fulfilled' ? aTotales(anterior.value[0]) : null,
+        consultas: consultas.status === 'fulfilled'
+          ? consultas.value.map((f) => ({ consulta: f.keys?.[0] ?? '', clics: f.clicks, impresiones: f.impressions, posicion: f.position }))
+          : [],
+        paginas: paginas.status === 'fulfilled'
+          ? paginas.value.map((f) => ({ ruta: (f.keys?.[0] ?? '').replace(origen, '') || '/', clics: f.clicks, impresiones: f.impressions }))
+          : [],
+        portadaEnGoogle: inicio.status === 'fulfilled' && inicio.value.veredicto ? inicio.value.veredicto === 'PASS' : null,
+      };
+    }
+    this.cacheDueno.set(clave, { hasta: ahora.getTime() + TTL_DUENO_MS, valor });
+    if (this.cacheDueno.size > 200) this.cacheDueno.delete(this.cacheDueno.keys().next().value as string);
+    return valor;
   }
 }
