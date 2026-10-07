@@ -208,6 +208,7 @@ export class MailService {
     'subscription-period-ended',
     'subscription-grace-reminder',
     'subscription-reactivated',
+    'subscription-frozen-price-ended',
     'business-cancellation-confirmed',
     'business-deletion-warning',
     'business-deleted',
@@ -350,6 +351,8 @@ export class MailService {
     // CircleCheck — se resolvió el pago, tienda activa de nuevo (mismo look
     // que order-confirmation: "todo bien").
     'subscription-reactivated': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
+    // Tag — terminó el precio congelado de una campaña, pasa al de lista.
+    'subscription-frozen-price-ended': this.svgIcon('<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/>'),
     // Archive — baja voluntaria, datos guardados.
     'business-cancellation-confirmed': this.svgIcon(
       '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/>',
@@ -1242,6 +1245,18 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `¡Tu tienda en Orbita está activa de nuevo!`, 'subscription-reactivated', data, meta);
+  }
+
+  // Se cobró el último mes a precio congelado (campañas de precio, 2026-10):
+  // avisa que el próximo débito ya sale al precio de lista, para que la suba
+  // no sea una sorpresa en el resumen de la tarjeta. Los montos llegan ya
+  // formateados ("$10.000"). nextChargeDate puede faltar si no se conoce.
+  async sendFrozenPriceEnded(
+    to: string,
+    data: { businessName: string; frozenAmount: string; listAmount: string; nextChargeDate?: string; manageUrl: string },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Tu precio congelado terminó: tu plan pasa a ${data.listAmount} por mes`, 'subscription-frozen-price-ended', data, meta);
   }
 
   // ── Cancelación voluntaria + ventana de 60 días (RBT, 2026-09) ────────

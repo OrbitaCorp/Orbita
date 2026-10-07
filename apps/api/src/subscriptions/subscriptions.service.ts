@@ -1517,7 +1517,13 @@ export class SubscriptionsService implements OnModuleInit {
   //   ACTIVE  → PAID     si ya se cobraron `chargesTotal` veces desde el link
   //                      (1 con un código, varios con un precio congelado)
   //   PAID    → RESTORED devolviéndole a la preapproval el precio de lista
-  private async avanzarDescuentoDeActivacion(id: string, businessId: string): Promise<void> {
+  //
+  // `conRespaldo` (solo el barrido nocturno): si por nuestros registros todavía
+  // faltan cobros, se le pregunta a Mercado Pago cuántos hizo de verdad. La
+  // suba al precio de lista se dispara al registrar un cobro, y ese registro
+  // depende de que llegue el aviso de MP: sin esto, un aviso perdido dejaba al
+  // negocio pagando el precio rebajado para siempre, sin que nadie se entere.
+  private async avanzarDescuentoDeActivacion(id: string, businessId: string, conRespaldo = false): Promise<void> {
     let fila = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id, businessId } });
     if (!fila) return;
 
@@ -1529,7 +1535,7 @@ export class SubscriptionsService implements OnModuleInit {
     }
 
     if (fila.status === 'ACTIVE') {
-      const cobros = await this.prisma.subscriptionPayment.count({
+      let cobros = await this.prisma.subscriptionPayment.count({
         where: {
           subscription: { businessId: fila.businessId },
           status: 'APPROVED',
@@ -1537,6 +1543,19 @@ export class SubscriptionsService implements OnModuleInit {
           paidAt: { gte: fila.createdAt },
         },
       });
+      if (conRespaldo && cobros < fila.chargesTotal) {
+        const segunMP = await this.cobrosSegunMercadoPago(fila);
+        if (segunMP > cobros) {
+          this.logger.error(
+            `Descuento de activación de ${fila.businessId} (preapproval ${fila.preapprovalId}): hay ${cobros} cobro(s) registrado(s) y Mercado Pago informa ${segunMP}. Se perdió el aviso de algún cobro; se sigue con lo que dice MP.`,
+          );
+          await this.avisarInterno(
+            'Se perdió el aviso de un cobro de suscripción',
+            `<p>El negocio ${fila.businessId} (preapproval ${fila.preapprovalId}) tiene ${cobros} cobro(s) registrado(s) y Mercado Pago informa ${segunMP}. El precio rebajado se corta igual cuando corresponde, pero conviene revisar por qué no llegó el aviso y completar el historial de facturación a mano.</p>`,
+          );
+          cobros = segunMP;
+        }
+      }
       // Precio congelado: se va descontando en la suscripción lo que queda,
       // que es lo que muestra el panel y lo que usa activatePlan si el dueño
       // vuelve a pedir el link (por ejemplo tras un cambio de plan).
@@ -1558,7 +1577,7 @@ export class SubscriptionsService implements OnModuleInit {
   // autorizada (no la frecuencia), y el cambio rige desde el próximo cobro. Si
   // MP falla, la fila queda en PAID y el barrido nocturno reintenta — nunca se
   // da por restaurada sin que MP lo haya aceptado.
-  private async restaurarPrecioDeLista(fila: { id: string; businessId: string; preapprovalId: string; amountList: Prisma.Decimal; codeId: string | null }) {
+  private async restaurarPrecioDeLista(fila: { id: string; businessId: string; preapprovalId: string; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal; codeId: string | null }) {
     try {
       await this.preapproval.update({
         id: fila.preapprovalId,
@@ -1576,6 +1595,59 @@ export class SubscriptionsService implements OnModuleInit {
       data: { amount: fila.amountList, ...(fila.codeId ? {} : { frozenChargesLeft: 0 }) },
     });
     this.logger.log(`Descuento de activación de ${fila.businessId}: precio de lista devuelto a la preapproval ${fila.preapprovalId}`);
+    // Fin de un precio congelado: se le avisa al dueño que el próximo débito ya
+    // sale al precio de lista. Solo llega acá una vez por fila (PAID →
+    // RESTORED). Con un código de un solo cobro no se manda: ahí el precio
+    // rebajado era un descuento puntual que el dueño aplicó ese mismo día.
+    if (!fila.codeId) {
+      await this.notificarFinDePrecioCongelado(fila).catch((e) =>
+        this.logger.warn(`No se pudo mandar el aviso de fin de precio congelado de ${fila.businessId}: ${describeError(e)}`),
+      );
+    }
+  }
+
+  private async notificarFinDePrecioCongelado(fila: { businessId: string; amountList: Prisma.Decimal; amountFinal: Prisma.Decimal }): Promise<void> {
+    const { business, emails } = await this.destinatarios(fila.businessId);
+    if (!business || emails.length === 0) return;
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId: fila.businessId }, select: { currentPeriodEnd: true } });
+    const pesos = (n: Prisma.Decimal) => `$${Number(n).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    // El próximo cobro es cuando vence el período que se acaba de pagar. Si esa
+    // fecha ya pasó (se llegó acá por el respaldo, sin el cobro registrado) no
+    // se inventa una: el mail sale sin fecha.
+    const nextChargeDate = sub && sub.currentPeriodEnd > new Date()
+      ? sub.currentPeriodEnd.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' })
+      : undefined;
+    for (const email of emails) {
+      await this.mail.sendFrozenPriceEnded(
+        email,
+        { businessName: business.name, frozenAmount: pesos(fila.amountFinal), listAmount: pesos(fila.amountList), nextChargeDate, manageUrl: this.manageUrl(business.subdomain) },
+        { businessId: fila.businessId },
+      );
+    }
+  }
+
+  // Cuántos cobros hizo Mercado Pago sobre esta preapproval, para el respaldo
+  // de avanzarDescuentoDeActivacion. La fuente es el propio resumen de MP
+  // (`summarized.charged_quantity`). Si MP no lo informa, se estima por fecha:
+  // el cobro N cae N-1 meses después de la autorización, así que pasada esa
+  // fecha (más 5 días de margen para los reintentos de MP) y con la
+  // preapproval todavía autorizada, se dan por hechos. Devuelve 0 ante
+  // cualquier duda: sin certeza no se le sube el precio a nadie.
+  private async cobrosSegunMercadoPago(fila: { preapprovalId: string; chargesTotal: number; activatedAt: Date | null }): Promise<number> {
+    let mp;
+    try {
+      mp = await this.preapproval.get({ id: fila.preapprovalId });
+    } catch (err) {
+      this.logger.warn(`No se pudo consultar la preapproval ${fila.preapprovalId} para el respaldo de cobros: ${this.mpErrorMessage(err)}`);
+      return 0;
+    }
+    const informados = mp.summarized?.charged_quantity;
+    if (typeof informados === 'number') return informados;
+    if (mp.status !== 'authorized' || !fila.activatedAt) return 0;
+    const limite = new Date(fila.activatedAt);
+    limite.setMonth(limite.getMonth() + fila.chargesTotal - 1);
+    limite.setDate(limite.getDate() + 5);
+    return new Date() >= limite ? fila.chargesTotal : 0;
   }
 
   // Barrido nocturno de los descuentos de activación que quedaron a medias:
@@ -1606,7 +1678,7 @@ export class SubscriptionsService implements OnModuleInit {
           await this.prisma.subscriptionActivationDiscount.update({ where: { id: fila.id }, data: { status: 'CLOSED' } });
           continue;
         }
-        await this.avanzarDescuentoDeActivacion(fila.id, fila.businessId);
+        await this.avanzarDescuentoDeActivacion(fila.id, fila.businessId, true);
         const despues = await this.prisma.subscriptionActivationDiscount.findFirst({ where: { id: fila.id, businessId: fila.businessId }, select: { status: true, updatedAt: true } });
         if (despues?.status === 'PAID' && despues.updatedAt.getTime() < Date.now() - 24 * 60 * 60 * 1000) {
           atascadas.push(`${fila.businessId} — preapproval ${fila.preapprovalId}`);

@@ -413,6 +413,21 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { businessName: FIXTURE_BUSINESS_BRANDING.storeName, storeUrl: 'https://mitienda.orbita.site' },
   },
   {
+    id: 'subscription-frozen-price-ended',
+    label: 'Terminó el precio congelado',
+    group: 'Plataforma',
+    template: 'subscription-frozen-price-ended',
+    isPlatform: true,
+    subject: 'Tu precio congelado terminó: tu plan pasa a $16.500 por mes',
+    data: {
+      businessName: FIXTURE_BUSINESS_BRANDING.storeName,
+      frozenAmount: '$10.000',
+      listAmount: '$16.500',
+      nextChargeDate: '06/02/2027',
+      manageUrl: 'https://mitienda.orbita.site/admin/ventas/configuracion?vista=suscripcion',
+    },
+  },
+  {
     id: 'business-welcome',
     label: 'Bienvenida al dueño (fin del onboarding)',
     group: 'Plataforma',
