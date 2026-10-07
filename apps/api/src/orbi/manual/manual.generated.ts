@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "46011809137ccff1",
+  "version": "061e735c99ee85af",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -243,6 +243,16 @@ export const MANUAL_GENERADO: ManualGenerado = {
         "seccion": "catalogo",
         "vista": "nuevo",
         "label": "Crear un producto"
+      }
+    },
+    {
+      "id": "importar-excel",
+      "capitulo": "Productos",
+      "titulo": "Importar muchos productos desde Excel",
+      "texto": "Si tenés que cargar decenas o cientos de productos, no hace falta ir uno por uno. En Productos, el botón \"Importar Excel\" abre un asistente de cuatro pasos: Archivo, Revisión, Importar y Fotos.\n\n1. Descargá la plantilla: Con \"Descargar plantilla\" bajás un Excel con las columnas que espera el sistema (las mismas de \"Crear producto\"), tus categorías como lista desplegable y cuatro filas de ejemplo en gris que no se importan.\n2. Completala: Una fila por producto: nombre, categoría, precio, costo, stock, descripción y estado. Si tiene variantes, escribís el nombre de la variante (por ejemplo Color) y sus valores separados por coma (Rojo, Azul, Negro); con dos variantes se arman solas todas las combinaciones. El SKU se genera solo.\n3. Subila y revisá: Arrastrás o elegís el archivo y ves la revisión: qué se va a crear, qué categorías nuevas aparecen y, si hay errores, en qué fila y columna están. Con errores no se importa nada: los corregís en el Excel y lo volvés a subir con \"Subir otro archivo\".\n4. Importá y sumá fotos: Al confirmar se crean las categorías que faltaban y los productos. Al final podés ir cargando las fotos de cada uno sin salir del asistente, o tocar \"Seguir después\" y hacerlo desde cada producto.\n\nDato: Si dejás el Estado vacío, el producto queda en Borrador: así podés importar todo, ponerle fotos y publicarlo cuando esté listo. Para que un producto salga Publicado tiene que tener stock.\n\nConsejo: Si un nombre se repite en el archivo, el asistente lo marca como error: si son variantes del mismo producto, van en una sola fila con los valores separados por coma.",
+      "destino": {
+        "seccion": "catalogo",
+        "label": "Ir a Productos"
       }
     },
     {

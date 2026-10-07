@@ -227,7 +227,10 @@ export const CSS_ONBOARDING = `
   .tuob-opciones[data-n='1'], .tuob-opciones--pila { grid-template-columns: minmax(0, 1fr); }
   .tuob-opciones[data-n='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tuob-opcion { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--tuob-hueco); cursor: pointer; transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms ease, transform 220ms var(--tuo-ease); }
-  .tuob-opcion input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+  /* El radio (una sola) cubre la tarjeta entera, invisible y por encima: se elige tocando en cualquier lado.
+     La casilla (varias) sigue adentro de su label y queda escondida. */
+  .tuob-opcion > input[type='radio'] { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .tuob-opcion > input[type='checkbox'] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
   .tuob-opcion > svg { flex-shrink: 0; margin-top: 1px; color: var(--color-muted); transition: color 180ms ease; }
   .tuob-opcion > span { flex: 1; min-width: 0; }
   .tuob-opcion strong { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
@@ -237,6 +240,25 @@ export const CSS_ONBOARDING = `
   .tuob-opcion:has(input:checked) > svg { color: var(--color-primary-h); }
   .tuob-opcion:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .tuob-opcion[data-fija='true'] { cursor: default; }
+  /* "Qué es": el signo de admiración de la esquina, al lado del tilde. Mide 30 px pero se toca en 44
+     (el ::before agranda el área sin mover nada) y va por encima del radio que cubre la tarjeta. */
+  .tuob-que-es { position: relative; z-index: 3; width: 30px; height: 30px; margin: -4px 0; flex-shrink: 0; display: grid; place-items: center; padding: 0; border: none; border-radius: 8px; background: transparent; color: var(--color-muted); font-family: inherit; cursor: pointer; transition: color 160ms ease, background 160ms ease, transform 260ms cubic-bezier(0.34, 1.45, 0.64, 1); }
+  .tuob-que-es::before { content: ''; position: absolute; inset: -7px; }
+  .tuob-que-es:active { transform: scale(0.9); transition-duration: 90ms; }
+  .tuob-que-es:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .tuob-opcion:has(input:checked) > .tuob-que-es { color: var(--color-primary-h); }
+  /* El modal del "qué es": por encima del botón flotante de Orbi y de su burbuja (170 y 175), por debajo de su panel (200). */
+  .tuob-que-es-velo { z-index: 180; }
+  .tuob-que-es-icono { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--color-primary-h); background: rgba(96,165,250,0.12); border: 1px solid rgba(147,197,253,0.2); }
+  .tuob-que-es-cuerpo { display: grid; gap: 16px; }
+  .tuob-que-es-bloque { display: grid; gap: 4px; }
+  .tuob-que-es-bloque .tuo-rotulo { color: var(--chip-primary-fg); }
+  .tuob-que-es-bloque p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--color-body); }
+  /* Campo que completó Orbi: borde y fondo en el azul de la marca hasta que la persona lo edita a mano.
+     Gana sobre "disponible" (verde); "en uso" (rojo) sigue mandando. */
+  .tuob-control[data-sugerido='true']:not([data-chequeo='ocupado']) > .tuob-input:not(:focus) { border-color: #60A5FA; background: rgba(96,165,250,0.08); }
+  .tuob-sugerido { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; line-height: 1.5; font-weight: 600; color: var(--color-primary-h); animation: tuoEntra 220ms ease both; }
+  .tuob-sugerido > svg { flex-shrink: 0; }
   .tuob-plan-chip { height: 20px; margin-left: 8px; padding: 0 8px; font-size: 10.5px; vertical-align: 2px; }
   .tuob-plan-precio { font-size: 15px; font-weight: 600; color: var(--color-text); }
   .tuob-dias { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -475,6 +497,7 @@ export const CSS_ONBOARDING = `
     .tuob-logo-marco:hover { border-color: #60A5FA; box-shadow: 0 0 0 4px rgba(96,165,250,0.18); transform: scale(1.03); }
     .tuob-opcion:not([data-fija='true']):hover { border-color: rgba(147,197,253,0.5); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(3,6,14,0.5); }
     .tuob-opcion:has(input:checked):not([data-fija='true']):hover { box-shadow: 0 0 0 3px rgba(96,165,250,0.28), 0 12px 30px rgba(37,99,235,0.3); }
+    .tuob-que-es:hover { color: var(--color-primary-h); background: var(--color-primary-bg); transform: scale(1.14); }
     .tuob-dia:hover { border-color: var(--color-border-strong); color: var(--color-text); }
     .tuob-qr:hover { transform: scale(1.04) rotate(-1.5deg); box-shadow: 0 16px 40px rgba(37,99,235,0.45); }
     .tuo-btn:hover .tuob-flecha { transform: translateX(4px); }
@@ -558,14 +581,14 @@ export const CSS_ONBOARDING = `
   }
   @media (prefers-reduced-motion: reduce) {
     .tuob-paso, .tuob-previa-cuerpo, .tuob-serv, .tuob-serv[data-saliendo='true'], .tuob-tilde, .tuob-error, .tuob-planeta::before, .tuob-planeta::after, .tuob-planeta svg, .tuob-previa-hueco svg,
-    .tuob .tuob-gira, .tuob-girando, .tuob-pasos li, .tuob-tel-pantalla, .tuob-ms-rollo, .tuob-procesando, .tuob-codigo-ok, .tuob-modulo-lista { animation: none !important; }
+    .tuob .tuob-gira, .tuob-girando, .tuob-pasos li, .tuob-tel-pantalla, .tuob-ms-rollo, .tuob-procesando, .tuob-codigo-ok, .tuob-modulo-lista, .tuob-sugerido { animation: none !important; }
     .tuob-planeta::before, .tuob-planeta::after { opacity: 0; }
     /* La reserva de la página simple queda quieta en su primera pantalla: la página con el botón. */
     .tuob-esc, .tuob-dedo, .tuob-esc [data-el]::after, .tuob-esc-pulso, .tuob-esc-tilde, .tuob-esc-puntos i { animation: none !important; }
     .tuob-esc:first-child { opacity: 1; }
     .tuob-esc-puntos { display: none; }
-    .tuob-satelite, .tuob-recorrido, .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-punto > i, .tuob-pasos li, .tuob-logo-marco, .tuob-marca-opcion { transition: none !important; }
-    .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-logo-marco { transform: none !important; }
+    .tuob-satelite, .tuob-recorrido, .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-punto > i, .tuob-pasos li, .tuob-logo-marco, .tuob-marca-opcion, .tuob-que-es { transition: none !important; }
+    .tuob-rubro, .tuob-rubro-icono, .tuob-opcion, .tuob-modulo, .tuob-qr, .tuob-flecha, .tuob-agregar svg, .tuob-logo-marco, .tuob-que-es { transform: none !important; }
   }
   @media (max-width: 640px) { .tuob .tuo-btn--sm { min-height: 44px; } }
 `

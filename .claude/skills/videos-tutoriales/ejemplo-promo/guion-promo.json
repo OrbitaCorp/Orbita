@@ -1,0 +1,30 @@
+{
+ "voz": "Achird",
+ "idioma": "es-AR",
+ "_nota": "Tono de ANUNCIO (no de tutorial): frases cortas, preguntas que enganchan, exclamaciones. Reel = ganchos A (a1, a2) o B (b1, b2) + cuerpo c1–c5; YouTube = y*. Solo el texto (el TTS lee en voz alta cualquier instrucción). 'pantalla' = cómo se escribe (con *énfasis* y | para cortar los subtítulos).",
+ "frases": [
+  { "id": "a1", "texto": "¡Tu tienda online por menos de veinte mil pesos al mes!", "pantalla": "Tu tienda online por *menos de $20.000* al mes" },
+  { "id": "a2", "texto": "¡Y sin comisión por venta!", "pantalla": "Y *sin comisión* por venta" },
+  { "id": "b1", "texto": "¿Ferretería? ¿Pet shop? ¿Ropa? ¿Librería?" },
+  { "id": "b2", "texto": "¡Órbita se adapta a lo que vendés!", "pantalla": "Órbita se adapta a *lo que vendés*" },
+  { "id": "c1", "texto": "Tus clientes compran desde el celu, y te pagan con Mercado Pago.", "pantalla": "Tus clientes compran desde el celu | y te pagan con *Mercado Pago*" },
+  { "id": "c2", "texto": "Los pedidos te llegan al toque, y el stock se actualiza solo.", "pantalla": "Los pedidos te llegan al toque | y el *stock se actualiza solo*" },
+  { "id": "c3", "texto": "¿Qué se vende más? Preguntale a Orbi, tu asistente con inteligencia artificial.", "pantalla": "¿Qué se vende más? | Preguntale a *Orbi*, tu asistente con IA" },
+  { "id": "c4", "texto": "¿Querés vender más? Con Avanzado, sumá juegos con premio y ofertas relámpago.", "pantalla": "¿Querés vender más? | Sumá *juegos con premio* y ofertas relámpago" },
+  { "id": "c5", "texto": "Órbita. Tu tienda y tu negocio, en un solo lugar. ¡Sin comisión por venta!" },
+
+  { "id": "y1", "texto": "¿Ferretería? ¿Pet shop? ¿Ropa? ¿Librería?" },
+  { "id": "y2", "texto": "¡Tu tienda online por menos de veinte mil pesos al mes, y sin comisión por venta!", "pantalla": "Tu tienda online por *menos de $20.000* al mes y *sin comisión* por venta" },
+  { "id": "y3", "texto": "Vendas lo que vendas, se adapta: talles y colores, números de serie, o venta por kilo y por metro.", "pantalla": "Vendas lo que vendas, se adapta: | *talles y colores*, números de serie, | o venta por kilo y por metro" },
+  { "id": "y4", "texto": "Tus clientes eligen desde el celu, y te pagan con Mercado Pago o transferencia.", "pantalla": "Tus clientes eligen desde el celu | y te pagan con *Mercado Pago* o transferencia" },
+  { "id": "y4b", "texto": "Ellos eligen cómo recibirlo: envío a domicilio, o retiro en tu local.", "pantalla": "Eligen cómo recibirlo: | *envío a domicilio* | o retiro en tu local" },
+  { "id": "y5", "texto": "Cada pedido te llega al panel. Lo confirmás con un toque, y el stock se descuenta solo.", "pantalla": "Cada pedido te llega al panel. | Lo confirmás con un toque | y *el stock se descuenta solo*" },
+  { "id": "y6", "texto": "Mirá cuánto vale tu inventario, y cuánto te deja de ganancia.", "pantalla": "Cuánto vale tu inventario | y *cuánto te deja de ganancia*" },
+  { "id": "y6c", "texto": "Sabé quién te compra y cuánto, y respondé todos los mensajes desde un solo lugar.", "pantalla": "Sabé quién te compra y cuánto | y respondé *todos los mensajes* en un solo lugar" },
+  { "id": "y6d", "texto": "Armá cupones de descuento, y usá tu propio dominio.", "pantalla": "Armá *cupones* de descuento | y usá *tu propio dominio*" },
+  { "id": "y7", "texto": "Y en el inicio: tus ventas, las alertas, y lo que más se vende.", "pantalla": "Y en el inicio: | tus ventas, | las alertas, | y *lo que más se vende*" },
+  { "id": "y8", "texto": "¿Tenés una duda? Preguntale a Orbi, tu asistente con inteligencia artificial.", "pantalla": "¿Tenés una duda? | Preguntale a *Orbi*, tu asistente con IA" },
+  { "id": "y9", "texto": "¿Querés vender más? Con el paquete Avanzado sumás juegos con premio, ofertas relámpago, y portadas para cada rubro.", "pantalla": "¿Querés vender más? | Sumá *juegos con premio*, ofertas relámpago y portadas por rubro" },
+  { "id": "y10", "texto": "Órbita. Tu tienda y tu negocio, en un solo lugar. ¡Sin comisión por venta!" }
+ ]
+}

@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Órbita · compositor de videos tutoriales</title>
+<style>
+@font-face{font-family:'Geist';font-style:normal;font-weight:100 900;src:url(fonts/geist-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Geist';font-style:normal;font-weight:100 900;src:url(fonts/geist-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Sora';font-style:normal;font-weight:100 900;src:url(fonts/sora-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Sora';font-style:normal;font-weight:100 900;src:url(fonts/sora-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{ --primary:#3B82F6; --primary-h:#2563EB; --text:#0F172A; --muted:#64748B; }
+*{box-sizing:border-box}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#fff}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#bg{position:absolute;inset:0;background:
+    radial-gradient(1100px 760px at 12% 6%, rgba(37,99,235,.55) 0%, transparent 62%),
+    radial-gradient(900px 700px at 96% 104%, rgba(59,130,246,.40) 0%, transparent 60%),
+    linear-gradient(158deg,#0C1A3D 0%,#0A1432 48%,#060B1E 100%)}
+#rings{position:absolute;inset:0}
+#noise{position:absolute;inset:0;opacity:.05;mix-blend-mode:overlay;pointer-events:none}
+canvas{position:absolute;left:0;top:0}
+
+/* ── Diálogo "Abrir" (recreación de Windows 11) ───────────────── */
+#dlg{position:absolute;left:520px;top:250px;width:880px;height:560px;border-radius:8px;overflow:hidden;opacity:0;
+  font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A1A1A;
+  background:linear-gradient(180deg,#EEF2F7 0%,#F3F3F3 120px);border:1px solid rgba(0,0,0,.14);
+  box-shadow:0 32px 64px rgba(0,0,0,.30),0 2px 21px rgba(0,0,0,.20);transform-origin:50% 50%}
+#dlg .tb{position:absolute;left:0;top:0;right:0;height:34px;display:flex;align-items:center;padding-left:14px;gap:10px;font-size:12px}
+#dlg .tb .x{position:absolute;right:0;top:0;width:46px;height:34px;display:grid;place-items:center;color:#333}
+#dlg .tool{position:absolute;left:0;right:0;top:34px;height:46px;display:flex;align-items:center;gap:6px;padding:0 10px}
+#dlg .ib{width:32px;height:32px;display:grid;place-items:center;border-radius:4px;color:#555}
+#dlg .addr{flex:1;height:32px;border-radius:4px;background:#fff;border:1px solid #E5E5E5;display:flex;align-items:center;gap:6px;padding:0 10px;color:#1A1A1A}
+#dlg .addr .sep{color:#8A8A8A}
+#dlg .search{width:240px;height:32px;border-radius:4px;background:#fff;border:1px solid #E5E5E5;display:flex;align-items:center;gap:8px;padding:0 10px;color:#767676}
+#dlg .cmd{position:absolute;left:0;right:0;top:80px;height:40px;display:flex;align-items:center;gap:18px;padding:0 16px;border-bottom:1px solid #E5E5E5;color:#1A1A1A}
+#dlg .cmd span{display:flex;align-items:center;gap:6px}
+#dlg .nav{position:absolute;left:0;top:120px;width:196px;bottom:104px;padding:8px 6px;border-right:1px solid #E8E8E8;background:rgba(255,255,255,.35)}
+#dlg .nav div{height:30px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:4px}
+#dlg .nav div.sel{background:#E0E7F1}
+#dlg .nav hr{border:0;border-top:1px solid #E1E1E1;margin:6px 8px}
+#dlg .content{position:absolute;left:196px;right:0;top:120px;bottom:104px;background:#fff}
+#dlg .item{position:absolute;top:18px;width:136px;height:170px;border-radius:4px;border:1px solid transparent;text-align:center}
+#dlg .item.sel{background:#CCE8FF;border-color:#99D1FF}
+#dlg .item .th{width:120px;height:112px;margin:8px auto 6px;display:grid;place-items:center}
+#dlg .item .th img{max-width:116px;max-height:110px;object-fit:contain;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+#dlg .item .nm{font-size:12px;line-height:16px;padding:0 6px;word-break:break-all}
+#dlg .foot{position:absolute;left:0;right:0;bottom:0;height:104px;border-top:1px solid #E5E5E5;background:#F3F3F3}
+#dlg .row1{position:absolute;left:22px;right:22px;top:16px;display:flex;align-items:center;gap:10px}
+#dlg .fname{flex:1;height:30px;border-radius:4px;background:#fff;border:1px solid #D9D9D9;border-bottom:2px solid #005FB8;display:flex;align-items:center;padding:0 10px;white-space:nowrap;overflow:hidden;font-size:12.5px}
+#dlg .filter{width:270px;height:30px;border-radius:4px;background:#fff;border:1px solid #D9D9D9;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:12.5px;white-space:nowrap;overflow:hidden}
+#dlg .btn{position:absolute;top:58px;width:96px;height:32px;border-radius:4px;display:grid;place-items:center;font-size:13px}
+#dlg .btn.ok{right:132px;background:#005FB8;color:#fff;border:1px solid #0067C0}
+#dlg .btn.ok.press{background:#00508F}
+#dlg .btn.no{right:24px;background:#fff;border:1px solid #D0D0D0}
+#key{position:absolute;opacity:0;padding:6px 12px;border-radius:8px;background:#0F172A;color:#fff;font:600 18px/1 'Geist';box-shadow:0 8px 20px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15)}
+
+/* ── Carteles ───────────────────────────────────────────────── */
+#cap{position:absolute;left:84px;top:900px;display:flex;align-items:center;gap:18px;padding:16px 28px 16px 16px;border-radius:20px;background:rgba(255,255,255,.97);
+  box-shadow:0 24px 60px rgba(2,6,23,.40),0 0 0 1px rgba(15,23,42,.06);opacity:0;will-change:transform,opacity;max-width:900px}
+#capN{flex:none;width:48px;height:48px;border-radius:14px;background:linear-gradient(140deg,#3B82F6,#2563EB);color:#fff;display:flex;align-items:center;justify-content:center;
+  font:700 24px/1 'Geist';letter-spacing:-.02em;box-shadow:0 6px 14px rgba(37,99,235,.35)}
+#capN.icon{font-size:22px}
+#capT{font:650 30px/1.1 'Geist';color:var(--text);letter-spacing:-.022em;white-space:nowrap}
+#capS{font:500 19px/1.25 'Geist';color:var(--muted);letter-spacing:-.01em;margin-top:5px;white-space:nowrap}
+
+/* ── Placa de capítulo ──────────────────────────────────────── */
+#capitulo{position:absolute;left:0;top:0;width:1920px;height:1080px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;opacity:0;pointer-events:none}
+#capK{padding:11px 24px;border-radius:999px;background:rgba(59,130,246,.20);border:1px solid rgba(147,197,253,.50);color:#BFDBFE;font:700 22px/1 'Geist';letter-spacing:.16em;text-transform:uppercase}
+#capTit{font:600 78px/1.05 'Sora';letter-spacing:-.035em;color:#fff;text-align:center;text-shadow:0 10px 50px rgba(2,6,23,.65)}
+#capSub{font:500 29px/1.3 'Geist';letter-spacing:-.01em;color:rgba(226,232,240,.92);text-align:center}
+
+/* ── Intro / cierre ─────────────────────────────────────────── */
+#veil{position:absolute;inset:0;background:#fff}
+#veil .glow{position:absolute;inset:0;background:radial-gradient(ellipse 900px 900px at 50% 44%, rgba(59,130,246,.09) 0%, transparent 70%)}
+#logo{position:absolute;left:50%;top:0;width:0;height:0}
+#logoSpin{position:absolute;left:-110px;top:-110px;width:220px;height:220px}
+.ring{position:absolute;left:-110px;top:-110px;width:220px;height:220px;border-radius:50%}
+#brand{position:absolute;left:0;width:1920px;text-align:center;font:700 56px/1 'Geist';letter-spacing:-.02em;color:var(--text)}
+#title{position:absolute;left:0;width:1920px;text-align:center;font:600 46px/1.15 'Sora';letter-spacing:-.03em;color:var(--text)}
+#site{position:absolute;left:50%;transform:translateX(-50%);padding:12px 26px;border-radius:999px;background:#EFF6FF;color:#1D4ED8;font:600 26px/1 'Geist';letter-spacing:-.01em;border:1px solid #DBEAFE}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg"></div>
+  <svg id="rings" viewBox="0 0 1920 1080" width="1920" height="1080"></svg>
+  <svg id="noise" width="1920" height="1080"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+  <canvas id="cam" width="1920" height="1080"></canvas>
+
+  <div id="dlg">
+    <div class="tb">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" fill="#FFC83D"/><path d="M3 9h18v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="#FFD75E"/></svg>
+      <span>Abrir</span>
+      <div class="x"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="#333" stroke-width="1.1"/></svg></div>
+    </div>
+    <div class="tool">
+      <div class="ib"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" fill="none" stroke="#666" stroke-width="1.3"/></svg></div>
+      <div class="ib"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5" fill="none" stroke="#AAA" stroke-width="1.3"/></svg></div>
+      <div class="ib"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" fill="none" stroke="#666" stroke-width="1.3"/></svg></div>
+      <div class="addr">
+        <svg width="16" height="16" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="#7FB3E8"/><circle cx="9" cy="10" r="2" fill="#fff"/><path d="M5 17l5-5 3 3 2-2 4 4z" fill="#3D7CC9"/></svg>
+        <span class="sep">›</span><span>Este equipo</span><span class="sep">›</span><span id="dlgRuta">Imágenes</span>
+      </div>
+      <div class="search"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="#777" stroke-width="1.2"/><path d="M10.5 10.5L14 14" stroke="#777" stroke-width="1.2"/></svg><span id="dlgBuscar">Buscar en Imágenes</span></div>
+    </div>
+    <div class="cmd">
+      <span>Organizar <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 2.5l3 3 3-3" fill="none" stroke="#333"/></svg></span>
+      <span>Nueva carpeta</span>
+      <span style="margin-left:auto;color:#555"><svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" fill="none" stroke="#555"/><rect x="9" y="2" width="5" height="5" fill="none" stroke="#555"/><rect x="2" y="9" width="5" height="5" fill="none" stroke="#555"/><rect x="9" y="9" width="5" height="5" fill="none" stroke="#555"/></svg></span>
+    </div>
+    <div class="nav">
+      <div>🏠&nbsp;Inicio</div><div>🖼️&nbsp;Galería</div><hr>
+      <div>🖥️&nbsp;Escritorio</div><div>⬇️&nbsp;Descargas</div><div>📄&nbsp;Documentos</div><div class="sel">🖼️&nbsp;Imágenes</div><div>🎵&nbsp;Música</div><div>🎬&nbsp;Videos</div><hr><div>💻&nbsp;Este equipo</div>
+    </div>
+    <div class="content" id="dlgItems"></div>
+    <div class="foot">
+      <div class="row1">
+        <span>Nombre:</span>
+        <div class="fname" id="dlgName"></div>
+        <div class="filter">Archivos de imagen (*.jpg;*.png;*.webp;*.heic) <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 2.5l3 3 3-3" fill="none" stroke="#333"/></svg></div>
+      </div>
+      <div class="btn ok" id="dlgOk">Abrir</div>
+      <div class="btn no">Cancelar</div>
+    </div>
+  </div>
+  <div id="key">⇧ Shift</div>
+
+  <canvas id="cur" width="1920" height="1080"></canvas>
+
+  <div id="cap"><div id="capN">1</div><div><div id="capT"></div><div id="capS"></div></div></div>
+  <div id="capitulo"><div id="capK"></div><div id="capTit"></div><div id="capSub"></div></div>
+
+  <div id="veil">
+    <div class="glow"></div>
+    <div id="logo">
+      <div class="ring" id="ring1"></div>
+      <div class="ring" id="ring2"></div>
+      <svg id="logoSpin" viewBox="0 0 88 88" fill="none">
+        <circle id="hubHalo" cx="44" cy="44" r="18" fill="rgba(59,130,246,.10)"/>
+        <g id="spinG">
+          <circle id="arc" cx="44" cy="44" r="32" stroke-width="3" stroke="#3B82F6" stroke-linecap="round" stroke-dasharray="151 50" transform="rotate(-90 44 44)"/>
+          <circle id="satHalo" cx="44" cy="12" r="9" fill="rgba(37,99,235,.22)"/>
+          <circle id="sat" cx="44" cy="12" r="5.5" fill="#2563EB"/>
+        </g>
+        <circle id="hub" cx="44" cy="44" r="10" fill="#0F172A"/>
+      </svg>
+    </div>
+    <div id="brand">Órbita</div>
+    <div id="title"></div>
+    <div id="site">orbita.site</div>
+  </div>
+</div>
+
+<script>
+// ── Utilidades ─────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const lerp = (a, b, u) => a + (b - a) * u
+const prog = (t, a, b) => clamp((t - a) / (b - a), 0, 1)
+const eio = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2
+const eo = u => 1 - Math.pow(1 - u, 3)
+const eo5 = u => 1 - Math.pow(1 - u, 5)
+const smooth = u => u * u * u * (u * (u * 6 - 15) + 10)
+const spring = (u, k = 1) => u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.exp(-6 * u) * Math.cos(9.5 * u * k)
+
+let TL = null
+// Ventana en coordenadas de "mundo" (stage a zoom 1)
+const WX = 240, WY = 68, WW = 1440, WH = 944, CH = 44, SY = WY + CH
+const scr = (x, y) => [WX + x, SY + y]          // pantalla (px CSS del panel) → mundo
+
+// ── Fondo ─────────────────────────────────────────────────────────────────
+function drawRings(t) {
+  const cx = 1500, cy = 120
+  let html = ''
+  ;[260, 470, 700, 960, 1240].forEach((r, i) => {
+    html += `<ellipse cx="${cx}" cy="${cy}" rx="${r}" ry="${r * 0.62}" fill="none" stroke="rgba(147,197,253,${0.10 - i * 0.012})" stroke-width="1.2" transform="rotate(-18 ${cx} ${cy})"/>`
+  })
+  ;[[470, 0.035, 0], [960, 0.018, 2.1]].forEach(([r, w, ph]) => {
+    const a = ph + t * w * Math.PI * 2, rot = -18 * Math.PI / 180
+    const x0 = Math.cos(a) * r, y0 = Math.sin(a) * r * 0.62
+    const x = cx + x0 * Math.cos(rot) - y0 * Math.sin(rot), y = cy + x0 * Math.sin(rot) + y0 * Math.cos(rot)
+    html += `<circle cx="${x}" cy="${y}" r="10" fill="rgba(147,197,253,.10)"/><circle cx="${x}" cy="${y}" r="4" fill="rgba(191,219,254,.55)"/>`
+  })
+  $('rings').innerHTML = html
+}
+
+// ── Logo del loader ───────────────────────────────────────────────────────
+function drawLogo(a, cy, alpha) {
+  const L = $('logo')
+  L.style.top = cy + 'px'; L.style.opacity = alpha
+  $('hub').setAttribute('r', (10 * spring(prog(a, 0, .55))).toFixed(3))
+  $('hubHalo').setAttribute('r', (18 * spring(prog(a, .08, .65))).toFixed(3))
+  const arcU = eo(prog(a, .12, .85)), C = 2 * Math.PI * 32
+  $('arc').setAttribute('stroke-dasharray', `${(151 * arcU).toFixed(2)} ${(C - 151 * arcU).toFixed(2)}`)
+  $('arc').style.opacity = arcU > 0 ? 1 : 0
+  const satU = eo(prog(a, .35, .7))
+  $('sat').setAttribute('r', (5.5 * satU).toFixed(3)); $('satHalo').setAttribute('r', (9 * satU).toFixed(3))
+  const ang = (a < .9 ? 360 * (a * a / 1.8) : 360 * (.45 + (a - .9))) % 360
+  $('spinG').setAttribute('transform', `rotate(${ang.toFixed(2)} 44 44)`)
+  const ringsOn = prog(a, .55, 1)
+  ;[['ring1', 0, .35], ['ring2', .75, .20]].forEach(([id, d, op]) => {
+    const el = $(id), k = a - .55 - d
+    if (k < 0) { el.style.opacity = 0; return }
+    const u = (k % 2) / 2, e = 1 - Math.pow(1 - u, 2)
+    el.style.border = `3.75px solid rgba(59,130,246,${op})`
+    el.style.transform = `scale(${lerp(.85, 2.2, e)})`
+    el.style.opacity = (1 - e) * ringsOn
+  })
+}
+function fadeUp(el, t, a, dur = .6, dist = 34) { const u = eo5(prog(t, a, a + dur)); el.style.opacity = u; return (1 - u) * dist }
+
+// ── Tiempo de salida → fuente ─────────────────────────────────────────────
+function segAt(t) {
+  const S = TL.segs; let lo = 0, hi = S.length - 1, idx = 0
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (S[m].o0 <= t) { idx = m; lo = m + 1 } else hi = m - 1 }
+  return idx
+}
+function srcTime(t, i = segAt(t)) {
+  const s = TL.segs[i], u = clamp((t - s.o0) / Math.max(1e-6, s.o1 - s.o0), 0, 1)
+  return lerp(s.s0, s.s1, s.ease ? smooth(u) : u)
+}
+function frameAt(s) {
+  const F = TL.frames; let lo = 0, hi = F.length - 1, idx = 0
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (F[m].s <= s + 1e-6) { idx = m; lo = m + 1 } else hi = m - 1 }
+  return F[idx].f
+}
+function urlAt(s) { let u = TL.urls[0]?.u ?? ''; for (const e of TL.urls) if (e.s <= s) u = e.u; return u }
+
+// ── Cámara: un rectángulo de "mundo" que se ve en pantalla ────────────────
+// Cada objetivo (foco en px de pantalla + zoom) se convierte en un
+// rectángulo {cx, cy, w}; entre dos rectángulos se interpola el ancho en forma
+// geométrica y el centro con el MISMO peso que el ancho, así el movimiento es
+// un zoom sobre un punto fijo, sin quiebres. Todo se dibuja en canvas con
+// posición subpíxel (nada se redondea a píxeles enteros: sin temblor).
+const R0 = { cx: 960, cy: 540, w: 1920 }
+function rectObjetivo(k) {
+  const z = k.z ?? 1
+  if (z <= 1.0001) return { ...R0 }
+  const w = 1920 / z, h = 1080 / z
+  let [fx, fy] = scr(k.x ?? 720, k.y ?? 450)
+  const b = smooth(clamp((z - 1) / .35, 0, 1))
+  fx = lerp(960, fx, b); fy = lerp(540, fy, b)
+  const loX = WX + w / 2, hiX = WX + WW - w / 2
+  fx = loX <= hiX ? clamp(fx, loX, hiX) : clamp(fx, hiX, loX)
+  const loY = WY + h / 2, hiY = WY + WH - h / 2
+  fy = loY <= hiY ? clamp(fy, loY, hiY) : clamp(fy, hiY, loY)
+  return { cx: fx, cy: fy, w }
+}
+function interpRect(A, B, s) {
+  const w = A.w * Math.pow(B.w / A.w, s)
+  const g = Math.abs(B.w - A.w) > .5 ? (w - A.w) / (B.w - A.w) : s
+  return { cx: lerp(A.cx, B.cx, g), cy: lerp(A.cy, B.cy, g), w }
+}
+let CAM = []
+function prepararCamara() {
+  const ks = [...TL.cam].sort((a, b) => a.t - b.t)
+  let prev = null, from = { ...R0 }
+  CAM = []
+  for (const k of ks) {
+    let t = k.t
+    if (prev && t < prev.t + prev.d) t = prev.t + prev.d      // sin solapes
+    const kk = { t, d: Math.max(.05, k.d), from, to: rectObjetivo(k) }
+    CAM.push(kk); from = kk.to; prev = kk
+  }
+}
+function camAt(t) {
+  let r = { ...R0 }
+  for (const k of CAM) { if (t < k.t) break; r = t >= k.t + k.d ? k.to : interpRect(k.from, k.to, smooth((t - k.t) / k.d)) }
+  return r
+}
+// Entrada/salida de la ventana (sobre el mundo, antes de la cámara)
+function winAnim(t) {
+  const OUT = TL.duration - (TL.outro ?? 5.4)
+  const inU = eo5(prog(t, 2.55, 3.55)), outU = eio(prog(t, OUT, OUT + .9))
+  return { s: lerp(.9, 1, inU) * lerp(1, .86, outU), dy: (1 - inU) * 90, a: Math.min(inU, 1 - outU) }
+}
+// Matriz mundo → stage (canvas): cámara ∘ animación de ventana
+function matriz(t) {
+  const r = camAt(t), k = 1920 / r.w, h = r.w * 9 / 16
+  const w = winAnim(t), s = w.s
+  const v0x = r.cx - r.w / 2, v0y = r.cy - h / 2
+  return { a: s * k, e: (960 * (1 - s) - v0x) * k, f: (540 * (1 - s) + w.dy - v0y) * k, alpha: w.a }
+}
+const aStage = (m, x, y) => [x * m.a + m.e, y * m.a + m.f]
+
+// ── Barra del navegador (se cachea por URL) ───────────────────────────────
+const chromeCache = new Map()
+function chromeCanvas(url) {
+  if (chromeCache.has(url)) return chromeCache.get(url)
+  const S = 2, c = document.createElement('canvas'); c.width = WW * S; c.height = CH * S
+  const x = c.getContext('2d'); x.scale(S, S)
+  x.fillStyle = '#F8FAFC'; x.fillRect(0, 0, WW, CH)
+  x.fillStyle = '#E2E8F0'; x.fillRect(0, CH - 1, WW, 1)
+  ;[['#FF5F57', 24], ['#FEBC2E', 44], ['#28C840', 64]].forEach(([col, cx]) => { x.beginPath(); x.arc(cx, 22, 6, 0, Math.PI * 2); x.fillStyle = col; x.fill() })
+  x.font = '500 14px Geist'
+  const tw = x.measureText(url).width
+  const pw = clamp(tw + 60, 520, 760), px = WW / 2 - pw / 2
+  x.fillStyle = '#EEF2F7'; x.beginPath(); x.roundRect(px, 8, pw, 28, 8); x.fill()
+  const gx = WW / 2 - (tw + 21) / 2
+  // candado
+  x.strokeStyle = '#64748B'; x.lineWidth = 1.5; x.lineCap = 'round'; x.lineJoin = 'round'
+  x.beginPath(); x.roundRect(gx, 17.5, 10, 8, 1.5); x.stroke()
+  x.beginPath(); x.moveTo(gx + 2.5, 17.5); x.lineTo(gx + 2.5, 15); x.arc(gx + 5, 15, 2.5, Math.PI, 0); x.lineTo(gx + 7.5, 17.5); x.stroke()
+  x.fillStyle = '#475569'; x.textBaseline = 'middle'; x.fillText(url, gx + 19, 22.5)
+  chromeCache.set(url, c)
+  return c
+}
+
+// ── Imágenes de la pantalla ───────────────────────────────────────────────
+const imgCache = new Map()
+function img(src) {
+  let e = imgCache.get(src)
+  if (!e) {
+    const im = new Image(); im.src = src
+    e = { im, p: im.decode().catch(() => {}) }
+    imgCache.set(src, e)
+    if (imgCache.size > 24) { const k = imgCache.keys().next().value; imgCache.delete(k) }
+  }
+  return e
+}
+
+// ── Scroll suave por compensación de movimiento ──────────────────────────
+function planScroll(t, seg) {
+  const sc = TL.scrolls[seg.scroll], F = sc.frames
+  const P = sc.Y * smooth(clamp((t - seg.o0) / (seg.o1 - seg.o0), 0, 1))
+  let lo = 0, hi = F.length - 1, i1 = 0
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (F[m].P <= P) { i1 = m; lo = m + 1 } else hi = m - 1 }
+  const f1 = F[i1], f2 = F[Math.min(F.length - 1, i1 + 1)].P >= P ? F[Math.min(F.length - 1, i1 + 1)] : f1
+  const d1 = Math.max(0, P - f1.P), d2 = Math.max(0, f2.P - P)
+  return { P, f1, f2, d1, d2, base: d1 <= d2 ? f1 : f2, zona: sc.zona }
+}
+
+// ── Resaltado de bloques ──────────────────────────────────────────────────
+// TL.hl: [{o0, o1, boxes:[{t,x,y,w,h}]}] en px de pantalla
+function hlAt(t) {
+  for (const h of TL.hl ?? []) {
+    if (t < h.o0 - .01 || t > h.o1 + .4) continue
+    const a = Math.min(eo(prog(t, h.o0, h.o0 + .35)), 1 - eio(prog(t, h.o1, h.o1 + .4)))
+    let b = h.boxes[0]
+    for (let i = 1; i < h.boxes.length; i++) {
+      const nb = h.boxes[i]
+      if (t >= nb.t) { const u = smooth(prog(t, nb.t, nb.t + .4)); b = { x: lerp(b.x, nb.x, u), y: lerp(b.y, nb.y, u), w: lerp(b.w, nb.w, u), h: lerp(b.h, nb.h, u) } }
+    }
+    return { a, ...b }
+  }
+  return null
+}
+
+// ── Dibujo de la ventana ──────────────────────────────────────────────────
+const ctx = $('cam').getContext('2d'), cctx = $('cur').getContext('2d')
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r) }
+async function drawWindow(t) {
+  const m = matriz(t)
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 1920, 1080)
+  if (m.alpha <= .001) return m
+  const i = segAt(t), s = srcTime(t, i), seg = TL.segs[i]
+  const plan = seg.scroll != null ? planScroll(t, seg) : null
+  const A = img(plan ? plan.base.f : frameAt(s))
+  const I1 = plan ? img(plan.f1.f) : null, I2 = plan ? img(plan.f2.f) : null
+  if (plan) { await I1.p; await I2.p }
+  let B = null, bA = 0
+  if (seg.xf && t < seg.o0 + seg.xf && i > 0) { B = img(frameAt(TL.segs[i - 1].s1)); bA = 1 - smooth(prog(t, seg.o0, seg.o0 + seg.xf)) }
+  await A.p; if (B) await B.p
+  ctx.globalAlpha = m.alpha
+  ctx.setTransform(m.a, 0, 0, m.a, m.e, m.f)
+  // sombras (en espacio de dispositivo: escalar a mano)
+  ctx.save()
+  ctx.shadowColor = 'rgba(2,6,23,.62)'; ctx.shadowBlur = 150 * m.a; ctx.shadowOffsetY = 60 * m.a
+  rr(ctx, WX, WY, WW, WH, 14); ctx.fillStyle = '#fff'; ctx.fill()
+  ctx.shadowColor = 'rgba(2,6,23,.32)'; ctx.shadowBlur = 40 * m.a; ctx.shadowOffsetY = 18 * m.a; ctx.fill()
+  ctx.restore()
+  ctx.save()
+  rr(ctx, WX, WY, WW, WH, 14); ctx.clip()
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(chromeCanvas(urlAt(s)), WX, WY, WW, CH)
+  ctx.drawImage(A.im, WX, SY, WW, WH - CH)
+  if (plan && (plan.d1 > .01 || plan.d2 > .01)) {
+    // compensación: la zona que scrollea se arma con los dos cuadros vecinos
+    // corridos a la posición exacta de la curva suave
+    const z = plan.zona, [zx, zy] = scr(z.x, z.y)
+    ctx.save(); ctx.beginPath(); ctx.rect(zx, zy, z.w, z.h); ctx.clip()
+    ctx.drawImage(I2.im, WX, SY + plan.d2, WW, WH - CH)
+    ctx.beginPath(); ctx.rect(zx, zy, z.w, plan.d2 + 1); ctx.clip()
+    ctx.drawImage(I1.im, WX, SY - plan.d1, WW, WH - CH)
+    ctx.restore()
+    // elementos fijos dentro de la zona (no se desplazan)
+    for (const fz of z.fijos ?? []) {
+      const [fx, fy] = scr(fz.x, fz.y), k = A.im.naturalWidth / WW
+      ctx.drawImage(A.im, fz.x * k, fz.y * k, fz.w * k, fz.h * k, fx, fy, fz.w, fz.h)
+    }
+  }
+  if (B && bA > 0) { ctx.globalAlpha = m.alpha * bA; ctx.drawImage(B.im, WX, SY, WW, WH - CH); ctx.globalAlpha = m.alpha }
+  // resaltado
+  const h = hlAt(t)
+  if (h && h.a > 0) {
+    const pad = 10, [hx, hy] = scr(h.x - pad, h.y - pad), hw = h.w + pad * 2, hh = h.h + pad * 2
+    ctx.fillStyle = `rgba(15,23,42,${.32 * h.a})`
+    ctx.beginPath(); ctx.rect(WX, SY, WW, WH - CH); ctx.roundRect(hx, hy, hw, hh, 12); ctx.fill('evenodd')
+    ctx.save(); ctx.shadowColor = `rgba(59,130,246,${.55 * h.a})`; ctx.shadowBlur = 22 * m.a
+    ctx.strokeStyle = `rgba(59,130,246,${h.a})`; ctx.lineWidth = 3; rr(ctx, hx, hy, hw, hh, 12); ctx.stroke(); ctx.restore()
+  }
+  ctx.restore()
+  ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1 / m.a; rr(ctx, WX + .5 / m.a, WY + .5 / m.a, WW - 1 / m.a, WH - 1 / m.a, 14); ctx.stroke()
+  ctx.globalAlpha = 1
+  return m
+}
+
+// ── Cursor (encima de todo, incluido el diálogo) ──────────────────────────
+function curAt(t) {
+  let p = { x: TL.cur[0]?.x ?? 720, y: TL.cur[0]?.y ?? 450 }
+  for (const k of TL.cur) {
+    if (t < k.t) break
+    const u = eio(prog(t, k.t, k.t + k.d)), from = { ...p }
+    const dx = k.x - from.x, dy = k.y - from.y, dist = Math.hypot(dx, dy)
+    const bow = Math.sin(Math.PI * u) * Math.min(60, dist * 0.10)
+    const nx = dist ? -dy / dist : 0, ny = dist ? dx / dist : 0
+    p = u >= 1 ? { x: k.x, y: k.y } : { x: lerp(from.x, k.x, u) + nx * bow, y: lerp(from.y, k.y, u) + ny * bow }
+  }
+  return p
+}
+function curVisible(t) {
+  let v = 0, since = -9
+  for (const e of TL.curVis) if (e.t <= t) { v = e.v; since = e.t }
+  const u = eo(prog(t, since, since + .25)); return v ? u : 1 - u
+}
+const CURSOR = new Path2D('M5 3 L5 26 L10.6 20.8 L14.4 29.6 L18.6 27.8 L14.9 19.2 L22.6 19.2 Z')
+function drawCursor(t, m) {
+  cctx.setTransform(1, 0, 0, 1, 0, 0); cctx.clearRect(0, 0, 1920, 1080)
+  const vis = curVisible(t) * m.alpha
+  if (vis <= .001) return
+  const p = curAt(t), [wx, wy] = scr(p.x, p.y)
+  let press = 0, pulseU = -1
+  for (const c of TL.clicks) { const dt = t - c; if (dt >= -.08 && dt < .18) press = Math.max(press, 1 - Math.abs(dt - .03) / .15); if (dt >= 0 && dt < .55) pulseU = dt / .55 }
+  cctx.setTransform(m.a, 0, 0, m.a, m.e, m.f)
+  if (pulseU >= 0) {
+    const e = eo(pulseU), r = lerp(7.5, 37.5, e)
+    cctx.globalAlpha = (1 - pulseU) * .95 * vis
+    cctx.beginPath(); cctx.arc(wx, wy, r, 0, Math.PI * 2); cctx.fillStyle = 'rgba(59,130,246,.18)'; cctx.fill()
+    cctx.lineWidth = 3; cctx.strokeStyle = '#3B82F6'; cctx.stroke()
+  }
+  const s = 1 - .14 * clamp(press, 0, 1)
+  cctx.globalAlpha = vis
+  cctx.save()
+  cctx.translate(wx, wy); cctx.scale(s, s); cctx.translate(-4, -3)
+  cctx.shadowColor = 'rgba(0,0,0,.28)'; cctx.shadowBlur = 6 * m.a * s; cctx.shadowOffsetY = 3 * m.a * s
+  cctx.fillStyle = '#0F172A'; cctx.fill(CURSOR)
+  cctx.shadowColor = 'transparent'
+  cctx.lineJoin = 'round'; cctx.lineWidth = 2.2; cctx.strokeStyle = '#fff'; cctx.stroke(CURSOR); cctx.fill(CURSOR)
+  cctx.restore()
+  cctx.globalAlpha = 1
+}
+
+// ── Diálogo "Abrir" (uno o varios por video) ──────────────────────────────
+// Geometría (mundo, zoom 1): lib/edicion.mjs apunta el cursor a estos lugares
+const DLG = { x: 520, y: 250, w: 880, h: 560 }
+let dialogos = [], dlgActual = -1
+function prepararDialogo() {
+  dialogos = TL.dialogos ?? (TL.dialog ? [TL.dialog] : [])
+  // precargar las miniaturas de todos los diálogos
+  return Promise.all(dialogos.flatMap(d => d.fotos.map(f => { const im = new Image(); im.src = f; return im.decode().catch(() => {}) })))
+}
+async function armarDialogo(d) {
+  const partes = (d.carpeta ?? 'Imágenes').split(/\s*[›>\/]\s*/)
+  $('dlgRuta').innerHTML = partes.map(p => `<span>${p}</span>`).join('<span class="sep">›</span>')
+  $('dlgBuscar').textContent = 'Buscar en ' + partes[partes.length - 1]
+  $('dlgItems').innerHTML = d.fotos.map((f, i) => `<div class="item" id="it${i}" style="left:${22 + i * 148}px"><div class="th"><img src="${f}"></div><div class="nm">${d.nombres[i]}</div></div>`).join('')
+  await Promise.all([...document.querySelectorAll('#dlg img')].map(i => i.decode().catch(() => {})))
+}
+const dialogoEn = t => dialogos.findIndex(d => t >= d.o0 - .01 && t <= d.close + .25)
+async function drawDialog(t) {
+  const el = $('dlg'), key = $('key'), k = dialogoEn(t)
+  if (k < 0) { el.style.opacity = 0; key.style.opacity = 0; return null }
+  const d = dialogos[k]
+  if (k !== dlgActual) { dlgActual = k; await armarDialogo(d) }
+  const inU = eo(prog(t, d.o0, d.o0 + .2)), outU = eio(prog(t, d.close, d.close + .16))
+  el.style.opacity = Math.min(inU, 1 - outU)
+  el.style.transform = `scale(${lerp(.965, 1, inU) * lerp(1, .985, outU)})`
+  const varios = d.fotos.length > 1
+  const sel = varios && t >= d.click2 ? d.fotos.map((_, i) => i) : t >= d.click1 ? [0] : []
+  d.fotos.forEach((_, i) => $('it' + i).classList.toggle('sel', sel.includes(i)))
+  $('dlgName').textContent = sel.length === 0 ? '' : sel.length === 1 ? d.nombres[0] : sel.map(i => `"${d.nombres[i]}"`).join(' ')
+  $('dlgOk').classList.toggle('press', t >= d.click3 - .02 && t < d.click3 + .16)
+  // tecla Shift junto al cursor en el segundo clic (solo si se eligen varios)
+  const ku = varios ? Math.min(eo(prog(t, d.click2 - .5, d.click2 - .3)), 1 - eo(prog(t, d.click2 + .35, d.click2 + .55))) : 0
+  const p = curAt(t), [wx, wy] = scr(p.x, p.y)
+  key.style.opacity = ku; key.style.left = (wx + 26) + 'px'; key.style.top = (wy + 26) + 'px'
+  return DLG
+}
+
+// ── Placas de capítulo ("Opción 1 · Con Orbi, en segundos") ───────────────
+// TL.capitulos: [{o0, o1, kicker, titulo, sub}]. Se dibujan durante una pausa:
+// el panel queda quieto y oscurecido, y el título aparece al centro.
+const capituloEn = t => (TL.capitulos ?? []).find(c => t >= c.o0 && t <= c.o1)
+const capAlpha = (c, t) => Math.min(eo(prog(t, c.o0, c.o0 + .45)), 1 - eio(prog(t, c.o1 - .4, c.o1)))
+function drawCapitulo(t) {
+  const el = $('capitulo'), c = capituloEn(t)
+  if (!c) { el.style.opacity = 0; return }
+  const a = capAlpha(c, t)
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.fillStyle = `rgba(6,11,30,${.66 * a})`; ctx.fillRect(0, 0, 1920, 1080)
+  $('capK').textContent = c.kicker ?? ''; $('capK').style.display = c.kicker ? 'block' : 'none'
+  $('capTit').textContent = c.titulo; $('capSub').textContent = c.sub ?? ''
+  el.style.opacity = a
+  el.style.transform = `translateY(${(1 - a) * 26}px) scale(${lerp(.965, 1, a)})`
+}
+
+// ── Carteles: la esquina libre de cada paso ───────────────────────────────
+const CORNERS = ['BL', 'BR', 'TL', 'TR']
+const PREF = { BL: 0, BR: .6, TL: 2.2, TR: 2.8 }
+function cornerPos(c, w, h) { return { x: c[1] === 'L' ? 84 : 1920 - 84 - w, y: c[0] === 'B' ? 1080 - 84 - h : 84 } }
+function prepararCarteles() {
+  const C = TL.caps, cap = $('cap')
+  const sigue = i => C[i + 1] && C[i + 1].n === C[i].n && Math.abs(C[i + 1].o0 - C[i].o1) < .05
+  // medir cada cartel
+  cap.style.opacity = 0
+  for (const c of C) {
+    $('capN').textContent = c.n; $('capT').textContent = c.txt; $('capS').textContent = c.sub ?? ''
+    $('capS').style.display = c.sub ? 'block' : 'none'
+    const r = cap.getBoundingClientRect(); c.w = r.width; c.h = r.height
+  }
+  // grupos (pasos con el mismo número seguidos)
+  let i = 0
+  while (i < C.length) {
+    let j = i; while (sigue(j)) j++
+    const g = C.slice(i, j + 1), o0 = g[0].o0, o1 = g[g.length - 1].o1
+    const w = Math.max(...g.map(c => c.w)), h = Math.max(...g.map(c => c.h))
+    let mejor = 'BL', best = Infinity
+    for (const corner of CORNERS) {
+      const p = cornerPos(corner, w, h), R = { x: p.x - 40, y: p.y - 40, w: w + 80, h: h + 80 }
+      const dentro = (x, y) => x >= R.x && x <= R.x + R.w && y >= R.y && y <= R.y + R.h
+      let score = PREF[corner]
+      for (let t = o0 - .2; t <= o1 + .3; t += 1 / 30) {
+        const m = matriz(t)
+        if (curVisible(t) > .5) { const q = curAt(t), [sx, sy] = aStage(m, ...scr(q.x, q.y)); if (dentro(sx, sy)) score += 1 }
+        const hh = hlAt(t)
+        if (hh && hh.a > .5) {
+          const [x1, y1] = aStage(m, ...scr(hh.x, hh.y)), [x2, y2] = aStage(m, ...scr(hh.x + hh.w, hh.y + hh.h))
+          const ix = Math.max(0, Math.min(x2, R.x + R.w) - Math.max(x1, R.x)), iy = Math.max(0, Math.min(y2, R.y + R.h) - Math.max(y1, R.y))
+          score += 6 * (ix * iy) / (R.w * R.h)
+        }
+        const kd = dialogoEn(t), d = kd >= 0 ? dialogos[kd] : null
+        if (d && t >= d.o0 && t <= d.close) {
+          const [x1, y1] = aStage(m, DLG.x, DLG.y), [x2, y2] = aStage(m, DLG.x + DLG.w, DLG.y + DLG.h)
+          const ix = Math.max(0, Math.min(x2, R.x + R.w) - Math.max(x1, R.x)), iy = Math.max(0, Math.min(y2, R.y + R.h) - Math.max(y1, R.y))
+          score += 8 * (ix * iy) / (R.w * R.h)
+        }
+      }
+      for (const ct of TL.clicks) {
+        if (ct < o0 - .3 || ct > o1 + .3) continue
+        const m = matriz(ct), q = curAt(ct), [sx, sy] = aStage(m, ...scr(q.x, q.y))
+        if (dentro(sx, sy)) score += 40
+      }
+      if (score < best) { best = score; mejor = corner }
+    }
+    for (const c of g) { c.corner = mejor; c.gw = w; c.gh = h }
+    i = j + 1
+  }
+}
+function drawCaption(t) {
+  const cap = $('cap'), C = TL.caps
+  const sigue = i => C[i + 1] && C[i + 1].n === C[i].n && Math.abs(C[i + 1].o0 - C[i].o1) < .05
+  const viene = i => i > 0 && sigue(i - 1)
+  let i = C.findIndex(c => t >= c.o0 - .01 && t < c.o1)
+  if (i < 0) i = C.findIndex((c, k) => !sigue(k) && t >= c.o1 && t < c.o1 + .45)
+  if (i < 0) { cap.style.opacity = 0; return }
+  const c = C[i]
+  let g0 = i; while (viene(g0)) g0--
+  let g1 = i; while (sigue(g1)) g1++
+  const o0 = C[g0].o0, o1 = C[g1].o1
+  const inU = spring(prog(t, o0, o0 + .7)), outU = eio(prog(t, o1, o1 + .4))
+  $('capN').textContent = c.n; $('capN').className = typeof c.n === 'number' ? '' : 'icon'
+  $('capT').textContent = c.txt; $('capS').textContent = c.sub ?? ''; $('capS').style.display = c.sub ? 'block' : 'none'
+  const txtA = viene(i) ? eo(prog(t, c.o0, c.o0 + .35)) : 1
+  for (const id of ['capT', 'capS']) { $(id).style.opacity = txtA; $(id).style.transform = `translateY(${viene(i) ? (1 - txtA) * 8 : 0}px)` }
+  const corner = c.corner ?? 'BL', p = cornerPos(corner, c.gw ?? c.w, c.gh ?? c.h), dir = corner[0] === 'B' ? 1 : -1
+  cap.style.left = (corner[1] === 'L' ? p.x : 'auto') + (corner[1] === 'L' ? 'px' : '')
+  cap.style.right = corner[1] === 'R' ? '84px' : 'auto'
+  cap.style.top = p.y + 'px'
+  const y = dir * ((1 - inU) * 40 + outU * 24)
+  cap.style.opacity = Math.min(prog(t, o0, o0 + .25), 1 - outU)
+  cap.style.transform = `translateY(${y}px) scale(${lerp(.96, 1, Math.min(1, inU))})`
+}
+
+// ── seek(t) ───────────────────────────────────────────────────────────────
+function circlePath(cx, cy, r) { return `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z` }
+async function seek(t) {
+  const D = TL.duration, INTRO = TL.intro ?? 3.6, OUT = D - (TL.outro ?? 5.4)
+  drawRings(t)
+  const m = await drawWindow(t)
+  drawCapitulo(t)
+  await drawDialog(t)
+  drawCursor(t, m)
+  drawCaption(t)
+  const veil = $('veil'), LOGO_Y = 430
+  if (t < INTRO) {
+    const r = lerp(0, 2300, eio(prog(t, 2.25, 3.25)))
+    veil.style.display = 'block'
+    veil.style.clipPath = r > 0 ? `path(evenodd, "M0 0H1920V1080H0Z ${circlePath(960, LOGO_Y, r)}")` : 'none'
+    const leave = eio(prog(t, 2.05, 2.6))
+    drawLogo(t, LOGO_Y, 1 - leave)
+    $('logo').style.transform = `scale(${lerp(1, .82, leave)})`
+    const bY = 580
+    $('brand').style.top = (bY + fadeUp($('brand'), t, .62, .6, 30)) + 'px'
+    $('brand').style.opacity = Math.min(+$('brand').style.opacity, 1 - leave)
+    $('title').textContent = TL.title
+    $('title').style.top = (bY + 92 + fadeUp($('title'), t, 1.0, .65, 30)) + 'px'
+    $('title').style.opacity = Math.min(+$('title').style.opacity, 1 - leave)
+    $('site').style.opacity = 0
+  } else if (t >= OUT + .35) {
+    veil.style.display = 'block'
+    veil.style.clipPath = `path("${circlePath(960, 540, lerp(0, 2300, eio(prog(t, OUT + .35, OUT + 1.25))))}")`
+    const a0 = OUT + 1.0, LY = 400
+    drawLogo(t - a0, LY, 1); $('logo').style.transform = 'none'
+    $('brand').style.opacity = 0
+    const tY = LY + 165
+    $('title').textContent = TL.endTitle
+    $('title').style.top = (tY + fadeUp($('title'), t, a0 + .7, .65, 30)) + 'px'
+    $('site').style.top = (tY + 96 + fadeUp($('site'), t, a0 + 1.15, .6, 24)) + 'px'
+  } else veil.style.display = 'none'
+  return true
+}
+
+async function load(tl) {
+  TL = tl
+  await document.fonts.ready
+  await Promise.all([document.fonts.load('500 14px Geist'), document.fonts.load('650 30px Geist'), document.fonts.load('600 46px Sora'), ...[...document.fonts].map(f => f.load().catch(() => {}))])
+  prepararCamara()
+  await prepararDialogo()
+  prepararCarteles()
+  return TL.caps.map(c => `${c.n} ${c.corner}`)
+}
+window.seek = seek; window.load = load
+</script>
+</body>
+</html>

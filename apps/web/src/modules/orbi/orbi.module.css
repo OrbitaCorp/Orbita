@@ -291,7 +291,16 @@
 .alFinal svg { width: 14px; height: 14px; }
 
 /* ─── Estado vacío ────────────────────────────────────────────────────────── */
-.vacio { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+/* Se achica y scrollea como el historial: si no, en la hoja a media altura
+   (56dvh) mide más que el lugar libre y empuja el pie con la caja fuera de la
+   pantalla. Centrado con márgenes automáticos y no con justify-content: center,
+   que al desbordar corta la parte de arriba sin dejar llegar con el scroll. */
+.vacio {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center;
+}
+.vacio > :first-child { margin-top: auto; }
+.vacio > :last-child { margin-bottom: auto; }
 .vacio h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .vacio p { margin: 0; font-size: 13px; color: var(--color-muted); line-height: 1.5; max-width: 300px; }
 .sugerencias { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 360px; margin-top: 6px; }

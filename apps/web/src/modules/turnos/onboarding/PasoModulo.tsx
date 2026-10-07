@@ -7,7 +7,8 @@
 import { CalendarClock, Check, Clock, ShoppingBag, type LucideIcon } from 'lucide-react'
 import { moduloHabilitado, pasosDe, type Modulo } from './modelo'
 
-const MODULOS: { id: Modulo; Icon: LucideIcon; titulo: string; bajada: string; puntos: string[]; para: string }[] = [
+// Exportado para Orbi (OrbiAlta.tsx): son las opciones que puede elegir en este paso.
+export const MODULOS: { id: Modulo; Icon: LucideIcon; titulo: string; bajada: string; puntos: string[]; para: string }[] = [
   {
     id: 'tienda', Icon: ShoppingBag, titulo: 'Tienda online', bajada: 'Vendé tus productos con catálogo, carrito y cobro online.',
     puntos: ['Catálogo con variantes, fotos y stock', 'Cobrás con Mercado Pago o por transferencia', 'Pedidos, clientes y cupones en un solo panel'],

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, TrendingUp, Download, Upload, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2, MessageSquare, Clapperboard, UploadCloud } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -34,6 +34,7 @@ import type { EstadoProducto } from './types/catalogo.types'
 import { ResenasProducto } from './components/ResenasProducto'
 import { ContenidoFichaModal } from './components/ContenidoFichaModal'
 import { StockRapidoModal } from './components/StockRapido'
+import { ImportarProductos } from './importar/ImportarProductos'
 import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
@@ -765,6 +766,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
     const [cargando, setCargando] = useState(true)
     const [exportando, setExportando] = useState(false)
+    const [importando, setImportando] = useState(false)
     const [error, setError] = useState('')
 
     const createdProductIds = useOrbiStore(s => s.createdProductIds)
@@ -1217,7 +1219,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         {total} producto{total === 1 ? '' : 's'}
                     </span>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Button variant="outline" icon={<Upload size={15} />} onClick={() => setImportando(true)}>Importar Excel</Button>
                     <Button variant="outline" icon={<Download size={15} />} onClick={() => void exportarExcel()} disabled={exportando || total === 0}>
                         {exportando ? 'Exportando…' : 'Exportar Excel'}
                     </Button>
@@ -1584,6 +1587,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* Edición rápida de stock — ver components/StockRapido.tsx. Al
                 guardar se refresca la lista (cambia totalStock, y puede
                 cambiar el estado visual si pasó a/de "sin stock"). */}
+            {/* Carga masiva desde Excel: plantilla, revisión, importación y fotos. */}
+            <ImportarProductos abierto={importando} onCerrar={() => setImportando(false)} onImportado={() => void cargarSilencioso()} />
+
             {stockDe && (
                 <StockRapidoModal
                     productoId={stockDe.id}
