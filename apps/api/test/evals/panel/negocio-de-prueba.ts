@@ -143,6 +143,11 @@ export const CATEGORIAS: Categoria[] = [
   { id: cat(4), nombre: 'Accesorios' },
   // Vacía a propósito: el snapshot del catálogo la cuenta como alerta.
   { id: cat(5), nombre: 'Regalos' },
+  // Con tilde y un nombre que se escribe de muchas formas ("perfumeria",
+  // "PERFUMERÍAS"): la de los casos de datos-de-accion. En producción, cargar
+  // un producto en "Perfumería" fallaba 4 de cada 5 veces (el modelo no tenía
+  // el id de la categoría).
+  { id: cat(6), nombre: 'Perfumería' },
 ];
 
 export const PRODUCTOS: Producto[] = [
@@ -158,6 +163,11 @@ export const PRODUCTOS: Producto[] = [
   { id: prod(10), nombre: 'Yerbera y Azucarera de Lata', categoriaId: cat(4), precio: 12500, stock: 6, estado: 'PUBLISHED', creadoHaceHoras: 1500 },
   { id: prod(11), nombre: 'Matero de Cuero', categoriaId: cat(4), precio: 39000, stock: 4, estado: 'PUBLISHED', creadoHaceHoras: 1000 },
   { id: prod(12), nombre: 'Kit Matero Regalo', categoriaId: cat(4), precio: 45000, stock: 0, estado: 'DRAFT', creadoHaceHoras: 200 },
+  // Los de Perfumería: sin ventas y con stock de sobra (no cambian los números
+  // de ventas, sin stock ni stock crítico), y más viejos que el Kit (no cambia
+  // el primero de listProducts).
+  { id: prod(13), nombre: 'Perfume de Yerba Mate 50 ml', categoriaId: cat(6), precio: 7900, stock: 15, estado: 'PUBLISHED', creadoHaceHoras: 900 },
+  { id: prod(14), nombre: 'Jabón Artesanal de Yerba', categoriaId: cat(6), precio: 3200, stock: 20, estado: 'PUBLISHED', creadoHaceHoras: 850 },
 ];
 
 export const CLIENTES: Cliente[] = [

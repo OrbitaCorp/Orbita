@@ -37,6 +37,7 @@ import { CASOS_PANEL, CATEGORIAS_DE_CASOS, type CasoPanel } from '../evals/panel
 import {
   NOMBRES_DE_TOOLS_DEL_PANEL,
   destinoDelPath,
+  escriturasPermitidas,
   evaluarReglasGlobales,
   largoRazonable,
   numerosDelTexto,
@@ -212,6 +213,26 @@ describe('expectativas por caso', () => {
     expect(ok.violaciones).toEqual([]);
     const otro = verificarExpectativas(t, [{ tipo: 'propone', tool: 'updateOrderStatus', args: { orderId: (v, x) => v === pedidoNumero(x, 1025).id } }], d);
     expect(otro.violaciones).toHaveLength(1);
+  });
+
+  it('pide-datos: sin tarjeta de la tool y preguntando por cada grupo; un intento rechazado vale', () => {
+    const exp = [{ tipo: 'pide-datos' as const, tool: 'createProduct', menciona: [['precio'], ['categoría', 'categoria']] }];
+    const pregunta = '¿A qué precio lo cargo y en qué categoría?';
+    const bien = turno({ texto: pregunta, escriturasRechazadas: [{ name: 'createProduct', arguments: {} }] });
+    expect(verificarExpectativas(bien, exp, d).violaciones).toEqual([]);
+    // El intento rechazado no es una escritura no pedida.
+    expect(sinEscriturasNoPedidas(bien, escriturasPermitidas(exp))).toEqual([]);
+
+    const soloPrecio = verificarExpectativas(turno({ texto: '¿A qué precio?' }), exp, d).violaciones;
+    expect(soloPrecio.map((v) => v.detalle)).toEqual(['No pregunta por "categoría" ni "categoria"']);
+
+    const conTarjeta = turno({ texto: pregunta, propuestas: [{ tool: 'createProduct', args: {}, resumen: 'Crear el producto "X" a $1' }] });
+    expect(verificarExpectativas(conTarjeta, exp, d).violaciones.map((v) => v.regla)).toEqual(['pide-datos']);
+
+    // `admite`: puede ofrecer crear la categoría en el mismo turno; otra escritura, no.
+    const admite = [{ tipo: 'pide-datos' as const, tool: 'createProduct', menciona: [], admite: ['createCategory'] }];
+    expect(escriturasPermitidas(admite)).toEqual(['createProduct', 'createCategory']);
+    expect(verificarExpectativas(turno({ toolsOfrecidas: ['navigateTo'] }), exp, d).noAplica.map((n) => n.tipo)).toEqual(['pide-datos']);
   });
 
   it('navega por sección y vista', () => {
@@ -524,7 +545,8 @@ describe('golden set', () => {
     for (const c of CASOS_PANEL) {
       const ofrecidas = registry.getTools(OrbiSurface.PANEL, permisosDelRol(c.rol ?? 'dueno')).map((t) => t.name);
       for (const e of c.expectativas) {
-        if ((e.tipo === 'llama' || e.tipo === 'propone') && !ofrecidas.includes(e.tool)) malArmados.push(`${c.id}: ${e.tool}`);
+        if ((e.tipo === 'llama' || e.tipo === 'propone' || e.tipo === 'pide-datos') && !ofrecidas.includes(e.tool)) malArmados.push(`${c.id}: ${e.tool}`);
+        if (e.tipo === 'pide-datos') for (const t of e.admite ?? []) if (!ofrecidas.includes(t)) malArmados.push(`${c.id}: ${t}`);
         if (e.tipo === 'cita-tema' && !ofrecidas.includes('leerTemaDelManual')) malArmados.push(`${c.id}: leerTemaDelManual`);
       }
     }
@@ -542,9 +564,10 @@ describe('golden set', () => {
             expect(VISTAS_DE_CONFIGURACION).toContain(e.vista);
           }
         }
-        if (e.tipo === 'llama' || e.tipo === 'no-llama' || e.tipo === 'propone') {
+        if (e.tipo === 'llama' || e.tipo === 'no-llama' || e.tipo === 'propone' || e.tipo === 'pide-datos') {
           expect(NOMBRES_DE_TOOLS_DEL_PANEL).toContain(e.tool);
         }
+        if (e.tipo === 'pide-datos') for (const t of e.admite ?? []) expect(NOMBRES_DE_TOOLS_DEL_PANEL).toContain(t);
         if (e.tipo === 'cita-tema') for (const id of e.ids) expect(idsDelManual).toContain(id);
       }
     }
@@ -568,6 +591,57 @@ describe('golden set', () => {
     // Lo que Órbita no hace se pregunta desde adentro: no se despacha con la frase.
     for (const c of CASOS_PANEL.filter((x) => x.categoria === 'fuera-del-manual' && x.expectativas.some((e) => e.tipo === 'reconoce-limite'))) {
       expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'dentro-de-alcance') }).toEqual({ id: c.id, ok: true });
+    }
+  });
+
+  it('datos-de-accion: unos 12 a 15 casos, con completos, incompletos y nombres escritos distinto', () => {
+    const casos = CASOS_PANEL.filter((c) => c.categoria === 'datos-de-accion');
+    expect(casos.length).toBeGreaterThanOrEqual(12);
+    expect(casos.length).toBeLessThanOrEqual(15);
+    const tipos = casos.flatMap((c) => c.expectativas.map((e) => e.tipo));
+    expect(tipos).toEqual(expect.arrayContaining(['propone', 'pide-datos']));
+    for (const tool of ['createProduct', 'createDiscount', 'createCoupon']) {
+      const deLaTool = casos.flatMap((c) => c.expectativas).filter((e) => 'tool' in e && e.tool === tool);
+      expect({ tool, propone: deLaTool.some((e) => e.tipo === 'propone'), pide: deLaTool.some((e) => e.tipo === 'pide-datos') })
+        .toEqual({ tool, propone: true, pide: true });
+    }
+  });
+
+  it('las tarjetas que esperan los casos de acción pasan la validación real con los args que se dan por buenos', async () => {
+    // Si el caso aprueba unos argumentos que el servidor rechazaría, el caso
+    // mide un Orbi que nunca puede aprobar. Un ejemplo por caso, armado a mano.
+    const registry = armarRegistry(armarFakes(d));
+    const ctx = { businessId: BUSINESS_ID, userId: 'm', surface: OrbiSurface.PANEL, permissions: permisosDelRol('dueno') };
+    const ejemplos: [string, string, Record<string, unknown>][] = [
+      ['datos-accion-producto-completo', 'createProduct', { name: 'Difusor de Yerba Mate', basePrice: 12000, categoria: 'Perfumería' }],
+      ['datos-accion-producto-sin-tilde', 'createProduct', { name: 'Agua de Colonia Cítrica', basePrice: 9500, categoria: 'perfumeria' }],
+      ['datos-accion-producto-plural-mayusculas', 'createProduct', { name: 'Crema de Manos de Yerba', basePrice: 6800, categoria: 'PERFUMERÍAS' }],
+      ['accion-producto', 'createProduct', { name: 'Bombilla de Caña', basePrice: 2500, categoria: 'Bombillas' }],
+      ['datos-accion-categoria-crear', 'createCategory', { name: 'Sahumerios' }],
+      ['datos-accion-descuento-categoria', 'createDiscount', { type: 'PERCENT_PRODUCT', value: 15, categorias: ['Perfumería'] }],
+      ['datos-accion-descuento-nombre-distinto', 'createDiscount', { type: 'PERCENT_PRODUCT', value: 10, categorias: ['perfumerias'] }],
+      ['datos-accion-descuento-producto', 'createDiscount', { type: 'PERCENT_PRODUCT', value: 20, productos: ['Mate de Algarrobo'] }],
+      ['datos-accion-descuento-total', 'createDiscount', { type: 'AMOUNT_TICKET', value: 2000, minAmount: 30000 }],
+      ['accion-descuento-categoria', 'createDiscount', { type: 'PERCENT_PRODUCT', value: 20, categorias: ['Mates'] }],
+      ['datos-accion-cupon-categoria', 'createCoupon', { code: 'PERFU10', type: 'PERCENT_PRODUCT', value: 10, categorias: ['Perfumería '] }],
+      ['datos-accion-cupon-condiciones', 'createCoupon', { code: 'BIENVENIDA', type: 'AMOUNT_TICKET', value: 1500, minAmount: 10000, maxUsesPerCustomer: 1 }],
+      ['accion-cupon', 'createCoupon', { code: 'VERANO15', type: 'PERCENT_TICKET', value: 15 }],
+    ];
+    for (const [id, tool, args] of ejemplos) {
+      const caso = CASOS_PANEL.find((c) => c.id === id)!;
+      const p = await registry.proponer(tool, args, ctx);
+      expect({ id, propuesta: p && 'resumen' in p }).toEqual({ id, propuesta: true });
+      const t = turno({ texto: 'Te dejo la tarjeta.', propuestas: [{ tool, args, resumen: (p as { resumen: string }).resumen }] });
+      expect({ id, v: verificarExpectativas(t, caso.expectativas, d).violaciones }).toEqual({ id, v: [] });
+    }
+  });
+
+  it('las tarjetas de Perfumería dicen el nombre real, como lo escriba la persona', async () => {
+    const registry = armarRegistry(armarFakes(d));
+    const ctx = { businessId: BUSINESS_ID, userId: 'm', surface: OrbiSurface.PANEL, permissions: permisosDelRol('dueno') };
+    for (const escrito of ['perfumeria', 'Perfumería ', 'PERFUMERÍAS']) {
+      const p = await registry.proponer('createProduct', { name: 'X', basePrice: 1, categoria: escrito }, ctx);
+      expect({ escrito, resumen: p && 'resumen' in p ? p.resumen : p }).toEqual({ escrito, resumen: expect.stringContaining('en la categoría "Perfumería"') });
     }
   });
 
@@ -643,6 +717,33 @@ describe('motor de las evals', () => {
     ]);
     const r = await correrCaso(caso({}), 1, d, actual, { llm: g.llm });
     expect(r.violaciones.map((v) => v.regla)).toContain('sin-escrituras-no-pedidas');
+  });
+
+  it('a un producto sin precio ni categoría, el modelo recibe qué falta (y pregunta): pide-datos aprueba', async () => {
+    const g = guion([
+      [llamada('createProduct', { name: 'Jabón de Glicerina con Yerba' }), fin],
+      [texto('¿A qué precio lo cargo y en qué categoría? Tenés Yerbas, Mates, Bombillas, Accesorios, Regalos y Perfumería.'), fin],
+    ]);
+    const incompleto = CASOS_PANEL.find((c) => c.id === 'datos-accion-producto-incompleto')!;
+    const r = await correrCaso(incompleto, 1, d, actual, { llm: g.llm });
+    expect(r.turno.propuestas).toEqual([]);
+    expect(r.turno.escriturasRechazadas).toHaveLength(1);
+    const alModelo = JSON.parse(g.recibidos[1].find((m) => m.role === 'tool')!.content);
+    expect(alModelo).toEqual(expect.objectContaining({ success: false, faltan: ['precio', 'categoría'] }));
+    expect(r.violaciones).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  it('una categoría que no existe vuelve al modelo con las que hay', async () => {
+    const g = guion([
+      [llamada('createProduct', { name: 'Vela de Soja', basePrice: 5000, categoria: 'Velas' }), fin],
+      [texto('No tenés la categoría Velas. ¿La creo o la cargo en Regalos?'), fin],
+    ]);
+    const caso = CASOS_PANEL.find((c) => c.id === 'datos-accion-producto-categoria-inexistente')!;
+    const r = await correrCaso(caso, 1, d, actual, { llm: g.llm });
+    const alModelo = JSON.parse(g.recibidos[1].find((m) => m.role === 'tool')!.content);
+    expect(alModelo.invalidos).toEqual([expect.objectContaining({ campo: 'categoría', opciones: expect.arrayContaining(['Perfumería', 'Regalos']) })]);
+    expect(r.ok).toBe(true);
   });
 
   it('una escritura con argumentos inválidos no llega a tarjeta y se cuenta como intento', async () => {
