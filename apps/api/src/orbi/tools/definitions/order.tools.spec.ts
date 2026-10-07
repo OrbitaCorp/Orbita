@@ -179,14 +179,21 @@ describe('updateOrderStatus — validación', () => {
   it('estado que el DTO no acepta: error, y no se consulta la base', async () => {
     const { registry, prisma } = armar(pedido());
     expect(await registry.proponer('updateOrderStatus', { orderId: PEDIDO, status: 'ARCHIVED' }, ctx))
-      .toEqual({ error: expect.any(String) });
+      .toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('sin pedido ni estado: los dos juntos, y no se consulta la base', async () => {
+    const { registry, prisma } = armar(pedido());
+    expect(await registry.proponer('updateOrderStatus', {}, ctx))
+      .toEqual({ error: expect.stringContaining('Faltan datos'), faltan: ['qué pedido (número)', 'estado nuevo'] });
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
   });
 
   it('orderId que no es UUID: error, y no se consulta la base', async () => {
     const { registry, prisma } = armar(pedido());
     expect(await registry.proponer('updateOrderStatus', { orderId: '1042', status: 'CONFIRMED' }, ctx))
-      .toEqual({ error: expect.any(String) });
+      .toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
   });
 

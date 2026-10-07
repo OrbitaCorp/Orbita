@@ -3,10 +3,21 @@ import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interfa
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { DiscountsService } from '../../../discounts/discounts.service';
 import type { CouponsService } from '../../../coupons/coupons.service';
+import type { PrismaService } from '../../../prisma/prisma.service';
 import { UpsertDiscountDto } from '../../../discounts/dto/upsert-discount.dto';
 import { UpsertCouponDto } from '../../../coupons/dto/upsert-coupon.dto';
-import { validarConDto, validarConServicio } from '../acciones/validar-args';
-import { cantidad, dato, entreComillas, presente } from '../acciones/formato';
+import { AccionInvalida, validarConDto, validarConServicio, type ArgsInvalidos, type Invalido, type ResultadoDeValidacion } from '../acciones/validar-args';
+import { dato, entreComillas, monto, presente } from '../acciones/formato';
+import { DIAS_DE_LA_SEMANA, FICHAS, descripcionDe, fallaDeDatos, faltantes, invalidoDelDto, parametrosDe, tieneValor, type FichaDeAccion } from '../acciones/requisitos';
+import {
+  CATEGORIA,
+  PRODUCTO,
+  cargarCategorias,
+  cargarProductos,
+  normalizarNombre,
+  resolverLista,
+  type Candidato,
+} from '../acciones/resolver-nombres';
 
 export class ListDiscountsTool implements OrbiTool {
   name = 'listDiscounts';
@@ -68,94 +79,230 @@ const ALCANCE: Record<string, string> = {
   TICKET: 'toda la compra',
 };
 
-// Alcance, cuántos productos/categorías y vigencia (spec §3.2): con solo el
-// código y el valor, un cupón "para 1 producto" y uno "para toda la tienda"
-// se veían igual en la tarjeta. Los ids no se muestran (no le dicen nada a
-// nadie): se muestra cuántos son, que es lo que la persona puede chequear.
-function alcanceYVigencia(args: Record<string, unknown>): string {
-  const partes = [`para ${ALCANCE[String(args.scope)] ?? dato(args.scope)}`];
-  if (presente(args.productIds)) partes.push(cantidad(args.productIds, 'producto', 'productos'));
-  if (presente(args.categoryIds)) partes.push(cantidad(args.categoryIds, 'categoría', 'categorías'));
+const TIPOS_DE_TICKET = ['PERCENT_TICKET', 'AMOUNT_TICKET'];
+const TIPOS_DE_PRODUCTO = ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT'];
+const A_QUE_APLICA = 'a qué aplica';
+
+/**
+ * El alcance sale del tipo y de lo que se eligió, como en el panel (tipo ×
+ * alcance, ver couponApi.ts del front): un tipo "sobre el total" es TICKET; uno
+ * "por producto" es PRODUCT con productos o CATEGORY con categorías. El motor
+ * de descuentos NO aplica un tipo por producto con alcance TICKET ni uno de
+ * ticket con productos: esa mezcla quedaba guardada y no descontaba nada.
+ *
+ * `scope`, si el modelo lo manda, tiene que coincidir.
+ */
+function alcanceDe(args: Record<string, unknown>): { scope?: string; faltan: string[]; invalidos: Invalido[] } {
+  const tipo = String(args.type ?? '');
+  const hayProductos = tieneValor(args.productos);
+  const hayCategorias = tieneValor(args.categorias);
+  const faltan: string[] = [];
+  const invalidos: Invalido[] = [];
+  let scope: string | undefined;
+
+  if (TIPOS_DE_TICKET.includes(tipo)) {
+    scope = 'TICKET';
+    if (hayProductos || hayCategorias) {
+      invalidos.push({
+        campo: A_QUE_APLICA,
+        motivo: 'un descuento sobre el total de la compra no lleva productos ni categorías: o es sobre el total, o es de un tipo "en productos o categorías elegidos"',
+        opciones: TIPOS_DE_PRODUCTO,
+      });
+    }
+  } else if (TIPOS_DE_PRODUCTO.includes(tipo)) {
+    if (hayProductos && hayCategorias) {
+      invalidos.push({ campo: A_QUE_APLICA, motivo: 'va productos o categorías, no las dos a la vez' });
+    } else if (hayProductos) {
+      scope = 'PRODUCT';
+    } else if (hayCategorias) {
+      scope = 'CATEGORY';
+    } else if (args.scope === 'TICKET') {
+      invalidos.push({ campo: 'tipo', motivo: 'para toda la compra el tipo es "sobre el total de la compra"', opciones: TIPOS_DE_TICKET });
+    } else {
+      faltan.push('a qué productos o categorías aplica (o si es sobre el total de la compra)');
+    }
+  }
+  if (scope && presente(args.scope) && args.scope !== scope) {
+    invalidos.push({ campo: A_QUE_APLICA, motivo: `scope ${dato(args.scope)} no coincide con lo pedido (${ALCANCE[scope]}): mandalo como ${scope} o no lo mandes` });
+  }
+  return { scope: scope ?? (presente(args.scope) ? String(args.scope) : undefined), faltan, invalidos };
+}
+
+/** Los productos y categorías por nombre (o id), acotados al negocio de la sesión. */
+async function resolverElegidos(args: Record<string, unknown>, ctx: ToolExecutionContext, prisma: PrismaService, ficha: FichaDeAccion) {
+  const invalidos: Invalido[] = [];
+  let productos: Candidato[] = [];
+  let categorias: Candidato[] = [];
+  if (tieneValor(args.productos)) {
+    const r = resolverLista(ficha.campos.productos.etiqueta, args.productos, await cargarProductos(prisma, ctx.businessId), PRODUCTO);
+    productos = r.entidades;
+    invalidos.push(...r.invalidos);
+  }
+  if (tieneValor(args.categorias)) {
+    const r = resolverLista(ficha.campos.categorias.etiqueta, args.categorias, await cargarCategorias(prisma, ctx.businessId), CATEGORIA);
+    categorias = r.entidades;
+    invalidos.push(...r.invalidos);
+  }
+  return { productos, categorias, invalidos };
+}
+
+/** "martes", "Miércoles" → 2, 3 (0 = domingo, como el DTO). */
+function diasDe(args: Record<string, unknown>): { dias?: number[]; invalidos: Invalido[] } {
+  if (!tieneValor(args.activeDays)) return { invalidos: [] };
+  const valores = DIAS_DE_LA_SEMANA.map((d) => d.valor);
+  const dias: number[] = [];
+  const invalidos: Invalido[] = [];
+  for (const d of (Array.isArray(args.activeDays) ? args.activeDays : []) as unknown[]) {
+    const i = valores.indexOf(normalizarNombre(String(d)));
+    if (i >= 0) dias.push(i);
+    else invalidos.push({ campo: 'días', motivo: `"${dato(d)}" no es un día de la semana`, opciones: valores });
+  }
+  return { dias: [...new Set(dias)].sort(), invalidos };
+}
+
+const nombresEnLista = (lista: Candidato[]) => {
+  const muestra = lista.slice(0, 5).map((c) => entreComillas(c.name)).join(', ');
+  return lista.length > 5 ? `${muestra} y ${lista.length - 5} más` : muestra;
+};
+
+/** El nombre que se le pone si la persona no dio uno: "15% en Perfumería", "$2000 sobre el total". */
+function nombrePorDefecto(tipo: unknown, valor: unknown, productos: Candidato[], categorias: Candidato[]): string {
+  const cuanto = String(tipo).startsWith('PERCENT') ? `${dato(valor)}%` : `$${dato(valor)}`;
+  const elegidos = [...categorias, ...productos];
+  const donde = String(tipo).endsWith('_TICKET') || elegidos.length === 0
+    ? 'sobre el total'
+    : elegidos.length === 1 ? `en ${elegidos[0].name}` : `en ${elegidos.length} ${categorias.length ? 'categorías' : 'productos'}`;
+  return `${cuanto} ${donde}`.slice(0, 120);
+}
+
+const DIAS_EN_PALABRAS = DIAS_DE_LA_SEMANA.map((d) => d.dice);
+
+/**
+ * Lo que va en la tarjeta además del valor: a qué aplica (con los nombres
+ * reales de productos y categorías), la vigencia y las condiciones. Cada
+ * valor que se escribe se ve (invariante 4 del catálogo).
+ */
+function alcanceYCondiciones(args: Record<string, unknown>, scope: string | undefined, productos: Candidato[], categorias: Candidato[], dias?: number[]): string {
+  const partes = [`para ${ALCANCE[String(scope)] ?? dato(scope)}`];
+  if (productos.length) partes.push(`${productos.length === 1 ? 'el producto' : `${productos.length} productos:`} ${nombresEnLista(productos)}`);
+  if (categorias.length) partes.push(`${categorias.length === 1 ? 'la categoría' : `${categorias.length} categorías:`} ${nombresEnLista(categorias)}`);
   const desde = presente(args.startDate) ? `desde ${dato(args.startDate)}` : 'desde ahora';
   const hasta = presente(args.endDate) ? `hasta ${dato(args.endDate)}` : 'sin fecha de fin';
-  return `${partes.join(', ')}; ${desde}, ${hasta}`;
+  const condiciones: string[] = [];
+  if (presente(args.minAmount)) condiciones.push(`con compra mínima de ${monto(args.minAmount)}`);
+  if (presente(args.maxUsesTotal)) condiciones.push(`hasta ${dato(args.maxUsesTotal)} usos en total`);
+  if (presente(args.maxUsesPerCustomer)) condiciones.push(`hasta ${dato(args.maxUsesPerCustomer)} por cliente`);
+  if (dias?.length) condiciones.push(`solo ${dias.map((d) => DIAS_EN_PALABRAS[d]).join(', ')}`);
+  if (presente(args.startTime) || presente(args.endTime)) {
+    condiciones.push(`de ${presente(args.startTime) ? dato(args.startTime) : '00:00'} a ${presente(args.endTime) ? dato(args.endTime) : '23:59'}`);
+  }
+  return [`${partes.join(', ')}; ${desde}, ${hasta}`, ...condiciones].join('; ');
 }
 
-// Lo que se le manda al service, armado en un solo lugar: validarArgs() lo
-// pasa por el DTO del endpoint y execute() lo escribe, así lo validado es
-// exactamente lo escrito. Un null del modelo en un opcional es "no mandar":
-// no se escribe nada que la tarjeta no muestre. Sin conversiones de tipo: si
-// el modelo manda "20" en vez de 20, el DTO lo rechaza, igual que por HTTP.
-function aDtoDescuento(args: Record<string, unknown>): UpsertDiscountDto {
-  return {
-    name: args.name as string,
+type PromoArmada<T> = { dto: T; scope: string; productos: Candidato[]; categorias: Candidato[]; dias?: number[] };
+
+/**
+ * Lo que se le manda al service, armado en un solo lugar: validarArgs() lo
+ * pasa por el DTO del endpoint y execute() lo escribe, así lo validado es
+ * exactamente lo escrito. Un null del modelo en un opcional es "no mandar":
+ * no se escribe nada que la tarjeta no muestre. Sin conversiones de tipo: si
+ * el modelo manda "20" en vez de 20, el DTO lo rechaza, igual que por HTTP.
+ *
+ * Faltantes, alcance y nombres se juntan antes de devolver: el modelo recibe
+ * TODO lo que hay que preguntar de una vez.
+ */
+async function armarDescuento(
+  args: Record<string, unknown>,
+  ctx: ToolExecutionContext,
+  prisma: PrismaService,
+  ficha: FichaDeAccion,
+): Promise<{ ok: true; promo: PromoArmada<UpsertDiscountDto> } | ArgsInvalidos> {
+  const alcance = alcanceDe(args);
+  const elegidos = await resolverElegidos(args, ctx, prisma, ficha);
+  const { dias, invalidos: diasInvalidos } = diasDe(args);
+  const faltan = [...faltantes(ficha, args), ...alcance.faltan];
+  const invalidos = [...alcance.invalidos, ...elegidos.invalidos, ...diasInvalidos];
+  if (faltan.length || invalidos.length || !alcance.scope) return fallaDeDatos(faltan, invalidos);
+
+  const scope = alcance.scope;
+  const opcional = <T>(v: unknown) => (presente(v) ? (v as T) : undefined);
+  const dto: UpsertDiscountDto = {
+    name: tieneValor(args.name) ? (args.name as string) : nombrePorDefecto(args.type, args.value, elegidos.productos, elegidos.categorias),
     type: args.type as string,
     value: args.value as number,
-    scope: args.scope as string,
-    productIds: (args.productIds ?? undefined) as string[] | undefined,
-    // Orbi elige productos (los ids de listProducts), nunca variantes. El
-    // service exige el nivel con scope PRODUCT: sin esto, todo descuento por
-    // producto de Orbi fallaba DESPUÉS de que la persona lo confirmara.
-    productLevel: args.scope === 'PRODUCT' ? 'padre' : undefined,
-    categoryIds: (args.categoryIds ?? undefined) as string[] | undefined,
+    scope,
+    productIds: elegidos.productos.length ? elegidos.productos.map((p) => p.id) : undefined,
+    // Orbi elige productos, nunca variantes. El service exige el nivel con
+    // scope PRODUCT: sin esto, todo descuento por producto de Orbi fallaba
+    // DESPUÉS de que la persona lo confirmara.
+    productLevel: scope === 'PRODUCT' ? 'padre' : undefined,
+    categoryIds: elegidos.categorias.length ? elegidos.categorias.map((c) => c.id) : undefined,
     startDate: (args.startDate as string | undefined) ?? new Date().toISOString(),
-    endDate: (args.endDate ?? undefined) as string | undefined,
+    endDate: opcional<string>(args.endDate),
+    minAmount: opcional<number>(args.minAmount),
+    maxUsesTotal: opcional<number>(args.maxUsesTotal),
+    maxUsesPerCustomer: opcional<number>(args.maxUsesPerCustomer),
+    activeDays: dias,
+    startTime: opcional<string>(args.startTime),
+    endTime: opcional<string>(args.endTime),
   };
+  // Lo que no vino no viaja: el DTO del cupón no declara días ni horario.
+  for (const k of Object.keys(dto) as (keyof UpsertDiscountDto)[]) if (dto[k] === undefined) delete dto[k];
+  return { ok: true, promo: { dto, scope, productos: elegidos.productos, categorias: elegidos.categorias, dias } };
 }
 
-const tieneIds = (v: unknown) => Array.isArray(v) && v.length > 0;
+// Las propiedades del DTO que en la tool se llaman distinto.
+const PARAMETRO_DEL_DTO = { productIds: 'productos', categoryIds: 'categorias' };
 
-// El service acepta scope PRODUCT con categoryIds (y al revés), pero la
-// tarjeta diría "para productos elegidos, 2 categorías" y el panel nunca arma
-// esa mezcla: un modelo que la propone confundió los ids.
-function alcanceIncoherente(args: Record<string, unknown>): string | null {
-  const productos = tieneIds(args.productIds);
-  const categorias = tieneIds(args.categoryIds);
-  if (args.scope === 'PRODUCT' && (!productos || categorias)) {
-    return 'Argumento inválido (scope): con scope PRODUCT van solo productIds, los ids que te devolvió listProducts';
-  }
-  if (args.scope === 'CATEGORY' && (!categorias || productos)) {
-    return 'Argumento inválido (scope): con scope CATEGORY van solo categoryIds, ids de categorías del negocio';
-  }
-  return null;
+/** Validación completa: datos, alcance y nombres; el DTO del endpoint; y las reglas del service. */
+async function validarPromo<T extends object>(
+  armado: { ok: true; promo: PromoArmada<T> } | ArgsInvalidos,
+  Dto: new () => T,
+  ficha: FichaDeAccion,
+  servicio: (dto: T) => Promise<unknown>,
+): Promise<ResultadoDeValidacion> {
+  if (!armado.ok) return armado;
+  const forma = await validarConDto(Dto, { ...armado.promo.dto } as Record<string, unknown>);
+  if (!forma.ok) return invalidoDelDto(ficha, forma, PARAMETRO_DEL_DTO);
+  return validarConServicio(() => servicio(armado.promo.dto));
 }
+
+/** Para la tarjeta: los nombres reales (si alguno no existe, no hay tarjeta) y el alcance que se va a escribir. */
+async function vistaDePromo(args: Record<string, unknown>, ctx: ToolExecutionContext, prisma: PrismaService, ficha: FichaDeAccion) {
+  const elegidos = await resolverElegidos(args, ctx, prisma, ficha);
+  const { dias, invalidos } = diasDe(args);
+  if (elegidos.invalidos.length || invalidos.length) {
+    const falla = fallaDeDatos([], [...elegidos.invalidos, ...invalidos]);
+    throw new AccionInvalida(falla.error, falla);
+  }
+  return { productos: elegidos.productos, categorias: elegidos.categorias, dias, scope: alcanceDe(args).scope };
+}
+
+const FICHA_DESCUENTO = FICHAS.createDiscount;
 
 export class CreateDiscountTool implements OrbiTool {
   name = 'createDiscount';
-  description = 'Crear un descuento automático (sin código) para productos, categorías o el ticket total. Se aplica solo, sin que el cliente escriba nada.';
+  description = descripcionDe(FICHA_DESCUENTO);
+  parameters = parametrosDe(FICHA_DESCUENTO);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
-  describirAccion(args: Record<string, unknown>): string {
-    return `Crear el descuento ${entreComillas(args.name ?? 'sin nombre')} de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
+  constructor(
+    private readonly discountsService: DiscountsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async describirAccion(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
+    const v = await vistaDePromo(args, ctx, this.prisma, FICHA_DESCUENTO);
+    const nombre = tieneValor(args.name) ? args.name : nombrePorDefecto(args.type, args.value, v.productos, v.categorias);
+    return `Crear el descuento ${entreComillas(nombre)} de ${formatearValor(args.type, args.value)}, ${alcanceYCondiciones(args, v.scope, v.productos, v.categorias, v.dias)}`;
   }
 
-  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
-    const dto = aDtoDescuento(args);
-    const forma = await validarConDto(UpsertDiscountDto, { ...dto });
-    if (!forma.ok) return forma;
-    const alcance = alcanceIncoherente(args);
-    if (alcance) return { ok: false as const, error: alcance };
-    return validarConServicio(() => this.discountsService.validarAlta(ctx.businessId, dto));
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ResultadoDeValidacion> {
+    const armado = await armarDescuento(args, ctx, this.prisma, FICHA_DESCUENTO);
+    return validarPromo(armado, UpsertDiscountDto, FICHA_DESCUENTO, (dto) => this.discountsService.validarAlta(ctx.businessId, dto));
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Nombre del descuento' },
-      type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de descuento' },
-      value: { type: 'number', description: 'Valor del descuento (porcentaje 1-99, o monto en pesos)' },
-      scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el descuento' },
-      productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
-      categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },
-      startDate: { type: 'string', description: 'Fecha de inicio ISO 8601 (default: ahora)' },
-      endDate: { type: 'string', description: 'Fecha de fin ISO 8601 (opcional, sin fin si no se indica)' },
-    },
-    required: ['name', 'type', 'value', 'scope'],
-  };
-
-  constructor(private readonly discountsService: DiscountsService) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -163,11 +310,13 @@ export class CreateDiscountTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const discount = await this.discountsService.create(ctx.businessId, ctx.userId, aDtoDescuento(args));
+      const armado = await armarDescuento(args, ctx, this.prisma, FICHA_DESCUENTO);
+      if (!armado.ok) return { success: false, error: `No pude crear el descuento: ${armado.error}`, label: 'Error creando descuento' };
+      const discount = await this.discountsService.create(ctx.businessId, ctx.userId, armado.promo.dto);
 
       return {
         success: true,
-        label: `Descuento "${args.name}" creado`,
+        label: `Descuento "${discount.name}" creado`,
         data: { discountId: discount.id, name: discount.name },
       };
     } catch (error: any) {
@@ -177,48 +326,44 @@ export class CreateDiscountTool implements OrbiTool {
   }
 }
 
-// Mismo criterio que aDtoDescuento, con el código.
-function aDtoCupon(args: Record<string, unknown>): UpsertCouponDto {
-  return { ...aDtoDescuento(args), code: args.code as string };
+const FICHA_CUPON = FICHAS.createCoupon;
+
+// Mismo criterio que armarDescuento, con el código. Sin nombre, va el código.
+async function armarCupon(
+  args: Record<string, unknown>,
+  ctx: ToolExecutionContext,
+  prisma: PrismaService,
+): Promise<{ ok: true; promo: PromoArmada<UpsertCouponDto> } | ArgsInvalidos> {
+  const armado = await armarDescuento(args, ctx, prisma, FICHA_CUPON);
+  if (!armado.ok) return armado;
+  const { dto, ...resto } = armado.promo;
+  const cupon: UpsertCouponDto = { ...dto, code: args.code as string, name: tieneValor(args.name) ? (args.name as string) : String(args.code) };
+  return { ok: true, promo: { dto: cupon, ...resto } };
 }
 
 export class CreateCouponTool implements OrbiTool {
   name = 'createCoupon';
-  description = 'Crear un cupón con código que el cliente ingresa manualmente en el checkout.';
+  description = descripcionDe(FICHA_CUPON);
+  parameters = parametrosDe(FICHA_CUPON);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['discounts.manage'];
   requiresConfirmation = true;
 
-  describirAccion(args: Record<string, unknown>): string {
-    return `Crear el cupón ${entreComillas(args.code ?? '(sin código)')} (${entreComillas(args.name ?? 'sin nombre')}) de ${formatearValor(args.type, args.value)}, ${alcanceYVigencia(args)}`;
+  constructor(
+    private readonly couponsService: CouponsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async describirAccion(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<string> {
+    const v = await vistaDePromo(args, ctx, this.prisma, FICHA_CUPON);
+    const nombre = tieneValor(args.name) && args.name !== args.code ? ` (${entreComillas(args.name)})` : '';
+    return `Crear el cupón ${entreComillas(args.code ?? '(sin código)')}${nombre} de ${formatearValor(args.type, args.value)}, ${alcanceYCondiciones(args, v.scope, v.productos, v.categorias)}`;
   }
 
-  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext) {
-    const dto = aDtoCupon(args);
-    const forma = await validarConDto(UpsertCouponDto, { ...dto });
-    if (!forma.ok) return forma;
-    const alcance = alcanceIncoherente(args);
-    if (alcance) return { ok: false as const, error: alcance };
-    return validarConServicio(() => this.couponsService.validarAlta(ctx.businessId, dto));
+  async validarArgs(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ResultadoDeValidacion> {
+    const armado = await armarCupon(args, ctx, this.prisma);
+    return validarPromo(armado, UpsertCouponDto, FICHA_CUPON, (dto) => this.couponsService.validarAlta(ctx.businessId, dto));
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      code: { type: 'string', description: 'Código del cupón (ej. VERANO20)' },
-      name: { type: 'string', description: 'Nombre descriptivo del cupón' },
-      type: { type: 'string', enum: ['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'], description: 'Tipo de cupón' },
-      value: { type: 'number', description: 'Valor del cupón (porcentaje 1-99, o monto en pesos)' },
-      scope: { type: 'string', enum: ['PRODUCT', 'CATEGORY', 'TICKET'], description: 'A qué aplica el cupón' },
-      productIds: { type: 'array', items: { type: 'string' }, description: 'IDs de productos (requerido si scope es PRODUCT)' },
-      categoryIds: { type: 'array', items: { type: 'string' }, description: 'IDs de categorías (requerido si scope es CATEGORY)' },
-      startDate: { type: 'string', description: 'Fecha de inicio ISO 8601 (default: ahora)' },
-      endDate: { type: 'string', description: 'Fecha de expiración ISO 8601 (opcional)' },
-    },
-    required: ['code', 'name', 'type', 'value', 'scope'],
-  };
-
-  constructor(private readonly couponsService: CouponsService) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -226,7 +371,9 @@ export class CreateCouponTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const coupon = await this.couponsService.create(ctx.businessId, ctx.userId, aDtoCupon(args));
+      const armado = await armarCupon(args, ctx, this.prisma);
+      if (!armado.ok) return { success: false, error: `No pude crear el cupón: ${armado.error}`, label: 'Error creando cupón' };
+      const coupon = await this.couponsService.create(ctx.businessId, ctx.userId, armado.promo.dto);
 
       return {
         success: true,

@@ -23,6 +23,7 @@ export const ERROR_DESACTUALIZADA = 'desactualizada';
 /** Etiqueta fija de cada tool que escribe, y la pantalla donde se revisa. */
 const ACCIONES: Record<string, { etiqueta: string; pantalla: string }> = {
   createProduct: { etiqueta: 'Crear producto', pantalla: 'Productos' },
+  createCategory: { etiqueta: 'Crear categoría', pantalla: 'Categorías' },
   createDiscount: { etiqueta: 'Crear descuento', pantalla: 'Descuentos' },
   createCoupon: { etiqueta: 'Crear cupón', pantalla: 'Cupones' },
   updateOrderStatus: { etiqueta: 'Cambiar estado del pedido', pantalla: 'Pedidos' },

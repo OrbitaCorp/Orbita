@@ -75,20 +75,26 @@ describe('config — validan con UpdateBusinessDto / UpdateBusinessConfigDto', (
   });
 
   it('transferAlias de más de 60: error, sin tarjeta', async () => {
-    expect(await registry.proponer('updatePaymentMethods', { transferAlias: 'a'.repeat(61) }, ctx)).toEqual({ error: expect.any(String) });
+    expect(await registry.proponer('updatePaymentMethods', { transferAlias: 'a'.repeat(61) }, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
   });
 
   it('nombre del negocio de más de 80: error', async () => {
-    expect(await registry.proponer('updateBusinessInfo', { name: 'n'.repeat(81) }, ctx)).toEqual({ error: expect.any(String) });
+    expect(await registry.proponer('updateBusinessInfo', { name: 'n'.repeat(81) }, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
   });
 
   it('transportista fuera de la lista cerrada, o monto negativo: error', async () => {
-    expect(await registry.proponer('updateShipping', { enabledCarriers: ['DHL'] }, ctx)).toEqual({ error: expect.any(String) });
-    expect(await registry.proponer('updateShipping', { freeShippingFrom: -1 }, ctx)).toEqual({ error: expect.any(String) });
+    expect(await registry.proponer('updateShipping', { enabledCarriers: ['DHL'] }, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
+    expect(await registry.proponer('updateShipping', { freeShippingFrom: -1 }, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
   });
 
   it('un booleano que no es booleano: error', async () => {
-    expect(await registry.proponer('updatePaymentMethods', { acceptsCash: 'sí' }, ctx)).toEqual({ error: expect.any(String) });
+    expect(await registry.proponer('updatePaymentMethods', { acceptsCash: 'sí' }, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
+  });
+
+  it('sin nada que cambiar no hay tarjeta "sin cambios": se pide qué cambiar', async () => {
+    expect(await registry.proponer('updateShipping', {}, ctx)).toEqual(expect.objectContaining({ faltan: ['qué cambiar de los envíos'] }));
+    expect(await registry.proponer('updateBusinessInfo', { name: null }, ctx)).toEqual(expect.objectContaining({ faltan: [expect.stringContaining('nombre, rubro o descripción')] }));
+    expect(await registry.proponer('updatePaymentMethods', {}, ctx)).toEqual(expect.objectContaining({ faltan: expect.any(Array) }));
   });
 
   it('un parámetro que la tool no declara (ej. subdomain): error', async () => {

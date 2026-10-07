@@ -62,6 +62,15 @@ export type Expectativa =
   | { tipo: 'no-llama'; tool: string }
   /** `o`: otras formas válidas de pedir lo mismo (cada una con todos sus args). */
   | { tipo: 'propone'; tool: string; args?: Record<string, ValorEsperado>; o?: Record<string, ValorEsperado>[] }
+  /**
+   * Faltan datos para una escritura: NO hay tarjeta de `tool`, y el texto
+   * pregunta por cada grupo de `menciona` (alguno de cada uno), todo en el
+   * mismo mensaje. Un intento que el servidor rechazó por los datos no es una
+   * falla (es la red de seguridad: el modelo recibe qué falta y pregunta).
+   * `admite`: otras escrituras que puede ofrecer en el mismo turno (crear la
+   * categoría que no existe).
+   */
+  | { tipo: 'pide-datos'; tool: string; menciona: string[][]; admite?: string[] }
   | { tipo: 'navega'; seccion: string; vista?: string }
   | { tipo: 'cita-tema'; ids: string[] }
   | { tipo: 'menciona'; alguno: (string | ((d: NegocioDePrueba) => string))[] }
@@ -84,6 +93,7 @@ export const TOPE_DE_LARGO_POR_DEFECTO = 1200;
 /** Las tools del panel y del manual: ninguna puede aparecer como texto. */
 export const NOMBRES_DE_TOOLS_DEL_PANEL = [
   'navigateTo', 'listProducts', 'createProduct', 'generateDescription',
+  'listCategories', 'createCategory',
   'listDiscounts', 'createDiscount', 'createCoupon',
   'listOrders', 'getOrderDetail', 'updateOrderStatus',
   'listCustomers', 'getCustomerDetail',
@@ -353,6 +363,21 @@ export function verificarExpectativas(
         }
         break;
 
+      case 'pide-datos': {
+        if (!turno.toolsOfrecidas.includes(e.tool)) {
+          noAplica.push({ tipo: 'pide-datos', motivo: `la variante no ofrece ${e.tool}` });
+          break;
+        }
+        const tarjeta = turno.propuestas.find((p) => p.tool === e.tool);
+        if (tarjeta) violaciones.push({ regla: 'pide-datos', detalle: `Propuso ${e.tool} sin tener los datos: "${tarjeta.resumen}"` });
+        for (const grupo of e.menciona) {
+          if (!grupo.some((f) => texto.includes(normalizar(f)))) {
+            violaciones.push({ regla: 'pide-datos', detalle: `No pregunta por ${grupo.map((f) => `"${f}"`).join(' ni ')}` });
+          }
+        }
+        break;
+      }
+
       case 'navega': {
         // El panel dibuja UN solo botón "Ir a…", el del primer destino
         // (OrbiMessages.tsx: msg.actions.find(esNavegacion)). Los demás no se ven.
@@ -434,9 +459,17 @@ export function verificarExpectativas(
   return { violaciones, noAplica };
 }
 
-/** Las escrituras que el caso habilita: las de sus expectativas `propone`. */
+/**
+ * Las escrituras que el caso habilita: las de sus expectativas `propone`, y en
+ * `pide-datos` la tool de la acción (un intento rechazado por los datos vale;
+ * la tarjeta la marca la propia expectativa) y las que `admite`.
+ */
 export function escriturasPermitidas(expectativas: Expectativa[]): string[] {
-  return expectativas.filter((e): e is Extract<Expectativa, { tipo: 'propone' }> => e.tipo === 'propone').map((e) => e.tool);
+  return expectativas.flatMap((e) => {
+    if (e.tipo === 'propone') return [e.tool];
+    if (e.tipo === 'pide-datos') return [e.tool, ...(e.admite ?? [])];
+    return [];
+  });
 }
 
 /** Sección y vista de un path del panel: /admin/ventas/<seccion>?vista=<vista>. */

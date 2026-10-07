@@ -5,6 +5,7 @@ import { LeerTemaDelManualTool } from './definitions/manual.tools';
 import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './definitions/estado.tools';
 import { GetResumenDelPeriodoTool } from './definitions/periodo.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './definitions/product.tools';
+import { ListCategoriesTool, CreateCategoryTool } from './definitions/category.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './definitions/order.tools';
 import { ListCustomersTool, GetCustomerDetailTool } from './definitions/customer.tools';
@@ -25,6 +26,11 @@ const altaValida = { validarAlta: async () => undefined } as any;
 // la base. Este falso devuelve nombres que LLEVAN el id buscado: así, en la
 // invariante 4, el centinela de un id aparece en el resumen si y solo si la
 // tool buscó ese id (y no otro).
+//
+// Las que reciben NOMBRES (categoría, productos, etiquetas) los resuelven contra
+// la lista del negocio: el falso tiene los centinelas de la invariante 4 (los
+// textos y las listas a1, a2, a3) como nombres, cada uno con su id.
+const conNombres = (...nombres: string[]) => jest.fn(async () => nombres.map((name, i) => ({ id: `id-${i}-${name}`, name })));
 const prismaFalso = {
   order: {
     findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({
@@ -35,9 +41,9 @@ const prismaFalso = {
       onlineOrderDetails: { buyerName: `cliente-${where.id}`, buyerEmail: 'c@example.com' },
     })),
   },
-  category: {
-    findFirst: jest.fn(async ({ where }: { where: { id: string } }) => ({ name: `categoria-${where.id}` })),
-  },
+  category: { findMany: conNombres('centinela-categoria', 'otro-categoria', 'a1', 'a2', 'a3') },
+  product: { findMany: conNombres('a1', 'a2', 'a3') },
+  tag: { findMany: conNombres('a1', 'a2', 'a3') },
 } as any;
 
 describe('Orbi — catálogo completo de tools', () => {
@@ -50,9 +56,11 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new ListProductsTool(stub));
     registry.register(new CreateProductTool(stub, prismaFalso));
     registry.register(new GenerateDescriptionTool(stub, stub));
+    registry.register(new ListCategoriesTool(stub));
+    registry.register(new CreateCategoryTool(stub, prismaFalso));
     registry.register(new ListDiscountsTool(stub));
-    registry.register(new CreateDiscountTool(altaValida));
-    registry.register(new CreateCouponTool(altaValida));
+    registry.register(new CreateDiscountTool(altaValida, prismaFalso));
+    registry.register(new CreateCouponTool(altaValida, prismaFalso));
     registry.register(new ListOrdersTool(stub));
     registry.register(new GetOrderDetailTool(stub));
     registry.register(new UpdateOrderStatusTool(stub, prismaFalso));
@@ -77,6 +85,7 @@ describe('Orbi — catálogo completo de tools', () => {
   const PANEL_TOOL_NAMES = [
     'navigateTo',
     'listProducts', 'createProduct', 'generateDescription',
+    'listCategories', 'createCategory',
     'listDiscounts', 'createDiscount', 'createCoupon',
     'listOrders', 'getOrderDetail', 'updateOrderStatus',
     'listCustomers', 'getCustomerDetail',
@@ -95,7 +104,7 @@ describe('Orbi — catálogo completo de tools', () => {
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 27 tools del catálogo completo', () => {
+  it('registra las 29 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, CODIGOS_DEL_CATALOGO).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
@@ -198,7 +207,7 @@ describe('Orbi — catálogo completo de tools', () => {
   // pide catalog.manage y consume la cuota diaria.
   const SOLO_LECTURA = [
     'navigateTo',
-    'listProducts', 'generateDescription',
+    'listProducts', 'generateDescription', 'listCategories',
     'listDiscounts',
     'listOrders', 'getOrderDetail',
     'listCustomers', 'getCustomerDetail',
@@ -206,7 +215,7 @@ describe('Orbi — catálogo completo de tools', () => {
     'leerTemaDelManual', 'estadoPrimerosPasos', 'accesoDelEquipo', 'getResumenDelPeriodo',
   ];
   const ESCRIBEN = [
-    'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
+    'createProduct', 'createCategory', 'createDiscount', 'createCoupon', 'updateOrderStatus',
     'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
   ];
 
@@ -273,6 +282,8 @@ describe('Orbi — catálogo completo de tools', () => {
   it('el mapeo de permisos por tool es el del spec (§3.1)', () => {
     const esperado: Record<string, string[]> = {
       createProduct: ['catalog.manage'],
+      createCategory: ['catalog.manage'],
+      listCategories: ['catalog.view'],
       generateDescription: ['catalog.manage'],
       createDiscount: ['discounts.manage'],
       createCoupon: ['discounts.manage'],
@@ -305,7 +316,7 @@ describe('Orbi — catálogo completo de tools', () => {
     // Sin describirAccion el botón diría el nombre de la función, que es
     // exactamente lo que la persona no puede evaluar. Tiene que poder leer los
     // valores concretos y decidir si el modelo entendió bien.
-    for (const nombre of ['createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus', 'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping']) {
+    for (const nombre of ['createProduct', 'createCategory', 'createDiscount', 'createCoupon', 'updateOrderStatus', 'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping']) {
       const tool = (registry as any).tools.get(nombre);
       expect({ nombre, describe: typeof tool?.describirAccion === 'function' })
         .toEqual({ nombre, describe: true });
@@ -386,7 +397,7 @@ describe('Orbi — catálogo completo de tools', () => {
     }
 
     it.each([
-      'createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus',
+      'createProduct', 'createCategory', 'createDiscount', 'createCoupon', 'updateOrderStatus',
       'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
     ])('%s', async (nombre) => {
       const tool = (registry as any).tools.get(nombre);
@@ -411,13 +422,16 @@ describe('Orbi — catálogo completo de tools', () => {
 
     it('lo que se lee de la base para la tarjeta sale acotado al negocio del token', async () => {
       prismaFalso.order.findFirst.mockClear();
-      prismaFalso.category.findFirst.mockClear();
-      const orderTool = (registry as any).tools.get('updateOrderStatus');
-      const productTool = (registry as any).tools.get('createProduct');
-      await orderTool.describirAccion({ orderId: 'o-1', status: 'CONFIRMED' }, ctx);
-      await productTool.describirAccion({ name: 'R', basePrice: 1, categoryId: 'c-1' }, ctx);
+      prismaFalso.category.findMany.mockClear();
+      prismaFalso.product.findMany.mockClear();
+      const tool = (nombre: string) => (registry as any).tools.get(nombre);
+      await tool('updateOrderStatus').describirAccion({ orderId: 'o-1', status: 'CONFIRMED' }, ctx);
+      await tool('createProduct').describirAccion({ name: 'R', basePrice: 1, categoria: 'a1' }, ctx);
+      await tool('createDiscount').describirAccion({ type: 'PERCENT_PRODUCT', value: 1, productos: ['a1'] }, ctx);
       expect(prismaFalso.order.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'o-1', businessId: 'biz-cat' }) }));
-      expect(prismaFalso.category.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'c-1', businessId: 'biz-cat' }) }));
+      // Los nombres se resuelven contra la lista del negocio de la sesión, nunca de otro.
+      expect(prismaFalso.category.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: 'biz-cat' } }));
+      expect(prismaFalso.product.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: 'biz-cat', deletedAt: null } }));
     });
   });
 

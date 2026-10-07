@@ -365,6 +365,8 @@ const FRASE_POR_TOOL: Record<string, string> = {
   navigateTo: 'Llevándote ahí',
   listProducts: 'Revisando tu catálogo',
   createProduct: 'Cargando el producto',
+  listCategories: 'Revisando tus categorías',
+  createCategory: 'Preparando la categoría',
   generateDescription: 'Escribiendo la descripción',
   listOrders: 'Buscando en tus pedidos',
   getOrderDetail: 'Abriendo el pedido',

@@ -84,6 +84,8 @@ export function crearTablas(d: NegocioDePrueba): Record<string, Fila[]> {
     variant: d.productos.map((p) => ({ id: `var-${p.id}`, productId: p.id, isActive: true, price: precioDe(p.id) })),
     variantStock: d.productos.map((p) => ({ variantId: `var-${p.id}`, quantity: p.stock, stockMin: 5 })),
     category: d.categorias.map((c) => ({ id: c.id, businessId: BUSINESS_ID, name: c.nombre })),
+    // El negocio de prueba no usa etiquetas: createProduct las resuelve contra esta lista vacía.
+    tag: [],
     conversation: Array.from({ length: CONVERSACIONES.total }, (_, i) => ({
       id: `conv-${i}`, businessId: BUSINESS_ID, isUnread: i < CONVERSACIONES.sinLeer, isArchived: false,
     })),

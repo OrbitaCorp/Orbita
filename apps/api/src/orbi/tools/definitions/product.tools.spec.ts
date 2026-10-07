@@ -36,26 +36,48 @@ describe('ListProductsTool', () => {
   });
 });
 
+const CATEGORIA = '55555555-5555-4555-8555-555555555555';
+const TAG1 = '66666666-6666-4666-8666-666666666666';
+const TAG2 = '77777777-7777-4777-8777-777777777777';
+
+/** Una base con las categorías y etiquetas del negocio, para el resolver de nombres. */
+function prismaCon(
+  categorias = [{ id: CATEGORIA, name: 'Perfumería' }, { id: '88888888-8888-4888-8888-888888888888', name: 'Ropa' }],
+  etiquetas = [{ id: TAG1, name: 'Verano' }, { id: TAG2, name: 'Oferta' }],
+) {
+  return {
+    category: { findMany: jest.fn().mockResolvedValue(categorias) },
+    tag: { findMany: jest.fn().mockResolvedValue(etiquetas) },
+  };
+}
+
 describe('CreateProductTool', () => {
-  it('calls ProductsService.create with correct args', async () => {
+  it('resuelve la categoría por nombre y llama a ProductsService.create con su id', async () => {
     const mockService = {
-      create: jest.fn().mockResolvedValue({ id: 'p-new', name: 'Remera' }),
+      create: jest.fn().mockResolvedValue({ id: 'p-new', name: 'Perfume' }),
     };
 
-    const tool = new CreateProductTool(mockService as any, {} as any);
+    const tool = new CreateProductTool(mockService as any, prismaCon() as any);
     const result = await tool.execute(
-      { name: 'Remera', basePrice: 5000, categoryId: 'cat-1' },
+      { name: 'Perfume', basePrice: 5000, categoria: 'perfumeria' },
       ctx,
     );
 
     expect(result.success).toBe(true);
     expect(mockService.create).toHaveBeenCalledWith('biz-1', expect.objectContaining({
-      name: 'Remera',
+      name: 'Perfume',
       basePrice: 5000,
-      categoryId: 'cat-1',
+      categoryId: CATEGORIA,
       status: 'DRAFT',
     }));
     expect((result.data as any).productId).toBe('p-new');
+  });
+
+  it('una propuesta guardada con la forma de antes (categoryId, tags) se sigue ejecutando', async () => {
+    const mockService = { create: jest.fn().mockResolvedValue({ id: 'p-new', name: 'Remera' }) };
+    const tool = new CreateProductTool(mockService as any, prismaCon() as any);
+    await tool.execute({ name: 'Remera', basePrice: 5000, categoryId: CATEGORIA, tags: [TAG1] }, ctx);
+    expect(mockService.create).toHaveBeenCalledWith('biz-1', expect.objectContaining({ categoryId: CATEGORIA, tagIds: [TAG1] }));
   });
 
   it('pide catalog.manage, el mismo permiso que POST /products', () => {
@@ -63,37 +85,48 @@ describe('CreateProductTool', () => {
     expect(tool.requiredPermissions).toEqual(['catalog.manage']);
     expect(tool.requiresConfirmation).toBe(true);
   });
+
+  it('al modelo le pide el NOMBRE de la categoría, no un id', () => {
+    const tool = new CreateProductTool({} as any, {} as any);
+    const props = (tool.parameters as any).properties;
+    expect(props.categoria.description).toContain('Nunca un id inventado');
+    expect(props.categoryId).toBeUndefined();
+    expect(tool.parameters.required).toEqual(['name', 'basePrice', 'categoria']);
+  });
 });
 
 describe('CreateProductTool — la tarjeta y la validación', () => {
-  const CATEGORIA = '55555555-5555-4555-8555-555555555555';
-  const TAG1 = '66666666-6666-4666-8666-666666666666';
-  const TAG2 = '77777777-7777-4777-8777-777777777777';
-
-  function armar(categoria: unknown = { name: 'Ropa' }) {
-    const prisma = { category: { findFirst: jest.fn().mockResolvedValue(categoria) } };
+  function armar(categorias?: { id: string; name: string }[]) {
+    const prisma = prismaCon(categorias);
     const tool = new CreateProductTool({} as any, prisma as any);
     const registry = new ToolRegistryService();
     registry.register(tool);
     return { prisma, tool, registry };
   }
 
-  const validos = { name: 'Remera', basePrice: 5000, categoryId: CATEGORIA };
+  const validos = { name: 'Remera', basePrice: 5000, categoria: 'Ropa' };
 
   it('muestra nombre, precio, categoría, estado, descripción truncada y etiquetas', async () => {
     const { tool } = armar();
     const r = await tool.describirAccion({
-      ...validos, status: 'PUBLISHED', tags: [TAG1, TAG2],
+      ...validos, status: 'PUBLISHED', etiquetas: ['verano', 'OFERTA'],
       description: `Algodón peinado\n"premium" ${'y'.repeat(200)}`,
     }, ctx);
     expect(r).toContain('"Remera"');
     expect(r).toContain('$5000');
     expect(r).toContain('"Ropa"');
     expect(r).toContain('publicado');
-    expect(r).toContain('2 etiquetas');
+    expect(r).toContain('"Verano", "Oferta"');
     expect(r).not.toMatch(/[\r\n]/);
     const descripcion = r.match(/"(Algodón[^"]*)"/)?.[1] ?? '';
     expect(Array.from(descripcion).length).toBeLessThanOrEqual(80);
+  });
+
+  it('la tarjeta muestra el nombre REAL de la categoría, no como lo escribió la persona', async () => {
+    const { tool } = armar();
+    for (const escrito of ['perfumeria', 'Perfumería ', 'PERFUMERÍAS']) {
+      expect(await tool.describirAccion({ ...validos, categoria: escrito }, ctx)).toContain('en la categoría "Perfumería"');
+    }
   });
 
   it('sin estado dice que queda como borrador', async () => {
@@ -101,26 +134,58 @@ describe('CreateProductTool — la tarjeta y la validación', () => {
     expect(await tool.describirAccion(validos, ctx)).toContain('borrador');
   });
 
-  it('la categoría se busca acotada al negocio; si no es suya, error sin tarjeta', async () => {
-    const { registry, prisma } = armar(null);
-    expect(await registry.proponer('createProduct', validos, ctx)).toEqual({ error: 'Categoría no encontrada' });
-    expect(prisma.category.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ id: CATEGORIA, businessId: 'biz-1' }),
+  it('las categorías se buscan acotadas al negocio', async () => {
+    const { registry, prisma } = armar();
+    await registry.proponer('createProduct', validos, ctx);
+    expect(prisma.category.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: 'biz-1' } }));
+  });
+
+  it('categoría que no existe: sin tarjeta, y el modelo recibe cuáles hay', async () => {
+    const { registry } = armar();
+    const r = await registry.proponer('createProduct', { ...validos, categoria: 'Velas' }, ctx);
+    expect(r).toEqual({
+      error: expect.stringContaining('no existe la categoría "Velas"'),
+      invalidos: [{ campo: 'categoría', motivo: expect.any(String), opciones: expect.arrayContaining(['Perfumería', 'Ropa']) }],
+    });
+  });
+
+  it('categoría ambigua: pregunta cuál', async () => {
+    const { registry } = armar([{ id: 'a', name: 'Remeras lisas' }, { id: 'b', name: 'Remeras estampadas' }]);
+    const r = await registry.proponer('createProduct', { ...validos, categoria: 'remeras' }, ctx);
+    expect(r).toEqual(expect.objectContaining({
+      invalidos: [expect.objectContaining({ motivo: expect.stringContaining('preguntale cuál'), opciones: ['Remeras lisas', 'Remeras estampadas'] })],
     }));
   });
 
-  it('valida con CreateProductDto: nombre de más de 150, categoría no UUID, precio 0, etiquetas no UUID', async () => {
+  it('faltan precio y categoría: los dos juntos, con sus nombres para la persona', async () => {
+    const { registry } = armar();
+    const r = await registry.proponer('createProduct', { name: 'Remera' }, ctx);
+    expect(r).toEqual({ error: expect.stringContaining('Faltan datos: precio, categoría'), faltan: ['precio', 'categoría'] });
+  });
+
+  it('etiqueta que no existe: error con las que hay', async () => {
+    const { registry } = armar();
+    const r = await registry.proponer('createProduct', { ...validos, etiquetas: ['invierno'] }, ctx);
+    expect(r).toEqual(expect.objectContaining({ invalidos: [expect.objectContaining({ campo: 'etiquetas', opciones: expect.arrayContaining(['Verano']) })] }));
+  });
+
+  it('valida con CreateProductDto: nombre de más de 150, precio 0 o como texto, estado inválido', async () => {
     const { registry } = armar();
     expect(await registry.proponer('createProduct', validos, ctx)).toEqual({ resumen: expect.any(String) });
     for (const malo of [
       { ...validos, name: 'n'.repeat(151) },
-      { ...validos, categoryId: 'ropa' },
       { ...validos, basePrice: 0 },
-      { ...validos, tags: ['verano'] },
+      { ...validos, basePrice: '5000' },
       { ...validos, status: 'ARCHIVED' },
     ]) {
-      expect(await registry.proponer('createProduct', malo, ctx)).toEqual({ error: expect.any(String) });
+      expect(await registry.proponer('createProduct', malo, ctx)).toEqual(expect.objectContaining({ error: expect.any(String), invalidos: expect.any(Array) }));
     }
+  });
+
+  it('el rechazo del DTO nombra el campo como se lo pide a la persona', async () => {
+    const { registry } = armar();
+    const r = await registry.proponer('createProduct', { ...validos, basePrice: 0 }, ctx);
+    expect(r).toEqual(expect.objectContaining({ error: expect.stringContaining('basePrice'), invalidos: [expect.objectContaining({ campo: 'precio' })] }));
   });
 });
 

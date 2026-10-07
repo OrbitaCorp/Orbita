@@ -82,6 +82,7 @@ export const ESPERAS_REINTENTO_MS: readonly number[] = [500, 1000, 2000, 4000, 8
 // no está acá no se nombra.
 const PANTALLA_DE: Record<string, string> = {
   createProduct: 'Productos',
+  createCategory: 'Categorías',
   createDiscount: 'Descuentos',
   createCoupon: 'Cupones',
   updateOrderStatus: 'Pedidos',

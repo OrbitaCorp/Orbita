@@ -4,7 +4,8 @@ import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { BusinessesService } from '../../../businesses/businesses.service';
 import { UpdateBusinessDto } from '../../../businesses/dto/update-business.dto';
 import { UpdateBusinessConfigDto } from '../../../businesses/dto/update-business-config.dto';
-import { validarConDto } from '../acciones/validar-args';
+import { validarConDto, type ResultadoDeValidacion } from '../acciones/validar-args';
+import { FICHAS, chequearFaltantes, descripcionDe, invalidoDelDto, parametrosDe, type FichaDeAccion } from '../acciones/requisitos';
 import { entreComillas, monto, presente } from '../acciones/formato';
 
 // Lo que se le manda al service, armado en un solo lugar: validarArgs() lo
@@ -19,13 +20,22 @@ function soloPresentes(args: Record<string, unknown>, claves: string[]): Record<
   return out;
 }
 
-const CAMPOS_NEGOCIO = ['name', 'industry', 'description'];
-const CAMPOS_PAGOS = ['acceptsMercadopago', 'acceptsCash', 'acceptsTransfer', 'acceptsCard', 'acceptsCoordinateLater', 'transferAlias'];
-const CAMPOS_ENVIOS = ['freeShippingFrom', 'shippingPolicy', 'enabledCarriers'];
+const CAMPOS_NEGOCIO = Object.keys(FICHAS.updateBusinessInfo.campos);
+const CAMPOS_PAGOS = Object.keys(FICHAS.updatePaymentMethods.campos);
+const CAMPOS_ENVIOS = Object.keys(FICHAS.updateShipping.campos);
+
+/** Sin nada que cambiar no hay tarjeta ("sin cambios"): se pide qué cambiar. Después, el DTO del endpoint. */
+async function validarCambios(ficha: FichaDeAccion, Dto: new () => object, args: Record<string, unknown>, claves: string[]): Promise<ResultadoDeValidacion> {
+  const faltan = chequearFaltantes(ficha, args);
+  if (faltan) return faltan;
+  const forma = await validarConDto(Dto, soloPresentes(args, claves));
+  return forma.ok ? { ok: true } : invalidoDelDto(ficha, forma);
+}
 
 export class UpdateBusinessInfoTool implements OrbiTool {
   name = 'updateBusinessInfo';
-  description = 'Actualizar el nombre, rubro o descripción del negocio. NO permite cambiar el subdominio, el plan ni las credenciales — eso está fuera de mi alcance.';
+  description = descripcionDe(FICHAS.updateBusinessInfo);
+  parameters = parametrosDe(FICHAS.updateBusinessInfo);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
@@ -42,17 +52,8 @@ export class UpdateBusinessInfoTool implements OrbiTool {
   }
 
   validarArgs(args: Record<string, unknown>) {
-    return validarConDto(UpdateBusinessDto, soloPresentes(args, CAMPOS_NEGOCIO));
+    return validarCambios(FICHAS.updateBusinessInfo, UpdateBusinessDto, args, CAMPOS_NEGOCIO);
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Nuevo nombre del negocio (opcional)' },
-      industry: { type: 'string', description: 'Nuevo rubro (opcional)' },
-      description: { type: 'string', description: 'Nueva descripción del negocio (opcional)' },
-    },
-  };
 
   constructor(private readonly businessesService: BusinessesService) {}
 
@@ -74,7 +75,8 @@ export class UpdateBusinessInfoTool implements OrbiTool {
 
 export class UpdatePaymentMethodsTool implements OrbiTool {
   name = 'updatePaymentMethods';
-  description = 'Actualizar qué métodos de pago acepta el negocio (efectivo, transferencia, tarjeta, MercadoPago, coordinar por WhatsApp) y sus datos asociados.';
+  description = descripcionDe(FICHAS.updatePaymentMethods);
+  parameters = parametrosDe(FICHAS.updatePaymentMethods);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
@@ -101,20 +103,8 @@ export class UpdatePaymentMethodsTool implements OrbiTool {
   }
 
   validarArgs(args: Record<string, unknown>) {
-    return validarConDto(UpdateBusinessConfigDto, soloPresentes(args, CAMPOS_PAGOS));
+    return validarCambios(FICHAS.updatePaymentMethods, UpdateBusinessConfigDto, args, CAMPOS_PAGOS);
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      acceptsMercadopago: { type: 'boolean' },
-      acceptsCash: { type: 'boolean' },
-      acceptsTransfer: { type: 'boolean' },
-      acceptsCard: { type: 'boolean' },
-      acceptsCoordinateLater: { type: 'boolean' },
-      transferAlias: { type: 'string', description: 'Alias de la cuenta para transferencias (opcional)' },
-    },
-  };
 
   constructor(private readonly businessesService: BusinessesService) {}
 
@@ -136,7 +126,8 @@ export class UpdatePaymentMethodsTool implements OrbiTool {
 
 export class UpdateShippingTool implements OrbiTool {
   name = 'updateShipping';
-  description = 'Actualizar la configuración de envíos: transportistas habilitados, costo de envío gratis a partir de cierto monto, y política de envíos.';
+  description = descripcionDe(FICHAS.updateShipping);
+  parameters = parametrosDe(FICHAS.updateShipping);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config.edit'];
   requiresConfirmation = true;
@@ -161,21 +152,8 @@ export class UpdateShippingTool implements OrbiTool {
   }
 
   validarArgs(args: Record<string, unknown>) {
-    return validarConDto(UpdateBusinessConfigDto, soloPresentes(args, CAMPOS_ENVIOS));
+    return validarCambios(FICHAS.updateShipping, UpdateBusinessConfigDto, args, CAMPOS_ENVIOS);
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      freeShippingFrom: { type: 'number', description: 'Monto a partir del cual el envío es gratis (opcional)' },
-      shippingPolicy: { type: 'string', description: 'Texto de política de envíos (opcional)' },
-      enabledCarriers: {
-        type: 'array',
-        items: { type: 'string', enum: ['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO'] },
-        description: 'Transportistas habilitados (opcional)',
-      },
-    },
-  };
 
   constructor(private readonly businessesService: BusinessesService) {}
 

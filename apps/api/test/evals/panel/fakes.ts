@@ -543,6 +543,17 @@ export function armarFakes(d: NegocioDePrueba) {
 
   const reports = estricto('ReportsService', reportes(d));
 
+  // GET /categories?flat=true: la lista plana con el conteo de productos.
+  const categories = estricto('CategoriesService', {
+    async findAll(_businessId: string, flat?: boolean) {
+      if (!flat) throw new Error('Las evals solo emulan la lista plana de categorías');
+      return d.categorias.map((c, position) => ({
+        id: c.id, name: c.nombre, slug: c.nombre.toLowerCase(), icon: null, color: null, imageUrl: null, parentId: null,
+        isActive: true, position, productCount: d.productos.filter((p) => p.categoriaId === c.id).length,
+      }));
+    },
+  });
+
   const productAi = estricto('ProductAiService', {
     // El real sugiere el id de una categoría del negocio que matchee el
     // producto (validado contra las categorías): acá, la que aparece en el
@@ -585,7 +596,7 @@ export function armarFakes(d: NegocioDePrueba) {
     },
   });
 
-  return { products, orders, customers, discounts, coupons, reports, productAi, cuota, prisma, moduleData, businesses, ahora: d.ahora };
+  return { products, orders, customers, discounts, coupons, categories, reports, productAi, cuota, prisma, moduleData, businesses, ahora: d.ahora };
 }
 
 // ─── Armado de las piezas reales ─────────────────────────────────────────────
@@ -608,8 +619,10 @@ const FABRICAS: Record<string, (f: Fakes) => OrbiTool | undefined> = {
   CreateProductTool: (f) => new CreateProductTool(f.products as never, f.prisma as never),
   GenerateDescriptionTool: (f) => new GenerateDescriptionTool(f.productAi as never, f.cuota as never),
   ListDiscountsTool: (f) => new ListDiscountsTool(f.discounts as never),
-  CreateDiscountTool: (f) => new CreateDiscountTool(f.discounts as never),
-  CreateCouponTool: (f) => new CreateCouponTool(f.coupons as never),
+  // Desde 2026-10-07 resuelven productos y categorías por nombre: leen la Prisma.
+  // Sobre main (línea de base) el constructor de un argumento ignora el segundo.
+  CreateDiscountTool: (f) => new CreateDiscountTool(f.discounts as never, f.prisma as never),
+  CreateCouponTool: (f) => new CreateCouponTool(f.coupons as never, f.prisma as never),
   ListOrdersTool: (f) => new ListOrdersTool(f.orders as never),
   GetOrderDetailTool: (f) => new GetOrderDetailTool(f.orders as never),
   UpdateOrderStatusTool: (f) => new UpdateOrderStatusTool(f.orders as never, f.prisma as never),
@@ -621,6 +634,15 @@ const FABRICAS: Record<string, (f: Fakes) => OrbiTool | undefined> = {
   GetSalesReportTool: (f) => new GetSalesReportTool(f.reports as never),
   GetProductReportTool: (f) => new GetProductReportTool(f.reports as never),
   GetCustomerReportTool: (f) => new GetCustomerReportTool(f.reports as never),
+  // Las de categorías: solo existen desde el 2026-10-07.
+  ListCategoriesTool: (f) => {
+    const C = claseDeTool('category.tools', 'ListCategoriesTool');
+    return C ? new C(f.categories as never) : undefined;
+  },
+  CreateCategoryTool: (f) => {
+    const C = claseDeTool('category.tools', 'CreateCategoryTool');
+    return C ? new C(f.categories as never, f.prisma as never) : undefined;
+  },
   // Las de la fase 6 y la de período: solo existen desde la rama del 2026-10-01.
   LeerTemaDelManualTool: () => {
     const C = claseDeTool('manual.tools', 'LeerTemaDelManualTool');

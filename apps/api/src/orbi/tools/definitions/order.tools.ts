@@ -5,7 +5,8 @@ import type { OrdersService } from '../../../orders/orders.service';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import { isUUID } from 'class-validator';
 import { UpdateOrderStatusDto } from '../../../orders/dto/update-order-status.dto';
-import { AccionInvalida, validarConDto } from '../acciones/validar-args';
+import { AccionInvalida, validarConDto, type ResultadoDeValidacion } from '../acciones/validar-args';
+import { FICHAS, chequearFaltantes, descripcionDe, fallaDeDatos, invalidoDelDto, parametrosDe } from '../acciones/requisitos';
 import { dato, entreComillas } from '../acciones/formato';
 
 const EN_CASTELLANO: Record<string, string> = {
@@ -148,7 +149,8 @@ export class GetOrderDetailTool implements OrbiTool {
 
 export class UpdateOrderStatusTool implements OrbiTool {
   name = 'updateOrderStatus';
-  description = 'Cambiar el estado de un pedido (ej. confirmar, marcar como enviado o entregado). Solo se permiten las transiciones válidas para el canal del pedido.';
+  description = descripcionDe(FICHAS.updateOrderStatus);
+  parameters = parametrosDe(FICHAS.updateOrderStatus);
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['orders.manage'];
   requiresConfirmation = true;
@@ -236,23 +238,19 @@ export class UpdateOrderStatusTool implements OrbiTool {
   }
 
   // El endpoint (PATCH /orders/:id/status) valida el estado con su DTO; el id
-  // va en la ruta. Acá los dos vienen del modelo: el id se chequea como UUID
-  // antes de ir a la base.
-  async validarArgs(args: Record<string, unknown>) {
+  // va en la ruta. Acá los dos vienen del modelo: primero lo que falta (los
+  // dos juntos), después el id como UUID antes de ir a la base.
+  async validarArgs(args: Record<string, unknown>): Promise<ResultadoDeValidacion> {
+    const ficha = FICHAS.updateOrderStatus;
+    const faltan = chequearFaltantes(ficha, args);
+    if (faltan) return faltan;
     if (!isUUID(args.orderId)) {
-      return { ok: false as const, error: 'Argumento inválido (orderId): tiene que ser el UUID del pedido (usá listOrders)' };
+      const falla = fallaDeDatos([], [{ campo: ficha.campos.orderId.etiqueta, motivo: 'tiene que ser el id (UUID) que devuelve listOrders: buscá el pedido por su número' }]);
+      return { ...falla, error: `Argumento inválido (orderId): tiene que ser el UUID del pedido (usá listOrders). ${falla.error}` };
     }
-    return validarConDto(UpdateOrderStatusDto, { status: args.status });
+    const forma = await validarConDto(UpdateOrderStatusDto, { status: args.status });
+    return forma.ok ? { ok: true } : invalidoDelDto(ficha, forma);
   }
-
-  parameters = {
-    type: 'object',
-    properties: {
-      orderId: { type: 'string', description: 'ID del pedido (UUID). Usá listOrders para obtenerlo.' },
-      status: { type: 'string', enum: ['PENDING', 'CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'CANCELLED'], description: 'Nuevo estado del pedido' },
-    },
-    required: ['orderId', 'status'],
-  };
 
   constructor(
     private readonly ordersService: OrdersService,

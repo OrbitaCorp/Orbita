@@ -14,6 +14,7 @@ import { NavigationTool } from './tools/definitions/navigation.tool';
 import { LeerTemaDelManualTool } from './tools/definitions/manual.tools';
 import { EstadoPrimerosPasosTool, AccesoDelEquipoTool } from './tools/definitions/estado.tools';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
+import { ListCategoriesTool, CreateCategoryTool } from './tools/definitions/category.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';
 import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './tools/definitions/order.tools';
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
@@ -24,6 +25,8 @@ import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, 
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
 import { ProductAiService } from '../products/product-ai.service';
+import { CategoriesModule } from '../categories/categories.module';
+import { CategoriesService } from '../categories/categories.service';
 import { DiscountsModule } from '../discounts/discounts.module';
 import { DiscountsService } from '../discounts/discounts.service';
 import { CouponsModule } from '../coupons/coupons.module';
@@ -50,6 +53,7 @@ import { PrismaService } from '../prisma/prisma.service';
 @Module({
   imports: [
     ProductsModule,
+    CategoriesModule,
     DiscountsModule,
     CouponsModule,
     OrdersModule,
@@ -80,6 +84,7 @@ export class OrbiModule {
     private readonly config: ConfigService,
     private readonly productsService: ProductsService,
     private readonly productAiService: ProductAiService,
+    private readonly categoriesService: CategoriesService,
     private readonly discountsService: DiscountsService,
     private readonly couponsService: CouponsService,
     private readonly ordersService: OrdersService,
@@ -104,10 +109,12 @@ export class OrbiModule {
     this.toolRegistry.register(new ListProductsTool(this.productsService));
     this.toolRegistry.register(new CreateProductTool(this.productsService, this.prisma));
     this.toolRegistry.register(new GenerateDescriptionTool(this.productAiService, this.cuotaService));
+    this.toolRegistry.register(new ListCategoriesTool(this.categoriesService));
+    this.toolRegistry.register(new CreateCategoryTool(this.categoriesService, this.prisma));
 
     this.toolRegistry.register(new ListDiscountsTool(this.discountsService));
-    this.toolRegistry.register(new CreateDiscountTool(this.discountsService));
-    this.toolRegistry.register(new CreateCouponTool(this.couponsService));
+    this.toolRegistry.register(new CreateDiscountTool(this.discountsService, this.prisma));
+    this.toolRegistry.register(new CreateCouponTool(this.couponsService, this.prisma));
 
     this.toolRegistry.register(new ListOrdersTool(this.ordersService));
     this.toolRegistry.register(new GetOrderDetailTool(this.ordersService));
