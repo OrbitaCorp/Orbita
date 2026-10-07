@@ -4,6 +4,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { CustomerMessageDto } from './dto/customer-message.dto';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { InstagramService } from '../instagram/instagram.service';
 
 // Chat cliente↔tienda. Una sola conversación por (business, customer) —
 // nace recién cuando el cliente manda su primer mensaje, no se crea una
@@ -19,6 +20,9 @@ export class ConversationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsappService,
+    // Opcional por compatibilidad con los specs anteriores a Instagram; en la app
+    // real Nest lo inyecta siempre (ConversationsModule importa InstagramModule).
+    private readonly instagram?: InstagramService,
   ) {}
 
   // Los últimos 500 de un hilo, en orden cronológico. Antes se devolvían
@@ -108,7 +112,7 @@ export class ConversationsService {
     }
 
     // La respuesta sale por el canal por el que el cliente escribió por última
-    // vez. Si es WhatsApp se manda PRIMERO y recién después se guarda: si Meta
+    // vez. Si es WhatsApp o Instagram se manda PRIMERO y recién después se guarda: si Meta
     // la rechaza (ventana de 24 h vencida, número inválido) el dueño ve el
     // error y no queda en el hilo un mensaje que el cliente nunca recibió.
     const ultimoDelCliente = await this.prisma.message.findFirst({
@@ -117,16 +121,24 @@ export class ConversationsService {
       select: { channel: true },
     });
     let externalId: string | undefined;
+    let canal: 'WHATSAPP' | 'INSTAGRAM' | undefined;
     if (ultimoDelCliente?.channel === 'WHATSAPP') {
       const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { whatsappId: true } });
       if (!cliente?.whatsappId) throw new BadRequestException('Este cliente no tiene un número de WhatsApp asociado');
       externalId = await this.whatsapp.enviarTexto(businessId, conversationId, cliente.whatsappId, dto.text);
+      canal = 'WHATSAPP';
+    } else if (ultimoDelCliente?.channel === 'INSTAGRAM') {
+      if (!this.instagram) throw new BadRequestException('Instagram no está disponible');
+      const cliente = await this.prisma.customer.findUnique({ where: { id: conv.customerId }, select: { instagramId: true } });
+      if (!cliente?.instagramId) throw new BadRequestException('Este cliente no tiene una cuenta de Instagram asociada');
+      externalId = await this.instagram.enviarTexto(businessId, conversationId, cliente.instagramId, dto.text);
+      canal = 'INSTAGRAM';
     }
 
     const msg = await this.prisma.message.create({
       data: {
         conversationId, sender: 'STORE', text: dto.text, orderId: dto.orderId,
-        ...(externalId ? { channel: 'WHATSAPP' as const, externalId, deliveryStatus: 'sent' } : {}),
+        ...(externalId && canal ? { channel: canal, externalId, deliveryStatus: 'sent' } : {}),
       },
     });
     // El staff acaba de contestar: la conversación queda "al día" desde su

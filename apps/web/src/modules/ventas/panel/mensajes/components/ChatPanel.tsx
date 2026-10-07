@@ -192,6 +192,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onPedido, onArchivar, plantil
               <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>
                 {hora}
                 {m.channel === 'WHATSAPP' && ` · WhatsApp${me && m.deliveryStatus ? ` · ${ENTREGA[m.deliveryStatus] ?? m.deliveryStatus}` : ''}`}
+                {m.channel === 'INSTAGRAM' && ' · Instagram'}
               </div>
             </div>
           )

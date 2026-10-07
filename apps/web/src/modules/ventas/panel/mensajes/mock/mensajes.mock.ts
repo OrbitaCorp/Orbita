@@ -11,7 +11,7 @@ export interface Conversacion {
   unread:     boolean
   archivado:  boolean
   pedido:     string | null
-  canal?:     'STOREFRONT' | 'WHATSAPP'
+  canal?:     'STOREFRONT' | 'WHATSAPP' | 'INSTAGRAM'
 }
 
 // Resuelve el nombre del cliente de una conversación por id.
