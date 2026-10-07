@@ -783,7 +783,9 @@ describe('cada control del editor mueve algo en la portada', () => {
       }
 
       sinProblemas(`editor-portada > ${p.id}`, mal)
-    })
+    // Glow tarda ~7 s (dibuja la portada decenas de veces con cada control movido) y el límite por
+    // defecto de vitest es 5 s: pasaba al borde y fallaba según la carga de la máquina.
+    }, 30_000)
   }
 })
 

@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
 import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { PlatformService } from './platform.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { SearchConsoleService } from '../search-console/search-console.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
@@ -35,6 +36,8 @@ export class PlatformController {
   constructor(
     private readonly platformService: PlatformService,
     private readonly wizardAnalytics: WizardAnalyticsService,
+    // Cómo ve Google a cada tienda (ver search-console/). Opcional por compatibilidad con specs unitarios.
+    private readonly searchConsole?: SearchConsoleService,
   ) {}
 
   // ── Analítica del wizard de onboarding ────────────────────────────────────
@@ -156,6 +159,21 @@ export class PlatformController {
     @Body() dto: SuspendBusinessDto,
   ) {
     return this.platformService.hideFromSearch(req.user.adminId, businessId, dto);
+  }
+
+  // Search Console: cómo ve Google a la tienda (clics, impresiones, búsquedas, si la portada está
+  // en el índice) y el botón para verificar su dominio y enviarle el sitemap ahora mismo.
+  @Get('businesses/:businessId/search-console')
+  searchConsoleDeTienda(@Param('businessId') businessId: string) {
+    if (!this.searchConsole) throw new ServiceUnavailableException('Search Console no está disponible');
+    return this.searchConsole.resumenDeTienda(businessId);
+  }
+
+  @Post('businesses/:businessId/search-console/sync')
+  @SoloSuperadmin()
+  sincronizarConGoogle(@Param('businessId') businessId: string) {
+    if (!this.searchConsole) throw new ServiceUnavailableException('Search Console no está disponible');
+    return this.searchConsole.sincronizarTienda(businessId);
   }
 
   @Post('businesses/:businessId/show-in-search')

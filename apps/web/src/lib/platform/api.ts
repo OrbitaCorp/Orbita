@@ -19,6 +19,28 @@ export class PlatformApiError extends Error {
   }
 }
 
+// Search Console: cómo ve Google a una tienda (ver apps/api/src/search-console/).
+export type GoogleResumen = {
+  configurado: boolean
+  aviso: string | null
+  propiedad: string | null
+  origen: string | null
+  dominioPropio: { domain: string; estado: 'PENDIENTE' | 'VERIFICADO'; error: string | null; sitemapEnviadoAt: string | null } | null
+  sitemapSubdominioAt: string | null
+  periodo: { desde: string; hasta: string } | null
+  rendimiento: { clics: number; impresiones: number; ctr: number; posicion: number } | null
+  consultas: { consulta: string; clics: number; impresiones: number; posicion: number }[]
+  paginas: { url: string; clics: number; impresiones: number }[]
+  inicio: { veredicto: string | null; estado: string | null; ultimoRastreo: string | null; canonicalGoogle: string | null; robots: string | null } | null
+  errores: string[]
+}
+
+export type GoogleSincronizacion = {
+  configurado: boolean
+  dominios: { domain: string; estado: 'no_configurado' | 'inactivo' | 'pendiente' | 'verificado'; mensaje?: string }[]
+  subdominio: { ok: boolean; mensaje?: string } | null
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
@@ -890,6 +912,8 @@ export const platformApi = {
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
   hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
+  businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
+  syncBusinessSearchConsole: (id: string) => sendJSON<GoogleSincronizacion>(`/platform/businesses/${id}/search-console/sync`, 'POST'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

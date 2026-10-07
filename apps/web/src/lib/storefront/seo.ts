@@ -31,6 +31,11 @@ export type SeoPagina = {
   /** Para `og:product:price`. */
   precio: { monto: number; moneda: string } | null
   jsonLd: Record<string, unknown>[]
+  /**
+   * Contenido de la etiqueta `<meta name="google-site-verification">`: la prueba de que Órbita es
+   * dueña del dominio propio ante Google Search Console. Solo la portada la lleva.
+   */
+  googleVerificacion?: string[]
 }
 
 /** Lo que cualquier página sabe de la tienda. */
@@ -46,6 +51,8 @@ export type ContextoSeo = {
   instagram: string | null
   facebook: string | null
   tiktok: string | null
+  /** Tokens de verificación de Google de los dominios propios de la tienda (los devuelve la API). */
+  googleVerificacion?: string[]
 }
 
 const MONEDA = 'ARS'
@@ -230,6 +237,11 @@ export function serializarJsonLd(data: unknown): string {
 
 // ─── Una función por página ────────────────────────────────────────────────
 
+/** Solo pasan tokens con la forma de los de Google: el valor va dentro de un atributo del HTML. */
+export function tokensDeVerificacion(lista: string[] | null | undefined): string[] {
+  return [...new Set((lista ?? []).filter((t) => /^[A-Za-z0-9_-]{20,128}$/.test(t)))]
+}
+
 const base = (ctx: ContextoSeo) => ({
   siteName: ctx.nombre,
   imageAlt: ctx.nombre,
@@ -268,6 +280,7 @@ export function seoInicio(ctx: ContextoSeo): SeoPagina {
     robots: ctx.indexable ? 'index, follow' : 'noindex, follow',
     image: imagenParaCompartir(ctx.origen, ctx.logo),
     jsonLd: ctx.indexable ? jsonLdTienda(ctx) : [],
+    googleVerificacion: tokensDeVerificacion(ctx.googleVerificacion),
   }
 }
 

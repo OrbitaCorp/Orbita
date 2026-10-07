@@ -12,6 +12,7 @@ import { DomainExpiryService } from '../domains/domain-expiry.service';
 import { EmailVerificationService } from '../member-profile/email-verification.service';
 import { CostsService } from '../platform/costs/costs.service';
 import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
+import { SearchConsoleService } from '../search-console/search-console.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -76,6 +77,9 @@ export class InternalCronController {
     // Alertas de los límites de gasto, justo después del sync de costos.
     // Opcional por la misma razón de compatibilidad con specs unitarios.
     private readonly alertasDeCosto?: AlertasDeCostoService,
+    // Search Console: reintenta verificar dominios propios y envía los sitemaps de las tiendas.
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly searchConsole?: SearchConsoleService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -151,6 +155,14 @@ export class InternalCronController {
           await this.alertasDeCosto?.revisar();
         } catch (e) {
           this.logger.error(`Sincronización de costos: no se pudo correr — ${describeError(e)}`);
+        }
+        // Search Console: reintenta los dominios propios que no pudieron verificarse y le
+        // envía a Google el sitemap de las tiendas que todavía no lo tienen. Mismo criterio:
+        // si falla, se anota sin marcar la corrida como fallida.
+        try {
+          await this.searchConsole?.mantenimientoNocturno();
+        } catch (e) {
+          this.logger.error(`Search Console: no se pudo correr — ${describeError(e)}`);
         }
       },
     );

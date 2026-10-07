@@ -5,6 +5,7 @@ import { VercelDomainsService } from './vercel-domains.service';
 import { AuditService } from '../audit/audit.service';
 import { esDominioDeOrbita } from './dominio-de-orbita';
 import { LinkDomainDto } from './dto/link-domain.dto';
+import { SearchConsoleService } from '../search-console/search-console.service';
 
 @Injectable()
 export class DomainsService {
@@ -16,6 +17,9 @@ export class DomainsService {
     // Registro de auditoría de vincular/verificar/borrar dominios (hallazgo
     // `auditoria-acciones-sin-registro`). Opcional solo para los tests.
     private readonly audit?: AuditService,
+    // Search Console: al activarse el dominio se verifica en Google y se le envía el sitemap.
+    // Opcional solo para los tests.
+    private readonly searchConsole?: SearchConsoleService,
   ) {}
 
   findAll(businessId: string) {
@@ -177,6 +181,19 @@ export class DomainsService {
       await this.audit?.registrar({
         businessId, memberId: actorId, entityType: 'domain', entityId: id, action: 'UPDATE',
         changes: [{ field: 'domain', before: null, after: domain.domain }, ...cambios],
+      });
+    }
+    // Dominio ya activo: se lo deja listo en Search Console (verificarlo y enviarle el sitemap).
+    // Se espera acá y no "en segundo plano" porque Cloud Run no le da CPU a una promesa que quedó
+    // suelta después de responder; con tope de tiempo, y nunca rompe la respuesta: es un extra.
+    // El servicio no insiste si lo intentó hace menos de un minuto, así que apretar "verificar"
+    // varias veces mientras propaga el DNS no le pega a Google en cada click.
+    if (status === 'ACTIVE' && this.searchConsole) {
+      await Promise.race([
+        this.searchConsole.registrarDominio(actualizado.id),
+        new Promise<void>((resolve) => setTimeout(resolve, 8_000)),
+      ]).catch((err: unknown) => {
+        this.logger.warn(`Search Console: no se pudo registrar ${domain.domain} — ${err instanceof Error ? err.message : String(err)}`);
       });
     }
     return actualizado;

@@ -103,3 +103,9 @@ FONDO_IA_MOTOR: "workers"
 # WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN y WHATSAPP_TOKEN_KEY son secretos:
 # viven en Secret Manager (ver SECRETS en deploy.sh).
 WHATSAPP_NEGOCIOS_HABILITADOS: "negocio"
+# Search Console (search-console/): la cuenta de servicio que la API suplanta para verificar los
+# dominios propios de las tiendas en Google y enviarle los sitemaps. SIN CLAVES: la organizacion
+# prohibe crearlas, asi que la cuenta de Cloud Run pide un token de esta (permiso
+# roles/iam.serviceAccountTokenCreator solo sobre ella). Ver DEPLOYMENT.md. Sin esta variable
+# (local, tests) todo el modulo queda apagado.
+SEARCH_CONSOLE_SERVICE_ACCOUNT: "search-console@orbita-api-corp.iam.gserviceaccount.com"

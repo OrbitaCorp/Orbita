@@ -50,6 +50,10 @@ model Business {
   // el dueño no lo ve ni lo toca.
   hiddenFromSearch       Boolean @default(false) @map("hidden_from_search")
   hiddenFromSearchReason String? @map("hidden_from_search_reason")
+  // Search Console (ver search-console/): la última vez que se le envió a Google el
+  // sitemap del SUBDOMINIO de la tienda (slug.orbita.site, bajo la propiedad de
+  // dominio orbita.site). Se reenvía cada tanto; null = todavía nunca.
+  gscSitemapAt DateTime? @map("gsc_sitemap_at")
   // Hasta qué instante están "al día" las fechas de los datos de la demo. Los
   // pedidos, pagos, visitas, etc. se sembraron relativos a un momento; cada
   // tanto se corren hacia adelante lo que pasó desde acá (DemoFechasService),
@@ -2506,6 +2510,16 @@ model CustomDomain {
   expiresAt   DateTime? @map("expires_at")
   autoRenew   Boolean   @default(true) @map("auto_renew")
 
+  // Search Console (ver search-console/): un dominio propio es otro dominio para
+  // Google, así que necesita su propia propiedad verificada. La verificación es
+  // con una etiqueta <meta> que Órbita sirve en la portada de la tienda: este es
+  // el contenido que Google le dio a nuestra cuenta de servicio para este dominio.
+  gscVerificationToken String?   @map("gsc_verification_token")
+  gscStatus            GscStatus @default(PENDIENTE) @map("gsc_status")
+  gscError             String?   @map("gsc_error") // último motivo por el que Google no lo verificó o no tomó el sitemap
+  gscTriedAt           DateTime? @map("gsc_tried_at") // último intento, para no insistir en cada sondeo del panel
+  gscSitemapAt         DateTime? @map("gsc_sitemap_at") // último envío del sitemap a Google
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2513,6 +2527,11 @@ model CustomDomain {
 
   @@index([businessId])
   @@map("custom_domains")
+}
+
+enum GscStatus {
+  PENDIENTE // todavía no se pudo verificar la propiedad en Search Console
+  VERIFICADO // Órbita es dueña verificada de la propiedad: ya se puede enviar el sitemap y leer datos
 }
 
 enum DomainSource {

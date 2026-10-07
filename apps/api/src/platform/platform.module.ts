@@ -14,11 +14,12 @@ import { OrbiUsoPlataformaController } from './orbi-uso/orbi-uso.controller';
 import { OrbiUsoService } from './orbi-uso/orbi-uso.service';
 import { ConversacionesPlataformaController } from './orbi-uso/conversaciones.controller';
 import { LecturaConversacionesService } from './orbi-uso/lectura-conversaciones.service';
+import { SearchConsoleModule } from '../search-console/search-console.module';
 
 @Module({
   // PlatformAdminLogModule: registro en platform_admin_logs de los mails de
   // prueba (y, desde AuthModule, del login y el segundo factor).
-  imports: [SubscriptionsModule, WizardAnalyticsModule, PlatformAdminLogModule, CostsModule, OrbiSaludModule, CupoOrbiModule],
+  imports: [SubscriptionsModule, WizardAnalyticsModule, PlatformAdminLogModule, CostsModule, OrbiSaludModule, CupoOrbiModule, SearchConsoleModule],
   controllers: [PlatformController, PlatformAuditController, OrbiSaludController, OrbiUsoPlataformaController, ConversacionesPlataformaController],
   providers: [PlatformService, PlatformAuditService, OrbiUsoService, LecturaConversacionesService],
 })

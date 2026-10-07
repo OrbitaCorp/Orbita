@@ -1236,20 +1236,27 @@ export class StorefrontService {
     // `hiddenFromSearch` es la moderación del equipo de Órbita: la tienda sigue
     // en línea y vendiendo, pero no se le pide a Google que la muestre.
     const abierta = business.isActive && !business.isPaused && !business.isDemo && !business.hiddenFromSearch;
-    const [producto, dominio] = await Promise.all([
+    const [producto, dominios] = await Promise.all([
       abierta
         ? this.prisma.product.findFirst({
             where: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
             select: { id: true },
           })
         : Promise.resolve(null),
-      this.prisma.customDomain.findFirst({
+      this.prisma.customDomain.findMany({
         where: { businessId: business.id, status: 'ACTIVE', dnsVerified: true },
-        select: { domain: true },
-        orderBy: { createdAt: 'asc' }, // si hubiera más de uno, siempre el mismo
+        select: { domain: true, gscVerificationToken: true },
+        orderBy: { createdAt: 'asc' }, // si hubiera más de uno, siempre el mismo primero
       }),
     ]);
-    return { indexable: abierta && !!producto, primaryDomain: dominio?.domain ?? null };
+    return {
+      indexable: abierta && !!producto,
+      primaryDomain: dominios[0]?.domain ?? null,
+      // Search Console (ver search-console/): el contenido de la etiqueta <meta
+      // name="google-site-verification"> que la portada del dominio propio tiene que
+      // mostrar para que Google lo dé por verificado. Es público por naturaleza (va en el HTML).
+      googleSiteVerification: dominios.map((d) => d.gscVerificationToken).filter((t): t is string => !!t),
+    };
   }
 
   /**
@@ -1341,7 +1348,9 @@ export class StorefrontService {
    */
   async getSitemap(slug: string) {
     const business = await this.resolveBusiness(slug);
-    const seo = await this.seoDe(business);
+    // El sitemap no necesita los tokens de verificación de Google: solo si indexa y bajo qué dominio.
+    const { indexable, primaryDomain } = await this.seoDe(business);
+    const seo = { indexable, primaryDomain };
     if (!seo.indexable) return { ...seo, categories: [], products: [] };
 
     const publicos = { deletedAt: null, status: { in: ['PUBLISHED' as const, 'OUT_OF_STOCK' as const] } };

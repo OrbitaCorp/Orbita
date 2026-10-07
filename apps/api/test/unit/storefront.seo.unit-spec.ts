@@ -6,7 +6,7 @@ import { StorefrontService } from '../../src/storefront/storefront.service';
 // Una tienda aparece en Google solo si está publicada, en línea, no es la demo
 // y tiene algo a la venta. Con dominio propio ACTIVO, ese es el canónico.
 
-function tienda(opts: { isActive?: boolean; isPaused?: boolean; isDemo?: boolean; hidden?: boolean; productos?: number; dominio?: string | null; categorias?: unknown[] } = {}) {
+function tienda(opts: { isActive?: boolean; isPaused?: boolean; isDemo?: boolean; hidden?: boolean; productos?: number; dominio?: string | null; token?: string | null; categorias?: unknown[] } = {}) {
   const hayProducto = (opts.productos ?? 1) > 0;
   const prisma = {
     business: {
@@ -22,7 +22,7 @@ function tienda(opts: { isActive?: boolean; isPaused?: boolean; isDemo?: boolean
         { id: 'p-2', updatedAt: new Date('2026-09-20T10:00:00Z') },
       ]),
     },
-    customDomain: { findFirst: jest.fn().mockResolvedValue(opts.dominio ? { domain: opts.dominio } : null) },
+    customDomain: { findMany: jest.fn().mockResolvedValue(opts.dominio ? [{ domain: opts.dominio, gscVerificationToken: opts.token ?? null }] : []) },
     category: { findMany: jest.fn().mockResolvedValue(opts.categorias ?? []) },
   };
   return { svc: new StorefrontService(prisma as any, {} as any, {} as any), prisma };
@@ -33,7 +33,7 @@ const cat = (slug: string, productos: number) => ({ slug, updatedAt: new Date('2
 describe('getSeo: ¿aparece en Google?', () => {
   it('una tienda publicada, en línea y con productos es indexable', async () => {
     const { svc } = tienda();
-    await expect(svc.getSeo('t')).resolves.toEqual({ indexable: true, primaryDomain: null });
+    await expect(svc.getSeo('t')).resolves.toEqual({ indexable: true, primaryDomain: null, googleSiteVerification: [] });
   });
 
   it.each([
@@ -57,9 +57,19 @@ describe('getSeo: ¿aparece en Google?', () => {
     const { svc, prisma } = tienda({ dominio: 'tefaltacalleok.com' });
     expect((await svc.getSeo('t')).primaryDomain).toBe('tefaltacalleok.com');
     // Solo cuenta un dominio ACTIVO y con el DNS verificado: uno "pendiente" no puede ser el canónico.
-    expect(prisma.customDomain.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.customDomain.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { businessId: 'biz-1', status: 'ACTIVE', dnsVerified: true },
     }));
+  });
+
+  it('devuelve el token de verificación de Google del dominio propio, para que la portada lo muestre', async () => {
+    const { svc } = tienda({ dominio: 'tefaltacalleok.com', token: 'abc123_TOKEN-de-google-0123456789' });
+    expect((await svc.getSeo('t')).googleSiteVerification).toEqual(['abc123_TOKEN-de-google-0123456789']);
+  });
+
+  it('un dominio sin token todavía no manda ninguna etiqueta', async () => {
+    const { svc } = tienda({ dominio: 'tefaltacalleok.com', token: null });
+    expect((await svc.getSeo('t')).googleSiteVerification).toEqual([]);
   });
 
   it('un slug que no existe da 404', async () => {

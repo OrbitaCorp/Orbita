@@ -253,6 +253,8 @@ export type StorefrontSeo = {
   indexable: boolean
   /** Dominio propio activo — el canónico. null = se queda el subdominio de Órbita. */
   primaryDomain: string | null
+  /** Tokens de Google Search Console de los dominios propios: la portada los muestra en una etiqueta <meta>. */
+  googleSiteVerification?: string[]
 }
 
 export type StorefrontSitemap = StorefrontSeo & {

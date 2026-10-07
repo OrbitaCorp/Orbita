@@ -16,6 +16,7 @@ import {
   DOMAIN_SOURCE_LABELS, DOMAIN_STATUS_LABELS, PLAN_LABELS,
 } from './ui'
 import { LineSeriesChart, AreaSeriesChart, ChartSkeleton, RangePicker, useRange, fmtMoney } from './charts'
+import { GoogleCard } from './GoogleCard'
 
 // Página completa de detalle de negocio — orbita.site/superadmin/negocios/:id.
 // Reemplaza el drawer lateral que existía antes (RBT — dashboard de super
@@ -292,6 +293,8 @@ function Detalle({ businessId }: { businessId: string }) {
           </div>
         )}
       </Card>
+
+      <GoogleCard businessId={businessId} />
 
       {d.activity.length > 0 && (
         <Card title="Qué hicimos con este negocio" subtitle="Acciones tomadas desde el panel de plataforma">

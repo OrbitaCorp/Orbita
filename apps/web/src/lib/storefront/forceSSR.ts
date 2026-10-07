@@ -176,6 +176,7 @@ async function armarSeo(ctx: Parameters<GetServerSideProps>[0], d: DatosSeo): Pr
     instagram: cfg.contact?.instagram ?? null,
     facebook: cfg.contact?.facebook ?? null,
     tiktok: cfg.contact?.tiktok ?? null,
+    googleVerificacion: seoApi?.googleSiteVerification ?? [],
   }
 
   if (tipo === 'inicio') return seoInicio(contexto)

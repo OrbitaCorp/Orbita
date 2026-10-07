@@ -17,6 +17,10 @@ export function SeoHead({ seo }: { seo: SeoPagina | null | undefined }) {
       <title key="title">{seo.title}</title>
       {seo.description && <meta key="description" name="description" content={seo.description} />}
       <meta key="robots" name="robots" content={seo.robots} />
+      {/* Prueba de dueño ante Google Search Console (solo la portada de un dominio propio). */}
+      {seo.googleVerificacion?.map((token) => (
+        <meta key={`google-site-verification-${token}`} name="google-site-verification" content={token} />
+      ))}
       {seo.canonical && <link key="canonical" rel="canonical" href={seo.canonical} />}
 
       <meta key="og:type" property="og:type" content={seo.tipo === 'product' ? 'product' : 'website'} />

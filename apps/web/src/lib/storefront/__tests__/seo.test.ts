@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { StorefrontProductDetail } from '../api'
 import {
   acotar, armarTitulo, imagenParaCompartir, origenDeTienda, parametrosRelevantes, precioLegible, robotsDeTienda,
-  seoCatalogo, seoCategoria, seoInicio, seoNoIndexable, seoProducto, serializarJsonLd, sitemapDeTienda, textoPlano,
+  seoCatalogo, seoCategoria, seoInicio, seoNoIndexable, seoProducto, serializarJsonLd, sitemapDeTienda, textoPlano, tokensDeVerificacion,
   type ContextoSeo,
 } from '../seo'
 import { urlDeFotoPermitida } from '../og'
@@ -103,6 +103,21 @@ describe('seoInicio', () => {
   })
   it('con dominio propio el canonical es el dominio propio', () => {
     expect(seoInicio(ctx({ origen: 'https://tefaltacalleok.com' })).canonical).toBe('https://tefaltacalleok.com/')
+  })
+
+  // Search Console: la etiqueta con la que Google da por verificado un dominio propio.
+  const TOKEN = 'abc123_TOKEN-de-google-0123456789'
+  it('la portada lleva el token de verificación de Google', () => {
+    expect(seoInicio(ctx({ googleVerificacion: [TOKEN] })).googleVerificacion).toEqual([TOKEN])
+  })
+  it('sin token (la mayoría de las tiendas) no manda ninguna etiqueta', () => {
+    expect(seoInicio(ctx()).googleVerificacion).toEqual([])
+  })
+  it('un token que no tiene la forma de los de Google se descarta (va dentro de un atributo del HTML)', () => {
+    expect(tokensDeVerificacion([TOKEN, 'corto', '"><script>alert(1)</script>' + 'x'.repeat(30), TOKEN])).toEqual([TOKEN])
+  })
+  it('solo la portada lo lleva: el catálogo y la ficha no', () => {
+    expect(seoCatalogo(ctx({ googleVerificacion: [TOKEN] }), {}).googleVerificacion).toBeUndefined()
   })
 })
 

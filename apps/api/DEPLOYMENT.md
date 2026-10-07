@@ -338,6 +338,43 @@ Los rechazos quedan en `orbi_turns` con `status = 'quota'` y
 mensajes por día del negocio, que no dependen de estas variables); el
 superadmin los ve separados en Orbi → Uso.
 
+## Search Console: tiendas en Google, sin claves
+
+Qué hace (código en `src/search-console/`): cuando un dominio propio queda ACTIVO lo
+verifica en Google Search Console con una etiqueta `<meta>` que la portada de la tienda
+muestra sola, y le envía el sitemap. A las tiendas en subdominio (`slug.orbita.site`) les
+envía el sitemap bajo la propiedad de dominio `orbita.site`. Lo reintenta cada noche
+(`nightly-subscriptions-maintenance`) y se ve por tienda en el superadmin ("Cómo te ve Google").
+
+**No hay clave JSON ni secreto.** La organización tiene activa la política
+`iam.disableServiceAccountKeyCreation` (no tocarla: es de seguridad). La API corre con la cuenta
+de Cloud Run (`681215569277-compute@developer.gserviceaccount.com`) y **suplanta** a
+`search-console@orbita-api-corp.iam.gserviceaccount.com`, pidiendo un token con los alcances
+`webmasters` y `siteverification` (`GoogleSearchClient`, `Impersonated` de `google-auth-library`).
+La variable `SEARCH_CONSOLE_SERVICE_ACCOUNT` (en `deploy/env-vars.yaml`) enciende el módulo; sin
+ella (local, tests) queda apagado y no rompe nada.
+
+Lo que tiene que existir (ya creado el 07/10/2026 en `orbita-api-corp`):
+
+```bash
+gcloud services enable searchconsole.googleapis.com siteverification.googleapis.com --project orbita-api-corp
+gcloud iam service-accounts create search-console --project orbita-api-corp \
+  --display-name="Orbita - Search Console (verificar dominios y enviar sitemaps)"
+gcloud iam service-accounts add-iam-policy-binding search-console@orbita-api-corp.iam.gserviceaccount.com \
+  --member="serviceAccount:681215569277-compute@developer.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator" --project orbita-api-corp
+```
+
+Y, a mano en la consola de Search Console (solo lo puede hacer quien sea propietario de la
+propiedad): propiedad de dominio `orbita.site` → Configuración → Usuarios y permisos → agregar
+`search-console@orbita-api-corp.iam.gserviceaccount.com` con permiso **Completo**. Sin eso, los
+subdominios dan "la cuenta de Órbita no tiene permiso" en el superadmin.
+
+Los dominios propios NO necesitan ese paso: la cuenta se vuelve propietaria de cada uno al
+verificarlo por META. Si un dominio se queda en "pendiente", mirar `custom_domains.gsc_error`
+(o el superadmin): casi siempre es que la portada todavía no muestra la etiqueta (la API guarda
+el SEO ~1 minuto) o que el dominio no abre por HTTPS.
+
 ## Ver logs
 
 ```bash
