@@ -2300,6 +2300,9 @@ model PriceCampaign {
   months        Int       @default(3) // cuántos meses dura el precio congelado (contando el del alta)
   maxSlots      Int?      @map("max_slots") // cupo; null = sin límite
   usedSlots     Int       @default(0) @map("used_slots")
+  // Si la landing y el alta muestran cuántos lugares quedan. Apagado, el cupo
+  // sigue rigiendo igual: solo no se le dice al visitante el número.
+  showCounter   Boolean   @default(true) @map("show_counter")
   startsAt      DateTime? @map("starts_at")
   endsAt        DateTime? @map("ends_at")
   note          String?

@@ -101,6 +101,7 @@ export interface PriceCampaignRow {
   months: number
   maxSlots: number | null
   usedSlots: number
+  showCounter: boolean
   startsAt: string | null
   endsAt: string | null
   note: string | null
@@ -127,6 +128,7 @@ export interface PriceCampaignInput {
   priceAdvanced: number
   months: number
   maxSlots: number | null
+  showCounter: boolean
   startsAt: string | null
   endsAt: string | null
   isActive: boolean

@@ -37,6 +37,12 @@ export class CreatePriceCampaignDto {
   @Min(1)
   maxSlots?: number | null;
 
+  // Mostrar en la landing y el alta cuántos lugares quedan. Solo tiene efecto
+  // en una campaña pública con cupo.
+  @IsOptional()
+  @IsBoolean()
+  showCounter?: boolean;
+
   @IsOptional()
   @IsString()
   startsAt?: string | null;
@@ -97,6 +103,10 @@ export class UpdatePriceCampaignDto {
   @IsInt()
   @Min(1)
   maxSlots?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  showCounter?: boolean;
 
   @IsOptional()
   @IsString()

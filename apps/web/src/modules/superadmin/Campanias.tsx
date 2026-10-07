@@ -239,7 +239,7 @@ function ModalPrecios({ data, onClose, onGuardado }: { data: PriceCampaignList; 
 
   const campo = (k: PlanPriceKey, label: string) => (
     <Field key={k} label={label} hint={pista(k)}>
-      <input type="number" min={1} value={valores[k]} onChange={(e) => setValores((v) => ({ ...v, [k]: e.target.value }))} className="ds-field" style={inputStyle} />
+      <input type="number" min={1} value={valores[k]} onChange={(e) => setValores((v) => ({ ...v, [k]: e.target.value }))} className="ds-field" style={{ ...inputStyle, width: '100%' }} />
     </Field>
   )
 
@@ -253,7 +253,7 @@ function ModalPrecios({ data, onClose, onGuardado }: { data: PriceCampaignList; 
         </p>
 
         {PERIODOS.map((p) => (
-          <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
             {campo(p.base, `${p.nombre} · Base`)}
             {campo(p.avanzado, `${p.nombre} · con Avanzado`)}
           </div>
@@ -307,6 +307,7 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
   const [months, setMonths] = useState(String(campania?.months ?? 3))
   const [sinCupo, setSinCupo] = useState(campania ? campania.maxSlots === null : false)
   const [maxSlots, setMaxSlots] = useState(String(campania?.maxSlots ?? 30))
+  const [showCounter, setShowCounter] = useState(campania?.showCounter ?? true)
   const [startsAt, setStartsAt] = useState(aDia(campania?.startsAt ?? null))
   const [endsAt, setEndsAt] = useState(aDia(campania?.endsAt ?? null))
   const [isActive, setIsActive] = useState(campania?.isActive ?? false)
@@ -348,6 +349,7 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
       priceAdvanced: Number(priceAdvanced),
       months: m,
       maxSlots: sinCupo ? null : cupo,
+      showCounter,
       startsAt: desdeDia(startsAt, false),
       endsAt: desdeDia(endsAt, true),
       isActive,
@@ -406,12 +408,12 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
           </fieldset>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
           <Field label="Base, por mes" hint={errBase || `De lista: ${money(lista.base)}${rebaja(priceBase, lista.base)}`}>
-            <input type="number" min={1} value={priceBase} onChange={(e) => setPriceBase(e.target.value)} className="ds-field" style={{ ...inputStyle, ...(errBase ? { borderColor: 'var(--color-error)' } : {}) }} />
+            <input type="number" min={1} value={priceBase} onChange={(e) => setPriceBase(e.target.value)} className="ds-field" style={{ ...inputStyle, width: '100%', ...(errBase ? { borderColor: 'var(--color-error)' } : {}) }} />
           </Field>
           <Field label="Con Avanzado, por mes" hint={errAvanzado || `De lista: ${money(lista.avanzado)}${rebaja(priceAdvanced, lista.avanzado)}`}>
-            <input type="number" min={1} value={priceAdvanced} onChange={(e) => setPriceAdvanced(e.target.value)} className="ds-field" style={{ ...inputStyle, ...(errAvanzado ? { borderColor: 'var(--color-error)' } : {}) }} />
+            <input type="number" min={1} value={priceAdvanced} onChange={(e) => setPriceAdvanced(e.target.value)} className="ds-field" style={{ ...inputStyle, width: '100%', ...(errAvanzado ? { borderColor: 'var(--color-error)' } : {}) }} />
           </Field>
         </div>
 
@@ -430,12 +432,28 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
           </div>
         </Field>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* El contador es de las campañas públicas con cupo: en una con código
+            no hay dónde mostrarlo, y sin cupo no hay nada que contar. */}
+        {(campania ? campania.isPublic : publica) && !sinCupo && (
+          <div style={{ marginTop: -4 }}>
+            <label style={check}>
+              <input type="checkbox" role="switch" checked={showCounter} onChange={(e) => setShowCounter(e.target.checked)} />
+              Mostrar el contador de lugares
+            </label>
+            <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>
+              {showCounter
+                ? 'En la sección de precios de la landing y en el último paso del alta se ve "Quedan X de N lugares", con una barra que se va llenando.'
+                : 'No se muestra cuántos quedan. El cupo sigue rigiendo igual: al llenarse, la campaña deja de aplicarse.'}
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
           <Field label="Desde (opcional)">
-            <input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="ds-field" style={inputStyle} />
+            <input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="ds-field" style={{ ...inputStyle, width: '100%' }} />
           </Field>
           <Field label="Hasta (opcional)">
-            <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="ds-field" style={inputStyle} />
+            <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="ds-field" style={{ ...inputStyle, width: '100%' }} />
           </Field>
         </div>
 

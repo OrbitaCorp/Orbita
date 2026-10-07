@@ -728,7 +728,11 @@ export class SubscriptionsService implements OnModuleInit {
             priceAdvanced: Number(c.priceAdvanced),
             months: c.months,
             maxSlots: c.maxSlots,
-            slotsLeft: c.maxSlots === null ? null : Math.max(c.maxSlots - c.usedSlots, 0),
+            // Con el contador apagado no se manda cuántos quedan: el número
+            // no tiene que poder leerse ni mirando la respuesta de la API.
+            // `maxSlots` sí va, porque es lo que dice el anuncio ("para los
+            // primeros N comercios") aunque no se muestre la cuenta.
+            slotsLeft: c.maxSlots === null || !c.showCounter ? null : Math.max(c.maxSlots - c.usedSlots, 0),
             endsAt: c.endsAt ? c.endsAt.toISOString() : null,
           }
         : null,

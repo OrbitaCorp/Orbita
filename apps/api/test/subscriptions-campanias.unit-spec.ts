@@ -20,6 +20,7 @@ const campania = (extra: Record<string, unknown> = {}) => ({
   months: 3,
   maxSlots: 30,
   usedSlots: 4,
+  showCounter: true,
   startsAt: null,
   endsAt: null,
   createdAt: new Date('2026-10-01'),
@@ -148,6 +149,18 @@ describe('alta con campaña pública', () => {
       list: { base: LISTA_BASE, avanzado: LISTA_AVANZADO },
       campaign: { name: 'Primeros 30', priceBase: 10000, priceAdvanced: 10000, months: 3, maxSlots: 30, slotsLeft: 26, endsAt: null },
     });
+  });
+
+  it('con el contador apagado no informa cuántos lugares quedan, pero el cupo sigue rigiendo', async () => {
+    const { service, prisma, preference } = armar();
+    prisma.priceCampaign.findMany.mockResolvedValue([campania({ showCounter: false })]);
+    await expect(service.ofertaPublica()).resolves.toMatchObject({ campaign: { maxSlots: 30, slotsLeft: null } });
+    // Sigue cobrando el precio de la campaña...
+    await service.startCheckoutPending(alta());
+    expect(cobrado(preference)).toBe(10000);
+    // ...y sigue cerrándose cuando se llena.
+    prisma.priceCampaign.findMany.mockResolvedValue([campania({ showCounter: false, usedSlots: 30 })]);
+    await expect(service.ofertaPublica()).resolves.toMatchObject({ campaign: null });
   });
 
   it('sin campaña vigente la oferta pública es solo la lista', async () => {

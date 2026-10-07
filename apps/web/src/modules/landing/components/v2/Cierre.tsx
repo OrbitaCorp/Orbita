@@ -62,10 +62,32 @@ export function Precios() {
                 cartel: el dato que importa (cuántos lugares quedan) es lo único
                 que lleva color. */}
             {campania && (
-                <p className="mx-auto mt-8 max-w-[640px] text-center text-[13.5px] leading-relaxed text-slate-300" aria-live="polite">
-                    {anuncio(campania)}
-                    {cupo && <> <strong className="font-bold text-blue-300">{cupo}.</strong></>}
-                </p>
+                <div className="mx-auto mt-8 max-w-[640px] text-center" aria-live="polite">
+                    <p className="text-[13.5px] leading-relaxed text-slate-300">{anuncio(campania)}</p>
+                    {/* El contador: solo si la campaña tiene cupo y el superadmin
+                        lo dejó prendido (si no, la API no manda cuántos quedan).
+                        La barra muestra lo ocupado, así se ve de un vistazo que
+                        se están yendo; el número es lo único con color. */}
+                    {cupo && campania.maxSlots !== null && campania.slotsLeft !== null && (
+                        <div className="mx-auto mt-4 max-w-[320px]">
+                            <div
+                                role="progressbar"
+                                aria-label="Lugares ocupados de la campaña"
+                                aria-valuemin={0}
+                                aria-valuemax={campania.maxSlots}
+                                aria-valuenow={campania.maxSlots - campania.slotsLeft}
+                                className="h-1 w-full overflow-hidden rounded-full"
+                                style={{ background: 'var(--oc-card-bd)' }}
+                            >
+                                <div
+                                    className="h-full rounded-full bg-blue-400"
+                                    style={{ width: `${Math.min(100, Math.max(4, ((campania.maxSlots - campania.slotsLeft) / campania.maxSlots) * 100))}%` }}
+                                />
+                            </div>
+                            <p className="mt-2 text-[13px] font-bold text-blue-300">{cupo}</p>
+                        </div>
+                    )}
+                </div>
             )}
 
             <div className={`mx-auto grid max-w-[720px] grid-cols-1 gap-4 sm:grid-cols-2 ${campania ? 'mt-6' : 'mt-10'}`}>
