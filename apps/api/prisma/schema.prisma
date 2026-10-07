@@ -2258,6 +2258,24 @@ model PlatformDiscountRedemption {
   @@map("platform_discount_redemptions")
 }
 
+// ─── Precios de lista de los planes ───────────────────────────────────────────
+// Lo que cobra cada plan, editable desde el superadmin. Es un historial: cada
+// cambio agrega una fila y el precio vigente de un plan es su fila más nueva.
+// Un plan sin filas usa el valor por defecto del código (PLANES_POR_DEFECTO en
+// subscriptions.service.ts), así que la tabla vacía es "los precios de siempre".
+// El historial no es solo para auditar: un débito autorizado al precio viejo
+// se reconoce buscando su monto acá (ver planDePreapproval).
+model PlanPrice {
+  id        String   @id @default(uuid())
+  plan      String // mensual | semestral | anual | mensualAvanzado | semestralAvanzado | anualAvanzado
+  amount    Decimal  @db.Decimal(12, 2) // lo que se cobra por período, comisión de MP incluida
+  createdBy String?  @map("created_by") // platform_admins.id, sin FK
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([plan, createdAt])
+  @@map("plan_prices")
+}
+
 // ─── Campañas de precio congelado ─────────────────────────────────────────────
 // "Los primeros N comercios pagan $X por mes durante M meses, después el precio
 // de lista." Todo lo que define la oferta es editable desde el superadmin, y

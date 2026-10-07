@@ -143,7 +143,7 @@ describe('alta con campaña pública', () => {
   it('la oferta pública informa precio, meses y lugares que quedan', async () => {
     const { service, prisma } = armar();
     prisma.priceCampaign.findMany.mockResolvedValue([campania()]);
-    await expect(service.ofertaPublica()).resolves.toEqual({
+    await expect(service.ofertaPublica()).resolves.toMatchObject({
       currency: 'ARS',
       list: { base: LISTA_BASE, avanzado: LISTA_AVANZADO },
       campaign: { name: 'Primeros 30', priceBase: 10000, priceAdvanced: 10000, months: 3, maxSlots: 30, slotsLeft: 26, endsAt: null },

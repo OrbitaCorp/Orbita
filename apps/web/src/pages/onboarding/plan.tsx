@@ -84,6 +84,14 @@ const CARDS: CardPlan[] = [
   },
 ]
 
+// Pisa los precios de lista con los vigentes (se editan desde el superadmin).
+// CARDS es un dato de módulo que leen las tres pantallas de este archivo, así
+// que se actualiza en el lugar: quien llama cambia estado después, y con eso
+// se vuelve a dibujar todo con el precio nuevo.
+function aplicarPreciosDeLista(list: { base: number; avanzado: number }) {
+  for (const c of CARDS) c.precioLista = c.key === 'mensualAvanzado' ? list.avanzado : list.base
+}
+
 /** Lo que paga por mes una tarjeta: el precio congelado de la campaña si hay una, o el de lista. */
 function precioMensual(c: CardPlan, campania: OfertaCampania | null): number {
   if (!campania) return c.precioLista
@@ -368,7 +376,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                   fontSize: 11.5, fontWeight: 600, color: 'white',
                   border: '1px solid rgba(255,255,255,0.25)',
                 }}>
-                  Precio congelado por {mesesTxt(mesesCongelados)}
+                  {campania && campania.maxSlots === null && !descuento?.frozenMonths ? 'Precio de lanzamiento' : 'Precio congelado'} por {mesesTxt(mesesCongelados)}
                 </div>
               )}
             </div>
@@ -925,9 +933,16 @@ function PlanContenido() {
   // lista: lo que se cobra lo decide el backend al pedir el link, así que acá
   // lo peor que puede pasar es mostrar un precio más alto que el real.
   const [campania, setCampania] = useState<OfertaCampania | null>(null)
+  // Solo para volver a dibujar cuando llegan los precios de lista vigentes.
+  const [, setOfertaLista] = useState(false)
   useEffect(() => {
     let vivo = true
-    getOfertaPublica().then(o => { if (vivo) setCampania(o.campaign) }).catch(() => undefined)
+    getOfertaPublica().then(o => {
+      if (!vivo) return
+      aplicarPreciosDeLista(o.list)
+      setCampania(o.campaign)
+      setOfertaLista(true)
+    }).catch(() => undefined)
     return () => { vivo = false }
   }, [])
 

@@ -17,6 +17,7 @@ export const ACTION_LABELS: Record<string, string> = {
   grant_comp: 'Ceder cortesía',
   create_price_campaign: 'Crear campaña de precio',
   update_price_campaign: 'Editar campaña de precio',
+  update_plan_prices: 'Cambiar precios de lista',
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
   deactivate_admin: 'Desactivar admin',

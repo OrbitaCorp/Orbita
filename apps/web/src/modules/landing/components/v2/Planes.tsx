@@ -20,7 +20,7 @@
 import { useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 import {
-    PRESTACIONES_BASE, PRESTACIONES_AVANZADO, PERIODOS, fmt, precioCongelado, meses, lugares,
+    PRESTACIONES_BASE, PRESTACIONES_AVANZADO, fmt, precioCongelado, meses, lugares,
     type PeriodoKey, type Prestacion,
 } from './planesDatos';
 import { useOferta } from './useOferta';
@@ -39,10 +39,10 @@ function Tilde() {
 
 export function Planes() {
     const [periodo, setPeriodo] = useState<PeriodoKey>('mensual');
-    const p = PERIODOS.find(x => x.key === periodo) ?? PERIODOS[0];
 
-    const campania = useOferta();
+    const { campania, periodos } = useOferta();
     const cupo = campania ? lugares(campania) : null;
+    const p = periodos.find(x => x.key === periodo) ?? periodos[0];
 
     return (
         <Seccion id="planes">
@@ -62,7 +62,7 @@ export function Planes() {
                         className="rounded-xl px-5 py-3.5 text-center text-[12.5px] leading-relaxed text-slate-300"
                         style={{ background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)' }}
                     >
-                        Precio congelado para los primeros comercios:{' '}
+                        {campania.maxSlots !== null ? 'Precio congelado para los primeros comercios:' : 'Precio de lanzamiento:'}{' '}
                         <strong className="font-bold text-white">
                             {campania.priceBase === campania.priceAdvanced
                                 ? `${fmt(precioCongelado('base', campania))}/mes en cualquiera de los dos planes`
@@ -81,7 +81,7 @@ export function Planes() {
                     className="flex w-full max-w-[400px] rounded-full p-1"
                     style={{ background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)' }}
                 >
-                    {PERIODOS.map(op => {
+                    {periodos.map(op => {
                         const activo = op.key === periodo;
                         return (
                             <button

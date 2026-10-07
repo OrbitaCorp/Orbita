@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -158,10 +158,16 @@ const BIENVENIDA_LEGADO: { base: CicloConfig; avanzado: CicloConfig } = {
 //   Anual + Avanzado:     21.700 × (13.000/16.500) × 12 = 205.164 -> $205.000
 //                         (≈$17.083/mes, −21% igual que el anual de Base)
 //
-// OJO si se tocan estos números: planDePreapproval() encuentra el plan por
-// (amount, frequency, frequencyType), así que dos planes no pueden compartir
-// esa terna o un cobro de MP se activaría como el plan equivocado.
-const PLANES: Record<PlanKey, CicloConfig> = {
+// Estos son los valores POR DEFECTO. Desde 2026-10 los montos se editan desde
+// el superadmin (tabla plan_prices) y el service trabaja con `this.planes`,
+// que es esto mismo con los montos vigentes encima (ver cargarPrecios). La
+// frecuencia de cada plan no se edita: es lo que el plan ES.
+//
+// OJO: planDePreapproval() encuentra el plan por (amount, frequency,
+// frequencyType), así que dos planes no pueden compartir esa terna o un cobro
+// de MP se activaría como el plan equivocado. platform.service.ts lo valida al
+// guardar precios (Avanzado siempre más caro que Base en el mismo período).
+const PLANES_POR_DEFECTO: Record<PlanKey, CicloConfig> = {
   mensual: { amount: 16500, frequency: 1, frequencyType: 'months' },
   semestral: { amount: 88000, frequency: 6, frequencyType: 'months' },
   anual: { amount: 156000, frequency: 12, frequencyType: 'months' },
@@ -212,9 +218,19 @@ type PendingPayload = {
   };
 };
 
+// Cada cuánto se vuelven a leer los precios de la base. Cloud Run puede tener
+// varias instancias: la que guarda un precio nuevo lo ve al instante, las demás
+// en este plazo como mucho.
+const PRECIOS_TTL_MS = 30_000;
+
 @Injectable()
-export class SubscriptionsService {
+export class SubscriptionsService implements OnModuleInit {
   private readonly logger = new Logger(SubscriptionsService.name);
+  // Los planes con sus montos vigentes y todos los montos que tuvo cada uno
+  // (ver cargarPrecios). Arrancan en los valores por defecto.
+  private planes: Record<PlanKey, CicloConfig> = PLANES_POR_DEFECTO;
+  private preciosAnteriores: { plan: PlanKey; amount: number }[] = [];
+  private preciosLeidosEn = 0;
   private _preapproval: PreApproval | undefined;
   private _payment: Payment | undefined;
   private _preference: Preference | undefined;
@@ -236,6 +252,59 @@ export class SubscriptionsService {
     // criterio, opcional.
     private readonly eventEmitter?: EventEmitter2,
   ) {}
+
+  async onModuleInit() {
+    await this.cargarPrecios().catch((err) =>
+      this.logger.error(`No se pudieron leer los precios de lista al arrancar (se reintenta en el primer uso): ${describeError(err)}`),
+    );
+  }
+
+  // Trae de plan_prices los montos vigentes de cada plan. Lo llama todo método
+  // público que cobra o muestra un precio de lista, antes de usarlo; con el
+  // TTL son como mucho dos consultas por minuto por instancia. Si la consulta
+  // falla, el error sube: cobrar con un precio viejo o por defecto sin que
+  // nadie se entere es peor que rechazar ese pedido.
+  async cargarPrecios(forzar = false): Promise<void> {
+    // Los specs que arman el service con un prisma parcial no tienen la tabla.
+    const tabla = (this.prisma as { planPrice?: PrismaService['planPrice'] }).planPrice;
+    if (!tabla) return;
+    if (!forzar && Date.now() - this.preciosLeidosEn < PRECIOS_TTL_MS) return;
+
+    const filas = await tabla.findMany({ orderBy: { createdAt: 'asc' }, select: { plan: true, amount: true } });
+    const planes = { ...PLANES_POR_DEFECTO };
+    const anteriores: { plan: PlanKey; amount: number }[] = [];
+    for (const f of filas) {
+      if (!esPlanKey(f.plan)) continue;
+      const amount = Number(f.amount);
+      // En orden cronológico: la última fila de cada plan es la vigente.
+      planes[f.plan] = { ...PLANES_POR_DEFECTO[f.plan], amount };
+      anteriores.push({ plan: f.plan, amount });
+    }
+    // Más nuevo primero, y al final los valores por defecto: son el precio que
+    // tenía cada plan antes de que existiera la tabla.
+    anteriores.reverse();
+    for (const k of PLAN_KEYS) anteriores.push({ plan: k, amount: PLANES_POR_DEFECTO[k].amount });
+    this.planes = planes;
+    this.preciosAnteriores = anteriores;
+    this.preciosLeidosEn = Date.now();
+  }
+
+  // Los seis planes con su monto vigente y cada cuántos meses se cobran. Para
+  // la landing, el wizard, el panel y el superadmin.
+  async preciosVigentes(): Promise<Record<PlanKey, { amount: number; months: number }>> {
+    await this.cargarPrecios();
+    const out = {} as Record<PlanKey, { amount: number; months: number }>;
+    for (const k of PLAN_KEYS) out[k] = { amount: this.planes[k].amount, months: this.planes[k].frequency };
+    return out;
+  }
+
+  // Valores por defecto de cada plan (los del código), para que el superadmin
+  // pueda mostrar de dónde se partió.
+  preciosPorDefecto(): Record<PlanKey, number> {
+    const out = {} as Record<PlanKey, number>;
+    for (const k of PLAN_KEYS) out[k] = PLANES_POR_DEFECTO[k].amount;
+    return out;
+  }
 
   // true si hay token de MP configurado. Los crons lo usan para no romper en
   // entornos sin MP (dev sin credenciales).
@@ -294,7 +363,7 @@ export class SubscriptionsService {
     return this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
   }
 
-  // El precio de verdad NO sale de env: sale de PLANES o de la campaña.
+  // El precio de verdad NO sale de env: sale de los planes o de la campaña.
   //
   // Antes salía de MP_SUBSCRIPTION_AMOUNT/FREQUENCY/FREQUENCY_TYPE, y un valor
   // de prueba olvidado en el hosting (15 cada 3 días, que es el minimo que
@@ -315,10 +384,11 @@ export class SubscriptionsService {
     const currency = this.currency;
     // El alta solo acepta los dos planes mensuales (StartPendingCheckoutDto):
     // el primer período es siempre UN mes, al precio de lista o al congelado.
-    const lista = PLANES[incluyeAvanzado(plan) ? 'mensualAvanzado' : 'mensual'];
-    const base: CicloConfig = campania
-      ? { ...lista, amount: Number(incluyeAvanzado(plan) ? campania.priceAdvanced : campania.priceBase) }
-      : lista;
+    const lista = this.planes[incluyeAvanzado(plan) ? 'mensualAvanzado' : 'mensual'];
+    // Si alguien bajó el precio de lista por debajo del de la campaña, se cobra
+    // la lista: una "promo" más cara que el precio normal no se le cobra a nadie.
+    const deCampania = campania ? Number(incluyeAvanzado(plan) ? campania.priceAdvanced : campania.priceBase) : null;
+    const base: CicloConfig = deCampania !== null && deCampania < lista.amount ? { ...lista, amount: deCampania } : lista;
     if (this.config.get<string>('MP_PLAN_OVERRIDE') !== 'true') {
       return { ...base, currency };
     }
@@ -349,11 +419,11 @@ export class SubscriptionsService {
   // para validar una campaña (un precio congelado tiene que quedar por debajo
   // del de lista y por encima del mínimo cobrable).
   preciosDeLista(): { base: number; avanzado: number; minAmount: number } {
-    return { base: PLANES.mensual.amount, avanzado: PLANES.mensualAvanzado.amount, minAmount: this.montoMinimo };
+    return { base: this.planes.mensual.amount, avanzado: this.planes.mensualAvanzado.amount, minAmount: this.montoMinimo };
   }
 
   private cicloDelPlan(plan: string): CicloConfig {
-    const ciclo = PLANES[plan as PlanKey];
+    const ciclo = this.planes[plan as PlanKey];
     if (!ciclo) throw new BadRequestException(`Plan desconocido: ${plan}`);
     return ciclo;
   }
@@ -453,7 +523,9 @@ export class SubscriptionsService {
     // privada (cortesía de precio congelado) o un código de descuento común.
     // Sin código, o con uno de descuento, entra por la campaña pública si hay
     // una prendida y con lugares.
-    const { campania, codigoDescuento } = await this.resolverCampania(dto.discountCode);
+    await this.cargarPrecios();
+    const { campania: candidata, codigoDescuento } = await this.resolverCampania(dto.discountCode);
+    const campania = this.siRebaja(candidata, dto.plan);
     const primerCobro = this.primerCobroParaPlan(dto.plan, campania);
     const { amount, currency } = primerCobro;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -622,16 +694,33 @@ export class SubscriptionsService {
     return { campania: await this.campaniaPublicaVigente(), codigoDescuento: codigo };
   }
 
+  // Una campaña cuyo precio para este plan no queda por debajo del de lista no
+  // se aplica (ver primerCobroParaPlan): el alta entra sin campaña, y así
+  // tampoco gasta un lugar ni queda con un "congelado" que no congela nada.
+  private siRebaja<C extends { priceBase: Prisma.Decimal | number; priceAdvanced: Prisma.Decimal | number }>(
+    campania: C | undefined,
+    plan: PlanKey,
+  ): C | undefined {
+    if (!campania) return undefined;
+    const lista = this.planes[incluyeAvanzado(plan) ? 'mensualAvanzado' : 'mensual'].amount;
+    return Number(incluyeAvanzado(plan) ? campania.priceAdvanced : campania.priceBase) < lista ? campania : undefined;
+  }
+
   // Lo que muestran la landing y el wizard del alta: los precios de lista y,
   // si hay una campaña pública vigente, el precio congelado y cuántos lugares
   // quedan. Es la ÚNICA fuente de eso para el frontend: prender, apagar o
   // editar la campaña desde el superadmin cambia lo que se ve sin desplegar.
   async ofertaPublica() {
+    const plans = await this.preciosVigentes();
     const { base, avanzado } = this.preciosDeLista();
-    const c = await this.campaniaPublicaVigente();
+    const vigente = await this.campaniaPublicaVigente();
+    // Solo se anuncia si rebaja los DOS planes: la landing tacha los dos precios.
+    const c = this.siRebaja(vigente, 'mensual') && this.siRebaja(vigente, 'mensualAvanzado') ? vigente : undefined;
     return {
       currency: this.currency,
       list: { base, avanzado },
+      // Los seis planes (período × Base/Avanzado) con su monto vigente.
+      plans,
       campaign: c
         ? {
             name: c.name,
@@ -705,8 +794,13 @@ export class SubscriptionsService {
   // privada: ahí no es "X% sobre el primer mes" sino "este precio durante N
   // meses", y el wizard lo muestra distinto.
   async previewDiscount(code: string, plan: PlanKey) {
-    const { campania, codigoDescuento } = await this.resolverCampania(code);
+    await this.cargarPrecios();
+    const { campania: candidata, codigoDescuento } = await this.resolverCampania(code);
+    const campania = this.siRebaja(candidata, plan);
     const { amount, currency } = this.primerCobroParaPlan(plan, campania);
+    if (candidata && !codigoDescuento && !campania) {
+      throw new BadRequestException('Ese código ya no mejora el precio actual del plan');
+    }
     if (campania && !codigoDescuento) {
       const lista = this.primerCobroParaPlan(plan).amount;
       return {
@@ -1108,6 +1202,7 @@ export class SubscriptionsService {
   // confirmPlanActivation, idéntico criterio que confirmAndCreate — nunca se
   // confía en que el dueño "ya volvió", siempre se le vuelve a preguntar a MP).
   async activatePlan(businessId: string, memberId: string, discountCode?: string) {
+    await this.cargarPrecios();
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     // El email de quien está pidiendo la activación (siempre owner/admin, ver
@@ -1222,7 +1317,7 @@ export class SubscriptionsService {
     plan: PlanKey,
   ): { amount: number; charges: number } | undefined {
     if (!sub.frozenAmount || sub.frozenChargesLeft <= 0) return undefined;
-    const ciclo = PLANES[plan];
+    const ciclo = this.planes[plan];
     if (ciclo.frequency !== 1 || ciclo.frequencyType !== 'months') return undefined;
     const amount = Number(sub.frozenAmount);
     // Un "congelado" que no baja el precio (subió la lista por debajo, dato
@@ -1247,6 +1342,7 @@ export class SubscriptionsService {
   // activatePlan, contra el plan que le toca activar a ESTE negocio (el precio
   // de lista, no el de bienvenida del alta).
   async previewActivationDiscount(businessId: string, code: string) {
+    await this.cargarPrecios();
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     const plan = sub.nextPlan ?? sub.plan;
@@ -1263,6 +1359,7 @@ export class SubscriptionsService {
   // Idempotente y con la misma desconfianza de siempre: vuelve a preguntarle
   // a MP el estado real antes de tocar la suscripción.
   async confirmPlanActivation(mpPreapprovalId: string) {
+    await this.cargarPrecios();
     const mp = await this.preapproval.get({ id: mpPreapprovalId });
     if (mp.status !== 'authorized') return { activated: false, status: mp.status ?? 'unknown' };
 
@@ -1301,7 +1398,7 @@ export class SubscriptionsService {
       this.logger.error(`Preapproval ${mpPreapprovalId} de ${businessId} no coincide con ningún plan (${JSON.stringify(mp.auto_recurring ?? null)}) — no se activa`);
       return { activated: false, status: 'plan_no_coincide' };
     }
-    const ciclo = PLANES[plan];
+    const ciclo = this.planes[plan];
     const now = new Date();
     const periodEnd = this.periodEnd(now, ciclo);
     // Si la tienda estaba suspendida por mora (lo normal: terminó la
@@ -1324,7 +1421,9 @@ export class SubscriptionsService {
         mpPreapprovalId,
         // Con descuento, lo que MP cobra este primer ciclo (después se
         // restaura el de lista, ver restaurarPrecioDeLista).
-        amount: planConDescuento && descuento ? descuento.amountFinal : ciclo.amount,
+        // Sin descuento, lo que MP tiene autorizado: si el dueño pidió el link
+        // antes de un cambio de precios, paga el precio que aceptó.
+        amount: planConDescuento && descuento ? descuento.amountFinal : Number(mp.auto_recurring?.transaction_amount ?? ciclo.amount),
         currency: this.currency,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
@@ -1360,7 +1459,7 @@ export class SubscriptionsService {
     amountFinal: number,
   ): boolean {
     if (!rec || rec.currency_id !== this.currency) return false;
-    const ciclo = PLANES[plan];
+    const ciclo = this.planes[plan];
     return (
       Math.abs(Number(rec.transaction_amount) - amountFinal) < 0.005 &&
       Number(rec.frequency) === ciclo.frequency &&
@@ -1522,13 +1621,22 @@ export class SubscriptionsService {
   }
 
   // A qué plan corresponde lo que MP tiene autorizado. undefined si no es
-  // ninguno (otra moneda, un monto viejo): en ese caso no se activa nada.
+  // ninguno (otra moneda, un monto que ningún plan tuvo nunca): en ese caso no
+  // se activa nada.
+  //
+  // Primero contra los precios vigentes. Si no coincide, contra los que tuvo
+  // cada plan antes (del más nuevo al más viejo): un link de activación pedido
+  // antes de un cambio de precios se autoriza al monto viejo, y esa persona
+  // tiene que quedar con su plan igual.
   private planDePreapproval(
     rec: { transaction_amount?: number; frequency?: number; frequency_type?: string; currency_id?: string } | undefined,
   ): PlanKey | undefined {
     if (!rec || rec.currency_id !== this.currency) return undefined;
-    return PLAN_KEYS.find(
-      (k) => PLANES[k].amount === Number(rec.transaction_amount) && PLANES[k].frequency === Number(rec.frequency) && PLANES[k].frequencyType === rec.frequency_type,
+    const mismoCiclo = (k: PlanKey) => this.planes[k].frequency === Number(rec.frequency) && this.planes[k].frequencyType === rec.frequency_type;
+    const monto = Number(rec.transaction_amount);
+    return (
+      PLAN_KEYS.find((k) => this.planes[k].amount === monto && mismoCiclo(k)) ??
+      this.preciosAnteriores.find((p) => p.amount === monto && mismoCiclo(p.plan))?.plan
     );
   }
 

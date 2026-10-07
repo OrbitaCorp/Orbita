@@ -30,7 +30,7 @@ import { Modal } from '@/design-system/components/Modal'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError, panelGetSubscription, panelGetAddons, panelActivatePlan, panelChangePlan, panelPreviewActivationDiscount,
-    panelGetBusiness, panelCancelBusiness, panelReactivateFromCancellation,
+    panelGetBusiness, panelCancelBusiness, panelReactivateFromCancellation, getOfertaPublica,
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
 
@@ -80,6 +80,19 @@ const PLANES: Record<PlanKey, { nombre: string; corto: string; precioMes: number
     semestralAvanzado: { nombre: 'Base + Avanzado · semestral',  corto: 'Semestral', precioMes: 19333, total: 116000, periodo: 'cada 6 meses' },
     anualAvanzado:     { nombre: 'Base + Avanzado · anual',      corto: 'Anual',     precioMes: 17083, total: 205000, periodo: 'por año' },
 }
+// Pisa los montos de PLANES con los precios de lista vigentes (se editan desde
+// el superadmin). PLANES es un dato de módulo que leen varios componentes de
+// este archivo, así que se actualiza en el lugar; quien llama cambia estado
+// después y con eso se redibuja todo. Los de arriba quedan como valor inicial.
+function aplicarPreciosDeLista(plans: Record<PlanKey, { amount: number; months: number }>) {
+    for (const k of Object.keys(PLANES) as PlanKey[]) {
+        const p = plans[k]
+        if (!p) continue
+        PLANES[k].precioMes = Math.round(p.amount / p.months)
+        PLANES[k].total = p.months === 1 ? null : p.amount
+    }
+}
+
 const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado', 'semestralAvanzado', 'anualAvanzado']
 
 function esPlanKey(v: string): v is PlanKey {
@@ -285,9 +298,12 @@ export default function Suscripcion() {
 
     useEffect(() => {
         let cancelado = false
-        Promise.all([panelGetSubscription(), panelGetAddons(), panelGetBusiness().catch(() => null)])
-            .then(([s, a, b]) => {
+        // La oferta es solo para los precios de lista vigentes: si no llega,
+        // quedan los que trae el archivo.
+        Promise.all([panelGetSubscription(), panelGetAddons(), panelGetBusiness().catch(() => null), getOfertaPublica().catch(() => null)])
+            .then(([s, a, b, oferta]) => {
                 if (cancelado) return
+                if (oferta?.plans) aplicarPreciosDeLista(oferta.plans)
                 setSub(s)
                 setAdvanced(a.advanced)
                 setAdvancedExpiresAt(a.advancedExpiresAt)

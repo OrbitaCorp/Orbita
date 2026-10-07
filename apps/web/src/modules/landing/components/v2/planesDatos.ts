@@ -1,9 +1,13 @@
 // Fuente única de los planes: la usan las dos tarjetas de precio del home
 // (Cierre.tsx#Precios) y la página de comparación (/planes).
 //
-// Los montos SON los reales (PLANES en subscriptions.service.ts — si cambian
-// de un lado, cambian del otro) y ya incluyen la comisión de Mercado Pago
-// sobre Suscripciones.
+// Los montos de acá son los valores POR DEFECTO (los mismos de
+// PLANES_POR_DEFECTO en subscriptions.service.ts), con la comisión de Mercado
+// Pago incluida. Los precios de lista se editan desde el superadmin: las
+// pantallas piden los vigentes con useOferta() y usan estos solo mientras
+// carga o si la API no responde. Si un precio cambia de forma definitiva,
+// conviene actualizarlo también acá para que la página no muestre un instante
+// el valor viejo.
 //
 // Lo que NO está acá es el precio promocional: desde 2026-10 no hay un
 // "beneficio de bienvenida" fijo, sino campañas de precio congelado que se
@@ -138,7 +142,7 @@ export const fmt = (n: number) => `$${n.toLocaleString('es-AR')}`;
 
 // ─── Precio de una tarjeta según la oferta vigente ──────────────────────────
 
-/** La campaña pública de precio congelado, tal como la devuelve la API. */
+/** La campaña pública de precio, tal como la devuelve la API. */
 export interface Campania {
     name: string;
     priceBase: number;
@@ -146,6 +150,31 @@ export interface Campania {
     months: number;
     maxSlots: number | null;
     slotsLeft: number | null;
+    endsAt: string | null;
+}
+
+/** Los seis planes con su precio vigente, tal como los devuelve la API. */
+export type PreciosVigentes = Record<
+    'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado',
+    { amount: number; months: number }
+>;
+
+/** Las dos tarjetas con el precio de lista vigente. */
+export function tarjetasCon(p: PreciosVigentes): Tarjeta[] {
+    return TARJETAS.map(t => ({ ...t, precioLista: t.key === 'avanzado' ? p.mensualAvanzado.amount : p.mensual.amount }));
+}
+
+/** Los tres períodos con los montos vigentes; el prorrateo y el ahorro se recalculan. */
+export function periodosCon(p: PreciosVigentes): Periodo[] {
+    return PERIODOS.map(per => {
+        const base = p[per.key];
+        const avanzado = p[`${per.key}Avanzado` as keyof PreciosVigentes];
+        const porMes = { base: Math.round(base.amount / base.months), avanzado: Math.round(avanzado.amount / avanzado.months) };
+        // Sobre Base, redondeado. Si un período largo no sale más barato que el
+        // mensual, no se anuncia ningún ahorro.
+        const ahorro = per.key === 'mensual' ? null : Math.round((1 - porMes.base / p.mensual.amount) * 100);
+        return { ...per, total: { base: base.amount, avanzado: avanzado.amount }, porMes, ahorro: ahorro !== null && ahorro > 0 ? ahorro : null };
+    });
 }
 
 /** Lo que paga por mes esta tarjeta si entra por la campaña. */
@@ -153,6 +182,19 @@ export const precioCongelado = (key: PlanTarjeta, c: Campania) => (key === 'avan
 
 /** "3 meses" / "1 mes". */
 export const meses = (n: number) => (n === 1 ? '1 mes' : `${n} meses`);
+
+/**
+ * Cómo se anuncia la campaña arriba de los precios. Con cupo es una oferta
+ * para los primeros que lleguen; sin cupo es simplemente el precio de entrada
+ * de hoy, y decir "para los primeros comercios" sería mentira.
+ */
+export function anuncio(c: Campania): string {
+    const hasta = c.endsAt
+        ? ` Hasta el ${new Date(c.endsAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', timeZone: 'America/Argentina/Buenos_Aires' })}.`
+        : '';
+    if (c.maxSlots !== null) return `Precio congelado por ${meses(c.months)} para los primeros comercios que se registren.${hasta}`;
+    return (c.months === 1 ? 'Precio de lanzamiento en tu primer mes.' : `Precio de lanzamiento durante tus primeros ${meses(c.months)}.`) + hasta;
+}
 
 /** "Quedan 26 de 30 lugares", o null si la campaña no tiene cupo. */
 export function lugares(c: Campania): string | null {

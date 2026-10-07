@@ -57,6 +57,18 @@ export class CreatePriceCampaignDto {
   note?: string | null;
 }
 
+// Precios de lista de los seis planes (período × Base / Base + Avanzado): lo que
+// se cobra por período, comisión de Mercado Pago incluida. Van siempre los
+// seis: se guardan solo los que cambiaron.
+export class UpdatePlanPricesDto {
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) mensual!: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) semestral!: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) anual!: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) mensualAvanzado!: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) semestralAvanzado!: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) anualAvanzado!: number;
+}
+
 // El código no se edita: es lo que distingue una pública de una privada y lo
 // que ya se le pudo haber pasado a alguien.
 export class UpdatePriceCampaignDto {

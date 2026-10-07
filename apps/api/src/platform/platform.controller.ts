@@ -12,7 +12,7 @@ import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
-import { CreatePriceCampaignDto, UpdatePriceCampaignDto } from './dto/price-campaign.dto';
+import { CreatePriceCampaignDto, UpdatePriceCampaignDto, UpdatePlanPricesDto } from './dto/price-campaign.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -269,6 +269,14 @@ export class PlatformController {
   }
 
   // ── Campañas de precio congelado ──────────────────────────────────────────
+
+  // Precios de lista de los planes. Cambian lo que paga toda alta y toda
+  // activación de plan de ahí en más.
+  @Put('plan-prices')
+  @SoloSuperadmin()
+  updatePlanPrices(@Req() req: RequestWithAdmin, @Body() dto: UpdatePlanPricesDto) {
+    return this.platformService.updatePlanPrices(req.user.adminId, dto);
+  }
 
   @Get('price-campaigns')
   listPriceCampaigns() {

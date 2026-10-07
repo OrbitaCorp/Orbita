@@ -112,8 +112,15 @@ export interface PriceCampaignList {
   // Precios de lista por mes y el mínimo que cobra Mercado Pago: un precio
   // congelado tiene que quedar entre los dos.
   list: { base: number; avanzado: number; minAmount: number }
+  // Los seis planes con su precio de lista vigente, los valores con los que
+  // nació el sistema y cuándo se editaron por última vez (null = nunca).
+  plans: Record<PlanPriceKey, { amount: number; months: number }>
+  planDefaults: Record<PlanPriceKey, number>
+  plansUpdatedAt: string | null
   campaigns: PriceCampaignRow[]
 }
+export type PlanPriceKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado' | 'semestralAvanzado' | 'anualAvanzado'
+export type PlanPricesInput = Record<PlanPriceKey, number>
 export interface PriceCampaignInput {
   name: string
   priceBase: number
@@ -932,6 +939,7 @@ export const platformApi = {
   updateDiscountCode: (id: string, input: UpdateDiscountCodeInput) => sendJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`, 'PUT', input),
 
   priceCampaigns: () => getJSON<PriceCampaignList>('/platform/price-campaigns'),
+  updatePlanPrices: (input: PlanPricesInput) => sendJSON<PriceCampaignList>('/platform/plan-prices', 'PUT', input),
   // El código solo va al crear: es lo que distingue una pública de una privada
   // y no se edita.
   createPriceCampaign: (input: PriceCampaignInput & { code: string | null }) => sendJSON<PriceCampaignList>('/platform/price-campaigns', 'POST', input),

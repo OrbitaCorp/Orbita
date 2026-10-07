@@ -383,6 +383,9 @@ export interface OfertaCampania {
 export interface OfertaPublica {
   currency: string
   list: { base: number; avanzado: number }
+  // Los seis planes con su precio de lista vigente (se editan desde el
+  // superadmin) y cada cuántos meses se cobran.
+  plans: Record<PlanKey, { amount: number; months: number }>
   campaign: OfertaCampania | null
 }
 export function getOfertaPublica() {

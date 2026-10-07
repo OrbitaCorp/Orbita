@@ -16,8 +16,8 @@ import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
-import { CreatePriceCampaignDto, UpdatePriceCampaignDto } from './dto/price-campaign.dto';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { CreatePriceCampaignDto, UpdatePriceCampaignDto, UpdatePlanPricesDto } from './dto/price-campaign.dto';
+import { SubscriptionsService, type PlanKey } from '../subscriptions/subscriptions.service';
 import { PlatformAdminLogService } from './platform-admin-log.service';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
@@ -966,6 +966,7 @@ export class PlatformService {
     const code = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
     if (!code) throw new NotFoundException('Código no encontrado');
 
+    await this.subscriptions.cargarPrecios();
     const { amountBase } = this.subscriptions.limitesDescuento();
     const final = Math.round(amountBase * (1 - code.percentOff / 100) * 100) / 100;
     const gratis = final === 0;
@@ -1018,7 +1019,8 @@ export class PlatformService {
 
   // Lo mismo que valida validarPorcentaje(), pero para que el panel lo pueda
   // avisar mientras el admin escribe el porcentaje, en vez de al guardar.
-  discountLimits() {
+  async discountLimits() {
+    await this.subscriptions.cargarPrecios();
     return this.subscriptions.limitesDescuento();
   }
 
@@ -1070,6 +1072,7 @@ export class PlatformService {
   }
 
   async createDiscountCode(adminId: string, dto: CreateDiscountCodeDto) {
+    await this.subscriptions.cargarPrecios();
     this.validarPorcentaje(dto.percentOff);
     this.validarTopeDeUsos(dto.percentOff, dto.maxUses);
     const code = PlatformService.normalizarCodigo(dto.code);
@@ -1111,6 +1114,7 @@ export class PlatformService {
   }
 
   async updateDiscountCode(adminId: string, id: string, dto: UpdateDiscountCodeDto) {
+    await this.subscriptions.cargarPrecios();
     const actual = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
     if (!actual) throw new NotFoundException('Código no encontrado');
     if (dto.percentOff !== undefined) this.validarPorcentaje(dto.percentOff);
@@ -1173,10 +1177,12 @@ export class PlatformService {
   }
 
   async listPriceCampaigns() {
-    const [campanias, lista] = await Promise.all([
+    const [campanias, plans, ultimoCambio] = await Promise.all([
       this.prisma.priceCampaign.findMany({ orderBy: { createdAt: 'desc' } }),
-      Promise.resolve(this.subscriptions.preciosDeLista()),
+      this.subscriptions.preciosVigentes(),
+      this.prisma.planPrice.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
     ]);
+    const lista = this.subscriptions.preciosDeLista();
     // Quiénes entraron por cada una: lo dice la suscripción del negocio, que es
     // donde quedó copiado el precio congelado.
     const ids = campanias.map((c) => c.id);
@@ -1196,6 +1202,11 @@ export class PlatformService {
       : [];
     return {
       list: lista,
+      // Los seis planes con su monto vigente, los valores con los que nació el
+      // sistema y cuándo se tocaron por última vez (null = nunca).
+      plans,
+      planDefaults: this.subscriptions.preciosPorDefecto(),
+      plansUpdatedAt: ultimoCambio?.createdAt.toISOString() ?? null,
       campaigns: campanias.map((c) => ({
         id: c.id,
         name: c.name,
@@ -1253,7 +1264,61 @@ export class PlatformService {
     if (otra) throw new BadRequestException(`Ya hay una campaña pública prendida ("${otra.name}"). Apagala antes de prender otra.`);
   }
 
+  // ── Precios de lista ──────────────────────────────────────────────────────
+  // Rigen para lo que se cobre DE ACÁ EN MÁS: el primer mes de un alta y el
+  // débito que se autorice al activar o cambiar un plan. A quien ya tiene un
+  // débito autorizado no se le toca: Mercado Pago le sigue cobrando el monto
+  // que aceptó, y subírselo es otra decisión (avisarle y actualizar su
+  // preapproval), que este cambio no toma por nadie.
+  async updatePlanPrices(adminId: string, dto: UpdatePlanPricesDto) {
+    const antes = await this.subscriptions.preciosVigentes();
+    const { minAmount } = this.subscriptions.preciosDeLista();
+    const claves = Object.keys(antes) as PlanKey[];
+
+    for (const k of claves) {
+      if (dto[k] < minAmount) throw new BadRequestException(`Ningún plan puede costar menos de $${minAmount}: Mercado Pago no cobra menos que eso.`);
+    }
+    // Avanzado más caro que Base en cada período: además de tener sentido, es
+    // lo que garantiza que dos planes con la misma frecuencia nunca compartan
+    // monto (planDePreapproval reconoce el plan por monto + frecuencia).
+    for (const [base, avanzado, nombre] of [['mensual', 'mensualAvanzado', 'mensual'], ['semestral', 'semestralAvanzado', 'semestral'], ['anual', 'anualAvanzado', 'anual']] as const) {
+      if (dto[avanzado] <= dto[base]) throw new BadRequestException(`En el plan ${nombre}, Base + Avanzado tiene que costar más que Base.`);
+    }
+    // Un período largo que sale más caro por mes que el mensual no lo elige nadie
+    // y casi seguro es un error de tipeo (un cero de más o de menos).
+    for (const [mensual, largo, nombre] of [['mensual', 'semestral', 'semestral'], ['mensual', 'anual', 'anual'], ['mensualAvanzado', 'semestralAvanzado', 'semestral con Avanzado'], ['mensualAvanzado', 'anualAvanzado', 'anual con Avanzado']] as const) {
+      const porMes = dto[largo] / antes[largo].months;
+      if (porMes > dto[mensual]) throw new BadRequestException(`El plan ${nombre} queda en $${Math.round(porMes)} por mes, más caro que el mensual ($${dto[mensual]}). Revisá el monto.`);
+    }
+    // Una campaña prendida que quedaría igual o más cara que la lista nueva
+    // dejaría de aplicarse sin que nadie lo note.
+    const prendidas = await this.prisma.priceCampaign.findMany({ where: { isActive: true }, select: { name: true, priceBase: true, priceAdvanced: true } });
+    const pisada = prendidas.find((c) => Number(c.priceBase) >= dto.mensual || Number(c.priceAdvanced) >= dto.mensualAvanzado);
+    if (pisada) {
+      throw new BadRequestException(`La campaña "${pisada.name}" está prendida con un precio que ya no sería menor al de lista. Bajale el precio o apagala antes.`);
+    }
+
+    const cambios = claves.filter((k) => dto[k] !== antes[k].amount);
+    if (cambios.length > 0) {
+      await this.prisma.$transaction([
+        this.prisma.planPrice.createMany({ data: cambios.map((k) => ({ plan: k, amount: new Prisma.Decimal(dto[k]), createdBy: adminId })) }),
+        this.prisma.platformAdminLog.create({
+          data: {
+            adminId,
+            action: 'update_plan_prices',
+            targetType: 'plan_prices',
+            targetId: 'plan_prices',
+            details: Object.fromEntries(cambios.map((k) => [k, { antes: antes[k].amount, despues: dto[k] }])),
+          },
+        }),
+      ]);
+      await this.subscriptions.cargarPrecios(true);
+    }
+    return this.listPriceCampaigns();
+  }
+
   async createPriceCampaign(adminId: string, dto: CreatePriceCampaignDto) {
+    await this.subscriptions.cargarPrecios();
     const code = dto.code?.trim() ? PlatformService.normalizarCodigo(dto.code) : null;
     if (code !== null && code.length < 3) throw new BadRequestException('El código tiene que tener al menos 3 caracteres');
     this.validarPreciosDeCampania(dto.priceBase, dto.priceAdvanced);
@@ -1303,6 +1368,7 @@ export class PlatformService {
   // Editar una campaña cambia lo que pagan los que entren DESPUÉS: a los que ya
   // entraron les quedó el precio copiado en su suscripción.
   async updatePriceCampaign(adminId: string, id: string, dto: UpdatePriceCampaignDto) {
+    await this.subscriptions.cargarPrecios();
     const actual = await this.prisma.priceCampaign.findUnique({ where: { id } });
     if (!actual) throw new NotFoundException('Campaña no encontrada');
 

@@ -120,7 +120,7 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
   // Al lado de Descuentos: las dos son formas de cobrarle menos a un negocio.
   // Un código descuenta el primer cobro; una campaña congela el precio varios meses.
-  { id: 'campanias', label: 'Campañas de precio', Icono: Tag, grupo: 'Clientes' },
+  { id: 'campanias', label: 'Precios y campañas', Icono: Tag, grupo: 'Clientes' },
   // Primero de "Interno": es el tablero de trabajo del equipo, lo que más se
   // abre; admins y actividad son de consulta.
   { id: 'costos', label: 'Costos', Icono: DollarSign, grupo: 'Interno' },

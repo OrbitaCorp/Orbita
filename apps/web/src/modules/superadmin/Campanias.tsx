@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
-import { platformApi, type PriceCampaignRow, type PriceCampaignEstado, type PriceCampaignInput } from '@/lib/platform/api'
+import {
+  platformApi, type PriceCampaignRow, type PriceCampaignEstado, type PriceCampaignInput, type PriceCampaignList,
+  type PlanPriceKey, type PlanPricesInput,
+} from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader,
   ModalShell, Field, money, date,
-  btnGhost, btnPrimary, inputStyle,
+  btnGhost, btnGhostSm, btnPrimary, inputStyle,
 } from './ui'
 
-// Campañas de precio congelado: "los primeros N comercios pagan $X por mes
-// durante M meses, después el precio de lista". Lo que se configura acá es lo
-// que cobra el alta (subscriptions.service.ts) y lo que muestran la landing y
-// el wizard, sin desplegar nada.
+// Lo que cobra Órbita, en una sola pantalla y sin desplegar nada:
 //
-// Hay dos tipos con el mismo formulario:
+//   1. Precios de lista de los seis planes. Rigen para toda alta y toda
+//      activación de plan de ahí en más; a quien ya tiene un débito autorizado
+//      no se le cambia (ver updatePlanPrices en platform.service.ts).
+//   2. Campañas: un precio más bajo por unos meses para quienes se registren.
+//      Con cupo es "los primeros N comercios"; sin cupo es un descuento global
+//      de entrada ("tu primer mes a $X") que dura hasta que se apague o venza.
+//
+// Lo que se configura acá es lo que cobra el alta (subscriptions.service.ts) y
+// lo que muestran la landing, el wizard y el panel.
+//
+// Hay dos tipos de campaña con el mismo formulario:
 //   - Pública: se le aplica sola a todo el que se registra mientras esté
 //     prendida y con lugares, y la landing tacha el precio de lista y muestra
 //     el contador. Solo puede haber una prendida a la vez.
@@ -45,6 +55,7 @@ export function TabCampanias() {
   const [reloadKey, setReloadKey] = useState(0)
   // 'nueva' abre el formulario vacío; un id, el de esa campaña.
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [editandoPrecios, setEditandoPrecios] = useState(false)
   const [aviso, setAviso] = useState<Aviso | null>(null)
   const { data, error } = useFetch(() => platformApi.priceCampaigns(), [reloadKey])
   const recargar = useCallback(() => setReloadKey((k) => k + 1), [])
@@ -76,8 +87,8 @@ export function TabCampanias() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <PageHeader
-        title="Campañas de precio"
-        subtitle="Precio congelado por unos meses para quienes se registren. Una campaña pública se aplica sola y se muestra en la landing con su contador de lugares; una con código es una cortesía que no se ve en ningún lado."
+        title="Precios y campañas"
+        subtitle="Los precios de lista de cada plan y las campañas que los rebajan por unos meses a quienes se registren. Una campaña pública se aplica sola y se muestra en la landing; una con código es una cortesía que no se ve en ningún lado."
         action={
           <button onClick={() => setAbierta('nueva')} className="ds-hover" style={btnPrimary}>
             <Plus size={16} strokeWidth={2} /> Nueva campaña
@@ -85,8 +96,10 @@ export function TabCampanias() {
         }
       />
 
+      {data && <PreciosDeLista data={data} onEditar={() => setEditandoPrecios(true)} />}
+
       {error ? (
-        <ErrorBox msg="No se pudieron cargar las campañas." />
+        <ErrorBox msg="No se pudieron cargar los precios y las campañas." />
       ) : !data ? (
         <Loader />
       ) : campanias.length === 0 ? (
@@ -134,6 +147,18 @@ export function TabCampanias() {
         />
       )}
 
+      {editandoPrecios && data && (
+        <ModalPrecios
+          data={data}
+          onClose={() => setEditandoPrecios(false)}
+          onGuardado={() => {
+            setEditandoPrecios(false)
+            recargar()
+            setAviso({ variant: 'success', title: 'Precios de lista guardados', description: 'Ya rigen para las altas y activaciones nuevas.' })
+          }}
+        />
+      )}
+
       {aviso && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
           <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />
@@ -142,6 +167,126 @@ export function TabCampanias() {
     </div>
   )
 }
+
+// ─── Precios de lista ────────────────────────────────────────────────────────
+
+const PERIODOS: { nombre: string; base: PlanPriceKey; avanzado: PlanPriceKey }[] = [
+  { nombre: 'Mensual', base: 'mensual', avanzado: 'mensualAvanzado' },
+  { nombre: 'Semestral', base: 'semestral', avanzado: 'semestralAvanzado' },
+  { nombre: 'Anual', base: 'anual', avanzado: 'anualAvanzado' },
+]
+
+function PreciosDeLista({ data, onEditar }: { data: PriceCampaignList; onEditar: () => void }) {
+  const porMes = (k: PlanPriceKey) => Math.round(data.plans[k].amount / data.plans[k].months)
+  const celda = (k: PlanPriceKey) => (
+    <span key={k} style={mono}>
+      {money(data.plans[k].amount)}
+      {data.plans[k].months > 1 && <span style={tenue}> · {money(porMes(k))}/mes</span>}
+    </span>
+  )
+  return (
+    <Card
+      title="Precios de lista"
+      subtitle={data.plansUpdatedAt ? `Última edición: ${date(data.plansUpdatedAt)}` : 'Son los precios originales: nunca se editaron.'}
+      action={<button onClick={onEditar} className="ds-hover" style={btnGhostSm}>Editar precios</button>}
+      noPad
+    >
+      <Table
+        head={['Período', 'Base', 'Base + Avanzado']}
+        alignRight={[1, 2]}
+        rows={PERIODOS.map((p) => ({ key: p.nombre, cells: [p.nombre, celda(p.base), celda(p.avanzado)] }))}
+      />
+    </Card>
+  )
+}
+
+function ModalPrecios({ data, onClose, onGuardado }: { data: PriceCampaignList; onClose: () => void; onGuardado: () => void }) {
+  const claves = Object.keys(data.plans) as PlanPriceKey[]
+  const [valores, setValores] = useState<Record<PlanPriceKey, string>>(
+    () => Object.fromEntries(claves.map((k) => [k, String(data.plans[k].amount)])) as Record<PlanPriceKey, string>,
+  )
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  const num = (k: PlanPriceKey) => Number(valores[k])
+  const cambiados = claves.filter((k) => valores[k].trim() !== '' && num(k) !== data.plans[k].amount)
+  // Lo que Órbita recibe después de la comisión de Mercado Pago sobre
+  // Suscripciones (7,61% efectivo, ver subscriptions.service.ts).
+  const limpio = (n: number) => money(Math.round(n * 0.9239))
+  // El prorrateo de un período largo, para ver de un vistazo si quedó más
+  // barato que el mensual (si no, el backend lo rechaza).
+  const pista = (k: PlanPriceKey) => {
+    const n = num(k)
+    if (!valores[k].trim() || !Number.isFinite(n) || n <= 0) return 'Escribí un monto.'
+    const m = data.plans[k].months
+    return m > 1 ? `${money(Math.round(n / m))} por mes · recibís ${limpio(n)}` : `Recibís ${limpio(n)}`
+  }
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (claves.some((k) => !valores[k].trim() || !Number.isFinite(num(k)) || num(k) <= 0)) { setError('Completá los seis precios.'); return }
+    setGuardando(true)
+    try {
+      await platformApi.updatePlanPrices(Object.fromEntries(claves.map((k) => [k, num(k)])) as PlanPricesInput)
+      onGuardado()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron guardar los precios.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const campo = (k: PlanPriceKey, label: string) => (
+    <Field key={k} label={label} hint={pista(k)}>
+      <input type="number" min={1} value={valores[k]} onChange={(e) => setValores((v) => ({ ...v, [k]: e.target.value }))} className="ds-field" style={inputStyle} />
+    </Field>
+  )
+
+  return (
+    <ModalShell title="Precios de lista" onClose={onClose} cerrarAlClickAfuera={false}>
+      <form onSubmit={guardar} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+          Es lo que se cobra por período, con la comisión de Mercado Pago adentro. El cambio rige para las altas
+          y las activaciones de plan desde ahora, y se ve en la landing, el alta y el panel.
+          <strong style={{ color: 'var(--color-text)', fontWeight: 600 }}> A quien ya tiene su débito autorizado no se le modifica.</strong>
+        </p>
+
+        {PERIODOS.map((p) => (
+          <div key={p.nombre} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {campo(p.base, `${p.nombre} · Base`)}
+            {campo(p.avanzado, `${p.nombre} · con Avanzado`)}
+          </div>
+        ))}
+
+        {cambiados.length > 0 && (
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: 'var(--color-body)' }}>
+            {cambiados.map((k) => {
+              const p = PERIODOS.find((x) => x.base === k || x.avanzado === k)!
+              return (
+                <li key={k}>
+                  {p.nombre}{p.avanzado === k ? ' con Avanzado' : ' Base'}: <span style={{ ...mono, color: 'var(--color-muted)', textDecoration: 'line-through' }}>{money(data.plans[k].amount)}</span>{' '}
+                  <span style={{ ...mono, fontWeight: 700 }}>{money(num(k))}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {error && <p role="alert" style={{ margin: 0, fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+          <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
+          <button type="submit" disabled={guardando || cambiados.length === 0} className="ds-hover" style={{ ...btnPrimary, ...(guardando || cambiados.length === 0 ? { opacity: 0.5, cursor: 'default' } : {}) }}>
+            {guardando ? 'Guardando…' : 'Guardar precios'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+// ─── Campañas ────────────────────────────────────────────────────────────────
 
 // Las fechas se cargan como día (sin hora) y valen en hora de Argentina: la
 // campaña arranca al empezar ese día y termina cuando ese día se acaba.
@@ -170,6 +315,11 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
   const [guardando, setGuardando] = useState(false)
 
   // Lo mismo que valida el backend, avisado mientras se escribe.
+  // "39% menos", para ver el tamaño del descuento sin hacer la cuenta.
+  const rebaja = (valor: string, deLista: number) => {
+    const n = Number(valor)
+    return Number.isFinite(n) && n > 0 && n < deLista ? ` · ${Math.round((1 - n / deLista) * 100)}% menos` : ''
+  }
   const errorPrecio = (valor: string, deLista: number, plan: string): string => {
     const n = Number(valor)
     if (!valor.trim() || !Number.isFinite(n)) return 'Escribí un precio.'
@@ -236,7 +386,7 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
             <legend style={{ padding: 0, marginBottom: 8, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>A quién le llega</legend>
             <label style={radio}>
               <input type="radio" name="tipo" checked={publica} onChange={() => setPublica(true)} style={{ marginTop: 3 }} />
-              <span><strong style={{ color: 'var(--color-text)', fontWeight: 600 }}>A todos los que se registren.</strong> La landing tacha el precio de lista y muestra los lugares que quedan.</span>
+              <span><strong style={{ color: 'var(--color-text)', fontWeight: 600 }}>A todos los que se registren.</strong> Sin código: la landing tacha el precio de lista y, si hay cupo, muestra los lugares que quedan.</span>
             </label>
             <label style={radio}>
               <input type="radio" name="tipo" checked={!publica} onChange={() => setPublica(false)} style={{ marginTop: 3 }} />
@@ -257,10 +407,10 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Base, por mes" hint={errBase || `De lista: ${money(lista.base)}`}>
+          <Field label="Base, por mes" hint={errBase || `De lista: ${money(lista.base)}${rebaja(priceBase, lista.base)}`}>
             <input type="number" min={1} value={priceBase} onChange={(e) => setPriceBase(e.target.value)} className="ds-field" style={{ ...inputStyle, ...(errBase ? { borderColor: 'var(--color-error)' } : {}) }} />
           </Field>
-          <Field label="Con Avanzado, por mes" hint={errAvanzado || `De lista: ${money(lista.avanzado)}`}>
+          <Field label="Con Avanzado, por mes" hint={errAvanzado || `De lista: ${money(lista.avanzado)}${rebaja(priceAdvanced, lista.avanzado)}`}>
             <input type="number" min={1} value={priceAdvanced} onChange={(e) => setPriceAdvanced(e.target.value)} className="ds-field" style={{ ...inputStyle, ...(errAvanzado ? { borderColor: 'var(--color-error)' } : {}) }} />
           </Field>
         </div>
@@ -269,7 +419,7 @@ function ModalCampania({ campania, lista, onClose, onGuardada }: {
           <input type="number" min={1} max={12} value={months} onChange={(e) => setMonths(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 110 }} />
         </Field>
 
-        <Field label="Cupo de comercios">
+        <Field label="Cupo de comercios" hint="Sin cupo es un descuento global: vale para todos los que se registren mientras esté prendida, hasta que la apagues o llegue la fecha de fin.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <input type="number" min={1} value={maxSlots} disabled={sinCupo} onChange={(e) => setMaxSlots(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 110, opacity: sinCupo ? 0.5 : 1 }} />
             <label style={check}>

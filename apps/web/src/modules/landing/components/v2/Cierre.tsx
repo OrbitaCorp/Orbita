@@ -16,7 +16,7 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 // Las tarjetas y sus montos viven en planesDatos.ts desde que existe /planes
 // (la comparación detallada): son los mismos datos en las dos pantallas, así
 // que se declaran una sola vez. Acá quedan solo el precio y las preguntas.
-import { TARJETAS, fmt, precioCongelado, meses, lugares } from './planesDatos';
+import { fmt, precioCongelado, meses, lugares, anuncio } from './planesDatos';
 import { useOferta } from './useOferta';
 
 const FAQS = [
@@ -47,7 +47,7 @@ const FAQS = [
 ];
 
 export function Precios() {
-    const campania = useOferta();
+    const { campania, tarjetas } = useOferta();
     const cupo = campania ? lugares(campania) : null;
     return (
         <Seccion id="precios">
@@ -63,13 +63,13 @@ export function Precios() {
                 que lleva color. */}
             {campania && (
                 <p className="mx-auto mt-8 max-w-[640px] text-center text-[13.5px] leading-relaxed text-slate-300" aria-live="polite">
-                    Precio congelado por {meses(campania.months)} para los primeros comercios que se registren.
+                    {anuncio(campania)}
                     {cupo && <> <strong className="font-bold text-blue-300">{cupo}.</strong></>}
                 </p>
             )}
 
             <div className={`mx-auto grid max-w-[720px] grid-cols-1 gap-4 sm:grid-cols-2 ${campania ? 'mt-6' : 'mt-10'}`}>
-                {TARJETAS.map((t, i) => (
+                {tarjetas.map((t, i) => (
                     <Reveal key={t.key} desde="escala" delay={i * 90}>
                         <Card destacada={!!t.destacada} className="relative flex h-full flex-col overflow-hidden p-7">
                             {t.destacada && (
