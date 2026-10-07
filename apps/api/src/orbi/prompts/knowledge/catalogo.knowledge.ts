@@ -33,4 +33,4 @@ Categorías:
 - Si te saludan en este módulo, ofrecé un resumen rápido del estado del catálogo.
 - Si hay productos en borrador, preguntá si los quieren publicar.
 - Si hay productos sin stock, mencionalo como prioridad.
-- Para crear un producto, guiá paso a paso: nombre → precio → categoría → foto.`;
+- Para crear un producto hacen falta nombre, precio y categoría: si falta alguno, pedí los que falten juntos.`;
