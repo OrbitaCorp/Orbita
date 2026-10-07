@@ -427,6 +427,21 @@ export const CAPITULOS: Capitulo[] = [
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
         },
         {
+            id: 'importar-excel', titulo: 'Importar muchos productos desde Excel',
+            bloques: [
+                { tipo: 'parrafo', texto: 'Si tenés que cargar decenas o cientos de productos, no hace falta ir uno por uno. En Productos, el botón [[Importar Excel]] abre un asistente de cuatro pasos: Archivo, Revisión, Importar y Fotos.' },
+                { tipo: 'pasos', items: [
+                    { titulo: 'Descargá la plantilla', texto: 'Con [[Descargar plantilla]] bajás un Excel con las columnas que espera el sistema (las mismas de "Crear producto"), tus categorías como lista desplegable y cuatro filas de ejemplo en gris que no se importan.' },
+                    { titulo: 'Completala', texto: 'Una fila por producto: nombre, categoría, precio, costo, stock, descripción y estado. Si tiene variantes, escribís el nombre de la variante (por ejemplo Color) y sus valores separados por coma (Rojo, Azul, Negro); con dos variantes se arman solas todas las combinaciones. El SKU se genera solo.' },
+                    { titulo: 'Subila y revisá', texto: 'Arrastrás o elegís el archivo y ves la revisión: qué se va a crear, qué categorías nuevas aparecen y, si hay errores, en qué fila y columna están. Con errores no se importa nada: los corregís en el Excel y lo volvés a subir con [[Subir otro archivo]].' },
+                    { titulo: 'Importá y sumá fotos', texto: 'Al confirmar se crean las categorías que faltaban y los productos. Al final podés ir cargando las fotos de cada uno sin salir del asistente, o tocar [[Seguir después]] y hacerlo desde cada producto.' },
+                ] },
+                { tipo: 'nota', variante: 'dato', texto: 'Si dejás el Estado vacío, el producto queda en Borrador: así podés importar todo, ponerle fotos y publicarlo cuando esté listo. Para que un producto salga Publicado tiene que tener stock.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si un nombre se repite en el archivo, el asistente lo marca como error: si son variantes del mismo producto, van en una sola fila con los valores separados por coma.' },
+            ],
+            ir: { label: 'Ir a Productos', seccion: 'catalogo' },
+        },
+        {
             id: 'ficha-tecnica', titulo: 'Ficha técnica: las características del producto',
             bloques: [
                 { tipo: 'parrafo', texto: 'Al cargar o editar un producto hay un interruptor **"Especificaciones técnicas"**, apagado por defecto. Sirve para lo que se compra mirando datos — tecnología, electrodomésticos, herramientas — y necesita ver "RAM: 8GB", "Pantalla: 6.5\"" antes de decidir.' },
