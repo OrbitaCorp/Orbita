@@ -2529,6 +2529,29 @@ export function panelGetDashboardAvanzado(from?: string, to?: string) {
   return panelRequest<ApiDashboardAvanzado>(`/reports/dashboard/advanced${qs ? `?${qs}` : ''}`)
 }
 
+// Cómo encuentran a la tienda en Google (GET /reports/dashboard/google): lo que muestra la sección
+// "Cómo te encuentran en Google" de las métricas avanzadas. `ctr` es una fracción (0,035 = 3,5 %).
+export type ApiGoogleTotales = { clics: number; impresiones: number; ctr: number; posicion: number }
+export type ApiDashboardGoogle =
+  | { disponible: false; motivo: 'conectando' | 'no_disponible' }
+  | {
+      disponible: true
+      periodo: { desde: string; hasta: string }
+      rendimiento: ApiGoogleTotales | null
+      anterior: ApiGoogleTotales | null
+      consultas: { consulta: string; clics: number; impresiones: number; posicion: number }[]
+      paginas: { ruta: string; clics: number; impresiones: number }[]
+      portadaEnGoogle: boolean | null
+    }
+
+export function panelGetDashboardGoogle(from?: string, to?: string) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return panelRequest<ApiDashboardGoogle>(`/reports/dashboard/google${qs ? `?${qs}` : ''}`)
+}
+
 // ── Reporte de pagos (RBT-619) ───────────────────────────────────────────────
 // Ingresos por medio de pago — posible desde que cada pedido deja un Payment
 // real sin importar el medio (antes solo Mercado Pago/nota de crédito).
