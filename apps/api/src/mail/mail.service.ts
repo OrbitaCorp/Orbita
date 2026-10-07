@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsageMeteringService } from '../platform/costs/usage-metering.service';
 import { escaparHtml } from '../common/utils/html';
 import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
+import { cuerpoAHtml, firmaAHtml, remitenteParaFrom, type FirmaCorreo } from './correo-directo';
 
 // Referencias opcionales para el registro de envíos: a qué negocio pertenece
 // el mail y a qué cliente/miembro le llegó. Todo opcional para que los flujos
@@ -498,8 +499,9 @@ export class MailService {
   // el layout no muestra la insignia circular, y acá le damos un poco más de
   // aire arriba del contenido para que no se sienta apretado contra el
   // header sin esa insignia de por medio.
-  private envolverEnLayout(contentHtml: string, branding: Branding, isPlatform: boolean, icon: string): string {
+  private envolverEnLayout(contentHtml: string, branding: Branding, isPlatform: boolean, icon: string, isDirect = false): string {
     return this.compile('email-layout')({
+      isDirect,
       ...branding,
       colorPrimaryDark: this.darken(branding.colorPrimary),
       // Fondo de la insignia circular del ícono — más saturado que el tint
@@ -1308,6 +1310,74 @@ export class MailService {
     },
   ): Promise<boolean> {
     return this.sendOrLog(to, 'Te guardamos un descuento en Órbita', 'platform-discount-offer', data);
+  }
+
+  // ── Correo directo (super panel → Correo) ─────────────────────────────
+
+  // Lo que el equipo escribe a mano a alguien de afuera (un proveedor, un
+  // hotel, un posible cliente): la plantilla de Órbita, el cuerpo tal cual se
+  // escribió y la firma de la casilla. Sin título adentro de la tarjeta: es
+  // una carta, no un aviso.
+  directoHtml(cuerpo: string, firma: FirmaCorreo): string {
+    return this.envolverEnLayout(cuerpoAHtml(cuerpo) + firmaAHtml(firma), this.DEFAULT_BRANDING, true, '', true);
+  }
+
+  // Sale DESDE la casilla elegida (no desde no-reply) y con Reply-To a ella:
+  // la respuesta le llega a esa persona. El dominio de la casilla tiene que
+  // estar verificado en Resend; si no, Resend lo rechaza y el motivo vuelve en
+  // `error` para mostrarlo en el panel.
+  async sendDirecto(e: { to: string; subject: string; cuerpo: string; firma: FirmaCorreo }): Promise<{ status: EmailSendStatus; error?: string }> {
+    const subject = limpiarAsunto(e.subject);
+    const template = 'platform-direct';
+    if (!esDestinatarioUnico(e.to)) {
+      await this.rechazarDestinatario(e.to, subject, template);
+      return { status: EmailSendStatus.FAILED, error: 'El destinatario no es un email válido' };
+    }
+    if (!this.isConfigured) {
+      this.logger.log(`[MAIL STUB] Correo directo → From: ${e.firma.email} | To: ${e.to} | Subject: ${subject}`);
+      await this.registrar(e.to, subject, template, EmailSendStatus.SIMULATED);
+      return { status: EmailSendStatus.SIMULATED };
+    }
+    try {
+      const { error } = await this.enviarConReintento({
+        from: remitenteParaFrom(e.firma.name, e.firma.email),
+        to: e.to,
+        subject,
+        html: this.directoHtml(e.cuerpo, e.firma),
+        replyTo: e.firma.email,
+      });
+      if (error) {
+        this.logger.error(`Resend rechazó el correo directo a ${e.to} desde ${e.firma.email}: ${error.message}`);
+        await this.registrar(e.to, subject, template, EmailSendStatus.FAILED, undefined, error.message);
+        return { status: EmailSendStatus.FAILED, error: error.message };
+      }
+      await this.registrar(e.to, subject, template, EmailSendStatus.SENT);
+      this.usageMetering?.track({ providerSlug: 'resend', category: 'email_sent', quantity: 1, unit: 'emails' });
+      return { status: EmailSendStatus.SENT };
+    } catch (err) {
+      this.logger.error(`No se pudo enviar el correo directo a ${e.to}: ${err}`);
+      await this.registrar(e.to, subject, template, EmailSendStatus.FAILED, undefined, String(err));
+      return { status: EmailSendStatus.FAILED, error: 'No se pudo conectar con el proveedor de correo' };
+    }
+  }
+
+  // Dominios de la cuenta de Resend y si están verificados, para avisar en el
+  // panel ANTES de enviar desde una casilla que Resend va a rechazar. null si
+  // no se pudo saber (sin API key, o una key que solo tiene permiso de envío).
+  async dominiosDeEnvio(): Promise<Map<string, boolean> | null> {
+    if (!this.isConfigured) return null;
+    try {
+      const res = (await this.resend.domains.list()) as unknown as {
+        data?: { data?: Array<{ name: string; status: string }> } | Array<{ name: string; status: string }> | null;
+        error?: unknown;
+      };
+      if (res.error || !res.data) return null;
+      const lista = Array.isArray(res.data) ? res.data : res.data.data;
+      if (!Array.isArray(lista)) return null;
+      return new Map(lista.map((d) => [d.name.toLowerCase(), d.status === 'verified']));
+    } catch {
+      return null;
+    }
   }
 
   // ── Platform admin (segundo factor del login, RBT-647) ────────────────

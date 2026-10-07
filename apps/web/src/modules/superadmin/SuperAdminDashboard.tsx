@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot,
+  Search, Plus, DollarSign, Bot, Send,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -21,6 +21,7 @@ import { TabAuditoria } from './Auditoria'
 import { TabSoporte } from './Soporte'
 import { TabCostos } from './Costos'
 import { TabOrbi } from './Orbi'
+import { TabCorreo } from './Correo'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -96,12 +97,13 @@ export function SuperAdminDashboard() {
       {tab === 'auditoria' && <TabAuditoria currentAdminId={user.admin.id} />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
+      {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -130,7 +132,10 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'auditoria', label: 'Auditoría', Icono: ClipboardCheck, grupo: 'Interno' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
   { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },
-  { id: 'testeo', label: 'Emails', Icono: Mail, grupo: 'Interno' },
+  // Correo: escribirle a alguien de afuera con la plantilla de Órbita. Al lado,
+  // el testeo de los emails automáticos (antes "Emails", que se confundía).
+  { id: 'correo', label: 'Correo', Icono: Send, grupo: 'Interno' },
+  { id: 'testeo', label: 'Testeo de emails', Icono: Mail, grupo: 'Interno' },
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
