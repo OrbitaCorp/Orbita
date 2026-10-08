@@ -2,7 +2,8 @@ import { Test } from '@nestjs/testing';
 import { DemoIaService } from '../demo/demo-ia.service';
 import { ConflictException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrbiController } from './orbi.controller';
+import { OrbiController, PROMPT_DEMO } from './orbi.controller';
+import { CIERRE_DEL_CONTEXTO, ENCABEZADO_DEL_CONTEXTO } from './turno/mensajes-del-turno';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
@@ -57,7 +58,7 @@ describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
   let registry: { getTools: jest.Mock; execute: jest.Mock; proponer: jest.Mock; requiereConfirmacion: jest.Mock; sigueVigente: jest.Mock };
-  let contextBuilder: { buildSystemPrompt: jest.Mock };
+  let contextBuilder: { armarPrompt: jest.Mock; buildSystemPrompt: jest.Mock };
   let prisma: ReturnType<typeof prismaDeAcciones<{ order: { findFirst: jest.Mock } }>>;
   let acciones: PendingActionService;
   let conversaciones: { appendMessage: jest.Mock; historialSiEsPropia: jest.Mock; crear: jest.Mock };
@@ -109,6 +110,7 @@ describe('OrbiController', () => {
         {
           provide: ContextBuilderService,
           useValue: {
+            armarPrompt: jest.fn().mockResolvedValue({ sistema: 'Sos Orbi, el asistente de IA.', contexto: '' }),
             buildSystemPrompt: jest.fn().mockResolvedValue('Sos Orbi, el asistente de IA.'),
           },
         },
@@ -1569,7 +1571,60 @@ describe('OrbiController', () => {
     };
     const dto = { message: 'Hola', context: { surface: OrbiSurface.PANEL, module: 'pedidos' } } as any;
     await controller.chat(dto, createMockResponse() as any, usuario as any);
-    expect(contextBuilder.buildSystemPrompt).toHaveBeenLastCalledWith(expect.anything(), ['orders.view']);
+    expect(contextBuilder.armarPrompt).toHaveBeenLastCalledWith(expect.anything(), ['orders.view']);
+  });
+
+  // Caché implícita de Gemini: el system va fijo y lo que cambia por negocio y
+  // pantalla, como primer mensaje (ver mensajesDelTurno).
+  describe('contexto de la conversación', () => {
+    const duenio = {
+      type: 'member' as const, memberId: 'member-1', businessId: 'biz-1', businessMode: 'FULL' as const,
+      roleId: 'role-1', roleName: 'owner', permissions: [] as string[],
+    };
+
+    function llmQueAnota() {
+      const vistos: { role: string; content: string }[][] = [];
+      mockLlm.streamChat = async function* (req: { messages: { role: string; content: string }[] }) {
+        vistos.push(req.messages.map(m => ({ role: m.role, content: m.content })));
+        yield { type: 'text' as const, chunk: 'Hola' };
+        yield { type: 'done' as const };
+      } as any;
+      return vistos;
+    }
+
+    it('el system es solo lo fijo; la pantalla y el negocio van primero, antes del historial, marcados como datos del sistema', async () => {
+      contextBuilder.armarPrompt.mockResolvedValue({ sistema: 'FIJO', contexto: 'Negocio: "Rama".' });
+      conversaciones.historialSiEsPropia.mockResolvedValue([
+        { role: 'user', content: 'antes', timestamp: '' },
+        { role: 'assistant', content: 'respuesta', timestamp: '' },
+      ]);
+      const vistos = llmQueAnota();
+
+      await controller.chat(
+        { message: 'y ahora?', conversationId: '11111111-1111-4111-8111-111111111111', context: { surface: OrbiSurface.PANEL } } as any,
+        createMockResponse() as any,
+        duenio as any,
+      );
+
+      const [sistema, contexto, ...resto] = vistos[0];
+      expect(sistema).toEqual({ role: 'system', content: 'FIJO' });
+      expect(contexto.role).toBe('user');
+      expect(contexto.content.startsWith(ENCABEZADO_DEL_CONTEXTO)).toBe(true);
+      expect(contexto.content).toContain('Negocio: "Rama".');
+      expect(contexto.content.endsWith(CIERRE_DEL_CONTEXTO)).toBe(true);
+      expect(resto.map(m => m.content)).toEqual(['antes', 'respuesta', 'y ahora?']);
+    });
+
+    it('en la demo, la nota de la demo va al final del contexto y el system no cambia', async () => {
+      contextBuilder.armarPrompt.mockResolvedValue({ sistema: 'FIJO', contexto: 'Negocio: "Nébula Tech".' });
+      const vistos = llmQueAnota();
+
+      await controller.chat({ message: 'hola', context: { surface: OrbiSurface.PANEL } } as any, createMockResponse() as any, { ...duenio, readOnly: true } as any);
+
+      expect(vistos[0][0]).toEqual({ role: 'system', content: 'FIJO' });
+      expect(vistos[0][1].content).toContain(`Negocio: "Nébula Tech".\n\n${PROMPT_DEMO}`);
+      expect(vistos[0][2]).toEqual({ role: 'user', content: 'hola' });
+    });
   });
 
 

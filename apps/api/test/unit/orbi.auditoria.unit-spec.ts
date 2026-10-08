@@ -28,7 +28,7 @@ function controlador(opts: { mensajes?: number; eventos?: () => AsyncGenerator<a
     crear: jest.fn().mockResolvedValue({ id: 'conv-1' }),
     appendMessage: jest.fn().mockResolvedValue(undefined),
   };
-  const contexto = { buildSystemPrompt: jest.fn().mockResolvedValue('system') };
+  const contexto = { armarPrompt: jest.fn().mockResolvedValue({ sistema: 'system', contexto: 'pantalla y negocio' }), buildSystemPrompt: jest.fn().mockResolvedValue('system') };
   const tools = {
     getTools: jest.fn().mockReturnValue([{ name: 'listProducts' }]),
     proponer: jest.fn().mockResolvedValue(null),
@@ -92,9 +92,9 @@ describe('Costo por mensaje acotado', () => {
     const { ctrl, llm } = controlador({ mensajes: 120 });
     await ctrl.chat(chatPanel('11111111-1111-4111-8111-111111111111'), respuesta(), miembro);
     const { messages } = (llm.streamChat.mock.calls[0] as unknown as [{ messages: { content: string }[] }])[0];
-    // system + 30 de historial + el mensaje nuevo.
-    expect(messages).toHaveLength(32);
-    expect(messages[1].content).toBe('m90');
+    // system + contexto + 30 de historial + el mensaje nuevo.
+    expect(messages).toHaveLength(33);
+    expect(messages[2].content).toBe('m90');
   });
 
   it('el bucle de herramientas corta a las 6 vueltas', async () => {

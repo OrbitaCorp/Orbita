@@ -132,11 +132,11 @@ export class GeminiAdapter implements LlmAdapter {
     }));
 
     // Caché implícita: Gemini reusa el prefijo idéntico más largo entre
-    // requests (desde 4096 tokens en 3.x Flash). El system prompt viene de lo
-    // fijo a lo variable (context-builder.service.ts) y las tools en orden
-    // fijo (ToolRegistryService.getTools). En qué orden pone Google
-    // systemInstruction y tools dentro del prompt no está documentado ni lo
-    // define el SDK: van como campos separados del request.
+    // requests (desde 4096 tokens en 3.x Flash). En el panel el system es
+    // solo lo fijo y lo que cambia por negocio y pantalla llega como primer
+    // mensaje de `contents` (mensajesDelTurno), y las tools van en orden fijo
+    // (ToolRegistryService.getTools): systemInstruction + tools son idénticos
+    // entre requests, pongan Google el orden que ponga.
     const stream = await client.models.generateContentStream({
       model: modeloEfectivo,
       contents,

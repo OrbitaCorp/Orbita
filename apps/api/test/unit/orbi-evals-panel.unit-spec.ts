@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { LlmEvent, LlmMessage } from '../../src/orbi/llm/llm-adapter.interface';
 import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
+import { GeminiAdapter } from '../../src/orbi/llm/gemini.adapter';
 import { CORE_PROMPT } from '../../src/orbi/prompts/core';
 import { RESPUESTA_FUERA_DE_ALCANCE, capaDeAlcance } from '../../src/orbi/prompts/alcance';
 import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../src/orbi/navegacion/secciones';
@@ -718,6 +719,34 @@ function caso(parcial: Partial<CasoPanel>): CasoPanel {
 
 describe('motor de las evals', () => {
   const actual = VARIANTES.actual;
+
+  // Caché implícita de Gemini: reusa el prefijo idéntico más largo entre
+  // requests, desde 4096 tokens. Lo variable va como primer mensaje
+  // (mensajesDelTurno), así que systemInstruction + tools son lo mismo en
+  // cualquier pantalla. Medido el 2026-10-08 para el dueño: ~8.200 caracteres
+  // de system + ~16.000 de tools ≈ 24.000 (~6.900 tokens a 3,5 por token).
+  it('a Gemini le llegan el mismo system y las mismas tools en cada pantalla, y juntos pasan el mínimo de la caché', async () => {
+    const adapter = new GeminiAdapter({ get: () => 'test-key' } as never);
+    const generateContentStream = jest.fn().mockImplementation(async () => (async function* () {
+      yield { candidates: [{ content: { parts: [{ text: 'ok' }] } }] };
+    })());
+    (adapter as unknown as { client: unknown }).client = { models: { generateContentStream } };
+
+    for (const pantalla of ['dashboard', 'pedidos', 'catalogo', 'clientes'] as const) {
+      await correrCaso(caso({ pantalla, mensaje: 'hola' }), 1, d, actual, { llm: adapter });
+    }
+
+    const pedidos = generateContentStream.mock.calls.map((c) => c[0] as { config: { systemInstruction: string; tools: unknown }; contents: { parts: { text?: string }[] }[] });
+    expect(pedidos).toHaveLength(4);
+    const fijo = (p: (typeof pedidos)[number]) => JSON.stringify([p.config.systemInstruction, p.config.tools]);
+    expect(new Set(pedidos.map(fijo)).size).toBe(1);
+    // Lo de la pantalla y el negocio, en el primer content.
+    expect(pedidos[0].contents[0].parts[0].text).toContain('Yerbas del Sur');
+    expect(pedidos[0].config.systemInstruction).not.toContain('Yerbas del Sur');
+
+    const caracteres = pedidos[0].config.systemInstruction.length + JSON.stringify(pedidos[0].config.tools).length;
+    expect(caracteres).toBeGreaterThan(4096 * 3.5);
+  });
 
   it('ejecuta una lectura y juzga el texto de la vuelta final (el preámbulo no se ve)', async () => {
     const g = guion([

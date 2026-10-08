@@ -23,10 +23,14 @@ export function totalesDelConsumo(consumo: ConsumoPorProveedor) {
 
 export interface CaracteresDelContexto { system: number; tools: number; history: number; message: number }
 
-/** Tamaño de lo que se manda en la primera vuelta, por partes. En caracteres: contar tokens exactos pediría una llamada al proveedor. */
-export function caracteresDelContexto(p: { system: string; tools: LlmToolDefinition[]; history: LlmMessage[]; message: string }): CaracteresDelContexto {
+/**
+ * Tamaño de lo que se manda en la primera vuelta, por partes. En caracteres: contar tokens exactos pediría una llamada al proveedor.
+ * `contexto` (lo del negocio y la pantalla, que va como primer mensaje y no en el system) se suma a `system`: antes iba ahí, y así
+ * las fichas de antes y de después se comparan.
+ */
+export function caracteresDelContexto(p: { system: string; contexto?: string; tools: LlmToolDefinition[]; history: LlmMessage[]; message: string }): CaracteresDelContexto {
   return {
-    system: p.system.length,
+    system: p.system.length + (p.contexto?.length ?? 0),
     tools: p.tools.length ? JSON.stringify(p.tools).length : 0,
     history: p.history.reduce((n, m) => n + (m.content?.length ?? 0), 0),
     message: p.message.length,

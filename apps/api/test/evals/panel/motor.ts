@@ -23,6 +23,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interface';
 import { correrTurno, nuevoProgresoDelTurno, type EmisorDelTurno } from '../../../src/orbi/turno/motor-de-turno';
+import { mensajesDelTurno } from '../../../src/orbi/turno/mensajes-del-turno';
 import { resolverModuloDelPanel } from '../../../src/orbi/navegacion/modulo-de-orbi';
 import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
 import { costoTechoUsd, esTopeDeGastoDelProveedor } from './presupuesto';
@@ -249,8 +250,12 @@ export async function correrCaso(
     message: caso.mensaje,
     context: { surface: OrbiSurface.PANEL, module: 'ventas', section: caso.pantalla, businessId: BUSINESS_ID },
   };
+  // Como el controller: el system fijo por un lado y lo del negocio y la
+  // pantalla como primer mensaje (mensajesDelTurno). Las variantes tocan capas
+  // del system (manual, alcance), que están en la parte fija.
+  const prompt = await contextBuilder.armarPrompt(dto as never, permisos);
   const base = {
-    systemPrompt: await contextBuilder.buildSystemPrompt(dto as never, permisos),
+    systemPrompt: prompt.sistema,
     tools: registry.getTools(OrbiSurface.PANEL, permisos),
   };
   const { systemPrompt, tools } = variante.ajustar(base);
@@ -265,11 +270,12 @@ export async function correrCaso(
     roleName: usuario.roleName,
   } as ToolExecutionContext;
 
-  const messages: LlmMessage[] = [
-    { role: 'system', content: systemPrompt },
-    ...(caso.historial ?? []).map((m) => ({ role: m.role, content: m.content })),
-    { role: 'user', content: caso.mensaje },
-  ];
+  const messages = mensajesDelTurno({
+    sistema: systemPrompt,
+    contexto: prompt.contexto,
+    historial: (caso.historial ?? []).map((m): LlmMessage => ({ role: m.role, content: m.content })),
+    mensaje: caso.mensaje,
+  });
 
   const turno: TurnoDelPanel = {
     texto: '',

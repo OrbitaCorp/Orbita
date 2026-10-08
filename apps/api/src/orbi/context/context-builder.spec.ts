@@ -5,6 +5,8 @@ import { RESPUESTA_FUERA_DE_ALCANCE, capaDeAlcance } from '../prompts/alcance';
 import { CORE_PROMPT } from '../prompts/core';
 import { capaDelManual } from '../prompts/manual';
 import { reglasDelPanel } from '../prompts/panel';
+import { GeminiAdapter } from '../llm/gemini.adapter';
+import { CIERRE_DEL_CONTEXTO, ENCABEZADO_DEL_CONTEXTO, mensajesDelTurno } from '../turno/mensajes-del-turno';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -730,9 +732,10 @@ describe('ContextBuilderService', () => {
     });
 
     // Caché implícita de Gemini: reusa el prefijo idéntico más largo entre
-    // requests si pasa los 4096 tokens. Todo lo fijo va primero; lo que cambia
-    // por negocio, pantalla, permisos u hora va al final.
-    describe('prefijo compartido (caché de Gemini)', () => {
+    // requests si pasa los 4096 tokens. El system (systemInstruction) es solo
+    // lo fijo; lo que cambia por negocio, pantalla, permisos u hora va como
+    // primer mensaje de la conversación (mensajesDelTurno).
+    describe('system fijo y contexto aparte (caché de Gemini)', () => {
       const SEPARADOR = '\n\n---\n\n';
       const FIJO = [CORE_PROMPT, capaDeAlcance(), capaDelManual(), reglasDelPanel()].join(SEPARADOR);
       const SNAPSHOT = {
@@ -741,65 +744,110 @@ describe('ContextBuilderService', () => {
         pendingOrders: 5, cancelledThisMonth: 2, totalProducts: 40, outOfStockProducts: 3,
         totalCustomers: 80, newCustomersThisMonth: 12, unreadMessages: 7,
       };
-      const prefijoComun = (a: string, b: string) => {
-        let i = 0;
-        while (i < a.length && a[i] === b[i]) i++;
-        return a.slice(0, i);
-      };
+      const NEGOCIOS = [
+        { id: 'biz-1', name: 'Pizzería Don Pepe', industry: 'Gastronomía', mode: 'FULL' },
+        { id: 'biz-2', name: 'Rama', industry: 'Indumentaria', mode: 'CATALOG' },
+      ];
+      const PANTALLAS = [
+        { section: 'dashboard', permisos: CODIGOS_DEL_CATALOGO, marca: 'El usuario está en el Dashboard' },
+        { section: 'pedidos', permisos: ['orders.view'], marca: 'El usuario está en Pedidos' },
+      ];
+      const HORAS = ['2026-10-08T09:15:01Z', '2027-03-01T23:59:59Z'];
 
-      it('dos negocios en dos pantallas, con permisos distintos, comparten todo lo fijo', async () => {
-        mockPrisma.business.findUnique
-          .mockResolvedValueOnce({ name: 'Pizzería Don Pepe', industry: 'Gastronomía', mode: 'FULL' })
-          .mockResolvedValueOnce({ name: 'Rama', industry: 'Indumentaria', mode: 'CATALOG' });
-        mockModuleData.getSnapshot.mockResolvedValueOnce(SNAPSHOT);
-        const a = await service.buildSystemPrompt({
-          message: 'hola',
-          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
-        } as any, CODIGOS_DEL_CATALOGO);
-        const b = await service.buildSystemPrompt({
-          message: 'hola',
-          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos', businessId: 'biz-2' },
-        } as any, ['orders.view']);
+      /** Lo que GeminiAdapter le manda a Google para ese negocio, pantalla y hora. */
+      async function requestDeGemini(negocio: typeof NEGOCIOS[number], pantalla: typeof PANTALLAS[number], hora: string) {
+        jest.setSystemTime(new Date(hora));
+        mockPrisma.business.findUnique.mockResolvedValueOnce(negocio);
+        mockModuleData.getSnapshot.mockResolvedValueOnce(pantalla.section === 'dashboard' ? SNAPSHOT : { countByStatus: { PENDING: 3 }, avgTicketThisMonth: 5000 });
+        const dto = { message: 'hola', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: pantalla.section, businessId: negocio.id } } as any;
+        const { sistema, contexto } = await service.armarPrompt(dto, pantalla.permisos);
 
-        expect(a.startsWith(FIJO)).toBe(true);
-        expect(b.startsWith(FIJO)).toBe(true);
-        const comun = prefijoComun(a, b);
-        expect(comun.length).toBeGreaterThanOrEqual(FIJO.length);
-        for (const variable of ['Pizzería Don Pepe', 'Rama', 'Gastronomía', '$150.000', 'El usuario está en el Dashboard', 'El usuario está en Pedidos']) {
-          expect({ variable, enElPrefijo: comun.includes(variable) }).toEqual({ variable, enElPrefijo: false });
+        const adapter = new GeminiAdapter({ get: () => 'test-key' } as any);
+        const generateContentStream = jest.fn().mockResolvedValue((async function* () { yield { candidates: [{ content: { parts: [{ text: 'ok' }] } }] }; })());
+        (adapter as any).client = { models: { generateContentStream } };
+        const messages = mensajesDelTurno({
+          sistema,
+          contexto,
+          historial: [{ role: 'user', content: 'antes' }, { role: 'assistant', content: 'respuesta' }],
+          mensaje: 'hola',
+        });
+        for await (const _ of adapter.streamChat({ messages })) { /* consumir */ }
+        return generateContentStream.mock.calls[0][0] as { config: { systemInstruction: string }; contents: { role: string; parts: { text?: string }[] }[] };
+      }
+
+      beforeEach(() => { jest.useFakeTimers(); });
+      afterEach(() => { jest.useRealTimers(); });
+
+      it('systemInstruction es el mismo para dos negocios × dos pantallas × dos horas, y lo variable va solo en el primer content', async () => {
+        const instrucciones = new Set<string>();
+        for (const negocio of NEGOCIOS) {
+          for (const pantalla of PANTALLAS) {
+            for (const hora of HORAS) {
+              const req = await requestDeGemini(negocio, pantalla, hora);
+              instrucciones.add(req.config.systemInstruction);
+
+              const variables = [negocio.name, negocio.industry, pantalla.marca, '## Contexto de pantalla'];
+              if (pantalla.section === 'dashboard') variables.push('$150.000');
+              const caso = { negocio: negocio.name, pantalla: pantalla.section, hora };
+              for (const v of variables) {
+                expect({ ...caso, v, enElSystem: req.config.systemInstruction.includes(v) }).toEqual({ ...caso, v, enElSystem: false });
+                // Solo en el primer content, y ahí en su primer part (el bloque
+                // de contexto, cerrado antes del historial).
+                const dondeAparece = req.contents.flatMap((c, i) => c.parts.map((p, j) => (p.text?.includes(v) ? `${i}.${j}` : null))).filter(Boolean);
+                expect({ ...caso, v, dondeAparece }).toEqual({ ...caso, v, dondeAparece: ['0.0'] });
+              }
+              const bloque = req.contents[0].parts[0].text!;
+              expect(bloque.startsWith(ENCABEZADO_DEL_CONTEXTO)).toBe(true);
+              expect(bloque.endsWith(CIERRE_DEL_CONTEXTO)).toBe(true);
+              // El historial y el mensaje siguen después, sin tocar.
+              expect(req.contents[0].parts.slice(1)).toEqual([{ text: 'antes' }]);
+              expect(req.contents.slice(1)).toEqual([
+                { role: 'model', parts: [{ text: 'respuesta' }] },
+                { role: 'user', parts: [{ text: 'hola' }] },
+              ]);
+            }
+          }
         }
-        // Lo variable, al final y en ese orden: pantalla, negocio, números.
-        expect(a.indexOf('## Contexto de pantalla')).toBeLessThan(a.indexOf('Negocio: "Pizzería Don Pepe"'));
-        expect(a.indexOf('Negocio: "Pizzería Don Pepe"')).toBeLessThan(a.indexOf('$150.000'));
+        expect([...instrucciones]).toEqual([FIJO]);
 
-        // Tamaño medido el 2026-10-08: ~8.200 caracteres (~2.350 tokens a 3,5
-        // caracteres por token). El mínimo de la caché implícita de Gemini 3.x
-        // Flash es 4096 tokens (~14.000 caracteres), así que el system prompt
-        // fijo SOLO no alcanza. Lo que lo completa son las tools (unos 16.000
-        // caracteres para el dueño, en orden fijo: ver getTools): si Gemini
-        // arma el prompt con las tools antes del system, el prefijo de un dueño
-        // pasa los 7.000 tokens; si van después, el negocio y la pantalla al
-        // final del system las cortan. Google no documenta el orden. Para
-        // pasarlo seguro habría que sacar lo variable del system y mandarlo
-        // como primer mensaje de `contents`. Este piso avisa si el prefijo se
-        // achica sin querer (algo variable que se metió adelante).
+        // Tamaño medido el 2026-10-08: el system fijo son ~8.200 caracteres
+        // (~2.350 tokens a 3,5 caracteres por token), menos que el mínimo de la
+        // caché implícita de Gemini 3.x Flash (4096 tokens). Lo que lo pasa son
+        // las tools (en orden fijo, ver getTools), que ahora también son
+        // idénticas entre requests porque nada variable las precede en el
+        // system: system + tools del dueño ≈ 24.000 caracteres (~6.900 tokens;
+        // lo mide orbi-evals-panel.unit-spec.ts). Este piso avisa si el system
+        // se achica sin querer.
         expect(FIJO.length).toBeGreaterThan(8000);
       });
 
-      it('nada del prompt depende de la hora: el mismo pedido a otra hora da el mismo prompt', async () => {
-        const armar = async () => service.buildSystemPrompt({
+      it('el contexto lleva la pantalla, el negocio y los números, en ese orden; el system no lleva nada de eso', async () => {
+        mockPrisma.business.findUnique.mockResolvedValueOnce(NEGOCIOS[0]);
+        mockModuleData.getSnapshot.mockResolvedValueOnce(SNAPSHOT);
+        const { sistema, contexto } = await service.armarPrompt({
           message: 'hola',
           context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
         } as any, CODIGOS_DEL_CATALOGO);
-        jest.useFakeTimers().setSystemTime(new Date('2026-10-08T09:15:01Z'));
-        try {
-          const temprano = await armar();
-          jest.setSystemTime(new Date('2027-03-01T23:59:59Z'));
-          const tarde = await armar();
-          expect(tarde).toBe(temprano);
-        } finally {
-          jest.useRealTimers();
-        }
+
+        expect(sistema).toBe(FIJO);
+        expect(contexto.indexOf('## Contexto de pantalla')).toBeGreaterThanOrEqual(0);
+        expect(contexto.indexOf('## Contexto de pantalla')).toBeLessThan(contexto.indexOf('Negocio: "Pizzería Don Pepe"'));
+        expect(contexto.indexOf('Negocio: "Pizzería Don Pepe"')).toBeLessThan(contexto.indexOf('$150.000'));
+        // La regla contra instrucciones inyectadas nombra el bloque: es del sistema.
+        expect(sistema).toContain(`"${ENCABEZADO_DEL_CONTEXTO.split(' (')[0]}"`);
+      });
+
+      it('el wizard no tiene contexto aparte: todo sigue en el system', async () => {
+        const { sistema, contexto } = await service.armarPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.WIZARD, stepName: 'ubicacion' },
+        } as any);
+        expect(contexto).toBe('');
+        expect(sistema).toContain('wizard de onboarding');
+        expect(mensajesDelTurno({ sistema, contexto, historial: [], mensaje: 'hola' })).toEqual([
+          { role: 'system', content: sistema },
+          { role: 'user', content: 'hola' },
+        ]);
       });
     });
 

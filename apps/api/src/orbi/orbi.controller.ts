@@ -26,6 +26,7 @@ import { permisosDeOrbi } from './permisos-orbi';
 import { resolverModuloDelPanel } from './navegacion/modulo-de-orbi';
 import { tituloAutomatico } from './sesiones/titulo';
 import { ESCRITURA_NO_DISPONIBLE, MAX_VUELTAS_TOOLS, MENSAJE_VUELTAS, vueltaDeTools } from './turno/vuelta';
+import { mensajesDelTurno } from './turno/mensajes-del-turno';
 import { correrTurno, nuevoProgresoDelTurno, sumarConsumo, type ConsumoPorProveedor, type EmisorDelTurno } from './turno/motor-de-turno';
 import { costoDeConsumoUsd, redondearUsd } from '../platform/costs/precios';
 import { costoDelTurno } from './turno/costo-del-turno';
@@ -47,8 +48,9 @@ const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos
 const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';
 
 // Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
-// (miembro readOnly, ver demo/demo-ia.ts). Va al final del prompt de
-// sistema, así pisa cualquier invitación del prompt normal a hacer cambios.
+// (miembro readOnly, ver demo/demo-ia.ts). Va al final del contexto de la
+// conversación (no en el system, que es fijo para la caché de Gemini), así
+// pisa cualquier invitación del prompt normal a hacer cambios.
 export const PROMPT_DEMO = [
   'IMPORTANTE — DEMO PÚBLICA DE ÓRBITA.',
   'Estás hablando con un visitante que prueba la tienda DEMO de Órbita (Nébula Tech). No es el dueño: los datos de esta tienda son ficticios, cargados para mostrar cómo funciona Órbita.',
@@ -370,12 +372,12 @@ export class OrbiController {
         });
       }
 
-      const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto, permisos);
-      const messages: LlmMessage[] = [
-        { role: 'system', content: esDemo ? `${systemPrompt}\n\n${PROMPT_DEMO}` : systemPrompt },
-        ...history,
-        { role: 'user', content: dto.message },
-      ];
+      // El system es fijo (igual para todos los negocios y pantallas) y lo que
+      // cambia va como primer mensaje: así entra en la caché implícita de
+      // Gemini (ver ContextBuilderService#armarPrompt y mensajesDelTurno).
+      const prompt = await this.contextBuilder.armarPrompt(dto, permisos);
+      const contexto = esDemo ? [prompt.contexto, PROMPT_DEMO].filter(Boolean).join('\n\n') : prompt.contexto;
+      const messages = mensajesDelTurno({ sistema: prompt.sistema, contexto, historial: history, mensaje: dto.message });
 
       // Los permisos salen del JWT, NO de dto.context.permissions. El front
       // manda sus permisos en el contexto (útil para que la UI sepa qué
@@ -403,7 +405,7 @@ export class OrbiController {
         turnId,
       };
 
-      contextChars = caracteresDelContexto({ system: messages[0].content, tools, history, message: dto.message });
+      contextChars = caracteresDelContexto({ system: prompt.sistema, contexto, tools, history, message: dto.message });
       await correrTurno({
         llm: this.llm,
         registry: this.toolRegistry,
