@@ -1349,7 +1349,16 @@ export class MailService {
       if (error) {
         this.logger.error(`Resend rechazó el correo directo a ${e.to} desde ${e.firma.email}: ${error.message}`);
         await this.registrar(e.to, subject, template, EmailSendStatus.FAILED, undefined, error.message);
-        return { status: EmailSendStatus.FAILED, error: error.message };
+        // El rechazo más común, dicho en castellano y con qué hacer: Resend
+        // solo deja enviar desde dominios verificados en su cuenta.
+        const sinVerificar = /not verified/i.test(error.message);
+        const dominio = e.firma.email.split('@')[1] ?? '';
+        return {
+          status: EmailSendStatus.FAILED,
+          error: sinVerificar
+            ? `El dominio ${dominio} no está verificado en Resend. Hay que agregarlo en resend.com/domains y cargar sus registros DNS antes de enviar desde esta casilla.`
+            : error.message,
+        };
       }
       await this.registrar(e.to, subject, template, EmailSendStatus.SENT);
       this.usageMetering?.track({ providerSlug: 'resend', category: 'email_sent', quantity: 1, unit: 'emails' });

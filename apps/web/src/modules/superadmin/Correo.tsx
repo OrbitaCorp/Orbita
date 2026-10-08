@@ -365,6 +365,19 @@ function ModalCasillas({ casillas, puedeEditar, onClose, onCambio }: {
   )
 }
 
+// Las tarjetas de firma del equipo son de 1120 × 344 (3,3 a 1); un logo o una
+// firma escaneada rara vez pasa de 2,5 a 1.
+function esApaisada(file: File): Promise<boolean> {
+  return new Promise((resolve) => {
+    const src = URL.createObjectURL(file)
+    const img = new Image()
+    const listo = (valor: boolean) => { URL.revokeObjectURL(src); resolve(valor) }
+    img.onload = () => listo(img.naturalHeight > 0 && img.naturalWidth / img.naturalHeight >= 2.5)
+    img.onerror = () => listo(false)
+    img.src = src
+  })
+}
+
 function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo | null; onVolver: () => void; onGuardada: () => void }) {
   const [v, setV] = useState<CasillaCorreoInput>(() => casilla
     ? { email: casilla.email, name: casilla.name, jobTitle: casilla.jobTitle ?? '', phone: casilla.phone ?? '', signatureImageUrl: casilla.signatureImageUrl, signatureBanner: casilla.signatureBanner }
@@ -382,8 +395,10 @@ function FormCasilla({ casilla, onVolver, onGuardada }: { casilla: CasillaCorreo
     setError('')
     setSubiendo(true)
     try {
-      const { url } = await platformApi.subirImagenFirma(file)
-      setV((x) => ({ ...x, signatureImageUrl: url }))
+      const [{ url }, apaisada] = await Promise.all([platformApi.subirImagenFirma(file), esApaisada(file)])
+      // Una imagen bien apaisada es una tarjeta de firma, no un logo: se marca
+      // sola como firma completa (se puede destildar).
+      setV((x) => ({ ...x, signatureImageUrl: url, signatureBanner: apaisada }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo subir la imagen.')
     } finally {
