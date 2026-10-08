@@ -150,15 +150,26 @@ con `exit 1` (sin buildear nada) en el primero que falla:
 |---|---|---|---|
 | a | Árbol de git limpio | `git status --porcelain` vacío | lista lo sucio; commitear o descartar |
 | b | HEAD está en `main` | `git fetch origin` + `git merge-base --is-ancestor HEAD origin/main` | mergear a `main` (ff), pushear, esperar CI |
-| c | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**) | arreglar en `main` |
-| d | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
-| e | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success` | esperar o arreglar; si `gh` no está o no está logueado, avisa y sigue |
+| c | CI verde en GitHub | `gh api repos/OrbitaCorp/Orbita/commits/<sha>/check-runs`: todo `completed` + `success`. Un check en rojo corta de inmediato; si siguen corriendo, **espera** hasta `DEPLOY_ESPERA_CI` segundos (900) | arreglar en `main`, o relanzar con más espera. Si `gh` no está o no está logueado, avisa y pasa al chequeo d |
+| d | Misma red que CI, local | `pnpm typecheck` y `pnpm test` (**~10 minutos**). **Se omite si el chequeo c vio CI en verde** para ese sha: CI corre exactamente eso en un checkout limpio, así que repetirlo no agrega seguridad | arreglar en `main` |
+| e | Migraciones al día en PRODUCCIÓN | `./deploy/prisma-prod.sh migrate status` (solo lectura; lee `DATABASE_URL` / `DIRECT_URL` de Secret Manager, verifica que sean las de producción) | primero `./deploy/prisma-prod.sh migrate deploy` (ver § Rollback si es destructiva) |
+
+El orden (CI antes que los tests locales) es a propósito: si CI está en rojo
+se entera en segundos, no después de 10 minutos de tests. Sin `gh` el script
+sigue exigiendo typecheck + tests, corridos acá; la garantía es la misma, solo
+más lenta (unos 15 minutos de deploy en vez de unos 5).
 
 `Web — lint (informativo)` tiene `continue-on-error` en `ci.yml` y su check run
 figura como `failure` aunque el workflow pase: el preflight lo ignora a
 propósito. El job `API — typecheck + tests` tiene que existir y estar en verde.
 
 Variables de entorno:
+
+- `DEPLOY_TESTS_LOCALES=1 ./deploy/deploy.sh`: corre typecheck + tests acá
+  aunque CI esté en verde (por ejemplo, para sospechas de diferencias entre
+  esta máquina y el runner de GitHub).
+- `DEPLOY_ESPERA_CI=1800 ./deploy/deploy.sh`: segundos máximos que espera a
+  que CI termine antes de abortar (por defecto 900).
 
 - `DEPLOY_SOLO_PREFLIGHT=1 ./deploy/deploy.sh`: corre el preflight y termina
   antes del build. Para probar el script o responder "¿se puede desplegar ya?"

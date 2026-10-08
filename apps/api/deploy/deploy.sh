@@ -11,12 +11,15 @@
 #
 # Antes de buildear corre un PREFLIGHT (ver más abajo) que exige que lo que se
 # despliega sea un commit de main, con el árbol limpio, typecheck + tests en
-# verde, sin migraciones pendientes EN PRODUCCIÓN y con el CI de GitHub en verde.
+# verde (los de CI, o los locales si no se puede verificar CI), sin migraciones
+# pendientes EN PRODUCCIÓN y con el CI de GitHub en verde.
 #
 # Este script NO aplica migraciones: si el cambio trae una carpeta nueva en
 # prisma/migrations, primero se aplica con ./deploy/prisma-prod.sh migrate deploy.
 #   DEPLOY_SOLO_PREFLIGHT=1 ./deploy/deploy.sh   corre solo el preflight
 #   DEPLOY_SIN_PREFLIGHT=1  ./deploy/deploy.sh   emergencias, pide confirmar
+#   DEPLOY_TESTS_LOCALES=1  ./deploy/deploy.sh   corre typecheck + tests acá aunque CI esté verde
+#   DEPLOY_ESPERA_CI=1800   ./deploy/deploy.sh   segundos máx. esperando a CI (default 900)
 
 set -euo pipefail
 
@@ -53,15 +56,19 @@ SECRETS="DATABASE_URL=DATABASE_URL:latest,DIRECT_URL=DIRECT_URL:latest,GOOGLE_CL
 # Chequeos, en orden (el primero que falla corta con exit 1, antes del build):
 #   (a) árbol de git limpio            lo que se buildea es lo que está commiteado
 #   (b) HEAD contenido en origin/main  se despliega lo que ya está en main
-#   (c) pnpm typecheck + pnpm test     la misma red que CI, corrida acá (~10 min)
-#   (d) prisma migrate status al día   el código nuevo no puede salir antes que su
+#   (c) check runs de CI del sha       si `gh` está instalado y logueado. Espera
+#                                      hasta DEPLOY_ESPERA_CI segundos (900) a que
+#                                      CI termine; un check en rojo corta ya. Va
+#                                      antes que (d) para fallar rápido.
+#   (d) pnpm typecheck + pnpm test     la misma red que CI, corrida acá (~10 min).
+#                                      SE OMITE si (c) vio CI en verde para este
+#                                      sha (sería repetir lo mismo); se corre si
+#                                      no hay gh/login o con DEPLOY_TESTS_LOCALES=1
+#   (e) prisma migrate status al día   el código nuevo no puede salir antes que su
 #                                      migración. Se chequea contra la base de
 #                                      PRODUCCIÓN (deploy/prisma-prod.sh lee las
 #                                      URLs de Secret Manager; el .env local es
 #                                      la base de DEV). Solo lectura.
-#   (e) check runs de CI del sha       si `gh` está instalado y logueado; si no,
-#                                      avisa y sigue (los chequeos (c) y (d) ya
-#                                      cubren lo esencial)
 #
 # Escapes:
 #   DEPLOY_SOLO_PREFLIGHT=1  corre el preflight y termina antes del build. Sirve
@@ -129,25 +136,118 @@ preflight() {
       "(CLAUDE.md de la raíz, § Commit y push)."
   fi
 
-  # (c) La misma red que CI, corrida acá. Aunque CI ya haya pasado en GitHub,
-  # correrlo local cuesta ~10 minutos y garantiza que lo que se buildea compila
-  # y pasa los tests con las dependencias de esta máquina.
-  echo "==> [3/5] pnpm typecheck + pnpm test (la misma red que CI: tarda ~10 minutos, no lo cortes)"
-  pnpm typecheck || preflight_fallo "(c) pnpm typecheck falló. Arreglalo en main antes de desplegar."
-  pnpm test || preflight_fallo "(c) pnpm test falló. Un test rojo no va a producción."
+  # (c) CI verde en GitHub para este sha. Va ANTES que los tests locales por dos
+  # razones: (1) falla en segundos si CI está en rojo, en vez de gastar ~10
+  # minutos de tests para enterarse al final; (2) es la evidencia de que main
+  # pasó por la red de contención de ci.yml (typecheck + tests de la API en un
+  # checkout limpio, con Node y pnpm pinneados y --frozen-lockfile), que es
+  # exactamente lo que el paso (d) volvería a correr acá. Si CI está en verde
+  # para este sha, el paso (d) se omite. Si CI todavía está corriendo, se espera
+  # (en vez de abortar y obligar a relanzar el script).
+  echo "==> [3/5] Check runs de CI en GitHub para ${sha_completo}"
+  local ci_verde=0
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "    AVISO: gh (GitHub CLI) no está instalado; no se puede verificar CI. Se corren typecheck + tests acá."
+  elif ! gh auth status >/dev/null 2>&1; then
+    echo "    AVISO: gh no está logueado (gh auth login); no se puede verificar CI. Se corren typecheck + tests acá."
+  else
+    local espera="${DEPLOY_ESPERA_CI:-900}" intervalo=20 inicio transcurrido
+    local runs malos pendientes nombre estado conclusion
+    inicio="$(date +%s)"
+    while true; do
+      # Un mismo nombre de check puede aparecer más de una vez (reintento o
+      # rerun del workflow) — GitHub conserva TODAS las corridas viejas
+      # (cancelled/failure incluidas), no solo la última. Sin este filtro, un
+      # commit con CI realmente verde podía cortar acá para siempre por una
+      # corrida vieja cancelada que ya no importa (bug real, encontrado
+      # 28/09/2026). `sort_by(started_at) | reverse | unique_by(.name)` se
+      # queda con la corrida MÁS RECIENTE de cada nombre.
+      if ! runs="$(gh api "repos/OrbitaCorp/Orbita/commits/${sha_completo}/check-runs" \
+          --jq '[.check_runs[]] | sort_by(.started_at) | reverse | unique_by(.name)[] | "\(.name)|\(.status)|\(.conclusion)"' 2>&1)"; then
+        preflight_fallo \
+          "(c) No se pudieron leer los check runs de CI de GitHub para ${sha_completo}:" \
+          "$runs" \
+          "¿El commit ya está pusheado en origin/main?"
+      fi
 
-  # (d) Migraciones al día EN PRODUCCIÓN. El .env local de apps/api apunta a la
+      malos=""
+      pendientes=""
+      if [[ -z "$runs" ]]; then
+        # CI arranca al pushear main: puede tardar unos segundos en aparecer.
+        pendientes+="  - GitHub todavía no tiene ningún check run para este commit"$'\n'
+      else
+        while IFS='|' read -r nombre estado conclusion; do
+          [[ -z "$nombre" ]] && continue
+          # "Web — lint (informativo)" tiene continue-on-error en ci.yml: su check
+          # run figura como failure aunque el workflow pase. No bloquea, a propósito.
+          [[ "$nombre" == *informativo* ]] && continue
+          if [[ "$estado" != "completed" ]]; then
+            pendientes+="  - ${nombre}: todavía ${estado}"$'\n'
+          elif [[ "$conclusion" != "success" && "$conclusion" != "skipped" ]]; then
+            malos+="  - ${nombre}: ${conclusion}"$'\n'
+          fi
+        done <<<"$runs"
+        if ! grep -q '^API' <<<"$runs"; then
+          pendientes+="  - no aparece el job 'API — typecheck + tests' (¿cambió el nombre en ci.yml?)"$'\n'
+        fi
+      fi
+
+      # Un check en rojo corta ya, sin esperar a los que siguen corriendo.
+      if [[ -n "$malos" ]]; then
+        preflight_fallo \
+          "(c) CI de GitHub NO está en verde para ${GIT_SHA}:" \
+          "" \
+          "$malos" \
+          "Arreglá lo que falló en main; se despliega solo con CI verde." \
+          "Ver: https://github.com/OrbitaCorp/Orbita/commit/${sha_completo}/checks"
+      fi
+
+      if [[ -z "$pendientes" ]]; then
+        ci_verde=1
+        echo "    CI en verde:"
+        sed 's/^/      /; s/|/ · /g' <<<"$runs"
+        break
+      fi
+
+      transcurrido=$(( $(date +%s) - inicio ))
+      if (( transcurrido >= espera )); then
+        preflight_fallo \
+          "(c) CI de GitHub no terminó en verde para ${GIT_SHA} tras esperar ${espera}s:" \
+          "" \
+          "$pendientes" \
+          "Esperá a que termine y volvé a correr el script (o subí la espera: DEPLOY_ESPERA_CI=1800)." \
+          "Ver: https://github.com/OrbitaCorp/Orbita/commit/${sha_completo}/checks"
+      fi
+      echo "    Esperando a CI (${transcurrido}s de ${espera}s máx.):"
+      sed 's/^/      /' <<<"${pendientes%$'\n'}"
+      sleep "$intervalo"
+    done
+  fi
+
+  # (d) typecheck + tests locales. Con CI en verde sobre este mismo sha (árbol
+  # limpio y HEAD en main, pasos 1 y 2) son una repetición exacta de lo que ya
+  # pasó, así que se omiten: eran ~10 minutos de los ~15 del deploy. Se corren
+  # si no se pudo verificar CI (sin gh) o si se pide con DEPLOY_TESTS_LOCALES=1.
+  if [[ "$ci_verde" == "1" && "${DEPLOY_TESTS_LOCALES:-}" != "1" ]]; then
+    echo "==> [4/5] typecheck + tests: se omiten (CI ya los corrió en verde sobre este commit; DEPLOY_TESTS_LOCALES=1 los fuerza)"
+  else
+    echo "==> [4/5] pnpm typecheck + pnpm test (tarda ~10 minutos, no lo cortes)"
+    pnpm typecheck || preflight_fallo "(d) pnpm typecheck falló. Arreglalo en main antes de desplegar."
+    pnpm test || preflight_fallo "(d) pnpm test falló. Un test rojo no va a producción."
+  fi
+
+  # (e) Migraciones al día EN PRODUCCIÓN. El .env local de apps/api apunta a la
   # base de DEV (desde el corte del 2026-09-20), así que un `prisma migrate
   # status` pelado miraría la base equivocada y podría dar verde con una
   # migración pendiente en producción. prisma-prod.sh arma las URLs desde
   # Secret Manager (los mismos secrets que monta Cloud Run) y verifica que
   # sean las de producción. `migrate status` es de solo lectura.
-  echo "==> [4/5] prisma migrate status contra la base de PRODUCCIÓN (solo lectura, URLs de Secret Manager)"
+  echo "==> [5/5] prisma migrate status contra la base de PRODUCCIÓN (solo lectura, URLs de Secret Manager)"
   local salida_migrate
   if ! salida_migrate="$("$SCRIPT_DIR/prisma-prod.sh" migrate status 2>&1)"; then
     if grep -q "not yet been applied" <<<"$salida_migrate"; then
       preflight_fallo \
-        "(d) Hay migraciones de Prisma sin aplicar en la base de producción:" \
+        "(e) Hay migraciones de Prisma sin aplicar en la base de producción:" \
         "" \
         "$(sed -n '/not yet been applied/,/^$/p' <<<"$salida_migrate")" \
         "PRIMERO aplicalas con: cd apps/api && ./deploy/prisma-prod.sh migrate deploy" \
@@ -155,69 +255,12 @@ preflight() {
         "Después volvé a correr el script."
     fi
     preflight_fallo \
-      "(d) No se pudo leer el estado de las migraciones de la base de PRODUCCIÓN:" \
+      "(e) No se pudo leer el estado de las migraciones de la base de PRODUCCIÓN:" \
       "" \
       "$salida_migrate"
   fi
 
-  # (e) CI verde en GitHub para este sha. Es la evidencia de que main pasó por
-  # la red de contención de ci.yml. Si no está `gh`, se avisa y se sigue:
-  # (c) y (d) ya cubren lo esencial y no queremos que el deploy dependa de
-  # tener una herramienta más instalada.
-  echo "==> [5/5] Check runs de CI en GitHub para ${sha_completo}"
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "    AVISO: gh (GitHub CLI) no está instalado; no se pueden verificar los check runs de CI. Se sigue igual."
-  elif ! gh auth status >/dev/null 2>&1; then
-    echo "    AVISO: gh no está logueado (gh auth login); no se pueden verificar los check runs de CI. Se sigue igual."
-  else
-    local runs
-    # Un mismo nombre de check puede aparecer más de una vez (reintento o
-    # rerun del workflow) — GitHub conserva TODAS las corridas viejas
-    # (cancelled/failure incluidas), no solo la última. Sin este filtro, un
-    # commit con CI realmente verde podía cortar acá para siempre por una
-    # corrida vieja cancelada que ya no importa (bug real, encontrado
-    # 28/09/2026). `sort_by(started_at) | reverse | unique_by(.name)` se
-    # queda con la corrida MÁS RECIENTE de cada nombre.
-    if ! runs="$(gh api "repos/OrbitaCorp/Orbita/commits/${sha_completo}/check-runs" \
-        --jq '[.check_runs[]] | sort_by(.started_at) | reverse | unique_by(.name)[] | "\(.name)|\(.status)|\(.conclusion)"' 2>&1)"; then
-      preflight_fallo \
-        "(e) No se pudieron leer los check runs de CI de GitHub para ${sha_completo}:" \
-        "$runs" \
-        "¿El commit ya está pusheado en origin/main?"
-    fi
-    if [[ -z "$runs" ]]; then
-      preflight_fallo \
-        "(e) GitHub todavía no tiene ningún check run para ${sha_completo}." \
-        "CI arranca al pushear main: esperá a que termine en verde y volvé a correr el script."
-    fi
-    local malos="" nombre estado conclusion
-    while IFS='|' read -r nombre estado conclusion; do
-      [[ -z "$nombre" ]] && continue
-      # "Web — lint (informativo)" tiene continue-on-error en ci.yml: su check
-      # run figura como failure aunque el workflow pase. No bloquea, a propósito.
-      [[ "$nombre" == *informativo* ]] && continue
-      if [[ "$estado" != "completed" ]]; then
-        malos+="  - ${nombre}: todavía ${estado}"$'\n'
-      elif [[ "$conclusion" != "success" && "$conclusion" != "skipped" ]]; then
-        malos+="  - ${nombre}: ${conclusion}"$'\n'
-      fi
-    done <<<"$runs"
-    if ! grep -q '^API' <<<"$runs"; then
-      malos+="  - no aparece el job 'API — typecheck + tests' (¿cambió el nombre en ci.yml?)"$'\n'
-    fi
-    if [[ -n "$malos" ]]; then
-      preflight_fallo \
-        "(e) CI de GitHub NO está en verde para ${GIT_SHA}:" \
-        "" \
-        "$malos" \
-        "Esperá a que termine o arreglá lo que falló en main; se despliega solo con CI verde." \
-        "Ver: https://github.com/OrbitaCorp/Orbita/commit/${sha_completo}/checks"
-    fi
-    echo "    CI en verde:"
-    sed 's/^/      /; s/|/ · /g' <<<"$runs"
-  fi
-
-  echo "==> Preflight OK: ${GIT_SHA} está en main, limpio, con tests y migraciones de producción al día."
+  echo "==> Preflight OK: ${GIT_SHA} está en main, limpio, con CI/tests en verde y migraciones de producción al día."
 }
 
 if [[ "${DEPLOY_SOLO_PREFLIGHT:-}" == "1" ]]; then

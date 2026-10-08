@@ -48,8 +48,10 @@ Vercel (frontend, orbita.site)  ──fetch──▶  api.orbita.site
   con el sha corto del commit y despliega esa imagen a Cloud Run. Escala a 0 instancias, 2 vCPU,
   2 GiB.
 - **Preflight de `deploy.sh`** (corta con exit 1, sin buildear, en el primer fallo): árbol
-  limpio, HEAD contenido en `origin/main`, `pnpm typecheck` + `pnpm test` (~10 min), migraciones
-  de Prisma al día **en la base de producción**, y check runs de CI en verde para ese sha.
+  limpio, HEAD contenido en `origin/main`, check runs de CI en verde para ese sha (si siguen
+  corriendo, espera hasta 15 min), migraciones de Prisma al día **en la base de producción** y
+  `pnpm typecheck` + `pnpm test` — estos dos (~10 min) **se omiten si CI ya está en verde**, porque
+  CI corre lo mismo; solo se ejecutan acá si no hay `gh` logueado o con `DEPLOY_TESTS_LOCALES=1`.
   `DEPLOY_SOLO_PREFLIGHT=1` corre solo eso; `DEPLOY_SIN_PREFLIGHT=1` es la salida de emergencia
   y la corre una persona en la consola, nunca un agente.
 - **Secrets** (`DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, claves de Gemini, Mercado Pago,
@@ -145,11 +147,13 @@ este orden exacto, sin saltear pasos:
    **Por qué la API va después de `main` y no antes** (hallazgo `deploy-manual` de la
    auditoría interna): a producción va solo lo que ya está en `main` con CI verde, y
    `deploy.sh` ahora lo exige con un preflight (árbol limpio, HEAD contenido en
-   `origin/main`, typecheck + tests, sin migraciones pendientes, check runs de CI en
-   success): si se corre desde la rama o antes del push, corta con exit 1 sin buildear.
+   `origin/main`, check runs de CI en success, sin migraciones pendientes, y typecheck +
+   tests locales solo si no se puede verificar CI): si se corre desde la rama o antes del
+   push, corta con exit 1 sin buildear.
    **Trade-off:** con este orden Vercel publica el frontend unos minutos antes de que la API
    nueva esté sirviendo. Si el frontend necesita un endpoint nuevo, correr `deploy.sh` apenas
-   CI da verde (el preflight tarda ~10 minutos por los tests: avisar que está corriendo). Si
+   CI da verde (con CI en verde el preflight tarda segundos; si espera a CI o corre los
+   tests locales por falta de `gh`, tarda más: avisar que está corriendo). Si
    un cambio no tolera ni esa ventana (el storefront rompe sin el endpoint), la excepción
    documentada es desplegar la API PRIMERO, desde `main` ya pusheado, con
    `DEPLOY_SIN_PREFLIGHT=1 ./deploy/deploy.sh`: imprime un aviso grande y pide confirmar

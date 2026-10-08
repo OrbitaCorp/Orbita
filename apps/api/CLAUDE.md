@@ -26,9 +26,11 @@ cd apps/api
 `deploy-manual` de la auditoría interna, 10/09): el orden es commit → push de
 `main` → CI verde (`.github/workflows/ci.yml`) → `deploy.sh`, nunca al revés.
 El script lo hace cumplir con un preflight antes del build: árbol de git
-limpio, HEAD contenido en `origin/main`, `pnpm typecheck` + `pnpm test` (~10
-minutos, avisá que está corriendo), `prisma migrate status` sin pendientes
-**contra la base de producción** y los check runs de CI del sha en `success`. Si algo falla corta con exit 1 sin
+limpio, HEAD contenido en `origin/main`, los check runs de CI del sha en `success`
+(espera hasta 15 min si siguen corriendo), `prisma migrate status` sin pendientes
+**contra la base de producción** y `pnpm typecheck` + `pnpm test` (~10 minutos,
+avisá que está corriendo) — estos dos se omiten si CI ya está en verde, y solo
+corren acá si no hay `gh` logueado o con `DEPLOY_TESTS_LOCALES=1`. Si algo falla corta con exit 1 sin
 buildear nada. `DEPLOY_SOLO_PREFLIGHT=1` corre solo el preflight;
 `DEPLOY_SIN_PREFLIGHT=1` es el escape para emergencias y pide confirmación por
 teclado, así que lo corre una persona, no un agente. Detalle en
