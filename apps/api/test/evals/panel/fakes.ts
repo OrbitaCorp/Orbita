@@ -672,8 +672,9 @@ export function toolsDelPanelDelModulo(): string[] {
 }
 
 /**
- * Las tools reales del panel, en el MISMO orden que OrbiModule (el orden de
- * las tools en el request puede cambiar lo que elige el modelo).
+ * Las tools reales del panel, las mismas que registra OrbiModule. El orden en
+ * el request lo fija getTools (por grupo y nombre, para la caché de Gemini),
+ * igual que en producción.
  */
 export function armarRegistry(f: Fakes): ToolRegistryService {
   const registry = new ToolRegistryService();

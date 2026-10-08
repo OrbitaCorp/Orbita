@@ -7,8 +7,9 @@
  * VENDERLOS (descripción, precio, promo), no a producirlos.
  *
  * Solo en el panel, entre CORE_PROMPT y la capa del manual: no depende del
- * negocio, así que el comienzo del prompt sigue igual para todos y la caché
- * implícita de Gemini lo reusa. El wizard tiene su propia regla
+ * negocio ni de la pantalla, así que el comienzo del prompt sigue igual para
+ * todos y la caché implícita de Gemini lo reusa (orden completo en
+ * context-builder.service.ts). El wizard tiene su propia regla
  * (prompts/wizard.ts, WIZARD_BASE).
  *
  * La respuesta fuera de alcance es una frase fija para poder contarla: el

@@ -5,7 +5,7 @@ import type { OrbiChatDto } from '../dto/orbi-chat.dto';
 import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../prompts/core';
 import { getWizardPrompt } from '../prompts/wizard';
-import { getPanelPrompt } from '../prompts/panel';
+import { getPanelPrompt, type InfoDelNegocio } from '../prompts/panel';
 import { capaDelManual } from '../prompts/manual';
 import { capaDeAlcance } from '../prompts/alcance';
 import { resolverModuloDelPanel } from '../navegacion/modulo-de-orbi';
@@ -45,7 +45,7 @@ export class ContextBuilderService {
         dto.context.formState,
       ));
     } else {
-      let businessInfo: { name: string; industry: string; mode: string } | undefined;
+      let businessInfo: InfoDelNegocio | undefined;
 
       if (dto.context.businessId) {
         try {
@@ -72,9 +72,15 @@ export class ContextBuilderService {
         ? await this.moduleData.getSnapshot(dto.context.businessId, modulo)
         : {};
 
-      // El alcance y el índice del manual van antes de la capa del panel:
-      // hasta acá el prompt es igual para todos los negocios (caché de
-      // Gemini). Ver prompts/alcance.ts y prompts/manual.ts.
+      // Caché implícita de Gemini: reusa el prefijo idéntico más largo entre
+      // requests, y solo si pasa los 4096 tokens. Por eso el prompt va de lo
+      // fijo a lo variable: core, alcance, índice del manual y reglas de todo
+      // el panel (iguales para todos los negocios y pantallas, sin fechas ni
+      // horas), después la capa de la pantalla (igual para todos los
+      // negocios) y recién al final el negocio y los números del snapshot. La
+      // nota de la demo se suma después, en el controller. Nada que cambie por
+      // negocio, pantalla, permisos u hora puede ir antes de reglasDelPanel():
+      // lo cuida context-builder.spec.ts ("prefijo compartido").
       layers.push(capaDeAlcance());
       layers.push(capaDelManual());
       layers.push(getPanelPrompt(

@@ -1,7 +1,10 @@
 import { ContextBuilderService } from './context-builder.service';
 import { OrbiSurface, OrbiWizardFormStateDto } from '../dto/orbi-chat.dto';
 import { CODIGOS_DEL_CATALOGO } from '../../common/permisos/catalogo';
-import { RESPUESTA_FUERA_DE_ALCANCE } from '../prompts/alcance';
+import { RESPUESTA_FUERA_DE_ALCANCE, capaDeAlcance } from '../prompts/alcance';
+import { CORE_PROMPT } from '../prompts/core';
+import { capaDelManual } from '../prompts/manual';
+import { reglasDelPanel } from '../prompts/panel';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -724,6 +727,80 @@ describe('ContextBuilderService', () => {
       const fin = (p: string) => p.indexOf('Configuración → Soporte');
       expect(fin(a)).toBeGreaterThan(0);
       expect(a.slice(0, fin(a))).toBe(b.slice(0, fin(b)));
+    });
+
+    // Caché implícita de Gemini: reusa el prefijo idéntico más largo entre
+    // requests si pasa los 4096 tokens. Todo lo fijo va primero; lo que cambia
+    // por negocio, pantalla, permisos u hora va al final.
+    describe('prefijo compartido (caché de Gemini)', () => {
+      const SEPARADOR = '\n\n---\n\n';
+      const FIJO = [CORE_PROMPT, capaDeAlcance(), capaDelManual(), reglasDelPanel()].join(SEPARADOR);
+      const SNAPSHOT = {
+        salesThisMonth: { total: 150000, count: 25, avgTicket: 6000 },
+        salesLastMonth: { total: 120000, count: 20 },
+        pendingOrders: 5, cancelledThisMonth: 2, totalProducts: 40, outOfStockProducts: 3,
+        totalCustomers: 80, newCustomersThisMonth: 12, unreadMessages: 7,
+      };
+      const prefijoComun = (a: string, b: string) => {
+        let i = 0;
+        while (i < a.length && a[i] === b[i]) i++;
+        return a.slice(0, i);
+      };
+
+      it('dos negocios en dos pantallas, con permisos distintos, comparten todo lo fijo', async () => {
+        mockPrisma.business.findUnique
+          .mockResolvedValueOnce({ name: 'Pizzería Don Pepe', industry: 'Gastronomía', mode: 'FULL' })
+          .mockResolvedValueOnce({ name: 'Rama', industry: 'Indumentaria', mode: 'CATALOG' });
+        mockModuleData.getSnapshot.mockResolvedValueOnce(SNAPSHOT);
+        const a = await service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
+        } as any, CODIGOS_DEL_CATALOGO);
+        const b = await service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos', businessId: 'biz-2' },
+        } as any, ['orders.view']);
+
+        expect(a.startsWith(FIJO)).toBe(true);
+        expect(b.startsWith(FIJO)).toBe(true);
+        const comun = prefijoComun(a, b);
+        expect(comun.length).toBeGreaterThanOrEqual(FIJO.length);
+        for (const variable of ['Pizzería Don Pepe', 'Rama', 'Gastronomía', '$150.000', 'El usuario está en el Dashboard', 'El usuario está en Pedidos']) {
+          expect({ variable, enElPrefijo: comun.includes(variable) }).toEqual({ variable, enElPrefijo: false });
+        }
+        // Lo variable, al final y en ese orden: pantalla, negocio, números.
+        expect(a.indexOf('## Contexto de pantalla')).toBeLessThan(a.indexOf('Negocio: "Pizzería Don Pepe"'));
+        expect(a.indexOf('Negocio: "Pizzería Don Pepe"')).toBeLessThan(a.indexOf('$150.000'));
+
+        // Tamaño medido el 2026-10-08: ~8.200 caracteres (~2.350 tokens a 3,5
+        // caracteres por token). El mínimo de la caché implícita de Gemini 3.x
+        // Flash es 4096 tokens (~14.000 caracteres), así que el system prompt
+        // fijo SOLO no alcanza. Lo que lo completa son las tools (unos 16.000
+        // caracteres para el dueño, en orden fijo: ver getTools): si Gemini
+        // arma el prompt con las tools antes del system, el prefijo de un dueño
+        // pasa los 7.000 tokens; si van después, el negocio y la pantalla al
+        // final del system las cortan. Google no documenta el orden. Para
+        // pasarlo seguro habría que sacar lo variable del system y mandarlo
+        // como primer mensaje de `contents`. Este piso avisa si el prefijo se
+        // achica sin querer (algo variable que se metió adelante).
+        expect(FIJO.length).toBeGreaterThan(8000);
+      });
+
+      it('nada del prompt depende de la hora: el mismo pedido a otra hora da el mismo prompt', async () => {
+        const armar = async () => service.buildSystemPrompt({
+          message: 'hola',
+          context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'dashboard', businessId: 'biz-1' },
+        } as any, CODIGOS_DEL_CATALOGO);
+        jest.useFakeTimers().setSystemTime(new Date('2026-10-08T09:15:01Z'));
+        try {
+          const temprano = await armar();
+          jest.setSystemTime(new Date('2027-03-01T23:59:59Z'));
+          const tarde = await armar();
+          expect(tarde).toBe(temprano);
+        } finally {
+          jest.useRealTimers();
+        }
+      });
     });
 
     it('el wizard no lleva el manual del panel', async () => {

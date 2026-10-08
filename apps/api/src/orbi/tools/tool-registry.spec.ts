@@ -40,6 +40,39 @@ describe('ToolRegistryService', () => {
     expect(withPerm.find(t => t.name === 'deleteSomething')).toBeDefined();
   });
 
+  // Las tools son parte del prefijo que reusa la caché implícita de Gemini:
+  // tienen que salir siempre en el mismo orden, y lo que ve todo el mundo
+  // primero, para que un empleado o la demo compartan el comienzo con el dueño.
+  it('orden fijo para la caché: sin permiso, lecturas con permiso, escrituras; cada grupo por nombre', () => {
+    const tool = (name: string, requiredPermissions: string[], requiresConfirmation = false): OrbiTool => ({
+      name, description: 'Test', parameters: {}, surfaces: [OrbiSurface.PANEL], requiredPermissions,
+      ...(requiresConfirmation ? { requiresConfirmation: true } : {}),
+      async execute() { return { success: true, label: 'ok' }; },
+      toLlmDefinition() { return { name: this.name, description: this.description, parameters: this.parameters }; },
+    });
+    const todas = [
+      tool('zCrear', ['x.manage'], true), tool('bListar', ['x.view']), tool('aCrear', ['x.manage'], true),
+      tool('leerManual', []), tool('aListar', ['x.view']),
+    ];
+    const nombres = (orden: OrbiTool[], permisos: string[], soloLectura = false) => {
+      const r = new ToolRegistryService();
+      (r as unknown as { logger: { log: () => void } }).logger.log = () => undefined;
+      r.register(new NavigationTool());
+      for (const t of orden) r.register(t);
+      return r.getTools(OrbiSurface.PANEL, permisos, undefined, { soloLectura }).map((t) => t.name);
+    };
+
+    const dueno = nombres(todas, ['x.view', 'x.manage']);
+    expect(dueno).toEqual(['leerManual', 'navigateTo', 'aListar', 'bListar', 'aCrear', 'zCrear']);
+    // El orden de registro no cambia nada.
+    expect(nombres([...todas].reverse(), ['x.view', 'x.manage'])).toEqual(dueno);
+    // La demo (sin escrituras) y quien solo lee ven un comienzo de la lista del dueño.
+    const demo = nombres(todas, ['x.view', 'x.manage'], true);
+    expect(dueno.slice(0, demo.length)).toEqual(demo);
+    const lector = nombres(todas, ['x.view']);
+    expect(dueno.slice(0, lector.length)).toEqual(lector);
+  });
+
   it('execute returns error for non-existent tool', async () => {
     const result = await registry.execute('noExiste', {}, {
       businessId: 'biz-1',

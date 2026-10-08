@@ -2,10 +2,10 @@
  * Capa del manual (spec 2026-09-30-orbi-base-de-conocimiento, §3.3). Solo en el
  * panel, entre CORE_PROMPT y la capa del panel.
  *
- * Va ANTES de todo lo que depende del negocio (el nombre, el rubro, el
- * snapshot): así el comienzo del prompt es idéntico para todos los negocios y
- * la caché implícita de Gemini lo puede reusar. Si se mueve después de la capa
- * del panel, cada negocio paga su propio prefijo.
+ * Va ANTES de todo lo que depende del negocio o de la pantalla (el nombre, el
+ * rubro, la capa de la pantalla, el snapshot): así el comienzo del prompt es
+ * idéntico para todos y la caché implícita de Gemini lo puede reusar. Ver el
+ * orden completo en context-builder.service.ts.
  *
  * Es el índice (un renglón por tema), no el manual: el texto de cada tema lo
  * pide el modelo con leerTemaDelManual. La alternativa (el manual entero acá)

@@ -15,6 +15,16 @@ function fallida(error: string, detalle?: { faltan?: string[]; invalidos?: Inval
   };
 }
 
+/** 0: sin permiso, 1: lectura con permiso, 2: escritura. Ver getTools. */
+function grupoParaLaCache(t: OrbiTool): number {
+  if (t.requiresConfirmation) return 2;
+  return t.requiredPermissions.length === 0 ? 0 : 1;
+}
+
+export function compararParaLaCache(a: OrbiTool, b: OrbiTool): number {
+  return grupoParaLaCache(a) - grupoParaLaCache(b) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+}
+
 @Injectable()
 export class ToolRegistryService {
   private readonly logger = new Logger(ToolRegistryService.name);
@@ -27,6 +37,13 @@ export class ToolRegistryService {
 
   // `soloLectura`: el visitante de la demo pública — no ve las tools que
   // escriben (tampoco podría confirmarlas: DemoGuard corta /orbi/confirm).
+  //
+  // Orden fijo, no el de registro: las tools son parte del prefijo que la
+  // caché implícita de Gemini reusa entre requests (ver
+  // context-builder.service.ts). Primero las que ve todo el mundo, después
+  // las lecturas con permiso y al final las escrituras, cada grupo por
+  // nombre: así un empleado o la demo (sin escrituras) comparten con el dueño
+  // el comienzo de la lista.
   getTools(surface: OrbiSurface, permissions: string[], stepName?: string, opciones?: { soloLectura?: boolean }): LlmToolDefinition[] {
     return Array.from(this.tools.values())
       .filter(t => t.surfaces.includes(surface))
@@ -36,6 +53,7 @@ export class ToolRegistryService {
         t.requiredPermissions.length === 0 ||
         t.requiredPermissions.every(p => permissions.includes(p)),
       )
+      .sort(compararParaLaCache)
       .map(t => t.toLlmDefinition());
   }
 

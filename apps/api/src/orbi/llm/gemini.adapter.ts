@@ -131,6 +131,12 @@ export class GeminiAdapter implements LlmAdapter {
       parametersJsonSchema: t.parameters,
     }));
 
+    // Caché implícita: Gemini reusa el prefijo idéntico más largo entre
+    // requests (desde 4096 tokens en 3.x Flash). El system prompt viene de lo
+    // fijo a lo variable (context-builder.service.ts) y las tools en orden
+    // fijo (ToolRegistryService.getTools). En qué orden pone Google
+    // systemInstruction y tools dentro del prompt no está documentado ni lo
+    // define el SDK: van como campos separados del request.
     const stream = await client.models.generateContentStream({
       model: modeloEfectivo,
       contents,

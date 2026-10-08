@@ -439,7 +439,7 @@ describe('Orbi — catálogo completo de tools', () => {
     const names = registry.getTools(OrbiSurface.PANEL, []).map(t => t.name);
     // Sin ningún permiso solo queda navegar y leer el manual: ni escrituras ni
     // lecturas del negocio.
-    expect(names).toEqual(['navigateTo', 'leerTemaDelManual']);
+    expect(names).toEqual(['leerTemaDelManual', 'navigateTo']);
   });
 
   it('un empleado con solo lectura ve las lecturas de sus permisos y ninguna escritura', () => {
