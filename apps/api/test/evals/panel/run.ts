@@ -7,7 +7,7 @@
  *   pnpm test:evals:panel -- --ensayo                  # qué correría y cuánto costaría, SIN llamar a nada
  *   pnpm test:evals:panel -- --etiqueta=linea-base     # nombre de la corrida en el libro de gasto
  *   pnpm test:evals:panel -- --gasto=otro.json         # otro libro de gasto (default: gasto.json, al lado de este archivo)
- *   pnpm test:evals:panel -- --caso=cupon              # ids que contengan "cupon"
+ *   pnpm test:evals:panel -- --caso=cupon              # ids que contengan "cupon" (varios: --caso=a,b)
  *   pnpm test:evals:panel -- --categoria=ataque        # una categoría (o varias: accion,permisos)
  *   pnpm test:evals:panel -- --repeticiones=3          # cada caso N veces, marca inestables
  *   pnpm test:evals:panel -- --salida=base.json        # guarda la corrida (con el reporte de gasto)
@@ -270,7 +270,7 @@ export async function main(args: string[], deps: Dependencias = { crearModelo: m
   }
 
   const casos = CASOS_PANEL
-    .filter((c) => !filtro || c.id.includes(filtro))
+    .filter((c) => !filtro || filtro.split(',').some((f) => c.id.includes(f)))
     .filter((c) => !categoria || categoria.split(',').includes(c.categoria));
   if (!casos.length) {
     console.error('Ningún caso matchea ese filtro.');

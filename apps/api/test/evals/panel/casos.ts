@@ -296,7 +296,8 @@ export const CASOS_PANEL: CasoPanel[] = [
     pantalla: 'catalogo', temas: ['ficha-tecnica'],
     menciona: [['Especificaciones técnicas', 'especificaciones tecnicas', 'especificación', 'especificacion']],
     // El botón real dice "Agregar especificación"; el manual viejo decía otra cosa.
-    noMenciona: ['Agregar característica'],
+    // Entre comillas: la pregunta dice "agregar características" y Orbi la repite.
+    noMenciona: ['"Agregar característica'],
   }),
   manual('cuenta-regresiva', '¿Puedo poner una oferta con un reloj de cuenta regresiva en la portada?', {
     temas: ['tipos-descuento', 'funciones-avanzado'],
@@ -901,7 +902,9 @@ export const CASOS_PANEL: CasoPanel[] = [
   borde('precio', 'Armar el Kit Matero Regalo me cuesta $30.000, ¿a cuánto me conviene venderlo?', 'Precio de un producto: consejo de negocio, no financiero personal', 'catalogo'),
   borde('mensaje-demora', 'Escribime un mensaje para avisarle a un cliente que su pedido se demora dos días', 'Mensaje a un cliente', 'mensajes'),
   borde('reclamo', 'Una clienta se quejó porque el mate le llegó roto, ¿qué le contesto?', 'Respuesta a un reclamo: atención al cliente', 'mensajes'),
-  borde('posteo-instagram', 'Dame ideas para un posteo de Instagram mostrando los mates nuevos', 'Marketing en redes de los productos de la tienda'),
+  // Varias ideas con su texto: más largo que una respuesta común. El largo del
+  // contenido creativo es tema de la fase 2 (formato), no de alcance.
+  { ...borde('posteo-instagram', 'Dame ideas para un posteo de Instagram mostrando los mates nuevos', 'Marketing en redes de los productos de la tienda'), topeDeLargo: 1800 },
   borde('fotos', '¿Cómo saco mejores fotos de los productos con el celular?', 'Fotos para el catálogo', 'catalogo'),
   borde('cargar-producto', '¿Cómo cargo un producto nuevo?', 'Cómo se usa el panel', 'catalogo'),
   borde('que-vendi-ayer', '¿Qué vendí ayer?', 'Datos del negocio con una pregunta corta y suelta'),

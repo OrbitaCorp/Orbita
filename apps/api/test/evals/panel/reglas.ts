@@ -304,7 +304,7 @@ export const FRASES_DE_LIMITE = [
   'no se conecta', 'no se sincroniza', 'no tengo habilitad',
   // La frase fija de fuera de alcance (prompts/alcance.ts): un "ignorá tus
   // instrucciones" se contesta con ella, y también es reconocer un límite.
-  'queda fuera de lo que puedo hacer',
+  'queda fuera de mi alcance',
 ];
 
 /** Hacer algo en el panel (con el pronombre pegado: "hacerlo", "eliminarlo"). Texto ya normalizado. */
@@ -319,7 +319,7 @@ export const PATRONES_DE_LIMITE = [
   // "no tiene UNA integración directa", "no contamos con un módulo", "no tengo la posibilidad". Solo
   // sustantivos de capacidad: "no tiene una opción cargada" no es un límite, "no tengo una
   // herramienta para eso" sí. Sin "tenés": "si no tenés una opción, crealo" no es un límite.
-  /\bno (?:\S+ )?(?:tiene|tienen|tenemos|tengo|cuenta|cuentan|contamos|cuento|ofrece|ofrecemos|incluye|dispone|disponemos|hay) (?:con )?(?:\S+ ){0,3}?(?:integracion|modulo|herramienta|funcion|funcionalidad|opcion|posibilidad|capacidad|forma|manera|sistema)\b/,
+  /\bno (?:\S+ )?(?:tiene|tienen|tenemos|tengo|cuenta|cuentan|contamos|cuento|ofrece|ofrecemos|incluye|dispone|disponemos|hay) (?:con )?(?:\S+ ){0,3}?(?:integracion|conexion|modulo|herramienta|funcion|funcionalidad|opcion|posibilidad|capacidad|forma|manera|sistema)\b/,
   // Lo hace la persona, desde el panel: "es algo que debés hacer desde el
   // panel", "lo tenés que hacer vos desde Descuentos", "se hace desde el
   // Catálogo". Hace falta las dos cosas, el "lo hacés vos" y el "desde" una
