@@ -837,6 +837,19 @@ describe('ContextBuilderService', () => {
         expect(sistema).toContain(`"${ENCABEZADO_DEL_CONTEXTO.split(' (')[0]}"`);
       });
 
+      it('lo que el rol no permite va en el contexto: un empleado sin "Gestionar pedidos" sabe que no hay tarjeta', async () => {
+        const dto = { message: 'Confirmá el pedido 1025', context: { surface: OrbiSurface.PANEL, module: 'ventas', section: 'pedidos' } } as any;
+
+        const empleado = await service.armarPrompt(dto, ['orders.view', 'catalog.manage']);
+        expect(empleado.sistema).toBe(FIJO);
+        expect(empleado.contexto).toContain('Permisos de esta persona: su usuario no puede cambiar el estado de un pedido');
+        expect(empleado.contexto).toContain('crear descuentos o cupones');
+        expect(empleado.contexto).not.toContain('crear productos o categorías');
+
+        const dueno = await service.armarPrompt(dto, ['orders.manage', 'discounts.manage', 'catalog.manage', 'config.edit']);
+        expect(dueno.contexto).not.toContain('Permisos de esta persona');
+      });
+
       it('el wizard no tiene contexto aparte: todo sigue en el system', async () => {
         const { sistema, contexto } = await service.armarPrompt({
           message: 'hola',

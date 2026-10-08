@@ -227,6 +227,8 @@ export function reglasDelPanel(): string {
 
 Podés ejecutar acciones usando las herramientas disponibles.
 
+Solo existen las herramientas que tenés en esta conversación: no llames otras. Si lo que pide no está entre ellas (por ejemplo, porque su usuario no tiene ese permiso), no hay tarjeta posible: decile que eso no lo podés hacer desde acá, y si es por permisos, que se lo pida al dueño o a un administrador.
+
 Antes de proponer un cambio (crear, cambiar estado, configurar):
 - Revisá qué datos pide la herramienta. Si falta alguno, pedí TODOS los que falten en un solo mensaje corto, con las opciones válidas en palabras simples (tipo: porcentaje/monto; alcance: todo/productos/categoría). Nunca de a uno.
 - No inventes ids ni datos. Productos, categorías y etiquetas van por nombre, como los escribió la persona: el sistema los busca.
@@ -408,6 +410,31 @@ export function datosDePantalla(module?: string, moduleData?: ModuleSnapshot): s
   }
 }
 
+/**
+ * Las escrituras de Orbi, por el permiso que piden (requiredPermissions de cada
+ * tool), con palabras de la persona.
+ */
+const ACCIONES_CON_PERMISO: [permiso: string, accion: string][] = [
+  ['orders.manage', 'cambiar el estado de un pedido (confirmarlo, prepararlo, enviarlo o cancelarlo)'],
+  ['discounts.manage', 'crear descuentos o cupones'],
+  ['catalog.manage', 'crear productos o categorías'],
+  ['config.edit', 'cambiar la configuración del negocio (datos, pagos o envíos)'],
+];
+
+/**
+ * Lo que esta persona no puede hacer por su rol. La capa de la pantalla
+ * describe las tools de escritura para cualquiera ("updateOrderStatus: … la
+ * persona lo confirma en una tarjeta"), y con eso un empleado sin "Gestionar
+ * pedidos" recibía "te dejo la tarjeta" sin que hubiera ninguna. `permisos`
+ * undefined es "no se sabe" (tests de la capa sola): no dice nada.
+ */
+export function capaDePermisos(permisos?: string[]): string {
+  if (!permisos) return '';
+  const negadas = ACCIONES_CON_PERMISO.filter(([p]) => !permisos.includes(p)).map(([, accion]) => accion);
+  if (!negadas.length) return '';
+  return `Permisos de esta persona: su usuario no puede ${negadas.join('; ni ')}. Esas herramientas no las tenés. Si te pide una de esas cosas, decile que desde su usuario no se puede y que se lo pida al dueño o a un administrador del negocio; no hay tarjeta.`;
+}
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 /**
@@ -421,9 +448,11 @@ export function contextoDelPanel(
   section?: string,
   businessInfo?: InfoDelNegocio,
   moduleData?: ModuleSnapshot,
+  permisos?: string[],
 ): string {
   return [
     capaDePantalla(module, section),
+    capaDePermisos(permisos),
     capaDelNegocio(businessInfo),
     datosDePantalla(module, moduleData),
   ].filter(Boolean).join('\n\n');

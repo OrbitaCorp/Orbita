@@ -14,6 +14,7 @@ import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 import { GeminiAdapter } from '../../src/orbi/llm/gemini.adapter';
 import { CORE_PROMPT } from '../../src/orbi/prompts/core';
 import { RESPUESTA_FUERA_DE_ALCANCE, capaDeAlcance } from '../../src/orbi/prompts/alcance';
+import { ESCRITURA_NO_DISPONIBLE } from '../../src/orbi/turno/vuelta';
 import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../src/orbi/navegacion/secciones';
 import { fechaArgentina } from '../../src/common/utils/hora-argentina';
 import {
@@ -827,7 +828,7 @@ describe('motor de las evals', () => {
     const r = await correrCaso(caso({ rol: 'empleado', expectativas: [{ tipo: 'reconoce-limite' }] }), 1, d, actual, { llm: g.llm });
     expect(r.turno.toolsOfrecidas).not.toContain('createCoupon');
     expect(r.turno.propuestas).toEqual([]);
-    expect(JSON.stringify(g.recibidos[1])).toContain('no tenés permiso');
+    expect(JSON.stringify(g.recibidos[1])).toContain(ESCRITURA_NO_DISPONIBLE);
   });
 
   it('las calls paralelas de una vuelta vuelven en UN turno del modelo, con sus firmas', async () => {

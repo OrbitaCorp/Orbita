@@ -14,9 +14,11 @@ export const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pi
 
 /**
  * Lo que recibe el modelo cuando pide una escritura que no puede proponerse
- * (demo, sin permiso, fuera del panel). Fijo y sin detalles.
+ * (demo, sin permiso, fuera del panel). Fijo y sin detalles. Dice que NO hay
+ * tarjeta: en una corrida, con el texto viejo, Orbi le contestó a un empleado
+ * sin permiso "te dejo la confirmación en la tarjeta" sin que hubiera ninguna.
  */
-export const ESCRITURA_NO_DISPONIBLE = 'No podés hacer esa acción desde acá: no tenés permiso o no está disponible.';
+export const ESCRITURA_NO_DISPONIBLE = 'No se hizo nada y no hay tarjeta para confirmar: esta persona no tiene permiso para esa acción o no está disponible desde acá. Decíselo así, sin prometer una tarjeta.';
 export const ESCRITURA_EN_DEMO = 'En la demo no se pueden hacer cambios';
 
 /**

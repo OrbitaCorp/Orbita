@@ -96,7 +96,7 @@ export class ContextBuilderService {
     // de la demo se suma al contexto, en el controller.
     return {
       sistema: [CORE_PROMPT, capaDeAlcance(), capaDelManual(), reglasDelPanel()].join(SEPARADOR_DE_CAPAS),
-      contexto: contextoDelPanel(modulo, seccion, businessInfo, moduleSnapshot),
+      contexto: contextoDelPanel(modulo, seccion, businessInfo, moduleSnapshot, permisos),
     };
   }
 
