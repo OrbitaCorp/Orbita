@@ -116,10 +116,33 @@ export const usd = (n: number, decimales = 4): string => `USD ${n.toFixed(decima
 
 export type Trabajo<C> = { caso: C; intento: number };
 
+// ─── El tope de gasto del proveedor ──────────────────────────────────────────
+
+/**
+ * Lo que se le dice a la persona cuando Google corta por el tope de gasto
+ * mensual del proyecto (AI Studio), que es otro tope: el de Google, no el
+ * nuestro del libro.
+ */
+export const MENSAJE_TOPE_DEL_PROVEEDOR =
+  'Google frenó por el tope de gasto del proyecto en AI Studio: subilo en https://ai.studio/spend y volvé a correr';
+
+/**
+ * Si el error del proveedor es el tope de gasto del proyecto: un 429
+ * RESOURCE_EXHAUSTED que dice "exceeded its monthly spending cap". No es un
+ * rate limit: esperar no sirve y cada caso que siga va a dar lo mismo.
+ */
+export function esTopeDeGastoDelProveedor(mensaje: string): boolean {
+  return /spend(?:ing)?[\s_-]*cap/i.test(mensaje);
+}
+
 export type CorridaConTope = {
   resultados: Resultado[];
-  /** Si el freno cortó: cuántos casos quedaron sin correr y el mensaje para la persona. */
-  frenada: { quedan: number; mensaje: string } | null;
+  /**
+   * Si la corrida se cortó: cuántos casos quedaron sin correr, el mensaje para
+   * la persona y por qué ('tope': el nuestro, del libro; 'proveedor': el tope
+   * de gasto del proyecto en Google).
+   */
+  frenada: { quedan: number; mensaje: string; motivo: 'tope' | 'proveedor' } | null;
   /** La entrada de esta corrida en el libro (ya guardada). */
   entrada: CorridaDelLibro;
 };
@@ -165,6 +188,7 @@ export async function correrConTope<C>(p: {
         entrada,
         frenada: {
           quedan,
+          motivo: 'tope',
           mensaje:
             `Tope de ${usd(libro.topeUsd, 2)} alcanzado: se gastaron ${usd(libro.gastadoUsd)}; ` +
             `quedan ${quedan} caso(s) sin correr (el próximo se estimaba en ${usd(estimado)}).`,
@@ -174,6 +198,28 @@ export async function correrConTope<C>(p: {
 
     p.alEmpezarCaso?.(estimado);
     const r = await p.correr(p.trabajos[i]);
+
+    // Google cortó por el tope de gasto del proyecto: los casos que siguen
+    // darían el mismo 429, cada uno anotado como "error de infraestructura".
+    // Se para acá. Este caso no entra en los resultados (no llegó a correr) y
+    // no se le anota el estimado: el pedido rechazado no se factura. Si antes
+    // del 429 alguna vuelta del caso sí terminó (raro), lo medido se anota,
+    // porque eso Google sí lo cobró.
+    if (r.infra && r.error && esTopeDeGastoDelProveedor(r.error)) {
+      const medido = r.costoUsd ?? 0;
+      entrada.llamadas += r.llamadas ?? 0;
+      entrada.usd += medido;
+      libro.gastadoUsd += medido;
+      entrada.estado = 'frenada';
+      guardarLibro(rutaLibro, libro);
+      const quedan = p.trabajos.length - i;
+      return {
+        resultados,
+        entrada,
+        frenada: { quedan, motivo: 'proveedor', mensaje: `${MENSAJE_TOPE_DEL_PROVEEDOR} (quedan ${quedan} caso(s) sin correr).` },
+      };
+    }
+
     resultados.push(r);
     const costo = r.costoUsd ?? 0;
     costos.push(costo);

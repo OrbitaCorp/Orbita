@@ -25,7 +25,7 @@ import type { ToolExecutionContext } from '../../../src/orbi/tools/tool.interfac
 import { correrTurno, nuevoProgresoDelTurno, type EmisorDelTurno } from '../../../src/orbi/turno/motor-de-turno';
 import { resolverModuloDelPanel } from '../../../src/orbi/navegacion/modulo-de-orbi';
 import { BUSINESS_ID, type NegocioDePrueba } from './negocio-de-prueba';
-import { costoTechoUsd } from './presupuesto';
+import { costoTechoUsd, esTopeDeGastoDelProveedor } from './presupuesto';
 import {
   armarContextBuilder,
   armarFakes,
@@ -212,7 +212,9 @@ export function conReintentoPorRateLimit(llm: Pick<LlmAdapter, 'streamChat'>, in
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           const esRateLimit = msg.includes('rate_limit') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-          if (entrego || !esRateLimit || i >= intentos) throw error;
+          // El tope de gasto del proyecto también es un 429, pero esperar no
+          // lo arregla: sube directo y la corrida para (presupuesto.ts).
+          if (entrego || !esRateLimit || esTopeDeGastoDelProveedor(msg) || i >= intentos) throw error;
           const segundos = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? /try again in ([\d.]+)s/.exec(msg)?.[1] ?? 15);
           console.log(`  … rate limit, esperando ${segundos.toFixed(0)}s`);
           await new Promise((r) => setTimeout(r, Math.ceil((segundos + 1) * 1000)));

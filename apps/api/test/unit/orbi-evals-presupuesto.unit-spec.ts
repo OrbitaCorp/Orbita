@@ -26,8 +26,10 @@ import {
   correrConTope,
   costoTechoUsd,
   ensayar,
+  esTopeDeGastoDelProveedor,
   estimarProximoCaso,
   leerLibro,
+  MENSAJE_TOPE_DEL_PROVEEDOR,
   reporteDeGasto,
   resolverTope,
   type Libro,
@@ -36,6 +38,7 @@ import { VARIANTES, correrCaso, type Resultado } from '../evals/panel/motor';
 import { crearNegocioDePrueba } from '../evals/panel/negocio-de-prueba';
 import { main } from '../evals/panel/run';
 import type { CasoPanel } from '../evals/panel/casos';
+import { RESPUESTA_FUERA_DE_ALCANCE } from '../../src/orbi/prompts/alcance';
 
 const FECHA = new Date('2026-10-07T12:00:00.000Z'); // flash a precio de lanzamiento: 0,75 / 0,075 / 3,75
 
@@ -173,6 +176,95 @@ describe('libro de gasto y freno', () => {
     expect(correr).not.toHaveBeenCalled();
     expect(r.frenada?.quedan).toBe(51);
     expect(leerLibro(ruta)!.gastadoUsd).toBeCloseTo(3.98, 9);
+  });
+});
+
+// ─── El tope de gasto del proyecto en Google ────────────────────────────────
+
+// Lo que contesta Gemini cuando el proyecto llegó a su tope de gasto mensual.
+const ERROR_TOPE_DE_GOOGLE =
+  '{"error":{"code":429,"message":"Your project has exceeded its monthly spending cap. Please go to AI Studio at https://ai.studio/spend to manage your project spend cap.","status":"RESOURCE_EXHAUSTED"}}';
+const ERROR_RATE_LIMIT =
+  '{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. Please retry in 20.5s.","status":"RESOURCE_EXHAUSTED"}}';
+
+describe('tope de gasto del proyecto en Google', () => {
+  it('reconoce el 429 del tope de gasto y no un rate limit común', () => {
+    expect(esTopeDeGastoDelProveedor(`Proveedor: ${ERROR_TOPE_DE_GOOGLE}`)).toBe(true);
+    expect(esTopeDeGastoDelProveedor('exceeded its monthly SPEND_CAP')).toBe(true);
+    expect(esTopeDeGastoDelProveedor(`Proveedor: ${ERROR_RATE_LIMIT}`)).toBe(false);
+    expect(esTopeDeGastoDelProveedor('Proveedor: 503 UNAVAILABLE')).toBe(false);
+  });
+
+  it('para en el primer caso que lo recibe: guarda lo anterior y no le anota costo a ese caso', async () => {
+    const ruta = join(dir, 'gasto.json');
+    let n = 0;
+    const correr = jest.fn(async () => {
+      n++;
+      if (n === 3) return resultado(0, { ok: false, infra: true, error: `Proveedor: ${ERROR_TOPE_DE_GOOGLE}`, llamadas: 0, costoUsd: 0 });
+      return resultado(0.01);
+    });
+
+    const r = await correrConTope({ trabajos: trabajos(6), correr, libro: { topeUsd: 4, gastadoUsd: 0, corridas: [] }, rutaLibro: ruta, etiqueta: 'x' });
+
+    // Los casos 4 a 6 no se intentan: darían el mismo 429.
+    expect(correr).toHaveBeenCalledTimes(3);
+    expect(r.resultados).toHaveLength(2);
+    expect(r.resultados.some((x) => x.infra)).toBe(false);
+    expect(r.frenada).toEqual({ quedan: 4, motivo: 'proveedor', mensaje: expect.stringContaining(MENSAJE_TOPE_DEL_PROVEEDOR) });
+    expect(MENSAJE_TOPE_DEL_PROVEEDOR).toBe('Google frenó por el tope de gasto del proyecto en AI Studio: subilo en https://ai.studio/spend y volvé a correr');
+    const libro = leerLibro(ruta)!;
+    expect(libro.gastadoUsd).toBeCloseTo(0.02, 9);
+    expect(libro.corridas[0]).toMatchObject({ casos: 2, estado: 'frenada' });
+    expect(libro.corridas[0].usd).toBeCloseTo(0.02, 9);
+  });
+
+  it('un error de infraestructura común no para la corrida', async () => {
+    const ruta = join(dir, 'gasto.json');
+    const correr = jest.fn(async () => resultado(0, { ok: false, infra: true, error: `Proveedor: ${ERROR_RATE_LIMIT}` }));
+
+    const r = await correrConTope({ trabajos: trabajos(3), correr, libro: { topeUsd: 4, gastadoUsd: 0, corridas: [] }, rutaLibro: ruta, etiqueta: 'x' });
+
+    expect(correr).toHaveBeenCalledTimes(3);
+    expect(r.frenada).toBeNull();
+  });
+
+  it('la CLI sale con código 3, con el mensaje, sin reintentar y con lo corrido guardado', async () => {
+    const ruta = join(dir, 'gasto.json');
+    const salida = join(dir, 'corrida.json');
+    // Un modelo guionado: contesta el primer caso y en el segundo Google corta.
+    let llamadas = 0;
+    const llm = {
+      async *streamChat(): AsyncGenerator<LlmEvent> {
+        llamadas++;
+        if (llamadas > 1) throw new Error(ERROR_TOPE_DE_GOOGLE);
+        yield { type: 'text', chunk: RESPUESTA_FUERA_DE_ALCANCE };
+        yield { type: 'usage', usage: { model: 'gemini-3.6-flash', provider: 'gemini', promptTokens: 1000, completionTokens: 10, cachedTokens: 0, thinkingTokens: 0 } };
+        yield { type: 'done' };
+      },
+    };
+    const keyAntes = process.env.GEMINI_API_KEY;
+    // main() exige que haya una key; nunca se usa: el modelo es el guionado.
+    process.env.GEMINI_API_KEY = 'no-se-usa-en-este-test';
+    try {
+      const codigo = await main(
+        ['--categoria=fuera-de-alcance', '--tope=4', `--gasto=${ruta}`, `--salida=${salida}`],
+        { crearModelo: () => ({ llm, nombre: 'gemini-3.6-flash' }) },
+      );
+      expect(codigo).toBe(3);
+    } finally {
+      if (keyAntes === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = keyAntes;
+    }
+
+    // Una llamada que anduvo y una que cortó: sin reintentos por "rate limit" ni más casos.
+    expect(llamadas).toBe(2);
+    expect(GeminiAdapter).not.toHaveBeenCalled();
+    expect((console.error as jest.Mock).mock.calls.flat().join('\n')).toContain(MENSAJE_TOPE_DEL_PROVEEDOR);
+    const guardada = JSON.parse(readFileSync(salida, 'utf8')) as { resultados: Resultado[] };
+    expect(guardada.resultados).toHaveLength(1);
+    expect(guardada.resultados[0].infra).toBeUndefined();
+    const libro = leerLibro(ruta)!;
+    expect(libro.corridas[0]).toMatchObject({ casos: 1, estado: 'frenada' });
   });
 });
 

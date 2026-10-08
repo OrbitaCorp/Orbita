@@ -40,6 +40,11 @@
  * lo que cobre Google debería ser menos, no más. No borres gasto.json para
  * "resetear": lo gastado no vuelve; si hace falta margen, subí el tope a
  * conciencia con --tope. Antes de una corrida grande, --ensayo.
+ *
+ * Aparte está el tope de gasto del PROYECTO en Google (AI Studio): si Google
+ * contesta 429 "exceeded its monthly spending cap", la corrida para en ese
+ * caso (los que siguen darían lo mismo), guarda lo que tiene y sale con
+ * código 3. Ese caso no se anota como corrido ni se le cobra el estimado.
  */
 
 import { resolve, join } from 'node:path';
@@ -230,7 +235,11 @@ export type Dependencias = {
   crearModelo: () => Required<Modelo>;
 };
 
-/** Devuelve el código de salida: 0 todo limpio, 1 fallas o error de uso, 2 frenada por el tope. */
+/**
+ * Devuelve el código de salida: 0 todo limpio, 1 fallas o error de uso, 2
+ * frenada por nuestro tope (el libro), 3 frenada por el tope de gasto del
+ * proyecto en Google.
+ */
 export async function main(args: string[], deps: Dependencias = { crearModelo: modeloDeVerdad }): Promise<number> {
   const arg = (nombre: string) => args.find((a) => a.startsWith(`--${nombre}=`))?.slice(nombre.length + 3);
   const filtro = arg('caso');
@@ -360,7 +369,7 @@ export async function main(args: string[], deps: Dependencias = { crearModelo: m
     console.log(`Guardado en ${destino}`);
   }
 
-  if (frenada) return 2;
+  if (frenada) return frenada.motivo === 'proveedor' ? 3 : 2;
   if (contra) comparar(resultados, contra);
 
   return resultados.some((r) => !r.ok) ? 1 : 0;
