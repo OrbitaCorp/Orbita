@@ -21,9 +21,13 @@
  * eliminar productos": borrar un producto es del negocio, solo que Orbi no
  * tiene la tool. Eso se contesta sin la frase, con dónde del panel se hace
  * (las evals lo exigen con `dentro-de-alcance` en esos casos).
+ *
+ * Antes decía "fuera de lo que puedo hacer": en la corrida final de la fase 1
+ * (2026-10-08) Gemini la escribió "lo que puedo me hacer" en 3 de 22 casos.
+ * "Fuera de mi alcance" es una frase hecha y no le deja dónde meter el "me".
  */
 
-export const RESPUESTA_FUERA_DE_ALCANCE = 'Eso queda fuera de lo que puedo hacer: estoy para ayudarte con tu negocio y con Órbita.';
+export const RESPUESTA_FUERA_DE_ALCANCE = 'Eso queda fuera de mi alcance: estoy para ayudarte con tu negocio y con Órbita.';
 
 export function capaDeAlcance(): string {
   return `## De qué hablás
@@ -62,7 +66,7 @@ function normalizar(texto: string): string {
 
 /**
  * Si la respuesta de Orbi es la de fuera de alcance: arranca con la primera
- * parte de la frase fija ("Eso queda fuera de lo que puedo hacer"), sin
+ * parte de la frase fija ("Eso queda fuera de mi alcance"), sin
  * importar mayúsculas, tildes, espacios ni un "**" o una comilla adelante.
  */
 export function esFueraDeAlcance(texto: string): boolean {

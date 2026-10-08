@@ -1324,7 +1324,7 @@ describe('OrbiController', () => {
 
     it('una respuesta con la frase fija de fuera de alcance marca el turno, sin guardar el texto', async () => {
       mockLlm.streamChat = async function* () {
-        yield { type: 'text' as const, chunk: 'Eso queda fuera de lo que puedo hacer: ' };
+        yield { type: 'text' as const, chunk: 'Eso queda fuera de mi alcance: ' };
         yield { type: 'text' as const, chunk: 'estoy para ayudarte con tu negocio y con Órbita. RESPUESTA-PRIVADA' };
         yield { type: 'done' as const };
       } as any;
