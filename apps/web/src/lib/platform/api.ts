@@ -41,6 +41,34 @@ export type GoogleSincronizacion = {
   subdominio: { ok: boolean; mensaje?: string } | null
 }
 
+// Correo del super panel (ver apps/api/src/platform/correo/).
+export type CasillaCorreo = {
+  id: string
+  email: string
+  name: string
+  jobTitle: string | null
+  phone: string | null
+  signatureImageUrl: string | null
+  // La imagen es la firma completa (una tarjeta) y reemplaza a la de texto.
+  signatureBanner: boolean
+  // Si el dominio está verificado en Resend. null = no se pudo consultar.
+  verified?: boolean | null
+}
+export type CasillaCorreoInput = Omit<CasillaCorreo, 'id' | 'verified'>
+export type CorreoEnviado = {
+  id: string
+  fromEmail: string
+  fromName: string
+  to: string
+  subject: string
+  body: string
+  status: 'SENT' | 'FAILED' | 'SIMULATED'
+  error: string | null
+  adminName: string
+  createdAt: string
+}
+export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
@@ -1010,4 +1038,24 @@ export const platformApi = {
   costsSync: () => sendJSON<{ synced: string[] }>('/platform/costs/sync', 'POST'),
   costsManualSnapshot: (body: { providerSlug: string; month: string; amountUsd: number; breakdown?: Record<string, number> }) =>
     sendJSON<{ id: string }>('/platform/costs/snapshot', 'POST', body),
+
+  correoCasillas: () => getJSON<CasillaCorreo[]>('/platform/correo/casillas'),
+  crearCasillaCorreo: (input: CasillaCorreoInput) => sendJSON<CasillaCorreo>('/platform/correo/casillas', 'POST', input),
+  editarCasillaCorreo: (id: string, input: CasillaCorreoInput) => sendJSON<CasillaCorreo>(`/platform/correo/casillas/${id}`, 'PUT', input),
+  borrarCasillaCorreo: (id: string) => sendJSON<{ ok: true }>(`/platform/correo/casillas/${id}`, 'DELETE'),
+  // multipart: sin Content-Type a mano, lo arma el navegador con su boundary.
+  subirImagenFirma: async (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await authedFetch(`${API_BASE}/platform/correo/firma-imagen`, { method: 'POST', body: form })
+    const data = (await res.json().catch(() => null)) as { url?: string; message?: string | string[] } | null
+    if (!res.ok || !data?.url) {
+      const msg = data?.message
+      throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? 'No se pudo subir la imagen.'))
+    }
+    return { url: data.url }
+  },
+  correoVistaPrevia: (input: { senderId: string; body: string }) => sendJSON<{ html: string }>('/platform/correo/vista-previa', 'POST', input),
+  enviarCorreo: (input: CorreoInput) => sendJSON<{ sent: boolean; simulated: boolean; error: string | null }>('/platform/correo/enviar', 'POST', input),
+  correosEnviados: () => getJSON<CorreoEnviado[]>('/platform/correo/enviados'),
 }

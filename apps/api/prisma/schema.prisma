@@ -2380,8 +2380,51 @@ model PlatformAdmin {
   auditActualizados    PlatformAuditItem[]      @relation("AuditActualizadoPor")
   auditDecisiones      PlatformAuditItem[]      @relation("AuditDecisionPor")
   supportMessages      SupportMessage[]
+  outboundMails        PlatformOutboundMail[]
 
   @@map("platform_admins")
+}
+
+// ─── Correo del super panel (super admin → Correo) ───────────────────────────
+//
+// Casillas desde las que el equipo de Órbita escribe correos a mano (a un
+// proveedor, a un hotel, a un posible cliente) con la plantilla de la marca.
+// Cada casilla lleva su firma: nombre, cargo, teléfono y una imagen opcional.
+// El dominio de la casilla tiene que estar verificado en Resend para que salga.
+model PlatformMailSender {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  name              String // con qué nombre sale el correo y firma
+  jobTitle          String?  @map("job_title")
+  phone             String?
+  signatureImageUrl String?  @map("signature_image_url")
+  // true: la imagen ES la firma (tarjeta completa) y reemplaza al texto.
+  signatureBanner   Boolean  @default(false) @map("signature_banner")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_mail_senders")
+}
+
+// Lo que se mandó desde Correo, con el cuerpo tal cual se escribió: email_logs
+// no guarda ni el cuerpo ni desde qué casilla salió. La casilla va copiada (no
+// como relación) para que borrarla no rompa el historial.
+model PlatformOutboundMail {
+  id        String          @id @default(uuid())
+  adminId   String          @map("admin_id")
+  fromEmail String          @map("from_email")
+  fromName  String          @map("from_name")
+  to        String
+  subject   String
+  body      String
+  status    EmailSendStatus
+  error     String?
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  admin PlatformAdmin @relation(fields: [adminId], references: [id])
+
+  @@index([createdAt])
+  @@map("platform_outbound_mails")
 }
 
 enum PlatformAdminRole {

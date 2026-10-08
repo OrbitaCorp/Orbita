@@ -82,8 +82,14 @@
               {{else}}
               <tr>
                 <td style="padding:16px 40px 28px; text-align:left;">
+                  {{!-- isDirect: correo escrito a mano desde el super panel, a alguien
+                       que no tiene negocio en Órbita. Sin la línea "para tu negocio". --}}
+                  {{#if isDirect}}
+                  <a href="https://www.orbita.site" style="font-size:10.5px; color:#8792a2; text-decoration:none;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Órbita · Tiendas online para negocios argentinos · orbita.site</a>
+                  {{else}}
                   <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Este es un correo de la plataforma Órbita para tu negocio.</span>
                   <br><a href="https://www.orbita.site" style="font-size:10.5px; color:#b3bcc9; text-decoration:none;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Hecho por Órbita</a>
+                  {{/if}}
                 </td>
               </tr>
               {{/unless}}

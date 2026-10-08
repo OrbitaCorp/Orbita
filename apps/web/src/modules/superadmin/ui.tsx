@@ -34,6 +34,7 @@ export const ACTION_LABELS: Record<string, string> = {
   mfa_code_failed: 'Código de acceso rechazado',
   mfa_code_blocked: 'Código de acceso bloqueado',
   send_mail_test: 'Enviar mail de prueba',
+  send_direct_mail: 'Enviar correo',
   password_reset: 'Restablecer contraseña',
   // Orbi: ajuste de cupo mensual y lectura de una conversación (platform-admin-log.service.ts).
   orbi_cupo_ajuste: 'Ajustar cupo de Orbi',
