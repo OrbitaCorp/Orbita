@@ -400,10 +400,12 @@ openssl rand -base64 32 | tr -d '\n' | gcloud secrets create TIKTOK_TOKEN_KEY --
 ```
 
 Configuración de la app en TikTok: tipo **Other**; productos **Login Kit** y **Content Posting API**
-(con **Direct Post** activado); permisos `user.info.basic` y `video.publish`; dirección de redirección
+(con **Direct Post** activado); permisos `user.info.basic`, `video.publish` (Direct Post) y `video.upload` (borradores); dirección de redirección
 exacta `https://api.orbita.site/api/v1/platform/marketing/tiktok/callback` (se puede cambiar con la
 variable `TIKTOK_REDIRECT_URI`). Los videos se suben desde el servidor por trozos (FILE_UPLOAD), así
-que no hace falta verificar ningún dominio.
+que no hace falta verificar ningún dominio. Hay dos formas de mandarlos: **publicar directo** (Direct Post) y
+**enviar a borradores** (el video llega a la cuenta y una persona lo termina en la app de TikTok). Los permisos
+que se piden al conectar salen de `TIKTOK_SCOPES` (por defecto los tres) y tienen que coincidir con los de la app.
 
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.

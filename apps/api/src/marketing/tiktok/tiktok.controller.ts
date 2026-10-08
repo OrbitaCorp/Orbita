@@ -6,6 +6,7 @@ import { SoloSuperadmin } from '../../common/decorators/platform-role.decorator'
 import { Public } from '../../common/decorators/public.decorator';
 import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { describeError } from '../../common/utils/describe-error.util';
+import { BorradorTiktokDto } from './dto/borrador-tiktok.dto';
 import { PublicarTiktokDto } from './dto/publicar-tiktok.dto';
 import { TiktokService } from './tiktok.service';
 
@@ -53,6 +54,13 @@ export class TiktokController {
   @SoloSuperadmin()
   publicar(@Req() req: RequestWithAdmin, @Body() dto: PublicarTiktokDto) {
     return this.tiktok.publicar(dto, req.user.adminId);
+  }
+
+  // Manda el video a los borradores de la cuenta: una persona lo termina y lo publica en la app de TikTok.
+  @Post('posts/draft')
+  @SoloSuperadmin()
+  enviarABorradores(@Req() req: RequestWithAdmin, @Body() dto: BorradorTiktokDto) {
+    return this.tiktok.enviarABorradores(dto.videoUrl, req.user.adminId);
   }
 
   @Get('posts/:publishId')

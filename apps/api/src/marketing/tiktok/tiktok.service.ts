@@ -21,7 +21,9 @@ import { PublicarTiktokDto } from './dto/publicar-tiktok.dto';
 // entorno donde TikTok todavía no está configurado.
 
 const TIKTOK = 'https://open.tiktokapis.com';
-const SCOPES = 'user.info.basic,video.publish';
+// Los permisos que se piden al conectar: perfil, publicar directo y mandar a borradores. Tienen que coincidir
+// con los de la app en developers.tiktok.com (si se pide uno que la app no tiene, TikTok rechaza el login).
+const SCOPES_POR_DEFECTO = 'user.info.basic,video.publish,video.upload';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const RENOVAR_CON_ANTICIPACION_MS = 6 * 3_600_000;
 const MAX_TITULO = 2200;
@@ -102,6 +104,10 @@ export class TiktokService {
     return this.requerida('TIKTOK_TOKEN_KEY');
   }
 
+  private get scopes(): string {
+    return this.config.get<string>('TIKTOK_SCOPES') ?? SCOPES_POR_DEFECTO;
+  }
+
   /** ¿Están cargados los secretos de la app de TikTok? */
   configurado(): boolean {
     return !!(this.config.get('TIKTOK_CLIENT_KEY') && this.config.get('TIKTOK_CLIENT_SECRET') && this.config.get('TIKTOK_TOKEN_KEY'));
@@ -159,7 +165,7 @@ export class TiktokService {
   urlDeAutorizacion(adminId: string): string {
     const params = new URLSearchParams({
       client_key: this.requerida('TIKTOK_CLIENT_KEY'),
-      scope: SCOPES,
+      scope: this.scopes,
       response_type: 'code',
       redirect_uri: this.redirectUri,
       state: this.firmarState(adminId),
@@ -189,7 +195,7 @@ export class TiktokService {
         ${randomUUID()}, ${openId}, ${usuario?.display_name ?? null}, ${usuario?.avatar_url ?? null},
         encode(pgp_sym_encrypt(${t.access_token}, ${this.tokenKey}), 'base64'),
         encode(pgp_sym_encrypt(${t.refresh_token}, ${this.tokenKey}), 'base64'),
-        ${venceAcceso}, ${venceRenovacion}, ${t.scope ?? SCOPES}, ${adminId}, now(), now()
+        ${venceAcceso}, ${venceRenovacion}, ${t.scope ?? this.scopes}, ${adminId}, now(), now()
       )
       ON CONFLICT (open_id) DO UPDATE SET
         display_name = EXCLUDED.display_name,
@@ -411,7 +417,21 @@ export class TiktokService {
     const uploadUrl = init.data?.upload_url;
     if (!publishId || !uploadUrl) throw new BadGatewayException('TikTok no devolvió dónde subir el video');
 
-    // El último trozo se lleva lo que sobra de la división.
+    await this.subirPorTrozos(uploadUrl, datos, tipo, trozo, cantidad);
+
+    const post = await this.prisma.marketingTiktokPost.create({
+      data: {
+        accountId: v.cuentaId, publishId, title: dto.title, privacyLevel: dto.privacyLevel, videoUrl: dto.videoUrl,
+        status: 'PROCESSING_UPLOAD', createdBy: adminId ?? null,
+      },
+      select: { id: true, publishId: true, status: true },
+    });
+    if (adminId) await this.registrar(adminId, 'tiktok_publish', publishId, { privacidad: dto.privacyLevel, titulo: dto.title.slice(0, 120) });
+    return post;
+  }
+
+  /** Sube el video a la dirección que dio TikTok, por trozos. El último se lleva lo que sobra de la división. */
+  private async subirPorTrozos(uploadUrl: string, datos: Buffer, tipo: string, trozo: number, cantidad: number): Promise<void> {
     for (let i = 0; i < cantidad; i++) {
       const desde = i * trozo;
       const hasta = i === cantidad - 1 ? datos.length : desde + trozo;
@@ -424,15 +444,34 @@ export class TiktokService {
       });
       if (!r.ok && r.status !== 206) throw new BadGatewayException(`TikTok rechazó el trozo ${i + 1} de ${cantidad} (${r.status})`);
     }
+  }
+
+  /**
+   * Manda el video a los BORRADORES de la cuenta (permiso video.upload): no se publica solo, una persona lo
+   * termina en la app de TikTok (título, visibilidad, etc.). Sirve para publicar con una persona mirando y,
+   * hasta que la app pase la auditoría, para no depender de la visibilidad "solo yo" del Direct Post.
+   */
+  async enviarABorradores(videoUrl: string, adminId?: string) {
+    const v = await this.tokenVigente();
+    if (!v) throw new BadRequestException('TikTok no está conectado');
+    const { datos, tipo } = await this.descargarVideo(videoUrl);
+    const { trozo, cantidad } = planDeTrozos(datos.length);
+    const init = await this.llamarApi<{ data?: { publish_id?: string; upload_url?: string } }>('POST', `${TIKTOK}/v2/post/publish/inbox/video/init/`, v.token, {
+      source_info: { source: 'FILE_UPLOAD', video_size: datos.length, chunk_size: trozo, total_chunk_count: cantidad },
+    }).catch((e: unknown) => this.traducir(e));
+    const publishId = init.data?.publish_id;
+    const uploadUrl = init.data?.upload_url;
+    if (!publishId || !uploadUrl) throw new BadGatewayException('TikTok no devolvió dónde subir el video');
+    await this.subirPorTrozos(uploadUrl, datos, tipo, trozo, cantidad);
 
     const post = await this.prisma.marketingTiktokPost.create({
       data: {
-        accountId: v.cuentaId, publishId, title: dto.title, privacyLevel: dto.privacyLevel, videoUrl: dto.videoUrl,
+        accountId: v.cuentaId, publishId, title: '(borrador)', privacyLevel: 'BORRADOR', videoUrl,
         status: 'PROCESSING_UPLOAD', createdBy: adminId ?? null,
       },
       select: { id: true, publishId: true, status: true },
     });
-    if (adminId) await this.registrar(adminId, 'tiktok_publish', publishId, { privacidad: dto.privacyLevel, titulo: dto.title.slice(0, 120) });
+    if (adminId) await this.registrar(adminId, 'tiktok_draft', publishId, { video: videoUrl.slice(0, 200) });
     return post;
   }
 
