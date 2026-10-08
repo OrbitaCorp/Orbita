@@ -13,6 +13,7 @@ import { EmailVerificationService } from '../member-profile/email-verification.s
 import { CostsService } from '../platform/costs/costs.service';
 import { AlertasDeCostoService } from '../platform/costs/alertas-de-costo.service';
 import { SearchConsoleService } from '../search-console/search-console.service';
+import { TiktokService } from '../marketing/tiktok/tiktok.service';
 import { InstagramService } from '../instagram/instagram.service';
 
 /**
@@ -84,6 +85,9 @@ export class InternalCronController {
     // Renovación del token de Instagram (dura 60 días). Opcional por la misma razón de
     // compatibilidad con specs unitarios.
     private readonly instagram?: InstagramService,
+    // TikTok de marketing: renueva el token de acceso (dura 24 h) para que la conexión no se corte.
+    // Opcional por la misma razón de compatibilidad con specs unitarios.
+    private readonly tiktok?: TiktokService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -176,6 +180,8 @@ export class InternalCronController {
         } catch (e) {
           this.logger.error(`Tokens de Instagram: no se pudo correr — ${describeError(e)}`);
         }
+        // Token de TikTok de marketing: el servicio ya no tira (si falla, queda en su propio log).
+        await this.tiktok?.renovarTokens();
       },
     );
   }

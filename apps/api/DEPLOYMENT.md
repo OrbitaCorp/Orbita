@@ -386,6 +386,41 @@ verificarlo por META. Si un dominio se queda en "pendiente", mirar `custom_domai
 (o el superadmin): casi siempre es que la portada todavía no muestra la etiqueta (la API guarda
 el SEO ~1 minuto) o que el dominio no abre por HTTPS.
 
+## TikTok: videos de marketing de Órbita
+
+Qué hace (código en `src/marketing/tiktok/`): conecta la cuenta de TikTok de la EMPRESA (una sola) y
+publica videos con la Content Posting API (Direct Post). Se maneja desde Superadmin → Marketing. Los
+tokens van cifrados con `pgp_sym_encrypt` (igual que WhatsApp e Instagram) y se renuevan cada noche
+dentro del mantenimiento nocturno (el de acceso dura 24 h, el de renovación 365 días).
+
+**Mientras la app de TikTok no pase su auditoría, todo lo que se publique queda en privado
+("Solo yo")** y la cuenta tiene que ser privada. Es una regla de TikTok: la única forma de levantarla
+es la auditoría (video de demostración del flujo completo, que es esta misma pantalla).
+
+Secretos (Secret Manager, proyecto `orbita-api-corp`; se cargan UNA vez y se agregan a `SECRETS=` en
+`deploy/deploy.sh` — si se agregan a esa lista sin que existan, el deploy falla):
+
+- `TIKTOK_CLIENT_KEY` y `TIKTOK_CLIENT_SECRET`: de la app en developers.tiktok.com (Manage apps).
+- `TIKTOK_TOKEN_KEY`: clave con la que Postgres cifra los tokens. Una cadena larga al azar
+  (`openssl rand -base64 32`). **Si se pierde, hay que volver a conectar la cuenta.**
+
+```bash
+printf '%s' 'VALOR' | gcloud secrets create TIKTOK_CLIENT_KEY --data-file=- --project orbita-api-corp
+printf '%s' 'VALOR' | gcloud secrets create TIKTOK_CLIENT_SECRET --data-file=- --project orbita-api-corp
+openssl rand -base64 32 | tr -d '\n' | gcloud secrets create TIKTOK_TOKEN_KEY --data-file=- --project orbita-api-corp
+```
+
+Configuración de la app en TikTok: tipo **Other**; productos **Login Kit** y **Content Posting API**
+(con **Direct Post** activado); permisos `user.info.basic`, `video.publish` (Direct Post) y `video.upload` (borradores); dirección de redirección
+exacta `https://api.orbita.site/api/v1/platform/marketing/tiktok/callback` (se puede cambiar con la
+variable `TIKTOK_REDIRECT_URI`). Los videos se suben desde el servidor por trozos (FILE_UPLOAD), así
+que no hace falta verificar ningún dominio. Hay dos formas de mandarlos: **publicar directo** (Direct Post) y
+**enviar a borradores** (el video llega a la cuenta y una persona lo termina en la app de TikTok). Los permisos
+que se piden al conectar salen de `TIKTOK_SCOPES` (por defecto los tres) y tienen que coincidir con los de la app.
+
+Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
+de la API sigue igual.
+
 ## Ver logs
 
 ```bash

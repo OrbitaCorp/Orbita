@@ -38,13 +38,13 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
  * la cantidad de integrantes hay que volver a mirar las cuatro caras, sobre
  * todo con la tarjeta abierta, que es la más ancha.
  *
- * La de Alexander ya viene de frente y de cerca, por eso no lleva zoom.
+ * Las cuatro son de medio cuerpo o más abiertas, por eso todas llevan zoom.
  */
 interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; encuadre?: string }
 
 const EQUIPO: Miembro[] = [
     { nombre: 'Mateo Rojas',       sigla: 'CEO', puesto: 'Fundador y director ejecutivo',               foto: '/nosotros/ceo.jpg', zoom: 1.35, foco: '43% 35%' },
-    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Fundador y director de producto',             foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
+    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Fundador y director de producto',             foto: '/nosotros/cpo.jpg', zoom: 1.3,  foco: '50% 40%' },
     { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Fundador y director de tecnología',           foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
     { nombre: 'Milagros Lucchi',   sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.55, foco: '55% 41%' },
 ];

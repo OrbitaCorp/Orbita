@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "0030a40a1d9e2e1e",
+  "version": "7d0d4c8b2328cd46",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -238,7 +238,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "crear-producto",
       "capitulo": "Productos",
       "titulo": "Crear un producto",
-      "texto": "El botón \"Crear producto\" abre el alta. Lo importante, en orden:\n\n1. Nombre: Cómo lo busca tu cliente, no cómo lo llamás vos internamente.\n2. Fotos: Lo que más vende. La primera es la que se ve en el catálogo; el resto, al abrir el producto.\n3. Precio: El que ve el cliente.\n4. Stock: Cuántas unidades tenés. Se descuenta solo con cada venta, incluidas las que cargás a mano.\n5. Categoría: Dónde vive dentro de tu catálogo.\n6. Publicado o borrador: Borrador lo deja invisible hasta que esté listo.\n\nConsejo: Escribí el nombre y tocá \"Redactar con Orbi\": te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.",
+      "texto": "El botón \"Crear producto\" abre el alta. Lo importante, en orden:\n\n1. Nombre: Cómo lo busca tu cliente, no cómo lo llamás vos internamente.\n2. Fotos: Lo que más vende. La primera es la que se ve en el catálogo; el resto, al abrir el producto.\n3. Precio: El que ve el cliente.\n4. Stock: Cuántas unidades tenés. Se descuenta solo con cada venta, incluidas las que cargás a mano.\n5. Categoría: Dónde vive dentro de tu catálogo.\n6. Publicado o borrador: Borrador lo deja invisible hasta que esté listo.\n\nMientras cargás, la vista previa muestra cómo queda el producto en tu tienda. En el celular está oculta: tocá \"Ver vista previa\" (arriba del formulario) para abrirla.\n\nConsejo: Escribí el nombre y tocá \"Redactar con Orbi\": te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.",
       "destino": {
         "seccion": "catalogo",
         "vista": "nuevo",
