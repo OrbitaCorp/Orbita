@@ -69,6 +69,45 @@ export type CorreoEnviado = {
 }
 export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
 
+// Marketing de Órbita en TikTok (ver apps/api/src/marketing/tiktok/).
+export type TiktokEstado = {
+  configurado: boolean
+  conectado: boolean
+  cuenta: { nombre: string | null; avatar: string | null; permisos: string[]; conectadaEl: string; renovacionVenceEl: string } | null
+}
+export type TiktokCreador = {
+  avatar: string | null
+  usuario: string
+  nombre: string
+  privacidades: string[]
+  comentariosDeshabilitados: boolean
+  duetosDeshabilitados: boolean
+  stitchDeshabilitado: boolean
+  duracionMaximaSeg: number
+}
+export type TiktokPublicacion = {
+  id: string
+  publishId: string
+  title: string
+  privacyLevel: string
+  videoUrl: string
+  status: string
+  failReason: string | null
+  postId: string | null
+  createdAt: string
+}
+export type TiktokPublicar = {
+  title: string
+  videoUrl: string
+  privacyLevel: string
+  disableComment?: boolean
+  disableDuet?: boolean
+  disableStitch?: boolean
+  brandContent?: boolean
+  brandOrganic?: boolean
+  isAigc?: boolean
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
@@ -944,6 +983,13 @@ export const platformApi = {
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
   syncBusinessSearchConsole: (id: string) => sendJSON<GoogleSincronizacion>(`/platform/businesses/${id}/search-console/sync`, 'POST'),
+  tiktokEstado: () => getJSON<TiktokEstado>('/platform/marketing/tiktok'),
+  tiktokConectar: () => sendJSON<{ url: string }>('/platform/marketing/tiktok/connect', 'POST'),
+  tiktokCreador: () => getJSON<TiktokCreador>('/platform/marketing/tiktok/creator-info'),
+  tiktokPublicaciones: () => getJSON<TiktokPublicacion[]>('/platform/marketing/tiktok/posts'),
+  tiktokPublicar: (body: TiktokPublicar) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts', 'POST', body),
+  tiktokEstadoPublicacion: (publishId: string) => getJSON<TiktokPublicacion>(`/platform/marketing/tiktok/posts/${publishId}`),
+  tiktokDesconectar: () => sendJSON<{ ok: true }>('/platform/marketing/tiktok', 'DELETE'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

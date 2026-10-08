@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send,
+  Search, Plus, DollarSign, Bot, Send, Megaphone,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -22,6 +22,7 @@ import { TabSoporte } from './Soporte'
 import { TabCostos } from './Costos'
 import { TabOrbi } from './Orbi'
 import { TabCorreo } from './Correo'
+import { TabMarketing } from './Marketing'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -98,12 +99,13 @@ export function SuperAdminDashboard() {
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
       {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role === 'SUPERADMIN'} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -136,6 +138,8 @@ export const NAV: ItemNav<Tab>[] = [
   // el testeo de los emails automáticos (antes "Emails", que se confundía).
   { id: 'correo', label: 'Correo', Icono: Send, grupo: 'Interno' },
   { id: 'testeo', label: 'Testeo de emails', Icono: Mail, grupo: 'Interno' },
+  // Publicar los videos de marketing de Órbita en TikTok, desde la cuenta de la empresa.
+  { id: 'marketing', label: 'Marketing', Icono: Megaphone, grupo: 'Interno' },
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────

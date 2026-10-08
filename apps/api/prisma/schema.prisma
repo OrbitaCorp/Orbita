@@ -3316,3 +3316,51 @@ model OrbiConversationAccess {
   @@index([adminId, createdAt])
   @@map("orbi_conversation_access")
 }
+
+// ─── Marketing de Órbita: TikTok ─────────────────────────────────────────────
+// La cuenta de TikTok de la EMPRESA (no de un negocio) con la que se publican los
+// videos de marketing de Órbita (Content Posting API). Hay una sola, y la conecta
+// un superadmin desde Superadmin → Marketing → TikTok. Los tokens van CIFRADOS con
+// pgp_sym_encrypt, igual que WhatsappConnection e InstagramConnection: Node nunca
+// los cifra ni los descifra, lo hace Postgres. El de acceso dura 24 h y el de
+// renovación 365 días (se renuevan cada noche, ver TiktokService#renovarTokens).
+model MarketingTiktokAccount {
+  id               String   @id @default(uuid())
+  openId           String   @unique @map("open_id") // id de la cuenta en TikTok para esta app
+  displayName      String?  @map("display_name")
+  avatarUrl        String?  @map("avatar_url")
+  accessToken      String   @map("access_token") // CIFRADO (pgp_sym_encrypt)
+  refreshToken     String   @map("refresh_token") // CIFRADO (pgp_sym_encrypt)
+  accessExpiresAt  DateTime @map("access_expires_at")
+  refreshExpiresAt DateTime @map("refresh_expires_at")
+  scopes           String // los permisos que TikTok concedió, separados por coma
+  connectedBy      String?  @map("connected_by") // adminId del superadmin que la conectó
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  posts MarketingTiktokPost[]
+
+  @@map("marketing_tiktok_accounts")
+}
+
+// Cada video que se mandó a TikTok desde Órbita, con el estado que informa TikTok.
+model MarketingTiktokPost {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  publishId    String   @unique @map("publish_id") // el que devuelve TikTok al iniciar la subida
+  title        String
+  privacyLevel String   @map("privacy_level") // PUBLIC_TO_EVERYONE, SELF_ONLY, etc.
+  videoUrl     String   @map("video_url") // de dónde se descargó el video
+  // PROCESSING_UPLOAD | PROCESSING_DOWNLOAD | SEND_TO_USER_INBOX | PUBLISH_COMPLETE | FAILED
+  status       String
+  failReason   String?  @map("fail_reason")
+  postId       String?  @map("post_id") // id público del video, cuando TikTok lo publica
+  createdBy    String?  @map("created_by") // adminId
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  account MarketingTiktokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@map("marketing_tiktok_posts")
+}
