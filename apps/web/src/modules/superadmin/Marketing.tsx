@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { platformApi, type TiktokCreador, type TiktokPublicacion } from '@/lib/platform/api'
+import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
 } from './ui'
 
-// Marketing: publicar los videos de Órbita en TikTok desde la cuenta de la empresa.
+// Marketing: los canales de la empresa para llegar a más gente (TikTok, Instagram y WhatsApp).
+// Arriba, una tarjeta por canal con su estado; abajo, el detalle del canal elegido.
 //
+// TikTok es el único que se maneja desde acá: se conecta la cuenta de la empresa y se publican videos. Instagram y
+// WhatsApp se conectan por negocio desde su bandeja de mensajes: esta pantalla muestra su estado y qué falta.
+//
+// Publicar en TikTok:
 // La pantalla de publicar sigue las reglas de TikTok para la Content Posting API (es lo que revisan
 // en la auditoría): se muestra con qué cuenta se publica, la visibilidad se elige a mano (sin valor
 // por defecto) entre las que TikTok permite en ese momento, los comentarios, dúos y stitch arrancan
@@ -37,21 +42,124 @@ const URL_MARCA = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
 
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 96, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }
 
+type Canal = 'tiktok' | 'instagram' | 'whatsapp'
+type Tono = 'green' | 'amber' | 'gray'
+type Estado = { texto: string; tono: Tono }
+
 export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
   const router = useRouter()
   const [tick, setTick] = useState(0)
-  const { data: estado, error } = useFetch(() => platformApi.tiktokEstado(), [tick])
+  const { data: tiktok, loading: cargandoTiktok } = useFetch(() => platformApi.tiktokEstado(), [tick])
+  const { data: canales } = useFetch(() => platformApi.marketingCanales(), [])
+  const [canal, setCanal] = useState<Canal>('tiktok')
   const [aviso, setAviso] = useState<Aviso | null>(null)
-  const [conectando, setConectando] = useState(false)
-  const [desconectando, setDesconectando] = useState(false)
 
   // TikTok vuelve a esta pantalla con el resultado de la conexión en la dirección.
   useEffect(() => {
     const r = router.query.tiktok
     if (r === 'conectado') setAviso({ variant: 'success', title: 'Cuenta de TikTok conectada' })
     else if (r === 'error') setAviso({ variant: 'error', title: 'No se pudo conectar TikTok', description: 'Probá de nuevo. Si sigue igual, revisá que la dirección de redirección de la app sea la correcta.' })
-    if (r) void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true })
+    if (r) { setCanal('tiktok'); void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true }) }
   }, [router.query.tiktok]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Qué dice cada tarjeta de un vistazo. El estado siempre va en palabras: el color solo lo acompaña.
+  const estadoTiktok: Estado = !tiktok ? { texto: cargandoTiktok ? 'Cargando…' : 'No disponible', tono: 'gray' }
+    : !tiktok.configurado ? { texto: 'Sin configurar', tono: 'gray' }
+    : tiktok.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
+  const lineaTiktok = !tiktok ? '' : !tiktok.configurado ? 'Faltan los datos de la app' : tiktok.cuenta?.nombre ?? 'Todavía no hay una cuenta'
+
+  const ig = canales?.instagram
+  const estadoInstagram: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' } : ig?.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
+  const lineaInstagram = !canales ? '' : ig?.conectado ? (ig.usuario ? `@${ig.usuario}` : 'Cuenta conectada') : 'Todavía no hay una cuenta'
+
+  const wa = canales?.whatsapp
+  const estadoWhatsapp: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' }
+    : wa?.conectado ? (wa.dePrueba ? { texto: 'Número de prueba', tono: 'amber' } : { texto: 'Conectado', tono: 'green' })
+    : { texto: 'Pendiente', tono: 'amber' }
+  const lineaWhatsapp = !canales ? '' : wa?.conectado ? (wa.numero ?? '') : 'Falta el número de la empresa'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <style>{`
+        .mk-canal { transition: border-color 150ms, background-color 150ms; }
+        .mk-canal:hover { border-color: var(--color-muted); }
+        .mk-canal[aria-pressed="true"] { border-color: var(--color-primary); }
+        .mk-canal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { .mk-canal { transition: none; } }
+      `}</style>
+
+      <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+        <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} />
+        <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} />
+        <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
+      </div>
+
+      {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} setAviso={setAviso} />}
+      {canal === 'instagram' && <PanelInstagram canales={canales} />}
+      {canal === 'whatsapp' && <PanelWhatsapp canales={canales} />}
+
+      {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
+    </div>
+  )
+}
+
+function CanalTarjeta({ nombre, para, estado, linea, activo, onElegir }: { nombre: string; para: string; estado: Estado; linea: string; activo: boolean; onElegir: () => void }) {
+  return (
+    <button
+      type="button"
+      className="mk-canal"
+      onClick={onElegir}
+      aria-pressed={activo}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+        minHeight: 132, padding: '16px 18px', borderRadius: 14, background: 'var(--color-bg)',
+        border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)',
+      }}
+    >
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{nombre}</span>
+      <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{para}</span>
+      <span style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+        <Chip text={estado.texto} tone={estado.tono} dot />
+        <span style={{ fontSize: 12.5, color: 'var(--color-body)', minHeight: 18, overflowWrap: 'anywhere' }}>{linea}</span>
+      </span>
+    </button>
+  )
+}
+
+// Una línea "etiqueta: valor" para los datos de la cuenta.
+function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 13.5, padding: '9px 0', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+      <span style={{ width: 150, flexShrink: 0, color: 'var(--color-muted)', fontSize: 12.5 }}>{etiqueta}</span>
+      <span style={{ color: 'var(--color-text)', minWidth: 0, overflowWrap: 'anywhere' }}>{children}</span>
+    </div>
+  )
+}
+
+// Una fila de "qué se puede hacer" o de un paso a seguir: título, explicación y su estado en palabras.
+function Fila({ titulo, detalle, estado, ultimo }: { titulo: string; detalle: string; estado: Estado; ultimo?: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 0', borderBottom: ultimo ? 'none' : '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+      <div style={{ minWidth: 0, flex: '1 1 320px' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3, lineHeight: 1.5 }}>{detalle}</div>
+      </div>
+      <Chip text={estado.texto} tone={estado.tono} dot />
+    </div>
+  )
+}
+
+const enlaceBoton: React.CSSProperties = { ...btnGhostSm, textDecoration: 'none', height: 34 }
+
+// ─── TikTok ─────────────────────────────────────────────────────────────────────
+
+function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, setAviso }: {
+  estado: TiktokEstado | null; puedePublicar: boolean; refrescar: number; onCambio: () => void; setAviso: (a: Aviso) => void
+}) {
+  const [conectando, setConectando] = useState(false)
+  const [desconectando, setDesconectando] = useState(false)
 
   const conectar = async () => {
     setConectando(true)
@@ -64,14 +172,11 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
     }
   }
 
-  if (error) return <ErrorBox msg="No se pudo cargar el estado de TikTok." />
-  if (!estado) return <Loader />
+  if (!estado) return <Card title="TikTok"><Loader /></Card>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <PageHeader title="Marketing" subtitle="Publicá los videos de Órbita en la cuenta de TikTok de la empresa" />
-
-      <Card title="TikTok" subtitle="La cuenta con la que se publican los videos de marketing">
+    <>
+      <Card title="Cuenta de TikTok" subtitle="La cuenta de la empresa con la que se publican los videos">
         {!estado.configurado ? (
           <Empty text="TikTok todavía no está configurado en este entorno: faltan los datos de la app (client key, client secret y clave de cifrado)." />
         ) : !estado.conectado || !estado.cuenta ? (
@@ -99,8 +204,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
         )}
       </Card>
 
-      {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={() => setTick((n) => n + 1)} setAviso={setAviso} />}
-      {estado.conectado && <Publicaciones refrescar={tick} />}
+      {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={onCambio} setAviso={setAviso} />}
+      {estado.conectado && <Publicaciones refrescar={refrescar} />}
 
       {desconectando && (
         <ConfirmModal
@@ -111,13 +216,116 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
           onConfirm={async () => {
             await platformApi.tiktokDesconectar()
             setDesconectando(false)
-            setTick((n) => n + 1)
+            onCambio()
             setAviso({ variant: 'success', title: 'Cuenta de TikTok desconectada' })
           }}
         />
       )}
-      {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
-    </div>
+    </>
+  )
+}
+
+// ─── Instagram ──────────────────────────────────────────────────────────────────
+
+function PanelInstagram({ canales }: { canales: MarketingCanales | null }) {
+  if (!canales) return <Card title="Instagram"><Loader /></Card>
+  const { instagram: ig, negocio } = canales
+  const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
+  const conectado = ig.conectado
+
+  return (
+    <>
+      <Card
+        title="Cuenta de Instagram"
+        subtitle="Instagram se conecta al negocio desde su bandeja de mensajes; acá se ve el estado"
+        action={bandeja ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{conectado ? 'Abrir la bandeja' : 'Conectar desde la bandeja'}</a> : undefined}
+      >
+        {ig.conectado ? (
+          <div>
+            <Dato etiqueta="Cuenta">
+              {ig.usuario ? <a href={`https://www.instagram.com/${ig.usuario}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>@{ig.usuario}</a> : 'Cuenta conectada'}
+            </Dato>
+            {negocio && <Dato etiqueta="Conectada al negocio">{negocio.nombre} <span style={{ color: 'var(--color-muted)' }}>({negocio.subdominio})</span></Dato>}
+            <Dato etiqueta="Acceso">
+              {ig.diasRestantes > 0 ? `Vigente por ${ig.diasRestantes} ${ig.diasRestantes === 1 ? 'día' : 'días'}` : 'Vencido: hay que volver a conectar la cuenta'}
+              <span style={{ color: 'var(--color-muted)' }}> · se renueva solo cada noche</span>
+            </Dato>
+          </div>
+        ) : (
+          <Empty text={negocio ? `Todavía no hay una cuenta de Instagram conectada al negocio ${negocio.nombre}.` : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
+        )}
+      </Card>
+
+      <Card title="Qué se puede hacer" subtitle="Lo que está disponible hoy y lo que depende de la revisión de Meta">
+        <Fila
+          titulo="Recibir y contestar mensajes directos"
+          detalle="Los mensajes que llegan a la cuenta aparecen en la bandeja de mensajes del negocio y se contestan desde ahí, dentro de las 24 horas de que escribió la persona."
+          estado={conectado ? { texto: 'Disponible', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }}
+        />
+        <Fila
+          titulo="Publicar fotos y Reels"
+          detalle="Necesita el permiso de publicación de Instagram, que Meta da después de revisar la app."
+          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+        />
+        <Fila
+          titulo="Métricas de la cuenta"
+          detalle="Alcance, seguidores e interacciones. Depende de la misma revisión."
+          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+          ultimo
+        />
+      </Card>
+    </>
+  )
+}
+
+// ─── WhatsApp ───────────────────────────────────────────────────────────────────
+
+function PanelWhatsapp({ canales }: { canales: MarketingCanales | null }) {
+  if (!canales) return <Card title="WhatsApp"><Loader /></Card>
+  const { whatsapp: wa, negocio } = canales
+  const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
+
+  return (
+    <>
+      <Card
+        title="Número de WhatsApp"
+        subtitle="WhatsApp se conecta al negocio desde su bandeja de mensajes; acá se ve el estado"
+        action={bandeja ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>Abrir la bandeja</a> : undefined}
+      >
+        {wa.conectado ? (
+          <div>
+            <Dato etiqueta="Número">{wa.numero ?? 'Número conectado'}</Dato>
+            {negocio && <Dato etiqueta="Conectado al negocio">{negocio.nombre} <span style={{ color: 'var(--color-muted)' }}>({negocio.subdominio})</span></Dato>}
+            {wa.dePrueba && (
+              <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.55, paddingTop: 12 }}>
+                Es el número de prueba que da Meta para desarrollar. Sirve para probar cómo llegan y se contestan los mensajes, pero no para atender a clientes de verdad.
+              </div>
+            )}
+          </div>
+        ) : (
+          <Empty text="Todavía no hay un número de WhatsApp conectado." />
+        )}
+      </Card>
+
+      <Card title="Para pasar a un número de la empresa" subtitle="Lo que hace falta, en orden">
+        <Fila
+          titulo="1. Conseguir un número exclusivo para la empresa"
+          detalle="Tiene que poder recibir un código por SMS o llamada, y conviene que no esté en uso en la app de WhatsApp ni en WhatsApp Business. Una línea nueva sirve."
+          estado={{ texto: 'Pendiente', tono: 'amber' }}
+        />
+        <Fila
+          titulo="2. Verificar la empresa en Meta"
+          detalle="Se hace en el administrador comercial de Meta. Meta puede pedir datos o documentación de la empresa."
+          estado={{ texto: 'Después', tono: 'gray' }}
+        />
+        <Fila
+          titulo="3. Registrar el número y conectarlo"
+          detalle="Se agrega en la app de Meta y se conecta desde la bandeja de mensajes del negocio. Desde ahí empiezan a llegar los mensajes."
+          estado={{ texto: 'Después', tono: 'gray' }}
+          ultimo
+        />
+      </Card>
+    </>
   )
 }
 

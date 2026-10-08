@@ -70,6 +70,12 @@ export type CorreoEnviado = {
 export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
 
 // Marketing de Órbita en TikTok (ver apps/api/src/marketing/tiktok/).
+// Instagram y WhatsApp de la empresa: se leen del negocio al que están conectados (ver apps/api/src/marketing/canales.service.ts).
+export type MarketingCanales = {
+  negocio: { nombre: string; subdominio: string } | null
+  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: string; diasRestantes: number }
+  whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean }
+}
 export type TiktokEstado = {
   configurado: boolean
   conectado: boolean
@@ -983,6 +989,7 @@ export const platformApi = {
   showBusinessInSearch: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/show-in-search`, 'POST'),
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
   syncBusinessSearchConsole: (id: string) => sendJSON<GoogleSincronizacion>(`/platform/businesses/${id}/search-console/sync`, 'POST'),
+  marketingCanales: () => getJSON<MarketingCanales>('/platform/marketing/channels'),
   tiktokEstado: () => getJSON<TiktokEstado>('/platform/marketing/tiktok'),
   tiktokConectar: () => sendJSON<{ url: string }>('/platform/marketing/tiktok/connect', 'POST'),
   tiktokCreador: () => getJSON<TiktokCreador>('/platform/marketing/tiktok/creator-info'),
