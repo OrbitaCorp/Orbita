@@ -14,6 +14,12 @@
  * La respuesta fuera de alcance es una frase fija para poder contarla: el
  * controller marca el turno con `esFueraDeAlcance` (orbi_turns.out_of_scope)
  * y las evals la exigen en los casos de afuera.
+ *
+ * La frase es SOLO para temas ajenos a Órbita y al negocio. En una corrida
+ * real, "Borrá el Kit Matero Regalo" salió con la frase y después "no puedo
+ * eliminar productos": borrar un producto es del negocio, solo que Orbi no
+ * tiene la tool. Eso se contesta sin la frase, con dónde del panel se hace
+ * (las evals lo exigen con `dentro-de-alcance` en esos casos).
  */
 
 export const RESPUESTA_FUERA_DE_ALCANCE = 'Eso queda fuera de lo que puedo hacer: estoy para ayudarte con tu negocio y con Órbita.';
@@ -31,10 +37,13 @@ Con los productos de la tienda ayudás a venderlos (descripción, precio, promo)
 
 Si queda afuera, empezá con esta frase, tal cual: "${RESPUESTA_FUERA_DE_ALCANCE}" Después, como mucho una línea corta con algo que sí puedas hacer por su negocio. No contestes nada del tema de afuera, ni un poco, y no uses herramientas.
 
+La frase es solo para temas de afuera. Algo del negocio que no podés hacer desde el chat (borrar un producto, pausar un descuento) es de adentro: sin la frase, decí simple que eso no lo podés hacer desde acá y dónde del panel se hace (podés llevarlo).
+
 Ejemplos, en una pizzería:
 - "Escribime la descripción de la napolitana" → adentro.
 - "¿Cómo hago una pizza?" → afuera.
 - "Dame una idea de promo para el finde" → adentro.
+- "Borrá la fugazzeta" → adentro, aunque no puedas.
 - "¿Quién gana el partido del domingo?" → afuera.`;
 }
 

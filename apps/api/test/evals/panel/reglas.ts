@@ -307,6 +307,11 @@ export const FRASES_DE_LIMITE = [
   'queda fuera de lo que puedo hacer',
 ];
 
+/** Hacer algo en el panel (con el pronombre pegado: "hacerlo", "eliminarlo"). Texto ya normalizado. */
+const VERBO_DE_ACCION = '(?:hacer|gestionar|pausar|borrar|eliminar|editar|cambiar|crear|activar|desactivar)(?:lo|la|los|las|se)?';
+/** "desde el panel", "desde la sección", "desde Descuentos": una pantalla, no "desde hoy". */
+const DESDE_UNA_PANTALLA = 'desde (?:(?:el|la|los|las|tu|su) )?(?:panel|seccion|pantalla|ficha|menu|configuracion|catalogo|descuentos|cupones|pedidos|clientes|productos|categorias|equipo|mensajes|inicio|dashboard)\\b';
+
 /** Las mismas negativas con hasta dos palabras en el medio: "no LOS puedo ver", "no tenés MÁS permiso". */
 export const PATRONES_DE_LIMITE = [
   /\bno (?:\S+ ){0,2}pued(?:o|e|es|en)\b/,
@@ -315,6 +320,14 @@ export const PATRONES_DE_LIMITE = [
   // sustantivos de capacidad: "no tiene una opción cargada" no es un límite, "no tengo una
   // herramienta para eso" sí. Sin "tenés": "si no tenés una opción, crealo" no es un límite.
   /\bno (?:\S+ )?(?:tiene|tienen|tenemos|tengo|cuenta|cuentan|contamos|cuento|ofrece|ofrecemos|incluye|dispone|disponemos|hay) (?:con )?(?:\S+ ){0,3}?(?:integracion|modulo|herramienta|funcion|funcionalidad|opcion|posibilidad|capacidad|forma|manera|sistema)\b/,
+  // Lo hace la persona, desde el panel: "es algo que debés hacer desde el
+  // panel", "lo tenés que hacer vos desde Descuentos", "se hace desde el
+  // Catálogo". Hace falta las dos cosas, el "lo hacés vos" y el "desde" una
+  // pantalla: "desde el panel ves tus descuentos" o "tenés que confirmar en
+  // la tarjeta" no son reconocer que Orbi no puede.
+  new RegExp(`\\b(?:debes|deberias|tenes que|tendras que|vas a tener que|hay que) (?:\\S+ ){0,2}?${VERBO_DE_ACCION} (?:\\S+ ){0,3}?${DESDE_UNA_PANTALLA}`),
+  new RegExp(`\\bse (?:hace|hacen|puede hacer|pueden hacer|gestiona|gestionan|pausa|pausan|borra|borran|elimina|eliminan|edita|editan|cambia|cambian) (?:\\S+ ){0,3}?${DESDE_UNA_PANTALLA}`),
+  new RegExp(`\\b(?:hacelo|hacela|hacelos|hacelas) (?:\\S+ ){0,2}?${DESDE_UNA_PANTALLA}`),
 ];
 
 function cumpleValor(esperado: ValorEsperado, real: unknown, d: NegocioDePrueba): boolean {

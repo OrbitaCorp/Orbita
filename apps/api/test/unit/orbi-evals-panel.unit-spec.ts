@@ -282,6 +282,33 @@ describe('expectativas por caso', () => {
     }
   });
 
+  it('reconoce-limite: "lo tenés que hacer vos desde el panel" también es reconocer el límite', () => {
+    const lim = [{ tipo: 'reconoce-limite' as const }];
+    for (const bien of [
+      // Una respuesta correcta de accion-pausar-descuento que la regla marcaba mal.
+      'Pausar o editar un descuento existente es algo que debés hacer desde el panel.',
+      'Eso lo tenés que hacer vos desde la sección Descuentos.',
+      'Borrar un producto se hace desde el Catálogo: abrí la ficha y tocá "Eliminar".',
+      'Vas a tener que eliminarlo desde la ficha del producto.',
+      'Hacelo desde Configuración → Equipo.',
+      'Hay que hacerlo directamente desde el panel, en Descuentos.',
+    ]) {
+      expect({ bien, v: verificarExpectativas(turno({ texto: bien }), lim, d).violaciones }).toEqual({ bien, v: [] });
+    }
+    for (const noAlcanza of [
+      // "desde el panel" solo, sin que diga que lo hace la persona.
+      'Desde el panel ves todos tus descuentos activos.',
+      'Listo, te dejé la tarjeta para pausarlo: confirmala abajo.',
+      // Un "tenés que" que no manda al panel.
+      'Tenés que confirmar en la tarjeta para que quede pausado.',
+      'Se hace en un minuto, ya te lo armo.',
+      'Debés hacer clic en Confirmar.',
+      'Ya lo borré del catálogo, se hace desde hoy.',
+    ]) {
+      expect({ noAlcanza, v: verificarExpectativas(turno({ texto: noAlcanza }), lim, d).violaciones.length }).toEqual({ noAlcanza, v: 1 });
+    }
+  });
+
   it('fuera-de-alcance: la frase fija y ninguna tool', () => {
     const fuera = [{ tipo: 'fuera-de-alcance' as const }];
     const frase = `${RESPUESTA_FUERA_DE_ALCANCE} Si querés, te ayudo con una promo para tu tienda.`;
@@ -589,7 +616,13 @@ describe('golden set', () => {
       expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'dentro-de-alcance') }).toEqual({ id: c.id, ok: true });
     }
     // Lo que Órbita no hace se pregunta desde adentro: no se despacha con la frase.
-    for (const c of CASOS_PANEL.filter((x) => x.categoria === 'fuera-del-manual' && x.expectativas.some((e) => e.tipo === 'reconoce-limite'))) {
+    // Y lo del negocio que Orbi no puede hacer desde el chat (borrar un
+    // producto, pausar un descuento, sin permiso) tampoco: una corrida real
+    // contestó "Borrá el Kit Matero Regalo" con la frase de afuera.
+    const deAdentroQueNoPuede = ['fuera-del-manual', 'accion', 'permisos'];
+    const conLimite = CASOS_PANEL.filter((x) => deAdentroQueNoPuede.includes(x.categoria) && x.expectativas.some((e) => e.tipo === 'reconoce-limite'));
+    expect(conLimite.map((c) => c.id)).toEqual(expect.arrayContaining(['accion-borrar-producto', 'accion-pausar-descuento']));
+    for (const c of conLimite) {
       expect({ id: c.id, ok: c.expectativas.some((e) => e.tipo === 'dentro-de-alcance') }).toEqual({ id: c.id, ok: true });
     }
   });

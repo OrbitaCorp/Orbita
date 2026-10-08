@@ -31,4 +31,14 @@ describe('alcance del Orbi del panel', () => {
     // Compacta: es parte de cada mensaje del panel.
     expect(capa.length).toBeLessThan(2000);
   });
+
+  it('la frase es solo para temas de afuera: lo del negocio que no puede hacer va sin la frase', () => {
+    // Una corrida real contestó "Borrá el Kit Matero Regalo" con la frase de
+    // afuera y después "no puedo eliminar productos".
+    const capa = capaDeAlcance();
+    expect(capa).toContain('La frase es solo para temas de afuera');
+    expect(capa).toMatch(/no podés hacer desde el chat[^\n]*es de adentro/);
+    expect(capa).toMatch(/dónde del panel se hace/);
+    expect(capa).toContain('"Borrá la fugazzeta" → adentro');
+  });
 });
