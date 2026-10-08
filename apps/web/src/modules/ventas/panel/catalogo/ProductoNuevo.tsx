@@ -21,6 +21,7 @@ import { useRouter } from 'next/router'
 import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
+import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney, formatMiles } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
@@ -297,6 +298,7 @@ async function subirVideoProducto(file: File, onProgress?: (pct: number) => void
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
     const [contenidoAbierto, setContenidoAbierto] = useState(false)
+    const [vistaMovilAbierta, setVistaMovilAbierta] = useState(false)
     const [bloquesContenido, setBloquesContenido] = useState<ApiProductContentBlock[]>([])
     const [bloquesContenidoModificado, setBloquesContenidoModificado] = useState(false)
     const router = useRouter()
@@ -1922,12 +1924,44 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const inactivas = filas.filter(f => !f.activa).length
     const errorPrecioFila = (f: FilaVariante) => hayFalta('pn-variantes-tabla') && f.activa && !(Number(f.precio) > 0)
 
+    // La misma vista previa en la columna de escritorio y en la hoja del celular.
+    const vistaPrevia = (
+        <PreviewProducto
+            nombre={prod.nombre}
+            descripcion={prod.descripcion}
+            precio={prod.tieneVariantes ? String(precioMinVariantes || '') : prod.precio}
+            desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
+            estado={prod.estado}
+            categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
+            imagenPrincipal={
+                // Igual criterio que el backend (pickPrimaryImageUrl): principal
+                // marcada > primera general > primera de variante que exista. Se
+                // usa solo para decidir CON QUÉ arranca la navegación (índice 0) —
+                // si el producto es puramente de variantes (solo fotos por color,
+                // ninguna general), arranca en la primera foto de variante en vez
+                // de quedar sin foto.
+                imagenes.find(i => i.principal)?.preview
+                ?? imagenes.find(i => !i.valorOpcion)?.preview
+                ?? guardadas.find(g => g.principal)?.url
+                ?? guardadas.find(g => !g.optionValueId)?.url
+            }
+            fotosGenerales={fotosGeneralesPreview}
+            nombreOpcionVisual={opcionVisual?.nombre}
+            fotosPorValor={fotosPorValorPreview}
+            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
+            stockTotal={stockTotal}
+            urlsConFondoIA={urlsConFondoIA}
+            urlsEnProceso={urlsEnProceso}
+        />
+    )
+
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
+                .pn-vista-movil { display: none; }
                 .pn-3col    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
                 .pn-3col > * { min-width: 0; }
                 /* Un <input> trae un ancho mínimo propio (~170px): sin esto, dentro de una columna
@@ -1955,8 +1989,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-vgrid-sku { grid-template-columns: minmax(0,1fr) 88px !important; }
                     .pn-vgrid-sku > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
                     /* Celular: la vista previa iba al final de todo, después del botón de guardar —
-                       una pantalla entera de scroll que no aporta mientras se carga. Se oculta. */
+                       una pantalla entera de scroll que no aporta mientras se carga. La columna se
+                       oculta y la vista previa se abre en una hoja desde el botón de arriba. */
                     .pn-preview { display: none !important; }
+                    .pn-vista-movil { display: inline-flex !important; }
                     .pn-titulo { font-size: 22px !important; margin-bottom: 14px !important; }
                     /* iOS hace zoom al enfocar un campo de menos de 16px y deja la pantalla movida. */
                     .pn-page input:not([type='checkbox']):not([type='radio']):not([type='file']), .pn-page textarea, .pn-page select { font-size: 16px !important; }
@@ -1976,6 +2012,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             <h1 className="pn-titulo" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
+
+            <button
+                type="button"
+                className="pn-vista-movil ds-hover"
+                onClick={() => setVistaMovilAbierta(true)}
+                style={{
+                    alignItems: 'center', gap: 6, height: 34, padding: '0 14px', margin: '0 0 14px',
+                    border: '1px solid var(--color-border)', borderRadius: 9999, background: 'var(--color-surface)',
+                    color: 'var(--color-text)', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
+                }}
+            >
+                <Eye size={14} /> Ver vista previa
+            </button>
 
             {error && (
                 <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, marginBottom: 16, maxWidth: 860 }}>
@@ -3002,36 +3051,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
                             Vista previa
                         </div>
-                        <PreviewProducto
-                            nombre={prod.nombre}
-                            descripcion={prod.descripcion}
-                            precio={prod.tieneVariantes ? String(precioMinVariantes || '') : prod.precio}
-                            desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
-                            estado={prod.estado}
-                            categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
-                            imagenPrincipal={
-                                // Igual criterio que el backend (pickPrimaryImageUrl): principal
-                                // marcada > primera general > primera de variante que exista. Se
-                                // usa solo para decidir CON QUÉ arranca la navegación (índice 0) —
-                                // si el producto es puramente de variantes (solo fotos por color,
-                                // ninguna general), arranca en la primera foto de variante en vez
-                                // de quedar sin foto.
-                                imagenes.find(i => i.principal)?.preview
-                                ?? imagenes.find(i => !i.valorOpcion)?.preview
-                                ?? guardadas.find(g => g.principal)?.url
-                                ?? guardadas.find(g => !g.optionValueId)?.url
-                            }
-                            fotosGenerales={fotosGeneralesPreview}
-                            nombreOpcionVisual={opcionVisual?.nombre}
-                            fotosPorValor={fotosPorValorPreview}
-                            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
-                            stockTotal={stockTotal}
-                            urlsConFondoIA={urlsConFondoIA}
-                            urlsEnProceso={urlsEnProceso}
-                        />
+                        {vistaPrevia}
                     </Card>
                 </div>
             </div>
+
+            {/* Celular: la columna de la derecha está oculta, así que la vista previa se abre
+                en una hoja desde el botón de arriba. Solo se monta abierta: no duplica trabajo. */}
+            <Modal isOpen={vistaMovilAbierta} onClose={() => setVistaMovilAbierta(false)} title="Vista previa" maxWidth={400}>
+                {vistaPrevia}
+            </Modal>
 
             <EstudioFondoModal
                 isOpen={modalFondoIA}

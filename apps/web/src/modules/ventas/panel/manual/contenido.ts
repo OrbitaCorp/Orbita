@@ -433,6 +433,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Categoría', texto: 'Dónde vive dentro de tu catálogo.' },
                     { titulo: 'Publicado o borrador', texto: 'Borrador lo deja invisible hasta que esté listo.' },
                 ] },
+                { tipo: 'parrafo', texto: 'Mientras cargás, la vista previa muestra cómo queda el producto en tu tienda. En el celular está oculta: tocá [[Ver vista previa]] (arriba del formulario) para abrirla.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Escribí el nombre y tocá [[Redactar con Orbi]]: te escribe la descripción y te sugiere categoría y etiquetas al toque. Después la editás si querés — es un punto de partida, no una imposición.' },
             ],
             ir: { label: 'Crear un producto', seccion: 'catalogo', query: { vista: 'nuevo' } },
