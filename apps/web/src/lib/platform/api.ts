@@ -988,6 +988,7 @@ export const platformApi = {
   tiktokCreador: () => getJSON<TiktokCreador>('/platform/marketing/tiktok/creator-info'),
   tiktokPublicaciones: () => getJSON<TiktokPublicacion[]>('/platform/marketing/tiktok/posts'),
   tiktokPublicar: (body: TiktokPublicar) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts', 'POST', body),
+  tiktokBorrador: (videoUrl: string) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts/draft', 'POST', { videoUrl }),
   tiktokEstadoPublicacion: (publishId: string) => getJSON<TiktokPublicacion>(`/platform/marketing/tiktok/posts/${publishId}`),
   tiktokDesconectar: () => sendJSON<{ ok: true }>('/platform/marketing/tiktok', 'DELETE'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),

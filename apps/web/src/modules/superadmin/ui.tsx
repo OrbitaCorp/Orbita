@@ -16,6 +16,7 @@ export const ACTION_LABELS: Record<string, string> = {
   show_business_in_search: 'Volver a mostrar en Google y el directorio',
   tiktok_connect: 'Conectar la cuenta de TikTok de Órbita',
   tiktok_publish: 'Publicar un video en TikTok',
+  tiktok_draft: 'Enviar un video a los borradores de TikTok',
   tiktok_disconnect: 'Desconectar la cuenta de TikTok de Órbita',
   grant_comp: 'Ceder cortesía',
   create_price_campaign: 'Crear campaña de precio',

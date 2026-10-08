@@ -102,9 +102,14 @@ describe('conectar la cuenta', () => {
     const url = new URL(armar().svc.urlDeAutorizacion('admin-1'));
     expect(url.origin + url.pathname).toBe('https://www.tiktok.com/v2/auth/authorize/');
     expect(url.searchParams.get('client_key')).toBe('ck_test');
-    expect(url.searchParams.get('scope')).toBe('user.info.basic,video.publish');
+    expect(url.searchParams.get('scope')).toBe('user.info.basic,video.publish,video.upload');
     expect(url.searchParams.get('redirect_uri')).toBe('https://api.orbita.site/api/v1/platform/marketing/tiktok/callback');
     expect(url.searchParams.get('state')).toContain('.');
+  });
+
+  it('los permisos que se piden se pueden ajustar sin tocar el código (TIKTOK_SCOPES)', () => {
+    const { svc } = armar({ ...ENV, TIKTOK_SCOPES: 'user.info.basic,video.upload' });
+    expect(new URL(svc.urlDeAutorizacion('admin-1')).searchParams.get('scope')).toBe('user.info.basic,video.upload');
   });
 
   it('un state adulterado o inventado se rechaza', async () => {
@@ -288,6 +293,58 @@ describe('publicar un video', () => {
   it('el título no puede pasar de 2200 caracteres', async () => {
     const { svc } = conCuenta();
     await expect(svc.publicar(dto({ title: 'a'.repeat(2201) }), 'admin-1')).rejects.toThrow('2200');
+  });
+});
+
+describe('enviar a borradores', () => {
+  const URL_VIDEO = 'https://videos.orbita.site/demo.mp4';
+
+  function simular(tamano: number) {
+    const subidas: { url: string; init: RequestInit }[] = [];
+    fetchMock.mockImplementation(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url);
+      if (u.startsWith('https://videos.orbita.site')) return new Response(new Uint8Array(tamano), { status: 200, headers: { 'content-type': 'video/mp4' } });
+      if (u.includes('/inbox/video/init/')) return json({ data: { publish_id: 'borrador-1', upload_url: 'https://upload.tiktok.test/u/9' }, error: { code: 'ok' } });
+      if (u.startsWith('https://upload.tiktok.test')) { subidas.push({ url: u, init: init! }); return new Response(null, { status: 201 }); }
+      throw new Error(`llamada inesperada: ${u}`);
+    });
+    return subidas;
+  }
+
+  it('sube el video a los borradores: inicia en el endpoint de borradores, sin título ni visibilidad, y lo anota', async () => {
+    const { svc, prisma } = armar();
+    prisma.$queryRaw.mockResolvedValue([cuenta()]);
+    prisma.marketingTiktokPost.create.mockImplementation(async ({ data }: any) => ({ id: 'p-2', publishId: data.publishId, status: data.status }));
+    const subidas = simular(3 * MB);
+    await expect(svc.enviarABorradores(URL_VIDEO, 'admin-1')).resolves.toMatchObject({ publishId: 'borrador-1' });
+
+    const init = fetchMock.mock.calls.find((c) => String(c[0]).includes('/inbox/video/init/'))!;
+    const cuerpo = JSON.parse(init[1].body);
+    expect(cuerpo).toEqual({ source_info: { source: 'FILE_UPLOAD', video_size: 3 * MB, chunk_size: 3 * MB, total_chunk_count: 1 } });
+    expect(subidas).toHaveLength(1);
+    expect(prisma.marketingTiktokPost.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ publishId: 'borrador-1', privacyLevel: 'BORRADOR', title: '(borrador)', status: 'PROCESSING_UPLOAD', createdBy: 'admin-1' }),
+    }));
+    expect(prisma.platformAdminLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: 'tiktok_draft', targetId: 'borrador-1' }) });
+  });
+
+  it('un video grande también se sube en trozos', async () => {
+    const { svc, prisma } = armar();
+    prisma.$queryRaw.mockResolvedValue([cuenta()]);
+    const subidas = simular(25 * MB);
+    await svc.enviarABorradores(URL_VIDEO, 'admin-1');
+    expect(subidas.map((s) => (s.init.headers as Record<string, string>)['Content-Range'])).toEqual([`bytes 0-${10 * MB - 1}/${25 * MB}`, `bytes ${10 * MB}-${25 * MB - 1}/${25 * MB}`]);
+  });
+
+  it('sin cuenta conectada, avisa', async () => {
+    await expect(armar().svc.enviarABorradores(URL_VIDEO, 'admin-1')).rejects.toThrow('TikTok no está conectado');
+  });
+
+  it('también se niega a bajar de redes internas', async () => {
+    const { svc, prisma } = armar();
+    prisma.$queryRaw.mockResolvedValue([cuenta()]);
+    await expect(svc.enviarABorradores('https://169.254.169.254/x.mp4', 'admin-1')).rejects.toThrow('no está permitida');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

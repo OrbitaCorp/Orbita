@@ -22,6 +22,7 @@ const PRIVACIDAD: Record<string, string> = {
   MUTUAL_FOLLOW_FRIENDS: 'Amigos (se siguen entre sí)',
   FOLLOWER_OF_CREATOR: 'Seguidores',
   SELF_ONLY: 'Solo yo',
+  BORRADOR: 'Borrador',
 }
 const ESTADO: Record<string, { texto: string; tono: 'green' | 'red' | 'amber' | 'gray' }> = {
   PROCESSING_UPLOAD: { texto: 'Subiendo', tono: 'amber' },
@@ -145,6 +146,8 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const [deMarca, setDeMarca] = useState(false)
   const [ia, setIa] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  // Directo: se publica desde acá. Borrador: el video llega a los borradores de TikTok y una persona lo termina en la app.
+  const [modo, setModo] = useState<'directo' | 'borrador'>('directo')
 
   if (error) return <Card title="Publicar un video"><ErrorBox msg="No se pudo consultar a TikTok qué se puede hacer con la cuenta. Puede que haya que volver a conectarla." /></Card>
   if (!creador) return <Card title="Publicar un video"><Loader /></Card>
@@ -152,11 +155,21 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const sinTipoDeMarca = declara && !tuMarca && !deMarca
   // Un video de marca no puede ser privado: TikTok lo rechaza.
   const marcaYPrivado = declara && (tuMarca || deMarca) && privacidad === 'SELF_ONLY'
-  const listo = puedePublicar && !enviando && videoUrl.startsWith('https://') && title.trim().length > 0 && !!privacidad && !sinTipoDeMarca && !marcaYPrivado
+  const urlValida = videoUrl.startsWith('https://')
+  const listo = modo === 'borrador'
+    ? puedePublicar && !enviando && urlValida
+    : puedePublicar && !enviando && urlValida && title.trim().length > 0 && !!privacidad && !sinTipoDeMarca && !marcaYPrivado
 
   const publicar = async () => {
     setEnviando(true)
     try {
+      if (modo === 'borrador') {
+        await platformApi.tiktokBorrador(videoUrl.trim())
+        setAviso({ variant: 'success', title: 'Video enviado a los borradores de TikTok', description: 'Abrí TikTok con la cuenta de la empresa, buscá la notificación o los borradores y terminá de publicarlo desde ahí.' })
+        setVideoUrl('')
+        onPublicado()
+        return
+      }
       await platformApi.tiktokPublicar({
         title: title.trim(), videoUrl: videoUrl.trim(), privacyLevel: privacidad,
         disableComment: !comentarios, disableDuet: !duetos, disableStitch: !stitch,
@@ -183,12 +196,27 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
           {creador.usuario && <span style={{ color: 'var(--color-muted)' }}>@{creador.usuario}</span>}
         </div>
 
+        <div role="group" aria-label="Cómo enviarlo" style={{ display: 'inline-flex', background: 'var(--color-surface-alt)', borderRadius: 10, padding: 3, alignSelf: 'flex-start' }}>
+          {([['directo', 'Publicar directo'], ['borrador', 'Enviar a borradores']] as const).map(([id, texto]) => (
+            <button key={id} type="button" onClick={() => setModo(id)} aria-pressed={modo === id} className="ds-hover"
+              style={{ height: 30, padding: '0 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: modo === id ? 600 : 500, background: modo === id ? 'var(--color-bg)' : 'transparent', color: modo === id ? 'var(--color-text)' : 'var(--color-muted)' }}>
+              {texto}
+            </button>
+          ))}
+        </div>
+        {modo === 'borrador' && (
+          <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+            El video llega a los borradores de la cuenta. El título, la visibilidad y el resto los completa una persona en la app de TikTok antes de publicarlo.
+          </div>
+        )}
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
           Dirección del video (https)
           <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4" style={inputStyle} />
           <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-muted)' }}>Un MP4 público. Duración máxima de la cuenta: {Math.round(creador.duracionMaximaSeg / 60)} min.</span>
         </label>
 
+        {modo === 'directo' && (<>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
           Título
           <textarea value={title} onChange={(e) => setTitle(e.target.value)} maxLength={2200} placeholder="Descripción y #hashtags" style={textarea} />
@@ -234,9 +262,11 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
           {' '}El video puede tardar unos minutos en aparecer en la cuenta después de enviarlo.
         </div>
 
+        </>)}
+
         <div>
           <button onClick={publicar} disabled={!listo} style={{ ...btnPrimary, opacity: listo ? 1 : 0.5, cursor: listo ? 'pointer' : 'not-allowed' }}>
-            {enviando ? 'Enviando a TikTok…' : 'Publicar en TikTok'}
+            {enviando ? 'Enviando a TikTok…' : modo === 'borrador' ? 'Enviar a borradores' : 'Publicar en TikTok'}
           </button>
         </div>
       </div>
