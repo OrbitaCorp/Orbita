@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Clock, ExternalLink, Play, X } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
@@ -77,10 +77,24 @@ export function InstagramModal({ estado, resultado = null, onCerrar, onCambio }:
     return () => document.removeEventListener('keydown', alTeclear)
   }, [onCerrar])
 
+  const conectado = estado?.connected === true
+
+  // Mientras la cuenta no está conectada, el estado se vuelve a pedir solo cada 20 segundos (con la
+  // pestaña a la vista): si el equipo habilita el negocio con el modal abierto, pasa del paso 2 al 3
+  // sin tener que cerrarlo y abrirlo. Es lo único que se puede sincronizar: Instagram no avisa si
+  // la persona aceptó la invitación (eso se verifica al conectar).
+  const alCambiar = useRef(onCambio)
+  useEffect(() => { alCambiar.current = onCambio })
+  useEffect(() => {
+    if (conectado) return
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') alCambiar.current()
+    }, 20_000)
+    return () => clearInterval(t)
+  }, [conectado])
+
   // Sin portal en el servidor: el modal siempre se abre desde un clic, pero Next renderiza primero.
   if (!montado) return null
-
-  const conectado = estado?.connected === true
 
   return createPortal(
     <div className="igm-fondo" onClick={onCerrar}>
@@ -252,10 +266,10 @@ function ConectarCuenta() {
   }
 
   return (
-    <div className="igm-form">
+    <div className="igm-form igm-centro">
       <p className="igm-suave">
         Te enviamos a tu Instagram la invitación de prueba de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
-        Si ya la aceptaste, tocá el botón: vas a iniciar sesión en Instagram y darle permiso a Órbita para leer y responder tus mensajes directos.
+        Cuando la hayas aceptado, tocá <strong>Verificar y conectar</strong>: iniciás sesión en Instagram y le das permiso a Órbita para leer y responder tus mensajes directos.
       </p>
       <a className="igm-externo" href={URL_INVITACIONES} target="_blank" rel="noopener noreferrer">
         Abrir invitaciones en Instagram <ExternalLink size={15} strokeWidth={2} aria-hidden />
@@ -263,7 +277,10 @@ function ConectarCuenta() {
       </a>
       <VideoTutorial />
       {error && <p className="igm-error" role="alert">{error}</p>}
-      <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%' }}>Conectar con Instagram</Button>
+      <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%' }}>Verificar y conectar</Button>
+      <p className="igm-suave igm-pie">
+        Si Instagram te dice que no tenés permiso, es que todavía falta aceptar la invitación: aceptala y volvé a tocar acá.
+      </p>
     </div>
   )
 }
@@ -408,6 +425,8 @@ const CSS = `
 .igm-video-play { width: 38px; height: 38px; margin-bottom: 6px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); background: var(--color-surface); border: 1px solid var(--color-border); }
 .igm-video-titulo { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
 .igm-video-texto { margin: 0; max-width: 30ch; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
+.igm-centro, .igm-centro .igm-suave, .igm-centro .igm-error { text-align: center; }
+.igm-pie { margin: 10px 0 0; font-size: 12px; }
 .igm-externo {
   display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; margin: 0 0 12px; box-sizing: border-box;
   border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); text-decoration: none;
