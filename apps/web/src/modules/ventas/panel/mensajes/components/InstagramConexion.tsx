@@ -23,14 +23,8 @@ const PASOS_EVALUADOR = 'En Instagram, andá a Configuración → Apps y sitios 
 
 export function InstagramBoton() {
   const router = useRouter()
-  const [estado, setEstado] = useState<InstagramEstado | null>(null)
-  const [visible, setVisible] = useState(true)
+  const { estado, visible, cargar } = useInstagramEstado()
   const [abierto, setAbierto] = useState(false)
-
-  const cargar = () => getInstagramConnection().then(setEstado).catch((e) => {
-    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) setVisible(false)
-  })
-  useEffect(() => { cargar() }, [])
 
   // Al volver del login, la API manda ?ig=conectado | sin-suscripcion: se abre el
   // modal con el resultado y se limpia la dirección para no repetirlo al recargar.
@@ -70,6 +64,28 @@ export function InstagramBoton() {
 }
 
 function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: InstagramEstado | null; resultado: string | null; onCerrar: () => void; onCambio: () => void }) {
+  return (
+    <Modal isOpen onClose={onCerrar} title="Instagram" maxWidth={460}>
+      <ContenidoInstagram estado={estado} resultado={resultado} onCambio={onCambio} onDesconectado={onCerrar} />
+    </Modal>
+  )
+}
+
+// Estado de la conexión para las pantallas que la muestran (la bandeja y Difusión). Si el backend
+// responde 403 o 404 (el front sale unos minutos antes que la API), `visible` pasa a false.
+export function useInstagramEstado() {
+  const [estado, setEstado] = useState<InstagramEstado | null>(null)
+  const [visible, setVisible] = useState(true)
+  const cargar = () => getInstagramConnection().then(setEstado).catch((e) => {
+    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) setVisible(false)
+  })
+  useEffect(() => { cargar() }, [])
+  return { estado, visible, cargar }
+}
+
+// Lo que se hace con Instagram según el estado: pedir acceso, conectar o desconectar. Va dentro de
+// un modal (bandeja) o de una tarjeta (Difusión).
+export function ContenidoInstagram({ estado, resultado = null, onCambio, onDesconectado }: { estado: InstagramEstado | null; resultado?: string | null; onCambio: () => void; onDesconectado?: () => void }) {
   const [trabajando, setTrabajando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const conectado = estado?.connected === true
@@ -90,7 +106,7 @@ function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: Ins
     try {
       await disconnectInstagram()
       onCambio()
-      onCerrar()
+      onDesconectado?.()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo desconectar. Probá de nuevo.')
     } finally {
@@ -99,7 +115,7 @@ function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: Ins
   }
 
   return (
-    <Modal isOpen onClose={onCerrar} title="Instagram" maxWidth={460}>
+    <>
       {resultado === 'sin-suscripcion' && (
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--color-text)', lineHeight: 1.5 }}>
           Se conectó la cuenta, pero no se pudo activar el aviso de mensajes nuevos: no vas a recibir mensajes hasta que se resuelva. Probá desconectar y volver a conectar.
@@ -113,7 +129,7 @@ function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: Ins
             Conectado a la cuenta <strong>{estado.username ? `@${estado.username}` : 'de Instagram'}</strong>.
           </p>
           <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            Los mensajes directos que te lleguen por Instagram aparecen en esta bandeja, y tus respuestas salen por el mismo canal.
+            Los mensajes directos que te lleguen por Instagram aparecen en la bandeja de Mensajes, y tus respuestas salen por el mismo canal.
             Instagram solo permite responder dentro de las 24 horas del último mensaje del cliente.
           </p>
           {error && <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>}
@@ -122,7 +138,7 @@ function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: Ins
       ) : (
         <div>
           <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-            Vas a iniciar sesión con tu cuenta de Instagram y dar permiso para leer y responder tus mensajes directos desde esta bandeja.
+            Vas a iniciar sesión con tu cuenta de Instagram y dar permiso para leer y responder tus mensajes directos desde la bandeja de Mensajes.
           </p>
           <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
             Necesitás una cuenta <strong>profesional</strong> (de empresa o de creador). Si tu cuenta es personal, podés cambiarla desde los ajustes de Instagram sin costo.
@@ -134,7 +150,7 @@ function ModalInstagram({ estado, resultado, onCerrar, onCambio }: { estado: Ins
           <Button size="sm" loading={trabajando} onClick={conectar}>Conectar con Instagram</Button>
         </div>
       )}
-    </Modal>
+    </>
   )
 }
 

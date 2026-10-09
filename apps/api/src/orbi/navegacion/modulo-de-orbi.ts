@@ -38,6 +38,8 @@ const MODULO_DE_LA_SECCION: Record<SeccionDelPanel, ModuloDeOrbi | undefined> = 
   // La capa de descuentos ya cubre cupones (createCoupon, listDiscounts).
   cupones: 'descuentos',
   mensajes: 'mensajes',
+  // Difusión (Instagram) todavía no tiene capa ni tools de Orbi: cae al prompt genérico.
+  difusion: undefined,
   perfil: undefined,
   avanzado: undefined,
   manual: undefined,

@@ -36,6 +36,7 @@ const componentMap: Record<string, Record<SeccionDelPanel, ComponentType>> = {
         descuentos:     dynamic(() => import('@/modules/ventas/panel/descuentos/DescuentosShell').then(m => ({ default: m.DescuentosShell })), { ssr: false }),
         cupones:        dynamic(() => import('@/modules/ventas/panel/descuentos/CuponesShell').then(m => ({ default: m.CuponesShell })), { ssr: false }),
         mensajes:       dynamic(() => import('@/modules/ventas/panel/mensajes/Bandeja').then(m => ({ default: m.MensajesHub })), { ssr: false }),
+        difusion:       dynamic(() => import('@/modules/ventas/panel/difusion/Difusion'), { ssr: false }),
         perfil:         dynamic(() => import('@/modules/ventas/panel/perfil/MiPerfil'), { ssr: false }),
         avanzado:       dynamic(() => import('@/modules/ventas/panel/avanzado/Avanzado'), { ssr: false }),
         manual:         dynamic(() => import('@/modules/ventas/panel/manual/Manual'), { ssr: false }),

@@ -23,7 +23,7 @@
 
 import {
     Rocket, Compass, LayoutDashboard, ShoppingBag, Users, Package, MessageSquare,
-    Tag, BarChart3, Settings, Sparkles, UserCircle, LifeBuoy,
+    Tag, BarChart3, Settings, Sparkles, UserCircle, LifeBuoy, Megaphone,
 } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
 import type { IlustracionId } from './ilustraciones'
@@ -539,6 +539,26 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'nota', variante: 'tip', texto: 'Es la mejora más grande por menos trabajo de todo el módulo. Con cinco plantillas te sacás de encima la mitad de los mensajes del día.' },
             ],
             ir: { label: 'Ir a Plantillas', seccion: 'mensajes', query: { vista: 'plantillas' } },
+        },
+    ],
+},
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIFUSIÓN
+// ═══════════════════════════════════════════════════════════════════════════
+{
+    id: 'difusion', titulo: 'Difusión', Icon: Megaphone,
+    resumen: 'Mostrar tu negocio en Instagram: conectar tu cuenta y, más adelante, publicar desde Órbita.',
+    ir: { label: 'Ir a Difusión', seccion: 'difusion' },
+    temas: [
+        {
+            id: 'instagram-conexion', titulo: 'Conectar tu Instagram',
+            bloques: [
+                { tipo: 'parrafo', texto: 'En el módulo **Difusión** del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.' },
+                { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá [[Pedir acceso]]. Cuando la sumemos como evaluadora de la app, ahí mismo aparece el botón para conectar.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas **Publicaciones**, **Comentarios** y **Estadísticas** de Difusión dicen "Próximamente" hasta que estén listas.' },
+            ],
+            ir: { label: 'Ir a Difusión', seccion: 'difusion' },
         },
     ],
 },

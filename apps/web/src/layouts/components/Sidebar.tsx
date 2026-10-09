@@ -18,7 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Megaphone, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer, ChevronDown } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { getUnreadConversationsCount, ApiError } from '@/lib/api'
@@ -71,6 +71,15 @@ const MODULOS: Modulo[] = [
         subs: [
             { label: 'Bandeja', seccion: 'mensajes' },
             { label: 'Plantillas', seccion: 'mensajes', vista: 'plantillas' },
+        ],
+    },
+    {
+        id: 'difusion', label: 'Difusión', Icon: Megaphone, seccion: 'difusion',
+        subs: [
+            { label: 'Instagram', seccion: 'difusion' },
+            { label: 'Publicaciones', seccion: 'difusion', vista: 'publicaciones' },
+            { label: 'Comentarios', seccion: 'difusion', vista: 'comentarios' },
+            { label: 'Estadísticas', seccion: 'difusion', vista: 'estadisticas' },
         ],
     },
     {

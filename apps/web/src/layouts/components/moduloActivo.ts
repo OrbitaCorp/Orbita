@@ -7,7 +7,7 @@
 const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
     catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
-    mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
+    mensajes: 'mensajes', difusion: 'difusion', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
     avanzado: 'avanzado', manual: 'manual',
 }
 

@@ -16,6 +16,7 @@ describe('moduloDeOrbiParaSeccion', () => {
     descuentos: 'descuentos',
     cupones: 'descuentos',
     mensajes: 'mensajes',
+    difusion: undefined,
     perfil: undefined,
     avanzado: undefined,
     manual: undefined,

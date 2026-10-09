@@ -27,6 +27,7 @@ const seccionLabels: Record<string, string> = {
     descuentos: 'Descuentos',
     cupones: 'Cupones',
     mensajes: 'Mensajes',
+    difusion: 'Difusión',
     configuracion: 'Configuración',
     perfil: 'Mi perfil',
     manual: 'Manual',
@@ -650,7 +651,8 @@ const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: 
     { label: 'Descuentos',           seccion: 'descuentos',    alias: ['descuentos', 'promociones'] },
     { label: 'Cupones',              seccion: 'cupones',       alias: ['cupones', 'cupon', 'cupón'] },
     { label: 'Mensajes',             seccion: 'mensajes',      alias: ['mensajes', 'chat', 'conversaciones'] },
-    { label: 'Configuración',        seccion: 'configuracion', alias: ['configuracion', 'configuración', 'ajustes', 'equipo', 'apariencia', 'notificaciones'] },
+    { label: 'Difusión',             seccion: 'difusion',      alias: ['difusion', 'difusión', 'instagram', 'publicar', 'publicaciones', 'redes'] },
+    { label: 'Configuración',       seccion: 'configuracion', alias: ['configuracion', 'configuración', 'ajustes', 'equipo', 'apariencia', 'notificaciones'] },
 ]
 
 function BusquedaGlobal() {

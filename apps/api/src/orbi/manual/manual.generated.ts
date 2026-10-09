@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "31e073e393d33124",
+  "version": "b67720563c0d115f",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -344,6 +344,16 @@ export const MANUAL_GENERADO: ManualGenerado = {
         "seccion": "mensajes",
         "vista": "plantillas",
         "label": "Ir a Plantillas"
+      }
+    },
+    {
+      "id": "instagram-conexion",
+      "capitulo": "Difusión",
+      "titulo": "Conectar tu Instagram",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". Cuando la sumemos como evaluadora de la app, ahí mismo aparece el botón para conectar.\n\nConsejo: Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas Publicaciones, Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
+      "destino": {
+        "seccion": "difusion",
+        "label": "Ir a Difusión"
       }
     },
     {
@@ -914,6 +924,13 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "label": "Mensajes",
       "permisos": [
         "messages.view"
+      ]
+    },
+    {
+      "id": "difusion",
+      "label": "Difusión",
+      "permisos": [
+        "advanced.manage"
       ]
     },
     {
