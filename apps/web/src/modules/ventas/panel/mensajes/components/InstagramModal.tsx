@@ -17,13 +17,13 @@ import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramCo
 // evaluadora y toca "Habilitar" en el superadmin. Mientras el pedido está pendiente (paso 2) NO se le
 // manda a Instagram a buscarla: no va a encontrar nada. La invitación se explica en el paso 3.
 
-const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones de evaluador'
+const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones de prueba'
 
-// Página de Instagram "Apps y sitios web", donde está la pestaña de invitaciones de evaluador. Sin los
+// Página de Instagram "Apps y sitios web", donde está la pestaña de invitaciones de prueba. Sin los
 // parámetros de seguimiento (fbclid y compañía) que trae el link copiado del navegador.
 const URL_INVITACIONES = 'https://www.instagram.com/accounts/manage_access/'
 
-// Video que muestra dónde aceptar la invitación de evaluador en Instagram. Pegá acá la dirección de
+// Video que muestra dónde aceptar la invitación de prueba en Instagram. Pegá acá la dirección de
 // YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, el espacio dice
 // "Próximamente". Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
 const VIDEO_EVALUADOR_URL: string | null = null
@@ -201,7 +201,7 @@ function PendienteDeConfirmacion({ usuario }: { usuario: string }) {
   return (
     <div>
       <p className="igm-suave">
-        Tu pedido con <strong>@{usuario}</strong> está <strong>pendiente de confirmación</strong>. Estamos sumando tu cuenta como evaluadora de la app de Órbita.
+        Tu pedido con <strong>@{usuario}</strong> está <strong>pendiente de confirmación</strong>. Estamos sumando tu cuenta como cuenta de prueba de la app de Órbita.
       </p>
       <div className="igm-nota">
         <Clock size={15} strokeWidth={2} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
@@ -218,7 +218,7 @@ function PendienteDeConfirmacion({ usuario }: { usuario: string }) {
 // el lugar reservado; con URL, el reproductor.
 function VideoTutorial() {
   const video = parseVideoEmbed(VIDEO_EVALUADOR_URL)
-  const titulo = 'Cómo aceptar la invitación de evaluador en Instagram'
+  const titulo = 'Cómo aceptar la invitación de prueba en Instagram'
   return (
     <figure className="igm-video">
       {video?.tipo === 'file' ? (
@@ -254,7 +254,7 @@ function ConectarCuenta() {
   return (
     <div className="igm-form">
       <p className="igm-suave">
-        Te enviamos a tu Instagram la invitación de evaluador de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
+        Te enviamos a tu Instagram la invitación de prueba de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
         Si ya la aceptaste, tocá el botón: vas a iniciar sesión en Instagram y darle permiso a Órbita para leer y responder tus mensajes directos.
       </p>
       <a className="igm-externo" href={URL_INVITACIONES} target="_blank" rel="noopener noreferrer">

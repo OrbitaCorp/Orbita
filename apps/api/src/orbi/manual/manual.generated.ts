@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "0f3f260a5c22bba8",
+  "version": "79ae1cbbb7ce502e",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -319,7 +319,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.\n\nInstagram está en acceso anticipado. Si todavía no lo tenés, tocá \"Conectar Instagram\", escribí el usuario de tu cuenta profesional y tocá \"Pedir acceso\". Tu pedido queda pendiente de confirmación hasta que sumemos tu cuenta como evaluadora de la app de Órbita: mientras tanto no hay nada que hacer en Instagram, porque todavía no te mandamos la invitación. Cuando la enviemos, ahí mismo se explica cómo aceptarla (Configuración → Apps y sitios web → Invitaciones de evaluador) y aparece el botón para conectar.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.\n\nInstagram está en acceso anticipado. Si todavía no lo tenés, tocá \"Conectar Instagram\", escribí el usuario de tu cuenta profesional y tocá \"Pedir acceso\". Tu pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app de Órbita: mientras tanto no hay nada que hacer en Instagram, porque todavía no te mandamos la invitación. Cuando la enviemos, ahí mismo se explica cómo aceptarla (Configuración → Apps y sitios web → Invitaciones de prueba) y aparece el botón para conectar.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"
@@ -350,7 +350,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "instagram-conexion",
       "capitulo": "Difusión",
       "titulo": "Conectar tu Instagram",
-      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como evaluadora de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas Publicaciones, Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas Publicaciones, Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
       "destino": {
         "seccion": "difusion",
         "label": "Ir a Difusión"
