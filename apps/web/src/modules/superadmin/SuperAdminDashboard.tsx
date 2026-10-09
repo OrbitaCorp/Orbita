@@ -72,7 +72,19 @@ export function SuperAdminDashboard() {
     [esAdmin, tickSoporte],
   )
   const orbiApagado = estadoOrbi?.estado.status === 'MAINTENANCE' ? 1 : 0
-  const items = NAV.map((n) => (n.id === 'soporte' ? { ...n, badge: abiertas } : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' } : n))
+  // Pedidos de acceso a Instagram que esperan que los habilitemos: también tienen que verse desde
+  // cualquier sección, porque nadie entra a mirar una pestaña que no sabe que tiene algo.
+  const { data: pedidosInstagram } = useFetch(
+    () => (esAdmin ? platformApi.instagramPedidos().catch(() => null) : Promise.resolve(null)),
+    [esAdmin, tickSoporte],
+  )
+  const instagramPendientes = pedidosInstagram?.filter((p) => p.status === 'PENDING').length ?? 0
+  const items = NAV.map((n) => (
+    n.id === 'soporte' ? { ...n, badge: abiertas }
+      : n.id === 'orbi' ? { ...n, badge: orbiApagado, badgeLabel: 'apagado' }
+        : n.id === 'instagram' ? { ...n, badge: instagramPendientes, badgeLabel: `${instagramPendientes} pendientes` }
+          : n
+  ))
 
   if (!user || user.type !== 'platform_admin') return null
 
@@ -101,7 +113,7 @@ export function SuperAdminDashboard() {
       {tab === 'logs' && <TabLogs />}
       {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
       {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role === 'SUPERADMIN'} />}
-      {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} onCambio={refrescarSoporte} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
   )

@@ -1,7 +1,8 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock, X } from 'lucide-react'
+import { Check, Clock, Play, X } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramConnect, type InstagramEstado } from '@/lib/api'
 
 // Modal de Instagram: el único lugar desde donde se pide acceso, se conecta y se desconecta (lo abre
@@ -12,6 +13,11 @@ import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramCo
 // 2) esperar a que lo sumemos, 3) conectar. El estado de la API decide en cuál está la persona.
 
 const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones de evaluador'
+
+// Video que muestra dónde aceptar la invitación de evaluador en Instagram. Pegá acá la dirección de
+// YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 2; mientras sea null, el espacio dice
+// "Próximamente". Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
+const VIDEO_EVALUADOR_URL: string | null = null
 
 const TITULOS_PASOS = ['Dejá tu usuario', 'Te sumamos como evaluador', 'Conectá tu cuenta']
 
@@ -190,7 +196,30 @@ function EsperarHabilitacion({ usuario }: { usuario: string }) {
         <Clock size={15} strokeWidth={2} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
         <p>Mientras tanto, entrá a Instagram y aceptá la invitación de evaluador que te va a llegar: <strong>{PASOS_EVALUADOR}</strong>.</p>
       </div>
+      <VideoTutorial />
     </div>
+  )
+}
+
+// Espacio del video de "dónde aceptar la invitación". Sin URL cargada (VIDEO_EVALUADOR_URL) muestra
+// el lugar reservado; con URL, el reproductor.
+function VideoTutorial() {
+  const video = parseVideoEmbed(VIDEO_EVALUADOR_URL)
+  const titulo = 'Cómo aceptar la invitación de evaluador en Instagram'
+  return (
+    <figure className="igm-video">
+      {video?.tipo === 'file' ? (
+        <video src={video.src} controls preload="metadata" playsInline aria-label={titulo} />
+      ) : video ? (
+        <iframe src={video.src} title={titulo} loading="lazy" allow="fullscreen; picture-in-picture" allowFullScreen />
+      ) : (
+        <div className="igm-video-vacio">
+          <span className="igm-video-play" aria-hidden><Play size={16} strokeWidth={2} fill="currentColor" /></span>
+          <p className="igm-video-titulo">Video tutorial</p>
+          <p className="igm-video-texto">Próximamente: te mostramos paso a paso a dónde ir para aceptar la invitación.</p>
+        </div>
+      )}
+    </figure>
   )
 }
 
@@ -355,6 +384,12 @@ const CSS = `
 
 .igm-nota { display: flex; gap: 8px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); background: var(--color-surface-alt); }
 .igm-nota p { margin: 0; }
+.igm-video { position: relative; aspect-ratio: 16 / 9; margin: 0 0 12px; overflow: hidden; border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-surface-alt); }
+.igm-video video, .igm-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.igm-video-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px; text-align: center; }
+.igm-video-play { width: 38px; height: 38px; margin-bottom: 6px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); background: var(--color-surface); border: 1px solid var(--color-border); }
+.igm-video-titulo { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
+.igm-video-texto { margin: 0; max-width: 30ch; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
 .igm-enlace { align-self: flex-start; padding: 6px 0; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--color-primary); text-decoration: none; }
 .igm-enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
 

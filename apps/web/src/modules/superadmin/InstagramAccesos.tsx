@@ -13,7 +13,7 @@ import { useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, dateT
 
 type Aviso = { variant: ToastVariant; title: string; description?: string }
 
-export function TabInstagram({ puedeHabilitar }: { puedeHabilitar: boolean }) {
+export function TabInstagram({ puedeHabilitar, onCambio }: { puedeHabilitar: boolean; onCambio?: () => void }) {
   const [tick, setTick] = useState(0)
   const [trabajando, setTrabajando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<Aviso | null>(null)
@@ -25,6 +25,7 @@ export function TabInstagram({ puedeHabilitar }: { puedeHabilitar: boolean }) {
       await (habilitar ? platformApi.instagramHabilitar(p.businessId) : platformApi.instagramDeshabilitar(p.businessId))
       setAviso({ variant: 'success', title: habilitar ? `${p.business.name} habilitado` : `${p.business.name}: acceso quitado` })
       setTick((t) => t + 1)
+      onCambio?.()
     } catch {
       setAviso({ variant: 'error', title: 'No se pudo cambiar el acceso', description: 'Probá de nuevo en un momento.' })
     } finally {
