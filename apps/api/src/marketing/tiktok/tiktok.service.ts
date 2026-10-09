@@ -6,6 +6,7 @@ import { isIP } from 'net';
 import { PrismaService } from '../../prisma/prisma.service';
 import { describeError } from '../../common/utils/describe-error.util';
 import { PublicarTiktokDto } from './dto/publicar-tiktok.dto';
+import { R2Service } from '../../r2/r2.service';
 
 // Publicar los videos de marketing de Órbita en TikTok (Content Posting API, "Direct Post").
 //
@@ -34,6 +35,8 @@ const TROZO_MIN = 5 * MB;
 const TROZO_MAX = 64 * MB;
 const TIMEOUT_MS = 30_000;
 const TIMEOUT_SUBIDA_MS = 180_000;
+
+const EXTENSION_VIDEO: Record<string, string> = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' };
 
 export type EstadoPublicacion = 'PROCESSING_UPLOAD' | 'PROCESSING_DOWNLOAD' | 'SEND_TO_USER_INBOX' | 'PUBLISH_COMPLETE' | 'FAILED';
 
@@ -88,6 +91,8 @@ export class TiktokService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    // Opcional por compatibilidad con los specs que construyen el servicio a mano; en la app real Nest lo inyecta siempre.
+    private readonly r2?: R2Service,
   ) {}
 
   private requerida(nombre: string): string {
@@ -351,6 +356,19 @@ export class TiktokService {
   }
 
   // ── Publicar ───────────────────────────────────────────────────────────
+
+  /**
+   * Una dirección firmada para que el navegador suba el video DIRECTO a R2 (sin pasar por el servidor, así no
+   * pesa el límite de tamaño de la API) y la dirección pública con la que después se publica en TikTok.
+   * Es el mismo camino que usa la sección de video de Apariencia.
+   */
+  async urlDeSubida(mimetype: string): Promise<{ uploadUrl: string; publicUrl: string }> {
+    if (!this.r2) throw new ServiceUnavailableException('El almacenamiento de videos no está disponible');
+    const ext = EXTENSION_VIDEO[mimetype];
+    if (!ext) throw new BadRequestException('El archivo tiene que ser un video mp4, mov o webm');
+    const path = `marketing/tiktok/${randomUUID()}.${ext}`;
+    return { uploadUrl: await this.r2.presignUpload(path, mimetype), publicUrl: this.r2.publicUrlDe(path) };
+  }
 
   /** Baja el video (solo https, sin redes internas, con tope de tamaño). */
   private async descargarVideo(url: string): Promise<{ datos: Buffer; tipo: string }> {

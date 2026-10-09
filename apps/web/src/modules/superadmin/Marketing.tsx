@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
+import { InstagramBandeja } from './InstagramBandeja'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
@@ -50,7 +51,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
   const router = useRouter()
   const [tick, setTick] = useState(0)
   const { data: tiktok, loading: cargandoTiktok } = useFetch(() => platformApi.tiktokEstado(), [tick])
-  const { data: canales } = useFetch(() => platformApi.marketingCanales(), [])
+  const [tickCanales, setTickCanales] = useState(0)
+  const { data: canales } = useFetch(() => platformApi.marketingCanales(), [tickCanales])
   const [canal, setCanal] = useState<Canal>('tiktok')
   const [aviso, setAviso] = useState<Aviso | null>(null)
 
@@ -70,13 +72,14 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
 
   const ig = canales?.instagram
   const estadoInstagram: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' } : ig?.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
-  const lineaInstagram = !canales ? '' : ig?.conectado ? (ig.usuario ? `@${ig.usuario}` : 'Cuenta conectada') : 'Todavía no hay una cuenta'
+  const sinLeer = ig?.conectado ? ig.mensajesSinLeer : 0
+  const lineaInstagram = !canales ? '' : ig?.conectado
+    ? `${ig.usuario ? `@${ig.usuario}` : 'Cuenta conectada'}${sinLeer > 0 ? ` · ${sinLeer} sin leer` : ''}`
+    : 'Todavía no hay una cuenta'
 
-  const wa = canales?.whatsapp
-  const estadoWhatsapp: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' }
-    : wa?.conectado ? (wa.dePrueba ? { texto: 'Número de prueba', tono: 'amber' } : { texto: 'Conectado', tono: 'green' })
-    : { texto: 'Pendiente', tono: 'amber' }
-  const lineaWhatsapp = !canales ? '' : wa?.conectado ? (wa.numero ?? '') : 'Falta el número de la empresa'
+  // WhatsApp todavía no se usa: hace falta una cuenta de WhatsApp Business con un número de la empresa.
+  const estadoWhatsapp: Estado = { texto: 'Próximamente', tono: 'gray' }
+  const lineaWhatsapp = 'Requiere una cuenta Business'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -97,8 +100,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       </div>
 
       {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} setAviso={setAviso} />}
-      {canal === 'instagram' && <PanelInstagram canales={canales} />}
-      {canal === 'whatsapp' && <PanelWhatsapp canales={canales} />}
+      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} />}
+      {canal === 'whatsapp' && <PanelWhatsapp />}
 
       {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
     </div>
@@ -227,40 +230,43 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, setAviso }: {
 
 // ─── Instagram ──────────────────────────────────────────────────────────────────
 
-function PanelInstagram({ canales }: { canales: MarketingCanales | null }) {
+function PanelInstagram({ canales, puedeVer, onCambio }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void }) {
   if (!canales) return <Card title="Instagram"><Loader /></Card>
   const { instagram: ig, negocio } = canales
+  // Reconectar la cuenta (si venció el acceso) se hace desde la bandeja del negocio al que está atada.
   const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
-  const conectado = ig.conectado
 
   return (
     <>
       <Card
         title="Cuenta de Instagram"
-        subtitle="Instagram se conecta al negocio desde su bandeja de mensajes; acá se ve el estado"
-        action={bandeja ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{conectado ? 'Abrir la bandeja' : 'Conectar desde la bandeja'}</a> : undefined}
+        subtitle="La cuenta de la empresa conectada a Órbita"
+        action={bandeja && (!ig.conectado || ig.diasRestantes < 10)
+          ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}</a>
+          : undefined}
       >
         {ig.conectado ? (
           <div>
             <Dato etiqueta="Cuenta">
               {ig.usuario ? <a href={`https://www.instagram.com/${ig.usuario}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>@{ig.usuario}</a> : 'Cuenta conectada'}
             </Dato>
-            {negocio && <Dato etiqueta="Conectada al negocio">{negocio.nombre} <span style={{ color: 'var(--color-muted)' }}>({negocio.subdominio})</span></Dato>}
             <Dato etiqueta="Acceso">
               {ig.diasRestantes > 0 ? `Vigente por ${ig.diasRestantes} ${ig.diasRestantes === 1 ? 'día' : 'días'}` : 'Vencido: hay que volver a conectar la cuenta'}
               <span style={{ color: 'var(--color-muted)' }}> · se renueva solo cada noche</span>
             </Dato>
           </div>
         ) : (
-          <Empty text={negocio ? `Todavía no hay una cuenta de Instagram conectada al negocio ${negocio.nombre}.` : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
+          <Empty text={negocio ? 'Todavía no hay una cuenta de Instagram conectada. Se conecta desde la bandeja de mensajes del negocio de la empresa.' : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
         )}
       </Card>
+
+      {ig.conectado && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
 
       <Card title="Qué se puede hacer" subtitle="Lo que está disponible hoy y lo que depende de la revisión de Meta">
         <Fila
           titulo="Recibir y contestar mensajes directos"
-          detalle="Los mensajes que llegan a la cuenta aparecen en la bandeja de mensajes del negocio y se contestan desde ahí, dentro de las 24 horas de que escribió la persona."
-          estado={conectado ? { texto: 'Disponible', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }}
+          detalle="Los mensajes que llegan a la cuenta aparecen en la bandeja de arriba y se contestan desde ahí."
+          estado={ig.conectado ? { texto: 'Disponible', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }}
         />
         <Fila
           titulo="Publicar fotos y Reels"
@@ -280,53 +286,90 @@ function PanelInstagram({ canales }: { canales: MarketingCanales | null }) {
 
 // ─── WhatsApp ───────────────────────────────────────────────────────────────────
 
-function PanelWhatsapp({ canales }: { canales: MarketingCanales | null }) {
-  if (!canales) return <Card title="WhatsApp"><Loader /></Card>
-  const { whatsapp: wa, negocio } = canales
-  const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
+function PanelWhatsapp() {
+  return (
+    <Card title="WhatsApp" subtitle="Atención por mensajes a clientes y contactos">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 560 }}>
+        <div><Chip text="Próximamente" tone="gray" dot /></div>
+        <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+          Para usar WhatsApp con la cuenta de la empresa hace falta una cuenta de WhatsApp Business con un número exclusivo. Cuando la tengamos, los mensajes van a llegar y contestarse desde esta pantalla, igual que los de Instagram.
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// Elegir el video: se sube un archivo de la computadora (directo a R2, con barra de avance) o se pega una dirección https.
+function SelectorDeVideo({ url, onUrl, onOcupado, duracionMaxMin }: { url: string; onUrl: (u: string) => void; onOcupado: (o: boolean) => void; duracionMaxMin: number }) {
+  const [archivo, setArchivo] = useState<{ nombre: string; mb: string } | null>(null)
+  const [progreso, setProgreso] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+
+  const elegir = async (f: File) => {
+    setError('')
+    if (!TIPOS_DE_VIDEO.includes(f.type)) { setError('Tiene que ser un video mp4, mov o webm.'); return }
+    if (f.size > MAX_VIDEO_MB * 1024 * 1024) { setError(`El video no puede pasar de ${MAX_VIDEO_MB} MB.`); return }
+    onOcupado(true)
+    setProgreso(0)
+    try {
+      const { uploadUrl, publicUrl } = await platformApi.tiktokUrlDeSubida(f.type)
+      await subirArchivo(uploadUrl, f, setProgreso)
+      setArchivo({ nombre: f.name, mb: (f.size / 1048576).toFixed(1) })
+      onUrl(publicUrl)
+    } catch (e) {
+      setArchivo(null)
+      onUrl('')
+      setError(e instanceof Error && e.message ? e.message : 'No se pudo subir el video. Probá de nuevo.')
+    } finally {
+      setProgreso(null)
+      onOcupado(false)
+      if (input.current) input.current.value = ''
+    }
+  }
 
   return (
-    <>
-      <Card
-        title="Número de WhatsApp"
-        subtitle="WhatsApp se conecta al negocio desde su bandeja de mensajes; acá se ve el estado"
-        action={bandeja ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>Abrir la bandeja</a> : undefined}
-      >
-        {wa.conectado ? (
-          <div>
-            <Dato etiqueta="Número">{wa.numero ?? 'Número conectado'}</Dato>
-            {negocio && <Dato etiqueta="Conectado al negocio">{negocio.nombre} <span style={{ color: 'var(--color-muted)' }}>({negocio.subdominio})</span></Dato>}
-            {wa.dePrueba && (
-              <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.55, paddingTop: 12 }}>
-                Es el número de prueba que da Meta para desarrollar. Sirve para probar cómo llegan y se contestan los mensajes, pero no para atender a clientes de verdad.
-              </div>
-            )}
-          </div>
-        ) : (
-          <Empty text="Todavía no hay un número de WhatsApp conectado." />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Video</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <input ref={input} type="file" accept="video/mp4,video/quicktime,video/webm" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void elegir(f) }} />
+        <button type="button" onClick={() => input.current?.click()} disabled={progreso !== null} className="ds-hover" style={{ ...btnGhostSm, height: 38, opacity: progreso !== null ? 0.6 : 1 }}>
+          {progreso !== null ? 'Subiendo…' : archivo ? 'Cambiar el archivo' : 'Subir desde mi computadora'}
+        </button>
+        {progreso !== null && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-muted)' }}>
+            <span style={{ width: 120, height: 6, borderRadius: 3, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
+              <span style={{ display: 'block', width: `${progreso}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 150ms' }} />
+            </span>
+            {progreso}%
+          </span>
         )}
-      </Card>
-
-      <Card title="Para pasar a un número de la empresa" subtitle="Lo que hace falta, en orden">
-        <Fila
-          titulo="1. Conseguir un número exclusivo para la empresa"
-          detalle="Tiene que poder recibir un código por SMS o llamada, y conviene que no esté en uso en la app de WhatsApp ni en WhatsApp Business. Una línea nueva sirve."
-          estado={{ texto: 'Pendiente', tono: 'amber' }}
-        />
-        <Fila
-          titulo="2. Verificar la empresa en Meta"
-          detalle="Se hace en el administrador comercial de Meta. Meta puede pedir datos o documentación de la empresa."
-          estado={{ texto: 'Después', tono: 'gray' }}
-        />
-        <Fila
-          titulo="3. Registrar el número y conectarlo"
-          detalle="Se agrega en la app de Meta y se conecta desde la bandeja de mensajes del negocio. Desde ahí empiezan a llegar los mensajes."
-          estado={{ texto: 'Después', tono: 'gray' }}
-          ultimo
-        />
-      </Card>
-    </>
+        {progreso === null && archivo && <span style={{ fontSize: 12.5, color: 'var(--color-body)' }}>{archivo.nombre} · {archivo.mb} MB</span>}
+      </div>
+      {error && <span role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)' }}>{error}</span>}
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 400, color: 'var(--color-muted)' }}>
+        O pegá la dirección de un video (https)
+        <input value={url} onChange={(e) => { setArchivo(null); onUrl(e.target.value) }} placeholder="https://…/video.mp4" style={inputStyle} />
+      </label>
+      <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>mp4, mov o webm, hasta {MAX_VIDEO_MB} MB. Duración máxima de la cuenta: {duracionMaxMin} min.</span>
+    </div>
   )
+}
+
+const TIPOS_DE_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
+const MAX_VIDEO_MB = 200
+
+/** PUT del archivo a la dirección firmada de R2, con avance (fetch todavía no informa el progreso de una subida). */
+function subirArchivo(uploadUrl: string, archivo: File, onProgreso: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', archivo.type)
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso(Math.round((e.loaded / e.total) * 100)) }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`El almacenamiento rechazó el archivo (${xhr.status}).`)))
+    xhr.onerror = () => reject(new Error('Se cortó la subida. Revisá la conexión y probá de nuevo.'))
+    xhr.send(archivo)
+  })
 }
 
 // ─── Publicar un video ──────────────────────────────────────────────────────────
@@ -354,6 +397,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const [deMarca, setDeMarca] = useState(false)
   const [ia, setIa] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [subiendo, setSubiendo] = useState(false) // se está subiendo el archivo elegido
   // Directo: se publica desde acá. Borrador: el video llega a los borradores de TikTok y una persona lo termina en la app.
   const [modo, setModo] = useState<'directo' | 'borrador'>('directo')
 
@@ -363,7 +407,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const sinTipoDeMarca = declara && !tuMarca && !deMarca
   // Un video de marca no puede ser privado: TikTok lo rechaza.
   const marcaYPrivado = declara && (tuMarca || deMarca) && privacidad === 'SELF_ONLY'
-  const urlValida = videoUrl.startsWith('https://')
+  const urlValida = videoUrl.startsWith('https://') && !subiendo
   const listo = modo === 'borrador'
     ? puedePublicar && !enviando && urlValida
     : puedePublicar && !enviando && urlValida && title.trim().length > 0 && !!privacidad && !sinTipoDeMarca && !marcaYPrivado
@@ -418,11 +462,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
           </div>
         )}
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-          Dirección del video (https)
-          <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4" style={inputStyle} />
-          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-muted)' }}>Un MP4 público. Duración máxima de la cuenta: {Math.round(creador.duracionMaximaSeg / 60)} min.</span>
-        </label>
+        <SelectorDeVideo url={videoUrl} onUrl={setVideoUrl} onOcupado={setSubiendo} duracionMaxMin={Math.round(creador.duracionMaximaSeg / 60)} />
 
         {modo === 'directo' && (<>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
