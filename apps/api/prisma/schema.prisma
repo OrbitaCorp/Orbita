@@ -1650,12 +1650,13 @@ enum InstagramConnectionStatus {
 // pedido ENABLED, que abre la compuerta de ese negocio (ver
 // InstagramService.estaHabilitado). Un pedido por negocio.
 model InstagramEarlyAccess {
-  id          String                     @id @default(uuid())
-  businessId  String                     @unique @map("business_id")
-  username    String // @usuario de Instagram, sin la @
-  status      InstagramEarlyAccessStatus @default(PENDING)
-  requestedAt DateTime                   @default(now()) @map("requested_at")
-  enabledAt   DateTime?                  @map("enabled_at")
+  id           String                     @id @default(uuid())
+  businessId   String                     @unique @map("business_id")
+  username     String // @usuario de Instagram, sin la @
+  contactEmail String?                    @map("contact_email") // a quién avisar cuando se habilita; null = el propietario
+  status       InstagramEarlyAccessStatus @default(PENDING)
+  requestedAt  DateTime                   @default(now()) @map("requested_at")
+  enabledAt    DateTime?                  @map("enabled_at")
 
   business Business @relation(fields: [businessId], references: [id])
 

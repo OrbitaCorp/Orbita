@@ -330,6 +330,19 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     },
   },
   {
+    id: 'instagram-acceso-listo',
+    label: 'Acceso a Instagram listo (al dueño)',
+    group: 'Plataforma',
+    template: 'instagram-acceso-listo',
+    isPlatform: true,
+    subject: 'Tu acceso a Instagram en Órbita está listo',
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      username: 'panaderialopez',
+      panelUrl: 'https://panaderialopez.orbita.site/admin/ventas/difusion',
+    },
+  },
+  {
     id: 'subscription-payment-failed',
     label: 'Pago de suscripción fallido',
     group: 'Plataforma',

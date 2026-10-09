@@ -46,8 +46,8 @@ export class InstagramController {
   @FullModeOnly()
   @Roles('owner', 'admin')
   async pedirAcceso(@CurrentBusiness() ctx: AuthContext, @Body() dto: SolicitarAccesoDto) {
-    const { businessId } = assertMemberContext(ctx);
-    return this.instagram.solicitarAcceso(businessId, dto.username);
+    const { businessId, memberId } = assertMemberContext(ctx);
+    return this.instagram.solicitarAcceso(businessId, dto.username, memberId);
   }
 
   // Devuelve la dirección del login de Instagram: el panel redirige ahí al dueño.

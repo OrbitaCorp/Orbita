@@ -22,8 +22,15 @@ export function TabInstagram({ puedeHabilitar, onCambio }: { puedeHabilitar: boo
   async function cambiar(p: InstagramPedido, habilitar: boolean) {
     setTrabajando(p.businessId)
     try {
-      await (habilitar ? platformApi.instagramHabilitar(p.businessId) : platformApi.instagramDeshabilitar(p.businessId))
-      setAviso({ variant: 'success', title: habilitar ? `${p.business.name} habilitado` : `${p.business.name}: acceso quitado` })
+      if (habilitar) {
+        const { avisado } = await platformApi.instagramHabilitar(p.businessId)
+        setAviso(avisado
+          ? { variant: 'success', title: `${p.business.name} habilitado`, description: 'Le avisamos por correo con el botón para conectar.' }
+          : { variant: 'warning', title: `${p.business.name} habilitado`, description: 'No salió el correo de aviso: avisale vos que ya puede conectar.' })
+      } else {
+        await platformApi.instagramDeshabilitar(p.businessId)
+        setAviso({ variant: 'success', title: `${p.business.name}: acceso quitado` })
+      }
       setTick((t) => t + 1)
       onCambio?.()
     } catch {
@@ -43,7 +50,7 @@ export function TabInstagram({ puedeHabilitar, onCambio }: { puedeHabilitar: boo
       />
       <p style={{ margin: 0, maxWidth: 680, fontSize: 13, lineHeight: 1.6, color: 'var(--color-muted)' }}>
         Orden: 1) sumá la cuenta como evaluadora en Meta (Roles → Agregar personas → Evaluador de Instagram), 2) recién ahí tocá <strong>Habilitar</strong>.
-        Habilitar es avisarle al dueño que <strong>la invitación ya está enviada</strong>: le aparece &quot;Aceptá la invitación y conectá&quot;.
+        Habilitar es avisarle al dueño que <strong>la invitación ya está enviada</strong>: le aparece &quot;Aceptá la invitación y conectá&quot; y le sale un correo con el botón para conectar.
         Mientras no lo hagas, él ve &quot;Pendiente de confirmación&quot; y sabe que no tiene que buscar nada en Instagram.
       </p>
       {error ? <ErrorBox msg="No se pudieron cargar los pedidos." action={<button style={btnGhostSm} onClick={() => setTick((t) => t + 1)}>Reintentar</button>} /> : loading && !data ? <Loader /> : (

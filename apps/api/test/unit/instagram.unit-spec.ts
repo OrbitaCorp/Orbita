@@ -44,6 +44,7 @@ const evento = (...mensajes: unknown[]): IgWebhookBody => ({ object: 'instagram'
 function build(overrides: Record<string, any> = {}, cfg: Record<string, string> = {}, mail?: any) {
   const prisma: any = {
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'mitienda' }) },
+    member: { findFirst: jest.fn().mockResolvedValue(null) },
     instagramEarlyAccess: {
       findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -389,7 +390,7 @@ describe('InstagramService (unit)', () => {
       const { svc, prisma } = build({ business: NEGOCIO }, PROD, mail);
       const pedido = await svc.solicitarAcceso(BIZ, '  @Mi.Tienda_1 ');
       expect(pedido.username).toBe('mi.tienda_1');
-      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, create: { businessId: BIZ, username: 'mi.tienda_1' } }));
+      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, create: { businessId: BIZ, username: 'mi.tienda_1', contactEmail: null } }));
       expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
       expect(mail.sendCustomEmail.mock.calls[0][2]).toContain('@mi.tienda_1');
     });
@@ -425,6 +426,67 @@ describe('InstagramService (unit)', () => {
       await svc.cambiarHabilitacion(BIZ, false);
       expect(prisma.instagramEarlyAccess.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: { status: 'PENDING', enabledAt: null } }));
       await expect(build({}).svc.cambiarHabilitacion(BIZ, true)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('solicitarAcceso guarda el correo de quien pide, buscado en ESE negocio', async () => {
+      const { svc, prisma } = build({ member: { findFirst: jest.fn().mockResolvedValue({ email: 'dueno@tienda.com' }) } }, PROD);
+      await svc.solicitarAcceso(BIZ, 'mitienda', 'm-1');
+      expect(prisma.member.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'm-1', businessId: BIZ } }));
+      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: { businessId: BIZ, username: 'mitienda', contactEmail: 'dueno@tienda.com' } }));
+    });
+
+    describe('aviso al habilitar', () => {
+      const pendiente = (extra: Record<string, unknown> = {}) => ({
+        instagramEarlyAccess: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'a1', status: 'PENDING', username: 'mitienda', contactEmail: 'pidio@tienda.com', ...extra }),
+          update: jest.fn().mockResolvedValue({ businessId: BIZ, status: 'ENABLED' }),
+        },
+        business: { findUnique: jest.fn().mockResolvedValue({ name: 'Mi Tienda', subdomain: 'mitienda' }) },
+      });
+
+      it('al pasar de pendiente a habilitado manda el correo con el botón a Difusión', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const { svc } = build(pendiente(), {}, mail);
+        const r = await svc.cambiarHabilitacion(BIZ, true);
+        expect(r.avisado).toBe(true);
+        expect(mail.sendInstagramAccesoListo).toHaveBeenCalledWith(
+          'pidio@tienda.com',
+          { storeName: 'Mi Tienda', username: 'mitienda', panelUrl: 'https://mitienda.orbita.site/admin/ventas/difusion' },
+          { businessId: BIZ },
+        );
+      });
+
+      it('sin correo guardado (pedido viejo) avisa al propietario del negocio', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const { svc, prisma } = build({ ...pendiente({ contactEmail: null }), member: { findFirst: jest.fn().mockResolvedValue({ email: 'owner@tienda.com' }) } }, {}, mail);
+        await svc.cambiarHabilitacion(BIZ, true);
+        expect(prisma.member.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ, role: { name: 'owner' }, status: 'ACTIVE' } }));
+        expect(mail.sendInstagramAccesoListo.mock.calls[0][0]).toBe('owner@tienda.com');
+      });
+
+      it('no reenvía si ya estaba habilitado, ni al quitar el acceso', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockResolvedValue(true) };
+        const yaHabilitado = build(pendiente({ status: 'ENABLED' }), {}, mail);
+        expect((await yaHabilitado.svc.cambiarHabilitacion(BIZ, true)).avisado).toBe(false);
+        const quitar = build(pendiente({ status: 'ENABLED' }), {}, mail);
+        expect((await quitar.svc.cambiarHabilitacion(BIZ, false)).avisado).toBe(false);
+        expect(mail.sendInstagramAccesoListo).not.toHaveBeenCalled();
+      });
+
+      it('si el correo falla, igual queda habilitado y avisado=false', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn().mockRejectedValue(new Error('resend caído')) };
+        const { svc, prisma } = build(pendiente(), {}, mail);
+        const r = await svc.cambiarHabilitacion(BIZ, true);
+        expect(r.avisado).toBe(false);
+        expect(prisma.instagramEarlyAccess.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'ENABLED' }) }));
+      });
+
+      it('sin ningún correo a quién avisar, avisado=false', async () => {
+        const mail = { sendInstagramAccesoListo: jest.fn() };
+        const { svc } = build(pendiente({ contactEmail: null }), {}, mail);
+        expect((await svc.cambiarHabilitacion(BIZ, true)).avisado).toBe(false);
+        expect(mail.sendInstagramAccesoListo).not.toHaveBeenCalled();
+      });
     });
   });
 });

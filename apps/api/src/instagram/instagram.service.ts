@@ -186,16 +186,22 @@ export class InstagramService {
    * de Meta. Un pedido por negocio: pedir de nuevo con otro usuario lo corrige, y
    * el aviso al equipo sale solo si el pedido es nuevo o cambió el usuario.
    */
-  async solicitarAcceso(businessId: string, usuarioCrudo: string) {
+  async solicitarAcceso(businessId: string, usuarioCrudo: string, memberId?: string) {
     const username = this.normalizarUsuario(usuarioCrudo);
     if (await this.estaHabilitado(businessId)) {
       throw new ConflictException('Instagram ya está habilitado para este negocio');
     }
+    // A esa persona se le avisa cuando habiliten el negocio. Si no hay (o no se encuentra),
+    // el aviso va al propietario.
+    const quien = memberId
+      ? await this.prisma.member.findFirst({ where: { id: memberId, businessId }, select: { email: true } })
+      : null;
+    const contactEmail = quien?.email ?? null;
     const previo = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { username: true } });
     const pedido = await this.prisma.instagramEarlyAccess.upsert({
       where: { businessId },
-      create: { businessId, username },
-      update: { username },
+      create: { businessId, username, contactEmail },
+      update: { username, ...(contactEmail ? { contactEmail } : {}) },
       select: { username: true, requestedAt: true },
     });
     if (!previo || previo.username !== username) await this.avisarPedido(businessId, username);
@@ -233,14 +239,49 @@ export class InstagramService {
     });
   }
 
+  /**
+   * Habilitar es decirle al dueño que la invitación de evaluador ya está enviada: se le avisa por
+   * correo (con un botón directo a Difusión) la primera vez que pasa de pendiente a habilitado.
+   * Volver a habilitar uno que ya estaba habilitado no reenvía nada.
+   */
   async cambiarHabilitacion(businessId: string, habilitar: boolean) {
-    const pedido = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { id: true } });
+    const pedido = await this.prisma.instagramEarlyAccess.findUnique({
+      where: { businessId },
+      select: { id: true, status: true, username: true, contactEmail: true },
+    });
     if (!pedido) throw new NotFoundException('Ese negocio no pidió acceso a Instagram');
-    return this.prisma.instagramEarlyAccess.update({
+    const actualizado = await this.prisma.instagramEarlyAccess.update({
       where: { businessId },
       data: habilitar ? { status: 'ENABLED', enabledAt: new Date() } : { status: 'PENDING', enabledAt: null },
       select: { businessId: true, username: true, status: true, enabledAt: true },
     });
+    const avisado = habilitar && pedido.status !== 'ENABLED' ? await this.avisarHabilitacion(businessId, pedido) : false;
+    return { ...actualizado, avisado };
+  }
+
+  // Si el correo falla, el negocio igual queda habilitado: el superadmin se entera por `avisado: false`.
+  private async avisarHabilitacion(businessId: string, pedido: { username: string; contactEmail: string | null }): Promise<boolean> {
+    try {
+      if (!this.mail) return false;
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+      if (!negocio) return false;
+      const destino =
+        pedido.contactEmail ??
+        (await this.prisma.member.findFirst({ where: { businessId, role: { name: 'owner' }, status: 'ACTIVE' }, select: { email: true } }))?.email;
+      if (!destino) return false;
+      return await this.mail.sendInstagramAccesoListo(
+        destino,
+        {
+          storeName: negocio.name,
+          username: pedido.username,
+          panelUrl: `https://${negocio.subdomain}.orbita.site/admin/ventas/difusion`,
+        },
+        { businessId },
+      );
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar la habilitación de Instagram: ${describeError(e)}`);
+      return false;
+    }
   }
 
   // ── Conectar: login con Instagram ──────────────────────────────────────────

@@ -990,7 +990,8 @@ export const platformApi = {
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
   // Pedidos de acceso anticipado a Instagram (apps/api/src/instagram/instagram-admin.controller.ts).
   instagramPedidos: () => getJSON<InstagramPedido[]>('/platform/instagram/acceso'),
-  instagramHabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/habilitar`, 'POST'),
+  // `avisado`: salió el correo "tu acceso está listo" al dueño (false si ya estaba habilitado o falló el envío).
+  instagramHabilitar: (businessId: string) => sendJSON<{ avisado: boolean }>(`/platform/instagram/acceso/${businessId}/habilitar`, 'POST'),
   instagramDeshabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/deshabilitar`, 'POST'),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),

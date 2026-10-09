@@ -229,6 +229,8 @@ export class MailService {
     // La respuesta va al revés (Órbita → negocio), pero la firma Órbita como
     // plataforma, no la tienda: el que la recibe es el dueño de esa tienda.
     'support-reply',
+    // Órbita le avisa al dueño que ya puede conectar Instagram (acceso anticipado).
+    'instagram-acceso-listo',
   ]);
 
   // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
@@ -383,6 +385,8 @@ export class MailService {
     'support-reply': this.svgIcon(
       '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
     ),
+    // CircleCheck — el acceso a Instagram quedó listo.
+    'instagram-acceso-listo': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
   };
 
   constructor(
@@ -1398,6 +1402,15 @@ export class MailService {
   ): Promise<boolean> {
     const asunto = data.recordatorio ? 'Recordatorio: Orbi sigue en mantenimiento' : 'Orbi pasó a mantenimiento';
     return this.sendOrLog(to, asunto, 'orbi-mantenimiento', data);
+  }
+
+  /** Al dueño: el equipo ya sumó su cuenta como evaluadora de Instagram y puede conectarla (botón a Difusión). */
+  async sendInstagramAccesoListo(
+    to: string,
+    data: { storeName: string; username: string; panelUrl: string },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, 'Tu acceso a Instagram en Órbita está listo', 'instagram-acceso-listo', data, meta);
   }
 
   async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
