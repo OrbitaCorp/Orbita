@@ -9,7 +9,9 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
+import { PublicarInstagramDto } from './dto/publicar-instagram.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
+import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramService } from './instagram.service';
 
 // `express` es solo dependencia transitiva — mismo motivo que en
@@ -28,9 +30,30 @@ export class InstagramController {
 
   constructor(
     private readonly instagram: InstagramService,
+    private readonly publicaciones: InstagramPublicacionesService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+  }
+
+  // Historial de lo publicado desde Órbita (Difusión → Publicaciones).
+  @Get('posts')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async historial(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.publicaciones.listar(businessId);
+  }
+
+  // Publica en Instagram la foto de un producto con el texto que escribió el dueño. Es una acción con
+  // efecto afuera de Órbita (queda a la vista de los seguidores): solo propietario/admin.
+  @Post('posts')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async publicar(@CurrentBusiness() ctx: AuthContext, @Body() dto: PublicarInstagramDto) {
+    const { businessId, memberId } = assertMemberContext(ctx);
+    return this.publicaciones.publicarProducto(businessId, memberId, dto.productId, dto.caption);
   }
 
   @Get('connection')
@@ -60,7 +83,7 @@ export class InstagramController {
     await this.instagram.asegurarHabilitado(member.businessId);
     // El Origin del navegador dice desde qué dirección se está usando el panel: al terminar el login se
     // vuelve a ese mismo lugar, donde está la sesión.
-    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId, req.headers.origin, dto?.seccion) };
+    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId, req.headers.origin, dto?.seccion, dto?.permisos) };
   }
 
   @Delete('connection')

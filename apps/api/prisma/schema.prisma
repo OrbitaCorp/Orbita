@@ -102,6 +102,7 @@ model Business {
   whatsappConnection   WhatsappConnection?
   instagramConnection  InstagramConnection?
   instagramEarlyAccess InstagramEarlyAccess?
+  instagramPosts       InstagramPost[]
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1630,6 +1631,7 @@ model InstagramConnection {
   username       String?                   @map("username") // @usuario, solo para mostrar en el panel
   accessToken    String                    @map("access_token") // CIFRADO (pgp_sym_encrypt)
   tokenExpiresAt DateTime                  @map("token_expires_at")
+  scopes         String?                   @map("scopes") // permisos concedidos, separados por coma (instagram_business_content_publish habilita Publicaciones); null = conexión vieja, solo mensajes
   status         InstagramConnectionStatus @default(ACTIVE)
   createdAt      DateTime                  @default(now()) @map("created_at")
   updatedAt      DateTime                  @updatedAt @map("updated_at")
@@ -1637,6 +1639,27 @@ model InstagramConnection {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("instagram_connections")
+}
+
+// Publicación hecha en Instagram desde Difusión → Publicaciones: queda el historial (con el enlace a
+// la publicación) de lo que Órbita subió en nombre del negocio. Solo se guarda lo que salió: si falla,
+// no queda fila. No lleva FK al producto (se puede borrar después): el nombre queda de copia.
+model InstagramPost {
+  id          String   @id @default(uuid())
+  businessId  String   @map("business_id")
+  productId   String?  @map("product_id")
+  productName String   @map("product_name")
+  memberId    String?  @map("member_id") // quién la publicó
+  caption     String
+  imageUrl    String   @map("image_url") // el JPEG que se mandó (se borra del almacenamiento al terminar)
+  igMediaId   String   @unique @map("ig_media_id")
+  permalink   String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@map("instagram_posts")
 }
 
 enum InstagramConnectionStatus {

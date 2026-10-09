@@ -6,4 +6,6 @@ export type PantallaDeRetorno = (typeof PANTALLAS_DE_RETORNO)[number];
 
 export class ConectarInstagramDto {
   @IsOptional() @IsIn(PANTALLAS_DE_RETORNO) seccion?: PantallaDeRetorno;
+  // 'publicar' = además de los mensajes, pedirle a Instagram el permiso de publicar contenido (Publicaciones).
+  @IsOptional() @IsIn(['publicar']) permisos?: 'publicar';
 }

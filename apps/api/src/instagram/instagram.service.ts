@@ -39,7 +39,10 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const RENOVAR_CON_ANTICIPACION_MS = 15 * 24 * 60 * 60 * 1000;
 // Límite de la API de Instagram para un mensaje de texto.
 const MAX_BYTES_TEXTO = 1000;
-const SCOPES = 'instagram_business_basic,instagram_business_manage_messages';
+const SCOPES_BASE = 'instagram_business_basic,instagram_business_manage_messages';
+// Publicaciones (kit de difusión): se pide solo cuando la persona entra a autorizar la publicación, para que
+// quien solo quiere mensajes no vea en Instagram una pantalla que pide más de lo que usa.
+export const SCOPE_PUBLICAR = 'instagram_business_content_publish';
 
 interface StatePayload {
   businessId: string;
@@ -50,6 +53,8 @@ interface StatePayload {
   origen?: string;
   // Pantalla del panel desde la que se pidió la conexión (mensajes o difusion).
   seccion?: PantallaDeRetorno;
+  // 'publicar' = además del permiso de mensajes, pide el de publicar contenido.
+  permisos?: 'publicar';
   nonce: string;
   exp: number;
 }
@@ -296,12 +301,13 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'publicar'): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
       ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
       ...(seccion && PANTALLAS_DE_RETORNO.includes(seccion) ? { seccion } : {}),
+      ...(permisos === 'publicar' ? { permisos } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -364,13 +370,13 @@ export class InstagramService {
     }
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno): string {
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'publicar'): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: SCOPES,
-      state: this.firmarState(businessId, memberId, origen, seccion),
+      scope: permisos === 'publicar' ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE,
+      state: this.firmarState(businessId, memberId, origen, seccion, permisos),
       // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
       // cuenta (Meta lo recomienda sobre todo en celulares).
       force_reauth: 'true',
@@ -380,7 +386,7 @@ export class InstagramService {
 
   /** Vuelta del login: cambia el code por el token, lo guarda cifrado y suscribe el webhook. */
   async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean; retorno: string }> {
-    const { businessId, origen, seccion } = this.verificarState(state);
+    const { businessId, origen, seccion, permisos } = this.verificarState(state);
     await this.asegurarHabilitado(businessId);
 
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
@@ -394,12 +400,17 @@ export class InstagramService {
       redirect_uri: this.redirectUri,
       code,
     });
-    const corto = await this.llamar<{ access_token?: string; data?: { access_token?: string }[] }>('https://api.instagram.com/oauth/access_token', {
+    const corto = await this.llamar<{ access_token?: string; permissions?: string | string[]; data?: { access_token?: string; permissions?: string | string[] }[] }>('https://api.instagram.com/oauth/access_token', {
       method: 'POST',
       body: form,
     });
     const tokenCorto = corto.access_token ?? corto.data?.[0]?.access_token;
     if (!tokenCorto) throw new BadGatewayException('Instagram no devolvió el token esperado');
+    // Qué permisos concedió la persona (puede destildar alguno en la pantalla de Instagram). Si la respuesta no
+    // los trae, se toman los que se pidieron.
+    const concedidos = corto.permissions ?? corto.data?.[0]?.permissions;
+    const scopes = (Array.isArray(concedidos) ? concedidos.join(',') : concedidos)
+      ?? (permisos === 'publicar' ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE);
 
     // 2) token corto (1 hora) → token largo (60 días). Siempre desde el servidor:
     // lleva el App Secret.
@@ -423,17 +434,18 @@ export class InstagramService {
 
     try {
       await this.prisma.$executeRaw`
-        INSERT INTO instagram_connections (id, business_id, ig_user_id, username, access_token, token_expires_at, status, created_at, updated_at)
+        INSERT INTO instagram_connections (id, business_id, ig_user_id, username, access_token, token_expires_at, scopes, status, created_at, updated_at)
         VALUES (
           ${randomUUID()}, ${businessId}, ${igUserId}, ${perfil.username ?? null},
           encode(pgp_sym_encrypt(${largo.access_token}, ${this.tokenKey}), 'base64'),
-          ${vence}, 'ACTIVE'::"InstagramConnectionStatus", now(), now()
+          ${vence}, ${scopes}, 'ACTIVE'::"InstagramConnectionStatus", now(), now()
         )
         ON CONFLICT (business_id) DO UPDATE SET
           ig_user_id = EXCLUDED.ig_user_id,
           username = EXCLUDED.username,
           access_token = EXCLUDED.access_token,
           token_expires_at = EXCLUDED.token_expires_at,
+          scopes = EXCLUDED.scopes,
           status = 'ACTIVE'::"InstagramConnectionStatus",
           updated_at = now()`;
     } catch (e) {
@@ -461,10 +473,27 @@ export class InstagramService {
   async estado(businessId: string) {
     const c = await this.prisma.instagramConnection.findUnique({
       where: { businessId },
-      select: { status: true, username: true, tokenExpiresAt: true, createdAt: true },
+      select: { status: true, username: true, tokenExpiresAt: true, createdAt: true, scopes: true },
     });
     if (!c || c.status !== 'ACTIVE') return { connected: false as const };
-    return { connected: true as const, username: c.username, connectedAt: c.createdAt, tokenExpiresAt: c.tokenExpiresAt };
+    return {
+      connected: true as const,
+      username: c.username,
+      connectedAt: c.createdAt,
+      tokenExpiresAt: c.tokenExpiresAt,
+      // ¿Se concedió el permiso de publicar? Sin él, Publicaciones pide volver a autorizar.
+      puedePublicar: this.concedePublicar(c.scopes),
+    };
+  }
+
+  private concedePublicar(scopes: string | null | undefined): boolean {
+    return (scopes ?? '').split(',').map((s) => s.trim()).includes(SCOPE_PUBLICAR);
+  }
+
+  /** ¿La conexión del negocio tiene el permiso de publicar contenido? */
+  async puedePublicar(businessId: string): Promise<boolean> {
+    const c = await this.prisma.instagramConnection.findUnique({ where: { businessId }, select: { status: true, scopes: true } });
+    return !!c && c.status === 'ACTIVE' && this.concedePublicar(c.scopes);
   }
 
   async desconectar(businessId: string) {
@@ -690,6 +719,70 @@ export class InstagramService {
       if (e instanceof InstagramApiError && (e.code === 190 || e.tipo === 'OAuthException')) {
         await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
         throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Mensajes.');
+      }
+      throw e;
+    }
+  }
+
+  // ── Publicar una foto en el feed ───────────────────────────────────────────
+
+  private pausa(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  /**
+   * Publica una foto en el feed de la cuenta conectada. Instagram lo hace en tres pasos: crea un
+   * "contenedor" con la imagen (que Instagram descarga de `imageUrl`, así que tiene que ser una
+   * dirección pública y un JPEG), espera a que lo procese y recién ahí lo publica. Devuelve el id de la
+   * publicación y su enlace.
+   */
+  async publicarImagen(businessId: string, imageUrl: string, caption: string): Promise<{ mediaId: string; permalink: string | null }> {
+    if (!(await this.puedePublicar(businessId))) {
+      throw new ForbiddenException('Falta autorizar la publicación: volvé a conectar Instagram dándole ese permiso a Órbita.');
+    }
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    const base = `https://graph.instagram.com/${this.version}`;
+    const auth = { Authorization: `Bearer ${cred.access_token}` };
+    const json = { ...auth, 'Content-Type': 'application/json' };
+
+    try {
+      const contenedor = await this.llamar<{ id?: string }>(`${base}/${cred.ig_user_id}/media`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ image_url: imageUrl, caption }),
+      });
+      if (!contenedor.id) throw new BadGatewayException('Instagram no aceptó la imagen');
+
+      // Las imágenes suelen quedar listas enseguida, pero Instagram pide confirmarlo antes de publicar.
+      let listo = false;
+      for (let i = 0; i < 10 && !listo; i++) {
+        const estado = await this.llamar<{ status_code?: string }>(`${base}/${contenedor.id}?fields=status_code`, { headers: auth });
+        if (estado.status_code === 'FINISHED') listo = true;
+        else if (estado.status_code === 'ERROR' || estado.status_code === 'EXPIRED') {
+          throw new UnprocessableEntityException('Instagram no pudo procesar la imagen. Probá con otra foto del producto.');
+        } else await this.pausa(1500);
+      }
+      if (!listo) throw new ServiceUnavailableException('Instagram está tardando en procesar la imagen. Probá de nuevo en un momento.');
+
+      const publicado = await this.llamar<{ id?: string }>(`${base}/${cred.ig_user_id}/media_publish`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ creation_id: contenedor.id }),
+      });
+      if (!publicado.id) throw new BadGatewayException('Instagram no confirmó la publicación');
+
+      // El enlace es un extra: si falla, la publicación ya salió igual.
+      const permalink = await this.llamar<{ permalink?: string }>(`${base}/${publicado.id}?fields=permalink`, { headers: auth })
+        .then((r) => r.permalink ?? null)
+        .catch(() => null);
+      return { mediaId: publicado.id, permalink };
+    } catch (e) {
+      // Solo el 190 es "token inválido". Otros OAuthException (por ejemplo, falta de permiso) NO cortan la
+      // conexión: no es que la cuenta se haya desconectado.
+      if (e instanceof InstagramApiError && e.code === 190) {
+        await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
+        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Difusión.');
       }
       throw e;
     }
