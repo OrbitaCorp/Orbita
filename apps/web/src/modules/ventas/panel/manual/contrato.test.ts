@@ -69,7 +69,7 @@ const TEXTOS_DE_PANTALLA = new Set(pantallasDe(SRC).flatMap(textosDelArchivo))
 const CARPETA_DE_SECCION: Record<string, string> = {
   pedidos: 'pedidos', catalogo: 'catalogo', categorias: 'catalogo', clientes: 'clientes',
   reportes: 'reportes', descuentos: 'descuentos', cupones: 'descuentos', mensajes: 'mensajes',
-  avanzado: 'avanzado', perfil: 'perfil',
+  avanzado: 'avanzado', perfil: 'perfil', difusion: 'difusion',
 }
 function textosDeSeccion(seccion: string): Set<string> {
   const carpeta = CARPETA_DE_SECCION[seccion]

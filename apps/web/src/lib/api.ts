@@ -3341,14 +3341,33 @@ export function disconnectWhatsapp() { return panelRequest<{ connected: false }>
 export type InstagramEstado =
   | { habilitado: false; connected: false; solicitud: { username: string; requestedAt: string } | null }
   | { habilitado?: true; connected: false }
-  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string }
+  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string; puedePublicar?: boolean }
 export function getInstagramConnection() { return panelRequest<InstagramEstado>('/instagram/connection') }
 export function requestInstagramAccess(username: string) {
   return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
 }
 // `seccion`: la pantalla del panel a la que se vuelve al terminar el login de Instagram (por defecto Mensajes).
-export function startInstagramConnect(seccion?: 'mensajes' | 'difusion') {
-  return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST', body: JSON.stringify(seccion ? { seccion } : {}) })
+// `permisos: 'publicar'`: además de los mensajes, pide el permiso de publicar contenido (Difusión → Publicaciones).
+export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones', permisos?: 'publicar') {
+  return panelRequest<{ url: string }>('/instagram/connect', {
+    method: 'POST',
+    body: JSON.stringify({ ...(seccion ? { seccion } : {}), ...(permisos ? { permisos } : {}) }),
+  })
+}
+
+// Lo que Órbita publicó en el Instagram del negocio (Difusión → Publicaciones).
+export type InstagramPublicacion = {
+  id: string
+  productId: string | null
+  productName: string
+  caption: string
+  imageUrl: string
+  permalink: string | null
+  createdAt: string
+}
+export function getInstagramPosts() { return panelRequest<InstagramPublicacion[]>('/instagram/posts') }
+export function publishInstagramPost(input: { productId: string; caption: string }) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts', { method: 'POST', body: JSON.stringify(input) })
 }
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 

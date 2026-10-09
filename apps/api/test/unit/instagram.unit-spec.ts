@@ -396,7 +396,7 @@ describe('InstagramService (unit)', () => {
     });
 
     it('vuelve a la pantalla desde la que se pidió la conexión (Mensajes por defecto, o Difusión)', async () => {
-      const volver = async (seccion?: 'mensajes' | 'difusion') => {
+      const volver = async (seccion?: 'mensajes' | 'difusion' | 'publicaciones') => {
         const { svc } = build({}, {});
         const url = svc.urlDeAutorizacion(BIZ, 'm-1', 'http://mitienda.orbita.local:3001', seccion);
         return svc.retornoDelState(new URL(url).searchParams.get('state') ?? undefined);
@@ -404,6 +404,16 @@ describe('InstagramService (unit)', () => {
       expect(await volver()).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
       expect(await volver('mensajes')).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
       expect(await volver('difusion')).toBe('http://mitienda.orbita.local:3001/admin/ventas/difusion');
+      // Publicaciones es una vista de Difusión: vuelve con ?vista= (el controlador agrega ?ig= con &).
+      expect(await volver('publicaciones')).toBe('http://mitienda.orbita.local:3001/admin/ventas/difusion?vista=publicaciones');
+    });
+
+    it('pedir el permiso de publicar suma ese permiso al login y queda en el state', () => {
+      const { svc } = build({}, {});
+      const base = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'publicaciones')).searchParams.get('scope');
+      expect(base).toBe('instagram_business_basic,instagram_business_manage_messages');
+      const conPublicar = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'publicaciones', 'publicar')).searchParams.get('scope');
+      expect(conPublicar).toBe('instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish');
     });
 
     it('una pantalla fuera de la lista no entra en la ruta de vuelta', async () => {

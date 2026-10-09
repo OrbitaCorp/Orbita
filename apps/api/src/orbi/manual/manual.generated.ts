@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "79ae1cbbb7ce502e",
+  "version": "d4e469ab1e341c5b",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -350,10 +350,21 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "instagram-conexion",
       "capitulo": "Difusión",
       "titulo": "Conectar tu Instagram",
-      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas Publicaciones, Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Responder comentarios y ver estadísticas están en camino: las pantallas Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
       "destino": {
         "seccion": "difusion",
         "label": "Ir a Difusión"
+      }
+    },
+    {
+      "id": "publicar-instagram",
+      "capitulo": "Difusión",
+      "titulo": "Publicar un producto en Instagram",
+      "texto": "En Difusión → Publicaciones subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado y haber dado el permiso de publicar: la primera vez, tocá \"Autorizar publicación\" e iniciá sesión de nuevo en Instagram.\n\n1. Elegí un producto: Aparecen solo los productos publicados en tu tienda. Los que no tienen foto no se pueden usar.\n2. Escribí el texto: Arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda). Editalo como quieras: Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: La foto se publica cuadrada, sobre fondo blanco. Instagram no convierte los enlaces del texto en botones: para que te compren, poné el link de tu tienda en la biografía de tu perfil.",
+      "destino": {
+        "seccion": "difusion",
+        "vista": "publicaciones",
+        "label": "Ir a Publicaciones"
       }
     },
     {

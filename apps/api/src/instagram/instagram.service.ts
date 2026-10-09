@@ -353,7 +353,9 @@ export class InstagramService {
     const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
     const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
     const pantalla = PANTALLAS_DE_RETORNO.includes(seccion) ? seccion : 'mensajes';
-    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/${pantalla}`;
+    // Publicaciones es una vista de Difusión (?vista=), no una sección aparte.
+    const ruta = pantalla === 'publicaciones' ? 'difusion?vista=publicaciones' : pantalla;
+    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/${ruta}`;
   }
 
   /**

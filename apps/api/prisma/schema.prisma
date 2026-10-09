@@ -1651,7 +1651,7 @@ model InstagramPost {
   productName String   @map("product_name")
   memberId    String?  @map("member_id") // quién la publicó
   caption     String
-  imageUrl    String   @map("image_url") // el JPEG que se mandó (se borra del almacenamiento al terminar)
+  imageUrl    String   @map("image_url") // la foto del producto que se usó (para la miniatura del historial)
   igMediaId   String   @unique @map("ig_media_id")
   permalink   String?
   createdAt   DateTime @default(now()) @map("created_at")

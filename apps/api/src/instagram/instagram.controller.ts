@@ -110,13 +110,13 @@ export class InstagramController {
       if (error || !code) throw new Error(error ?? 'Falta el code de Instagram');
       // Instagram agrega "#_" al final del code en algunos redirects.
       const { suscripta, retorno } = await this.instagram.manejarCallback(code.replace(/#_$/, ''), state);
-      res.redirect(`${retorno}?ig=${suscripta ? 'conectado' : 'sin-suscripcion'}`);
+      res.redirect(`${retorno}${retorno.includes('?') ? '&' : '?'}ig=${suscripta ? 'conectado' : 'sin-suscripcion'}`);
     } catch (e) {
       this.logger.warn(`Conexión de Instagram fallida: ${describeError(e)}`);
       // Con el state válido se sabe a qué negocio y a qué panel volver: se vuelve ahí y el modal explica qué
       // hacer. Sin negocio verificable no hay a dónde volver con certeza: cae al login.
       const retorno = await this.instagram.retornoDelState(state);
-      res.redirect(retorno ? `${retorno}?ig=error` : `${this.frontendUrl}/login?ig=error`);
+      res.redirect(retorno ? `${retorno}${retorno.includes('?') ? '&' : '?'}ig=error` : `${this.frontendUrl}/login?ig=error`);
     }
   }
 

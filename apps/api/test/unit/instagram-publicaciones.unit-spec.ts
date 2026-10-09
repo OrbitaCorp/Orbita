@@ -148,7 +148,7 @@ describe('InstagramPublicacionesService (unit)', () => {
     expect(meta.format).toBe('jpeg');
     expect([meta.width, meta.height]).toEqual([1080, 1080]);
     expect(ig.publicarImagen).toHaveBeenCalledWith('biz-1', 'https://cdn.supabase.co/tmp.jpg', 'Remera lisa $15.000');
-    expect(prisma.instagramPost.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ businessId: 'biz-1', productId: 'p-1', productName: 'Remera lisa', memberId: 'm-1', igMediaId: 'media-9' }) }));
+    expect(prisma.instagramPost.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ businessId: 'biz-1', productId: 'p-1', productName: 'Remera lisa', memberId: 'm-1', igMediaId: 'media-9', imageUrl: 'https://cdn.supabase.co/principal.webp' }) }));
     expect(post.permalink).toBe('https://www.instagram.com/p/abc/');
     expect(storage.remove).toHaveBeenCalledWith([ruta]);
   });

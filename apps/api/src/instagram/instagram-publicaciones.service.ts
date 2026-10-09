@@ -66,7 +66,7 @@ export class InstagramPublicacionesService {
     try {
       const { mediaId, permalink } = await this.instagram.publicarImagen(businessId, imageUrl, caption);
       const post = await this.prisma.instagramPost.create({
-        data: { businessId, productId: producto.id, productName: producto.name, memberId: memberId ?? null, caption, imageUrl, igMediaId: mediaId, permalink },
+        data: { businessId, productId: producto.id, productName: producto.name, memberId: memberId ?? null, caption, imageUrl: foto.url, igMediaId: mediaId, permalink },
         select: { id: true, productId: true, productName: true, caption: true, imageUrl: true, permalink: true, createdAt: true },
       });
       return post;
