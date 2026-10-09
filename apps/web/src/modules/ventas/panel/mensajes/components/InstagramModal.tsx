@@ -38,7 +38,7 @@ function GlifoInstagram({ size = 22 }: { size?: number }) {
 }
 
 // El degradé de la marca solo va en el logo: es el dato (de qué red se trata), no decoración.
-function Marca({ size = 48 }: { size?: number }) {
+export function Marca({ size = 48 }: { size?: number }) {
   return (
     <span
       aria-hidden

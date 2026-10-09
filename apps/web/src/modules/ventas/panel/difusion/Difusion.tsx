@@ -1,29 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Card } from '@/design-system/components/Card'
+import { Clock } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
-import { InstagramModal } from '../mensajes/components/InstagramModal'
+import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
+import type { InstagramEstado } from '@/lib/api'
 
 // Difusión: darle a conocer el negocio en redes. Hoy está la conexión con Instagram (la misma que
 // se ve en Mensajes); publicar productos, responder comentarios y ver estadísticas se suman acá
 // a medida que se construyan. Cada pantalla es una ?vista= (ver Sidebar.tsx).
+//
+// Mientras la conexión no esté completa, el modal de Instagram se abre cada vez que se entra al
+// módulo (en cualquier pantalla): es lo único que hay para hacer hasta que quede conectada.
 
 type Vista = 'instagram' | 'publicaciones' | 'comentarios' | 'estadisticas'
-type VistaFutura = Exclude<Vista, 'instagram'>
+type Funcion = Exclude<Vista, 'instagram'>
 
-const FUTURAS: Record<VistaFutura, { titulo: string; texto: string }> = {
+const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: ReactNode }> = {
   publicaciones: {
     titulo: 'Publicaciones',
     texto: 'Elegí un producto, mirá cómo queda la publicación y subila a tu Instagram sin salir de Órbita.',
+    ilustracion: <IlustracionPublicacion />,
   },
   comentarios: {
     titulo: 'Comentarios',
     texto: 'Leé y respondé los comentarios de tus publicaciones desde acá, junto con tus mensajes.',
+    ilustracion: <IlustracionComentarios />,
   },
   estadisticas: {
     titulo: 'Estadísticas',
     texto: 'Mirá cuánta gente vio lo que publicaste y qué publicaciones funcionan mejor.',
+    ilustracion: <IlustracionEstadisticas />,
   },
 }
 
@@ -31,96 +38,195 @@ function esVista(v: unknown): v is Vista {
   return v === 'instagram' || v === 'publicaciones' || v === 'comentarios' || v === 'estadisticas'
 }
 
+// Cuántos de los 3 pasos de la conexión están hechos: 0 sin pedido, 1 pedido enviado (pendiente de
+// confirmación), 2 habilitado para conectar, 3 conectado.
+function pasosHechos(estado: InstagramEstado | null): number {
+  if (!estado) return 0
+  if (estado.connected) return 3
+  if (estado.habilitado === false) return estado.solicitud ? 1 : 0
+  return 2
+}
+
 export default function Difusion() {
   const router = useRouter()
   const vista: Vista = esVista(router.query.vista) ? router.query.vista : 'instagram'
-
-  return (
-    <div style={{ padding: '24px 32px 64px', maxWidth: 960 }}>
-      <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 6px' }}>Difusión</h1>
-      <p style={{ margin: '0 0 22px', fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-        Mostrá tus productos en redes y respondé a quienes te escriben, desde un solo lugar.
-      </p>
-      {vista === 'instagram' ? <TableroInstagram /> : <TarjetaFutura vista={vista} />}
-    </div>
-  )
-}
-
-function TableroInstagram() {
   const { estado, visible, cargar } = useInstagramEstado()
   const [abierto, setAbierto] = useState(false)
   const [yaSeOfrecio, setYaSeOfrecio] = useState(false)
 
-  // La primera vez que se entra sin cuenta conectada, el modal se abre solo: es lo único que hay
-  // para hacer acá. Si se cierra, no vuelve a abrirse hasta que se toque el botón.
+  // Cada vez que se entra a Difusión sin la conexión completa, el modal se abre solo. Si se cierra,
+  // no vuelve a abrirse hasta volver a entrar al módulo o tocar el botón.
   useEffect(() => {
-    if (estado && !estado.connected && !yaSeOfrecio) {
+    if (visible && estado && !estado.connected && !yaSeOfrecio) {
       setAbierto(true)
       setYaSeOfrecio(true)
     }
-  }, [estado, yaSeOfrecio])
-
-  if (!visible) {
-    return (
-      <Card padding="sm" style={{ padding: 20 }}>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.5 }}>Instagram todavía no está disponible para tu negocio.</p>
-      </Card>
-    )
-  }
-
-  const conectado = estado?.connected === true
-  const pendiente = estado?.habilitado === false && estado.solicitud !== null
-  const resumen = estado === null
-    ? 'Cargando…'
-    : conectado && estado.connected
-      ? (estado.username ? `Conectado a @${estado.username}` : 'Conectado')
-      : pendiente && estado.habilitado === false && estado.solicitud
-        ? `Pendiente de confirmación · @${estado.solicitud.username}`
-        : 'Sin conectar'
+  }, [visible, estado, yaSeOfrecio])
 
   return (
-    <>
-      <Card padding="sm" style={{ padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            {/* El punto verde es el dato: solo aparece si está conectado. */}
-            <span
-              aria-hidden
-              style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: conectado ? 'var(--color-success)' : 'var(--color-border)' }}
-            />
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Instagram</p>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)' }}>{resumen}</p>
-            </div>
-          </div>
-          <Button size="sm" variant={conectado ? 'secondary' : 'primary'} disabled={estado === null} onClick={() => setAbierto(true)}>
-            {conectado ? 'Administrar' : pendiente ? 'Ver estado' : 'Conectar'}
-          </Button>
-        </div>
-      </Card>
+    <div className="dif-pagina">
+      <style>{CSS}</style>
+      <h1 className="dif-titulo">Difusión</h1>
+      <p className="dif-bajada">Mostrá tus productos en redes y respondé a quienes te escriben, desde un solo lugar.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginTop: 14 }}>
-        {(Object.keys(FUTURAS) as VistaFutura[]).map((v) => (
-          <Card key={v} padding="sm" style={{ padding: 20 }}>
-            <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{FUTURAS[v].titulo}</p>
-            <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.55 }}>{FUTURAS[v].texto}</p>
-            <p style={{ margin: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--color-muted)' }}>Próximamente</p>
-          </Card>
-        ))}
-      </div>
+      {!visible ? (
+        <div className="dif-tarjeta dif-aviso">Instagram todavía no está disponible para tu negocio.</div>
+      ) : (
+        <>
+          <EstadoInstagram estado={estado} onAbrir={() => setAbierto(true)} />
+          {vista === 'instagram' ? (
+            <div className="dif-grilla">
+              {(Object.keys(FUNCIONES) as Funcion[]).map((f) => <TarjetaFuncion key={f} funcion={f} />)}
+            </div>
+          ) : (
+            <div className="dif-uno"><TarjetaFuncion funcion={vista} /></div>
+          )}
+        </>
+      )}
 
       {abierto && <InstagramModal estado={estado} onCerrar={() => setAbierto(false)} onCambio={cargar} />}
-    </>
+    </div>
   )
 }
 
-function TarjetaFutura({ vista }: { vista: VistaFutura }) {
-  const { titulo, texto } = FUTURAS[vista]
+// ─── Estado de la conexión ─────────────────────────────────────────────────────
+
+function EstadoInstagram({ estado, onAbrir }: { estado: InstagramEstado | null; onAbrir: () => void }) {
+  const hechos = pasosHechos(estado)
+  const conectado = estado?.connected === true
+  const usuario = estado?.connected ? estado.username : estado?.habilitado === false ? estado.solicitud?.username : null
+
+  const linea =
+    estado === null ? 'Cargando…'
+      : conectado ? `Conectado${usuario ? ` · @${usuario}` : ''}`
+        : hechos === 1 ? `Pendiente de confirmación${usuario ? ` · @${usuario}` : ''}`
+          : hechos === 2 ? 'Listo para conectar'
+            : 'Sin conectar'
+  const boton = conectado ? 'Administrar' : hechos === 1 ? 'Ver estado' : hechos === 2 ? 'Conectar' : 'Empezar'
+
   return (
-    <Card padding="sm" style={{ padding: 20, maxWidth: 560 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 6px' }}>{titulo}</h2>
-      <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>{texto} Hace falta tener Instagram conectado.</p>
-      <p style={{ margin: 0, fontSize: 12.5, fontWeight: 500, color: 'var(--color-muted)' }}>Próximamente</p>
-    </Card>
+    <section className="dif-tarjeta dif-estado" aria-label="Estado de Instagram">
+      <Marca size={44} />
+      <div className="dif-estado-texto">
+        <p className="dif-estado-nombre">Instagram</p>
+        <p className="dif-estado-linea">
+          {conectado && <span className="dif-punto" aria-hidden />}
+          {linea}
+        </p>
+        {!conectado && estado !== null && (
+          <div className="dif-avance" role="img" aria-label={`Conexión: ${hechos} de 3 pasos`}>
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={`dif-tramo${i < hechos ? ' dif-tramo-hecho' : i === hechos ? ' dif-tramo-actual' : ''}`} />
+            ))}
+            <span className="dif-avance-texto">Paso {Math.min(hechos + 1, 3)} de 3</span>
+          </div>
+        )}
+      </div>
+      <Button size="md" variant={conectado ? 'secondary' : 'primary'} disabled={estado === null} onClick={onAbrir}>{boton}</Button>
+    </section>
   )
 }
+
+// ─── Funciones que vienen ──────────────────────────────────────────────────────
+
+function TarjetaFuncion({ funcion }: { funcion: Funcion }) {
+  const { titulo, texto, ilustracion } = FUNCIONES[funcion]
+  return (
+    <article className="dif-tarjeta dif-funcion">
+      <div className="dif-ilustracion" aria-hidden>{ilustracion}</div>
+      <h2 className="dif-funcion-titulo">{titulo}</h2>
+      <p className="dif-funcion-texto">{texto}</p>
+      <p className="dif-pronto"><Clock size={13} strokeWidth={2} aria-hidden /> Próximamente</p>
+    </article>
+  )
+}
+
+// Ilustraciones: maquetas en gris de lo que va a ser cada pantalla. Sin color a propósito: nada de
+// ahí se puede tocar, y el azul del panel queda reservado para lo que sí.
+function IlustracionPublicacion() {
+  return (
+    <div className="dif-mock dif-mock-post">
+      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-linea" style={{ width: '38%' }} /></div>
+      <div className="dif-imagen"><span className="dif-sol" /><span className="dif-monte" /></div>
+      <span className="dif-linea" style={{ width: '70%' }} />
+      <span className="dif-linea" style={{ width: '45%' }} />
+    </div>
+  )
+}
+
+function IlustracionComentarios() {
+  return (
+    <div className="dif-mock dif-mock-comentarios">
+      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-burbuja" style={{ width: '62%' }}><span className="dif-linea" style={{ width: '80%' }} /><span className="dif-linea" style={{ width: '55%' }} /></span></div>
+      <div className="dif-mock-fila dif-mock-der"><span className="dif-burbuja dif-burbuja-propia" style={{ width: '54%' }}><span className="dif-linea" style={{ width: '75%' }} /></span></div>
+      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-burbuja" style={{ width: '48%' }}><span className="dif-linea" style={{ width: '70%' }} /></span></div>
+    </div>
+  )
+}
+
+function IlustracionEstadisticas() {
+  const barras = [34, 52, 41, 70, 58, 88]
+  return (
+    <div className="dif-mock dif-mock-barras">
+      {barras.map((h, i) => <span key={i} className={`dif-barra${i === barras.length - 1 ? ' dif-barra-top' : ''}`} style={{ height: `${h}%` }} />)}
+    </div>
+  )
+}
+
+// ─── Estilos ───────────────────────────────────────────────────────────────────
+
+const CSS = `
+.dif-pagina { padding: 32px 32px 64px; max-width: 980px; margin: 0 auto; }
+.dif-titulo { margin: 0 0 6px; text-align: center; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); }
+.dif-bajada { margin: 0 auto 26px; max-width: 560px; text-align: center; font-size: 13.5px; line-height: 1.5; color: var(--color-muted); }
+.dif-tarjeta { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: var(--shadow-card); }
+.dif-aviso { padding: 20px; font-size: 13px; color: var(--color-muted); }
+
+.dif-estado { display: flex; align-items: center; gap: 16px; padding: 18px 20px; }
+.dif-estado-texto { flex: 1; min-width: 0; }
+.dif-estado-nombre { margin: 0; font-size: 15px; font-weight: 600; color: var(--color-text); }
+.dif-estado-linea { display: flex; align-items: center; gap: 7px; margin: 2px 0 0; font-size: 13px; color: var(--color-muted); }
+.dif-punto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-success); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16); }
+.dif-avance { display: flex; align-items: center; gap: 5px; margin-top: 10px; }
+.dif-tramo { width: 34px; height: 5px; border-radius: 5px; background: var(--color-border); }
+.dif-tramo-hecho { background: var(--color-success); }
+.dif-tramo-actual { background: var(--color-primary); }
+.dif-avance-texto { margin-left: 6px; font-size: 12px; color: var(--color-muted); }
+
+.dif-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
+.dif-uno { max-width: 420px; margin: 16px auto 0; }
+.dif-funcion { display: flex; flex-direction: column; padding: 14px 14px 18px; }
+.dif-ilustracion { position: relative; aspect-ratio: 16 / 10; margin-bottom: 16px; overflow: hidden; border-radius: 12px; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
+.dif-funcion-titulo { margin: 0 6px 6px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text); }
+.dif-funcion-texto { margin: 0 6px 14px; font-size: 13px; line-height: 1.55; color: var(--color-muted); flex: 1; }
+.dif-pronto { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px; font-size: 12.5px; font-weight: 500; color: var(--color-muted); }
+
+.dif-mock { position: absolute; inset: 0; display: flex; padding: 14px 16px; box-sizing: border-box; }
+.dif-mock-fila { display: flex; align-items: center; gap: 8px; }
+.dif-mock-der { justify-content: flex-end; }
+.dif-avatar { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; background: var(--color-border); }
+.dif-linea { display: block; height: 6px; border-radius: 6px; background: var(--color-border); }
+
+.dif-mock-post { flex-direction: column; justify-content: center; gap: 7px; }
+.dif-mock-post .dif-linea { margin-left: 2px; }
+.dif-imagen { position: relative; height: 54%; overflow: hidden; border-radius: 8px; background: linear-gradient(135deg, var(--color-border), var(--color-surface)); }
+.dif-sol { position: absolute; top: 16%; right: 14%; width: 15px; height: 15px; border-radius: 50%; background: var(--color-surface); }
+.dif-monte { position: absolute; left: -12%; bottom: -34%; width: 124%; height: 62%; border-radius: 50%; background: var(--color-muted); opacity: 0.24; }
+
+.dif-mock-comentarios { flex-direction: column; justify-content: center; gap: 9px; }
+.dif-burbuja { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 10px 10px 10px 3px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.dif-burbuja-propia { border-radius: 10px 10px 3px 10px; background: var(--color-border); border-color: transparent; }
+.dif-burbuja-propia .dif-linea { background: var(--color-surface); }
+
+.dif-mock-barras { align-items: flex-end; justify-content: space-between; gap: 10px; padding: 16px 20px 14px; }
+.dif-mock-barras::after { content: ''; position: absolute; left: 20px; right: 20px; bottom: 14px; height: 1px; background: var(--color-border); }
+.dif-barra { flex: 1; border-radius: 5px 5px 0 0; background: var(--color-border); }
+.dif-barra-top { background: var(--color-muted); opacity: 0.55; }
+
+@media (max-width: 640px) {
+  .dif-pagina { padding: 16px 14px 48px; }
+  .dif-estado { flex-wrap: wrap; }
+  .dif-estado-texto { flex-basis: calc(100% - 64px); }
+  .dif-estado > button { width: 100%; height: 44px; }
+}
+`
