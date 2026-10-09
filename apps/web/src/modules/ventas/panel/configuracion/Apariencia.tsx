@@ -134,6 +134,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
             ...(usaAnuncio ? [['mostrarBannerEnvio', 'Anuncio arriba del header'] as [keyof Ap, string]] : []),
             ...(usaStats ? [['mostrarStats', 'Barra de estadísticas'] as [keyof Ap, string]] : []),
             ...(esEstandar ? [
+                ['mostrarResenas', 'Opiniones de clientes'],
+                ['mostrarBadgeNuevo', 'Badge "Nuevo"'],
+                ['mostrarBadgeOferta', 'Badge "Oferta" con %'],
+                ['mostrarStockBajo', 'Indicador de stock bajo'],
                 ['mostrarCategorias', 'Sección de categorías'],
                 ['mostrarBuscador', 'Barra de búsqueda'],
                 ['mostrarWhatsapp', 'WhatsApp (flotante y banner)'],

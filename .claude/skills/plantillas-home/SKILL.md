@@ -47,6 +47,7 @@ dueño decide cuáles se ven.
 | Video | Contenido → Video en tu tienda | Apagado o sin un link válido |
 | WhatsApp | Contenido → WhatsApp | Apagado o sin número en Contacto |
 | Buscador | Contenido → Barra de búsqueda | Apagado |
+| Cartelitos de la tarjeta (Nuevo, Oferta con %, Últimas unidades) y opiniones | Contenido → Visibilidad | Apagados: la tarjeta de TODAS las plantillas los respeta (`toProducto` lee `showNewBadge`, `showOfferBadge`, `showLowStock`); no es trabajo de cada plantilla |
 | Pie | Pie de página | Nunca: lleva los legales |
 
 Cómo funciona: `plantillaReal()` lee Apariencia y resuelve los interruptores
@@ -445,7 +446,7 @@ dueño edita desde Avanzado → Plantillas de Home:
 | Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
 | Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
 | Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
-| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las treinta y dos. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video, y los de las tarjetas: opiniones, badge "Nuevo", badge "Oferta" e indicador de stock bajo ("Últimas unidades") | Las mismas columnas que Apariencia, en las treinta y dos. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
 | Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
 
 Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`

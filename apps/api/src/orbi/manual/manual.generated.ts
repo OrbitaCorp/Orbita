@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "7d0d4c8b2328cd46",
+  "version": "cbc72bdbc4079063",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -595,7 +595,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "funciones-avanzado",
       "capitulo": "Avanzado",
       "titulo": "Qué trae",
-      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda y el WhatsApp, y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
+      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda, el WhatsApp, las opiniones de clientes y los cartelitos de las tarjetas (Nuevo, Oferta con el porcentaje y Últimas unidades), y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
       "destino": {
         "seccion": "avanzado",
         "label": "Ir a Avanzado"
