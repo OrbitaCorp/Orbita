@@ -73,9 +73,19 @@ export type CorreoInput = { senderId: string; to: string; subject: string; body:
 // Instagram y WhatsApp de la empresa: se leen del negocio al que están conectados (ver apps/api/src/marketing/canales.service.ts).
 export type MarketingCanales = {
   negocio: { nombre: string; subdominio: string } | null
-  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: string; diasRestantes: number }
+  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: string; diasRestantes: number; mensajesSinLeer: number }
   whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean }
 }
+// La bandeja de mensajes directos de Instagram de la empresa (ver apps/api/src/marketing/instagram-bandeja.service.ts).
+export type IgConversacion = {
+  id: string
+  nombre: string
+  avatar: string | null
+  sinLeer: boolean
+  ultimo: { texto: string; esMio: boolean; fecha: string } | null
+  actualizadaEl: string
+}
+export type IgMensaje = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; channel: string; createdAt: string }
 export type TiktokEstado = {
   configurado: boolean
   conectado: boolean
@@ -990,6 +1000,11 @@ export const platformApi = {
   businessSearchConsole: (id: string) => getJSON<GoogleResumen>(`/platform/businesses/${id}/search-console`),
   syncBusinessSearchConsole: (id: string) => sendJSON<GoogleSincronizacion>(`/platform/businesses/${id}/search-console/sync`, 'POST'),
   marketingCanales: () => getJSON<MarketingCanales>('/platform/marketing/channels'),
+  igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
+  igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
+  igDesconectar: () => sendJSON<{ connected: false }>('/platform/marketing/instagram/connection', 'DELETE'),
+  igResponder: (id: string, text: string) => sendJSON<IgMensaje>(`/platform/marketing/instagram/conversations/${id}/messages`, 'POST', { text }),
+  tiktokUrlDeSubida: (mimetype: string) => sendJSON<{ uploadUrl: string; publicUrl: string }>('/platform/marketing/tiktok/video-upload-url', 'POST', { mimetype }),
   tiktokEstado: () => getJSON<TiktokEstado>('/platform/marketing/tiktok'),
   tiktokConectar: () => sendJSON<{ url: string }>('/platform/marketing/tiktok/connect', 'POST'),
   tiktokCreador: () => getJSON<TiktokCreador>('/platform/marketing/tiktok/creator-info'),

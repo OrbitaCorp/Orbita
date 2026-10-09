@@ -5,11 +5,12 @@ import { CanalesService, esNumeroDePrueba } from '../../src/marketing/canales.se
 
 const AHORA = new Date('2026-10-09T12:00:00Z');
 
-function armar(over: { negocio?: object | null; ig?: object | null; wa?: object | null; env?: Record<string, string> } = {}) {
+function armar(over: { negocio?: object | null; ig?: object | null; wa?: object | null; sinLeer?: number; env?: Record<string, string> } = {}) {
   const prisma = {
     business: { findFirst: jest.fn().mockResolvedValue(over.negocio === undefined ? { id: 'b-1', name: 'alexadner messi', subdomain: 'negocio' } : over.negocio) },
     instagramConnection: { findUnique: jest.fn().mockResolvedValue(over.ig ?? null) },
     whatsappConnection: { findUnique: jest.fn().mockResolvedValue(over.wa ?? null) },
+    conversation: { count: jest.fn().mockResolvedValue(over.sinLeer ?? 0) },
   };
   const config = { get: (k: string) => over.env?.[k] };
   return { svc: new CanalesService(prisma as any, config as any), prisma };
@@ -53,7 +54,13 @@ describe('canales de la empresa', () => {
     const { svc } = armar({ ig: { username: 'orbita.site', status: 'ACTIVE', tokenExpiresAt: new Date('2026-12-06T21:53:38Z') } });
     const r = await svc.canales(AHORA);
     expect(r.negocio).toEqual({ nombre: 'alexadner messi', subdominio: 'negocio' });
-    expect(r.instagram).toEqual({ conectado: true, usuario: 'orbita.site', venceEl: new Date('2026-12-06T21:53:38Z'), diasRestantes: 59 });
+    expect(r.instagram).toEqual({ conectado: true, usuario: 'orbita.site', venceEl: new Date('2026-12-06T21:53:38Z'), diasRestantes: 59, mensajesSinLeer: 0 });
+  });
+
+  it('cuenta las conversaciones de Instagram sin leer del negocio (no las archivadas)', async () => {
+    const { svc, prisma } = armar({ ig: { username: 'orbita.site', status: 'ACTIVE', tokenExpiresAt: new Date('2026-12-06T21:53:38Z') }, sinLeer: 3 });
+    expect((await svc.canales(AHORA)).instagram).toMatchObject({ conectado: true, mensajesSinLeer: 3 });
+    expect(prisma.conversation.count).toHaveBeenCalledWith({ where: { businessId: 'b-1', isUnread: true, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } } } });
   });
 
   it('un acceso ya vencido no da días negativos', async () => {
@@ -62,8 +69,9 @@ describe('canales de la empresa', () => {
   });
 
   it('un Instagram desconectado figura como sin conectar', async () => {
-    const { svc } = armar({ ig: { username: 'orbita.site', status: 'DISCONNECTED', tokenExpiresAt: new Date('2026-12-06T00:00:00Z') } });
+    const { svc, prisma } = armar({ ig: { username: 'orbita.site', status: 'DISCONNECTED', tokenExpiresAt: new Date('2026-12-06T00:00:00Z') } });
     expect((await svc.canales(AHORA)).instagram).toEqual({ conectado: false });
+    expect(prisma.conversation.count).not.toHaveBeenCalled();
   });
 
   it('WhatsApp con el número de prueba de Meta se marca como de prueba', async () => {

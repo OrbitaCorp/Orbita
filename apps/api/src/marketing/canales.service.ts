@@ -21,7 +21,7 @@ export function esNumeroDePrueba(numero: string | null | undefined): boolean {
 export type CanalesEmpresa = {
   /** El negocio al que están conectadas las cuentas. null = no existe (cambió el subdominio o se borró). */
   negocio: { nombre: string; subdominio: string } | null;
-  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: Date; diasRestantes: number };
+  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: Date; diasRestantes: number; mensajesSinLeer: number };
   whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean };
 };
 
@@ -45,10 +45,16 @@ export class CanalesService {
       this.prisma.whatsappConnection.findUnique({ where: { businessId: negocio.id }, select: { status: true, displayPhone: true } }),
     ]);
 
+    const instagramActivo = !!ig && ig.status === 'ACTIVE';
+    // Conversaciones de Instagram que nadie del equipo leyó todavía (la bandeja las muestra con un punto).
+    const sinLeer = instagramActivo
+      ? await this.prisma.conversation.count({ where: { businessId: negocio.id, isUnread: true, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } } } })
+      : 0;
+
     return {
       negocio: { nombre: negocio.name, subdominio: negocio.subdomain },
-      instagram: ig && ig.status === 'ACTIVE'
-        ? { conectado: true, usuario: ig.username, venceEl: ig.tokenExpiresAt, diasRestantes: Math.max(0, Math.ceil((ig.tokenExpiresAt.getTime() - ahora.getTime()) / DIA_MS)) }
+      instagram: ig && instagramActivo
+        ? { conectado: true, usuario: ig.username, venceEl: ig.tokenExpiresAt, diasRestantes: Math.max(0, Math.ceil((ig.tokenExpiresAt.getTime() - ahora.getTime()) / DIA_MS)), mensajesSinLeer: sinLeer }
         : { conectado: false },
       whatsapp: wa && wa.status === 'ACTIVE'
         ? { conectado: true, numero: wa.displayPhone, dePrueba: esNumeroDePrueba(wa.displayPhone) }
