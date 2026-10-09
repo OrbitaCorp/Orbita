@@ -278,7 +278,10 @@ function ConectarCuenta({ desde }: { desde: 'mensajes' | 'difusion' }) {
     <div className="igm-form igm-centro">
       <p className="igm-suave">
         Te enviamos a tu Instagram la invitación de prueba de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
-        Cuando la hayas aceptado, tocá <strong>Verificar y conectar</strong>: iniciás sesión en Instagram y le das permiso a Órbita para leer y responder tus mensajes directos.
+        Cuando la hayas aceptado, tocá <strong>Verificar y conectar</strong>: iniciás sesión en Instagram y le das permiso a Órbita para{' '}
+        {desde === 'mensajes'
+          ? 'leer y responder tus mensajes directos.'
+          : 'leer y responder tus mensajes directos y publicar tus productos cuando vos lo confirmes. Los permisos se piden una sola vez.'}
       </p>
       <a className="igm-externo" href={URL_INVITACIONES} target="_blank" rel="noopener noreferrer">
         Abrir invitaciones en Instagram <ExternalLink size={15} strokeWidth={2} aria-hidden />

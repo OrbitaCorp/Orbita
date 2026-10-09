@@ -377,7 +377,7 @@ export class InstagramService {
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: permisos === 'publicar' ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE,
+      scope: this.permisosPedidos(permisos, seccion),
       state: this.firmarState(businessId, memberId, origen, seccion, permisos),
       // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
       // cuenta (Meta lo recomienda sobre todo en celulares).
@@ -412,7 +412,7 @@ export class InstagramService {
     // los trae, se toman los que se pidieron.
     const concedidos = corto.permissions ?? corto.data?.[0]?.permissions;
     const scopes = (Array.isArray(concedidos) ? concedidos.join(',') : concedidos)
-      ?? (permisos === 'publicar' ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE);
+      ?? this.permisosPedidos(permisos, seccion);
 
     // 2) token corto (1 hora) → token largo (60 días). Siempre desde el servidor:
     // lleva el App Secret.
@@ -486,6 +486,23 @@ export class InstagramService {
       // ¿Se concedió el permiso de publicar? Sin él, Publicaciones pide volver a autorizar.
       puedePublicar: this.concedePublicar(c.scopes),
     };
+  }
+
+
+  /**
+   * Permisos que se piden en el login. Quien se conecta desde Difusión (el kit de difusión) autoriza de una
+   * vez los de mensajes y los de publicar: se piden desde la primera conexión, para no volver a pedirle nada
+   * cuando use Publicaciones. Quien se conecta desde el botón de Mensajes autoriza solo los de mensajes.
+   *
+   * INSTAGRAM_PEDIR_PUBLICAR=false lo apaga (Difusión pasa a pedir solo mensajes). Hay que apagarlo si la app
+   * sale a producción con los permisos de publicar sin aprobar: un permiso sin aprobar en el login hace fallar
+   * la conexión de todos los clientes reales.
+   */
+  private permisosPedidos(permisos?: 'publicar', seccion?: PantallaDeRetorno): string {
+    const desdeDifusion = seccion === 'difusion' || seccion === 'publicaciones';
+    const apagado = this.config.get<string>('INSTAGRAM_PEDIR_PUBLICAR') === 'false';
+    const conPublicar = permisos === 'publicar' || (desdeDifusion && !apagado);
+    return conPublicar ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE;
   }
 
   private concedePublicar(scopes: string | null | undefined): boolean {

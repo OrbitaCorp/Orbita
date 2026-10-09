@@ -115,3 +115,6 @@ SEARCH_CONSOLE_SERVICE_ACCOUNT: "search-console@orbita-api-corp.iam.gserviceacco
 # en deploy.sh). Solo se ve y se usa en los negocios listados (subdominios, coma).
 INSTAGRAM_APP_ID: "1821127815727257"
 INSTAGRAM_NEGOCIOS_HABILITADOS: "negocio"
+# Conectarse desde Difusión pide también el permiso de publicar (kit de difusión). Si la app sale a producción
+# con ese permiso SIN aprobar, descomentar esta línea: de lo contrario el login falla para los clientes reales.
+# INSTAGRAM_PEDIR_PUBLICAR: "false"

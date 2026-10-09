@@ -563,7 +563,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'publicar-instagram', titulo: 'Publicar un producto en Instagram',
             bloques: [
-                { tipo: 'parrafo', texto: 'En **Difusión → Publicaciones** subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado y haber dado el permiso de publicar: la primera vez, tocá [[Autorizar publicación]] e iniciá sesión de nuevo en Instagram.' },
+                { tipo: 'parrafo', texto: 'En **Difusión → Publicaciones** subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado con el permiso de publicar. Si conectaste tu cuenta desde Difusión, ese permiso ya se pidió en el mismo momento. Si la conectaste desde Mensajes, la pantalla te muestra [[Autorizar publicación]]: tocalo e iniciá sesión de nuevo en Instagram.' },
                 { tipo: 'pasos', items: [
                     { titulo: 'Elegí un producto', texto: 'Aparecen solo los productos publicados en tu tienda. Los que no tienen foto no se pueden usar.' },
                     { titulo: 'Escribí el texto', texto: 'Arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda). Editalo como quieras: Instagram admite hasta 2.200 caracteres.' },
