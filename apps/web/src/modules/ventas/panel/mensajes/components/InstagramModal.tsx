@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock, Play, X } from 'lucide-react'
+import { Check, Clock, ExternalLink, Play, X } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { parseVideoEmbed } from '@/lib/storefront/utils'
 import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramConnect, type InstagramEstado } from '@/lib/api'
@@ -18,6 +18,10 @@ import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramCo
 // manda a Instagram a buscarla: no va a encontrar nada. La invitación se explica en el paso 3.
 
 const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones de evaluador'
+
+// Página de Instagram "Apps y sitios web", donde está la pestaña de invitaciones de evaluador. Sin los
+// parámetros de seguimiento (fbclid y compañía) que trae el link copiado del navegador.
+const URL_INVITACIONES = 'https://www.instagram.com/accounts/manage_access/'
 
 // Video que muestra dónde aceptar la invitación de evaluador en Instagram. Pegá acá la dirección de
 // YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, el espacio dice
@@ -253,6 +257,10 @@ function ConectarCuenta() {
         Te enviamos a tu Instagram la invitación de evaluador de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
         Si ya la aceptaste, tocá el botón: vas a iniciar sesión en Instagram y darle permiso a Órbita para leer y responder tus mensajes directos.
       </p>
+      <a className="igm-externo" href={URL_INVITACIONES} target="_blank" rel="noopener noreferrer">
+        Abrir invitaciones en Instagram <ExternalLink size={15} strokeWidth={2} aria-hidden />
+        <span className="igm-solo-lector"> (se abre en una pestaña nueva)</span>
+      </a>
       <VideoTutorial />
       {error && <p className="igm-error" role="alert">{error}</p>}
       <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%' }}>Conectar con Instagram</Button>
@@ -400,6 +408,14 @@ const CSS = `
 .igm-video-play { width: 38px; height: 38px; margin-bottom: 6px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); background: var(--color-surface); border: 1px solid var(--color-border); }
 .igm-video-titulo { margin: 0; font-size: 13px; font-weight: 600; color: var(--color-text); }
 .igm-video-texto { margin: 0; max-width: 30ch; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
+.igm-externo {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; margin: 0 0 12px; box-sizing: border-box;
+  border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); text-decoration: none;
+  font-size: 14px; font-weight: 600; color: var(--color-text); transition: background-color 150ms, border-color 150ms;
+}
+.igm-externo:hover { background: var(--color-surface-alt); border-color: var(--color-muted); }
+.igm-externo:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.igm-solo-lector { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .igm-enlace { align-self: flex-start; padding: 6px 0; border: none; background: transparent; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--color-primary); text-decoration: none; }
 .igm-enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
 
