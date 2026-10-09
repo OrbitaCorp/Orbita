@@ -55,6 +55,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
   const { data: canales } = useFetch(() => platformApi.marketingCanales(), [tickCanales])
   const [canal, setCanal] = useState<Canal>('tiktok')
   const [aviso, setAviso] = useState<Aviso | null>(null)
+  // Desconectar una cuenta (pedido desde la tarjeta o desde el detalle del canal): se confirma acá, en un solo lugar.
+  const [confirmar, setConfirmar] = useState<'tiktok' | 'instagram' | null>(null)
 
   // TikTok vuelve a esta pantalla con el resultado de la conexión en la dirección.
   useEffect(() => {
@@ -94,40 +96,85 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-        <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} />
-        <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} />
+        <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
+        <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
         <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
       </div>
 
-      {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} setAviso={setAviso} />}
-      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} />}
+      {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
+      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} />}
       {canal === 'whatsapp' && <PanelWhatsapp />}
 
+      {confirmar === 'tiktok' && (
+        <ConfirmModal
+          title="Desconectar la cuenta de TikTok"
+          body="Se revoca el acceso de Órbita a la cuenta y se borra la conexión. Los videos ya publicados no se tocan. Para volver a publicar hay que conectarla de nuevo."
+          confirmLabel="Desconectar"
+          onCancel={() => setConfirmar(null)}
+          onConfirm={async () => {
+            await platformApi.tiktokDesconectar()
+            setConfirmar(null)
+            setTick((n) => n + 1)
+            setAviso({ variant: 'success', title: 'Cuenta de TikTok desconectada' })
+          }}
+        />
+      )}
+      {confirmar === 'instagram' && (
+        <ConfirmModal
+          title="Desconectar la cuenta de Instagram"
+          body="Se deja de recibir mensajes de esta cuenta en Órbita y se borra el acceso guardado. Los mensajes que ya llegaron se conservan. Para volver a conectarla hay que iniciar sesión de nuevo desde la bandeja de mensajes del negocio."
+          confirmLabel="Desconectar"
+          onCancel={() => setConfirmar(null)}
+          onConfirm={async () => {
+            await platformApi.igDesconectar()
+            setConfirmar(null)
+            setTickCanales((n) => n + 1)
+            setAviso({ variant: 'success', title: 'Cuenta de Instagram desconectada' })
+          }}
+        />
+      )}
       {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
     </div>
   )
 }
 
-function CanalTarjeta({ nombre, para, estado, linea, activo, onElegir }: { nombre: string; para: string; estado: Estado; linea: string; activo: boolean; onElegir: () => void }) {
+function CanalTarjeta({ nombre, para, estado, linea, activo, onElegir, onDesconectar }: {
+  nombre: string; para: string; estado: Estado; linea: string; activo: boolean; onElegir: () => void; onDesconectar?: () => void
+}) {
   return (
-    <button
-      type="button"
-      className="mk-canal"
-      onClick={onElegir}
-      aria-pressed={activo}
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-        minHeight: 132, padding: '16px 18px', borderRadius: 14, background: 'var(--color-bg)',
-        border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)',
-      }}
-    >
-      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{nombre}</span>
-      <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{para}</span>
-      <span style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-        <Chip text={estado.texto} tone={estado.tono} dot />
-        <span style={{ fontSize: 12.5, color: 'var(--color-body)', minHeight: 18, overflowWrap: 'anywhere' }}>{linea}</span>
-      </span>
-    </button>
+    // "Desconectar" va AL LADO del botón que elige la tarjeta y no adentro: un botón dentro de otro botón no es HTML válido
+    // (y el teclado y los lectores de pantalla lo tratan mal).
+    <div style={{ position: 'relative', display: 'flex' }}>
+      <button
+        type="button"
+        className="mk-canal"
+        onClick={onElegir}
+        aria-pressed={activo}
+        style={{
+          display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', width: '100%',
+          minHeight: 132, padding: onDesconectar ? '16px 18px 56px' : '16px 18px', borderRadius: 14, background: 'var(--color-bg)',
+          border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)',
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{nombre}</span>
+        <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{para}</span>
+        <span style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+          <Chip text={estado.texto} tone={estado.tono} dot />
+          <span style={{ fontSize: 12.5, color: 'var(--color-body)', minHeight: 18, overflowWrap: 'anywhere' }}>{linea}</span>
+        </span>
+      </button>
+      {onDesconectar && (
+        <button
+          type="button"
+          onClick={onDesconectar}
+          className="ds-hover"
+          aria-label={`Desconectar ${nombre}`}
+          style={{ ...btnGhostSm, height: 32, position: 'absolute', left: 18, bottom: 14 }}
+        >
+          Desconectar
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -158,11 +205,10 @@ const enlaceBoton: React.CSSProperties = { ...btnGhostSm, textDecoration: 'none'
 
 // ─── TikTok ─────────────────────────────────────────────────────────────────────
 
-function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, setAviso }: {
-  estado: TiktokEstado | null; puedePublicar: boolean; refrescar: number; onCambio: () => void; setAviso: (a: Aviso) => void
+function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar, setAviso }: {
+  estado: TiktokEstado | null; puedePublicar: boolean; refrescar: number; onCambio: () => void; onDesconectar: () => void; setAviso: (a: Aviso) => void
 }) {
   const [conectando, setConectando] = useState(false)
-  const [desconectando, setDesconectando] = useState(false)
 
   const conectar = async () => {
     setConectando(true)
@@ -202,7 +248,7 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, setAviso }: {
                 </div>
               </div>
             </div>
-            {puedePublicar && <button onClick={() => setDesconectando(true)} className="ds-hover" style={btnGhostSm}>Desconectar</button>}
+            {puedePublicar && <button onClick={onDesconectar} className="ds-hover" style={btnGhostSm}>Desconectar</button>}
           </div>
         )}
       </Card>
@@ -210,27 +256,13 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, setAviso }: {
       {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={onCambio} setAviso={setAviso} />}
       {estado.conectado && <Publicaciones refrescar={refrescar} />}
 
-      {desconectando && (
-        <ConfirmModal
-          title="Desconectar la cuenta de TikTok"
-          body="Se revoca el acceso de Órbita a la cuenta y se borra la conexión. Los videos ya publicados no se tocan. Para volver a publicar hay que conectarla de nuevo."
-          confirmLabel="Desconectar"
-          onCancel={() => setDesconectando(false)}
-          onConfirm={async () => {
-            await platformApi.tiktokDesconectar()
-            setDesconectando(false)
-            onCambio()
-            setAviso({ variant: 'success', title: 'Cuenta de TikTok desconectada' })
-          }}
-        />
-      )}
     </>
   )
 }
 
 // ─── Instagram ──────────────────────────────────────────────────────────────────
 
-function PanelInstagram({ canales, puedeVer, onCambio }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void }) {
+function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void; onDesconectar: () => void }) {
   if (!canales) return <Card title="Instagram"><Loader /></Card>
   const { instagram: ig, negocio } = canales
   // Reconectar la cuenta (si venció el acceso) se hace desde la bandeja del negocio al que está atada.
@@ -241,9 +273,14 @@ function PanelInstagram({ canales, puedeVer, onCambio }: { canales: MarketingCan
       <Card
         title="Cuenta de Instagram"
         subtitle="La cuenta de la empresa conectada a Órbita"
-        action={bandeja && (!ig.conectado || ig.diasRestantes < 10)
-          ? <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}</a>
-          : undefined}
+        action={(
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {bandeja && (!ig.conectado || ig.diasRestantes < 10) && (
+              <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}</a>
+            )}
+            {ig.conectado && puedeVer && <button type="button" onClick={onDesconectar} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Desconectar</button>}
+          </span>
+        )}
       >
         {ig.conectado ? (
           <div>
@@ -261,6 +298,7 @@ function PanelInstagram({ canales, puedeVer, onCambio }: { canales: MarketingCan
       </Card>
 
       {ig.conectado && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
+
 
       <Card title="Qué se puede hacer" subtitle="Lo que está disponible hoy y lo que depende de la revisión de Meta">
         <Fila
@@ -439,7 +477,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   }
 
   return (
-    <Card title="Publicar un video" subtitle="Se baja de la dirección que pongas y se sube a TikTok">
+    <Card title="Publicar un video" subtitle="Subí el video desde tu computadora o pegá su dirección, y se envía a TikTok">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 680 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
           {creador.avatar && <img src={creador.avatar} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />}

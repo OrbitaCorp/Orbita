@@ -9,6 +9,7 @@ const NEGOCIO = { id: 'b-orbita' };
 function armar(over: { negocio?: object | null; conversacion?: object | null; filas?: object[] } = {}) {
   const prisma = {
     business: { findFirst: jest.fn().mockResolvedValue(over.negocio === undefined ? NEGOCIO : over.negocio) },
+    platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
     conversation: {
       findFirst: jest.fn().mockResolvedValue(over.conversacion === undefined ? { id: 'c-1' } : over.conversacion),
       findMany: jest.fn().mockResolvedValue(over.filas ?? []),
@@ -18,8 +19,9 @@ function armar(over: { negocio?: object | null; conversacion?: object | null; fi
     getMessages: jest.fn().mockResolvedValue([{ id: 'm-1', text: 'hola' }]),
     sendMessage: jest.fn().mockResolvedValue({ id: 'm-2', text: 'hola, gracias' }),
   };
+  const instagram = { desconectar: jest.fn().mockResolvedValue({ connected: false }) };
   const config = { get: (k: string) => (k === 'MARKETING_NEGOCIO' ? undefined : undefined) };
-  return { svc: new InstagramBandejaService(prisma as any, config as any, conversations as any), prisma, conversations };
+  return { svc: new InstagramBandejaService(prisma as any, config as any, conversations as any, instagram as any), prisma, conversations, instagram };
 }
 
 const fila = (over: object = {}) => ({
@@ -66,6 +68,30 @@ describe('conversaciones', () => {
   it('si el negocio de la empresa no existe, avisa', async () => {
     const { svc } = armar({ negocio: null });
     await expect(svc.conversaciones()).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('desconectar la cuenta', () => {
+  it('desconecta Instagram del negocio de la empresa y deja anotado quién lo hizo', async () => {
+    const { svc, prisma, instagram } = armar();
+    await expect(svc.desconectar('admin-1')).resolves.toEqual({ connected: false });
+    expect(instagram.desconectar).toHaveBeenCalledWith('b-orbita');
+    expect(prisma.platformAdminLog.create).toHaveBeenCalledWith({ data: { adminId: 'admin-1', action: 'instagram_disconnect', targetType: 'marketing_instagram', targetId: 'b-orbita' } });
+  });
+
+  it('si no se puede anotar en el historial, la desconexión igual queda hecha', async () => {
+    const { svc, prisma } = armar();
+    prisma.platformAdminLog.create.mockRejectedValue(new Error('db'));
+    await expect(svc.desconectar('admin-1')).resolves.toEqual({ connected: false });
+  });
+
+  it('si no hay negocio de la empresa o ninguna conexión, avisa y no anota nada', async () => {
+    const sinNegocio = armar({ negocio: null });
+    await expect(sinNegocio.svc.desconectar('admin-1')).rejects.toBeInstanceOf(NotFoundException);
+    const sinConexion = armar();
+    sinConexion.instagram.desconectar.mockRejectedValue(new NotFoundException('No hay una conexión de Instagram para desconectar'));
+    await expect(sinConexion.svc.desconectar('admin-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(sinConexion.prisma.platformAdminLog.create).not.toHaveBeenCalled();
   });
 });
 

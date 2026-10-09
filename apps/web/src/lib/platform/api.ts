@@ -1002,6 +1002,7 @@ export const platformApi = {
   marketingCanales: () => getJSON<MarketingCanales>('/platform/marketing/channels'),
   igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
   igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
+  igDesconectar: () => sendJSON<{ connected: false }>('/platform/marketing/instagram/connection', 'DELETE'),
   igResponder: (id: string, text: string) => sendJSON<IgMensaje>(`/platform/marketing/instagram/conversations/${id}/messages`, 'POST', { text }),
   tiktokUrlDeSubida: (mimetype: string) => sendJSON<{ uploadUrl: string; publicUrl: string }>('/platform/marketing/tiktok/video-upload-url', 'POST', { mimetype }),
   tiktokEstado: () => getJSON<TiktokEstado>('/platform/marketing/tiktok'),

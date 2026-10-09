@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationsService } from '../conversations/conversations.service';
+import { InstagramService } from '../instagram/instagram.service';
 import { SendMessageDto } from '../conversations/dto/send-message.dto';
 
 // La bandeja de mensajes directos de Instagram de la EMPRESA, dentro del super panel.
@@ -32,6 +33,8 @@ export class InstagramBandejaService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly conversations: ConversationsService,
+    // Opcional por compatibilidad con los specs que construyen el servicio a mano; en la app real Nest lo inyecta siempre.
+    private readonly instagram?: InstagramService,
   ) {}
 
   private async negocioId(): Promise<string> {
@@ -73,6 +76,21 @@ export class InstagramBandejaService {
     const businessId = await this.negocioId();
     await this.asegurarDeInstagram(businessId, conversationId);
     return this.conversations.getMessages(businessId, conversationId);
+  }
+
+  /**
+   * Desconecta la cuenta de Instagram de la empresa: se deja de recibir mensajes y se borra el token (lo mismo que
+   * hace el dueño de un negocio desde su panel). Los mensajes que ya llegaron se conservan. Para volver a conectarla
+   * hay que iniciar sesión de nuevo desde la bandeja del negocio. Queda anotado quién lo hizo.
+   */
+  async desconectar(adminId: string) {
+    if (!this.instagram) throw new ServiceUnavailableException('Instagram no está disponible');
+    const businessId = await this.negocioId();
+    const r = await this.instagram.desconectar(businessId);
+    await this.prisma.platformAdminLog
+      .create({ data: { adminId, action: 'instagram_disconnect', targetType: 'marketing_instagram', targetId: businessId } })
+      .catch(() => undefined); // es un registro: no puede deshacer la desconexión que ya se hizo
+    return r;
   }
 
   async responder(conversationId: string, dto: SendMessageDto) {
