@@ -10,16 +10,21 @@ import { ApiError, disconnectInstagram, requestInstagramAccess, startInstagramCo
 //
 // Mientras la app de Meta no tenga acceso avanzado, solo conectan las cuentas que el equipo sumó como
 // evaluadoras, así que el recorrido son tres pasos que se ven siempre: 1) dejar el @usuario,
-// 2) esperar a que lo sumemos, 3) conectar. El estado de la API decide en cuál está la persona.
+// 2) esperar que confirmemos la cuenta, 3) aceptar la invitación y conectar. El estado de la API
+// decide en cuál está la persona.
+//
+// Ojo con el orden: la invitación de Instagram recién existe cuando el equipo suma la cuenta como
+// evaluadora y toca "Habilitar" en el superadmin. Mientras el pedido está pendiente (paso 2) NO se le
+// manda a Instagram a buscarla: no va a encontrar nada. La invitación se explica en el paso 3.
 
 const PASOS_EVALUADOR = 'Configuración → Apps y sitios web → Invitaciones de evaluador'
 
 // Video que muestra dónde aceptar la invitación de evaluador en Instagram. Pegá acá la dirección de
-// YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 2; mientras sea null, el espacio dice
+// YouTube, Vimeo o un archivo .mp4/.webm y aparece en el paso 3; mientras sea null, el espacio dice
 // "Próximamente". Se borra junto con PASOS_EVALUADOR cuando Meta apruebe el acceso avanzado.
 const VIDEO_EVALUADOR_URL: string | null = null
 
-const TITULOS_PASOS = ['Dejá tu usuario', 'Te sumamos como evaluador', 'Conectá tu cuenta']
+const TITULOS_PASOS = ['Dejá tu usuario', 'Confirmamos tu cuenta', 'Aceptá la invitación y conectá']
 
 // Glifo de Instagram (Feather). lucide-react ya no trae íconos de marcas.
 function GlifoInstagram({ size = 22 }: { size?: number }) {
@@ -129,7 +134,7 @@ function Recorrido({ estado, onCambio }: { estado: InstagramEstado; onCambio: ()
                 {hecho && i === 0 && solicitud && !editando && <span className="igm-usuario"> · @{solicitud.username}</span>}
               </p>
               {activo && i === 0 && <PedirUsuario inicial={solicitud?.username ?? ''} onEnviado={() => { setEditando(false); onCambio() }} />}
-              {activo && i === 1 && solicitud && <EsperarHabilitacion usuario={solicitud.username} />}
+              {activo && i === 1 && solicitud && <PendienteDeConfirmacion usuario={solicitud.username} />}
               {activo && i === 2 && <ConectarCuenta />}
               {hecho && i === 0 && solicitud && !editando && (
                 <button type="button" className="igm-enlace" onClick={() => setEditando(true)}>Cambiar usuario</button>
@@ -186,17 +191,21 @@ function PedirUsuario({ inicial, onEnviado }: { inicial: string; onEnviado: () =
   )
 }
 
-function EsperarHabilitacion({ usuario }: { usuario: string }) {
+// Paso 2: el pedido está en nuestras manos. Todavía no hay invitación en Instagram, así que se le dice
+// de frente que no busque nada ahí (ver el comentario de arriba).
+function PendienteDeConfirmacion({ usuario }: { usuario: string }) {
   return (
     <div>
       <p className="igm-suave">
-        Estamos sumando a <strong>@{usuario}</strong> como evaluadora de la app de Órbita. Cuando esté lista, este paso se completa solo y te aparece el botón para conectar.
+        Tu pedido con <strong>@{usuario}</strong> está <strong>pendiente de confirmación</strong>. Estamos sumando tu cuenta como evaluadora de la app de Órbita.
       </p>
       <div className="igm-nota">
         <Clock size={15} strokeWidth={2} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
-        <p>Mientras tanto, entrá a Instagram y aceptá la invitación de evaluador que te va a llegar: <strong>{PASOS_EVALUADOR}</strong>.</p>
+        <p>
+          Todavía <strong>no te mandamos la invitación</strong>, así que no hace falta que busques nada en Instagram por ahora.
+          Cuando la enviemos, este paso se completa y acá mismo te explicamos cómo aceptarla. Volvé a abrir esta ventana más tarde.
+        </p>
       </div>
-      <VideoTutorial />
     </div>
   )
 }
@@ -241,9 +250,10 @@ function ConectarCuenta() {
   return (
     <div className="igm-form">
       <p className="igm-suave">
-        Vas a iniciar sesión en Instagram y darle permiso a Órbita para leer y responder tus mensajes directos.
-        Si es la primera vez, antes aceptá la invitación de evaluador: <strong>{PASOS_EVALUADOR}</strong>.
+        Te enviamos a tu Instagram la invitación de evaluador de la app de Órbita. Aceptala desde <strong>{PASOS_EVALUADOR}</strong>.
+        Si ya la aceptaste, tocá el botón: vas a iniciar sesión en Instagram y darle permiso a Órbita para leer y responder tus mensajes directos.
       </p>
+      <VideoTutorial />
       {error && <p className="igm-error" role="alert">{error}</p>}
       <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%' }}>Conectar con Instagram</Button>
     </div>

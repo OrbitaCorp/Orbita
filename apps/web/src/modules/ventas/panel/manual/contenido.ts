@@ -519,7 +519,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.' },
                 { tipo: 'parrafo', texto: 'Cuando hay algo sin leer, aparece un punto rojo en **Mensajes** en el menú de la izquierda: no hace falta entrar a chequear.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.' },
-                { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado. Si todavía no lo tenés, tocá [[Conectar Instagram]], escribí el usuario de tu cuenta profesional y tocá [[Pedir acceso]]: la sumamos como evaluadora de la app de Órbita y, cuando esté lista, ahí mismo aparece el botón para conectar. Antes de conectar, aceptá la invitación de evaluador que te llega en Instagram (Configuración → Apps y sitios web → Invitaciones de evaluador).' },
+                { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado. Si todavía no lo tenés, tocá [[Conectar Instagram]], escribí el usuario de tu cuenta profesional y tocá [[Pedir acceso]]. Tu pedido queda **pendiente de confirmación** hasta que sumemos tu cuenta como evaluadora de la app de Órbita: mientras tanto no hay nada que hacer en Instagram, porque todavía no te mandamos la invitación. Cuando la enviemos, ahí mismo se explica cómo aceptarla (Configuración → Apps y sitios web → Invitaciones de evaluador) y aparece el botón para conectar.' },
             ],
         },
         {
@@ -555,7 +555,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'instagram-conexion', titulo: 'Conectar tu Instagram',
             bloques: [
                 { tipo: 'parrafo', texto: 'En el módulo **Difusión** del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.' },
-                { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá [[Pedir acceso]]. Cuando la sumemos como evaluadora de la app, ahí mismo aparece el botón para conectar.' },
+                { tipo: 'parrafo', texto: 'Instagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá [[Pedir acceso]]. El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como evaluadora de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.' },
                 { tipo: 'nota', variante: 'tip', texto: 'Publicar productos, responder comentarios y ver estadísticas están en camino: las pantallas **Publicaciones**, **Comentarios** y **Estadísticas** de Difusión dicen "Próximamente" hasta que estén listas.' },
             ],
             ir: { label: 'Ir a Difusión', seccion: 'difusion' },

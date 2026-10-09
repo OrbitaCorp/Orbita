@@ -41,6 +41,11 @@ export function TabInstagram({ puedeHabilitar, onCambio }: { puedeHabilitar: boo
         title="Instagram"
         subtitle={pendientes > 0 ? `${pendientes} pedido${pendientes === 1 ? '' : 's'} esperando` : 'Pedidos de acceso anticipado de los negocios'}
       />
+      <p style={{ margin: 0, maxWidth: 680, fontSize: 13, lineHeight: 1.6, color: 'var(--color-muted)' }}>
+        Orden: 1) sumá la cuenta como evaluadora en Meta (Roles → Agregar personas → Evaluador de Instagram), 2) recién ahí tocá <strong>Habilitar</strong>.
+        Habilitar es avisarle al dueño que <strong>la invitación ya está enviada</strong>: le aparece &quot;Aceptá la invitación y conectá&quot;.
+        Mientras no lo hagas, él ve &quot;Pendiente de confirmación&quot; y sabe que no tiene que buscar nada en Instagram.
+      </p>
       {error ? <ErrorBox msg="No se pudieron cargar los pedidos." action={<button style={btnGhostSm} onClick={() => setTick((t) => t + 1)}>Reintentar</button>} /> : loading && !data ? <Loader /> : (
         <Card noPad>
           {data && data.length > 0 ? (

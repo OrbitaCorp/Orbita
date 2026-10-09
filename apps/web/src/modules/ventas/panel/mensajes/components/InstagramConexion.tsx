@@ -60,7 +60,7 @@ export function InstagramBoton() {
       >
         {/* El punto verde es el dato: solo aparece si está conectado. */}
         {conectado && <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)' }} />}
-        {conectado ? 'Instagram conectado' : pedidoPendiente ? 'Instagram: acceso pendiente' : 'Conectar Instagram'}
+        {conectado ? 'Instagram conectado' : pedidoPendiente ? 'Instagram: pendiente de confirmación' : 'Conectar Instagram'}
       </button>
       {abierto && <InstagramModal estado={estado} resultado={resultado} onCerrar={() => setAbierto(false)} onCambio={cargar} />}
     </>

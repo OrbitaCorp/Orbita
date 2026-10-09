@@ -75,7 +75,7 @@ function TableroInstagram() {
     : conectado && estado.connected
       ? (estado.username ? `Conectado a @${estado.username}` : 'Conectado')
       : pendiente && estado.habilitado === false && estado.solicitud
-        ? `Acceso pendiente · @${estado.solicitud.username}`
+        ? `Pendiente de confirmación · @${estado.solicitud.username}`
         : 'Sin conectar'
 
   return (
