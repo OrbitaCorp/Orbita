@@ -3333,8 +3333,19 @@ export function disconnectWhatsapp() { return panelRequest<{ connected: false }>
 // Instagram — conexión del negocio (solo propietario/admin). Conectar devuelve la
 // dirección del login de Instagram: el panel redirige al dueño ahí y Instagram lo
 // devuelve a la API, que lo manda de vuelta a Mensajes con ?ig=conectado.
-export type InstagramEstado = { connected: false } | { connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string }
+//
+// Mientras la app de Meta no tenga acceso avanzado, solo conectan las cuentas que el
+// equipo sumó como evaluadoras: `habilitado: false` es un negocio que todavía no
+// pidió (solicitud null) o que pidió y espera (solicitud con su @usuario). La API
+// anterior no mandaba `habilitado`, por eso es opcional en los casos habilitados.
+export type InstagramEstado =
+  | { habilitado: false; connected: false; solicitud: { username: string; requestedAt: string } | null }
+  | { habilitado?: true; connected: false }
+  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string }
 export function getInstagramConnection() { return panelRequest<InstagramEstado>('/instagram/connection') }
+export function requestInstagramAccess(username: string) {
+  return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
+}
 export function startInstagramConnect() { return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST' }) }
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 

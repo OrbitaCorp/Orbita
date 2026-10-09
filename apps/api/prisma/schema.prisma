@@ -101,6 +101,7 @@ model Business {
   mpCredentials        MpCredentials?
   whatsappConnection   WhatsappConnection?
   instagramConnection  InstagramConnection?
+  instagramEarlyAccess InstagramEarlyAccess?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1641,6 +1642,29 @@ model InstagramConnection {
 enum InstagramConnectionStatus {
   ACTIVE
   DISCONNECTED
+}
+
+// Pedido de acceso anticipado a Instagram. Mientras la app de Meta no tenga
+// acceso avanzado, solo las cuentas agregadas como evaluadoras pueden conectar:
+// el dueño deja su @usuario, el equipo lo suma como evaluador en Meta y marca el
+// pedido ENABLED, que abre la compuerta de ese negocio (ver
+// InstagramService.estaHabilitado). Un pedido por negocio.
+model InstagramEarlyAccess {
+  id          String                     @id @default(uuid())
+  businessId  String                     @unique @map("business_id")
+  username    String // @usuario de Instagram, sin la @
+  status      InstagramEarlyAccessStatus @default(PENDING)
+  requestedAt DateTime                   @default(now()) @map("requested_at")
+  enabledAt   DateTime?                  @map("enabled_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_early_access")
+}
+
+enum InstagramEarlyAccessStatus {
+  PENDING
+  ENABLED
 }
 
 // Conexión de un negocio con WhatsApp Business (Cloud API de Meta). Una por

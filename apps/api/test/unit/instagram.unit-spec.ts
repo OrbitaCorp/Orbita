@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto';
-import { BadRequestException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InstagramService, IgWebhookBody } from '../../src/instagram/instagram.service';
 import { ConversationsService } from '../../src/conversations/conversations.service';
 
@@ -41,9 +41,15 @@ function mensaje(mid: string, texto: string, extra: Record<string, unknown> = {}
 }
 const evento = (...mensajes: unknown[]): IgWebhookBody => ({ object: 'instagram', entry: [{ id: IG_CUENTA, messaging: mensajes as any }] });
 
-function build(overrides: Record<string, any> = {}, cfg: Record<string, string> = {}) {
+function build(overrides: Record<string, any> = {}, cfg: Record<string, string> = {}, mail?: any) {
   const prisma: any = {
     business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'mitienda' }) },
+    instagramEarlyAccess: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ username: create.username, requestedAt: new Date('2026-10-08') })),
+      update: jest.fn().mockResolvedValue({}),
+    },
     instagramConnection: {
       findUnique: jest.fn().mockResolvedValue({ businessId: BIZ, status: 'ACTIVE' }),
       findMany: jest.fn().mockResolvedValue([]),
@@ -69,7 +75,7 @@ function build(overrides: Record<string, any> = {}, cfg: Record<string, string> 
     $transaction: jest.fn().mockResolvedValue([]),
     ...overrides,
   };
-  return { svc: new InstagramService(prisma, config(cfg)), prisma };
+  return { svc: new InstagramService(prisma, config(cfg), mail), prisma };
 }
 
 function respuesta(json: unknown, ok = true, status = 200) {
@@ -356,6 +362,69 @@ describe('InstagramService (unit)', () => {
       await expect(build({}, lista).svc.asegurarHabilitado(BIZ)).resolves.toBeUndefined();
       const ajeno = build({ business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'ajena' }) } }, lista);
       await expect(ajeno.svc.asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('acceso anticipado', () => {
+    const PROD = { NODE_ENV: 'production' };
+    const NEGOCIO = { findUnique: jest.fn().mockResolvedValue({ name: 'Mi Tienda', subdomain: 'mitienda' }) };
+    const pedidoHabilitado = { instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ status: 'ENABLED' }) } };
+
+    it('un pedido aceptado habilita al negocio aunque no esté en la lista de producción', async () => {
+      await expect(build(pedidoHabilitado, PROD).svc.asegurarHabilitado(BIZ)).resolves.toBeUndefined();
+      const pendiente = build({ instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ status: 'PENDING' }) } }, PROD);
+      await expect(pendiente.svc.asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('estadoParaPanel: sin acceso devuelve el pedido, con acceso devuelve la conexión', async () => {
+      const pidio = { instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ username: 'mitienda', requestedAt: new Date('2026-10-08') }) } };
+      const sinAcceso = await build(pidio, PROD).svc.estadoParaPanel(BIZ);
+      expect(sinAcceso).toMatchObject({ habilitado: false, connected: false, solicitud: { username: 'mitienda' } });
+      const conAcceso = await build(pedidoHabilitado, PROD).svc.estadoParaPanel(BIZ);
+      expect(conAcceso).toMatchObject({ habilitado: true, connected: true });
+    });
+
+    it('solicitarAcceso guarda el usuario normalizado para ESE negocio y avisa al equipo', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+      const { svc, prisma } = build({ business: NEGOCIO }, PROD, mail);
+      const pedido = await svc.solicitarAcceso(BIZ, '  @Mi.Tienda_1 ');
+      expect(pedido.username).toBe('mi.tienda_1');
+      expect(prisma.instagramEarlyAccess.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, create: { businessId: BIZ, username: 'mi.tienda_1' } }));
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+      expect(mail.sendCustomEmail.mock.calls[0][2]).toContain('@mi.tienda_1');
+    });
+
+    it('pedir de nuevo con el mismo usuario no vuelve a avisar; con otro, sí', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
+      const { svc } = build({ business: NEGOCIO, instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ username: 'mitienda', status: 'PENDING' }), upsert: jest.fn().mockResolvedValue({ username: 'mitienda', requestedAt: new Date() }) } }, PROD, mail);
+      await svc.solicitarAcceso(BIZ, '@mitienda');
+      expect(mail.sendCustomEmail).not.toHaveBeenCalled();
+      await svc.solicitarAcceso(BIZ, '@otrousuario');
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza usuarios inválidos y a los negocios que ya están habilitados', async () => {
+      const { svc } = build({}, PROD);
+      for (const malo of ['', 'con espacio', 'a'.repeat(31), '<script>']) {
+        await expect(svc.solicitarAcceso(BIZ, malo)).rejects.toBeInstanceOf(BadRequestException);
+      }
+      await expect(build(pedidoHabilitado, PROD).svc.solicitarAcceso(BIZ, 'mitienda')).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('si falla el correo, el pedido igual queda guardado', async () => {
+      const mail = { sendCustomEmail: jest.fn().mockRejectedValue(new Error('resend caído')) };
+      const { svc } = build({ business: NEGOCIO }, PROD, mail);
+      await expect(svc.solicitarAcceso(BIZ, 'mitienda')).resolves.toMatchObject({ username: 'mitienda' });
+      expect(mail.sendCustomEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it('el superadmin habilita y quita el acceso; sin pedido, no encuentra el negocio', async () => {
+      const { svc, prisma } = build({ instagramEarlyAccess: { findUnique: jest.fn().mockResolvedValue({ id: 'a1' }), update: jest.fn().mockResolvedValue({}) } });
+      await svc.cambiarHabilitacion(BIZ, true);
+      expect(prisma.instagramEarlyAccess.update).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, data: expect.objectContaining({ status: 'ENABLED' }) }));
+      await svc.cambiarHabilitacion(BIZ, false);
+      expect(prisma.instagramEarlyAccess.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: { status: 'PENDING', enabledAt: null } }));
+      await expect(build({}).svc.cambiarHabilitacion(BIZ, true)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

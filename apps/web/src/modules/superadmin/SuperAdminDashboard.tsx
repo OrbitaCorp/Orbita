@@ -11,7 +11,7 @@ import {
 } from '@/lib/platform/api'
 import {
   LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Tag, Wand2, ClipboardCheck, LifeBuoy,
-  Search, Plus, DollarSign, Bot, Send, Megaphone,
+  Search, Plus, DollarSign, Bot, Send, Megaphone, MessageCircle,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
@@ -23,6 +23,7 @@ import { TabCostos } from './Costos'
 import { TabOrbi } from './Orbi'
 import { TabCorreo } from './Correo'
 import { TabMarketing } from './Marketing'
+import { TabInstagram } from './InstagramAccesos'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -100,12 +101,13 @@ export function SuperAdminDashboard() {
       {tab === 'logs' && <TabLogs />}
       {tab === 'correo' && <TabCorreo puedeEnviar={user.admin.role === 'SUPERADMIN'} />}
       {tab === 'marketing' && <TabMarketing puedePublicar={user.admin.role === 'SUPERADMIN'} />}
+      {tab === 'instagram' && <TabInstagram puedeHabilitar={user.admin.role === 'SUPERADMIN'} />}
       {tab === 'testeo' && <TabTesteo />}
     </SuperAdminShell>
   )
 }
 
-export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'soporte' | 'dominios' | 'duenos' | 'descuentos' | 'campanias' | 'auditoria' | 'admins' | 'logs' | 'testeo' | 'costos' | 'orbi' | 'correo' | 'marketing' | 'instagram'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -122,6 +124,9 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
   { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
+  // Pedidos de acceso anticipado a Instagram: los negocios que quieren conectar su cuenta
+  // mientras la app de Meta no tiene acceso avanzado.
+  { id: 'instagram', label: 'Instagram', Icono: MessageCircle, grupo: 'Clientes' },
   // Al lado de Descuentos: las dos son formas de cobrarle menos a un negocio.
   // Un código descuenta el primer cobro; una campaña congela el precio varios meses.
   { id: 'campanias', label: 'Precios y campañas', Icono: Tag, grupo: 'Clientes' },

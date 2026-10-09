@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/utils/describe-error.util';
+import { escaparHtml } from '../common/utils/html';
+import { MailService } from '../mail/mail.service';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
 //
@@ -97,6 +100,8 @@ export class InstagramService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    // Opcional: solo avisa los pedidos de acceso anticipado.
+    @Optional() private readonly mail?: MailService,
   ) {}
 
   // Las credenciales se leen al usarlas y no al arrancar: la API sigue
@@ -127,20 +132,115 @@ export class InstagramService {
    * negocios listados en INSTAGRAM_NEGOCIOS_HABILITADOS (subdominios separados
    * por coma); sin la variable, en ninguno. Fuera de producción, sin la
    * variable, están todos habilitados para poder probar.
+   *
+   * Además de la variable, un negocio queda habilitado cuando el equipo acepta su
+   * pedido de acceso anticipado (InstagramEarlyAccess en ENABLED): así no hace
+   * falta tocar variables ni redesplegar para sumar un piloto.
    */
-  async asegurarHabilitado(businessId: string): Promise<void> {
+  async estaHabilitado(businessId: string): Promise<boolean> {
+    const acceso = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { status: true } });
+    if (acceso?.status === 'ENABLED') return true;
     const lista = (this.config.get<string>('INSTAGRAM_NEGOCIOS_HABILITADOS') ?? '')
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
-    if (lista.length === 0) {
-      if (this.config.get<string>('NODE_ENV') === 'production') throw new ForbiddenException('Instagram todavía no está disponible para este negocio');
-      return;
-    }
+    if (lista.length === 0) return this.config.get<string>('NODE_ENV') !== 'production';
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
-    if (!negocio || !lista.includes(negocio.subdomain.toLowerCase())) {
+    return !!negocio && lista.includes(negocio.subdomain.toLowerCase());
+  }
+
+  async asegurarHabilitado(businessId: string): Promise<void> {
+    if (!(await this.estaHabilitado(businessId))) {
       throw new ForbiddenException('Instagram todavía no está disponible para este negocio');
     }
+  }
+
+  // ── Acceso anticipado ──────────────────────────────────────────────────────
+
+  // Usuario de Instagram: letras, números, puntos y guiones bajos, hasta 30.
+  private normalizarUsuario(crudo: string): string {
+    const usuario = (crudo ?? '').trim().replace(/^@/, '').toLowerCase();
+    if (!/^[a-z0-9._]{1,30}$/.test(usuario)) {
+      throw new BadRequestException('Escribí tu usuario de Instagram sin espacios (letras, números, puntos y guiones bajos).');
+    }
+    return usuario;
+  }
+
+  /**
+   * Lo que ve el panel: si el negocio puede conectar, el estado de la conexión; si
+   * no, su pedido de acceso anticipado (o null si todavía no pidió).
+   */
+  async estadoParaPanel(businessId: string) {
+    if (await this.estaHabilitado(businessId)) {
+      return { habilitado: true as const, ...(await this.estado(businessId)) };
+    }
+    const pedido = await this.prisma.instagramEarlyAccess.findUnique({
+      where: { businessId },
+      select: { username: true, requestedAt: true },
+    });
+    return { habilitado: false as const, connected: false as const, solicitud: pedido };
+  }
+
+  /**
+   * El dueño deja su @usuario para que el equipo lo sume como evaluador de la app
+   * de Meta. Un pedido por negocio: pedir de nuevo con otro usuario lo corrige, y
+   * el aviso al equipo sale solo si el pedido es nuevo o cambió el usuario.
+   */
+  async solicitarAcceso(businessId: string, usuarioCrudo: string) {
+    const username = this.normalizarUsuario(usuarioCrudo);
+    if (await this.estaHabilitado(businessId)) {
+      throw new ConflictException('Instagram ya está habilitado para este negocio');
+    }
+    const previo = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { username: true } });
+    const pedido = await this.prisma.instagramEarlyAccess.upsert({
+      where: { businessId },
+      create: { businessId, username },
+      update: { username },
+      select: { username: true, requestedAt: true },
+    });
+    if (!previo || previo.username !== username) await this.avisarPedido(businessId, username);
+    return pedido;
+  }
+
+  // El aviso nunca rompe el pedido: si el correo falla, el pedido igual queda en
+  // el superadmin.
+  private async avisarPedido(businessId: string, username: string): Promise<void> {
+    try {
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } });
+      if (!negocio || !this.mail) return;
+      const html =
+        `<p><strong>${escaparHtml(negocio.name)}</strong> (${escaparHtml(negocio.subdomain)}) pidió acceso anticipado a Instagram con la cuenta <strong>@${escaparHtml(username)}</strong>.</p>` +
+        '<p>Sumala como evaluadora de Instagram en los roles de la app de Meta y después habilitala en el superadmin.</p>';
+      await this.mail.sendCustomEmail('soporte@orbita.site', `Instagram: pedido de acceso de ${negocio.name}`, html);
+    } catch (e) {
+      this.logger.warn(`No se pudo avisar el pedido de acceso a Instagram: ${describeError(e)}`);
+    }
+  }
+
+  // ── Superadmin: pedidos de acceso ──────────────────────────────────────────
+
+  async pedidosDeAcceso() {
+    return this.prisma.instagramEarlyAccess.findMany({
+      orderBy: { requestedAt: 'desc' },
+      select: {
+        businessId: true,
+        username: true,
+        status: true,
+        requestedAt: true,
+        enabledAt: true,
+        business: { select: { name: true, subdomain: true } },
+      },
+    });
+  }
+
+  async cambiarHabilitacion(businessId: string, habilitar: boolean) {
+    const pedido = await this.prisma.instagramEarlyAccess.findUnique({ where: { businessId }, select: { id: true } });
+    if (!pedido) throw new NotFoundException('Ese negocio no pidió acceso a Instagram');
+    return this.prisma.instagramEarlyAccess.update({
+      where: { businessId },
+      data: habilitar ? { status: 'ENABLED', enabledAt: new Date() } : { status: 'PENDING', enabledAt: null },
+      select: { businessId: true, username: true, status: true, enabledAt: true },
+    });
   }
 
   // ── Conectar: login con Instagram ──────────────────────────────────────────

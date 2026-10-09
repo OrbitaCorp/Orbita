@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "7d0d4c8b2328cd46",
+  "version": "31e073e393d33124",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -319,7 +319,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.\n\nInstagram está en acceso anticipado. Si todavía no lo tenés, tocá \"Conectar Instagram\", escribí el usuario de tu cuenta profesional y tocá \"Pedir acceso\": la sumamos como evaluadora de la app de Órbita y, cuando esté lista, ahí mismo aparece el botón para conectar. Antes de conectar, aceptá la invitación de evaluador que te llega en Instagram (Configuración → Apps y sitios web → Invitaciones de evaluador).",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"

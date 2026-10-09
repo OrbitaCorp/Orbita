@@ -69,6 +69,17 @@ export type CorreoEnviado = {
 }
 export type CorreoInput = { senderId: string; to: string; subject: string; body: string }
 
+// Un negocio que pidió acceso anticipado a Instagram: PENDING hasta que el equipo lo suma como
+// evaluador en Meta y lo habilita.
+export type InstagramPedido = {
+  businessId: string
+  username: string
+  status: 'PENDING' | 'ENABLED'
+  requestedAt: string
+  enabledAt: string | null
+  business: { name: string; subdomain: string }
+}
+
 // Marketing de Órbita en TikTok (ver apps/api/src/marketing/tiktok/).
 export type TiktokEstado = {
   configurado: boolean
@@ -977,6 +988,10 @@ export const platformApi = {
     return getJSON<BusinessList>(`/platform/businesses${q ? `?${q}` : ''}`)
   },
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
+  // Pedidos de acceso anticipado a Instagram (apps/api/src/instagram/instagram-admin.controller.ts).
+  instagramPedidos: () => getJSON<InstagramPedido[]>('/platform/instagram/acceso'),
+  instagramHabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/habilitar`, 'POST'),
+  instagramDeshabilitar: (businessId: string) => sendJSON<unknown>(`/platform/instagram/acceso/${businessId}/deshabilitar`, 'POST'),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
   hideBusinessFromSearch: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/hide-from-search`, 'POST', { reason }),

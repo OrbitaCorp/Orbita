@@ -8,6 +8,7 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
+import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
 import { InstagramService } from './instagram.service';
 
 // `express` es solo dependencia transitiva — mismo motivo que en
@@ -36,8 +37,17 @@ export class InstagramController {
   @Roles('owner', 'admin')
   async estado(@CurrentBusiness() ctx: AuthContext) {
     const { businessId } = assertMemberContext(ctx);
-    await this.instagram.asegurarHabilitado(businessId);
-    return this.instagram.estado(businessId);
+    // Sin acceso todavía no es un error: el panel muestra "pedir acceso anticipado".
+    return this.instagram.estadoParaPanel(businessId);
+  }
+
+  // El dueño deja su @usuario para que el equipo lo sume como evaluador de la app.
+  @Post('access-request')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async pedirAcceso(@CurrentBusiness() ctx: AuthContext, @Body() dto: SolicitarAccesoDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.instagram.solicitarAcceso(businessId, dto.username);
   }
 
   // Devuelve la dirección del login de Instagram: el panel redirige ahí al dueño.
