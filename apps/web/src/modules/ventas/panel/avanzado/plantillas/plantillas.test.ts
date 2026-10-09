@@ -9,6 +9,7 @@ import { PLANTILLAS } from './datos'
 import { EsqueletoPlantilla } from './esqueleto'
 import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
 import { itemsMenuMovil, navDe, CSS } from './piezas'
+import { navRealDe } from '@/components/storefront/StorefrontHeader'
 import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
 import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
@@ -965,5 +966,18 @@ describe('enlaces del nav', () => {
     expect(hover).toBeTruthy()
     expect(hover).not.toMatch(/opacity/)
     expect(hover).toMatch(/underline/)
+  })
+})
+
+describe('enlaces del header de una tienda real', () => {
+  it('headerLinks vacío es "nunca configurado": salen los de siempre, no los de muestra', () => {
+    expect(navRealDe([]).map(l => l.label)).toEqual(['Catálogo', 'Ofertas', 'Más vendidos'])
+    expect(navRealDe(undefined).length).toBe(3)
+  })
+
+  it('con todos apagados no hay enlaces, y la portada no pinta los de la maqueta', () => {
+    const todosApagados = [{ id: 'catalogo', label: 'Catálogo', on: false }]
+    expect(navRealDe(todosApagados)).toEqual([])
+    expect(navDe(['Cocina', 'Textil'], { nav: [] } as never)).toEqual([])
   })
 })

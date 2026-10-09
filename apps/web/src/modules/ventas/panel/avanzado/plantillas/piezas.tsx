@@ -503,9 +503,11 @@ export function navDe(links: string[], acciones?: AccionesHome): { label: string
   // cada bloque para que valga en las catorce de una: el que elige esto
   // quiere el header limpio, sea cual sea la plantilla.
   if (acciones?.navLayout === 'minimal') return []
-  if (acciones?.nav && acciones.nav.length > 0) return acciones.nav
-  // Sin `acciones` es la vitrina. Con `acciones` pero sin `nav` (la tienda
-  // real con todos los enlaces apagados) no hay a dónde ir y no se inventa.
+  // Con la tienda real, `nav` manda aunque venga vacío (el dueño apagó todos los
+  // enlaces): caer a `links` pintaba los de muestra de la maqueta, sin destino.
+  if (acciones?.nav) return acciones.nav
+  // Sin `acciones` es la vitrina. Con `acciones` pero sin `nav` (quien no lo
+  // trae) se dibujan los `links` de la plantilla, sin destino.
   if (acciones) return links.map((label) => ({ label }))
   let n = 0
   return links.map((label) => {

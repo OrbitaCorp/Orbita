@@ -122,7 +122,9 @@ function pathDeLink(id: string): string {
  * los mismos lados, y duplicar el mapa era garantizar que se desincronizaran.
  */
 export function navRealDe(headerLinks?: { id: string; label: string; on: boolean }[]): { label: string; path: string }[] {
-  return headerLinks
+  // `[]` es "nunca configurado" (el backend lo devuelve así y el panel lo toma
+  // como los de siempre), no "todos apagados": esos vienen con `on: false`.
+  return headerLinks && headerLinks.length > 0
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
         .map(l => ({ label: l.label, path: pathDeLink(l.id) }))
@@ -142,7 +144,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // 'categorias'/'novedades' se filtran también acá por si el negocio guardó
   // su propia lista de headerLinks antes de esta limpieza (ver
   // apariencia.mapper.ts, mismo filtro del lado del panel).
-  const navLinks = headerLinks
+  const navLinks = headerLinks && headerLinks.length > 0
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
         .map(l => ({ id: l.id, label: l.label, path: pathDeLink(l.id), matcher: l.id === 'catalogo' ? '/catalogo' : null }))

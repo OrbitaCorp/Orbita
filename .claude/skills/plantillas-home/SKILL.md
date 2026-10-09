@@ -343,7 +343,7 @@ un teléfono de verdad, no solo achicando la ventana.
 ## El nav del header
 
 Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
-`<span className="pl-nav">`. Tres cosas se rompieron ahí y valen para todos:
+`<span className="pl-nav">`. Cuatro cosas se rompieron ahí y valen para todos:
 
 - **Un enlace no puede quedar muerto.** `navDe(links, acciones)` es el único
   camino: en la tienda devuelve `acciones.nav` (los enlaces reales de
@@ -364,6 +364,13 @@ Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
   `color: t.muted`, tiene que esparcir `...navHover(t)` en su `style`; si el
   enlace ya viene en `t.text` (o con su color inline, como "Ofertas" en
   `t.accent`) alcanza con el subrayado y no hace falta.
+
+- **En la tienda real nunca salen los enlaces de muestra.** `acciones.nav` manda
+  aunque venga vacío (el dueño los apagó todos), y `navRealDe([])` devuelve los
+  de siempre: el backend manda `headerLinks: []` a la tienda que nunca los
+  configuró, y eso es "sin configurar", no "todos apagados" (esos traen
+  `on: false`). Antes la portada caía a `p.links` y pintaba "Cocina, Textil…"
+  sin destino en una tienda real (Indecisas, 09/10).
 
 - **La vitrina no muestra el cursor de texto.** `Home()` marca su envoltorio con
   `data-pl-vitrina` cuando no hay `acciones`, y el CSS le pone `cursor: default`
