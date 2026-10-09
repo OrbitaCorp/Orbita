@@ -3346,7 +3346,10 @@ export function getInstagramConnection() { return panelRequest<InstagramEstado>(
 export function requestInstagramAccess(username: string) {
   return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
 }
-export function startInstagramConnect() { return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST' }) }
+// `seccion`: la pantalla del panel a la que se vuelve al terminar el login de Instagram (por defecto Mensajes).
+export function startInstagramConnect(seccion?: 'mensajes' | 'difusion') {
+  return panelRequest<{ url: string }>('/instagram/connect', { method: 'POST', body: JSON.stringify(seccion ? { seccion } : {}) })
+}
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)

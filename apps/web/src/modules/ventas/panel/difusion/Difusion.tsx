@@ -53,6 +53,7 @@ export default function Difusion() {
   const { estado, visible, cargar } = useInstagramEstado()
   const [abierto, setAbierto] = useState(false)
   const [yaSeOfrecio, setYaSeOfrecio] = useState(false)
+  const [resultadoIg, setResultadoIg] = useState<string | null>(null)
 
   // Cada vez que se entra a Difusión sin la conexión completa, el modal se abre solo. Si se cierra,
   // no vuelve a abrirse hasta volver a entrar al módulo o tocar el botón.
@@ -62,6 +63,21 @@ export default function Difusion() {
       setYaSeOfrecio(true)
     }
   }, [visible, estado, yaSeOfrecio])
+
+  // Al volver del login de Instagram la API manda ?ig=conectado | sin-suscripcion | error (se vuelve a
+  // la pantalla desde la que se pidió la conexión): se abre el modal con el resultado, se refresca el
+  // estado y se limpia la dirección para no repetirlo al recargar.
+  const resultado = typeof router.query.ig === 'string' ? router.query.ig : null
+  useEffect(() => {
+    if (!resultado) return
+    setResultadoIg(resultado)
+    setAbierto(true)
+    setYaSeOfrecio(true)
+    cargar()
+    const { ig: _ig, ...resto } = router.query
+    router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultado])
 
   return (
     <div className="dif-pagina">
@@ -84,7 +100,7 @@ export default function Difusion() {
         </>
       )}
 
-      {abierto && <InstagramModal estado={estado} onCerrar={() => setAbierto(false)} onCambio={cargar} />}
+      {abierto && <InstagramModal estado={estado} resultado={resultadoIg} desde="difusion" onCerrar={() => setAbierto(false)} onCambio={cargar} />}
     </div>
   )
 }

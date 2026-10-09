@@ -8,6 +8,7 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
+import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
 import { InstagramService } from './instagram.service';
 
@@ -54,12 +55,12 @@ export class InstagramController {
   @Post('connect')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  async conectar(@CurrentBusiness() ctx: AuthContext, @Req() req: { headers: { origin?: string } }) {
+  async conectar(@CurrentBusiness() ctx: AuthContext, @Req() req: { headers: { origin?: string } }, @Body() dto: ConectarInstagramDto) {
     const member = assertMemberContext(ctx);
     await this.instagram.asegurarHabilitado(member.businessId);
     // El Origin del navegador dice desde qué dirección se está usando el panel: al terminar el login se
     // vuelve a ese mismo lugar, donde está la sesión.
-    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId, req.headers.origin) };
+    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId, req.headers.origin, dto?.seccion) };
   }
 
   @Delete('connection')

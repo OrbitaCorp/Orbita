@@ -395,6 +395,22 @@ describe('InstagramService (unit)', () => {
       expect(await retornoPara('http://localhost:3001', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
     });
 
+    it('vuelve a la pantalla desde la que se pidió la conexión (Mensajes por defecto, o Difusión)', async () => {
+      const volver = async (seccion?: 'mensajes' | 'difusion') => {
+        const { svc } = build({}, {});
+        const url = svc.urlDeAutorizacion(BIZ, 'm-1', 'http://mitienda.orbita.local:3001', seccion);
+        return svc.retornoDelState(new URL(url).searchParams.get('state') ?? undefined);
+      };
+      expect(await volver()).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await volver('mensajes')).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await volver('difusion')).toBe('http://mitienda.orbita.local:3001/admin/ventas/difusion');
+    });
+
+    it('una pantalla fuera de la lista no entra en la ruta de vuelta', async () => {
+      const { svc } = build({}, {});
+      expect(svc.urlDeRetorno('mitienda', 'http://mitienda.orbita.local:3001', '../../login' as any)).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+    });
+
     it('con un state inválido no hay a dónde volver (cae al login)', async () => {
       const { svc } = build({}, {});
       expect(await svc.retornoDelState(undefined)).toBeUndefined();

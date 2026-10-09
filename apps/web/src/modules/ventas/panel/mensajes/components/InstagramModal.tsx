@@ -60,13 +60,15 @@ export function Marca({ size = 48 }: { size?: number }) {
 
 interface Props {
   estado: InstagramEstado | null
-  /** ?ig=… de la vuelta del login (conectado | sin-suscripcion). */
+  /** ?ig=… de la vuelta del login (conectado | sin-suscripcion | error). */
   resultado?: string | null
+  /** Pantalla desde la que se abrió: a ella se vuelve al terminar el login de Instagram. */
+  desde?: 'mensajes' | 'difusion'
   onCerrar: () => void
   onCambio: () => void
 }
 
-export function InstagramModal({ estado, resultado = null, onCerrar, onCambio }: Props) {
+export function InstagramModal({ estado, resultado = null, desde = 'mensajes', onCerrar, onCambio }: Props) {
   const tituloId = useId()
   const [montado, setMontado] = useState(false)
   useEffect(() => { setMontado(true) }, [])
@@ -124,7 +126,7 @@ export function InstagramModal({ estado, resultado = null, onCerrar, onCambio }:
               </p>
             )}
             <div className="igm-cuerpo">
-              {estado === null ? <p className="igm-suave">Cargando…</p> : <Recorrido estado={estado} onCambio={onCambio} />}
+              {estado === null ? <p className="igm-suave">Cargando…</p> : <Recorrido estado={estado} desde={desde} onCambio={onCambio} />}
             </div>
             <Incluye />
           </>
@@ -137,7 +139,7 @@ export function InstagramModal({ estado, resultado = null, onCerrar, onCambio }:
 
 // ─── Recorrido de tres pasos ───────────────────────────────────────────────────
 
-function Recorrido({ estado, onCambio }: { estado: InstagramEstado; onCambio: () => void }) {
+function Recorrido({ estado, desde, onCambio }: { estado: InstagramEstado; desde: 'mensajes' | 'difusion'; onCambio: () => void }) {
   const solicitud = estado.habilitado === false ? estado.solicitud : null
   const [editando, setEditando] = useState(false)
   // 0 = dejar usuario, 1 = esperar, 2 = conectar.
@@ -164,7 +166,7 @@ function Recorrido({ estado, onCambio }: { estado: InstagramEstado; onCambio: ()
             </div>
             {/* El paso 3 es el cierre del recorrido: su contenido ocupa todo el ancho del modal y va centrado,
                 en vez de quedar corrido a la derecha de la columna de los números. */}
-            {activo && i === 2 && <div className="igm-paso-ancho"><ConectarCuenta /></div>}
+            {activo && i === 2 && <div className="igm-paso-ancho"><ConectarCuenta desde={desde} /></div>}
           </li>
         )
       })}
@@ -257,14 +259,14 @@ function VideoTutorial() {
   )
 }
 
-function ConectarCuenta() {
+function ConectarCuenta({ desde }: { desde: 'mensajes' | 'difusion' }) {
   const [trabajando, setTrabajando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const conectar = async () => {
     setTrabajando(true); setError(null)
     try {
-      const { url } = await startInstagramConnect()
+      const { url } = await startInstagramConnect(desde)
       window.location.href = url
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo iniciar la conexión. Probá de nuevo.')

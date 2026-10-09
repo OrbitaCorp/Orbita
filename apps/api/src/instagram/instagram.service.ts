@@ -16,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { describeError } from '../common/utils/describe-error.util';
 import { escaparHtml } from '../common/utils/html';
 import { MailService } from '../mail/mail.service';
+import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
 //
@@ -47,6 +48,8 @@ interface StatePayload {
   // login. Sin esto se volvía siempre a FRONTEND_URL, que puede ser otro sitio que el de la sesión
   // (en local, localhost vs negocio.orbita.local) y la persona caía en el login.
   origen?: string;
+  // Pantalla del panel desde la que se pidió la conexión (mensajes o difusion).
+  seccion?: PantallaDeRetorno;
   nonce: string;
   exp: number;
 }
@@ -293,11 +296,12 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string, origen?: string): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
       ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
+      ...(seccion && PANTALLAS_DE_RETORNO.includes(seccion) ? { seccion } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -339,10 +343,11 @@ export class InstagramService {
    * Dirección del panel de Mensajes del negocio para volver tras el login de Instagram. En un host de la
    * tienda (negocio.orbita.site) las rutas del panel no llevan el subdominio; en el apex sí.
    */
-  urlDeRetorno(subdomain: string, origen?: string): string {
+  urlDeRetorno(subdomain: string, origen?: string, seccion: PantallaDeRetorno = 'mensajes'): string {
     const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
     const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
-    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/mensajes`;
+    const pantalla = PANTALLAS_DE_RETORNO.includes(seccion) ? seccion : 'mensajes';
+    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/${pantalla}`;
   }
 
   /**
@@ -351,21 +356,21 @@ export class InstagramService {
    */
   async retornoDelState(state: string | undefined): Promise<string | undefined> {
     try {
-      const { businessId, origen } = this.verificarState(state);
+      const { businessId, origen, seccion } = this.verificarState(state);
       const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
-      return negocio ? this.urlDeRetorno(negocio.subdomain, origen) : undefined;
+      return negocio ? this.urlDeRetorno(negocio.subdomain, origen, seccion) : undefined;
     } catch {
       return undefined;
     }
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string): string {
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
       scope: SCOPES,
-      state: this.firmarState(businessId, memberId, origen),
+      state: this.firmarState(businessId, memberId, origen, seccion),
       // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
       // cuenta (Meta lo recomienda sobre todo en celulares).
       force_reauth: 'true',
@@ -375,7 +380,7 @@ export class InstagramService {
 
   /** Vuelta del login: cambia el code por el token, lo guarda cifrado y suscribe el webhook. */
   async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean; retorno: string }> {
-    const { businessId, origen } = this.verificarState(state);
+    const { businessId, origen, seccion } = this.verificarState(state);
     await this.asegurarHabilitado(businessId);
 
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
@@ -450,7 +455,7 @@ export class InstagramService {
       suscripta = false;
       this.logger.warn(`No se pudo suscribir la cuenta de Instagram al webhook (negocio ${businessId}): ${describeError(e)}`);
     }
-    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen) };
+    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen, seccion) };
   }
 
   async estado(businessId: string) {
