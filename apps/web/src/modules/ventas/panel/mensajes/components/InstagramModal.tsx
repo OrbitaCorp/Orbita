@@ -153,11 +153,13 @@ function Recorrido({ estado, onCambio }: { estado: InstagramEstado; onCambio: ()
               </p>
               {activo && i === 0 && <PedirUsuario inicial={solicitud?.username ?? ''} onEnviado={() => { setEditando(false); onCambio() }} />}
               {activo && i === 1 && solicitud && <PendienteDeConfirmacion usuario={solicitud.username} />}
-              {activo && i === 2 && <ConectarCuenta />}
               {hecho && i === 0 && solicitud && !editando && (
                 <button type="button" className="igm-enlace" onClick={() => setEditando(true)}>Cambiar usuario</button>
               )}
             </div>
+            {/* El paso 3 es el cierre del recorrido: su contenido ocupa todo el ancho del modal y va centrado,
+                en vez de quedar corrido a la derecha de la columna de los números. */}
+            {activo && i === 2 && <div className="igm-paso-ancho"><ConectarCuenta /></div>}
           </li>
         )
       })}
@@ -204,7 +206,7 @@ function PedirUsuario({ inicial, onEnviado }: { inicial: string; onEnviado: () =
         />
       </div>
       {error && <p className="igm-error" role="alert">{error}</p>}
-      <Button type="submit" size="lg" loading={trabajando} disabled={!usuario.trim()} style={{ width: '100%' }}>Pedir acceso</Button>
+      <Button type="submit" size="lg" loading={trabajando} disabled={!usuario.trim()} style={{ width: '100%', justifyContent: 'center' }}>Pedir acceso</Button>
     </form>
   )
 }
@@ -277,7 +279,7 @@ function ConectarCuenta() {
       </a>
       <VideoTutorial />
       {error && <p className="igm-error" role="alert">{error}</p>}
-      <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%' }}>Verificar y conectar</Button>
+      <Button size="lg" loading={trabajando} onClick={conectar} style={{ width: '100%', justifyContent: 'center' }}>Verificar y conectar</Button>
       <p className="igm-suave igm-pie">
         Si Instagram te dice que no tenés permiso, es que todavía falta aceptar la invitación: aceptala y volvé a tocar acá.
       </p>
@@ -321,7 +323,7 @@ function Conectado({ username, tituloId, onCambio, onCerrar }: { username: strin
         <p className="igm-suave">Instagram solo permite responder dentro de las 24 horas del último mensaje del cliente.</p>
         {error && <p className="igm-error" role="alert">{error}</p>}
         <div className="igm-acciones">
-          <Button variant="secondary" size="lg" onClick={onCerrar} style={{ flex: 1 }}>Listo</Button>
+          <Button variant="secondary" size="lg" onClick={onCerrar} style={{ flex: 1, justifyContent: 'center' }}>Listo</Button>
           <button type="button" className="igm-peligro" disabled={trabajando} onClick={desconectar}>
             {trabajando ? 'Desconectando…' : 'Desconectar'}
           </button>
@@ -398,6 +400,8 @@ const CSS = `
 .igm-activo .igm-bolita { border-color: var(--color-primary); color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-bg); }
 .igm-hecho .igm-bolita { border-color: var(--color-success); background: var(--color-success); color: #fff; }
 .igm-paso-texto { min-width: 0; padding-top: 3px; }
+.igm-paso-ancho { grid-column: 1 / -1; min-width: 0; margin-top: 4px; }
+.igm-activo:last-child .igm-paso-titulo { margin-bottom: 0; }
 .igm-paso-titulo { margin: 0 0 8px; font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--color-muted); }
 .igm-activo .igm-paso-titulo, .igm-hecho .igm-paso-titulo { color: var(--color-text); }
 .igm-paso:not(.igm-activo) .igm-paso-titulo { margin-bottom: 0; }
