@@ -340,6 +340,35 @@ mirando. Por eso cada plantilla nueva o modificada se mira en **Celular** en la
 vitrina (Avanzado → Plantillas → Ver cómo queda) y aplicada en una tienda desde
 un teléfono de verdad, no solo achicando la ventana.
 
+## El nav del header
+
+Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
+`<span className="pl-nav">`. Dos cosas se rompieron ahí y valen para todos:
+
+- **Un enlace no puede quedar muerto.** `navDe(links, acciones)` es el único
+  camino: en la tienda devuelve `acciones.nav` (los enlaces reales de
+  Apariencia, con su `onClick`); en la **vitrina** del panel (sin `acciones`)
+  devuelve enlaces que llevan a la parte de la portada que les toca ("Inicio"
+  arriba, "Contacto" y afines al pie, el resto a las secciones con título, en
+  orden; `irEnVitrina` en `piezas.tsx`). Por eso una plantilla nueva **nunca
+  dibuja un nav con `links.map(...)` a mano**: usa `navDe`, y le pone al
+  `<span>` el `onClick={l.onClick}` y `cursor` según `l.onClick`. El destino
+  se busca con `data-pl-raiz` (el envoltorio de `Home()`) y `data-pl-sec` (lo
+  lleva `Titulo`): un bloque propio que arma sus títulos sin `Titulo` tiene
+  que ponerle `data-pl-sec=""` a su encabezado para que los enlaces lo
+  encuentren.
+- **El hover no baja la opacidad.** Antes `.pl-nav:hover` ponía `opacity: .58`
+  y sobre un nav gris (`t.muted`) quedaba un gris sucio que se leía como
+  "deshabilitado". Ahora el hover subraya y lleva el texto al color pleno de
+  la plantilla (`--pl-nav-hover`). Si el contenedor de los enlaces tiene
+  `color: t.muted`, tiene que esparcir `...navHover(t)` en su `style`; si el
+  enlace ya viene en `t.text` (o con su color inline, como "Ofertas" en
+  `t.accent`) alcanza con el subrayado y no hace falta.
+
+El grupo `enlaces del nav` del check lo prueba: la vitrina no tiene enlaces
+sin `onClick`, la tienda real conserva los de Apariencia y `.pl-nav:hover` no
+toca la opacidad.
+
 ## La carga
 
 Tres cosas hacen que una portada con plantilla no pegue saltos al cargar. Las
@@ -533,7 +562,7 @@ Celular:
 
 - que nada desborde a lo ancho y que el hero se lea sobre su foto;
 - que las fotos tengan que ver con el rubro y no desentonen con la paleta;
-- que todo lo que parece clickeable lo sea. En el código: `grep` de
+- que todo lo que parece clickeable lo sea (los enlaces del nav incluidos: ver § El nav del header). En el código: `grep` de
   `accion="` sin `onAccion`, de `<Boton` sin `onClick`, y de un `☰` dibujado
   sin `MenuMovil`;
 - que se distinga de las otras treinta y una.

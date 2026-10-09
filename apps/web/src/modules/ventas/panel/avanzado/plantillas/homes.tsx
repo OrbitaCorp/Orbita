@@ -7,7 +7,7 @@ import { useDeslizar } from '@/hooks/useDeslizar'
 import type { BloqueReceta, Estante, Plantilla, Producto, AccionesHome } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
-  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, MenuMovil,
+  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda, navDe, navHover, MenuMovil,
 } from './piezas'
 import { esAfirmacion, estanteDeSeccion, porDefectoDe, TITULOS_ESTANTE } from './secciones'
 
@@ -104,7 +104,7 @@ export function Home(props: HomeProps) {
     (e) => !!regionDelHero(envoltorio.current)?.contains(e.target as Node),
   )
   return (
-    <div ref={envoltorio} {...deslizar} style={{ display: 'contents' }}>
+    <div ref={envoltorio} data-pl-raiz="" {...deslizar} style={{ display: 'contents' }}>
       <HomeInterno {...props} giroRef={girar} />
     </div>
   )
@@ -923,7 +923,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
               const nav = navDe(p.links ?? [], acciones)
               if (nav.length === 0) return null
               return (
-                <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted, ...(acciones?.navLayout === 'centered' ? { margin: '0 auto' } : {}) }}>
+                <div style={{ display: 'flex', gap: 22, fontSize: 13.5, color: t.muted, ...navHover(t), ...(acciones?.navLayout === 'centered' ? { margin: '0 auto' } : {}) }}>
                   {nav.map((l) => (
                     <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, color: l.activo ? t.text : undefined, fontWeight: l.activo ? 700 : undefined }}>{l.label}</span>
                   ))}
@@ -1118,7 +1118,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
           if (nav.length === 0) return null
           const centrado = acciones?.navLayout === 'centered'
           return (
-            <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted, ...(centrado ? { margin: '0 auto' } : {}) }}>
+            <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted, ...navHover(t), ...(centrado ? { margin: '0 auto' } : {}) }}>
               {nav.map((l) => (
                 <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined, fontWeight: l.activo ? 700 : 500, color: l.activo ? t.text : undefined }}>{l.label}</span>
               ))}
@@ -1496,7 +1496,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
               style={{ fontFamily: t.fh, fontSize: movil ? 24 : 34, fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
             >{p.marca}</div>
             {!movil && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 12, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginTop: 12, fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted, ...navHover(t) }}>
                 {navDe(p.links ?? ['Anillos', 'Collares', 'Aros', 'Relojes', 'A pedido'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
@@ -1710,7 +1710,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
           >{p.marca}</span>
           {movil
             ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} />
-            : <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted }}>{navDe(p.links ?? ['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}</div>}
+            : <div style={{ display: 'flex', gap: 20, fontSize: 13, color: t.muted, ...navHover(t) }}>{navDe(p.links ?? ['Periféricos', 'Audio', 'Monitores', 'Reacondicionados'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}</div>}
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 12, alignItems: 'center', fontSize: 12.5, color: t.muted }}>
             {!movil && (acciones?.renderBuscador
               ? acciones.renderBuscador({})
@@ -2439,7 +2439,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
             <span style={{ fontFamily: t.fh, fontSize: movil ? 21 : 26, fontWeight: 800, letterSpacing: '-0.02em', color: t.text }}>{p.marca}</span>
           </span>
           {movil ? <MenuMovil t={t} links={p.links ?? []} acciones={acciones} /> : (
-            <div style={{ display: 'flex', gap: 22, fontSize: 13.5, fontWeight: 600, color: t.muted }}>
+            <div style={{ display: 'flex', gap: 22, fontSize: 13.5, fontWeight: 600, color: t.muted, ...navHover(t) }}>
               {navDe(p.links ?? ['Perros', 'Gatos', 'Alimento', 'Juguetes', 'Farmacia'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}
@@ -2553,7 +2553,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
               style={{ fontFamily: t.fh, fontSize: movil ? 26 : 38, fontWeight: 400, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
             >{p.marca}</div>
             {!movil && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.muted }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.muted, ...navHover(t) }}>
                 {navDe(p.links ?? ['Tintos', 'Blancos', 'Espumantes', 'Cajas', 'Bodegas'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
               </div>
             )}
@@ -2686,7 +2686,7 @@ function HomeInterno({ p, movil, acciones, soloCuerpo, soloHeader, giroRef }: {
             style={{ fontFamily: t.fh, fontSize: movil ? 25 : 32, fontWeight: 700, letterSpacing: '0.04em', color: t.primary, cursor: acciones?.irAInicio ? 'pointer' : undefined }}
           >{p.marca}</div>
           {!movil && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 12, fontSize: 13.5, color: t.muted, fontWeight: 600 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 26, marginTop: 12, fontSize: 13.5, color: t.muted, fontWeight: 600, ...navHover(t) }}>
               {navDe(p.links ?? ['Ropa', 'Juguetes', 'Habitación', 'Paseo', 'Regalos'], acciones).map((l) => <span key={l.label} className="pl-nav" onClick={l.onClick} style={{ cursor: l.onClick ? 'pointer' : undefined }}>{l.label}</span>)}
             </div>
           )}

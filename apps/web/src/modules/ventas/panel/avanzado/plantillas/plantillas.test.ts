@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { PLANTILLAS } from './datos'
 import { EsqueletoPlantilla } from './esqueleto'
 import { Home, LAYOUTS_CON_HEADER_PROPIO, FRACCION_MAXIMA_HERO } from './homes'
-import { itemsMenuMovil } from './piezas'
+import { itemsMenuMovil, navDe, CSS } from './piezas'
 import { SECCIONES_POR_PLANTILLA, TITULOS_ESTANTE, dibujaCupon, seccionesDe } from './secciones'
 import { BLOQUES_ESTANDAR, ESTANTES, type AccionesHome, type Plantilla } from './tipos'
 import { plantillaReal } from '@/modules/ventas/cliente/inicio/plantillaReal'
@@ -897,7 +897,7 @@ describe('en celular, el hero se desliza con el dedo', () => {
     it(p.id, () => {
       const mal: string[] = []
       const html = dibujar({ p: plantillaReal({ base: p, ...TIENDAS.completa }), movil: true, acciones: ACCIONES, soloCuerpo: !p.headerPropio })
-      if (!sinLinksYEstilos(html).startsWith('<div style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
+      if (!sinLinksYEstilos(html).startsWith('<div data-pl-raiz="" style="display:contents">')) mal.push('la portada no viene dentro del envoltorio que escucha el gesto')
 
       const region = regionDelHeroEnHtml(html)
       if (region === null) {
@@ -946,5 +946,24 @@ describe('el menú de celular vuelve al inicio', () => {
 
   it('en la vitrina del panel (sin acciones) la hamburguesa queda como estaba', () => {
     expect(itemsMenuMovil(['Uno', 'Dos'], undefined).map(i => i.label)).toEqual(['Uno', 'Dos'])
+  })
+})
+
+describe('enlaces del nav', () => {
+  it('en la vitrina (sin acciones) todos los enlaces hacen algo: no quedan muertos', () => {
+    const nav = navDe(['Inicio', 'Catálogo', 'Ofertas', 'Contacto'])
+    expect(nav.map(l => typeof l.onClick)).toEqual(['function', 'function', 'function', 'function'])
+  })
+
+  it('en la tienda real los enlaces son los de Apariencia, sin tocar', () => {
+    const real = [{ label: 'Catálogo', onClick: () => {} }]
+    expect(navDe(['Otro'], { nav: real } as never)).toBe(real)
+  })
+
+  it('el hover del nav no baja la opacidad (sobre un gris quedaba un gris sucio)', () => {
+    const hover = CSS.split('\n').find(l => l.startsWith('.pl-nav:hover'))
+    expect(hover).toBeTruthy()
+    expect(hover).not.toMatch(/opacity/)
+    expect(hover).toMatch(/underline/)
   })
 })
