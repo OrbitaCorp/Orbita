@@ -152,7 +152,7 @@ describe('InstagramService (unit)', () => {
 
       const r = await svc.manejarCallback('code-1', state);
 
-      expect(r).toEqual({ businessId: BIZ, subdomain: 'mitienda', suscripta: true });
+      expect(r).toEqual({ businessId: BIZ, subdomain: 'mitienda', suscripta: true, retorno: 'http://localhost:3001/admin/mitienda/ventas/mensajes' });
       const urls = fetchSpy.mock.calls.map((c) => c[0] as string);
       expect(urls[0]).toBe('https://api.instagram.com/oauth/access_token');
       expect(urls[1]).toContain('ig_exchange_token');
@@ -363,6 +363,42 @@ describe('InstagramService (unit)', () => {
       await expect(build({}, lista).svc.asegurarHabilitado(BIZ)).resolves.toBeUndefined();
       const ajeno = build({ business: { findUnique: jest.fn().mockResolvedValue({ subdomain: 'ajena' }) } }, lista);
       await expect(ajeno.svc.asegurarHabilitado(BIZ)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  // Tras el login de Instagram se vuelve al MISMO panel desde el que se empezó: antes se volvía siempre a
+  // FRONTEND_URL, que en local (localhost vs mitienda.orbita.local) es otro sitio que el de la sesión y
+  // mandaba a la persona al login.
+  describe('retorno al panel', () => {
+    const retornoPara = async (origen: string | undefined, cfg: Record<string, string> = {}) => {
+      const { svc } = build({}, cfg);
+      const url = svc.urlDeAutorizacion(BIZ, 'm-1', origen);
+      return svc.retornoDelState(new URL(url).searchParams.get('state') ?? undefined);
+    };
+
+    it('vuelve al host de la tienda desde el que se abrió el panel (sin el subdominio en la ruta)', async () => {
+      expect(await retornoPara('http://mitienda.orbita.local:3001')).toBe('http://mitienda.orbita.local:3001/admin/ventas/mensajes');
+      expect(await retornoPara('https://mitienda.orbita.site', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://mitienda.orbita.site/admin/ventas/mensajes');
+    });
+
+    it('desde el apex vuelve con el subdominio en la ruta', async () => {
+      expect(await retornoPara('https://orbita.site', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    it('sin origen, o con uno ajeno, vuelve a FRONTEND_URL: el state no sirve para redirigir a otro sitio', async () => {
+      expect(await retornoPara(undefined)).toBe('http://localhost:3001/admin/mitienda/ventas/mensajes');
+      expect(await retornoPara('https://sitio-malicioso.com')).toBe('http://localhost:3001/admin/mitienda/ventas/mensajes');
+      expect(await retornoPara('https://orbita.site.sitio-malicioso.com', { FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    it('en producción un origen de desarrollo se descarta', async () => {
+      expect(await retornoPara('http://localhost:3001', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
+    });
+
+    it('con un state inválido no hay a dónde volver (cae al login)', async () => {
+      const { svc } = build({}, {});
+      expect(await svc.retornoDelState(undefined)).toBeUndefined();
+      expect(await svc.retornoDelState('inventado.firma')).toBeUndefined();
     });
   });
 

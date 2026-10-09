@@ -118,6 +118,11 @@ export function InstagramModal({ estado, resultado = null, onCerrar, onCambio }:
                 Se conectó la cuenta, pero no se pudo activar el aviso de mensajes nuevos: no vas a recibir mensajes hasta que se resuelva. Probá desconectar y volver a conectar.
               </p>
             )}
+            {resultado === 'error' && (
+              <p className="igm-aviso" role="alert">
+                No se pudo completar la conexión con Instagram. Si decía que no tenías permiso, falta aceptar la invitación de prueba: aceptala y volvé a tocar Verificar y conectar.
+              </p>
+            )}
             <div className="igm-cuerpo">
               {estado === null ? <p className="igm-suave">Cargando…</p> : <Recorrido estado={estado} onCambio={onCambio} />}
             </div>

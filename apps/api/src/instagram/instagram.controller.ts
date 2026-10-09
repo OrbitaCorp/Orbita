@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Post, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
@@ -54,10 +54,12 @@ export class InstagramController {
   @Post('connect')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  async conectar(@CurrentBusiness() ctx: AuthContext) {
+  async conectar(@CurrentBusiness() ctx: AuthContext, @Req() req: { headers: { origin?: string } }) {
     const member = assertMemberContext(ctx);
     await this.instagram.asegurarHabilitado(member.businessId);
-    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId) };
+    // El Origin del navegador dice desde qué dirección se está usando el panel: al terminar el login se
+    // vuelve a ese mismo lugar, donde está la sesión.
+    return { url: this.instagram.urlDeAutorizacion(member.businessId, member.memberId, req.headers.origin) };
   }
 
   @Delete('connection')
@@ -83,12 +85,14 @@ export class InstagramController {
     try {
       if (error || !code) throw new Error(error ?? 'Falta el code de Instagram');
       // Instagram agrega "#_" al final del code en algunos redirects.
-      const { subdomain, suscripta } = await this.instagram.manejarCallback(code.replace(/#_$/, ''), state);
-      res.redirect(`${this.frontendUrl}/admin/${subdomain}/ventas/mensajes?ig=${suscripta ? 'conectado' : 'sin-suscripcion'}`);
+      const { suscripta, retorno } = await this.instagram.manejarCallback(code.replace(/#_$/, ''), state);
+      res.redirect(`${retorno}?ig=${suscripta ? 'conectado' : 'sin-suscripcion'}`);
     } catch (e) {
-      // Sin negocio verificable no hay a dónde volver con certeza: cae al login.
       this.logger.warn(`Conexión de Instagram fallida: ${describeError(e)}`);
-      res.redirect(`${this.frontendUrl}/login?ig=error`);
+      // Con el state válido se sabe a qué negocio y a qué panel volver: se vuelve ahí y el modal explica qué
+      // hacer. Sin negocio verificable no hay a dónde volver con certeza: cae al login.
+      const retorno = await this.instagram.retornoDelState(state);
+      res.redirect(retorno ? `${retorno}?ig=error` : `${this.frontendUrl}/login?ig=error`);
     }
   }
 

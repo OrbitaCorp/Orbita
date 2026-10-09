@@ -43,6 +43,10 @@ const SCOPES = 'instagram_business_basic,instagram_business_manage_messages';
 interface StatePayload {
   businessId: string;
   memberId?: string;
+  // Desde dónde se abrió el panel (el Origin del navegador): a ese mismo lugar se vuelve al terminar el
+  // login. Sin esto se volvía siempre a FRONTEND_URL, que puede ser otro sitio que el de la sesión
+  // (en local, localhost vs negocio.orbita.local) y la persona caía en el login.
+  origen?: string;
   nonce: string;
   exp: number;
 }
@@ -289,10 +293,11 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
+      ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -316,13 +321,51 @@ export class InstagramService {
     return payload;
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string): string {
+  /**
+   * ¿Es este origen un panel de Órbita al que se puede volver? Mismos orígenes fijos que acepta CORS
+   * (main.ts): FRONTEND_URL, orbita.site y sus subdominios, y en desarrollo localhost:3001 y
+   * orbita.local:3001. Cualquier otra cosa se descarta y se vuelve a FRONTEND_URL: el `state` no puede
+   * servir para mandar a la persona a un sitio ajeno.
+   */
+  private esOrigenDePanel(origen: string): boolean {
+    const frontend = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    if (origen === frontend) return true;
+    if (/^https:\/\/([a-z0-9-]+\.)?orbita\.site$/.test(origen)) return true;
+    if (this.config.get<string>('NODE_ENV') === 'production') return false;
+    return /^http:\/\/localhost:3001$/.test(origen) || /^http:\/\/([a-z0-9-]+\.)?orbita\.local:3001$/.test(origen);
+  }
+
+  /**
+   * Dirección del panel de Mensajes del negocio para volver tras el login de Instagram. En un host de la
+   * tienda (negocio.orbita.site) las rutas del panel no llevan el subdominio; en el apex sí.
+   */
+  urlDeRetorno(subdomain: string, origen?: string): string {
+    const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
+    const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
+    return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/mensajes`;
+  }
+
+  /**
+   * A dónde volver cuando el login de Instagram falló (el usuario canceló, no tiene permiso...): el panel de
+   * Mensajes del negocio del `state`, si el state se puede verificar. undefined si no (vencido, inventado).
+   */
+  async retornoDelState(state: string | undefined): Promise<string | undefined> {
+    try {
+      const { businessId, origen } = this.verificarState(state);
+      const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
+      return negocio ? this.urlDeRetorno(negocio.subdomain, origen) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
       scope: SCOPES,
-      state: this.firmarState(businessId, memberId),
+      state: this.firmarState(businessId, memberId, origen),
       // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
       // cuenta (Meta lo recomienda sobre todo en celulares).
       force_reauth: 'true',
@@ -331,8 +374,8 @@ export class InstagramService {
   }
 
   /** Vuelta del login: cambia el code por el token, lo guarda cifrado y suscribe el webhook. */
-  async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean }> {
-    const { businessId } = this.verificarState(state);
+  async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean; retorno: string }> {
+    const { businessId, origen } = this.verificarState(state);
     await this.asegurarHabilitado(businessId);
 
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
@@ -407,7 +450,7 @@ export class InstagramService {
       suscripta = false;
       this.logger.warn(`No se pudo suscribir la cuenta de Instagram al webhook (negocio ${businessId}): ${describeError(e)}`);
     }
-    return { businessId, subdomain: negocio.subdomain, suscripta };
+    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen) };
   }
 
   async estado(businessId: string) {
