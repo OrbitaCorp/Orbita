@@ -425,8 +425,7 @@ export class AuthService implements OnModuleInit {
       // Contraseña correcta ≠ sesión todavía — falta el segundo factor
       // (RBT-647). El código viaja por mail; la sesión real la emite
       // verifyPlatformAdminLoginCode() recién cuando lo confirma.
-      await this.issuePlatformAdminLoginCode(admin.id, admin.email, deviceInfo);
-      return { type: 'platform_admin_mfa_required', email: admin.email };
+      return this.segundoFactorOSesion(admin, deviceInfo);
     }
 
     // No es super admin → buscar member por email en cualquier negocio. El
@@ -985,8 +984,7 @@ export class AuthService implements OnModuleInit {
       await this.adminLog?.loginOk({ adminId: admin.id, via: 'google' });
       // Mismo segundo factor que el login por password (RBT-647) — si no,
       // Google sería una forma de esquivar el 2FA.
-      await this.issuePlatformAdminLoginCode(admin.id, admin.email);
-      return { type: 'platform_admin_mfa_required', email: admin.email };
+      return this.segundoFactorOSesion(admin);
     }
 
     const include = {
@@ -1120,6 +1118,33 @@ export class AuthService implements OnModuleInit {
   }
 
   // ── Segundo factor del login de platform admin (RBT-647) ───────────────────
+
+  /**
+   * Comodidad SOLO de desarrollo: que el super panel no pida el código de mail en la máquina de
+   * quien desarrolla. Doble candado: NUNCA en producción (se corta antes de mirar la variable) y
+   * solo con PLATFORM_ADMIN_SIN_CODIGO=true, que no está en deploy/env-vars.yaml ni en
+   * .env.example: se escribe a mano en el .env local.
+   */
+  private get omitirSegundoFactorEnDesarrollo(): boolean {
+    if (this.config.get<string>('NODE_ENV') === 'production') return false;
+    return this.config.get<string>('PLATFORM_ADMIN_SIN_CODIGO') === 'true';
+  }
+
+  /**
+   * Lo que sigue a una contraseña (o Google) correcta de un platform admin: el desafío del código de
+   * mail, o la sesión directa si el atajo de desarrollo está activo.
+   */
+  private async segundoFactorOSesion(
+    admin: { id: string; name: string; email: string; role: string },
+    deviceInfo?: DeviceInfo,
+  ): Promise<PlatformAdminMfaChallenge | PlatformAdminAuthResponse> {
+    if (this.omitirSegundoFactorEnDesarrollo) {
+      this.logger.warn(`PLATFORM_ADMIN_SIN_CODIGO activo: ${admin.email} entra al super panel sin código (solo desarrollo)`);
+      return this.buildPlatformAdminResponse(admin, deviceInfo);
+    }
+    await this.issuePlatformAdminLoginCode(admin.id, admin.email, deviceInfo);
+    return { type: 'platform_admin_mfa_required', email: admin.email };
+  }
 
   private async issuePlatformAdminLoginCode(adminId: string, email: string, deviceInfo?: DeviceInfo): Promise<void> {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');

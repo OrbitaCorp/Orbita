@@ -12,7 +12,7 @@ function hashCode(code: string): string {
   return createHash('sha256').update(code).digest('hex');
 }
 
-function svcCon(overrides: { admin?: any; loginCode?: any } = {}) {
+function svcCon(overrides: { admin?: any; loginCode?: any; env?: Record<string, string> } = {}) {
   const prisma = {
     platformAdmin: {
       findUnique: jest.fn().mockResolvedValue(overrides.admin ?? null),
@@ -30,7 +30,7 @@ function svcCon(overrides: { admin?: any; loginCode?: any } = {}) {
   const config = {
     // 32+ caracteres: AuthService rechaza secretos más cortos (RBT-666).
     getOrThrow: jest.fn().mockReturnValue('test-secret-de-al-menos-32-caracteres'),
-    get: jest.fn().mockReturnValue(undefined),
+    get: jest.fn().mockImplementation((k: string) => overrides.env?.[k]),
   };
   const svc = new AuthService(prisma as any, mail as any, config as any);
   return { svc, prisma, mail };
@@ -62,6 +62,41 @@ describe('AuthService — segundo factor de platform admin (unit)', () => {
       // El código que se guarda es el mismo que se manda por mail (hasheado).
       const codeEnviado = mail.sendPlatformAdminLoginCode.mock.calls[0][1].code;
       expect(prisma.platformAdminLoginCode.create.mock.calls[0][0].data.codeHash).toBe(hashCode(codeEnviado));
+    });
+  });
+
+  // Atajo SOLO de desarrollo (PLATFORM_ADMIN_SIN_CODIGO): sin código en la máquina de quien programa.
+  // Lo que importa es que en producción no exista, pase lo que pase con la variable.
+  describe('atajo de desarrollo sin código', () => {
+    const login = async (env: Record<string, string>) => {
+      const passwordHash = await argon2.hash('orbitatest1234', { type: argon2.argon2id });
+      const ctx = svcCon({ admin: { ...ADMIN, passwordHash }, env });
+      const result: any = await ctx.svc.login({ email: ADMIN.email, password: 'orbitatest1234' } as any);
+      return { result, ...ctx };
+    };
+
+    it('fuera de producción y con la variable en true, emite la sesión directo y no manda código', async () => {
+      const { result, prisma, mail } = await login({ NODE_ENV: 'development', PLATFORM_ADMIN_SIN_CODIGO: 'true' });
+      expect(result.type).toBe('platform_admin');
+      expect(result.token).toEqual(expect.any(String));
+      expect(result.refreshToken).toEqual(expect.any(String));
+      expect(prisma.platformAdminLoginCode.create).not.toHaveBeenCalled();
+      expect(mail.sendPlatformAdminLoginCode).not.toHaveBeenCalled();
+    });
+
+    it('en producción la variable se ignora: sigue pidiendo el código', async () => {
+      const { result, mail } = await login({ NODE_ENV: 'production', PLATFORM_ADMIN_SIN_CODIGO: 'true' });
+      expect(result).toEqual({ type: 'platform_admin_mfa_required', email: ADMIN.email });
+      expect(mail.sendPlatformAdminLoginCode).toHaveBeenCalledTimes(1);
+    });
+
+    it('fuera de producción pero sin la variable (o distinta de true), sigue pidiendo el código', async () => {
+      const entornos: Record<string, string>[] = [{ NODE_ENV: 'development' }, { NODE_ENV: 'development', PLATFORM_ADMIN_SIN_CODIGO: '1' }];
+      for (const env of entornos) {
+        const { result, mail } = await login(env);
+        expect(result).toEqual({ type: 'platform_admin_mfa_required', email: ADMIN.email });
+        expect(mail.sendPlatformAdminLoginCode).toHaveBeenCalledTimes(1);
+      }
     });
   });
 
