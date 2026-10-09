@@ -95,6 +95,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
 
       <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
 
+      <AnuncioSandbox />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
         <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
         <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
@@ -134,6 +136,22 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
         />
       )}
       {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
+    </div>
+  )
+}
+
+// Anuncio fijo: mientras las plataformas (TikTok y Meta) no aprueben la revisión de la app, todo el módulo funciona en
+// modo de pruebas. Cuando las dos aprueben, se borra este componente y su uso en TabMarketing.
+function AnuncioSandbox() {
+  return (
+    <div role="note" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 18px', borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <Chip text="Modo sandbox" tone="amber" dot />
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>Este módulo funciona en modo de pruebas hasta que las plataformas aprueben la revisión de la app</span>
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+        Mientras tanto, en TikTok solo se puede publicar con visibilidad «Solo yo» y con la cuenta en modo privado, y Instagram funciona con las cuentas que tienen un rol en la app de Meta.
+      </div>
     </div>
   )
 }
