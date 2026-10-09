@@ -410,7 +410,7 @@ describe('InstagramService (unit)', () => {
 
     it('conectarse desde Difusión pide mensajes y publicar de una vez; desde Mensajes, solo mensajes', () => {
       const MENSAJES = 'instagram_business_basic,instagram_business_manage_messages';
-      const TODO = `${MENSAJES},instagram_business_content_publish`;
+      const TODO = `${MENSAJES},instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights`;
       const scopeDe = (seccion: 'mensajes' | 'difusion' | 'publicaciones' | undefined, cfg: Record<string, string> = {}) =>
         new URL(build({}, cfg).svc.urlDeAutorizacion(BIZ, 'm-1', undefined, seccion)).searchParams.get('scope');
       expect(scopeDe(undefined)).toBe(MENSAJES);
@@ -421,14 +421,14 @@ describe('InstagramService (unit)', () => {
       expect(scopeDe('difusion', { INSTAGRAM_PEDIR_PUBLICAR: 'false' })).toBe(MENSAJES);
     });
 
-    it('pedir el permiso de publicar suma ese permiso al login y queda en el state', () => {
+    it('pedir el kit suma los permisos de publicar, comentarios y estadísticas al login', () => {
       const { svc } = build({}, {});
       // Desde Mensajes, sin pedirlo expresamente, solo mensajes.
       const base = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'mensajes')).searchParams.get('scope');
       expect(base).toBe('instagram_business_basic,instagram_business_manage_messages');
       // Pidiéndolo expresamente (conexión vieja que autoriza publicar), también desde Mensajes.
-      const conPublicar = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'mensajes', 'publicar')).searchParams.get('scope');
-      expect(conPublicar).toBe('instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish');
+      const conPublicar = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', undefined, 'mensajes', 'kit')).searchParams.get('scope');
+      expect(conPublicar).toBe('instagram_business_basic,instagram_business_manage_messages,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
     });
 
     it('una pantalla fuera de la lista no entra en la ruta de vuelta', async () => {

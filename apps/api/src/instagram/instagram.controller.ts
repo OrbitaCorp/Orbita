@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
@@ -9,8 +9,11 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
+import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
 import { PublicarInstagramDto } from './dto/publicar-instagram.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
+import { InstagramComentariosService } from './instagram-comentarios.service';
+import { InstagramEstadisticasService } from './instagram-estadisticas.service';
 import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramService } from './instagram.service';
 
@@ -31,6 +34,8 @@ export class InstagramController {
   constructor(
     private readonly instagram: InstagramService,
     private readonly publicaciones: InstagramPublicacionesService,
+    private readonly comentariosSvc: InstagramComentariosService,
+    private readonly estadisticasSvc: InstagramEstadisticasService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -54,6 +59,45 @@ export class InstagramController {
   async publicar(@CurrentBusiness() ctx: AuthContext, @Body() dto: PublicarInstagramDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
     return this.publicaciones.publicarProducto(businessId, memberId, dto.productId, dto.caption);
+  }
+
+  // Comentarios de las últimas publicaciones (Difusión → Comentarios).
+  @Get('comments')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async comentarios(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.comentariosSvc.listar(businessId);
+  }
+
+  // Responder un comentario queda a la vista pública: solo propietario/admin.
+  @Post('comments/:id/reply')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async responder(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ResponderComentarioDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.comentariosSvc.responder(businessId, id, dto.texto);
+  }
+
+  @Post('comments/:id/hide')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async ocultar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: OcultarComentarioDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.comentariosSvc.ocultar(businessId, id, dto.oculto);
+  }
+
+  // Resumen de la cuenta de los últimos 7 o 28 días (Difusión → Estadísticas).
+  @Get('insights')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async estadisticas(@CurrentBusiness() ctx: AuthContext, @Query('dias') dias?: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.estadisticasSvc.resumen(businessId, dias === '28' ? 28 : 7);
   }
 
   @Get('connection')

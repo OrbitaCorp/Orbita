@@ -51,7 +51,7 @@ function AutorizarPublicacion({ usuario }: { usuario: string | null }) {
     setTrabajando(true); setError(null)
     try {
       // Vuelve a Difusión con el permiso de publicar concedido (la conexión se actualiza sola).
-      const { url } = await startInstagramConnect('publicaciones', 'publicar')
+      const { url } = await startInstagramConnect('publicaciones', 'kit')
       window.location.href = url
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo iniciar la autorización. Probá de nuevo.')

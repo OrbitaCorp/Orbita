@@ -3347,8 +3347,8 @@ export function requestInstagramAccess(username: string) {
   return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
 }
 // `seccion`: la pantalla del panel a la que se vuelve al terminar el login de Instagram (por defecto Mensajes).
-// `permisos: 'publicar'`: además de los mensajes, pide el permiso de publicar contenido (Difusión → Publicaciones).
-export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones', permisos?: 'publicar') {
+// `permisos: 'kit'`: además de los mensajes, pide los permisos del kit de difusión (publicar, comentarios y estadísticas).
+export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones', permisos?: 'kit') {
   return panelRequest<{ url: string }>('/instagram/connect', {
     method: 'POST',
     body: JSON.stringify({ ...(seccion ? { seccion } : {}), ...(permisos ? { permisos } : {}) }),

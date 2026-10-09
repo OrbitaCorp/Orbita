@@ -40,9 +40,21 @@ const RENOVAR_CON_ANTICIPACION_MS = 15 * 24 * 60 * 60 * 1000;
 // Límite de la API de Instagram para un mensaje de texto.
 const MAX_BYTES_TEXTO = 1000;
 const SCOPES_BASE = 'instagram_business_basic,instagram_business_manage_messages';
-// Publicaciones (kit de difusión): se pide solo cuando la persona entra a autorizar la publicación, para que
-// quien solo quiere mensajes no vea en Instagram una pantalla que pide más de lo que usa.
+// Kit de difusión: publicar, comentarios y estadísticas. Se piden cuando la persona se conecta desde Difusión (o
+// autoriza el kit desde ahí), para que quien solo quiere mensajes no vea en Instagram una pantalla que pide más
+// de lo que usa.
 export const SCOPE_PUBLICAR = 'instagram_business_content_publish';
+export const SCOPE_COMENTAR = 'instagram_business_manage_comments';
+export const SCOPE_ESTADISTICAS = 'instagram_business_manage_insights';
+const SCOPES_KIT = [SCOPE_PUBLICAR, SCOPE_COMENTAR, SCOPE_ESTADISTICAS];
+const SCOPES_COMPLETOS = [SCOPES_BASE, ...SCOPES_KIT].join(',');
+
+// Qué hay que hacer cuando falta cada permiso (el mensaje que ve la persona).
+const MENSAJE_SIN_PERMISO: Record<string, string> = {
+  [SCOPE_PUBLICAR]: 'Falta autorizar la publicación: volvé a conectar Instagram dándole ese permiso a Órbita.',
+  [SCOPE_COMENTAR]: 'Falta autorizar los comentarios: volvé a conectar Instagram dándole ese permiso a Órbita.',
+  [SCOPE_ESTADISTICAS]: 'Falta autorizar las estadísticas: volvé a conectar Instagram dándole ese permiso a Órbita.',
+};
 
 interface StatePayload {
   businessId: string;
@@ -53,8 +65,8 @@ interface StatePayload {
   origen?: string;
   // Pantalla del panel desde la que se pidió la conexión (mensajes o difusion).
   seccion?: PantallaDeRetorno;
-  // 'publicar' = además del permiso de mensajes, pide el de publicar contenido.
-  permisos?: 'publicar';
+  // 'kit' = además del permiso de mensajes, pide los del kit de difusión (publicar, comentarios y estadísticas).
+  permisos?: 'kit';
   nonce: string;
   exp: number;
 }
@@ -301,13 +313,13 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'publicar'): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit'): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
       ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
       ...(seccion && PANTALLAS_DE_RETORNO.includes(seccion) ? { seccion } : {}),
-      ...(permisos === 'publicar' ? { permisos } : {}),
+      ...(permisos === 'kit' ? { permisos } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -353,8 +365,9 @@ export class InstagramService {
     const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
     const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
     const pantalla = PANTALLAS_DE_RETORNO.includes(seccion) ? seccion : 'mensajes';
-    // Publicaciones es una vista de Difusión (?vista=), no una sección aparte.
-    const ruta = pantalla === 'publicaciones' ? 'difusion?vista=publicaciones' : pantalla;
+    // Publicaciones, comentarios y estadísticas son vistas de Difusión (?vista=), no secciones aparte.
+    const esVistaDeDifusion = pantalla === 'publicaciones' || pantalla === 'comentarios' || pantalla === 'estadisticas';
+    const ruta = esVistaDeDifusion ? `difusion?vista=${pantalla}` : pantalla;
     return `${base}/admin/${enHostDeLaTienda ? '' : `${subdomain}/`}ventas/${ruta}`;
   }
 
@@ -372,7 +385,7 @@ export class InstagramService {
     }
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'publicar'): string {
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit'): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
@@ -483,8 +496,10 @@ export class InstagramService {
       username: c.username,
       connectedAt: c.createdAt,
       tokenExpiresAt: c.tokenExpiresAt,
-      // ¿Se concedió el permiso de publicar? Sin él, Publicaciones pide volver a autorizar.
-      puedePublicar: this.concedePublicar(c.scopes),
+      // ¿Qué permisos del kit se concedieron? Sin ellos, la pantalla correspondiente pide volver a autorizar.
+      puedePublicar: this.concede(c.scopes, SCOPE_PUBLICAR),
+      puedeComentar: this.concede(c.scopes, SCOPE_COMENTAR),
+      puedeVerEstadisticas: this.concede(c.scopes, SCOPE_ESTADISTICAS),
     };
   }
 
@@ -498,21 +513,58 @@ export class InstagramService {
    * sale a producción con los permisos de publicar sin aprobar: un permiso sin aprobar en el login hace fallar
    * la conexión de todos los clientes reales.
    */
-  private permisosPedidos(permisos?: 'publicar', seccion?: PantallaDeRetorno): string {
-    const desdeDifusion = seccion === 'difusion' || seccion === 'publicaciones';
+  private permisosPedidos(permisos?: 'kit', seccion?: PantallaDeRetorno): string {
+    const desdeDifusion = seccion === 'difusion' || seccion === 'publicaciones' || seccion === 'comentarios' || seccion === 'estadisticas';
     const apagado = this.config.get<string>('INSTAGRAM_PEDIR_PUBLICAR') === 'false';
-    const conPublicar = permisos === 'publicar' || (desdeDifusion && !apagado);
-    return conPublicar ? `${SCOPES_BASE},${SCOPE_PUBLICAR}` : SCOPES_BASE;
+    const conKit = permisos === 'kit' || (desdeDifusion && !apagado);
+    return conKit ? SCOPES_COMPLETOS : SCOPES_BASE;
   }
 
-  private concedePublicar(scopes: string | null | undefined): boolean {
-    return (scopes ?? '').split(',').map((s) => s.trim()).includes(SCOPE_PUBLICAR);
+  private concede(scopes: string | null | undefined, permiso: string): boolean {
+    return (scopes ?? '').split(',').map((s) => s.trim()).includes(permiso);
+  }
+
+  /** ¿La conexión del negocio está activa y tiene este permiso? */
+  async tienePermiso(businessId: string, permiso: string): Promise<boolean> {
+    const c = await this.prisma.instagramConnection.findUnique({ where: { businessId }, select: { status: true, scopes: true } });
+    return !!c && c.status === 'ACTIVE' && this.concede(c.scopes, permiso);
   }
 
   /** ¿La conexión del negocio tiene el permiso de publicar contenido? */
-  async puedePublicar(businessId: string): Promise<boolean> {
-    const c = await this.prisma.instagramConnection.findUnique({ where: { businessId }, select: { status: true, scopes: true } });
-    return !!c && c.status === 'ACTIVE' && this.concedePublicar(c.scopes);
+  puedePublicar(businessId: string): Promise<boolean> {
+    return this.tienePermiso(businessId, SCOPE_PUBLICAR);
+  }
+
+  /**
+   * Llamada a la API de Instagram con el token de la conexión del negocio, para las pantallas del kit
+   * (comentarios, estadísticas). Exige antes el permiso que corresponde. "{ig}" en la ruta se reemplaza por el
+   * id de la cuenta. El token vencido (código 190) corta la conexión para que el panel pida volver a conectar;
+   * otros errores (por ejemplo, un permiso que falta) NO la cortan.
+   */
+  async graph<T>(
+    businessId: string,
+    permiso: string,
+    ruta: string,
+    init: { metodo?: 'GET' | 'POST' | 'DELETE'; query?: Record<string, string>; cuerpo?: Record<string, unknown> } = {},
+  ): Promise<T> {
+    if (!(await this.tienePermiso(businessId, permiso))) {
+      throw new ForbiddenException(MENSAJE_SIN_PERMISO[permiso] ?? 'Falta autorizar un permiso de Instagram.');
+    }
+    const cred = await this.credenciales(businessId);
+    if (!cred) throw new BadRequestException('Instagram no está conectado');
+    const qs = new URLSearchParams(init.query ?? {}).toString();
+    const url = `https://graph.instagram.com/${this.version}/${ruta.replace('{ig}', cred.ig_user_id)}${qs ? `?${qs}` : ''}`;
+    const headers: Record<string, string> = { Authorization: `Bearer ${cred.access_token}` };
+    if (init.cuerpo) headers['Content-Type'] = 'application/json';
+    try {
+      return await this.llamar<T>(url, { method: init.metodo ?? 'GET', headers, ...(init.cuerpo ? { body: JSON.stringify(init.cuerpo) } : {}) });
+    } catch (e) {
+      if (e instanceof InstagramApiError && e.code === 190) {
+        await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
+        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Difusión.');
+      }
+      throw e;
+    }
   }
 
   async desconectar(businessId: string) {
