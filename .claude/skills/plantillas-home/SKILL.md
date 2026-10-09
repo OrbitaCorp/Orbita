@@ -343,7 +343,7 @@ un teléfono de verdad, no solo achicando la ventana.
 ## El nav del header
 
 Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
-`<span className="pl-nav">`. Dos cosas se rompieron ahí y valen para todos:
+`<span className="pl-nav">`. Tres cosas se rompieron ahí y valen para todos:
 
 - **Un enlace no puede quedar muerto.** `navDe(links, acciones)` es el único
   camino: en la tienda devuelve `acciones.nav` (los enlaces reales de
@@ -364,6 +364,12 @@ Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
   `color: t.muted`, tiene que esparcir `...navHover(t)` en su `style`; si el
   enlace ya viene en `t.text` (o con su color inline, como "Ofertas" en
   `t.accent`) alcanza con el subrayado y no hace falta.
+
+- **La vitrina no muestra el cursor de texto.** `Home()` marca su envoltorio con
+  `data-pl-vitrina` cuando no hay `acciones`, y el CSS le pone `cursor: default`
+  y `user-select: none`: el logo, "Ingresar" y el carrito no hacen nada ahí y la
+  "I" de texto prometía que se podían copiar. Lo que sí es clickeable fija su
+  `cursor: 'pointer'` inline y gana; una plantilla nueva no tiene que hacer nada.
 
 El grupo `enlaces del nav` del check lo prueba: la vitrina no tiene enlaces
 sin `onClick`, la tienda real conserva los de Apariencia y `.pl-nav:hover` no

@@ -104,7 +104,7 @@ export function Home(props: HomeProps) {
     (e) => !!regionDelHero(envoltorio.current)?.contains(e.target as Node),
   )
   return (
-    <div ref={envoltorio} data-pl-raiz="" {...deslizar} style={{ display: 'contents' }}>
+    <div ref={envoltorio} data-pl-raiz="" data-pl-vitrina={props.acciones ? undefined : ""} {...deslizar} style={{ display: 'contents' }}>
       <HomeInterno {...props} giroRef={girar} />
     </div>
   )

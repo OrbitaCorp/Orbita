@@ -20,6 +20,11 @@ export const CSS = `
    producto. En la vitrina del panel no hay a dónde ir y el cursor de mano
    prometería un click que no hace nada. */
 .pl-card[data-link="1"] { cursor: pointer; }
+/* La vitrina es una maqueta: el cursor de texto (la I) sobre el logo, "Ingresar"
+   o el carrito prometería que se puede seleccionar y copiar. Flecha y sin
+   selección; lo que sí lleva a algún lado (enlaces, tarjetas) fija su propio
+   cursor inline y gana. La tienda real no lleva este atributo. */
+[data-pl-vitrina] { cursor: default; user-select: none; }
 .pl-media { position: relative; overflow: hidden; }
 .pl-media img { transition: transform .8s cubic-bezier(.2,.7,.3,1), opacity .55s; }
 .pl-card:hover .pl-media .pl-a { transform: scale(1.06); }
