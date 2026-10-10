@@ -742,13 +742,14 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         {/* Mobile nav drawer */}
         {menuOpen && (
           <nav className="sf-drawer">
-            {/* "Minimal" (sinNav): tampoco acá — es "no se muestra
-                navegación" en todo el sitio, no solo en desktop. */}
+            {/* "Minimal" (sinNav): los enlaces del catálogo no van en ningún
+                lado, pero "Inicio" sí: con el header limpio el menú quedaba
+                con solo "Ingresar" y la única forma de volver era el logo. */}
             {/* "Inicio" primero: los enlaces de abajo son del catálogo y
-                ninguno vuelve a la portada (en celular no hay otra forma que
-                tocar el logo). Mismo destino que el logo. Si el negocio ya
-                cargó un enlace que se llama "Inicio", no se duplica. */}
-            {!sinNav && !navLinks.some(s => s.label.trim().toLowerCase() === 'inicio') && (
+                ninguno vuelve a la portada. Mismo destino que el logo. Si el
+                negocio ya cargó un enlace que se llama "Inicio", no se
+                duplica (con "Minimal" no hay enlaces, así que siempre va). */}
+            {(sinNav || !navLinks.some(s => s.label.trim().toLowerCase() === 'inicio')) && (
               <a href={base} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 Inicio
               </a>

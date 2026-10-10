@@ -452,13 +452,13 @@ export function MenuMovil({ t, links, acciones, color }: { t: Tema; links: strin
  * adelante. Los enlaces de Apariencia son del catálogo y ninguno vuelve a la
  * portada. Solo la hamburguesa lo lleva; la barra de escritorio no. Si el
  * dueño ya cargó un enlace que se llama "Inicio", no se duplica. Con el
- * header en "minimal" (sin navegación) no hay menú, como antes. Pura, para
- * poder probarla sin abrir el menú.
+ * header en "minimal" (sin enlaces, `navDe` devuelve []) el menú queda con
+ * "Inicio" solo: sin él la hamburguesa era un `☰` muerto. Pura, para poder
+ * probarla sin abrir el menú.
  */
 export function itemsMenuMovil(links: string[], acciones?: AccionesHome): { label: string; onClick?: () => void; activo?: boolean }[] {
   const nav = navDe(links, acciones)
-  const sinNavegacion = acciones?.navLayout === 'minimal'
-  if (!acciones?.irAInicio || sinNavegacion || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
+  if (!acciones?.irAInicio || nav.some((l) => l.label.trim().toLowerCase() === 'inicio')) return nav
   return [{ label: 'Inicio', onClick: acciones.irAInicio, activo: false }, ...nav]
 }
 

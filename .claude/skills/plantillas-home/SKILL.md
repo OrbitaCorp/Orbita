@@ -313,7 +313,7 @@ el corte es a 768px; en la tienda sale de `useMovilPlantilla()`.
 - **Se puede navegar.** Si los enlaces del header no entran, va `MenuMovil`.
   Nunca un `☰` dibujado. El menú lista **"Inicio" primero** y después los
   enlaces del header (`itemsMenuMovil` en `piezas.tsx`; no se duplica si el
-  dueño ya cargó uno llamado "Inicio", y con el header en "minimal" no hay menú).
+  dueño ya cargó uno llamado "Inicio", y con el header en "minimal" el menú es solo "Inicio", sin los enlaces).
 - **El hero con varios slides se desliza con el dedo**, además de las flechas.
   No hay que hacer nada por plantilla: `Home()` es un envoltorio
   (`display: contents`) que escucha el gesto y rota el hero. Solo hace falta
@@ -541,7 +541,7 @@ categorías, cuarenta productos).
 | esqueleto | El esqueleto de carga de cada plantilla no dibuja imágenes ni deja nada de la maqueta en el HTML |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 | deslizar | En celular, el gesto del hero se escucha sobre el bloque del hero y no sobre toda la portada (contiene el título del slide y abarca ≤60% de los elementos), o el hero es de slides fijos |
-| menú de celular | "Inicio" va primero, no se duplica, no hay menú en "minimal" |
+| menú de celular | "Inicio" va primero, no se duplica, en "minimal" el menú es solo "Inicio" |
 
 ### Cómo leer un fallo
 

@@ -941,8 +941,8 @@ describe('el menú de celular vuelve al inicio', () => {
     expect(itemsMenuMovil([], con({ nav: [] })).map(i => i.label)).toEqual(['Inicio'])
   })
 
-  it('con el header en "minimal" no hay menú, como antes', () => {
-    expect(itemsMenuMovil([], con({ navLayout: 'minimal' }))).toEqual([])
+  it('con el header en "minimal" no hay enlaces del catálogo, pero "Inicio" sí', () => {
+    expect(itemsMenuMovil([], con({ navLayout: 'minimal' })).map(i => i.label)).toEqual(['Inicio'])
   })
 
   it('en la vitrina del panel (sin acciones) la hamburguesa queda como estaba', () => {
