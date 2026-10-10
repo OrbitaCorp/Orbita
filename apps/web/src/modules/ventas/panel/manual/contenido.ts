@@ -466,6 +466,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'variantes', titulo: 'Variantes y stock',
             bloques: [
                 { tipo: 'parrafo', texto: 'Si el mismo producto viene en talles o colores, se cargan como **variantes**: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.' },
+                { tipo: 'parrafo', texto: 'El **orden de los valores** (S, M, L…) es el que ven tus clientes en la tienda. Para cambiarlo no hace falta borrar y volver a cargar: arrastrá cada valor a su lugar (en el celular, mantenelo apretado un instante y movelo). Con el teclado, usá las flechas izquierda y derecha.' },
                 { tipo: 'parrafo', texto: 'También podés definir un **stock mínimo**: cuando un producto baja de ahí, dispara la alerta de "stock crítico" en el Inicio y, si lo activaste, el aviso por la campana o por mail.' },
             ],
         },
