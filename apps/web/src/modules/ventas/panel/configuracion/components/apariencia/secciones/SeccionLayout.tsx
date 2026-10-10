@@ -77,10 +77,10 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     },
                 ]} />
             </div>
-            <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header: los de siempre y las categorías de tu tienda. La cantidad máxima depende del estilo de header que elijas. En el estilo Minimal no se muestra navegación.">Elementos del header</FieldLabel>
+            <FieldLabel help="Elegí qué enlaces de navegación se muestran en el header: los de siempre y las categorías de tu tienda. La cantidad máxima depende del estilo de header que elijas. En el estilo Minimal no se muestra navegación. En el celular, el menú de la hamburguesa siempre empieza con 'Inicio'.">Elementos del header</FieldLabel>
             {ap.layoutHeader === 'minimal' ? (
                 <div style={{ marginBottom: 18, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, border: '1px solid var(--color-border)', borderRadius: 8, padding: '12px 14px' }}>
-                    El estilo <strong style={{ color: 'var(--color-text)' }}>Minimal</strong> no muestra navegación en el header. Elegí Completo, Estándar o Centrado para armar los enlaces.
+                    El estilo <strong style={{ color: 'var(--color-text)' }}>Minimal</strong> no muestra enlaces en el header. En el celular, el menú de la hamburguesa igual trae "Inicio" para volver a la portada. Elegí Completo, Estándar o Centrado para armar los enlaces.
                 </div>
             ) : (
                 <div style={{ marginBottom: 18 }}>
@@ -90,6 +90,9 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                             : enLimite
                                 ? `${linksActivos} de ${limiteNav}: llegaste al máximo para este estilo de header. Apagá uno para sumar otro.`
                                 : `${linksActivos} de ${limiteNav} posibles con este estilo de header.`}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8, lineHeight: 1.45 }}>
+                        En el celular, el menú de la hamburguesa siempre empieza con "Inicio", sin que tengas que prenderlo.
                     </div>
                     <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
                         {itemsHeader.filter(x => !x.esCategoria).map((it, i, fijos) => (
