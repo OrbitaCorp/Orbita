@@ -204,7 +204,7 @@ export class InstagramPublicacionesService {
         if (roto) return this.fallar(post, this.mensajeDeContenedor(roto.detalle));
         if (!estados.every((e) => e.codigo === 'FINISHED')) return post;
         contenedor = await this.crearContenedor(businessId, { media_type: 'CAROUSEL', children: hijos.join(','), caption: post.caption });
-        post = await this.prisma.instagramPost.update({ where: { id: post.id }, data: { containerId: contenedor } });
+        post = await this.prisma.instagramPost.update({ where: { id: post.id, businessId: post.businessId }, data: { containerId: contenedor } });
       }
 
       const estado = await this.estadoContenedor(businessId, contenedor);
@@ -231,7 +231,7 @@ export class InstagramPublicacionesService {
         .catch(() => null);
 
       const listo = await this.prisma.instagramPost.update({
-        where: { id: post.id },
+        where: { id: post.id, businessId: post.businessId },
         data: { status: 'PUBLISHED', igMediaId: publicado.id, permalink, error: null },
       });
       await this.medios.limpiar((post.tempPaths as string[]) ?? []);
@@ -249,7 +249,7 @@ export class InstagramPublicacionesService {
   }
 
   private async fallar(post: InstagramPost, mensaje: string): Promise<InstagramPost> {
-    const fallada = await this.prisma.instagramPost.update({ where: { id: post.id }, data: { status: 'FAILED', error: mensaje } });
+    const fallada = await this.prisma.instagramPost.update({ where: { id: post.id, businessId: post.businessId }, data: { status: 'FAILED', error: mensaje } });
     await this.medios.limpiar((post.tempPaths as string[]) ?? []);
     return fallada;
   }
