@@ -8,9 +8,9 @@ import { ApiError, startInstagramConnect, type InstagramEstado } from '@/lib/api
 // a autorizar. Quien se conecta desde Difusión ya autoriza todo el kit de una vez, así que esto solo le
 // aparece a quien conectó desde Mensajes.
 
-export type PermisoDelKit = 'publicar' | 'comentar' | 'estadisticas'
+export type PermisoDelKit = 'publicar' | 'comentar' | 'estadisticas' | 'mensajes'
 
-const TEXTOS: Record<PermisoDelKit, { vista: 'publicaciones' | 'comentarios' | 'estadisticas'; paraConectar: string; paraAutorizar: string }> = {
+const TEXTOS: Record<PermisoDelKit, { vista: 'difusion' | 'publicaciones' | 'comentarios' | 'estadisticas'; paraConectar: string; paraAutorizar: string }> = {
   publicar: {
     vista: 'publicaciones',
     paraConectar: 'Para publicar desde Órbita necesitamos tu cuenta profesional de Instagram conectada.',
@@ -21,6 +21,12 @@ const TEXTOS: Record<PermisoDelKit, { vista: 'publicaciones' | 'comentarios' | '
     paraConectar: 'Para leer y responder comentarios necesitamos tu cuenta profesional de Instagram conectada.',
     paraAutorizar: 'leer y responder los comentarios de tus publicaciones',
   },
+  // Los mensajes directos se piden siempre al conectar: con la cuenta conectada no falta nada.
+  mensajes: {
+    vista: 'difusion',
+    paraConectar: 'Para leer y responder tus mensajes de Instagram necesitamos tu cuenta profesional conectada.',
+    paraAutorizar: 'leer y responder tus mensajes directos',
+  },
   estadisticas: {
     vista: 'estadisticas',
     paraConectar: 'Para mostrarte estadísticas necesitamos tu cuenta profesional de Instagram conectada.',
@@ -30,6 +36,7 @@ const TEXTOS: Record<PermisoDelKit, { vista: 'publicaciones' | 'comentarios' | '
 
 function concedido(estado: Extract<InstagramEstado, { connected: true }>, permiso: PermisoDelKit): boolean {
   if (permiso === 'publicar') return estado.puedePublicar === true
+  if (permiso === 'mensajes') return true
   if (permiso === 'comentar') return estado.puedeComentar === true
   return estado.puedeVerEstadisticas === true
 }

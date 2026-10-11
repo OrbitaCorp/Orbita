@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "26567027d21e482d",
+  "version": "4a6ccc0aecfe3149",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -319,7 +319,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "bandeja",
       "capitulo": "Mensajes",
       "titulo": "La bandeja",
-      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Si tu negocio tiene WhatsApp o Instagram conectado, los mensajes que te lleguen por ahí aparecen en esta misma bandeja, con la etiqueta del canal, y los respondés desde acá. Tanto WhatsApp como Instagram solo permiten responder dentro de las 24 horas del último mensaje del cliente.\n\nInstagram está en acceso anticipado. Si todavía no lo tenés, tocá \"Conectar Instagram\", escribí el usuario de tu cuenta profesional y tocá \"Pedir acceso\". Tu pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app de Órbita: mientras tanto no hay nada que hacer en Instagram, porque todavía no te mandamos la invitación. Cuando la enviemos, ahí mismo se explica cómo aceptarla (Configuración → Apps y sitios web → Invitaciones de prueba) y aparece el botón para conectar.",
+      "texto": "Tus clientes te escriben desde la tienda y todo cae acá. A la izquierda la lista de conversaciones, con los no leídos marcados; a la derecha, el chat abierto.\n\nCuando hay algo sin leer, aparece un punto rojo en Mensajes en el menú de la izquierda: no hace falta entrar a chequear.\n\nConsejo: Los mensajes directos de Instagram no están en esta bandeja: se atienden en Difusión → Mensajes, con una bandeja parecida a la de Instagram. Ahí también se conecta la cuenta.",
       "destino": {
         "seccion": "mensajes",
         "label": "Ir a Mensajes"
@@ -350,17 +350,28 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "instagram-conexion",
       "capitulo": "Difusión",
       "titulo": "Conectar tu Instagram",
-      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Al conectar desde Difusión se piden de una vez todos los permisos del kit: publicar, comentarios y estadísticas. Si conectaste desde Mensajes, cada pantalla te muestra \"Autorizar\" para dar el permiso que le falta.",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Una vez conectada podés responder tus mensajes directos, publicar, responder comentarios y ver estadísticas, todo desde Difusión.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Al conectar desde Difusión se piden de una vez todos los permisos: mensajes, publicar, comentarios y estadísticas. Si tu conexión es vieja y le falta alguno, la pantalla que lo necesita te muestra \"Autorizar\" para darlo.",
       "destino": {
         "seccion": "difusion",
         "label": "Ir a Difusión"
       }
     },
     {
+      "id": "mensajes-instagram",
+      "capitulo": "Difusión",
+      "titulo": "Responder los mensajes de Instagram",
+      "texto": "En Difusión → Mensajes están los mensajes directos que te escriben por Instagram, con el aspecto de la bandeja de la app: la lista de conversaciones a la izquierda y el chat a la derecha. Se actualiza sola. Los mensajes de Instagram no aparecen en el módulo Mensajes.\n\n- Con Sin leer ves solo las conversaciones que todavía no abriste, y con el buscador encontrás a alguien por su nombre.\n- Respondés con texto, con una foto (el botón de la imagen al lado del campo) o con las dos cosas: salen como dos mensajes, igual que en Instagram. Las fotos que te mandan los clientes se ven en el chat.\n- Instagram solo permite responder dentro de las 24 horas del último mensaje del cliente. El chat te dice hasta qué hora podés; pasado ese plazo la conversación se puede leer pero no responder, hasta que el cliente escriba de nuevo.\n\nConsejo: Cuando hay mensajes sin leer, Difusión muestra el número en el menú de la izquierda.",
+      "destino": {
+        "seccion": "difusion",
+        "vista": "mensajes",
+        "label": "Ir a Mensajes de Instagram"
+      }
+    },
+    {
       "id": "publicar-instagram",
       "capitulo": "Difusión",
-      "titulo": "Publicar un producto en Instagram",
-      "texto": "En Difusión → Publicaciones subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado con el permiso de publicar. Si conectaste tu cuenta desde Difusión, ese permiso ya se pidió en el mismo momento. Si la conectaste desde Mensajes, la pantalla te muestra \"Autorizar\": tocalo e iniciá sesión de nuevo en Instagram.\n\n1. Elegí un producto: Aparecen solo los productos publicados en tu tienda. Los que no tienen foto no se pueden usar.\n2. Escribí el texto: Arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda). Editalo como quieras: Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: La foto se publica cuadrada, sobre fondo blanco. Instagram no convierte los enlaces del texto en botones: para que te compren, poné el link de tu tienda en la biografía de tu perfil.",
+      "titulo": "Publicar en Instagram",
+      "texto": "En Difusión → Publicaciones subís a tu Instagram una foto, un carrusel de hasta 10 fotos y videos, o un video, con un texto. Hace falta tener Instagram conectado con el permiso de publicar: si conectaste desde Difusión, ya se pidió en el mismo momento.\n\n1. Qué vas a publicar: Podés partir de un producto de tu tienda (entran sus fotos y elegís cuáles usar), subir fotos y videos de tu computadora, o mezclar las dos cosas. Con más de un elemento se publica un carrusel: el primero es la portada y se reordenan con las flechas.\n2. Escribí el texto: Con un producto arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda); sin producto lo escribís vos, o lo dejás vacío. Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: La vista previa muestra el carrusel como se va a ver. Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: Las fotos se publican sobre fondo blanco, en formato cuadrado o vertical (lo elegís arriba de la vista previa). Un video solo se publica como reel. Los videos pueden tardar unos minutos en procesarse: el avance se ve en pantalla y queda en el historial. Instagram no convierte los enlaces del texto en botones: poné el link de tu tienda en la biografía.\n\nOjo: Archivos admitidos: fotos JPG, PNG o WebP de hasta 10 MB y videos MP4 o MOV de hasta 50 MB.",
       "destino": {
         "seccion": "difusion",
         "vista": "publicaciones",

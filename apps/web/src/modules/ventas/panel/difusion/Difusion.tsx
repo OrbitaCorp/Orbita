@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Comentarios } from './Comentarios'
 import { Estadisticas } from './Estadisticas'
+import { Mensajes } from './Mensajes'
 import { Publicaciones } from './Publicaciones'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
@@ -16,10 +17,15 @@ import type { InstagramEstado } from '@/lib/api'
 // Mientras la conexión no esté completa, el modal de Instagram se abre cada vez que se entra al
 // módulo (en cualquier pantalla): es lo único que hay para hacer hasta que quede conectada.
 
-type Vista = 'instagram' | 'publicaciones' | 'comentarios' | 'estadisticas'
+type Vista = 'instagram' | 'mensajes' | 'publicaciones' | 'comentarios' | 'estadisticas'
 type Funcion = Exclude<Vista, 'instagram'>
 
 const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: ReactNode }> = {
+  mensajes: {
+    titulo: 'Mensajes',
+    texto: 'Leé y respondé los mensajes directos de tu Instagram, con fotos, en una bandeja como la de la app.',
+    ilustracion: <IlustracionComentarios />,
+  },
   publicaciones: {
     titulo: 'Publicaciones',
     texto: 'Elegí un producto, mirá cómo queda la publicación y subila a tu Instagram sin salir de Órbita.',
@@ -38,7 +44,7 @@ const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: R
 }
 
 function esVista(v: unknown): v is Vista {
-  return v === 'instagram' || v === 'publicaciones' || v === 'comentarios' || v === 'estadisticas'
+  return v === 'instagram' || v === 'mensajes' || v === 'publicaciones' || v === 'comentarios' || v === 'estadisticas'
 }
 
 // Cuántos de los 3 pasos de la conexión están hechos: 0 sin pedido, 1 pedido enviado (pendiente de
@@ -103,6 +109,8 @@ export default function Difusion() {
                 <TarjetaFuncion key={f} funcion={f} onAbrir={() => router.push({ query: { ...router.query, vista: f } })} />
               ))}
             </div>
+          ) : vista === 'mensajes' ? (
+            <Mensajes estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'publicaciones' ? (
             <Publicaciones estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'comentarios' ? (

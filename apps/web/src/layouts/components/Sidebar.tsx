@@ -21,7 +21,7 @@ import { useRouter } from 'next/router'
 import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Megaphone, Tag, Settings, BookOpen, Sparkles, Maximize2, Minimize2, MousePointer, ChevronDown } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { getUnreadConversationsCount, ApiError } from '@/lib/api'
+import { getUnreadConversationsCount, getInstagramNoLeidos, ApiError } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiTrigger } from '@/components/orbi/OrbiTrigger'
@@ -77,6 +77,7 @@ const MODULOS: Modulo[] = [
         id: 'difusion', label: 'Difusión', Icon: Megaphone, seccion: 'difusion',
         subs: [
             { label: 'Instagram', seccion: 'difusion' },
+            { label: 'Mensajes', seccion: 'difusion', vista: 'mensajes' },
             { label: 'Publicaciones', seccion: 'difusion', vista: 'publicaciones' },
             { label: 'Comentarios', seccion: 'difusion', vista: 'comentarios' },
             { label: 'Estadísticas', seccion: 'difusion', vista: 'estadisticas' },
@@ -207,6 +208,27 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         let cancelado = false
         const cargar = () => getUnreadConversationsCount()
             .then(r => { if (!cancelado) setMensajesNoLeidos(r.count) })
+            .catch(err => { if (err instanceof ApiError && (err.status === 403 || err.status === 401)) clearInterval(interval) })
+        cargar()
+        const interval = setInterval(cargar, 15000)
+        const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+        document.addEventListener('visibilitychange', alVolver)
+        window.addEventListener('focus', alVolver)
+        return () => {
+            cancelado = true
+            clearInterval(interval)
+            document.removeEventListener('visibilitychange', alVolver)
+            window.removeEventListener('focus', alVolver)
+        }
+    }, [user?.type])
+
+    // Badge de "Difusión": mensajes de Instagram sin leer (su bandeja vive ahí, no en Mensajes).
+    const [instagramNoLeidos, setInstagramNoLeidos] = useState(0)
+    useEffect(() => {
+        if (user?.type !== 'member') return
+        let cancelado = false
+        const cargar = () => getInstagramNoLeidos()
+            .then(r => { if (!cancelado) setInstagramNoLeidos(r.count) })
             .catch(err => { if (err instanceof ApiError && (err.status === 403 || err.status === 401)) clearInterval(interval) })
         cargar()
         const interval = setInterval(cargar, 15000)
@@ -359,7 +381,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     const activo = moduloActivo === m.id
                     const open   = abierto === m.id
                     const subs   = (m.subs ?? []).filter(s => !permisos || !s.permisos || s.permisos.some(p => permisos.includes(p)))
-                    const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.badge
+                    const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.id === 'difusion' ? (instagramNoLeidos || undefined) : m.badge
                     const conSubs = subs.length > 0
                     const conFlotante = usaFlotante && conSubs
                     return (

@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { Search, MessageCircle } from 'lucide-react'
 import type { Conversacion, FiltroBandeja } from '../mock/mensajes.mock'
 import { ConversacionItem } from './ConversacionItem'
-import { WhatsappBoton } from './WhatsappConexion'
-import { InstagramBoton } from './InstagramConexion'
+// Conectar WhatsApp e Instagram está apagado en esta bandeja por ahora: la bandeja de Instagram vive en
+// Difusión → Mensajes, y la conexión de WhatsApp se vuelve a ofrecer cuando termine la revisión de Meta. Para
+// volver a mostrarlos, descomentar estas dos importaciones y las dos etiquetas de más abajo.
+// import { WhatsappBoton } from './WhatsappConexion'
+// import { InstagramBoton } from './InstagramConexion'
 import { OrbiPetVacio } from '@/components/orbi/pet/OrbiPetVacio'
 
 interface Props {
@@ -48,10 +51,10 @@ export function BandejaLista({ conversaciones, activaId, onSelect, onArchivar }:
               {sinLeerCount} sin leer
             </span>
           )}
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2 }}>
+          {/* <span style={{ marginLeft: 'auto', display: 'inline-flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2 }}>
             <WhatsappBoton />
             <InstagramBoton />
-          </span>
+          </span> */}
         </div>
 
         {/* Buscador */}

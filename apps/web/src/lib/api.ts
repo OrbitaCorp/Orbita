@@ -3407,6 +3407,39 @@ export async function subirVideoInstagram(file: File, onProgreso?: (porcentaje: 
   })
   return { ref: prep.ref, tipo: 'video', url: prep.url }
 }
+// Bandeja de mensajes directos (Difusión → Mensajes).
+export type InstagramCharla = {
+  id: string
+  nombre: string
+  ultimo: string
+  ultimoDe: 'cliente' | 'negocio' | null
+  fecha: string
+  noLeida: boolean
+  /** Hasta cuándo se puede contestar (24 h desde el último mensaje del cliente); null si ya venció. */
+  puedeResponderHasta: string | null
+}
+export type InstagramMensaje = {
+  id: string
+  de: 'cliente' | 'negocio'
+  texto: string
+  adjuntos: { tipo: 'image' | 'video' | 'audio' | 'file'; url: string }[]
+  estado: string | null
+  creado: string
+}
+export function getInstagramCharlas() { return panelRequest<InstagramCharla[]>('/instagram/inbox') }
+export function getInstagramNoLeidos() { return panelRequest<{ count: number }>('/instagram/inbox/unread-count') }
+export function getInstagramMensajes(id: string) {
+  return panelRequest<{ mensajes: InstagramMensaje[]; puedeResponderHasta: string | null }>(`/instagram/inbox/${id}/messages`)
+}
+export function responderInstagram(id: string, input: { texto?: string; foto?: File }) {
+  const form = new FormData()
+  if (input.texto?.trim()) form.append('texto', input.texto.trim())
+  if (input.foto) form.append('file', input.foto, input.foto.name)
+  return panelRequest<InstagramMensaje[]>(`/instagram/inbox/${id}/messages`, { method: 'POST', body: form })
+}
+export function marcarCharlaInstagram(id: string, leida: boolean) {
+  return panelRequest<{ ok: true }>(`/instagram/inbox/${id}`, { method: 'PATCH', body: JSON.stringify({ leida }) })
+}
 // Comentarios de las últimas publicaciones (Difusión → Comentarios).
 export type InstagramRespuesta = { id: string; usuario: string; texto: string; fecha: string | null }
 export type InstagramComentario = InstagramRespuesta & { likes: number; oculto: boolean; respuestas: InstagramRespuesta[] }
