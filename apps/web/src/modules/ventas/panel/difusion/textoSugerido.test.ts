@@ -1,29 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_TEXTO_INSTAGRAM, textoSugerido, urlDelProducto } from './textoSugerido'
+import { CIERRE, MAX_TEXTO_INSTAGRAM, textoSugerido, urlDelProducto } from './textoSugerido'
 
 describe('textoSugerido', () => {
   const remera = { name: ' Remera lisa ', description: 'Algodón peinado.\n\n  Talles   S a XL.', basePrice: 15000 }
 
-  it('arma nombre, descripción limpia, precio y enlace, separados por una línea en blanco', () => {
-    const t = textoSugerido(remera, 'tienda.orbita.site/p/1a2b3c4d')
-    expect(t).toBe('Remera lisa\n\nAlgodón peinado. Talles S a XL.\n\nPrecio: $15.000\n\nComprá en tienda.orbita.site/p/1a2b3c4d\nTambién en el link de mi perfil.')
+  it('arma nombre, descripción limpia, precio y el cierre que manda al link de la bio, separados por una línea en blanco', () => {
+    const t = textoSugerido(remera)
+    expect(t).toBe('Remera lisa\n\nAlgodón peinado. Talles S a XL.\n\nPrecio: $15.000\n\nComprá desde el link de mi bio.')
+    expect(t).not.toMatch(/https?:|orbita\.site/)
   })
 
-  it('omite lo que no hay: sin descripción, sin precio o sin enlace', () => {
-    expect(textoSugerido({ name: 'Gorra', description: null, basePrice: 0 }, null)).toBe('Gorra')
-    expect(textoSugerido({ name: 'Gorra', description: '  ', basePrice: 2500 }, null)).toBe('Gorra\n\nPrecio: $2.500')
+  it('omite lo que no hay: sin descripción o sin precio', () => {
+    expect(textoSugerido({ name: 'Gorra', description: null, basePrice: 0 })).toBe(`Gorra\n\n${CIERRE}`)
+    expect(textoSugerido({ name: 'Gorra', description: '  ', basePrice: 2500 })).toBe(`Gorra\n\nPrecio: $2.500\n\n${CIERRE}`)
   })
 
   it('recorta una descripción larga con puntos suspensivos', () => {
     const larga = 'a'.repeat(500)
-    const t = textoSugerido({ name: 'X', description: larga, basePrice: 0 }, null)
+    const t = textoSugerido({ name: 'X', description: larga, basePrice: 0 })
     const descripcion = t.split('\n\n')[1]
     expect(descripcion.length).toBe(220)
     expect(descripcion.endsWith('…')).toBe(true)
   })
 
   it('nunca pasa del máximo de Instagram', () => {
-    const t = textoSugerido({ name: 'n'.repeat(3000), description: null, basePrice: 1 }, 'https://x')
+    const t = textoSugerido({ name: 'n'.repeat(3000), description: null, basePrice: 1 })
     expect(t.length).toBeLessThanOrEqual(MAX_TEXTO_INSTAGRAM)
   })
 })

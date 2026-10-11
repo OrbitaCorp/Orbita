@@ -8,10 +8,9 @@ import {
   subirFotoInstagram, subirVideoInstagram,
   type ApiProductRow, type InstagramEstado, type InstagramItemPublicacion, type InstagramPublicacion, type InstagramTextoDeOrbi,
 } from '@/lib/api'
-import { currentSlug } from '@/lib/tenant'
 import { fmtMoney } from '@/lib/utils'
 import { Compuerta } from './Compuerta'
-import { MAX_TEXTO_INSTAGRAM, textoSugerido, urlDelProducto } from './textoSugerido'
+import { MAX_TEXTO_INSTAGRAM, textoSugerido } from './textoSugerido'
 
 // Difusión → Publicaciones: subir a Instagram una foto, un carrusel (hasta 10 fotos y videos) o un video.
 //
@@ -131,7 +130,7 @@ function Compositor({ usuario, productoInicial }: { usuario: string | null; prod
       }))
       return [...deProducto, ...propios]
     })
-    const nuevo = textoSugerido(p, urlDelProducto(currentSlug(), p.id))
+    const nuevo = textoSugerido(p)
     setTexto((actual) => (actual.trim() === '' || actual === sugeridoActual.current ? nuevo : actual))
     sugeridoActual.current = nuevo
     setHecho(null); setError(null); setAviso(null)
@@ -455,7 +454,7 @@ function Compositor({ usuario, productoInicial }: { usuario: string | null; prod
               <h2 className="pub-paso"><span className="pub-num">2</span> Escribí el texto</h2>
               {producto && (
                 <button type="button" className="pub-enlace-boton" onClick={() => {
-                  const s = textoSugerido(producto, urlDelProducto(currentSlug(), producto.id))
+                  const s = textoSugerido(producto)
                   sugeridoActual.current = s
                   setTexto(s)
                 }}>
