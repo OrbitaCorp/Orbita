@@ -122,7 +122,9 @@ function pathDeLink(id: string): string {
  * los mismos lados, y duplicar el mapa era garantizar que se desincronizaran.
  */
 export function navRealDe(headerLinks?: { id: string; label: string; on: boolean }[]): { label: string; path: string }[] {
-  return headerLinks
+  // `[]` es "nunca configurado" (el backend lo devuelve así y el panel lo toma
+  // como los de siempre), no "todos apagados": esos vienen con `on: false`.
+  return headerLinks && headerLinks.length > 0
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
         .map(l => ({ label: l.label, path: pathDeLink(l.id) }))
@@ -142,7 +144,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // 'categorias'/'novedades' se filtran también acá por si el negocio guardó
   // su propia lista de headerLinks antes de esta limpieza (ver
   // apariencia.mapper.ts, mismo filtro del lado del panel).
-  const navLinks = headerLinks
+  const navLinks = headerLinks && headerLinks.length > 0
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
         .map(l => ({ id: l.id, label: l.label, path: pathDeLink(l.id), matcher: l.id === 'catalogo' ? '/catalogo' : null }))
@@ -740,13 +742,14 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         {/* Mobile nav drawer */}
         {menuOpen && (
           <nav className="sf-drawer">
-            {/* "Minimal" (sinNav): tampoco acá — es "no se muestra
-                navegación" en todo el sitio, no solo en desktop. */}
+            {/* "Minimal" (sinNav): los enlaces del catálogo no van en ningún
+                lado, pero "Inicio" sí: con el header limpio el menú quedaba
+                con solo "Ingresar" y la única forma de volver era el logo. */}
             {/* "Inicio" primero: los enlaces de abajo son del catálogo y
-                ninguno vuelve a la portada (en celular no hay otra forma que
-                tocar el logo). Mismo destino que el logo. Si el negocio ya
-                cargó un enlace que se llama "Inicio", no se duplica. */}
-            {!sinNav && !navLinks.some(s => s.label.trim().toLowerCase() === 'inicio') && (
+                ninguno vuelve a la portada. Mismo destino que el logo. Si el
+                negocio ya cargó un enlace que se llama "Inicio", no se
+                duplica (con "Minimal" no hay enlaces, así que siempre va). */}
+            {(sinNav || !navLinks.some(s => s.label.trim().toLowerCase() === 'inicio')) && (
               <a href={base} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 Inicio
               </a>

@@ -8,6 +8,7 @@ import { PlatformAdminContext } from '../../common/types/auth-context.type';
 import { describeError } from '../../common/utils/describe-error.util';
 import { BorradorTiktokDto } from './dto/borrador-tiktok.dto';
 import { PublicarTiktokDto } from './dto/publicar-tiktok.dto';
+import { SubidaVideoTiktokDto } from './dto/subida-video-tiktok.dto';
 import { TiktokService } from './tiktok.service';
 
 // `express` es solo dependencia transitiva — mismo motivo que en instagram.controller.ts.
@@ -43,6 +44,13 @@ export class TiktokController {
   @Get('creator-info')
   infoDelCreador() {
     return this.tiktok.infoDelCreador();
+  }
+
+  // Una dirección para subir el video desde la computadora, directo a R2, y la dirección pública con la que después se publica.
+  @Post('video-upload-url')
+  @SoloSuperadmin()
+  urlDeSubida(@Body() dto: SubidaVideoTiktokDto) {
+    return this.tiktok.urlDeSubida(dto.mimetype);
   }
 
   @Get('posts')

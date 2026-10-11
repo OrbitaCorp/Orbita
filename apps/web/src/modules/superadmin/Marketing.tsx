@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { platformApi, type TiktokCreador, type TiktokPublicacion } from '@/lib/platform/api'
+import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
+import { InstagramBandeja } from './InstagramBandeja'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
 } from './ui'
 
-// Marketing: publicar los videos de Órbita en TikTok desde la cuenta de la empresa.
+// Marketing: los canales de la empresa para llegar a más gente (TikTok, Instagram y WhatsApp).
+// Arriba, una tarjeta por canal con su estado; abajo, el detalle del canal elegido.
 //
+// TikTok es el único que se maneja desde acá: se conecta la cuenta de la empresa y se publican videos. Instagram y
+// WhatsApp se conectan por negocio desde su bandeja de mensajes: esta pantalla muestra su estado y qué falta.
+//
+// Publicar en TikTok:
 // La pantalla de publicar sigue las reglas de TikTok para la Content Posting API (es lo que revisan
 // en la auditoría): se muestra con qué cuenta se publica, la visibilidad se elige a mano (sin valor
 // por defecto) entre las que TikTok permite en ese momento, los comentarios, dúos y stitch arrancan
@@ -37,21 +43,190 @@ const URL_MARCA = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
 
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 96, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }
 
+type Canal = 'tiktok' | 'instagram' | 'whatsapp'
+type Tono = 'green' | 'amber' | 'gray'
+type Estado = { texto: string; tono: Tono }
+
 export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
   const router = useRouter()
   const [tick, setTick] = useState(0)
-  const { data: estado, error } = useFetch(() => platformApi.tiktokEstado(), [tick])
+  const { data: tiktok, loading: cargandoTiktok } = useFetch(() => platformApi.tiktokEstado(), [tick])
+  const [tickCanales, setTickCanales] = useState(0)
+  const { data: canales } = useFetch(() => platformApi.marketingCanales(), [tickCanales])
+  const [canal, setCanal] = useState<Canal>('tiktok')
   const [aviso, setAviso] = useState<Aviso | null>(null)
-  const [conectando, setConectando] = useState(false)
-  const [desconectando, setDesconectando] = useState(false)
+  // Desconectar una cuenta (pedido desde la tarjeta o desde el detalle del canal): se confirma acá, en un solo lugar.
+  const [confirmar, setConfirmar] = useState<'tiktok' | 'instagram' | null>(null)
 
   // TikTok vuelve a esta pantalla con el resultado de la conexión en la dirección.
   useEffect(() => {
     const r = router.query.tiktok
     if (r === 'conectado') setAviso({ variant: 'success', title: 'Cuenta de TikTok conectada' })
     else if (r === 'error') setAviso({ variant: 'error', title: 'No se pudo conectar TikTok', description: 'Probá de nuevo. Si sigue igual, revisá que la dirección de redirección de la app sea la correcta.' })
-    if (r) void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true })
+    if (r) { setCanal('tiktok'); void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true }) }
   }, [router.query.tiktok]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Qué dice cada tarjeta de un vistazo. El estado siempre va en palabras: el color solo lo acompaña.
+  const estadoTiktok: Estado = !tiktok ? { texto: cargandoTiktok ? 'Cargando…' : 'No disponible', tono: 'gray' }
+    : !tiktok.configurado ? { texto: 'Sin configurar', tono: 'gray' }
+    : tiktok.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
+  const lineaTiktok = !tiktok ? '' : !tiktok.configurado ? 'Faltan los datos de la app' : tiktok.cuenta?.nombre ?? 'Todavía no hay una cuenta'
+
+  const ig = canales?.instagram
+  const estadoInstagram: Estado = !canales ? { texto: 'Cargando…', tono: 'gray' } : ig?.conectado ? { texto: 'Conectado', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }
+  const sinLeer = ig?.conectado ? ig.mensajesSinLeer : 0
+  const lineaInstagram = !canales ? '' : ig?.conectado
+    ? `${ig.usuario ? `@${ig.usuario}` : 'Cuenta conectada'}${sinLeer > 0 ? ` · ${sinLeer} sin leer` : ''}`
+    : 'Todavía no hay una cuenta'
+
+  // WhatsApp todavía no se usa: hace falta una cuenta de WhatsApp Business con un número de la empresa.
+  const estadoWhatsapp: Estado = { texto: 'Próximamente', tono: 'gray' }
+  const lineaWhatsapp = 'Requiere una cuenta Business'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <style>{`
+        .mk-canal { transition: border-color 150ms, background-color 150ms; }
+        .mk-canal:hover { border-color: var(--color-muted); }
+        .mk-canal[aria-pressed="true"] { border-color: var(--color-primary); }
+        .mk-canal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { .mk-canal { transition: none; } }
+      `}</style>
+
+      <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
+
+      <AnuncioSandbox />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+        <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
+        <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
+        <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
+      </div>
+
+      {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
+      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} />}
+      {canal === 'whatsapp' && <PanelWhatsapp />}
+
+      {confirmar === 'tiktok' && (
+        <ConfirmModal
+          title="Desconectar la cuenta de TikTok"
+          body="Se revoca el acceso de Órbita a la cuenta y se borra la conexión. Los videos ya publicados no se tocan. Para volver a publicar hay que conectarla de nuevo."
+          confirmLabel="Desconectar"
+          onCancel={() => setConfirmar(null)}
+          onConfirm={async () => {
+            await platformApi.tiktokDesconectar()
+            setConfirmar(null)
+            setTick((n) => n + 1)
+            setAviso({ variant: 'success', title: 'Cuenta de TikTok desconectada' })
+          }}
+        />
+      )}
+      {confirmar === 'instagram' && (
+        <ConfirmModal
+          title="Desconectar la cuenta de Instagram"
+          body="Se deja de recibir mensajes de esta cuenta en Órbita y se borra el acceso guardado. Los mensajes que ya llegaron se conservan. Para volver a conectarla hay que iniciar sesión de nuevo desde la bandeja de mensajes del negocio."
+          confirmLabel="Desconectar"
+          onCancel={() => setConfirmar(null)}
+          onConfirm={async () => {
+            await platformApi.igDesconectar()
+            setConfirmar(null)
+            setTickCanales((n) => n + 1)
+            setAviso({ variant: 'success', title: 'Cuenta de Instagram desconectada' })
+          }}
+        />
+      )}
+      {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
+    </div>
+  )
+}
+
+// Anuncio fijo: mientras las plataformas (TikTok y Meta) no aprueben la revisión de la app, todo el módulo funciona en
+// modo de pruebas. Cuando las dos aprueben, se borra este componente y su uso en TabMarketing.
+function AnuncioSandbox() {
+  return (
+    <div role="note" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 18px', borderRadius: 14, border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <Chip text="Modo sandbox" tone="amber" dot />
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>Este módulo funciona en modo de pruebas hasta que las plataformas aprueben la revisión de la app</span>
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+        Mientras tanto, en TikTok solo se puede publicar con visibilidad «Solo yo» y con la cuenta en modo privado, y Instagram funciona con las cuentas que tienen un rol en la app de Meta.
+      </div>
+    </div>
+  )
+}
+
+function CanalTarjeta({ nombre, para, estado, linea, activo, onElegir, onDesconectar }: {
+  nombre: string; para: string; estado: Estado; linea: string; activo: boolean; onElegir: () => void; onDesconectar?: () => void
+}) {
+  return (
+    // "Desconectar" va AL LADO del botón que elige la tarjeta y no adentro: un botón dentro de otro botón no es HTML válido
+    // (y el teclado y los lectores de pantalla lo tratan mal).
+    <div style={{ position: 'relative', display: 'flex' }}>
+      <button
+        type="button"
+        className="mk-canal"
+        onClick={onElegir}
+        aria-pressed={activo}
+        style={{
+          display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', width: '100%',
+          minHeight: 132, padding: onDesconectar ? '16px 18px 56px' : '16px 18px', borderRadius: 14, background: 'var(--color-bg)',
+          border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)',
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{nombre}</span>
+        <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.45 }}>{para}</span>
+        <span style={{ marginTop: 'auto', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+          <Chip text={estado.texto} tone={estado.tono} dot />
+          <span style={{ fontSize: 12.5, color: 'var(--color-body)', minHeight: 18, overflowWrap: 'anywhere' }}>{linea}</span>
+        </span>
+      </button>
+      {onDesconectar && (
+        <button
+          type="button"
+          onClick={onDesconectar}
+          className="ds-hover"
+          aria-label={`Desconectar ${nombre}`}
+          style={{ ...btnGhostSm, height: 32, position: 'absolute', left: 18, bottom: 14 }}
+        >
+          Desconectar
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Una línea "etiqueta: valor" para los datos de la cuenta.
+function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 13.5, padding: '9px 0', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+      <span style={{ width: 150, flexShrink: 0, color: 'var(--color-muted)', fontSize: 12.5 }}>{etiqueta}</span>
+      <span style={{ color: 'var(--color-text)', minWidth: 0, overflowWrap: 'anywhere' }}>{children}</span>
+    </div>
+  )
+}
+
+// Una fila de "qué se puede hacer" o de un paso a seguir: título, explicación y su estado en palabras.
+function Fila({ titulo, detalle, estado, ultimo }: { titulo: string; detalle: string; estado: Estado; ultimo?: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 0', borderBottom: ultimo ? 'none' : '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+      <div style={{ minWidth: 0, flex: '1 1 320px' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{titulo}</div>
+        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3, lineHeight: 1.5 }}>{detalle}</div>
+      </div>
+      <Chip text={estado.texto} tone={estado.tono} dot />
+    </div>
+  )
+}
+
+const enlaceBoton: React.CSSProperties = { ...btnGhostSm, textDecoration: 'none', height: 34 }
+
+// ─── TikTok ─────────────────────────────────────────────────────────────────────
+
+function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar, setAviso }: {
+  estado: TiktokEstado | null; puedePublicar: boolean; refrescar: number; onCambio: () => void; onDesconectar: () => void; setAviso: (a: Aviso) => void
+}) {
+  const [conectando, setConectando] = useState(false)
 
   const conectar = async () => {
     setConectando(true)
@@ -64,14 +239,11 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
     }
   }
 
-  if (error) return <ErrorBox msg="No se pudo cargar el estado de TikTok." />
-  if (!estado) return <Loader />
+  if (!estado) return <Card title="TikTok"><Loader /></Card>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <PageHeader title="Marketing" subtitle="Publicá los videos de Órbita en la cuenta de TikTok de la empresa" />
-
-      <Card title="TikTok" subtitle="La cuenta con la que se publican los videos de marketing">
+    <>
+      <Card title="Cuenta de TikTok" subtitle="La cuenta de la empresa con la que se publican los videos">
         {!estado.configurado ? (
           <Empty text="TikTok todavía no está configurado en este entorno: faltan los datos de la app (client key, client secret y clave de cifrado)." />
         ) : !estado.conectado || !estado.cuenta ? (
@@ -94,31 +266,166 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
                 </div>
               </div>
             </div>
-            {puedePublicar && <button onClick={() => setDesconectando(true)} className="ds-hover" style={btnGhostSm}>Desconectar</button>}
+            {puedePublicar && <button onClick={onDesconectar} className="ds-hover" style={btnGhostSm}>Desconectar</button>}
           </div>
         )}
       </Card>
 
-      {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={() => setTick((n) => n + 1)} setAviso={setAviso} />}
-      {estado.conectado && <Publicaciones refrescar={tick} />}
+      {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={onCambio} setAviso={setAviso} />}
+      {estado.conectado && <Publicaciones refrescar={refrescar} />}
 
-      {desconectando && (
-        <ConfirmModal
-          title="Desconectar la cuenta de TikTok"
-          body="Se revoca el acceso de Órbita a la cuenta y se borra la conexión. Los videos ya publicados no se tocan. Para volver a publicar hay que conectarla de nuevo."
-          confirmLabel="Desconectar"
-          onCancel={() => setDesconectando(false)}
-          onConfirm={async () => {
-            await platformApi.tiktokDesconectar()
-            setDesconectando(false)
-            setTick((n) => n + 1)
-            setAviso({ variant: 'success', title: 'Cuenta de TikTok desconectada' })
-          }}
+    </>
+  )
+}
+
+// ─── Instagram ──────────────────────────────────────────────────────────────────
+
+function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void; onDesconectar: () => void }) {
+  if (!canales) return <Card title="Instagram"><Loader /></Card>
+  const { instagram: ig, negocio } = canales
+  // Reconectar la cuenta (si venció el acceso) se hace desde la bandeja del negocio al que está atada.
+  const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
+
+  return (
+    <>
+      <Card
+        title="Cuenta de Instagram"
+        subtitle="La cuenta de la empresa conectada a Órbita"
+        action={(
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {bandeja && (!ig.conectado || ig.diasRestantes < 10) && (
+              <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}</a>
+            )}
+            {ig.conectado && puedeVer && <button type="button" onClick={onDesconectar} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Desconectar</button>}
+          </span>
+        )}
+      >
+        {ig.conectado ? (
+          <div>
+            <Dato etiqueta="Cuenta">
+              {ig.usuario ? <a href={`https://www.instagram.com/${ig.usuario}`} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>@{ig.usuario}</a> : 'Cuenta conectada'}
+            </Dato>
+            <Dato etiqueta="Acceso">
+              {ig.diasRestantes > 0 ? `Vigente por ${ig.diasRestantes} ${ig.diasRestantes === 1 ? 'día' : 'días'}` : 'Vencido: hay que volver a conectar la cuenta'}
+              <span style={{ color: 'var(--color-muted)' }}> · se renueva solo cada noche</span>
+            </Dato>
+          </div>
+        ) : (
+          <Empty text={negocio ? 'Todavía no hay una cuenta de Instagram conectada. Se conecta desde la bandeja de mensajes del negocio de la empresa.' : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
+        )}
+      </Card>
+
+      {ig.conectado && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
+
+
+      <Card title="Qué se puede hacer" subtitle="Lo que está disponible hoy y lo que depende de la revisión de Meta">
+        <Fila
+          titulo="Recibir y contestar mensajes directos"
+          detalle="Los mensajes que llegan a la cuenta aparecen en la bandeja de arriba y se contestan desde ahí."
+          estado={ig.conectado ? { texto: 'Disponible', tono: 'green' } : { texto: 'Sin conectar', tono: 'gray' }}
         />
-      )}
-      {aviso && <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />}
+        <Fila
+          titulo="Publicar fotos y Reels"
+          detalle="Necesita el permiso de publicación de Instagram, que Meta da después de revisar la app."
+          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+        />
+        <Fila
+          titulo="Métricas de la cuenta"
+          detalle="Alcance, seguidores e interacciones. Depende de la misma revisión."
+          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+          ultimo
+        />
+      </Card>
+    </>
+  )
+}
+
+// ─── WhatsApp ───────────────────────────────────────────────────────────────────
+
+function PanelWhatsapp() {
+  return (
+    <Card title="WhatsApp" subtitle="Atención por mensajes a clientes y contactos">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 560 }}>
+        <div><Chip text="Próximamente" tone="gray" dot /></div>
+        <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+          Para usar WhatsApp con la cuenta de la empresa hace falta una cuenta de WhatsApp Business con un número exclusivo. Cuando la tengamos, los mensajes van a llegar y contestarse desde esta pantalla, igual que los de Instagram.
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+// Elegir el video: se sube un archivo de la computadora (directo a R2, con barra de avance) o se pega una dirección https.
+function SelectorDeVideo({ url, onUrl, onOcupado, duracionMaxMin }: { url: string; onUrl: (u: string) => void; onOcupado: (o: boolean) => void; duracionMaxMin: number }) {
+  const [archivo, setArchivo] = useState<{ nombre: string; mb: string } | null>(null)
+  const [progreso, setProgreso] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+
+  const elegir = async (f: File) => {
+    setError('')
+    if (!TIPOS_DE_VIDEO.includes(f.type)) { setError('Tiene que ser un video mp4, mov o webm.'); return }
+    if (f.size > MAX_VIDEO_MB * 1024 * 1024) { setError(`El video no puede pasar de ${MAX_VIDEO_MB} MB.`); return }
+    onOcupado(true)
+    setProgreso(0)
+    try {
+      const { uploadUrl, publicUrl } = await platformApi.tiktokUrlDeSubida(f.type)
+      await subirArchivo(uploadUrl, f, setProgreso)
+      setArchivo({ nombre: f.name, mb: (f.size / 1048576).toFixed(1) })
+      onUrl(publicUrl)
+    } catch (e) {
+      setArchivo(null)
+      onUrl('')
+      setError(e instanceof Error && e.message ? e.message : 'No se pudo subir el video. Probá de nuevo.')
+    } finally {
+      setProgreso(null)
+      onOcupado(false)
+      if (input.current) input.current.value = ''
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Video</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <input ref={input} type="file" accept="video/mp4,video/quicktime,video/webm" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void elegir(f) }} />
+        <button type="button" onClick={() => input.current?.click()} disabled={progreso !== null} className="ds-hover" style={{ ...btnGhostSm, height: 38, opacity: progreso !== null ? 0.6 : 1 }}>
+          {progreso !== null ? 'Subiendo…' : archivo ? 'Cambiar el archivo' : 'Subir desde mi computadora'}
+        </button>
+        {progreso !== null && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--color-muted)' }}>
+            <span style={{ width: 120, height: 6, borderRadius: 3, background: 'var(--color-surface-alt)', overflow: 'hidden' }}>
+              <span style={{ display: 'block', width: `${progreso}%`, height: '100%', background: 'var(--color-primary)', transition: 'width 150ms' }} />
+            </span>
+            {progreso}%
+          </span>
+        )}
+        {progreso === null && archivo && <span style={{ fontSize: 12.5, color: 'var(--color-body)' }}>{archivo.nombre} · {archivo.mb} MB</span>}
+      </div>
+      {error && <span role="alert" style={{ fontSize: 12.5, color: 'var(--color-error)' }}>{error}</span>}
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 400, color: 'var(--color-muted)' }}>
+        O pegá la dirección de un video (https)
+        <input value={url} onChange={(e) => { setArchivo(null); onUrl(e.target.value) }} placeholder="https://…/video.mp4" style={inputStyle} />
+      </label>
+      <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>mp4, mov o webm, hasta {MAX_VIDEO_MB} MB. Duración máxima de la cuenta: {duracionMaxMin} min.</span>
     </div>
   )
+}
+
+const TIPOS_DE_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
+const MAX_VIDEO_MB = 200
+
+/** PUT del archivo a la dirección firmada de R2, con avance (fetch todavía no informa el progreso de una subida). */
+function subirArchivo(uploadUrl: string, archivo: File, onProgreso: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', archivo.type)
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso(Math.round((e.loaded / e.total) * 100)) }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`El almacenamiento rechazó el archivo (${xhr.status}).`)))
+    xhr.onerror = () => reject(new Error('Se cortó la subida. Revisá la conexión y probá de nuevo.'))
+    xhr.send(archivo)
+  })
 }
 
 // ─── Publicar un video ──────────────────────────────────────────────────────────
@@ -146,6 +453,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const [deMarca, setDeMarca] = useState(false)
   const [ia, setIa] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [subiendo, setSubiendo] = useState(false) // se está subiendo el archivo elegido
   // Directo: se publica desde acá. Borrador: el video llega a los borradores de TikTok y una persona lo termina en la app.
   const [modo, setModo] = useState<'directo' | 'borrador'>('directo')
 
@@ -155,7 +463,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   const sinTipoDeMarca = declara && !tuMarca && !deMarca
   // Un video de marca no puede ser privado: TikTok lo rechaza.
   const marcaYPrivado = declara && (tuMarca || deMarca) && privacidad === 'SELF_ONLY'
-  const urlValida = videoUrl.startsWith('https://')
+  const urlValida = videoUrl.startsWith('https://') && !subiendo
   const listo = modo === 'borrador'
     ? puedePublicar && !enviando && urlValida
     : puedePublicar && !enviando && urlValida && title.trim().length > 0 && !!privacidad && !sinTipoDeMarca && !marcaYPrivado
@@ -187,7 +495,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
   }
 
   return (
-    <Card title="Publicar un video" subtitle="Se baja de la dirección que pongas y se sube a TikTok">
+    <Card title="Publicar un video" subtitle="Subí el video desde tu computadora o pegá su dirección, y se envía a TikTok">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 680 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
           {creador.avatar && <img src={creador.avatar} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />}
@@ -210,11 +518,7 @@ function Publicar({ puedePublicar, onPublicado, setAviso }: { puedePublicar: boo
           </div>
         )}
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-          Dirección del video (https)
-          <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…/video.mp4" style={inputStyle} />
-          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-muted)' }}>Un MP4 público. Duración máxima de la cuenta: {Math.round(creador.duracionMaximaSeg / 60)} min.</span>
-        </label>
+        <SelectorDeVideo url={videoUrl} onUrl={setVideoUrl} onOcupado={setSubiendo} duracionMaxMin={Math.round(creador.duracionMaximaSeg / 60)} />
 
         {modo === 'directo' && (<>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>

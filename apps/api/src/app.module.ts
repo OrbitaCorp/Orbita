@@ -45,6 +45,7 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { InstagramModule } from './instagram/instagram.module';
 import { TiktokModule } from './marketing/tiktok/tiktok.module';
+import { MarketingModule } from './marketing/marketing.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -106,6 +107,7 @@ import { ImageStudioModule } from './image-studio/image-studio.module';
     WhatsappModule,
     InstagramModule,
     TiktokModule,
+    MarketingModule,
     MessageTemplatesModule,
     NotificationsModule,
     ReviewsModule,

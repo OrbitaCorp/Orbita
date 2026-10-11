@@ -18,6 +18,7 @@ export const ACTION_LABELS: Record<string, string> = {
   tiktok_publish: 'Publicar un video en TikTok',
   tiktok_draft: 'Enviar un video a los borradores de TikTok',
   tiktok_disconnect: 'Desconectar la cuenta de TikTok de Órbita',
+  instagram_disconnect: 'Desconectar la cuenta de Instagram de Órbita',
   grant_comp: 'Ceder cortesía',
   create_price_campaign: 'Crear campaña de precio',
   update_price_campaign: 'Editar campaña de precio',

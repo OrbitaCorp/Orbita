@@ -63,7 +63,7 @@ export const AYUDA_SECCIONES: Record<string, Ayuda> = {
     layout: {
         que: 'Cómo se acomodan las cosas: el estilo del header, qué enlaces muestra, de cuántas columnas es la grilla de productos y cómo se ven las categorías en el inicio.',
         donde: 'El header, en todas las páginas. La grilla, en el catálogo y en cada categoría. El estilo de categorías, en la sección "Comprá por categoría" del inicio.',
-        afecta: 'Con 4 columnas entran más productos por pantalla pero se ven más chicos; en Lista se ve uno por fila, más grande. El estilo de header "Minimal" no muestra navegación ni buscador. Mosaico y Tarjetas necesitan que las categorías tengan foto cargada.',
+        afecta: 'Con 4 columnas entran más productos por pantalla pero se ven más chicos; en Lista se ve uno por fila, más grande. El estilo de header "Minimal" no muestra enlaces ni buscador (en el celular, la hamburguesa igual trae "Inicio"). Mosaico y Tarjetas necesitan que las categorías tengan foto cargada.',
     },
     parallax: {
         que: 'Una imagen grande, a todo el ancho, que queda quieta mientras el resto de la página se desplaza por encima (el efecto parallax), con un título y un botón arriba.',

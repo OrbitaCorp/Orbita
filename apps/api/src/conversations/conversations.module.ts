@@ -9,5 +9,6 @@ import { InstagramModule } from '../instagram/instagram.module';
   imports: [WhatsappModule, InstagramModule], // responder por WhatsApp e Instagram desde la bandeja
   controllers: [ConversationsController, MeConversationController],
   providers: [ConversationsService],
+  exports: [ConversationsService], // la bandeja de Instagram del super panel (marketing/)
 })
 export class ConversationsModule {}

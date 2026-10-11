@@ -47,6 +47,7 @@ dueño decide cuáles se ven.
 | Video | Contenido → Video en tu tienda | Apagado o sin un link válido |
 | WhatsApp | Contenido → WhatsApp | Apagado o sin número en Contacto |
 | Buscador | Contenido → Barra de búsqueda | Apagado |
+| Cartelitos de la tarjeta (Nuevo, Oferta con %, Últimas unidades) y opiniones | Contenido → Visibilidad | Apagados: la tarjeta de TODAS las plantillas los respeta (`toProducto` lee `showNewBadge`, `showOfferBadge`, `showLowStock`); no es trabajo de cada plantilla |
 | Pie | Pie de página | Nunca: lleva los legales |
 
 Cómo funciona: `plantillaReal()` lee Apariencia y resuelve los interruptores
@@ -312,7 +313,7 @@ el corte es a 768px; en la tienda sale de `useMovilPlantilla()`.
 - **Se puede navegar.** Si los enlaces del header no entran, va `MenuMovil`.
   Nunca un `☰` dibujado. El menú lista **"Inicio" primero** y después los
   enlaces del header (`itemsMenuMovil` en `piezas.tsx`; no se duplica si el
-  dueño ya cargó uno llamado "Inicio", y con el header en "minimal" no hay menú).
+  dueño ya cargó uno llamado "Inicio", y con el header en "minimal" el menú es solo "Inicio", sin los enlaces).
 - **El hero con varios slides se desliza con el dedo**, además de las flechas.
   No hay que hacer nada por plantilla: `Home()` es un envoltorio
   (`display: contents`) que escucha el gesto y rota el hero. Solo hace falta
@@ -339,6 +340,48 @@ mide tamaños: el desborde, un título cortado o un botón chico solo se ven
 mirando. Por eso cada plantilla nueva o modificada se mira en **Celular** en la
 vitrina (Avanzado → Plantillas → Ver cómo queda) y aplicada en una tienda desde
 un teléfono de verdad, no solo achicando la ventana.
+
+## El nav del header
+
+Los enlaces del header los dibujan unos 14 bloques distintos, cada uno con su
+`<span className="pl-nav">`. Cuatro cosas se rompieron ahí y valen para todos:
+
+- **Un enlace no puede quedar muerto.** `navDe(links, acciones)` es el único
+  camino: en la tienda devuelve `acciones.nav` (los enlaces reales de
+  Apariencia, con su `onClick`); en la **vitrina** del panel (sin `acciones`)
+  devuelve enlaces que llevan a la parte de la portada que les toca ("Inicio"
+  arriba, "Contacto" y afines al pie, el resto a las secciones con título, en
+  orden; `irEnVitrina` en `piezas.tsx`). Por eso una plantilla nueva **nunca
+  dibuja un nav con `links.map(...)` a mano**: usa `navDe`, y le pone al
+  `<span>` el `onClick={l.onClick}` y `cursor` según `l.onClick`. El destino
+  se busca con `data-pl-raiz` (el envoltorio de `Home()`) y `data-pl-sec` (lo
+  lleva `Titulo`): un bloque propio que arma sus títulos sin `Titulo` tiene
+  que ponerle `data-pl-sec=""` a su encabezado para que los enlaces lo
+  encuentren.
+- **El hover no baja la opacidad.** Antes `.pl-nav:hover` ponía `opacity: .58`
+  y sobre un nav gris (`t.muted`) quedaba un gris sucio que se leía como
+  "deshabilitado". Ahora el hover subraya y lleva el texto al color pleno de
+  la plantilla (`--pl-nav-hover`). Si el contenedor de los enlaces tiene
+  `color: t.muted`, tiene que esparcir `...navHover(t)` en su `style`; si el
+  enlace ya viene en `t.text` (o con su color inline, como "Ofertas" en
+  `t.accent`) alcanza con el subrayado y no hace falta.
+
+- **En la tienda real nunca salen los enlaces de muestra.** `acciones.nav` manda
+  aunque venga vacío (el dueño los apagó todos), y `navRealDe([])` devuelve los
+  de siempre: el backend manda `headerLinks: []` a la tienda que nunca los
+  configuró, y eso es "sin configurar", no "todos apagados" (esos traen
+  `on: false`). Antes la portada caía a `p.links` y pintaba "Cocina, Textil…"
+  sin destino en una tienda real (Indecisas, 09/10).
+
+- **La vitrina no muestra el cursor de texto.** `Home()` marca su envoltorio con
+  `data-pl-vitrina` cuando no hay `acciones`, y el CSS le pone `cursor: default`
+  y `user-select: none`: el logo, "Ingresar" y el carrito no hacen nada ahí y la
+  "I" de texto prometía que se podían copiar. Lo que sí es clickeable fija su
+  `cursor: 'pointer'` inline y gana; una plantilla nueva no tiene que hacer nada.
+
+El grupo `enlaces del nav` del check lo prueba: la vitrina no tiene enlaces
+sin `onClick`, la tienda real conserva los de Apariencia y `.pl-nav:hover` no
+toca la opacidad.
 
 ## La carga
 
@@ -403,7 +446,7 @@ dueño edita desde Avanzado → Plantillas de Home:
 | Hero | Slides: foto, título, bajada, botón, enlace. Solo imagen completa | El mismo `heroSlides` de Apariencia. `heroMaxSlides` lo limita |
 | Header | Logo y enlaces del menú | `headerLinks` de Apariencia |
 | Secciones | Los encabezados de las filas y los bloques propios | `seccionesDe(id)`: de la receta, o declarado a mano |
-| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video | Las mismas columnas que Apariencia, en las treinta y dos. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
+| Contenido | Los interruptores y las tarjetas de Apariencia: anuncio, estadísticas, categorías, estantes, buscador, WhatsApp, parallax, marcas, video, y los de las tarjetas: opiniones, badge "Nuevo", badge "Oferta" e indicador de stock bajo ("Últimas unidades") | Las mismas columnas que Apariencia, en las treinta y dos. La barra de estadísticas solo en las que la dibujan (`usaStats`) |
 | Pie | La descripción bajo el logo y si se muestran las redes | Las columnas y los legales los arma `pieReal()`, no se editan |
 
 Las tarjetas de Contenido son las mismas piezas de `Apariencia.tsx`
@@ -498,7 +541,7 @@ categorías, cuarenta productos).
 | esqueleto | El esqueleto de carga de cada plantilla no dibuja imágenes ni deja nada de la maqueta en el HTML |
 | header | El header suelto (el que usa el catálogo, la ficha y el carrito) trae cuenta y carrito, y no arrastra la portada |
 | deslizar | En celular, el gesto del hero se escucha sobre el bloque del hero y no sobre toda la portada (contiene el título del slide y abarca ≤60% de los elementos), o el hero es de slides fijos |
-| menú de celular | "Inicio" va primero, no se duplica, no hay menú en "minimal" |
+| menú de celular | "Inicio" va primero, no se duplica, en "minimal" el menú es solo "Inicio" |
 
 ### Cómo leer un fallo
 
@@ -533,7 +576,7 @@ Celular:
 
 - que nada desborde a lo ancho y que el hero se lea sobre su foto;
 - que las fotos tengan que ver con el rubro y no desentonen con la paleta;
-- que todo lo que parece clickeable lo sea. En el código: `grep` de
+- que todo lo que parece clickeable lo sea (los enlaces del nav incluidos: ver § El nav del header). En el código: `grep` de
   `accion="` sin `onAccion`, de `<Boton` sin `onClick`, y de un `☰` dibujado
   sin `MenuMovil`;
 - que se distinga de las otras treinta y una.

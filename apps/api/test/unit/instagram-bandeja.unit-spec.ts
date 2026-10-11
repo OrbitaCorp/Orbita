@@ -1,132 +1,127 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { InstagramBandejaService } from '../../src/instagram/instagram-bandeja.service';
-import { InstagramService } from '../../src/instagram/instagram.service';
+import { NotFoundException } from '@nestjs/common';
+import { InstagramBandejaService } from '../../src/marketing/instagram-bandeja.service';
 
-// Bandeja de mensajes directos de Instagram (Difusión → Mensajes): solo las charlas de clientes de Instagram,
-// con sus fotos, el plazo de 24 horas para contestar, y un envío que no deja en la charla algo que no salió.
+// La bandeja de Instagram de la empresa dentro del super panel. Desde acá solo se ven y se contestan las
+// conversaciones de Instagram del negocio de la empresa: nunca las de otro negocio, ni el chat de la tienda.
 
-const BIZ = 'biz-1';
-const hace = (horas: number) => new Date(Date.now() - horas * 3600_000);
+const NEGOCIO = { id: 'b-orbita' };
 
-function build() {
-  const prisma: any = {
+function armar(over: { negocio?: object | null; conversacion?: object | null; filas?: object[] } = {}) {
+  const prisma = {
+    business: { findFirst: jest.fn().mockResolvedValue(over.negocio === undefined ? NEGOCIO : over.negocio) },
+    platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
     conversation: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue({ id: 'cv-1', isUnread: true, customer: { instagramId: 'IGSID1' } }),
-      count: jest.fn().mockResolvedValue(3),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findFirst: jest.fn().mockResolvedValue(over.conversacion === undefined ? { id: 'c-1' } : over.conversacion),
+      findMany: jest.fn().mockResolvedValue(over.filas ?? []),
     },
-    message: {
-      findMany: jest.fn().mockResolvedValue([]),
-      groupBy: jest.fn().mockResolvedValue([]),
-      create: jest.fn().mockImplementation(({ data }) =>
-        Promise.resolve({
-          id: `m-${data.text}`,
-          sender: data.sender,
-          text: data.text,
-          attachments: data.attachments ?? null,
-          deliveryStatus: data.deliveryStatus,
-          createdAt: new Date('2026-10-12T10:00:00Z'),
-        }),
-      ),
-    },
-    $executeRaw: jest.fn().mockResolvedValue(1),
   };
-  const instagram = {
-    enviarTexto: jest.fn().mockResolvedValue('mid.T'),
-    enviarImagen: jest.fn().mockResolvedValue('mid.I'),
-  } as unknown as jest.Mocked<InstagramService>;
-  const medios: any = { subirFotoDeMensaje: jest.fn().mockResolvedValue('https://almacen/mensajes/f.jpg') };
-  return { svc: new InstagramBandejaService(prisma, instagram, medios), prisma, instagram, medios };
+  const conversations = {
+    getMessages: jest.fn().mockResolvedValue([{ id: 'm-1', text: 'hola' }]),
+    sendMessage: jest.fn().mockResolvedValue({ id: 'm-2', text: 'hola, gracias' }),
+  };
+  const instagram = { desconectar: jest.fn().mockResolvedValue({ connected: false }) };
+  const config = { get: (k: string) => (k === 'MARKETING_NEGOCIO' ? undefined : undefined) };
+  return { svc: new InstagramBandejaService(prisma as any, config as any, conversations as any, instagram as any), prisma, conversations, instagram };
 }
 
-describe('InstagramBandejaService', () => {
-  it('lista solo charlas de clientes de Instagram de ESTE negocio', async () => {
-    const { svc, prisma } = build();
-    await svc.listar(BIZ);
-    expect(prisma.conversation.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ businessId: BIZ, customer: expect.objectContaining({ instagramId: { not: null } }) }) }),
-    );
+const fila = (over: object = {}) => ({
+  id: 'c-1', isUnread: true, updatedAt: new Date('2026-10-09T10:00:00Z'),
+  customer: { firstName: 'Lucía', lastName: 'Pérez', avatarUrl: null },
+  messages: [{ text: '¿Tienen planes para tiendas de ropa?', sender: 'CUSTOMER', createdAt: new Date('2026-10-09T10:00:00Z') }],
+  ...over,
+});
+
+describe('conversaciones', () => {
+  it('solo trae las del negocio de la empresa que tienen mensajes de Instagram y no están archivadas', async () => {
+    const { svc, prisma } = armar();
+    await svc.conversaciones();
+    expect(prisma.business.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { subdomain: 'negocio', deletedAt: null } }));
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { businessId: 'b-orbita', isArchived: false, messages: { some: { channel: 'INSTAGRAM' } } },
+      orderBy: { updatedAt: 'desc' },
+    }));
   });
 
-  it('resume la última foto como "Foto" y marca hasta cuándo se puede contestar', async () => {
-    const { svc, prisma } = build();
-    prisma.conversation.findMany.mockResolvedValue([
-      {
-        id: 'cv-1', isUnread: true, updatedAt: hace(1), customer: { firstName: 'Ana', lastName: null },
-        messages: [{ sender: 'CUSTOMER', text: '[Imagen]', attachments: [{ tipo: 'image', url: 'https://x/a.jpg' }], createdAt: hace(1) }],
-      },
-      {
-        id: 'cv-2', isUnread: false, updatedAt: hace(30), customer: { firstName: 'Beto', lastName: 'Paz' },
-        messages: [{ sender: 'STORE', text: 'Gracias!', attachments: null, createdAt: hace(30) }],
-      },
-    ]);
-    prisma.message.groupBy.mockResolvedValue([
-      { conversationId: 'cv-1', _max: { createdAt: hace(1) } },
-      { conversationId: 'cv-2', _max: { createdAt: hace(31) } },
-    ]);
-    const [a, b] = await svc.listar(BIZ);
-    expect(a).toMatchObject({ nombre: 'Ana', ultimo: 'Foto', ultimoDe: 'cliente', noLeida: true });
-    expect(a.puedeResponderHasta).not.toBeNull();
-    expect(b).toMatchObject({ nombre: 'Beto Paz', ultimo: 'Gracias!', ultimoDe: 'negocio', puedeResponderHasta: null });
-  });
-
-  it('abrir una charla la marca leída sin tocar updatedAt, y esconde la etiqueta "[Imagen]"', async () => {
-    const { svc, prisma } = build();
-    prisma.message.findMany.mockResolvedValue([
-      { id: 'm2', sender: 'STORE', text: 'Sí, hay', attachments: null, deliveryStatus: 'sent', createdAt: hace(1) },
-      { id: 'm1', sender: 'CUSTOMER', text: '[Imagen]', attachments: [{ tipo: 'image', url: 'https://x/a.jpg' }], deliveryStatus: null, createdAt: hace(2) },
-    ]);
-    const r = await svc.mensajes(BIZ, 'cv-1');
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(r.mensajes.map((m) => m.id)).toEqual(['m1', 'm2']);
-    expect(r.mensajes[0]).toMatchObject({ de: 'cliente', texto: '', adjuntos: [{ tipo: 'image', url: 'https://x/a.jpg' }] });
-    expect(r.puedeResponderHasta).not.toBeNull();
-  });
-
-  it('una charla de otro negocio (o que no es de Instagram) no se abre ni se responde', async () => {
-    const { svc, prisma } = build();
-    prisma.conversation.findFirst.mockResolvedValue(null);
-    await expect(svc.mensajes(BIZ, 'ajena')).rejects.toBeInstanceOf(NotFoundException);
-    await expect(svc.responder(BIZ, 'ajena', 'hola', undefined)).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ id: 'ajena', businessId: BIZ }) }),
-    );
-  });
-
-  it('sin texto ni foto no manda nada', async () => {
-    const { svc, instagram } = build();
-    await expect(svc.responder(BIZ, 'cv-1', '   ', undefined)).rejects.toBeInstanceOf(BadRequestException);
-    expect(instagram.enviarTexto).not.toHaveBeenCalled();
-  });
-
-  it('con foto y texto manda dos mensajes (la foto primero) y guarda cada uno con su id', async () => {
-    const { svc, prisma, instagram } = build();
-    const salida = await svc.responder(BIZ, 'cv-1', ' Hola ', { buffer: Buffer.from('x') } as any);
-    expect(instagram.enviarImagen).toHaveBeenCalledWith(BIZ, 'cv-1', 'IGSID1', 'https://almacen/mensajes/f.jpg');
-    expect(instagram.enviarTexto).toHaveBeenCalledWith(BIZ, 'cv-1', 'IGSID1', 'Hola');
-    expect(salida).toHaveLength(2);
-    expect(salida[0].adjuntos).toEqual([{ tipo: 'image', url: 'https://almacen/mensajes/f.jpg' }]);
-    expect(salida[1].texto).toBe('Hola');
-    expect(prisma.message.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ channel: 'INSTAGRAM', externalId: 'mid.I', sender: 'STORE' }),
-      select: expect.anything(),
+  it('arma la lista: nombre, si está sin leer y el último mensaje (de quién es)', async () => {
+    const { svc } = armar({
+      filas: [
+        fila(),
+        fila({ id: 'c-2', isUnread: false, customer: { firstName: 'Instagram 4821', lastName: null, avatarUrl: 'https://x/a.jpg' }, messages: [{ text: 'Gracias, te escribo mañana', sender: 'STORE', createdAt: new Date('2026-10-08T09:00:00Z') }] }),
+      ],
     });
-    expect(prisma.conversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'cv-1', businessId: BIZ } }));
+    const r = await svc.conversaciones();
+    expect(r[0]).toMatchObject({ id: 'c-1', nombre: 'Lucía Pérez', sinLeer: true, ultimo: { texto: '¿Tienen planes para tiendas de ropa?', esMio: false } });
+    expect(r[1]).toMatchObject({ id: 'c-2', nombre: 'Instagram 4821', avatar: 'https://x/a.jpg', sinLeer: false, ultimo: { esMio: true } });
   });
 
-  it('si Instagram rechaza el envío (plazo vencido) no queda nada guardado', async () => {
-    const { svc, prisma, instagram } = build();
-    (instagram.enviarTexto as jest.Mock).mockRejectedValue(new Error('Pasaron más de 24 horas'));
-    await expect(svc.responder(BIZ, 'cv-1', 'hola', undefined)).rejects.toThrow('24 horas');
-    expect(prisma.message.create).not.toHaveBeenCalled();
+  it('una conversación sin mensajes no rompe la lista', async () => {
+    const { svc } = armar({ filas: [fila({ messages: [] })] });
+    expect((await svc.conversaciones())[0].ultimo).toBeNull();
   });
 
-  it('cuenta las no leídas solo de Instagram', async () => {
-    const { svc, prisma } = build();
-    await expect(svc.noLeidas(BIZ)).resolves.toEqual({ count: 3 });
-    expect(prisma.conversation.count).toHaveBeenCalledWith({
-      where: expect.objectContaining({ businessId: BIZ, isUnread: true, customer: expect.objectContaining({ instagramId: { not: null } }) }),
-    });
+  it('el tope de la lista no pasa de 200', async () => {
+    const { svc, prisma } = armar();
+    await svc.conversaciones(5000);
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
+  });
+
+  it('si el negocio de la empresa no existe, avisa', async () => {
+    const { svc } = armar({ negocio: null });
+    await expect(svc.conversaciones()).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('desconectar la cuenta', () => {
+  it('desconecta Instagram del negocio de la empresa y deja anotado quién lo hizo', async () => {
+    const { svc, prisma, instagram } = armar();
+    await expect(svc.desconectar('admin-1')).resolves.toEqual({ connected: false });
+    expect(instagram.desconectar).toHaveBeenCalledWith('b-orbita');
+    expect(prisma.platformAdminLog.create).toHaveBeenCalledWith({ data: { adminId: 'admin-1', action: 'instagram_disconnect', targetType: 'marketing_instagram', targetId: 'b-orbita' } });
+  });
+
+  it('si no se puede anotar en el historial, la desconexión igual queda hecha', async () => {
+    const { svc, prisma } = armar();
+    prisma.platformAdminLog.create.mockRejectedValue(new Error('db'));
+    await expect(svc.desconectar('admin-1')).resolves.toEqual({ connected: false });
+  });
+
+  it('si no hay negocio de la empresa o ninguna conexión, avisa y no anota nada', async () => {
+    const sinNegocio = armar({ negocio: null });
+    await expect(sinNegocio.svc.desconectar('admin-1')).rejects.toBeInstanceOf(NotFoundException);
+    const sinConexion = armar();
+    sinConexion.instagram.desconectar.mockRejectedValue(new NotFoundException('No hay una conexión de Instagram para desconectar'));
+    await expect(sinConexion.svc.desconectar('admin-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(sinConexion.prisma.platformAdminLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('mensajes y respuestas', () => {
+  it('abrir un hilo usa el servicio del panel con el negocio de la empresa (y así lo marca leído)', async () => {
+    const { svc, conversations } = armar();
+    await expect(svc.mensajes('c-1')).resolves.toEqual([{ id: 'm-1', text: 'hola' }]);
+    expect(conversations.getMessages).toHaveBeenCalledWith('b-orbita', 'c-1');
+  });
+
+  it('antes de abrir, comprueba que la conversación sea del negocio de la empresa y de Instagram', async () => {
+    const { svc, prisma } = armar();
+    await svc.mensajes('c-1');
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'c-1', businessId: 'b-orbita', messages: { some: { channel: 'INSTAGRAM' } } },
+    }));
+  });
+
+  it('una conversación ajena o que no es de Instagram no se lee ni se contesta', async () => {
+    const { svc, conversations } = armar({ conversacion: null });
+    await expect(svc.mensajes('otra')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.responder('otra', { text: 'hola' })).rejects.toBeInstanceOf(NotFoundException);
+    expect(conversations.getMessages).not.toHaveBeenCalled();
+    expect(conversations.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('contestar manda solo el texto, por el servicio del panel y con el negocio de la empresa', async () => {
+    const { svc, conversations } = armar();
+    await expect(svc.responder('c-1', { text: 'hola, gracias', orderId: '3b8f6a58-1a2b-4c3d-8e9f-0a1b2c3d4e5f' })).resolves.toMatchObject({ id: 'm-2' });
+    // Nunca se menciona un pedido desde acá: es la cuenta de la empresa, no la atención de un comercio.
+    expect(conversations.sendMessage).toHaveBeenCalledWith('b-orbita', 'c-1', { text: 'hola, gracias' });
   });
 });

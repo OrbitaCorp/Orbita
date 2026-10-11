@@ -37,7 +37,8 @@ export function SeccionHeaderPlantilla({ ap, set, conIconoOpcional, enlaces }: P
             )}
             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
                 Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
-                más que eso empieza a apretarse.
+                más que eso empieza a apretarse. En el celular, el menú de la hamburguesa siempre
+                empieza con "Inicio", sin que tengas que prenderlo.
             </p>
             <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
                 {itemsHeader.map((it, i) => (

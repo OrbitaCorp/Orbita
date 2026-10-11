@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Sparkles, Trash2, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle, Info, ImagePlus, Loader2, Clapperboard, GripVertical } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -1885,7 +1885,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     const agregarValores = (ti: number, vals: string[]) => {
         const tp = prod.tiposVariante[ti]
-        actualizarTipo(ti, { opciones: ordenarValores(tp, [...tp.opciones, ...vals]) })
+        // Si el vendedor ya los ordenó a mano (no coinciden con el orden del
+        // modelo), lo suyo manda: los nuevos van al final y no se reacomoda nada.
+        const reordenadoAMano = ordenarValores(tp, tp.opciones).some((v, i) => v !== tp.opciones[i])
+        actualizarTipo(ti, {
+            opciones: reordenadoAMano
+                ? [...tp.opciones, ...ordenarValores(tp, vals.filter(v => !tp.opciones.includes(v)))]
+                : ordenarValores(tp, [...tp.opciones, ...vals]),
+        })
     }
 
     // Con variantes, el "Precio" de arriba se copia a las filas que todavía
@@ -2391,11 +2398,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                             </div>
                                                         )}
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                                            {tp.opciones.map(op => (
-                                                                <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
-                                                                    <button type="button" className="ds-hover" aria-label={`Quitar ${op}`} onClick={() => actualizarTipo(ti, { opciones: tp.opciones.filter(o => o !== op) })} style={chipX}><X size={11} strokeWidth={2} /></button>
-                                                                </span>
-                                                            ))}
+                                                            <ChipsValores grupo={tp.id} opciones={tp.opciones} onChange={opciones => actualizarTipo(ti, { opciones })} />
                                                             {/* Sugeridos: un toque los suma. Ninguno viene elegido de antemano. */}
                                                             {restantes.map(v => (
                                                                 <button key={v} type="button" className="ds-hover" onClick={() => agregarValores(ti, [v])} style={chipSugerido}>+ {v}</button>
@@ -2406,6 +2409,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                             ))}
                                                             <OpInput tipo={tp.nombre} onAdd={vals => agregarValores(ti, vals)} />
                                                         </div>
+                                                        {tp.opciones.length > 1 && (
+                                                            <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--color-muted)' }}>
+                                                                Arrastrá los valores para cambiar el orden en que se ven en la tienda (en el celular, mantené apretado un instante).
+                                                            </div>
+                                                        )}
                                                         {tp.opciones.length === 0 && habituales.length > 0 ? (
                                                             <button type="button" className="ds-link" onClick={() => agregarValores(ti, habituales)} style={{ ...enlace, marginTop: 10, fontSize: 12 }}>
                                                                 Usar los habituales ({habituales.join(', ')})
@@ -3363,10 +3371,13 @@ function useTouchReorder({
     enabled,
     itemsLength,
     onMover,
+    atributo = 'data-galeria-index',
 }: {
     enabled: boolean
     itemsLength: number
     onMover: (origen: number, destino: number) => void
+    /** Atributo con el índice de cada elemento arrastrable. Cada lista usa el suyo: con uno solo, soltar un chip sobre una foto movía cualquiera. */
+    atributo?: string
 }) {
     const [arrastrando, setArrastrando] = useState<number | null>(null)
     const [sobre, setSobre] = useState<number | null>(null)
@@ -3412,9 +3423,9 @@ function useTouchReorder({
                 const t = ev.touches[0]
                 if (!t) return
                 const elem = document.elementFromPoint(t.clientX, t.clientY)
-                const card = elem?.closest('[data-galeria-index]')
+                const card = elem?.closest(`[${atributo}]`)
                 if (card) {
-                    const targetIdx = Number(card.getAttribute('data-galeria-index'))
+                    const targetIdx = Number(card.getAttribute(atributo))
                     if (!Number.isNaN(targetIdx) && targetIdx !== touchTargetRef.current) {
                         touchTargetRef.current = targetIdx
                         setSobre(targetIdx)
@@ -3447,7 +3458,7 @@ function useTouchReorder({
             window.addEventListener('touchend', onWindowTouchEnd)
             window.addEventListener('touchcancel', onWindowTouchEnd)
         }, 180)
-    }, [enabled, itemsLength, onMover])
+    }, [enabled, itemsLength, onMover, atributo])
 
     const verificarMovimientoTouch = useCallback((e: React.TouchEvent) => {
         if (!touchPosRef.current || isTouchDragging) return
@@ -4435,6 +4446,87 @@ function CategoriaSelect({ categorias, value, onChange, error }: {
                 </div>
             )}
         </div>
+    )
+}
+
+// Los valores de una opción (S, M, L…) como chips que se arrastran para
+// ordenarlos. El orden es el que ve el cliente en la tienda y el de las
+// combinaciones; antes la única forma de cambiarlo era borrar y volver a
+// cargar. Mouse: arrastrar y soltar. Celular: mantener apretado un instante y
+// mover (useTouchReorder). Con el teclado, flechas izquierda/derecha. Devuelve
+// los chips sueltos (un fragmento) para que compartan la fila con las
+// sugerencias y el campo de agregar.
+function ChipsValores({ grupo, opciones, onChange }: { grupo: string; opciones: string[]; onChange: (o: string[]) => void }) {
+    // Un atributo por opción: Talle y Color no se mezclan, ni con la galería de fotos.
+    const atributo = `data-chip-${grupo.replace(/[^a-zA-Z0-9_-]/g, '')}`
+    const puede = opciones.length > 1
+
+    const mover = useCallback((origen: number, destino: number) => {
+        if (destino < 0 || destino >= opciones.length || origen === destino) return
+        const nuevo = [...opciones]
+        const [movido] = nuevo.splice(origen, 1)
+        nuevo.splice(destino, 0, movido)
+        onChange(nuevo)
+    }, [opciones, onChange])
+
+    const {
+        arrastrando, sobre, isTouchDragging,
+        setArrastrando, setSobre,
+        iniciarTouchDrag, verificarMovimientoTouch, cancelarTouchAntesDeIniciar,
+    } = useTouchReorder({ enabled: puede, itemsLength: opciones.length, onMover: mover, atributo })
+
+    function soltar(destino: number) {
+        if (arrastrando !== null && arrastrando !== destino) mover(arrastrando, destino)
+        setArrastrando(null)
+        setSobre(null)
+    }
+
+    return (
+        <>
+            {opciones.map((op, i) => {
+                const encima = puede && sobre === i && arrastrando !== null && arrastrando !== i
+                const agarrado = arrastrando === i
+                return (
+                    <span
+                        key={op}
+                        {...{ [atributo]: i }}
+                        draggable={puede}
+                        tabIndex={puede ? 0 : undefined}
+                        onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', op); setArrastrando(i) }}
+                        onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                        onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                        onDrop={e => { e.preventDefault(); soltar(i) }}
+                        onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                        onTouchStart={e => iniciarTouchDrag(e, i)}
+                        onTouchMove={verificarMovimientoTouch}
+                        onTouchEnd={cancelarTouchAntesDeIniciar}
+                        onTouchCancel={cancelarTouchAntesDeIniciar}
+                        onKeyDown={e => {
+                            if (!puede || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
+                            e.preventDefault()
+                            mover(i, i + (e.key === 'ArrowLeft' ? -1 : 1))
+                        }}
+                        title={puede ? 'Arrastralo para cambiar el orden' : undefined}
+                        style={{
+                            ...chip, border: '1px solid var(--color-primary)',
+                            cursor: puede ? 'grab' : 'default',
+                            opacity: agarrado ? (isTouchDragging ? 0.75 : 0.4) : 1,
+                            transform: isTouchDragging && agarrado ? 'scale(1.08)' : encima ? 'scale(0.94)' : 'none',
+                            outline: encima ? '2px dashed var(--color-primary)' : 'none',
+                            outlineOffset: 2,
+                            boxShadow: isTouchDragging && agarrado ? '0 6px 14px rgba(0,0,0,0.25)' : 'none',
+                            transition: 'opacity 120ms ease, transform 120ms ease',
+                            userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+                            position: 'relative', zIndex: isTouchDragging && agarrado ? 10 : 1,
+                        } as React.CSSProperties}
+                    >
+                        {puede && <GripVertical size={11} strokeWidth={2} style={{ marginLeft: -4, opacity: 0.55, pointerEvents: 'none' }} aria-hidden />}
+                        {op}
+                        <button type="button" className="ds-hover" aria-label={`Quitar ${op}`} onClick={() => onChange(opciones.filter(o => o !== op))} style={chipX}><X size={11} strokeWidth={2} /></button>
+                    </span>
+                )
+            })}
+        </>
     )
 }
 

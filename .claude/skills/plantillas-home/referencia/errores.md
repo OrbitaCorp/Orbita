@@ -444,3 +444,4 @@ falta la versión neutra.
 | Una plantilla nueva que pedía editor nuevo | Se escribió su bloque a mano aunque usaba el vocabulario de siempre | Si se puede escribir con `receta`, va con receta: el editor sale solo |
 | El panel ofrecía una plantilla que la API rechazaba con 400 | `datos.tsx` sumó ids y `HOME_TEMPLATES_DISPONIBLES` quedó atrás | Cruzar las dos listas antes de cerrar, y desplegar la API a mano |
 
+| Los enlaces del navbar no llevaban a ningún lado en la vitrina, y el hover era un gris sucio | `navDe` devolvía solo la etiqueta sin `acciones`, y `.pl-nav:hover` bajaba la opacidad al 58% sobre un nav ya gris | `navDe` da enlaces con `onClick` también en la vitrina (`irEnVitrina`), y el hover subraya y lleva el texto a `t.text` con `...navHover(t)`. Ver § El nav del header en la skill |

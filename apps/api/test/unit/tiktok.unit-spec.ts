@@ -29,7 +29,8 @@ function armar(env: Record<string, string> = ENV) {
     platformAdminLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const config = { get: (k: string) => env[k] };
-  return { svc: new TiktokService(prisma as any, config as any), prisma };
+  const r2 = { presignUpload: jest.fn().mockResolvedValue('https://r2.test/firmada?x=1'), publicUrlDe: jest.fn((p: string) => `https://pub.r2.test/${p}`) };
+  return { svc: new TiktokService(prisma as any, config as any, r2 as any), prisma, r2 };
 }
 
 const cuenta = (over: object = {}) => ({
@@ -345,6 +346,38 @@ describe('enviar a borradores', () => {
     prisma.$queryRaw.mockResolvedValue([cuenta()]);
     await expect(svc.enviarABorradores('https://169.254.169.254/x.mp4', 'admin-1')).rejects.toThrow('no está permitida');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('subir el video desde la computadora', () => {
+  it('da una dirección firmada para subir directo a R2 y la dirección pública para publicar', async () => {
+    const { svc, r2 } = armar();
+    const r = await svc.urlDeSubida('video/mp4');
+    expect(r.uploadUrl).toBe('https://r2.test/firmada?x=1');
+    expect(r.publicUrl).toMatch(/^https:\/\/pub\.r2\.test\/marketing\/tiktok\/[0-9a-f-]{36}\.mp4$/);
+    expect(r2.presignUpload).toHaveBeenCalledWith(expect.stringMatching(/^marketing\/tiktok\/[0-9a-f-]{36}\.mp4$/), 'video/mp4');
+  });
+
+  it('cada subida tiene su propio nombre: no se pisan videos', async () => {
+    const { svc } = armar();
+    expect((await svc.urlDeSubida('video/mp4')).publicUrl).not.toBe((await svc.urlDeSubida('video/mp4')).publicUrl);
+  });
+
+  it.each([['video/quicktime', 'mov'], ['video/webm', 'webm']])('%s se guarda como .%s', async (tipo, ext) => {
+    const { svc } = armar();
+    expect((await svc.urlDeSubida(tipo)).publicUrl.endsWith(`.${ext}`)).toBe(true);
+  });
+
+  it.each(['image/png', 'application/pdf', 'video/x-msvideo', ''])('rechaza %s', async (tipo) => {
+    const { svc, r2 } = armar();
+    await expect(svc.urlDeSubida(tipo)).rejects.toThrow('mp4, mov o webm');
+    expect(r2.presignUpload).not.toHaveBeenCalled();
+  });
+
+  it('sin almacenamiento disponible, avisa', async () => {
+    const prisma = {} as any;
+    const svc = new TiktokService(prisma, { get: (k: string) => ENV[k] } as any);
+    await expect(svc.urlDeSubida('video/mp4')).rejects.toThrow('almacenamiento');
   });
 });
 

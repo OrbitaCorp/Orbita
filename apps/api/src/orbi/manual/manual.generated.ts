@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "807c47c0f6fecbf8",
+  "version": "4ed31d7cd4f4238e",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -269,7 +269,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "variantes",
       "capitulo": "Productos",
       "titulo": "Variantes y stock",
-      "texto": "Si el mismo producto viene en talles o colores, se cargan como variantes: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.\n\nTambién podés definir un stock mínimo: cuando un producto baja de ahí, dispara la alerta de \"stock crítico\" en el Inicio y, si lo activaste, el aviso por la campana o por mail.",
+      "texto": "Si el mismo producto viene en talles o colores, se cargan como variantes: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.\n\nEl orden de los valores (S, M, L…) es el que ven tus clientes en la tienda. Para cambiarlo no hace falta borrar y volver a cargar: arrastrá cada valor a su lugar (en el celular, mantenelo apretado un instante y movelo). Con el teclado, usá las flechas izquierda y derecha.\n\nTambién podés definir un stock mínimo: cuando un producto baja de ahí, dispara la alerta de \"stock crítico\" en el Inicio y, si lo activaste, el aviso por la campana o por mail.",
       "destino": {
         "seccion": "catalogo",
         "label": "Ir a Productos"
@@ -659,7 +659,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "funciones-avanzado",
       "capitulo": "Avanzado",
       "titulo": "Qué trae",
-      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda y el WhatsApp, y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
+      "texto": "- Juegos con premio: Mini-juegos de habilidad (encestar, meter un gol). Vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin pasar por el módulo de Descuentos.\n- Modales de anuncios: Avisos grandes que aparecen en el momento justo en tu tienda: una bienvenida con descuento, un anuncio de temporada.\n- 2x1 y 3x2: La promo \"llevá X, pagá Y\" aplicada sola en el carrito, sin código, con un cartel en la tarjeta del producto.\n- Plantillas de Home: Diseños alternativos para la portada de tu tienda. El resto — catálogo, checkout, perfil — queda igual. Se prueban con \"Ver cómo queda\" antes de aplicar. Los colores y la tipografía son de la plantilla y no se cambian; lo que se muestra lo decidís vos. Con la plantilla puesta, en la pestaña Contenido prendés y apagás las filas de productos (Destacados, Nuevos ingresos, Recomendados, Top ventas), la sección de categorías, el anuncio de arriba, la barra de búsqueda, el WhatsApp, las opiniones de clientes y los cartelitos de las tarjetas (Nuevo, Oferta con el porcentaje y Últimas unidades), y cargás el banner parallax, las marcas y el video. Una fila sin productos no aparece aunque esté prendida.\n- Prueba social: Notificaciones tipo \"Fulano compró tal producto\", armadas con pedidos reales de tu tienda. Nunca con datos inventados.\n- Oferta relámpago: Un descuento que dura poco y se muestra en tu tienda con un reloj en cuenta regresiva. Se arma desde Descuentos, como cualquier otro, y se prende o apaga desde acá.",
       "destino": {
         "seccion": "avanzado",
         "label": "Ir a Avanzado"
