@@ -895,6 +895,23 @@ export class StorefrontService {
     };
   }
 
+  /**
+   * Link corto de un producto (`/p/<código>`, los primeros 8 caracteres de su id): para ponerlo en el texto de una
+   * publicación de Instagram, donde un enlace largo con un UUID no se puede tocar y es feo de copiar. Devuelve el
+   * id completo para que la tienda redirija a la ficha. Solo productos visibles de ESTA tienda.
+   */
+  async resolverLinkCorto(slug: string, codigo: string): Promise<{ id: string }> {
+    if (!/^[0-9a-f]{8}$/i.test(codigo)) throw new NotFoundException('Producto no encontrado');
+    const business = await this.resolveTiendaAbierta(slug);
+    const product = await this.prisma.product.findFirst({
+      where: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] }, id: { startsWith: codigo.toLowerCase() } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+    return { id: product.id };
+  }
+
   async getProduct(slug: string, id: string) {
     const business = await this.resolveTiendaAbierta(slug);
     const branch = await this.sucursalDeVenta(business.id);

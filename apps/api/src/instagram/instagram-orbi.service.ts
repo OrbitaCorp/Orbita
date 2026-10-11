@@ -31,6 +31,7 @@ Escribí exactamente 3 versiones, cada una distinta de verdad:
 - "cercano": tono conversacional, como si le hablaras a un seguidor; pregunta o invitación a comentar.
 - "vendedor": directo al beneficio y a la compra; incluye el precio solo si figura en el contexto, y el enlace de la tienda si figura.
 - "breve": máximo 3 líneas, punch corto.
+Instagram NO convierte los enlaces del texto en botones: nadie puede tocarlos. Por eso, si hay un enlace en el contexto, ponelo una sola vez, tal cual, sin "https://", en una línea propia al final de la versión "vendedor" (y de "cercano" si queda natural), con una frase corta como "Comprá en" o "Escribinos o entrá a"; nunca digas "tocá el link" ni "hacé clic". No lo pongas en "breve".
 Reglas: máximo 900 caracteres por versión; emojis con moderación (hasta 3); separá en párrafos cortos con líneas en blanco; no uses hashtags dentro del texto de las versiones; terminá con una invitación a la acción cuando tenga sentido.
 Además devolvé entre 8 y 12 hashtags relevantes (sin el símbolo #, en minúsculas, sin espacios ni tildes), mezclando amplios y específicos del rubro.
 Formato: {"versiones":[{"estilo":"cercano","texto":"..."},{"estilo":"vendedor","texto":"..."},{"estilo":"breve","texto":"..."}],"hashtags":["..."]}`;
@@ -104,7 +105,7 @@ export class InstagramOrbiService {
 
     const contexto = [`Negocio: ${negocio.name} (rubro: ${negocio.industry}).`];
     if (negocio.description) contexto.push(`Descripción del negocio: ${negocio.description.slice(0, 400)}`);
-    const tienda = `https://${negocio.subdomain}.orbita.site`;
+    const dominio = `${negocio.subdomain}.orbita.site`;
 
     if (input.productId) {
       const p = await this.prisma.product.findFirst({
@@ -115,9 +116,9 @@ export class InstagramOrbiService {
       contexto.push(`Producto a promocionar: ${p.name}.`);
       if (p.description) contexto.push(`Descripción del producto: ${p.description.replace(/\s+/g, ' ').slice(0, 500)}`);
       if (Number(p.basePrice) > 0) contexto.push(`Precio: $${Number(p.basePrice).toLocaleString('es-AR')}.`);
-      contexto.push(`Enlace del producto: ${tienda}/producto/${p.id}`);
+      contexto.push(`Enlace del producto (corto): ${dominio}/p/${p.id.slice(0, 8)}`);
     } else {
-      contexto.push(`Enlace de la tienda: ${tienda}`);
+      contexto.push(`Enlace de la tienda: ${dominio}`);
     }
     const idea = input.idea?.trim().slice(0, MAX_IDEA);
     if (idea) contexto.push(`Lo que el dueño quiere comunicar: ${idea}`);

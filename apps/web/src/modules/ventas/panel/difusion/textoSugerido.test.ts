@@ -5,8 +5,8 @@ describe('textoSugerido', () => {
   const remera = { name: ' Remera lisa ', description: 'Algodón peinado.\n\n  Talles   S a XL.', basePrice: 15000 }
 
   it('arma nombre, descripción limpia, precio y enlace, separados por una línea en blanco', () => {
-    const t = textoSugerido(remera, 'https://tienda.orbita.site/producto/p1')
-    expect(t).toBe('Remera lisa\n\nAlgodón peinado. Talles S a XL.\n\nPrecio: $15.000\n\nComprá en https://tienda.orbita.site/producto/p1')
+    const t = textoSugerido(remera, 'tienda.orbita.site/p/1a2b3c4d')
+    expect(t).toBe('Remera lisa\n\nAlgodón peinado. Talles S a XL.\n\nPrecio: $15.000\n\nComprá en tienda.orbita.site/p/1a2b3c4d\nTambién en el link de mi perfil.')
   })
 
   it('omite lo que no hay: sin descripción, sin precio o sin enlace', () => {
@@ -29,8 +29,8 @@ describe('textoSugerido', () => {
 })
 
 describe('urlDelProducto', () => {
-  it('arma la dirección pública de la tienda, o null sin subdominio', () => {
-    expect(urlDelProducto('mitienda', 'abc')).toBe('https://mitienda.orbita.site/producto/abc')
+  it('arma el link corto (8 caracteres del id, sin https), o null sin subdominio', () => {
+    expect(urlDelProducto('mitienda', '39b2a1a3-462a-4c1c-a1b2-8dd6c0bf5ca3')).toBe('mitienda.orbita.site/p/39b2a1a3')
     expect(urlDelProducto(null, 'abc')).toBeNull()
   })
 })

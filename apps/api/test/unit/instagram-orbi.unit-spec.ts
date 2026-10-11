@@ -72,7 +72,7 @@ describe('redactarTexto', () => {
     expect(prisma.product.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'p1', businessId: BIZ } }));
     const { user } = generar.mock.calls[0][1];
     expect(user).toContain('Remera lino');
-    expect(user).toContain('https://rama.orbita.site/producto/p1');
+    expect(user).toContain('rama.orbita.site/p/p1');
     expect(metering.track).toHaveBeenCalledTimes(2);
   });
 

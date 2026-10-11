@@ -474,6 +474,11 @@ export type StorefrontProductDetail = {
   images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null; hasAiBackground: boolean }[]
 }
 
+// Link corto de un producto (/p/<código>): devuelve el id de la ficha a la que redirigir.
+export function getStorefrontProductoCorto(slug: string, codigo: string) {
+  return storefrontRequest<{ id: string }>(`/${slug}/p/${encodeURIComponent(codigo)}`)
+}
+
 export function getStorefrontProduct(slug: string, id: string) {
   return storefrontRequest<StorefrontProductDetail>(`/${slug}/products/${id}`)
 }
