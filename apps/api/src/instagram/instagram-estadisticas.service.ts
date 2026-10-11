@@ -53,6 +53,8 @@ export interface ResumenDeEstadisticas {
   hasta: string;
   cuenta: { usuario: string | null; seguidores: number | null; siguiendo: number | null; publicaciones: number | null };
   metricas: Record<NombreMetrica, number | null>;
+  /** Las mismas métricas del período inmediatamente anterior (misma cantidad de días), para comparar. */
+  anterior: Record<NombreMetrica, number | null>;
   destacadas: PublicacionDestacada[];
 }
 
@@ -79,15 +81,9 @@ export class InstagramEstadisticasService {
       { query: { fields: 'username,followers_count,follows_count,media_count' } },
     );
 
-    const nombres = Object.keys(METRICAS) as NombreMetrica[];
-    const [metricas, medios] = await Promise.all([
-      Promise.allSettled(
-        nombres.map((n) =>
-          this.instagram.graph<{ data?: { total_value?: { value?: number } }[] }>(businessId, SCOPE_ESTADISTICAS, '{ig}/insights', {
-            query: { metric: METRICAS[n], period: 'day', metric_type: 'total_value', since: String(desdeS), until: String(hastaS) },
-          }),
-        ),
-      ),
+    const [valores, anterior, medios] = await Promise.all([
+      this.metricas(businessId, desdeS, hastaS),
+      this.metricas(businessId, desdeS - dias * DIA_S, desdeS),
       this.instagram
         .graph<{ data?: IgMedia[] }>(businessId, SCOPE_ESTADISTICAS, '{ig}/media', {
           query: {
@@ -100,14 +96,6 @@ export class InstagramEstadisticasService {
           return { data: [] as IgMedia[] };
         }),
     ]);
-
-    const valores = {} as Record<NombreMetrica, number | null>;
-    nombres.forEach((n, i) => {
-      const r = metricas[i];
-      // Instagram devuelve un conjunto vacío (no un cero) cuando todavía no hay datos: queda en null.
-      valores[n] = r.status === 'fulfilled' ? (r.value.data?.[0]?.total_value?.value ?? null) : null;
-      if (r.status === 'rejected') this.logger.warn(`Métrica ${METRICAS[n]} no disponible: ${describeError(r.reason)}`);
-    });
 
     const destacadas = (medios.data ?? [])
       .filter((m) => m.timestamp && Date.parse(m.timestamp) / 1000 >= desdeS)
@@ -134,9 +122,30 @@ export class InstagramEstadisticasService {
         publicaciones: cuenta.media_count ?? null,
       },
       metricas: valores,
+      anterior,
       destacadas,
     };
     this.cache.set(clave, { vence: Date.now() + CACHE_MS, valor });
     return valor;
+  }
+
+  // Cada métrica se pide por separado: una que falla queda en null y no tira abajo a las demás.
+  private async metricas(businessId: string, desdeS: number, hastaS: number): Promise<Record<NombreMetrica, number | null>> {
+    const nombres = Object.keys(METRICAS) as NombreMetrica[];
+    const respuestas = await Promise.allSettled(
+      nombres.map((n) =>
+        this.instagram.graph<{ data?: { total_value?: { value?: number } }[] }>(businessId, SCOPE_ESTADISTICAS, '{ig}/insights', {
+          query: { metric: METRICAS[n], period: 'day', metric_type: 'total_value', since: String(desdeS), until: String(hastaS) },
+        }),
+      ),
+    );
+    const valores = {} as Record<NombreMetrica, number | null>;
+    nombres.forEach((n, i) => {
+      const r = respuestas[i];
+      // Instagram devuelve un conjunto vacío (no un cero) cuando todavía no hay datos: queda en null.
+      valores[n] = r.status === 'fulfilled' ? (r.value.data?.[0]?.total_value?.value ?? null) : null;
+      if (r.status === 'rejected') this.logger.warn(`Métrica ${METRICAS[n]} no disponible: ${describeError(r.reason)}`);
+    });
+    return valores;
   }
 }

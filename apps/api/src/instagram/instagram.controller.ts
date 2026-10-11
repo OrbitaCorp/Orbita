@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -11,6 +11,7 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { MarcarLeidaDto, ResponderMensajeDto } from './dto/bandeja-instagram.dto';
+import { RedactarTextoDto, SugerirRespuestaDto } from './dto/orbi-instagram.dto';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
 import { CrearPublicacionDto, SubirVideoDto } from './dto/crear-publicacion.dto';
@@ -19,6 +20,7 @@ import { InstagramBandejaService } from './instagram-bandeja.service';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramEstadisticasService } from './instagram-estadisticas.service';
 import { InstagramMediosService } from './instagram-medios.service';
+import { InstagramOrbiService } from './instagram-orbi.service';
 import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramService } from './instagram.service';
 
@@ -43,6 +45,7 @@ export class InstagramController {
     private readonly comentariosSvc: InstagramComentariosService,
     private readonly estadisticasSvc: InstagramEstadisticasService,
     private readonly bandeja: InstagramBandejaService,
+    private readonly orbi: InstagramOrbiService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -90,6 +93,47 @@ export class InstagramController {
   async marcarCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: MarcarLeidaDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.marcarLeida(businessId, id, dto.leida);
+  }
+
+  // Ideas de qué publicar (productos de la tienda que todavía no se mostraron en Instagram).
+  @Get('posts/ideas')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async ideas(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.publicaciones.ideas(businessId);
+  }
+
+  // Orbi escribe el texto de una publicación (3 versiones y hashtags). Es una sugerencia: no publica nada.
+  @Post('orbi/texto')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async orbiTexto(@CurrentBusiness() ctx: AuthContext, @Body() dto: RedactarTextoDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.orbi.redactarTexto(businessId, dto);
+  }
+
+  // Orbi sugiere cómo responder un comentario o un mensaje directo (lo atiende todo el equipo).
+  @Post('orbi/respuesta')
+  @FullModeOnly()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async orbiRespuesta(@CurrentBusiness() ctx: AuthContext, @Body() dto: SugerirRespuestaDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.orbi.sugerirRespuesta(businessId, dto);
+  }
+
+  // Orbi explica las estadísticas en palabras simples.
+  @Get('orbi/lectura')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async orbiLectura(@CurrentBusiness() ctx: AuthContext, @Query('dias') dias?: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.orbi.leerEstadisticas(businessId, dias === '28' ? 28 : 7);
   }
 
   // Historial de lo publicado desde Órbita (Difusión → Publicaciones).

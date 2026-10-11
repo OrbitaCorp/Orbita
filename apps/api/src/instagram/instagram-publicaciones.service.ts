@@ -17,6 +17,7 @@ import { InstagramService, SCOPE_PUBLICAR } from './instagram.service';
 
 const MAX_ELEMENTOS = 10;
 const MAX_PUBLICACIONES_RECIENTES = 30;
+const MAX_IDEAS = 4;
 const INTENTOS_AL_CREAR = 5;
 const PAUSA_AL_CREAR_MS = 2000;
 // Pasado este tiempo sin terminar, se da por fallada (un contenedor de Instagram vence a las 24 h).
@@ -36,6 +37,14 @@ const SELECCION = {
   imageUrl: true, permalink: true, error: true, createdAt: true,
 } satisfies Prisma.InstagramPostSelect;
 type FilaVista = Prisma.InstagramPostGetPayload<{ select: typeof SELECCION }>;
+
+export interface IdeaDePublicacion {
+  productId: string;
+  nombre: string;
+  foto: string | null;
+  fotos: number;
+  motivo: string;
+}
 
 export interface PublicacionVista {
   id: string;
@@ -85,6 +94,35 @@ export class InstagramPublicacionesService {
       select: SELECCION,
     });
     return filas.map(aVista);
+  }
+
+  /**
+   * Productos de la tienda que todavía no se publicaron en Instagram desde Órbita, para sugerir qué subir: primero
+   * los destacados, después los más nuevos. Solo los publicados en la tienda y con foto.
+   */
+  async ideas(businessId: string): Promise<IdeaDePublicacion[]> {
+    const yaPublicados = await this.prisma.instagramPost.findMany({
+      where: { businessId, status: { in: ['PUBLISHED', 'PUBLISHING', 'PROCESSING'] }, productId: { not: null } },
+      select: { productId: true },
+    });
+    const excluidos = yaPublicados.flatMap((p) => (p.productId ? [p.productId] : []));
+    const productos = await this.prisma.product.findMany({
+      where: { businessId, status: 'PUBLISHED', id: { notIn: excluidos }, images: { some: {} } },
+      orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
+      take: MAX_IDEAS,
+      select: {
+        id: true, name: true, isFeatured: true, createdAt: true,
+        images: { orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }], select: { url: true } },
+      },
+    });
+    const haceUnMes = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return productos.map((p) => ({
+      productId: p.id,
+      nombre: p.name,
+      foto: p.images[0]?.url ?? null,
+      fotos: p.images.length,
+      motivo: p.isFeatured ? 'Es un producto destacado' : p.createdAt.getTime() > haceUnMes ? 'Es nuevo en tu tienda' : 'Todavía no lo mostraste en Instagram',
+    }));
   }
 
   // ── Crear ───────────────────────────────────────────────────────────────────
