@@ -3359,7 +3359,7 @@ export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publi
 // en procesarse: nace PROCESSING y el panel la sigue con `continuar` hasta que queda PUBLISHED o FAILED.
 export type InstagramPublicacion = {
   id: string
-  estado: 'PROCESSING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
+  estado: 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
   tipo: 'IMAGE' | 'VIDEO' | 'CAROUSEL' | string
   productId: string | null
   productName: string | null
@@ -3370,12 +3370,35 @@ export type InstagramPublicacion = {
   permalink: string | null
   error: string | null
   createdAt: string
+  /** Programadas: cuándo salen (ISO). */
+  programadaPara: string | null
+  /** Borradores y programadas: lo necesario para retomarlas en el compositor. */
+  formato: 'cuadrado' | 'vertical' | null
+  items: (InstagramItemPublicacion & { vista: string })[] | null
 }
 export type InstagramItemPublicacion = { origen: 'producto' | 'subida'; ref: string; tipo: 'image' | 'video' }
 export type InstagramArchivoSubido = { ref: string; tipo: 'image' | 'video'; url: string }
 export function getInstagramPosts() { return panelRequest<InstagramPublicacion[]>('/instagram/posts') }
 export function crearPublicacionInstagram(input: { productId?: string; caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }) {
   return panelRequest<InstagramPublicacion>('/instagram/posts', { method: 'POST', body: JSON.stringify(input) })
+}
+export type InstagramPublicacionBody = { id?: string; productId?: string; caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }
+export function programarPublicacionInstagram(input: InstagramPublicacionBody & { programarPara: string }) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts/schedule', { method: 'POST', body: JSON.stringify(input) })
+}
+export function guardarBorradorInstagram(input: InstagramPublicacionBody) {
+  return panelRequest<InstagramPublicacion>('/instagram/posts/draft', { method: 'POST', body: JSON.stringify(input) })
+}
+export function desprogramarPublicacionInstagram(id: string) {
+  return panelRequest<InstagramPublicacion>(`/instagram/posts/${id}/unschedule`, { method: 'POST' })
+}
+/** `conservarArchivos`: el borrador se acaba de publicar y sus archivos ya son de esa publicación. */
+export function descartarPublicacionInstagram(id: string, conservarArchivos = false) {
+  return panelRequest<{ ok: true }>(`/instagram/posts/${id}${conservarArchivos ? '?conservar=1' : ''}`, { method: 'DELETE' })
+}
+/** Lo publicado y lo programado de un mes (`2026-10`). */
+export function getInstagramCalendario(mes: string) {
+  return panelRequest<InstagramPublicacion[]>(`/instagram/posts/calendar?mes=${encodeURIComponent(mes)}`)
 }
 export function continuarPublicacionInstagram(id: string) {
   return panelRequest<InstagramPublicacion>(`/instagram/posts/${id}/continuar`, { method: 'POST' })
@@ -3452,7 +3475,9 @@ export type InstagramPublicacionComentada = {
   totalComentarios: number
   comentarios: InstagramComentario[]
 }
-export function getInstagramComentarios() { return panelRequest<{ publicaciones: InstagramPublicacionComentada[] }>('/instagram/comments') }
+export function getInstagramComentarios() {
+  return panelRequest<{ publicaciones: InstagramPublicacionComentada[]; ocultadosAutomaticamente?: number }>('/instagram/comments')
+}
 export function replyInstagramComment(id: string, texto: string) {
   return panelRequest<{ id: string }>(`/instagram/comments/${id}/reply`, { method: 'POST', body: JSON.stringify({ texto }) })
 }
@@ -3495,6 +3520,70 @@ export function pedirRespuestaAOrbi(input: { tipo: 'comentario' | 'mensaje'; tex
 export function pedirLecturaAOrbi(dias: 7 | 28) {
   return panelRequest<{ resumen: string; sugerencias: string[] }>(`/instagram/orbi/lectura?dias=${dias}`)
 }
+// Publicaciones que Orbi armó a partir de las métricas de la cuenta: producto, fotos, texto, hashtags y cuándo
+// conviene publicarlas. La persona las revisa; Orbi no publica nada solo.
+export type InstagramSugerida = {
+  productId: string
+  nombre: string
+  fotos: string[]
+  tipo: 'foto' | 'carrusel'
+  texto: string
+  hashtags: string[]
+  /** ISO (UTC). */
+  cuando: string
+  motivos: string[]
+  basadaEnMetricas: boolean
+}
+export function getInstagramSugeridas(refrescar = false) {
+  return panelRequest<InstagramSugerida[]>(`/instagram/orbi/sugeridas${refrescar ? '?refrescar=1' : ''}`)
+}
+
+// Qué tipo de publicación y qué momento le funciona mejor a la cuenta (sus últimas 50 publicaciones).
+export type InstagramRendimiento = {
+  muestra: number
+  suficiente: boolean
+  publicaciones: { id: string; texto: string; imagen: string | null; enlace: string | null; fecha: string | null; tipo: 'foto' | 'carrusel' | 'reel' | 'video'; likes: number; comentarios: number; interacciones: number }[]
+  tipos: { tipo: 'foto' | 'carrusel' | 'reel' | 'video'; publicaciones: number; promedio: number }[]
+  /** `clave`: día de la semana (0 = domingo … 6 = sábado). */
+  mejoresDias: { clave: number; publicaciones: number; promedio: number }[]
+  /** `clave`: hora (de Argentina) en que empieza la ventana de 3 horas. */
+  mejoresHoras: { clave: number; publicaciones: number; promedio: number }[]
+  proximoMomento: string
+  momentos: string[]
+  momentoDeLaCuenta: boolean
+}
+export function getInstagramRendimiento() { return panelRequest<InstagramRendimiento>('/instagram/insights/rendimiento') }
+
+// Ajustes de Difusión: respuestas automáticas de los mensajes y moderación de los comentarios.
+export type InstagramAjustes = {
+  bienvenida: { activa: boolean; texto: string }
+  ausencia: { activa: boolean; texto: string; desde: string; hasta: string; dias: number[] }
+  moderacion: { activa: boolean; palabras: string[] }
+}
+export function getInstagramAjustes() { return panelRequest<InstagramAjustes>('/instagram/settings') }
+export function saveInstagramAjustes(a: InstagramAjustes) {
+  return panelRequest<InstagramAjustes>('/instagram/settings', { method: 'PUT', body: JSON.stringify(a) })
+}
+
+// De la charla a la venta (Difusión → Mensajes).
+export type InstagramFichaCliente = {
+  id: string
+  nombre: string
+  email: string | null
+  telefono: string | null
+  desde: string
+  pedidos: { cantidad: number; total: number; ultimos: { id: string; numero: number; estado: string; total: number; fecha: string }[] }
+}
+export function enviarProductoInstagram(charlaId: string, productId: string) {
+  return panelRequest<InstagramMensaje[]>(`/instagram/inbox/${charlaId}/product`, { method: 'POST', body: JSON.stringify({ productId }) })
+}
+export function getInstagramClienteDeCharla(charlaId: string) {
+  return panelRequest<InstagramFichaCliente>(`/instagram/inbox/${charlaId}/customer`)
+}
+export function vincularInstagramCliente(charlaId: string, customerId: string) {
+  return panelRequest<{ conversationId: string }>(`/instagram/inbox/${charlaId}/link`, { method: 'POST', body: JSON.stringify({ customerId }) })
+}
+
 // Productos de la tienda que todavía no se mostraron en Instagram desde Órbita.
 export type InstagramIdea = { productId: string; nombre: string; foto: string | null; fotos: number; motivo: string }
 export function getInstagramIdeas() { return panelRequest<InstagramIdea[]>('/instagram/posts/ideas') }

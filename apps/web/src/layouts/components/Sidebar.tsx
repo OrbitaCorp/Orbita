@@ -79,6 +79,8 @@ const MODULOS: Modulo[] = [
             { label: 'Instagram', seccion: 'difusion' },
             { label: 'Mensajes', seccion: 'difusion', vista: 'mensajes' },
             { label: 'Publicaciones', seccion: 'difusion', vista: 'publicaciones' },
+            { label: 'Sugeridas por Orbi', seccion: 'difusion', vista: 'sugeridas' },
+            { label: 'Calendario', seccion: 'difusion', vista: 'calendario' },
             { label: 'Comentarios', seccion: 'difusion', vista: 'comentarios' },
             { label: 'Estadísticas', seccion: 'difusion', vista: 'estadisticas' },
         ],

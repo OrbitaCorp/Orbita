@@ -2,10 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { Calendario } from './Calendario'
 import { Comentarios } from './Comentarios'
 import { Estadisticas } from './Estadisticas'
 import { Mensajes } from './Mensajes'
 import { Publicaciones } from './Publicaciones'
+import { Sugeridas } from './Sugeridas'
 import { Tablero } from './Tablero'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
@@ -18,7 +20,7 @@ import type { InstagramEstado } from '@/lib/api'
 // Mientras la conexión no esté completa, el modal de Instagram se abre cada vez que se entra al
 // módulo (en cualquier pantalla): es lo único que hay para hacer hasta que quede conectada.
 
-type Vista = 'instagram' | 'mensajes' | 'publicaciones' | 'comentarios' | 'estadisticas'
+type Vista = 'instagram' | 'mensajes' | 'publicaciones' | 'sugeridas' | 'calendario' | 'comentarios' | 'estadisticas'
 type Funcion = Exclude<Vista, 'instagram'>
 
 const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: ReactNode }> = {
@@ -31,6 +33,16 @@ const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: R
     titulo: 'Publicaciones',
     texto: 'Elegí un producto, mirá cómo queda la publicación y subila a tu Instagram sin salir de Órbita.',
     ilustracion: <IlustracionPublicacion />,
+  },
+  sugeridas: {
+    titulo: 'Sugeridas por Orbi',
+    texto: 'Orbi arma las próximas publicaciones con tus ventas y lo que mejor te funcionó: vos las revisás y las programás.',
+    ilustracion: <IlustracionSugeridas />,
+  },
+  calendario: {
+    titulo: 'Calendario',
+    texto: 'Mirá lo publicado y lo programado de cada mes, y encontrá los días en que más reaccionan tus seguidores.',
+    ilustracion: <IlustracionCalendario />,
   },
   comentarios: {
     titulo: 'Comentarios',
@@ -45,7 +57,7 @@ const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: R
 }
 
 function esVista(v: unknown): v is Vista {
-  return v === 'instagram' || v === 'mensajes' || v === 'publicaciones' || v === 'comentarios' || v === 'estadisticas'
+  return v === 'instagram' || v === 'mensajes' || v === 'publicaciones' || v === 'sugeridas' || v === 'calendario' || v === 'comentarios' || v === 'estadisticas'
 }
 
 // Cuántos de los 3 pasos de la conexión están hechos: 0 sin pedido, 1 pedido enviado (pendiente de
@@ -116,6 +128,10 @@ export default function Difusion() {
             <Mensajes estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'publicaciones' ? (
             <Publicaciones estado={estado} onAbrirConexion={() => setAbierto(true)} />
+          ) : vista === 'sugeridas' ? (
+            <Sugeridas estado={estado} onAbrirConexion={() => setAbierto(true)} />
+          ) : vista === 'calendario' ? (
+            <Calendario estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : vista === 'comentarios' ? (
             <Comentarios estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : (
@@ -191,6 +207,36 @@ function IlustracionPublicacion() {
       <div className="dif-imagen"><span className="dif-sol" /><span className="dif-monte" /></div>
       <span className="dif-linea" style={{ width: '70%' }} />
       <span className="dif-linea" style={{ width: '45%' }} />
+    </div>
+  )
+}
+
+// Sugeridas por Orbi: dos publicaciones apiladas y una chispa, que es lo que Orbi arma por vos.
+function IlustracionSugeridas() {
+  return (
+    <div className="dif-mock dif-mock-sugeridas">
+      <div className="dif-sug-tarjeta dif-sug-atras" />
+      <div className="dif-sug-tarjeta">
+        <div className="dif-imagen" style={{ height: '48%' }}><span className="dif-sol" /><span className="dif-monte" /></div>
+        <span className="dif-linea" style={{ width: '80%' }} />
+        <span className="dif-linea" style={{ width: '55%' }} />
+      </div>
+      <span className="dif-chispa" aria-hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2L12 2z" fill="currentColor" /></svg>
+      </span>
+    </div>
+  )
+}
+
+// Calendario: una grilla de días con algunas publicaciones marcadas.
+function IlustracionCalendario() {
+  const marcados = new Set([3, 8, 10, 15, 17, 22])
+  return (
+    <div className="dif-mock dif-mock-calendario">
+      <span className="dif-linea" style={{ width: '34%', marginBottom: 8 }} />
+      <div className="dif-cal-grilla">
+        {Array.from({ length: 28 }, (_, i) => <span key={i} className={`dif-cal-dia${marcados.has(i) ? ' dif-cal-dia-marcado' : ''}${i === 15 ? ' dif-cal-dia-programado' : ''}`} />)}
+      </div>
     </div>
   )
 }
@@ -276,6 +322,15 @@ const CSS = `
 .dif-sol { position: absolute; top: 16%; right: 14%; width: 15px; height: 15px; border-radius: 50%; background: var(--color-surface); }
 .dif-monte { position: absolute; left: -12%; bottom: -34%; width: 124%; height: 62%; border-radius: 50%; background: var(--color-muted); opacity: 0.24; }
 
+.dif-mock-sugeridas { align-items: center; justify-content: center; }
+.dif-sug-tarjeta { position: relative; width: 46%; height: 88%; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; border-radius: 10px; background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: 0 6px 16px -10px rgba(15,23,42,0.35); }
+.dif-sug-atras { position: absolute; transform: translate(14%, -4%) rotate(5deg); opacity: 0.65; }
+.dif-chispa { position: absolute; right: 22%; top: 12%; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); background: var(--color-surface); border: 1px solid var(--color-border); }
+.dif-mock-calendario { flex-direction: column; justify-content: center; padding: 14px 20px; }
+.dif-cal-grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.dif-cal-dia { aspect-ratio: 1; border-radius: 5px; background: var(--color-border); opacity: 0.55; }
+.dif-cal-dia-marcado { background: var(--color-muted); opacity: 0.7; }
+.dif-cal-dia-programado { background: transparent; border: 1.5px dashed var(--color-muted); opacity: 1; }
 .dif-mock-comentarios { flex-direction: column; justify-content: center; gap: 8px; }
 .dif-mock-comentarios .dif-mock-fila { width: 100%; }
 .dif-mock-publicacion { padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }

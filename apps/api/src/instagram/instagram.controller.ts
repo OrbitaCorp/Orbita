@@ -157,10 +157,10 @@ export class InstagramController {
   @Delete('posts/:id')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  async descartar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+  async descartar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Query('conservar') conservar?: string) {
     const { businessId } = assertMemberContext(ctx);
     await this.instagram.asegurarHabilitado(businessId);
-    return this.publicaciones.descartar(businessId, id);
+    return this.publicaciones.descartar(businessId, id, conservar === '1');
   }
 
   // Lo publicado y lo programado de un mes (?mes=2026-10), para el calendario.

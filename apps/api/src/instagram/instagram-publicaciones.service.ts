@@ -374,12 +374,15 @@ export class InstagramPublicacionesService {
     return this.vista(businessId, id);
   }
 
-  /** Borra un borrador o una programada, con los archivos que se habían subido para ella. */
-  async descartar(businessId: string, id: string): Promise<{ ok: true }> {
+  /**
+   * Borra un borrador o una programada, con los archivos que se habían subido para ella. `conservarArchivos`: el
+   * borrador se acaba de publicar ahora, y los archivos ya son de esa publicación (no se tocan).
+   */
+  async descartar(businessId: string, id: string, conservarArchivos = false): Promise<{ ok: true }> {
     const f = await this.prisma.instagramPost.findFirst({ where: { id, businessId, status: { in: ['DRAFT', 'SCHEDULED'] } }, select: { plan: true } });
     if (!f) throw new NotFoundException('Publicación no encontrada');
     const r = await this.prisma.instagramPost.deleteMany({ where: { id, businessId, status: { in: ['DRAFT', 'SCHEDULED'] } } });
-    if (r.count > 0 && esPlan(f.plan)) await this.medios.limpiarSubidas(businessId, f.plan.items);
+    if (r.count > 0 && !conservarArchivos && esPlan(f.plan)) await this.medios.limpiarSubidas(businessId, f.plan.items);
     return { ok: true };
   }
 
