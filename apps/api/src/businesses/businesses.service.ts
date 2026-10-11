@@ -437,6 +437,11 @@ export class BusinessesService {
       else data.cuit = digitos;
     }
     if (dto.legalName !== undefined) data.legalName = (dto.legalName ?? '').trim() || null;
+    // Datos para transferir (alias, titular, entidad): se guardan sin espacios
+    // sobrantes y vacío borra (null), así el checkout no muestra una fila en blanco.
+    for (const campo of ['transferAlias', 'transferHolder', 'transferBank'] as const) {
+      if (dto[campo] !== undefined) data[campo] = (dto[campo] ?? '').trim() || null;
+    }
 
     return this.prisma.businessConfig.update({
       where: { businessId },

@@ -192,6 +192,7 @@ export type StorefrontConfigResponse = {
     transferAlias: string | null
     transferCbu: string | null
     transferHolder: string | null
+    transferBank: string | null
     cashDiscountPercent: number | null
     // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia"
     // (acceptsTransfer, hoy "Coordinar por WhatsApp").

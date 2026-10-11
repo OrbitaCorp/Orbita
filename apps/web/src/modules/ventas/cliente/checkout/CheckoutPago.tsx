@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
+import { DatosTransferencia } from './DatosTransferencia'
 import {
   Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
   CreditCard, X, MapPin, Plus, Gift, Check, MessageCircle,
@@ -1065,6 +1066,23 @@ export default function CheckoutPago() {
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
                           No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás (transferencia, link de pago, crédito, u otro medio), apenas confirmes el pedido.
                           {!!pctEsteMetodo && <> El total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).</>}
+                        </div>
+                      )}
+                      {/* Datos para transferir (opcionales, los carga el negocio):
+                          si los hay, el cliente puede adelantar el pago sin pedirlos por chat. */}
+                      {active && id === 'TRANSFER' && !transferenciaAlRetirar && (config?.payment?.transferAlias || config?.payment?.transferHolder || config?.payment?.transferBank) && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                            Si querés adelantar el pago, transferí a:
+                          </div>
+                          <DatosTransferencia
+                            alias={config?.payment?.transferAlias}
+                            titular={config?.payment?.transferHolder}
+                            entidad={config?.payment?.transferBank}
+                          />
+                          <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                            Si pagás antes, acordate de enviarle el comprobante al negocio por WhatsApp.
+                          </div>
                         </div>
                       )}
 

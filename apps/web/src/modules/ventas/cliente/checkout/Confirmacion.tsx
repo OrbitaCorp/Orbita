@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
+import { DatosTransferencia } from './DatosTransferencia'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt, openWpp } from '@/lib/storefront/utils'
@@ -245,6 +246,24 @@ export default function Confirmacion() {
             <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
               Tu pedido <strong style={{ color: 'var(--color-text)' }}>#{pedido.orderNumber}</strong> fue recibido correctamente. No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás.
             </p>
+
+            {/* Datos para transferir (opcionales, los carga el negocio en
+                Configuración → Pagos). Si no cargó ninguno, no se muestra nada. */}
+            {(config?.payment?.transferAlias || config?.payment?.transferHolder || config?.payment?.transferBank) && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8, textAlign: 'left' }}>
+                  Si querés adelantar el pago por transferencia
+                </div>
+                <DatosTransferencia
+                  alias={config?.payment?.transferAlias}
+                  titular={config?.payment?.transferHolder}
+                  entidad={config?.payment?.transferBank}
+                />
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 10, lineHeight: 1.5, textAlign: 'left' }}>
+                  Si pagás antes de que te contactemos, enviá el comprobante por WhatsApp indicando tu pedido <strong>#{pedido.orderNumber}</strong> para que podamos confirmarlo.
+                </div>
+              </div>
+            )}
 
             {tienda.wpp && (
               <button

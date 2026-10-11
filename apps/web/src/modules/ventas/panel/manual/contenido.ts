@@ -814,7 +814,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Qué medios de pago acepta tu tienda.' },
                 { tipo: 'campos', items: [
                     { label: 'Mercado Pago', texto: 'Pagos online con tarjeta, débito y cuotas. Se conecta con [[Conectar cuenta]]: te lleva a Mercado Pago, autorizás, y volvés. Es opcional: sin Mercado Pago igual podés cobrar por transferencia o en efectivo; lo que no vas a tener es el pago con tarjeta desde la tienda.' },
-                    { label: 'Coordinar por WhatsApp', texto: 'El cliente cierra la compra y vos arreglás el pago por WhatsApp. No se le muestra ningún CBU ni alias en la tienda.' },
+                    { label: 'Coordinar por WhatsApp', texto: 'El cliente cierra la compra y vos arreglás el pago por WhatsApp. Opcionalmente podés cargar **alias, nombre del titular y entidad** (banco o billetera): se los mostramos en el checkout y al confirmar la compra, así no tenés que pasárselos por chat. Si paga antes de que lo contactes, la tienda le avisa que te envíe el comprobante por WhatsApp. Si no cargás ninguno de los tres, no se le muestra ningún dato bancario.' },
                     { label: 'Retiro en local', texto: 'Si lo activás, el cliente puede retirar. Ahí se habilitan los medios de pago que aceptás en el mostrador: efectivo, débito, crédito o Mercado Pago.' },
                     { label: 'Descuento por pagar con Mercado Pago', texto: 'Un % opcional para empujar el pago online.' },
                 ] },

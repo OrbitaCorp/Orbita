@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "9d94db4e10c29074",
+  "version": "4d5bfe87d88cb271",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -539,7 +539,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-pagos",
       "capitulo": "Configuración",
       "titulo": "Pagos",
-      "texto": "Qué medios de pago acepta tu tienda.\n\n- Mercado Pago: Pagos online con tarjeta, débito y cuotas. Se conecta con \"Conectar cuenta\": te lleva a Mercado Pago, autorizás, y volvés. Es opcional: sin Mercado Pago igual podés cobrar por transferencia o en efectivo; lo que no vas a tener es el pago con tarjeta desde la tienda.\n- Coordinar por WhatsApp: El cliente cierra la compra y vos arreglás el pago por WhatsApp. No se le muestra ningún CBU ni alias en la tienda.\n- Retiro en local: Si lo activás, el cliente puede retirar. Ahí se habilitan los medios de pago que aceptás en el mostrador: efectivo, débito, crédito o Mercado Pago.\n- Descuento por pagar con Mercado Pago: Un % opcional para empujar el pago online.\n\nDato: Mercado Pago te cobra una comisión por cada cobro, y no es un % fijo: cambia según el medio de pago y las cuotas. La ves en el detalle de cada pedido y sumada por período en el Inicio.\n\nOjo: Si activás \"Retiro en local\" pero no cargaste la dirección, la tienda le avisa al cliente que se la vas a pasar por WhatsApp. Conviene cargarla en Negocio.",
+      "texto": "Qué medios de pago acepta tu tienda.\n\n- Mercado Pago: Pagos online con tarjeta, débito y cuotas. Se conecta con \"Conectar cuenta\": te lleva a Mercado Pago, autorizás, y volvés. Es opcional: sin Mercado Pago igual podés cobrar por transferencia o en efectivo; lo que no vas a tener es el pago con tarjeta desde la tienda.\n- Coordinar por WhatsApp: El cliente cierra la compra y vos arreglás el pago por WhatsApp. Opcionalmente podés cargar alias, nombre del titular y entidad (banco o billetera): se los mostramos en el checkout y al confirmar la compra, así no tenés que pasárselos por chat. Si paga antes de que lo contactes, la tienda le avisa que te envíe el comprobante por WhatsApp. Si no cargás ninguno de los tres, no se le muestra ningún dato bancario.\n- Retiro en local: Si lo activás, el cliente puede retirar. Ahí se habilitan los medios de pago que aceptás en el mostrador: efectivo, débito, crédito o Mercado Pago.\n- Descuento por pagar con Mercado Pago: Un % opcional para empujar el pago online.\n\nDato: Mercado Pago te cobra una comisión por cada cobro, y no es un % fijo: cambia según el medio de pago y las cuotas. La ves en el detalle de cada pedido y sumada por período en el Inicio.\n\nOjo: Si activás \"Retiro en local\" pero no cargaste la dirección, la tienda le avisa al cliente que se la vas a pasar por WhatsApp. Conviene cargarla en Negocio.",
       "destino": {
         "seccion": "configuracion",
         "vista": "pagos",

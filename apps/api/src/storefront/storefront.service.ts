@@ -476,6 +476,7 @@ export class StorefrontService {
             // que la tienda no está ofreciendo en este momento.
             transferCbu: contact.acceptsTransfer ? contact.transferCbu : null,
             transferHolder: contact.acceptsTransfer ? contact.transferHolder : null,
+            transferBank: contact.acceptsTransfer ? contact.transferBank : null,
             cashDiscountPercent: contact.acceptsCash && contact.cashDiscountPercent != null
               ? Number(contact.cashDiscountPercent)
               : null,

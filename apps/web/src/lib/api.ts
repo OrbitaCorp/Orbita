@@ -280,6 +280,7 @@ export type UpdateBusinessConfigInput = Partial<{
   transferAlias: string
   transferCbu: string
   transferHolder: string
+  transferBank: string
   pickupPaymentMethods: string[]
   // % de descuento por pagar en efectivo (ej: 10 = 10%) — ya existía en el
   // backend/DTO/checkout, faltaba exponerlo acá para poder configurarlo.
@@ -334,7 +335,7 @@ export function getBusinessConfig() {
     cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
-    transferCbu: string | null; transferHolder: string | null
+    transferCbu: string | null; transferHolder: string | null; transferBank: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
@@ -534,7 +535,7 @@ export function panelGetBusinessConfig() {
     cuit: string | null; legalName: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
-    transferCbu: string | null; transferHolder: string | null
+    transferCbu: string | null; transferHolder: string | null; transferBank: string | null
     pickupPaymentMethods: string[]
     cashDiscountPercent: string | number | null
     // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia".

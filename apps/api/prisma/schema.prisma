@@ -203,6 +203,11 @@ model BusinessConfig {
   // Los dos opcionales: un negocio puede seguir operando solo con alias.
   transferCbu    String? @map("transfer_cbu")
   transferHolder String? @map("transfer_holder")
+  // Entidad (banco o billetera) de la cuenta del alias. Junto con alias y
+  // titular se muestra en el checkout de "Coordinar por WhatsApp" para que el
+  // cliente que quiera adelantar el pago no tenga que pedirlos por chat. Los
+  // tres son opcionales.
+  transferBank   String? @map("transfer_bank") @db.VarChar(80)
 
   // Medios que se aceptan puntualmente AL RETIRAR en el local — puede ser
   // distinto de los medios de pago online (ej: acepta tarjeta al retirar
