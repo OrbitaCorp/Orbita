@@ -3474,9 +3474,30 @@ export type InstagramEstadisticas = {
     cuentasInteractuaron: number | null
     visitasAlPerfil: number | null
   }
+  /** Las mismas métricas del período inmediatamente anterior, para comparar. */
+  anterior?: InstagramEstadisticas['metricas']
   destacadas: { id: string; texto: string; imagen: string | null; enlace: string | null; fecha: string | null; likes: number; comentarios: number }[]
 }
 export function getInstagramEstadisticas(dias: 7 | 28) { return panelRequest<InstagramEstadisticas>(`/instagram/insights?dias=${dias}`) }
+
+// Orbi en Difusión: todo es una sugerencia que la persona revisa; nada se publica ni se manda solo.
+export type InstagramTextoDeOrbi = {
+  versiones: { estilo: 'cercano' | 'vendedor' | 'breve'; texto: string }[]
+  /** Sin el #. */
+  hashtags: string[]
+}
+export function pedirTextoAOrbi(input: { productId?: string; idea?: string; elementos?: number; hayVideo?: boolean }) {
+  return panelRequest<InstagramTextoDeOrbi>('/instagram/orbi/texto', { method: 'POST', body: JSON.stringify(input) })
+}
+export function pedirRespuestaAOrbi(input: { tipo: 'comentario' | 'mensaje'; texto?: string; publicacion?: string; conversationId?: string }) {
+  return panelRequest<{ sugerencias: string[] }>('/instagram/orbi/respuesta', { method: 'POST', body: JSON.stringify(input) })
+}
+export function pedirLecturaAOrbi(dias: 7 | 28) {
+  return panelRequest<{ resumen: string; sugerencias: string[] }>(`/instagram/orbi/lectura?dias=${dias}`)
+}
+// Productos de la tienda que todavía no se mostraron en Instagram desde Órbita.
+export type InstagramIdea = { productId: string; nombre: string; foto: string | null; fotos: number; motivo: string }
+export function getInstagramIdeas() { return panelRequest<InstagramIdea[]>('/instagram/posts/ideas') }
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)

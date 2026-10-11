@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { haceCuanto, numero, resumir } from './formato'
+import { haceCuanto, numero, resumir, variacion } from './formato'
 
 const AHORA = Date.parse('2026-10-09T12:00:00Z')
 const hace = (ms: number) => new Date(AHORA - ms).toISOString()
@@ -45,5 +45,19 @@ describe('resumir', () => {
   it('recorta con puntos suspensivos, mejor en un espacio que a mitad de palabra', () => {
     expect(resumir('Remera lisa oversize de algodón peinado', 25)).toBe('Remera lisa oversize de…')
     expect(resumir('a'.repeat(50), 10)).toBe(`${'a'.repeat(9)}…`)
+  })
+})
+
+describe('variacion', () => {
+  it('es el cambio porcentual redondeado respecto del período anterior', () => {
+    expect(variacion(150, 100)).toBe(50)
+    expect(variacion(80, 100)).toBe(-20)
+    expect(variacion(100, 100)).toBe(0)
+  })
+  it('sin un dato o con un anterior en cero no se compara (no se inventa un infinito)', () => {
+    expect(variacion(null, 100)).toBeNull()
+    expect(variacion(100, null)).toBeNull()
+    expect(variacion(100, undefined)).toBeNull()
+    expect(variacion(100, 0)).toBeNull()
   })
 })

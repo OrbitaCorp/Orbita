@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { ArrowLeft, ImagePlus, Search, SendHorizontal, X } from 'lucide-react'
 import {
-  ApiError, getInstagramCharlas, getInstagramMensajes, responderInstagram,
+  ApiError, getInstagramCharlas, getInstagramMensajes, pedirRespuestaAOrbi, responderInstagram,
   type InstagramCharla, type InstagramEstado, type InstagramMensaje,
 } from '@/lib/api'
 import { Compuerta } from './Compuerta'
 import { cuandoFue, diaDe, horaDe, iniciales } from './formatoMensajes'
+import { SugerenciasDeOrbi } from './SugerenciasDeOrbi'
 
 // Difusión → Mensajes: los mensajes directos de Instagram del negocio, con el aspecto de la bandeja de
 // Instagram. Lista de charlas a la izquierda y la conversación a la derecha; se responde con texto y/o una foto.
@@ -276,6 +277,16 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
           </p>
         )}
         {error && <p className="msg-error" role="alert">{error}</p>}
+        {puedeResponder && (mensajes?.length ?? 0) > 0 && (
+          <div className="msg-sugerencias">
+            <SugerenciasDeOrbi
+              compacto
+              pedir={async () => (await pedirRespuestaAOrbi({ tipo: 'mensaje', conversationId: charla.id })).sugerencias}
+              onElegir={setTexto}
+              disabled={enviando}
+            />
+          </div>
+        )}
         {foto && (
           <div className="msg-adjuntando">
             <img src={foto.vista} alt="Foto para enviar" />
@@ -388,6 +399,7 @@ const CSS = `
 .msg-compositor { padding: 10px 16px 14px; border-top: 1px solid var(--color-border); }
 .msg-plazo { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); background: var(--color-surface-alt); }
 .msg-error { margin: 0 0 8px; font-size: 12.5px; color: var(--color-error); }
+.msg-sugerencias { margin-bottom: 8px; }
 .msg-adjuntando { position: relative; width: 84px; height: 84px; margin-bottom: 8px; }
 .msg-adjuntando img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; border: 1px solid var(--color-border); }
 .msg-adjuntando button { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; background: rgba(0,0,0,0.7); }

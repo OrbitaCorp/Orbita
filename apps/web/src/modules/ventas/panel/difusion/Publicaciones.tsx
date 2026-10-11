@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
-import { Bookmark, Check, ChevronLeft, ChevronRight, ExternalLink, Heart, ImagePlus, MessageCircle, Play, Search, Send, X } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { Bookmark, Check, ChevronLeft, ChevronRight, ExternalLink, Heart, ImagePlus, MessageCircle, Play, Search, Send, Sparkles, X } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import {
-  ApiError, continuarPublicacionInstagram, crearPublicacionInstagram, getInstagramPosts, panelListProducts,
+  ApiError, continuarPublicacionInstagram, crearPublicacionInstagram, getInstagramPosts, panelListProducts, pedirTextoAOrbi,
   subirFotoInstagram, subirVideoInstagram,
-  type ApiProductRow, type InstagramEstado, type InstagramItemPublicacion, type InstagramPublicacion,
+  type ApiProductRow, type InstagramEstado, type InstagramItemPublicacion, type InstagramPublicacion, type InstagramTextoDeOrbi,
 } from '@/lib/api'
 import { currentSlug } from '@/lib/tenant'
 import { fmtMoney } from '@/lib/utils'
@@ -53,9 +54,12 @@ const fotosDe = (p: ApiProductRow): string[] => {
 }
 
 export function Publicaciones({ estado, onAbrirConexion }: Props) {
+  const { query } = useRouter()
+  // Desde las ideas del tablero se llega con el producto ya elegido (?producto=ID&nombre=...).
+  const inicial = typeof query.producto === 'string' ? { id: query.producto, nombre: typeof query.nombre === 'string' ? query.nombre : '' } : null
   return (
     <Compuerta estado={estado} permiso="publicar" onAbrirConexion={onAbrirConexion}>
-      {(usuario) => <Compositor usuario={usuario} />}
+      {(usuario) => <Compositor usuario={usuario} productoInicial={inicial} />}
     </Compuerta>
   )
 }
@@ -64,7 +68,7 @@ export function Publicaciones({ estado, onAbrirConexion }: Props) {
 
 type Fase = 'cerrado' | 'confirmar' | 'publicando' | 'listo' | 'fallo'
 
-function Compositor({ usuario }: { usuario: string | null }) {
+function Compositor({ usuario, productoInicial }: { usuario: string | null; productoInicial: { id: string; nombre: string } | null }) {
   const [busqueda, setBusqueda] = useState('')
   const [productos, setProductos] = useState<ApiProductRow[] | null>(null)
   const [producto, setProducto] = useState<ApiProductRow | null>(null)
@@ -81,6 +85,8 @@ function Compositor({ usuario }: { usuario: string | null }) {
   const montado = useRef(true)
   const sugeridoActual = useRef('')
   const entrada = useRef<HTMLInputElement>(null)
+  const [idea, setIdea] = useState('')
+  const [orbi, setOrbi] = useState<{ cargando: boolean; error: string | null; resultado: InstagramTextoDeOrbi | null }>({ cargando: false, error: null, resultado: null })
 
   useEffect(() => () => { montado.current = false }, [])
 
@@ -129,6 +135,38 @@ function Compositor({ usuario }: { usuario: string | null }) {
     setTexto((actual) => (actual.trim() === '' || actual === sugeridoActual.current ? nuevo : actual))
     sugeridoActual.current = nuevo
     setHecho(null); setError(null); setAviso(null)
+  }
+
+  // Llegó desde una idea del tablero: se busca ese producto por su nombre y se elige solo.
+  const inicialAplicado = useRef(false)
+  useEffect(() => {
+    if (!productoInicial || inicialAplicado.current) return
+    inicialAplicado.current = true
+    panelListProducts({ search: productoInicial.nombre || undefined, status: 'PUBLISHED', limit: 24 })
+      .then((r) => { const p = r.data.find((x) => x.id === productoInicial.id); if (p && montado.current) elegirProducto(p) })
+      .catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoInicial])
+
+  const escribirConOrbi = async () => {
+    setOrbi((o) => ({ ...o, cargando: true, error: null }))
+    try {
+      const resultado = await pedirTextoAOrbi({
+        productId: producto?.id,
+        idea: idea.trim() || undefined,
+        elementos: elementos.length || undefined,
+        hayVideo: elementos.some((e) => e.tipo === 'video') || undefined,
+      })
+      if (montado.current) setOrbi({ cargando: false, error: null, resultado })
+    } catch (e) {
+      if (montado.current) setOrbi((o) => ({ ...o, cargando: false, error: e instanceof ApiError ? e.message : 'No se pudo generar con Orbi. Probá de nuevo.' }))
+    }
+  }
+  const usarVersion = (t: string) => { sugeridoActual.current = ''; setTexto(t.slice(0, MAX_TEXTO_INSTAGRAM)) }
+  const agregarHashtags = (tags: string[]) => {
+    if (tags.length === 0) return
+    const linea = tags.map((h) => `#${h}`).join(' ')
+    setTexto((actual) => (actual.includes(`#${tags[0]}`) ? actual : `${actual.trimEnd()}${actual.trim() ? '\n\n' : ''}${linea}`.slice(0, MAX_TEXTO_INSTAGRAM)))
   }
 
   const quitarProducto = () => {
@@ -425,6 +463,39 @@ function Compositor({ usuario }: { usuario: string | null }) {
                 </button>
               )}
             </div>
+            <div className="pub-orbi">
+              <div className="pub-orbi-fila">
+                <input
+                  className="pub-orbi-idea"
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                  maxLength={600}
+                  placeholder="Contale a Orbi qué querés comunicar (opcional)"
+                  aria-label="Qué querés comunicar"
+                />
+                <Button variant="secondary" size="md" loading={orbi.cargando} onClick={escribirConOrbi} icon={<Sparkles size={14} aria-hidden />}>
+                  {orbi.resultado ? 'Otras versiones' : 'Escribir con Orbi'}
+                </Button>
+              </div>
+              {orbi.error && <p className="pub-error" role="alert" style={{ margin: '8px 0 0' }}>{orbi.error}</p>}
+              {orbi.resultado && (
+                <div className="pub-versiones" aria-live="polite">
+                  {orbi.resultado.versiones.map((v) => (
+                    <article key={v.estilo} className="pub-version">
+                      <p className="pub-version-estilo">{v.estilo === 'cercano' ? 'Cercano' : v.estilo === 'vendedor' ? 'Vendedor' : 'Breve'}</p>
+                      <p className="pub-version-texto">{v.texto}</p>
+                      <button type="button" className="pub-enlace-boton" onClick={() => usarVersion(v.texto)}>Usar este texto</button>
+                    </article>
+                  ))}
+                  {orbi.resultado.hashtags.length > 0 && (
+                    <div className="pub-hashtags">
+                      <p className="pub-version-texto">{orbi.resultado.hashtags.map((h) => `#${h}`).join(' ')}</p>
+                      <button type="button" className="pub-enlace-boton" onClick={() => agregarHashtags(orbi.resultado?.hashtags ?? [])}>Agregar al final del texto</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <textarea
               className="pub-texto"
               value={texto}
@@ -667,6 +738,14 @@ const CSS = `
 .pub-agregar:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .pub-agregar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+.pub-orbi { margin-bottom: 14px; }
+.pub-orbi-fila { display: flex; gap: 8px; align-items: center; }
+.pub-orbi-idea { flex: 1; min-width: 0; height: 40px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-alt); font: inherit; font-size: 16px; color: var(--color-text); outline: none; transition: border-color 150ms, box-shadow 150ms, background-color 150ms; }
+.pub-orbi-idea:focus { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-bg); }
+.pub-versiones { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pub-version, .pub-hashtags { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface-alt); }
+.pub-version-estilo { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--color-muted); }
+.pub-version-texto { margin: 0 0 6px; font-size: 13.5px; line-height: 1.5; color: var(--color-text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pub-texto { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface-alt); font: inherit; font-size: 16px; line-height: 1.5; color: var(--color-text); resize: vertical; outline: none; transition: border-color 150ms, box-shadow 150ms, background-color 150ms; }
 .pub-texto:focus { border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-bg); }
 .pub-contador { margin: 6px 0 0; text-align: right; font-size: 12px; color: var(--color-muted); }
@@ -723,6 +802,7 @@ const CSS = `
 .pub-giro { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--color-border); border-top-color: var(--color-primary); animation: pub-giro 0.8s linear infinite; }
 @keyframes pub-giro { to { transform: rotate(360deg); } }
 
+@media (max-width: 560px) { .pub-orbi-fila { flex-direction: column; align-items: stretch; } }
 @media (max-width: 860px) {
   .pub-grilla { grid-template-columns: minmax(0, 1fr); }
   .pub-lateral { position: static; order: -1; }

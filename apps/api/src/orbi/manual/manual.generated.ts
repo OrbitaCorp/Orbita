@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "4a6ccc0aecfe3149",
+  "version": "42713090c4ecd238",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -357,10 +357,20 @@ export const MANUAL_GENERADO: ManualGenerado = {
       }
     },
     {
+      "id": "tablero-difusion",
+      "capitulo": "Difusión",
+      "titulo": "El tablero de Difusión",
+      "texto": "Con Instagram conectado, la primera pantalla de Difusión es un tablero con tres bloques: Tu semana (alcance, interacciones y seguidores, comparados con la semana anterior), Para atender (los mensajes sin leer y los comentarios sin responder, con un toque vas directo a cada uno) y Para publicar (productos de tu tienda que todavía no mostraste en Instagram, con su botón Publicar para armar la publicación con ese producto ya elegido).\n\nConsejo: Cada bloque se carga por separado: si a tu conexión le falta un permiso, ese bloque no aparece y los demás siguen funcionando.",
+      "destino": {
+        "seccion": "difusion",
+        "label": "Ir a Difusión"
+      }
+    },
+    {
       "id": "mensajes-instagram",
       "capitulo": "Difusión",
       "titulo": "Responder los mensajes de Instagram",
-      "texto": "En Difusión → Mensajes están los mensajes directos que te escriben por Instagram, con el aspecto de la bandeja de la app: la lista de conversaciones a la izquierda y el chat a la derecha. Se actualiza sola. Los mensajes de Instagram no aparecen en el módulo Mensajes.\n\n- Con Sin leer ves solo las conversaciones que todavía no abriste, y con el buscador encontrás a alguien por su nombre.\n- Respondés con texto, con una foto (el botón de la imagen al lado del campo) o con las dos cosas: salen como dos mensajes, igual que en Instagram. Las fotos que te mandan los clientes se ven en el chat.\n- Instagram solo permite responder dentro de las 24 horas del último mensaje del cliente. El chat te dice hasta qué hora podés; pasado ese plazo la conversación se puede leer pero no responder, hasta que el cliente escriba de nuevo.\n\nConsejo: Cuando hay mensajes sin leer, Difusión muestra el número en el menú de la izquierda.",
+      "texto": "En Difusión → Mensajes están los mensajes directos que te escriben por Instagram, con el aspecto de la bandeja de la app: la lista de conversaciones a la izquierda y el chat a la derecha. Se actualiza sola. Los mensajes de Instagram no aparecen en el módulo Mensajes.\n\n- Con Sin leer ves solo las conversaciones que todavía no abriste, y con el buscador encontrás a alguien por su nombre.\n- Respondés con texto, con una foto (el botón de la imagen al lado del campo) o con las dos cosas: salen como dos mensajes, igual que en Instagram. Las fotos que te mandan los clientes se ven en el chat.\n- Con \"Sugerir con Orbi\" (arriba del campo de texto) Orbi propone dos respuestas según la conversación: elegís una, queda en el campo y la podés editar antes de mandar. Nunca manda nada solo.\n- Instagram solo permite responder dentro de las 24 horas del último mensaje del cliente. El chat te dice hasta qué hora podés; pasado ese plazo la conversación se puede leer pero no responder, hasta que el cliente escriba de nuevo.\n\nConsejo: Cuando hay mensajes sin leer, Difusión muestra el número en el menú de la izquierda.",
       "destino": {
         "seccion": "difusion",
         "vista": "mensajes",
@@ -371,7 +381,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "publicar-instagram",
       "capitulo": "Difusión",
       "titulo": "Publicar en Instagram",
-      "texto": "En Difusión → Publicaciones subís a tu Instagram una foto, un carrusel de hasta 10 fotos y videos, o un video, con un texto. Hace falta tener Instagram conectado con el permiso de publicar: si conectaste desde Difusión, ya se pidió en el mismo momento.\n\n1. Qué vas a publicar: Podés partir de un producto de tu tienda (entran sus fotos y elegís cuáles usar), subir fotos y videos de tu computadora, o mezclar las dos cosas. Con más de un elemento se publica un carrusel: el primero es la portada y se reordenan con las flechas.\n2. Escribí el texto: Con un producto arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda); sin producto lo escribís vos, o lo dejás vacío. Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: La vista previa muestra el carrusel como se va a ver. Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: Las fotos se publican sobre fondo blanco, en formato cuadrado o vertical (lo elegís arriba de la vista previa). Un video solo se publica como reel. Los videos pueden tardar unos minutos en procesarse: el avance se ve en pantalla y queda en el historial. Instagram no convierte los enlaces del texto en botones: poné el link de tu tienda en la biografía.\n\nOjo: Archivos admitidos: fotos JPG, PNG o WebP de hasta 10 MB y videos MP4 o MOV de hasta 50 MB.",
+      "texto": "En Difusión → Publicaciones subís a tu Instagram una foto, un carrusel de hasta 10 fotos y videos, o un video, con un texto. Hace falta tener Instagram conectado con el permiso de publicar: si conectaste desde Difusión, ya se pidió en el mismo momento.\n\n1. Qué vas a publicar: Podés partir de un producto de tu tienda (entran sus fotos y elegís cuáles usar), subir fotos y videos de tu computadora, o mezclar las dos cosas. Con más de un elemento se publica un carrusel: el primero es la portada y se reordenan con las flechas.\n2. Escribí el texto: Con un producto arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda); sin producto lo escribís vos, o lo dejás vacío. Con \"Escribir con Orbi\" Orbi te propone tres versiones (cercana, vendedora y breve) y hashtags: elegís una con Usar este texto y la editás. Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: La vista previa muestra el carrusel como se va a ver. Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: Las fotos se publican sobre fondo blanco, en formato cuadrado o vertical (lo elegís arriba de la vista previa). Un video solo se publica como reel. Los videos pueden tardar unos minutos en procesarse: el avance se ve en pantalla y queda en el historial. Instagram no convierte los enlaces del texto en botones: poné el link de tu tienda en la biografía.\n\nOjo: Archivos admitidos: fotos JPG, PNG o WebP de hasta 10 MB y videos MP4 o MOV de hasta 50 MB.",
       "destino": {
         "seccion": "difusion",
         "vista": "publicaciones",
@@ -382,7 +392,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "comentarios-instagram",
       "capitulo": "Difusión",
       "titulo": "Responder los comentarios de Instagram",
-      "texto": "En Difusión → Comentarios ves los comentarios de tus últimas publicaciones, agrupados por publicación, y los respondés sin salir de Órbita. Se leen al abrir la pantalla: si querés ver lo último, tocá \"Actualizar\".\n\n- Tocá Responder, escribí y confirmá con \"Responder\": la respuesta aparece debajo del comentario, a la vista de todos en Instagram.\n- Con Ocultar sacás un comentario de la vista pública; quien lo escribió lo sigue viendo. Se puede deshacer con Volver a mostrar.\n- Borrar comentarios no se ofrece desde Órbita: no tiene vuelta atrás. Si hace falta, se hace desde la app de Instagram.",
+      "texto": "En Difusión → Comentarios ves los comentarios de tus últimas publicaciones, agrupados por publicación, y los respondés sin salir de Órbita. Se leen al abrir la pantalla: si querés ver lo último, tocá \"Actualizar\". Arriba, los filtros Todos, Sin responder (lo pendiente) y Ocultos te ayudan a no perder ninguno.\n\n- Con \"Sugerir con Orbi\", dentro de la respuesta, Orbi propone dos textos: elegís uno y lo editás antes de mandarlo.\n- Tocá Responder, escribí y confirmá con \"Responder\": la respuesta aparece debajo del comentario, a la vista de todos en Instagram.\n- Con Ocultar sacás un comentario de la vista pública; quien lo escribió lo sigue viendo. Se puede deshacer con Volver a mostrar.\n- Borrar comentarios no se ofrece desde Órbita: no tiene vuelta atrás. Si hace falta, se hace desde la app de Instagram.",
       "destino": {
         "seccion": "difusion",
         "vista": "comentarios",
@@ -393,7 +403,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "estadisticas-instagram",
       "capitulo": "Difusión",
       "titulo": "Ver las estadísticas de Instagram",
-      "texto": "En Difusión → Estadísticas ves cuánta gente alcanzó tu cuenta y reaccionó a lo que publicás en los últimos 7 o 28 días, y cuáles fueron tus publicaciones con más movimiento.\n\n- Alcance: Cuentas distintas que vieron tu contenido.\n- Visualizaciones: Veces que se vio tu contenido, aunque sea la misma cuenta.\n- Interacciones: Me gusta, comentarios, guardados y compartidos.\n- Visitas al perfil: Veces que entraron a tu perfil.\n\nConsejo: Instagram puede demorar hasta 48 horas en actualizar los números, y algunos datos no aparecen en cuentas con pocos seguidores: lo que falta se muestra como \"—\", no como un cero.",
+      "texto": "En Difusión → Estadísticas ves cuánta gente alcanzó tu cuenta y reaccionó a lo que publicás en los últimos 7 o 28 días, y cuáles fueron tus publicaciones con más movimiento.\n\nCada número se compara con el período anterior de la misma duración (por ejemplo, los 7 días de antes), para que veas si vas mejorando. Con \"Explicámelo\" Orbi te cuenta en palabras simples qué significan tus números y te sugiere qué probar.\n\n- Alcance: Cuentas distintas que vieron tu contenido.\n- Visualizaciones: Veces que se vio tu contenido, aunque sea la misma cuenta.\n- Interacciones: Me gusta, comentarios, guardados y compartidos.\n- Visitas al perfil: Veces que entraron a tu perfil.\n\nConsejo: Instagram puede demorar hasta 48 horas en actualizar los números, y algunos datos no aparecen en cuentas con pocos seguidores: lo que falta se muestra como \"—\", no como un cero.",
       "destino": {
         "seccion": "difusion",
         "vista": "estadisticas",

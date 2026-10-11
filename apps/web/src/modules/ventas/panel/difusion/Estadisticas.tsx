@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, Heart, MessageCircle } from 'lucide-react'
+import { ExternalLink, Heart, MessageCircle, Sparkles } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
-import { ApiError, getInstagramEstadisticas, type InstagramEstado, type InstagramEstadisticas } from '@/lib/api'
+import { ApiError, getInstagramEstadisticas, pedirLecturaAOrbi, type InstagramEstado, type InstagramEstadisticas } from '@/lib/api'
 import { Compuerta } from './Compuerta'
-import { haceCuanto, numero, resumir } from './formato'
+import { haceCuanto, numero, resumir, variacion } from './formato'
 
 // Difusión → Estadísticas: cuánta gente vio y reaccionó a lo que publica la cuenta en los últimos 7 o 28 días,
 // y qué publicaciones funcionaron mejor. Instagram puede demorar hasta 48 horas en actualizar los números y no
@@ -51,6 +51,18 @@ function Resumen({ usuario }: { usuario: string | null }) {
   }, [])
   useEffect(() => { cargar(dias) }, [cargar, dias])
 
+  // La lectura de Orbi es de un período: al cambiarlo se descarta.
+  const [lectura, setLectura] = useState<{ cargando: boolean; error: string | null; datos: { resumen: string; sugerencias: string[] } | null }>({ cargando: false, error: null, datos: null })
+  useEffect(() => { setLectura({ cargando: false, error: null, datos: null }) }, [dias])
+  const leerConOrbi = async () => {
+    setLectura((l) => ({ ...l, cargando: true, error: null }))
+    try {
+      setLectura({ cargando: false, error: null, datos: await pedirLecturaAOrbi(dias) })
+    } catch (e) {
+      setLectura((l) => ({ ...l, cargando: false, error: e instanceof ApiError ? e.message : 'No se pudo generar con Orbi. Probá de nuevo.' }))
+    }
+  }
+
   return (
     <div className="est-raiz">
       <style>{CSS}</style>
@@ -77,13 +89,41 @@ function Resumen({ usuario }: { usuario: string | null }) {
 
       {datos && (
         <div className={cargando ? 'est-cargando' : undefined}>
+          <section className="est-orbi" aria-label="Lectura de Orbi">
+            {lectura.datos ? (
+              <>
+                <p className="est-orbi-titulo"><Sparkles size={14} aria-hidden /> Lo que dicen tus números</p>
+                <p className="est-orbi-texto">{lectura.datos.resumen}</p>
+                {lectura.datos.sugerencias.length > 0 && (
+                  <ul className="est-orbi-lista">
+                    {lectura.datos.sugerencias.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <div className="est-orbi-fila">
+                <p className="est-orbi-texto" style={{ margin: 0 }}>¿No sabés qué significan estos números? Orbi te los explica y te sugiere qué probar.</p>
+                <Button variant="secondary" size="sm" loading={lectura.cargando} onClick={leerConOrbi} icon={<Sparkles size={14} aria-hidden />}>
+                  Explicámelo
+                </Button>
+              </div>
+            )}
+            {lectura.error && <p className="est-orbi-error" role="alert">{lectura.error}</p>}
+          </section>
+
           <div className="est-grilla">
             {KPIS.map((k) => {
               const valor = datos.metricas[k.clave]
+              const cambio = variacion(valor, datos.anterior?.[k.clave])
               return (
                 <section key={k.clave} className="est-tarjeta">
                   <p className="est-etiqueta">{k.titulo}</p>
                   <p className="est-valor">{numero(valor)}</p>
+                  {cambio !== null && (
+                    <p className={`est-cambio ${cambio > 0 ? 'est-cambio-sube' : cambio < 0 ? 'est-cambio-baja' : ''}`}>
+                      {cambio === 0 ? 'Igual que' : `${cambio > 0 ? '↑' : '↓'} ${Math.abs(cambio)} % vs.`} los {datos.dias} días anteriores
+                    </p>
+                  )}
                   <p className="est-ayuda">{valor === null ? 'Instagram todavía no tiene este dato.' : k.ayuda}</p>
                 </section>
               )
@@ -152,6 +192,15 @@ const CSS = `
 .est-tarjeta { padding: 18px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: var(--shadow-card); }
 .est-etiqueta { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--color-muted); }
 .est-valor { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.est-cambio { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--color-muted); }
+.est-cambio-sube { color: var(--color-success); }
+.est-cambio-baja { color: var(--color-error); }
+.est-orbi { margin-bottom: 14px; padding: 16px 18px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: var(--shadow-card); }
+.est-orbi-fila { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.est-orbi-titulo { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--color-text); }
+.est-orbi-texto { margin: 0 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--color-text); }
+.est-orbi-lista { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.5; color: var(--color-text); }
+.est-orbi-error { margin: 8px 0 0; font-size: 12.5px; color: var(--color-error); }
 .est-ayuda { margin: 0; font-size: 12px; line-height: 1.45; color: var(--color-muted); }
 
 .est-destacadas { margin-top: 20px; }
@@ -174,6 +223,7 @@ const CSS = `
 .est-esqueleto { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .est-esqueleto span { height: 108px; border-radius: 16px; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
 
+@media (max-width: 520px) { .est-orbi-fila { flex-direction: column; align-items: stretch; } }
 @media (max-width: 860px) { .est-grilla, .est-esqueleto { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .est-grilla, .est-esqueleto { grid-template-columns: minmax(0, 1fr); } .est-valor { font-size: 24px; } }
 @media (prefers-reduced-motion: reduce) { .est-opcion, .est-cargando { transition: none; } }

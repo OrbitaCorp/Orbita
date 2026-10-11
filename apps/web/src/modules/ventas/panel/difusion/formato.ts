@@ -21,6 +21,12 @@ export function numero(n: number | null | undefined): string {
   return typeof n === 'number' ? n.toLocaleString('es-AR') : '—'
 }
 
+/** Cuánto cambió respecto del período anterior, en %; null si falta alguno de los dos números o el anterior es cero. */
+export function variacion(actual: number | null | undefined, anterior: number | null | undefined): number | null {
+  if (actual === null || actual === undefined || anterior === null || anterior === undefined || anterior <= 0) return null
+  return Math.round(((actual - anterior) / anterior) * 100)
+}
+
 /** Recorta un texto largo a `max` caracteres (sin cortar a mitad de palabra si se puede) y lo marca con "…". */
 export function resumir(texto: string, max: number): string {
   const limpio = texto.replace(/\s+/g, ' ').trim()

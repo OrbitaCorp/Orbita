@@ -6,6 +6,7 @@ import { Comentarios } from './Comentarios'
 import { Estadisticas } from './Estadisticas'
 import { Mensajes } from './Mensajes'
 import { Publicaciones } from './Publicaciones'
+import { Tablero } from './Tablero'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
 import type { InstagramEstado } from '@/lib/api'
@@ -103,7 +104,9 @@ export default function Difusion() {
       ) : (
         <>
           <EstadoInstagram estado={estado} onAbrir={() => setAbierto(true)} />
-          {vista === 'instagram' ? (
+          {vista === 'instagram' && estado?.connected ? (
+            <Tablero estado={estado} />
+          ) : vista === 'instagram' ? (
             <div className="dif-grilla">
               {(Object.keys(FUNCIONES) as Funcion[]).map((f) => (
                 <TarjetaFuncion key={f} funcion={f} onAbrir={() => router.push({ query: { ...router.query, vista: f } })} />

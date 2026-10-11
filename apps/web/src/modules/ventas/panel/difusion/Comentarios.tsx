@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { EyeOff, Eye, ExternalLink, Heart, MessageCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import {
-  ApiError, getInstagramComentarios, hideInstagramComment, replyInstagramComment,
+  ApiError, getInstagramComentarios, hideInstagramComment, pedirRespuestaAOrbi, replyInstagramComment,
   type InstagramComentario, type InstagramEstado, type InstagramPublicacionComentada,
 } from '@/lib/api'
 import { Compuerta } from './Compuerta'
+import { contarComentarios, filtrarComentarios, type FiltroDeComentarios } from './filtroComentarios'
 import { haceCuanto, resumir } from './formato'
+import { SugerenciasDeOrbi } from './SugerenciasDeOrbi'
 
 // Difusión → Comentarios: los comentarios de las últimas publicaciones, con respuesta en el lugar y la
 // posibilidad de ocultar (y volver a mostrar) los que no querés a la vista. Borrar no se ofrece: no tiene vuelta
@@ -30,6 +32,7 @@ function Lista({ usuario }: { usuario: string | null }) {
   const [publicaciones, setPublicaciones] = useState<InstagramPublicacionComentada[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
+  const [filtro, setFiltro] = useState<FiltroDeComentarios>('todos')
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null)
@@ -48,7 +51,9 @@ function Lista({ usuario }: { usuario: string | null }) {
   const cambiar = (publicacionId: string, comentarioId: string, fn: (c: InstagramComentario) => InstagramComentario) =>
     setPublicaciones((ps) => ps?.map((p) => (p.id !== publicacionId ? p : { ...p, comentarios: p.comentarios.map((c) => (c.id === comentarioId ? fn(c) : c)) })) ?? null)
 
-  const total = publicaciones?.reduce((n, p) => n + p.comentarios.length, 0) ?? 0
+  const cuenta = contarComentarios(publicaciones ?? [])
+  const total = cuenta.todos
+  const visibles = filtrarComentarios(publicaciones ?? [], filtro)
 
   return (
     <div className="com-raiz">
@@ -62,6 +67,16 @@ function Lista({ usuario }: { usuario: string | null }) {
         </Button>
       </div>
 
+      {total > 0 && (
+        <div className="com-filtros" role="group" aria-label="Filtrar comentarios">
+          {([['todos', 'Todos'], ['sin-responder', 'Sin responder'], ['ocultos', 'Ocultos']] as const).map(([clave, etiqueta]) => (
+            <button key={clave} type="button" className={`com-filtro${filtro === clave ? ' com-filtro-activo' : ''}`} aria-pressed={filtro === clave} onClick={() => setFiltro(clave)}>
+              {etiqueta} <span className="com-filtro-cuenta">{cuenta[clave]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && <p className="com-error" role="alert">{error}</p>}
 
       {publicaciones === null && <div className="com-esqueleto" aria-hidden><span /><span /><span /></div>}
@@ -74,7 +89,14 @@ function Lista({ usuario }: { usuario: string | null }) {
         </section>
       )}
 
-      {publicaciones?.map((p) => (
+      {publicaciones && publicaciones.length > 0 && visibles.length === 0 && (
+        <section className="com-tarjeta com-vacio">
+          <p className="com-vacio-titulo">{filtro === 'sin-responder' ? 'Estás al día' : 'No hay comentarios para mostrar'}</p>
+          <p className="com-suave">{filtro === 'sin-responder' ? 'Respondiste todos los comentarios de tus últimas publicaciones.' : 'No tenés comentarios ocultos.'}</p>
+        </section>
+      )}
+
+      {visibles.map((p) => (
         <section key={p.id} className="com-tarjeta">
           <header className="com-publicacion">
             <span className="com-miniatura">{p.imagen ? <img src={p.imagen} alt="" /> : null}</span>
@@ -93,6 +115,7 @@ function Lista({ usuario }: { usuario: string | null }) {
               <ComentarioFila
                 key={c.id}
                 c={c}
+                publicacion={p.texto}
                 usuarioPropio={usuario}
                 onRespondido={(r) => cambiar(p.id, c.id, (x) => ({ ...x, respuestas: [...x.respuestas, r] }))}
                 onOculto={(oculto) => cambiar(p.id, c.id, (x) => ({ ...x, oculto }))}
@@ -105,8 +128,9 @@ function Lista({ usuario }: { usuario: string | null }) {
   )
 }
 
-function ComentarioFila({ c, usuarioPropio, onRespondido, onOculto }: {
+function ComentarioFila({ c, publicacion, usuarioPropio, onRespondido, onOculto }: {
   c: InstagramComentario
+  publicacion: string
   usuarioPropio: string | null
   onRespondido: (r: InstagramComentario['respuestas'][number]) => void
   onOculto: (oculto: boolean) => void
@@ -178,6 +202,11 @@ function ComentarioFila({ c, usuarioPropio, onRespondido, onOculto }: {
               placeholder={`Respondé a @${c.usuario}`}
               aria-label={`Respuesta a ${c.usuario}`}
             />
+            <SugerenciasDeOrbi
+              pedir={async () => (await pedirRespuestaAOrbi({ tipo: 'comentario', texto: c.texto, publicacion })).sugerencias}
+              onElegir={setTexto}
+              disabled={enviando}
+            />
             <div className="com-form-acciones">
               <Button type="button" variant="ghost" size="sm" disabled={enviando} onClick={() => { setRespondiendo(false); setTexto(''); setError(null) }}>Cancelar</Button>
               <Button type="submit" size="sm" loading={enviando} disabled={!texto.trim()}>Responder</Button>
@@ -200,6 +229,12 @@ function ComentarioFila({ c, usuarioPropio, onRespondido, onOculto }: {
 const CSS = `
 .com-raiz { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
 .com-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.com-filtros { display: flex; flex-wrap: wrap; gap: 6px; }
+.com-filtro { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; color: var(--color-muted); transition: border-color 150ms, color 150ms, background-color 150ms; }
+.com-filtro:hover { color: var(--color-text); border-color: var(--color-muted); }
+.com-filtro-activo, .com-filtro-activo:hover { color: var(--color-surface); background: var(--color-text); border-color: var(--color-text); }
+.com-filtro-cuenta { font-size: 12px; font-variant-numeric: tabular-nums; opacity: 0.75; }
+.com-filtro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .com-resumen { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-text); }
 .com-error { margin: 0 0 4px; font-size: 12.5px; line-height: 1.4; color: var(--color-error); }
 .com-suave { margin: 0; font-size: 13px; line-height: 1.55; color: var(--color-muted); }
