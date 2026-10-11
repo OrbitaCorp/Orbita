@@ -548,7 +548,7 @@ export const CAPITULOS: Capitulo[] = [
 // ═══════════════════════════════════════════════════════════════════════════
 {
     id: 'difusion', titulo: 'Difusión', Icon: Megaphone,
-    resumen: 'Mostrar tu negocio en Instagram: conectar tu cuenta, responder mensajes y comentarios, publicar y ver estadísticas.',
+    resumen: 'Mostrar tu negocio en Instagram: conectar tu cuenta, responder mensajes y comentarios, publicar y programar, y ver estadísticas.',
     ir: { label: 'Ir a Difusión', seccion: 'difusion' },
     temas: [
         {
@@ -563,7 +563,7 @@ export const CAPITULOS: Capitulo[] = [
         {
             id: 'tablero-difusion', titulo: 'El tablero de Difusión',
             bloques: [
-                { tipo: 'parrafo', texto: 'Con Instagram conectado, la primera pantalla de **Difusión** es un tablero con tres bloques: **Tu semana** (alcance, interacciones y seguidores, comparados con la semana anterior), **Para atender** (los mensajes sin leer y los comentarios sin responder, con un toque vas directo a cada uno) y **Para publicar** (productos de tu tienda que todavía no mostraste en Instagram, con su botón **Publicar** para armar la publicación con ese producto ya elegido).' },
+                { tipo: 'parrafo', texto: 'Con Instagram conectado, la primera pantalla de **Difusión** es un tablero con tres bloques: **Tu semana** (alcance, interacciones y seguidores, comparados con la semana anterior), **Para atender** (los mensajes sin leer y los comentarios sin responder, con un toque vas directo a cada uno) y **Para publicar** (el acceso a las publicaciones **sugeridas por Orbi**, cuántas tenés programadas o en borrador, un aviso si hace rato que no publicás, y los productos de tu tienda que todavía no mostraste, ordenados por lo que más se vendió este último mes, cada uno con su botón **Publicar**).' },
                 { tipo: 'nota', variante: 'tip', texto: 'Cada bloque se carga por separado: si a tu conexión le falta un permiso, ese bloque no aparece y los demás siguen funcionando.' },
             ],
             ir: { label: 'Ir a Difusión', seccion: 'difusion' },
@@ -576,6 +576,9 @@ export const CAPITULOS: Capitulo[] = [
                     'Con **Sin leer** ves solo las conversaciones que todavía no abriste, y con el buscador encontrás a alguien por su nombre.',
                     'Respondés con texto, con una foto (el botón de la imagen al lado del campo) o con las dos cosas: salen como dos mensajes, igual que en Instagram. Las fotos que te mandan los clientes se ven en el chat.',
                     'Con [[Sugerir con Orbi]] (arriba del campo de texto) Orbi propone dos respuestas según la conversación: elegís una, queda en el campo y la podés editar antes de mandar. Nunca manda nada solo.',
+                    'Con el rayo ([[Respuestas rápidas]]) elegís una de tus plantillas de Mensajes, con el nombre de la persona y el de tu tienda ya completados. Con el carrito ([[Mandar un producto]]) le mandás la foto de un producto de tu tienda y, aparte, su nombre, precio y el enlace para comprarlo: en los mensajes directos los enlaces sí se pueden tocar.',
+                    'El botón [[Cliente]] abre un panel con los datos de la persona, cuántos pedidos tiene y cuánto gastó. Desde ahí tocás [[Crear pedido]] (arranca con esa persona ya elegida) o [[Ver cliente]]. Si ya te había comprado con otro nombre o email, [[Unir con un cliente]] junta los dos historiales en uno solo (no se puede deshacer).',
+                    'Con la ruedita de arriba de la lista ([[Respuestas automáticas]]) prendés un mensaje de **bienvenida** (sale una sola vez, cuando alguien te escribe por primera vez) y uno de **ausencia** (sale fuera de tu horario de atención, como mucho una vez cada 12 horas por persona). Orbi nunca contesta solo a un mensaje viejo ni al que escribiste vos.',
                     'Instagram solo permite responder dentro de las **24 horas** del último mensaje del cliente. El chat te dice hasta qué hora podés; pasado ese plazo la conversación se puede leer pero no responder, hasta que el cliente escriba de nuevo.',
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'Cuando hay mensajes sin leer, **Difusión** muestra el número en el menú de la izquierda.' },
@@ -589,17 +592,43 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'pasos', items: [
                     { titulo: 'Qué vas a publicar', texto: 'Podés partir de un producto de tu tienda (entran sus fotos y elegís cuáles usar), subir fotos y videos de tu computadora, o mezclar las dos cosas. Con más de un elemento se publica un carrusel: el primero es la portada y se reordenan con las flechas.' },
                     { titulo: 'Escribí el texto', texto: 'Con un producto arranca con un texto sugerido (nombre, descripción, precio y un cierre que manda a tu link de la bio); sin producto lo escribís vos, o lo dejás vacío. Con [[Escribir con Orbi]] Orbi te propone tres versiones (cercana, vendedora y breve) y hashtags: elegís una con **Usar este texto** y la editás. Instagram admite hasta 2.200 caracteres.' },
-                    { titulo: 'Mirá la vista previa y publicá', texto: 'La vista previa muestra el carrusel como se va a ver. Con [[Publicar en Instagram]] te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.' },
+                    { titulo: 'Mirá la vista previa y elegí cuándo', texto: 'La vista previa muestra el carrusel como se va a ver. En el paso 3 elegís [[Publicar ahora]] o [[Programar]]: con la segunda fijás día y hora, y Órbita la publica sola a esa hora, aunque no tengas el panel abierto (te sugiere los horarios en que más reaccionan tus seguidores). El botón de abajo dice [[Publicar en Instagram]] o [[Programar publicación]] y te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.' },
                 ] },
                 { tipo: 'nota', variante: 'tip', texto: 'Las fotos se publican sobre fondo blanco, en formato cuadrado o vertical (lo elegís arriba de la vista previa). Un video solo se publica como reel. Los videos pueden tardar unos minutos en procesarse: el avance se ve en pantalla y queda en el historial. Instagram no convierte los enlaces del texto en botones: poné el link de tu tienda en la biografía.' },
                 { tipo: 'nota', variante: 'aviso', texto: 'Archivos admitidos: fotos JPG, PNG o WebP de hasta 10 MB y videos MP4 o MOV de hasta 50 MB.' },
+                { tipo: 'lista', items: [
+                    'Con [[Guardar borrador]] dejás una publicación a medias (incluso sin fotos todavía) y la seguís después desde la pestaña **Borradores**, con [[Seguir]].',
+                    'Abajo del compositor, **Programadas** muestra lo que va a salir solo: podés [[Editar]] una, [[Pasar a borrador]] o cancelarla. **Publicadas** guarda el historial, y con [[Usar como base]] tomás el producto y el texto de una anterior para armar otra.',
+                    'Los textos sugeridos de un producto terminan con un cierre que manda a tu link de la bio y con hashtags armados con el nombre del producto, su categoría y tu tienda.',
+                ] },
             ],
             ir: { label: 'Ir a Publicaciones', seccion: 'difusion', query: { vista: 'publicaciones' } },
         },
         {
+            id: 'sugeridas-orbi', titulo: 'Publicaciones sugeridas por Orbi',
+            bloques: [
+                { tipo: 'parrafo', texto: 'En **Difusión → Sugeridas por Orbi** encontrás hasta 3 publicaciones ya armadas: el producto, las fotos, el texto con hashtags y el día y la hora en que conviene publicarlas. Orbi se apoya en tus ventas del último mes (productos que se vendieron y todavía no mostraste), en el formato que mejor le funciona a tu cuenta (foto o carrusel) y en el momento en que más reaccionan tus seguidores. Arriba te explica en qué se basó.' },
+                { tipo: 'lista', items: [
+                    '[[Programar]] la deja lista para salir sola a la hora sugerida (la podés cambiar antes de confirmar).',
+                    '[[Revisar y editar]] la abre en el compositor de Publicaciones para cambiar fotos, texto o la hora.',
+                    '[[Guardar borrador]] la guarda para después. [[Otras ideas]] pide un nuevo juego de sugerencias.',
+                ] },
+                { tipo: 'nota', variante: 'tip', texto: 'Orbi nunca publica nada solo: vos decidís. Si tu cuenta tiene menos de 8 publicaciones, arma las sugerencias solo con tus ventas y tu catálogo, y te lo avisa.' },
+            ],
+            ir: { label: 'Ir a Sugeridas por Orbi', seccion: 'difusion', query: { vista: 'sugeridas' } },
+        },
+        {
+            id: 'calendario-instagram', titulo: 'El calendario de publicaciones',
+            bloques: [
+                { tipo: 'parrafo', texto: 'En **Difusión → Calendario** ves, mes por mes, lo que ya publicaste desde Órbita (en sólido) y lo que está programado (con borde punteado). Tocá una publicación para ver su detalle; si todavía no salió, podés [[Editar]] la publicación. Si tocás el **+** de un día libre, se abre el compositor con ese día y la mejor hora ya elegidos.' },
+                { tipo: 'nota', variante: 'tip', texto: 'Si tu cuenta tiene suficientes publicaciones, los días en que más reaccionan tus seguidores aparecen marcados con una estrella. En el celular el calendario se ve como una lista por día.' },
+            ],
+            ir: { label: 'Ir al Calendario', seccion: 'difusion', query: { vista: 'calendario' } },
+        },
+        {
             id: 'comentarios-instagram', titulo: 'Responder los comentarios de Instagram',
             bloques: [
-                { tipo: 'parrafo', texto: 'En **Difusión → Comentarios** ves los comentarios de tus últimas publicaciones, agrupados por publicación, y los respondés sin salir de Órbita. Se leen al abrir la pantalla: si querés ver lo último, tocá [[Actualizar]]. Arriba, los filtros **Todos**, **Sin responder** (lo pendiente) y **Ocultos** te ayudan a no perder ninguno.' },
+                { tipo: 'parrafo', texto: 'En **Difusión → Comentarios** ves los comentarios de tus últimas publicaciones, agrupados por publicación, y los respondés sin salir de Órbita. Se leen al abrir la pantalla: si querés ver lo último, tocá [[Actualizar]]. Arriba, los filtros **Todos**, **Sin responder** (lo pendiente) y **Ocultos** te ayudan a no perder ninguno. Con [[Moderación]] elegís palabras o frases: los comentarios que las tengan se ocultan solos (cada pocos minutos y cada vez que abrís la pantalla), y los ves en **Ocultos** por si querés volver a mostrarlos.' },
                 { tipo: 'lista', items: [
                     'Con [[Sugerir con Orbi]], dentro de la respuesta, Orbi propone dos textos: elegís uno y lo editás antes de mandarlo.',
                     'Tocá **Responder**, escribí y confirmá con [[Responder]]: la respuesta aparece debajo del comentario, a la vista de todos en Instagram.',
@@ -613,7 +642,7 @@ export const CAPITULOS: Capitulo[] = [
             id: 'estadisticas-instagram', titulo: 'Ver las estadísticas de Instagram',
             bloques: [
                 { tipo: 'parrafo', texto: 'En **Difusión → Estadísticas** ves cuánta gente alcanzó tu cuenta y reaccionó a lo que publicás en los últimos 7 o 28 días, y cuáles fueron tus publicaciones con más movimiento.' },
-                { tipo: 'parrafo', texto: 'Cada número se compara con el período anterior de la misma duración (por ejemplo, los 7 días de antes), para que veas si vas mejorando. Con [[Explicámelo]] Orbi te cuenta en palabras simples qué significan tus números y te sugiere qué probar.' },
+                { tipo: 'parrafo', texto: 'Cada número se compara con el período anterior de la misma duración (por ejemplo, los 7 días de antes), para que veas si vas mejorando. Con [[Explicámelo]] Orbi te cuenta en palabras simples qué significan tus números y te sugiere qué probar. Más abajo, **Qué te funciona mejor** muestra tus mejores días y horarios para publicar, qué formato (foto, carrusel, reel) tiene más interacciones, y tus últimas publicaciones una al lado de la otra. Hace falta tener al menos 8 publicaciones para sacar conclusiones.' },
                 { tipo: 'campos', items: [
                     { label: 'Alcance', texto: 'Cuentas distintas que vieron tu contenido.' },
                     { label: 'Visualizaciones', texto: 'Veces que se vio tu contenido, aunque sea la misma cuenta.' },

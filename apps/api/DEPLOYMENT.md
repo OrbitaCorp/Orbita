@@ -663,6 +663,7 @@ request como cualquier otra.
 | `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos). También sincroniza los costos de proveedores (`CostsService.syncAll()`) para la pantalla Costos del super admin |
 | `resumen-diario` | 22:00 diario | `resumenDiario()` |
 | `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
+| `instagram-cada-5-minutos` | cada 5 minutos | `instagramCada5Minutos()`: lanza las publicaciones de Instagram **programadas** (Difusión → Publicaciones) que ya llegaron a su hora, sigue avanzando las que se están procesando y modera los comentarios de los negocios que prendieron la moderación. **Es un 4º job: cuesta ~US$0.10/mes** (ver abajo). Sin este job, las publicaciones programadas no salen |
 
 **Por qué son 3 jobs y no 4:** Cloud Scheduler regala **3 jobs gratis por
 proyecto/mes**; del 4to en adelante cobra **US$0.10/job/mes**. Consolidando
@@ -690,6 +691,16 @@ devuelven 401.
      --http-method=POST --headers="x-cron-secret=$(gcloud secrets versions access latest --secret=CRON_SECRET --project=orbita-api-corp)"
    ```
 4. Si ya hay 3 jobs activos, el nuevo cuesta US$0.10/mes — no es necesario evitarlo a toda costa, es un costo menor.
+
+**Job de Instagram (cada 5 minutos)** — se crea una sola vez, después del primer deploy que trae las publicaciones programadas:
+```bash
+gcloud scheduler jobs create http instagram-cada-5-minutos \
+  --project=orbita-api-corp --location=southamerica-east1 \
+  --schedule="*/5 * * * *" --time-zone="Etc/UTC" \
+  --uri="https://api.orbita.site/api/v1/internal-cron/instagram-cada-5-minutos" \
+  --http-method=POST --headers="x-cron-secret=$(gcloud secrets versions access latest --secret=CRON_SECRET --project=orbita-api-corp)"
+```
+No pasa por `correrUnaVez` a propósito: es idempotente (cada publicación se toma con un candado propio en la base) y se dispara muchas veces por día. Una programada que no pudo lanzarse queda `FAILED` con el motivo y se ve en Difusión → Publicaciones.
 
 **Para debuggear un job que no corrió:**
 ```bash

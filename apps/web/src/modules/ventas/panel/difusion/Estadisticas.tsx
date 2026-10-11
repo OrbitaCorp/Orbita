@@ -4,6 +4,7 @@ import { Button } from '@/design-system/components/Button'
 import { ApiError, getInstagramEstadisticas, pedirLecturaAOrbi, type InstagramEstado, type InstagramEstadisticas } from '@/lib/api'
 import { Compuerta } from './Compuerta'
 import { haceCuanto, numero, resumir, variacion } from './formato'
+import { RendimientoDeLaCuenta } from './RendimientoDeLaCuenta'
 
 // Difusión → Estadísticas: cuánta gente vio y reaccionó a lo que publica la cuenta en los últimos 7 o 28 días,
 // y qué publicaciones funcionaron mejor. Instagram puede demorar hasta 48 horas en actualizar los números y no
@@ -165,6 +166,8 @@ function Resumen({ usuario }: { usuario: string | null }) {
               </ol>
             )}
           </section>
+
+          <RendimientoDeLaCuenta />
 
           <p className="est-nota">
             Instagram puede demorar hasta 48 horas en actualizar estos números, y algunos datos no aparecen en cuentas con pocos seguidores.

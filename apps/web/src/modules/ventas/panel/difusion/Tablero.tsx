@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, CalendarClock, Sparkles } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import {
   getInstagramComentarios, getInstagramEstadisticas, getInstagramIdeas, getInstagramNoLeidos, getInstagramPosts,
   type InstagramEstadisticas, type InstagramEstado, type InstagramIdea, type InstagramPublicacion,
 } from '@/lib/api'
 import { contarComentarios } from './filtroComentarios'
+import { cuando as formatoCuando } from './fechaLocal'
 import { haceCuanto, numero, variacion } from './formato'
 
 // Tablero de Difusión (la pantalla de Instagram con la cuenta conectada): lo de la semana, lo que está esperando
@@ -23,6 +24,9 @@ interface Datos {
   comentariosSinResponder?: number
   ideas?: InstagramIdea[]
   ultima?: InstagramPublicacion | null
+  programadas?: number
+  borradores?: number
+  proxima?: InstagramPublicacion | null
 }
 
 export function Tablero({ estado }: Props) {
@@ -42,7 +46,15 @@ export function Tablero({ estado }: Props) {
       tareas.push(getInstagramComentarios().then((r) => poner({ comentariosSinResponder: contarComentarios(r.publicaciones)['sin-responder'] })).catch(() => undefined))
     }
     if (estado.puedePublicar) {
-      tareas.push(getInstagramPosts().then((posts) => poner({ ultima: posts.find((p) => p.estado === 'PUBLISHED') ?? null })).catch(() => undefined))
+      tareas.push(getInstagramPosts().then((posts) => {
+        const programadas = posts.filter((p) => p.estado === 'SCHEDULED').sort((a, b) => String(a.programadaPara).localeCompare(String(b.programadaPara)))
+        poner({
+          ultima: posts.find((p) => p.estado === 'PUBLISHED') ?? null,
+          programadas: programadas.length,
+          proxima: programadas[0] ?? null,
+          borradores: posts.filter((p) => p.estado === 'DRAFT').length,
+        })
+      }).catch(() => undefined))
     }
     Promise.all(tareas).finally(() => { if (!cancelado) setListo(true) })
     return () => { cancelado = true }
@@ -50,7 +62,7 @@ export function Tablero({ estado }: Props) {
 
   const ir = (vista: string, extra: Record<string, string> = {}) => router.push({ query: { ...router.query, vista, ...extra } })
 
-  const { semana, mensajesSinLeer, comentariosSinResponder, ideas, ultima } = datos
+  const { semana, mensajesSinLeer, comentariosSinResponder, ideas, ultima, programadas, borradores, proxima } = datos
   const kpis: { titulo: string; valor: number | null; cambio: number | null }[] = semana ? [
     { titulo: 'Alcance', valor: semana.metricas.alcance, cambio: variacion(semana.metricas.alcance, semana.anterior?.alcance) },
     { titulo: 'Interacciones', valor: semana.metricas.interacciones, cambio: variacion(semana.metricas.interacciones, semana.anterior?.interacciones) },
@@ -117,8 +129,27 @@ export function Tablero({ estado }: Props) {
             <h2 className="tab-titulo">Para publicar</h2>
             <button type="button" className="tab-enlace" onClick={() => ir('publicaciones')}>Nueva publicación <ArrowRight size={13} aria-hidden /></button>
           </div>
-          {diasSinPublicar !== null && diasSinPublicar >= 7 && (
-            <p className="tab-aviso">Hace {diasSinPublicar} días que no publicás desde Órbita. Publicar seguido ayuda a que te vean más.</p>
+          <button type="button" className="tab-tarjeta tab-sugeridas" onClick={() => ir('sugeridas')}>
+            <span className="tab-sugeridas-icono" aria-hidden><Sparkles size={18} strokeWidth={1.8} /></span>
+            <span className="tab-pendiente-texto">
+              <span className="tab-pendiente-titulo">Publicaciones sugeridas por Orbi</span>
+              <span className="tab-pendiente-sub">Orbi arma las próximas con tus ventas y lo que mejor te funcionó. Vos las revisás y las programás.</span>
+            </span>
+            <ArrowRight size={15} aria-hidden className="tab-flecha" />
+          </button>
+          {diasSinPublicar !== null && diasSinPublicar >= 7 && programadas === 0 && (
+            <p className="tab-aviso">Hace {diasSinPublicar} días que no publicás desde Órbita y no tenés nada programado. Programar varias publicaciones juntas te evita acordarte todos los días.</p>
+          )}
+          {diasSinPublicar !== null && diasSinPublicar >= 7 && programadas !== undefined && programadas > 0 && (
+            <p className="tab-aviso">Hace {diasSinPublicar} días que no publicás. Lo próximo que sale es el {proxima?.programadaPara ? formatoCuando(proxima.programadaPara) : 'que programaste'}.</p>
+          )}
+          {programadas !== undefined && (programadas > 0 || (borradores ?? 0) > 0) && (
+            <p className="tab-resumen">
+              <CalendarClock size={14} aria-hidden />
+              {programadas > 0 && <button type="button" className="tab-enlace" onClick={() => ir('calendario')}>{programadas} {programadas === 1 ? 'programada' : 'programadas'}</button>}
+              {programadas > 0 && (borradores ?? 0) > 0 && ' · '}
+              {(borradores ?? 0) > 0 && <button type="button" className="tab-enlace" onClick={() => ir('publicaciones')}>{borradores} {borradores === 1 ? 'borrador' : 'borradores'}</button>}
+            </p>
           )}
           {ideas && ideas.length > 0 ? (
             <ul className="tab-ideas">
@@ -172,6 +203,11 @@ const CSS = `
 .tab-pendiente-sub { font-size: 12.5px; color: var(--color-muted); }
 .tab-flecha { flex-shrink: 0; color: var(--color-muted); }
 
+.tab-sugeridas { display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 12px; padding: 14px 16px; font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms; }
+.tab-sugeridas:hover { border-color: var(--color-muted); }
+.tab-sugeridas:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.tab-sugeridas-icono { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--color-text); background: var(--color-surface-alt); border: 1px solid var(--color-border); }
+.tab-resumen { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 13px; color: var(--color-muted); }
 .tab-aviso { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-text); background: var(--color-surface-alt); border: 1px solid var(--color-border); }
 .tab-ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
 .tab-idea { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }

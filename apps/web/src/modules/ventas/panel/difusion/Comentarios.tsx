@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { EyeOff, Eye, ExternalLink, Heart, MessageCircle, RefreshCw } from 'lucide-react'
+import { EyeOff, Eye, ExternalLink, Heart, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import {
   ApiError, getInstagramComentarios, hideInstagramComment, pedirRespuestaAOrbi, replyInstagramComment,
   type InstagramComentario, type InstagramEstado, type InstagramPublicacionComentada,
 } from '@/lib/api'
+import { AjustesModal } from './AjustesModal'
 import { Compuerta } from './Compuerta'
 import { contarComentarios, filtrarComentarios, type FiltroDeComentarios } from './filtroComentarios'
 import { haceCuanto, resumir } from './formato'
@@ -33,11 +34,15 @@ function Lista({ usuario }: { usuario: string | null }) {
   const [error, setError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(false)
   const [filtro, setFiltro] = useState<FiltroDeComentarios>('todos')
+  const [ocultadosSolos, setOcultadosSolos] = useState(0)
+  const [moderacionAbierta, setModeracionAbierta] = useState(false)
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null)
     try {
-      setPublicaciones((await getInstagramComentarios()).publicaciones)
+      const r = await getInstagramComentarios()
+      setPublicaciones(r.publicaciones)
+      setOcultadosSolos(r.ocultadosAutomaticamente ?? 0)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudieron cargar los comentarios. Probá de nuevo en un momento.')
       setPublicaciones((previas) => previas ?? [])
@@ -62,10 +67,20 @@ function Lista({ usuario }: { usuario: string | null }) {
         <p className="com-resumen">
           {publicaciones === null ? 'Cargando comentarios…' : total > 0 ? `${total} comentario${total === 1 ? '' : 's'} en tus últimas publicaciones` : 'Comentarios de tus últimas publicaciones'}
         </p>
-        <Button variant="secondary" size="sm" onClick={cargar} disabled={cargando} icon={<RefreshCw size={14} className={cargando ? 'com-girar' : undefined} />}>
-          Actualizar
-        </Button>
+        <div className="com-botones">
+          <Button variant="ghost" size="sm" onClick={() => setModeracionAbierta(true)} icon={<ShieldCheck size={14} aria-hidden />}>Moderación</Button>
+          <Button variant="secondary" size="sm" onClick={cargar} disabled={cargando} icon={<RefreshCw size={14} className={cargando ? 'com-girar' : undefined} />}>
+            Actualizar
+          </Button>
+        </div>
       </div>
+
+      {ocultadosSolos > 0 && (
+        <p className="com-aviso" role="status">
+          Orbi ocultó {ocultadosSolos} {ocultadosSolos === 1 ? 'comentario' : 'comentarios'} por tus palabras de moderación. Los ves en el filtro <strong>Ocultos</strong> y podés volver a mostrarlos.
+        </p>
+      )}
+      {moderacionAbierta && <AjustesModal parte="comentarios" onCerrar={() => { setModeracionAbierta(false); void cargar() }} />}
 
       {total > 0 && (
         <div className="com-filtros" role="group" aria-label="Filtrar comentarios">
@@ -235,6 +250,8 @@ const CSS = `
 .com-filtro-activo, .com-filtro-activo:hover { color: var(--color-surface); background: var(--color-text); border-color: var(--color-text); }
 .com-filtro-cuenta { font-size: 12px; font-variant-numeric: tabular-nums; opacity: 0.75; }
 .com-filtro:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.com-botones { display: flex; align-items: center; gap: 6px; }
+.com-aviso { margin: 0; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-text); background: var(--color-surface-alt); border: 1px solid var(--color-border); }
 .com-resumen { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-text); }
 .com-error { margin: 0 0 4px; font-size: 12.5px; line-height: 1.4; color: var(--color-error); }
 .com-suave { margin: 0; font-size: 13px; line-height: 1.55; color: var(--color-muted); }

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { ArrowLeft, ImagePlus, Search, SendHorizontal, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Search, SendHorizontal, Settings2, ShoppingBag, UserRound, X } from 'lucide-react'
 import {
   ApiError, getInstagramCharlas, getInstagramMensajes, pedirRespuestaAOrbi, responderInstagram,
   type InstagramCharla, type InstagramEstado, type InstagramMensaje,
 } from '@/lib/api'
+import { AjustesModal } from './AjustesModal'
 import { Compuerta } from './Compuerta'
+import { EnviarProductoModal } from './EnviarProductoModal'
+import { PanelDelCliente } from './PanelDelCliente'
+import { RespuestasRapidas } from './RespuestasRapidas'
 import { cuandoFue, diaDe, horaDe, iniciales } from './formatoMensajes'
 import { SugerenciasDeOrbi } from './SugerenciasDeOrbi'
 
@@ -54,6 +58,7 @@ function Bandeja({ usuario }: { usuario: string | null }) {
   const [abierta, setAbierta] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [soloSinLeer, setSoloSinLeer] = useState(false)
+  const [ajustesAbiertos, setAjustesAbiertos] = useState(false)
   const montado = useRef(true)
   useEffect(() => () => { montado.current = false }, [])
 
@@ -80,7 +85,12 @@ function Bandeja({ usuario }: { usuario: string | null }) {
       <div className={`msg-caja${abierta ? ' msg-caja-hilo' : ''}`}>
         <aside className="msg-lista" aria-label="Conversaciones">
           <header className="msg-lista-cabecera">
-            <h2 className="msg-usuario">{usuario ? `@${usuario}` : 'Mensajes'}</h2>
+            <div className="msg-titulo-fila">
+              <h2 className="msg-usuario">{usuario ? `@${usuario}` : 'Mensajes'}</h2>
+              <button type="button" className="msg-ajustes" onClick={() => setAjustesAbiertos(true)} aria-label="Respuestas automáticas" title="Respuestas automáticas">
+                <Settings2 size={18} strokeWidth={1.8} />
+              </button>
+            </div>
             <label className="msg-buscador">
               <Search size={15} strokeWidth={2} aria-hidden />
               <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar" aria-label="Buscar conversación" />
@@ -124,7 +134,15 @@ function Bandeja({ usuario }: { usuario: string | null }) {
 
         <section className="msg-hilo" aria-label="Conversación">
           {actual ? (
-            <Hilo key={actual.id} charla={actual} onVolver={() => setAbierta(null)} onLeida={alLeer} onCambio={cargar} />
+            <Hilo
+              key={actual.id}
+              charla={actual}
+              onVolver={() => setAbierta(null)}
+              onLeida={alLeer}
+              onCambio={cargar}
+              // Al unir con un cliente que ya tenía charla, esta pasa a ser la de él.
+              onVinculado={(id) => { setAbierta(id); cargar() }}
+            />
           ) : (
             <div className="msg-sin-hilo">
               <span className="msg-sin-hilo-icono" aria-hidden><SendHorizontal size={26} strokeWidth={1.6} /></span>
@@ -134,6 +152,7 @@ function Bandeja({ usuario }: { usuario: string | null }) {
           )}
         </section>
       </div>
+      {ajustesAbiertos && <AjustesModal parte="mensajes" onCerrar={() => setAjustesAbiertos(false)} />}
     </div>
   )
 }
@@ -153,9 +172,12 @@ interface HiloProps {
   onVolver: () => void
   onLeida: (id: string) => void
   onCambio: () => void
+  onVinculado: (conversationId: string) => void
 }
 
-function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
+const CLAVE_PANEL = 'difusion-panel-cliente'
+
+function Hilo({ charla, onVolver, onLeida, onCambio, onVinculado }: HiloProps) {
   const [mensajes, setMensajes] = useState<InstagramMensaje[] | null>(null)
   const [hasta, setHasta] = useState<string | null>(charla.puedeResponderHasta)
   const [texto, setTexto] = useState('')
@@ -163,6 +185,10 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ahora, setAhora] = useState(() => Date.now())
+  const [panelAbierto, setPanelAbierto] = useState(() => {
+    try { return window.localStorage.getItem(CLAVE_PANEL) === '1' } catch { return false }
+  })
+  const [mandandoProducto, setMandandoProducto] = useState(false)
   const fin = useRef<HTMLDivElement>(null)
   const cerca = useRef(true)
   const lista = useRef<HTMLDivElement>(null)
@@ -207,6 +233,13 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
     setFoto({ archivo, vista: URL.createObjectURL(archivo) })
   }
 
+  const alternarPanel = () => {
+    setPanelAbierto((a) => {
+      try { window.localStorage.setItem(CLAVE_PANEL, a ? '0' : '1') } catch { /* sin almacenamiento: no se recuerda */ }
+      return !a
+    })
+  }
+
   const enviar = async () => {
     if (!puedeEnviar) return
     setEnviando(true); setError(null)
@@ -237,6 +270,7 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
   const ultimoPropio = [...(mensajes ?? [])].reverse().find((m) => m.de === 'negocio')
 
   return (
+    <div className="msg-hilo-fila">
     <div className="msg-hilo-interno">
       <header className="msg-hilo-cabecera">
         <button type="button" className="msg-volver" onClick={onVolver} aria-label="Volver a las conversaciones"><ArrowLeft size={20} /></button>
@@ -247,6 +281,9 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
             {puedeResponder && hasta ? `Podés responder hasta las ${horaDe(hasta)}` : 'Pasó el plazo de 24 horas para responder'}
           </p>
         </div>
+        <button type="button" className={`msg-cliente-boton${panelAbierto ? ' msg-cliente-boton-activo' : ''}`} aria-pressed={panelAbierto} onClick={alternarPanel}>
+          <UserRound size={15} aria-hidden /> Cliente
+        </button>
       </header>
 
       <div className="msg-mensajes" ref={lista} onScroll={alScrollear}>
@@ -298,6 +335,10 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
             <ImagePlus size={20} strokeWidth={1.8} />
           </button>
           <input ref={entrada} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={elegirFoto} />
+          <RespuestasRapidas cliente={charla.nombre} disabled={!puedeResponder || enviando} onElegir={(t) => setTexto(t.slice(0, MAX_TEXTO))} />
+          <button type="button" className="msg-adjuntar" disabled={!puedeResponder || enviando} onClick={() => setMandandoProducto(true)} aria-label="Mandar un producto" title="Mandar un producto">
+            <ShoppingBag size={19} strokeWidth={1.8} />
+          </button>
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
@@ -313,6 +354,17 @@ function Hilo({ charla, onVolver, onLeida, onCambio }: HiloProps) {
         </div>
         {largo > MAX_TEXTO - 100 && <p className={`msg-contador${largo > MAX_TEXTO ? ' msg-contador-excedido' : ''}`}>{largo} / {MAX_TEXTO}</p>}
       </footer>
+    </div>
+
+    {panelAbierto && <PanelDelCliente charlaId={charla.id} onVinculado={onVinculado} />}
+    {mandandoProducto && (
+      <EnviarProductoModal
+        charlaId={charla.id}
+        cliente={charla.nombre}
+        onCerrar={() => setMandandoProducto(false)}
+        onEnviado={(nuevos) => { cerca.current = true; setMensajes((previos) => [...(previos ?? []), ...nuevos]); onCambio() }}
+      />
+    )}
     </div>
   )
 }
@@ -343,7 +395,15 @@ const CSS = `
 
 .msg-lista { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--color-border); }
 .msg-lista-cabecera { padding: 16px 16px 10px; }
-.msg-usuario { margin: 0 0 12px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-titulo-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.msg-ajustes { width: 34px; height: 34px; flex-shrink: 0; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
+.msg-ajustes:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.msg-ajustes:focus-visible, .msg-cliente-boton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.msg-cliente-boton { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
+.msg-cliente-boton:hover { color: var(--color-text); background: var(--color-surface-alt); }
+.msg-cliente-boton-activo, .msg-cliente-boton-activo:hover { color: var(--color-text); background: var(--color-surface-alt); border-color: var(--color-muted); }
+.msg-hilo-fila { position: relative; flex: 1; min-height: 0; display: flex; }
+.msg-usuario { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg-buscador { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: 10px; background: var(--color-surface-alt); color: var(--color-muted); border: 1px solid transparent; transition: border-color 150ms, background-color 150ms; }
 .msg-buscador:focus-within { border-color: var(--color-primary); background: var(--color-surface); }
 .msg-buscador input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 16px; color: var(--color-text); }
@@ -373,7 +433,7 @@ const CSS = `
 .msg-sin-hilo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; }
 .msg-sin-hilo-icono { width: 64px; height: 64px; margin-bottom: 8px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--color-text); border: 2px solid var(--color-text); }
 .msg-sin-hilo-titulo { margin: 0; font-size: 18px; font-weight: 600; color: var(--color-text); }
-.msg-hilo-interno { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.msg-hilo-interno { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .msg-hilo-cabecera { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
 .msg-volver { display: none; width: 36px; height: 36px; margin-left: -8px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; align-items: center; justify-content: center; color: var(--color-text); }
 .msg-hilo-nombre { min-width: 0; }
