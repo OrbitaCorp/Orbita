@@ -3341,14 +3341,14 @@ export function disconnectWhatsapp() { return panelRequest<{ connected: false }>
 export type InstagramEstado =
   | { habilitado: false; connected: false; solicitud: { username: string; requestedAt: string } | null }
   | { habilitado?: true; connected: false }
-  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string; puedePublicar?: boolean }
+  | { habilitado?: true; connected: true; username: string | null; connectedAt: string; tokenExpiresAt: string; puedePublicar?: boolean; puedeComentar?: boolean; puedeVerEstadisticas?: boolean }
 export function getInstagramConnection() { return panelRequest<InstagramEstado>('/instagram/connection') }
 export function requestInstagramAccess(username: string) {
   return panelRequest<{ username: string; requestedAt: string }>('/instagram/access-request', { method: 'POST', body: JSON.stringify({ username }) })
 }
 // `seccion`: la pantalla del panel a la que se vuelve al terminar el login de Instagram (por defecto Mensajes).
 // `permisos: 'kit'`: además de los mensajes, pide los permisos del kit de difusión (publicar, comentarios y estadísticas).
-export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones', permisos?: 'kit') {
+export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publicaciones' | 'comentarios' | 'estadisticas', permisos?: 'kit') {
   return panelRequest<{ url: string }>('/instagram/connect', {
     method: 'POST',
     body: JSON.stringify({ ...(seccion ? { seccion } : {}), ...(permisos ? { permisos } : {}) }),
@@ -3369,6 +3369,43 @@ export function getInstagramPosts() { return panelRequest<InstagramPublicacion[]
 export function publishInstagramPost(input: { productId: string; caption: string }) {
   return panelRequest<InstagramPublicacion>('/instagram/posts', { method: 'POST', body: JSON.stringify(input) })
 }
+// Comentarios de las últimas publicaciones (Difusión → Comentarios).
+export type InstagramRespuesta = { id: string; usuario: string; texto: string; fecha: string | null }
+export type InstagramComentario = InstagramRespuesta & { likes: number; oculto: boolean; respuestas: InstagramRespuesta[] }
+export type InstagramPublicacionComentada = {
+  id: string
+  texto: string
+  imagen: string | null
+  enlace: string | null
+  fecha: string | null
+  totalComentarios: number
+  comentarios: InstagramComentario[]
+}
+export function getInstagramComentarios() { return panelRequest<{ publicaciones: InstagramPublicacionComentada[] }>('/instagram/comments') }
+export function replyInstagramComment(id: string, texto: string) {
+  return panelRequest<{ id: string }>(`/instagram/comments/${id}/reply`, { method: 'POST', body: JSON.stringify({ texto }) })
+}
+export function hideInstagramComment(id: string, oculto: boolean) {
+  return panelRequest<{ id: string; oculto: boolean }>(`/instagram/comments/${id}/hide`, { method: 'POST', body: JSON.stringify({ oculto }) })
+}
+
+// Estadísticas de la cuenta (Difusión → Estadísticas). Una métrica en null es una que Instagram todavía no
+// tiene (datos que demoran, cuentas con pocos seguidores).
+export type InstagramEstadisticas = {
+  dias: 7 | 28
+  desde: string
+  hasta: string
+  cuenta: { usuario: string | null; seguidores: number | null; siguiendo: number | null; publicaciones: number | null }
+  metricas: {
+    alcance: number | null
+    visualizaciones: number | null
+    interacciones: number | null
+    cuentasInteractuaron: number | null
+    visitasAlPerfil: number | null
+  }
+  destacadas: { id: string; texto: string; imagen: string | null; enlace: string | null; fecha: string | null; likes: number; comentarios: number }[]
+}
+export function getInstagramEstadisticas(dias: 7 | 28) { return panelRequest<InstagramEstadisticas>(`/instagram/insights?dias=${dias}`) }
 export function disconnectInstagram() { return panelRequest<{ connected: false }>('/instagram/connection', { method: 'DELETE' }) }
 
 // Plantillas de mensaje (RBT-657)

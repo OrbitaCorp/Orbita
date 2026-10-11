@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "7b29189eca07ad38",
+  "version": "26567027d21e482d",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -350,7 +350,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "instagram-conexion",
       "capitulo": "Difusión",
       "titulo": "Conectar tu Instagram",
-      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Responder comentarios y ver estadísticas están en camino: las pantallas Comentarios y Estadísticas de Difusión dicen \"Próximamente\" hasta que estén listas.",
+      "texto": "En el módulo Difusión del menú lateral conectás la cuenta profesional de Instagram de tu negocio. Hoy sirve para recibir y responder tus mensajes directos desde la bandeja de Mensajes.\n\nInstagram está en acceso anticipado: si todavía no lo tenés, escribí el usuario de tu cuenta y tocá \"Pedir acceso\". El pedido queda pendiente de confirmación hasta que sumemos tu cuenta como cuenta de prueba de la app; recién ahí te mandamos la invitación de Instagram y aparece el botón para conectar.\n\nConsejo: Al conectar desde Difusión se piden de una vez todos los permisos del kit: publicar, comentarios y estadísticas. Si conectaste desde Mensajes, cada pantalla te muestra \"Autorizar\" para dar el permiso que le falta.",
       "destino": {
         "seccion": "difusion",
         "label": "Ir a Difusión"
@@ -360,11 +360,33 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "publicar-instagram",
       "capitulo": "Difusión",
       "titulo": "Publicar un producto en Instagram",
-      "texto": "En Difusión → Publicaciones subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado con el permiso de publicar. Si conectaste tu cuenta desde Difusión, ese permiso ya se pidió en el mismo momento. Si la conectaste desde Mensajes, la pantalla te muestra \"Autorizar publicación\": tocalo e iniciá sesión de nuevo en Instagram.\n\n1. Elegí un producto: Aparecen solo los productos publicados en tu tienda. Los que no tienen foto no se pueden usar.\n2. Escribí el texto: Arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda). Editalo como quieras: Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: La foto se publica cuadrada, sobre fondo blanco. Instagram no convierte los enlaces del texto en botones: para que te compren, poné el link de tu tienda en la biografía de tu perfil.",
+      "texto": "En Difusión → Publicaciones subís a tu Instagram la foto de un producto con un texto. Hace falta tener Instagram conectado con el permiso de publicar. Si conectaste tu cuenta desde Difusión, ese permiso ya se pidió en el mismo momento. Si la conectaste desde Mensajes, la pantalla te muestra \"Autorizar\": tocalo e iniciá sesión de nuevo en Instagram.\n\n1. Elegí un producto: Aparecen solo los productos publicados en tu tienda. Los que no tienen foto no se pueden usar.\n2. Escribí el texto: Arranca con un texto sugerido (nombre, descripción, precio y el enlace de tu tienda). Editalo como quieras: Instagram admite hasta 2.200 caracteres.\n3. Mirá la vista previa y publicá: Con \"Publicar en Instagram\" te pedimos confirmar antes de subirlo. Nada se publica sin esa confirmación.\n\nConsejo: La foto se publica cuadrada, sobre fondo blanco. Instagram no convierte los enlaces del texto en botones: para que te compren, poné el link de tu tienda en la biografía de tu perfil.",
       "destino": {
         "seccion": "difusion",
         "vista": "publicaciones",
         "label": "Ir a Publicaciones"
+      }
+    },
+    {
+      "id": "comentarios-instagram",
+      "capitulo": "Difusión",
+      "titulo": "Responder los comentarios de Instagram",
+      "texto": "En Difusión → Comentarios ves los comentarios de tus últimas publicaciones, agrupados por publicación, y los respondés sin salir de Órbita. Se leen al abrir la pantalla: si querés ver lo último, tocá \"Actualizar\".\n\n- Tocá Responder, escribí y confirmá con \"Responder\": la respuesta aparece debajo del comentario, a la vista de todos en Instagram.\n- Con Ocultar sacás un comentario de la vista pública; quien lo escribió lo sigue viendo. Se puede deshacer con Volver a mostrar.\n- Borrar comentarios no se ofrece desde Órbita: no tiene vuelta atrás. Si hace falta, se hace desde la app de Instagram.",
+      "destino": {
+        "seccion": "difusion",
+        "vista": "comentarios",
+        "label": "Ir a Comentarios"
+      }
+    },
+    {
+      "id": "estadisticas-instagram",
+      "capitulo": "Difusión",
+      "titulo": "Ver las estadísticas de Instagram",
+      "texto": "En Difusión → Estadísticas ves cuánta gente alcanzó tu cuenta y reaccionó a lo que publicás en los últimos 7 o 28 días, y cuáles fueron tus publicaciones con más movimiento.\n\n- Alcance: Cuentas distintas que vieron tu contenido.\n- Visualizaciones: Veces que se vio tu contenido, aunque sea la misma cuenta.\n- Interacciones: Me gusta, comentarios, guardados y compartidos.\n- Visitas al perfil: Veces que entraron a tu perfil.\n\nConsejo: Instagram puede demorar hasta 48 horas en actualizar los números, y algunos datos no aparecen en cuentas con pocos seguidores: lo que falta se muestra como \"—\", no como un cero.",
+      "destino": {
+        "seccion": "difusion",
+        "vista": "estadisticas",
+        "label": "Ir a Estadísticas"
       }
     },
     {

@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, Clock } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { Comentarios } from './Comentarios'
+import { Estadisticas } from './Estadisticas'
 import { Publicaciones } from './Publicaciones'
 import { InstagramModal, Marca } from '../mensajes/components/InstagramModal'
 import { useInstagramEstado } from '../mensajes/components/InstagramConexion'
@@ -73,9 +75,9 @@ export default function Difusion() {
     if (!resultado) return
     setYaSeOfrecio(true)
     cargar()
-    // Si se volvió a Publicaciones con el permiso ya concedido, no hay nada que mostrar en el modal: se sigue
-    // en la pantalla. Cualquier otro resultado (o desde otra pantalla) sí abre el modal.
-    if (!(resultado === 'conectado' && vista === 'publicaciones')) {
+    // Si se volvió a Publicaciones, Comentarios o Estadísticas con los permisos ya concedidos, no hay nada que
+    // mostrar en el modal: se sigue en la pantalla. Cualquier otro resultado (o desde el tablero) sí abre el modal.
+    if (!(resultado === 'conectado' && vista !== 'instagram')) {
       setResultadoIg(resultado)
       setAbierto(true)
     }
@@ -98,17 +100,15 @@ export default function Difusion() {
           {vista === 'instagram' ? (
             <div className="dif-grilla">
               {(Object.keys(FUNCIONES) as Funcion[]).map((f) => (
-                <TarjetaFuncion
-                  key={f}
-                  funcion={f}
-                  onAbrir={f === 'publicaciones' ? () => router.push({ query: { ...router.query, vista: 'publicaciones' } }) : undefined}
-                />
+                <TarjetaFuncion key={f} funcion={f} onAbrir={() => router.push({ query: { ...router.query, vista: f } })} />
               ))}
             </div>
           ) : vista === 'publicaciones' ? (
             <Publicaciones estado={estado} onAbrirConexion={() => setAbierto(true)} />
+          ) : vista === 'comentarios' ? (
+            <Comentarios estado={estado} onAbrirConexion={() => setAbierto(true)} />
           ) : (
-            <div className="dif-uno"><TarjetaFuncion funcion={vista} /></div>
+            <Estadisticas estado={estado} onAbrirConexion={() => setAbierto(true)} />
           )}
         </>
       )}
@@ -158,22 +158,17 @@ function EstadoInstagram({ estado, onAbrir }: { estado: InstagramEstado | null; 
 
 // ─── Funciones que vienen ──────────────────────────────────────────────────────
 
-// Con `onAbrir` la función ya existe: la tarjeta entera es un botón que la abre. Sin él, es "Próximamente".
-function TarjetaFuncion({ funcion, onAbrir }: { funcion: Funcion; onAbrir?: () => void }) {
+// La tarjeta entera es un botón que abre la pantalla de la función.
+function TarjetaFuncion({ funcion, onAbrir }: { funcion: Funcion; onAbrir: () => void }) {
   const { titulo, texto, ilustracion } = FUNCIONES[funcion]
-  const contenido = (
-    <>
+  return (
+    <button type="button" className="dif-tarjeta dif-funcion dif-funcion-activa" onClick={onAbrir}>
       <div className="dif-ilustracion" aria-hidden>{ilustracion}</div>
       <h2 className="dif-funcion-titulo">{titulo}</h2>
       <p className="dif-funcion-texto">{texto}</p>
-      {onAbrir
-        ? <p className="dif-abrir">Abrir <ArrowRight size={14} strokeWidth={2} aria-hidden /></p>
-        : <p className="dif-pronto"><Clock size={13} strokeWidth={2} aria-hidden /> Próximamente</p>}
-    </>
+      <p className="dif-abrir">Abrir <ArrowRight size={14} strokeWidth={2} aria-hidden /></p>
+    </button>
   )
-  return onAbrir
-    ? <button type="button" className="dif-tarjeta dif-funcion dif-funcion-activa" onClick={onAbrir}>{contenido}</button>
-    : <article className="dif-tarjeta dif-funcion">{contenido}</article>
 }
 
 // Ilustraciones: maquetas en gris de lo que va a ser cada pantalla. Sin color a propósito: nada de
@@ -229,7 +224,6 @@ const CSS = `
 .dif-avance-texto { margin-left: 6px; font-size: 12px; color: var(--color-muted); }
 
 .dif-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
-.dif-uno { max-width: 420px; margin: 16px auto 0; }
 .dif-funcion { display: flex; flex-direction: column; padding: 14px 14px 18px; }
 .dif-ilustracion { position: relative; aspect-ratio: 16 / 10; margin-bottom: 16px; overflow: hidden; border-radius: 12px; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
 .dif-funcion-titulo { margin: 0 6px 6px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text); }
@@ -238,7 +232,6 @@ const CSS = `
 .dif-funcion-activa:hover { border-color: var(--color-muted); box-shadow: 0 6px 20px -10px rgba(15, 23, 42, 0.25); }
 .dif-funcion-activa:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .dif-abrir { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px; font-size: 13px; font-weight: 600; color: var(--color-primary); }
-.dif-pronto { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px; font-size: 12.5px; font-weight: 500; color: var(--color-muted); }
 
 .dif-mock { position: absolute; inset: 0; display: flex; padding: 14px 16px; box-sizing: border-box; }
 .dif-mock-fila { display: flex; align-items: center; gap: 8px; }

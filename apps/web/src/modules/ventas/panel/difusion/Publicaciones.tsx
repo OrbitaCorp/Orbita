@@ -3,11 +3,12 @@ import { Bookmark, Check, ExternalLink, Heart, MessageCircle, Search, Send } fro
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import {
-  ApiError, getInstagramPosts, panelListProducts, publishInstagramPost, startInstagramConnect,
+  ApiError, getInstagramPosts, panelListProducts, publishInstagramPost,
   type ApiProductRow, type InstagramEstado, type InstagramPublicacion,
 } from '@/lib/api'
 import { currentSlug } from '@/lib/tenant'
 import { fmtMoney } from '@/lib/utils'
+import { Compuerta } from './Compuerta'
 import { MAX_TEXTO_INSTAGRAM, textoSugerido, urlDelProducto } from './textoSugerido'
 
 // Difusión → Publicaciones: subir a Instagram la foto de un producto con un texto propio.
@@ -26,60 +27,10 @@ interface Props {
 const fotoDe = (p: ApiProductRow): string | null => p.primaryImageUrl ?? p.images[0] ?? null
 
 export function Publicaciones({ estado, onAbrirConexion }: Props) {
-  if (estado === null) return <p className="pub-suave">Cargando…</p>
-  if (!estado.connected) {
-    return (
-      <Aviso
-        titulo="Primero conectá tu Instagram"
-        texto="Para publicar desde Órbita necesitamos tu cuenta profesional de Instagram conectada."
-        boton="Conectar Instagram"
-        onClick={onAbrirConexion}
-      />
-    )
-  }
-  if (estado.puedePublicar !== true) return <AutorizarPublicacion usuario={estado.username} />
-  return <Compositor usuario={estado.username} />
-}
-
-// ─── Falta un permiso ──────────────────────────────────────────────────────────
-
-function AutorizarPublicacion({ usuario }: { usuario: string | null }) {
-  const [trabajando, setTrabajando] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const autorizar = async () => {
-    setTrabajando(true); setError(null)
-    try {
-      // Vuelve a Difusión con el permiso de publicar concedido (la conexión se actualiza sola).
-      const { url } = await startInstagramConnect('publicaciones', 'kit')
-      window.location.href = url
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'No se pudo iniciar la autorización. Probá de nuevo.')
-      setTrabajando(false)
-    }
-  }
-
   return (
-    <Aviso
-      titulo="Autorizá la publicación"
-      texto={`Tu cuenta${usuario ? ` @${usuario}` : ''} está conectada solo para mensajes. Para publicar fotos en tu nombre, Instagram te pide un permiso más: vas a iniciar sesión de nuevo y volvés acá. Órbita solo publica lo que vos confirmás.`}
-      boton="Autorizar publicación"
-      cargando={trabajando}
-      error={error}
-      onClick={autorizar}
-    />
-  )
-}
-
-function Aviso({ titulo, texto, boton, onClick, cargando, error }: { titulo: string; texto: string; boton: string; onClick: () => void; cargando?: boolean; error?: string | null }) {
-  return (
-    <section className="pub-tarjeta pub-aviso">
-      <style>{CSS}</style>
-      <h2 className="pub-titulo-aviso">{titulo}</h2>
-      <p className="pub-suave">{texto}</p>
-      {error && <p className="pub-error" role="alert">{error}</p>}
-      <Button size="lg" loading={cargando} onClick={onClick}>{boton}</Button>
-    </section>
+    <Compuerta estado={estado} permiso="publicar" onAbrirConexion={onAbrirConexion}>
+      {(usuario) => <Compositor usuario={usuario} />}
+    </Compuerta>
   )
 }
 
@@ -315,9 +266,6 @@ const CSS = `
 .pub-suave { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: var(--color-muted); }
 .pub-error { margin: 0 0 12px; font-size: 12.5px; line-height: 1.4; color: var(--color-error); }
 
-.pub-aviso { margin-top: 16px; padding: 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; }
-.pub-aviso .pub-suave { max-width: 46ch; }
-.pub-titulo-aviso { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-text); }
 
 .pub-exito { display: flex; align-items: center; gap: 14px; }
 .pub-exito-icono { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--color-success); }
