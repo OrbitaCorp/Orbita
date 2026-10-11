@@ -3355,19 +3355,57 @@ export function startInstagramConnect(seccion?: 'mensajes' | 'difusion' | 'publi
   })
 }
 
-// Lo que Órbita publicó en el Instagram del negocio (Difusión → Publicaciones).
+// Lo que Órbita publicó en el Instagram del negocio (Difusión → Publicaciones). Una publicación con video tarda
+// en procesarse: nace PROCESSING y el panel la sigue con `continuar` hasta que queda PUBLISHED o FAILED.
 export type InstagramPublicacion = {
   id: string
+  estado: 'PROCESSING' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED'
+  tipo: 'IMAGE' | 'VIDEO' | 'CAROUSEL' | string
   productId: string | null
-  productName: string
+  productName: string | null
   caption: string
-  imageUrl: string
+  /** 'image' o 'video' por cada elemento, en orden. */
+  elementos: ('image' | 'video')[]
+  miniatura: string | null
   permalink: string | null
+  error: string | null
   createdAt: string
 }
+export type InstagramItemPublicacion = { origen: 'producto' | 'subida'; ref: string; tipo: 'image' | 'video' }
+export type InstagramArchivoSubido = { ref: string; tipo: 'image' | 'video'; url: string }
 export function getInstagramPosts() { return panelRequest<InstagramPublicacion[]>('/instagram/posts') }
-export function publishInstagramPost(input: { productId: string; caption: string }) {
+export function crearPublicacionInstagram(input: { productId?: string; caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }) {
   return panelRequest<InstagramPublicacion>('/instagram/posts', { method: 'POST', body: JSON.stringify(input) })
+}
+export function continuarPublicacionInstagram(id: string) {
+  return panelRequest<InstagramPublicacion>(`/instagram/posts/${id}/continuar`, { method: 'POST' })
+}
+export function subirFotoInstagram(file: File) {
+  const form = new FormData()
+  form.append('file', file, file.name)
+  return panelRequest<InstagramArchivoSubido>('/instagram/media/foto', { method: 'POST', body: form })
+}
+// El video no pasa por la API (pesa demasiado): se pide una dirección firmada y el navegador lo sube directo
+// al almacenamiento, con el mismo formato que usa su librería (PUT con un FormData).
+export async function subirVideoInstagram(file: File, onProgreso?: (porcentaje: number) => void): Promise<InstagramArchivoSubido> {
+  const tipo = file.type || (file.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+  const prep = await panelRequest<InstagramArchivoSubido & { subida: { url: string; token: string } }>('/instagram/media/video', {
+    method: 'POST',
+    body: JSON.stringify({ tipo, bytes: file.size }),
+  })
+  await new Promise<void>((resolve, reject) => {
+    const form = new FormData()
+    form.append('cacheControl', '3600')
+    form.append('', file)
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', prep.subida.url)
+    xhr.setRequestHeader('x-upsert', 'false')
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso?.(Math.round((e.loaded / e.total) * 100)) }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, 'No se pudo subir el video. Probá de nuevo.')))
+    xhr.onerror = () => reject(new ApiError(0, 'Se cortó la subida del video. Revisá tu conexión y probá de nuevo.'))
+    xhr.send(form)
+  })
+  return { ref: prep.ref, tipo: 'video', url: prep.url }
 }
 // Comentarios de las últimas publicaciones (Difusión → Comentarios).
 export type InstagramRespuesta = { id: string; usuario: string; texto: string; fecha: string | null }
