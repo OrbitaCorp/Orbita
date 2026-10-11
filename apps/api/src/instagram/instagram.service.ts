@@ -17,6 +17,7 @@ import { describeError } from '../common/utils/describe-error.util';
 import { escaparHtml } from '../common/utils/html';
 import { MailService } from '../mail/mail.service';
 import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
+import { InstagramAjustesService } from './instagram-ajustes.service';
 import { InstagramMediosService } from './instagram-medios.service';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
@@ -130,6 +131,8 @@ export class InstagramService {
     @Optional() private readonly mail?: MailService,
     // Opcional: guarda las imágenes que llegan por mensaje directo (la dirección de Instagram vence).
     @Optional() private readonly medios?: InstagramMediosService,
+    // Opcional: las respuestas automáticas (bienvenida y ausencia) de los mensajes.
+    @Optional() private readonly ajustes?: InstagramAjustesService,
   ) {}
 
   // Las credenciales se leen al usarlas y no al arrancar: la API sigue
@@ -700,9 +703,11 @@ export class InstagramService {
     const customerId = await this.resolverCliente(conexion.businessId, idCliente);
     if (!customerId) return;
 
+    // Primera vez que esta persona escribe: es la ocasión de la bienvenida.
+    let esNueva = false;
     const conv =
       (await this.prisma.conversation.findFirst({ where: { businessId: conexion.businessId, customerId }, select: { id: true } })) ??
-      (await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
+      ((esNueva = true), await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
 
     const creado = m.timestamp ? new Date(m.timestamp > 1e12 ? m.timestamp : m.timestamp * 1000) : new Date();
     const adjuntos = await this.adjuntosDe(conexion.businessId, msg);
@@ -719,6 +724,23 @@ export class InstagramService {
         data: eco ? { updatedAt: new Date() } : { isUnread: true, isArchived: false, updatedAt: new Date() },
       }),
     ]);
+    if (!eco) await this.responderSolo(conexion.businessId, conv.id, idCliente, esNueva, creado);
+  }
+
+  // Bienvenida y ausencia: si corresponde, contesta solo. Nunca tira: un mensaje automático que falla no puede
+  // perder el mensaje del cliente (que ya quedó guardado) ni hacer que Meta reintente el lote.
+  private async responderSolo(businessId: string, conversationId: string, igsid: string, esNueva: boolean, enviadoEn: Date): Promise<void> {
+    if (!this.ajustes) return;
+    try {
+      const texto = await this.ajustes.respuestaAutomatica(businessId, conversationId, { esNueva, enviadoEn });
+      if (!texto) return;
+      const externalId = await this.enviarTexto(businessId, conversationId, igsid, texto);
+      await this.prisma.message.create({
+        data: { conversationId, sender: 'STORE', text: texto, channel: 'INSTAGRAM', externalId, deliveryStatus: 'sent' },
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo mandar la respuesta automática de Instagram (negocio ${businessId}): ${describeError(e)}`);
+    }
   }
 
   private async conexionActiva(ids: (string | undefined)[]): Promise<{ businessId: string } | null> {

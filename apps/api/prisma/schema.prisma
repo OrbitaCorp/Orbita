@@ -103,6 +103,7 @@ model Business {
   instagramConnection  InstagramConnection?
   instagramEarlyAccess InstagramEarlyAccess?
   instagramPosts       InstagramPost[]
+  instagramSettings    InstagramSettings?
   discounts            Discount[]
   discountRedemptions  DiscountRedemption[]
   returns              Return[]
@@ -1668,6 +1669,8 @@ model InstagramPost {
   error             String?
   igMediaId         String?             @unique @map("ig_media_id")
   permalink         String?
+  scheduledAt       DateTime?           @map("scheduled_at") // SCHEDULED: cuándo se publica
+  plan              Json?               // SCHEDULED y DRAFT: lo necesario para armarla después { formato, items: [{ origen, ref, tipo }] }
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at")
 
@@ -1675,14 +1678,41 @@ model InstagramPost {
 
   @@index([businessId, createdAt])
   @@index([businessId, status])
+  @@index([status, scheduledAt])
   @@map("instagram_posts")
 }
 
 enum InstagramPostStatus {
+  DRAFT // borrador: se guardó a medias, no sale sola
+  SCHEDULED // programada: sale sola a la hora de scheduledAt
   PROCESSING
   PUBLISHING
   PUBLISHED
   FAILED
+}
+
+// Ajustes de Instagram de un negocio (Difusión): respuestas automáticas de los mensajes y moderación de
+// comentarios. Una fila por negocio.
+model InstagramSettings {
+  id                 String   @id @default(uuid())
+  businessId         String   @unique @map("business_id")
+  welcomeEnabled     Boolean  @default(false) @map("welcome_enabled")
+  welcomeText        String   @default("") @map("welcome_text")
+  awayEnabled        Boolean  @default(false) @map("away_enabled")
+  awayText           String   @default("") @map("away_text")
+  // Horario de atención en hora de Argentina ("09:00"–"18:00") y días en que se atiende (0 = domingo … 6 = sábado).
+  // Fuera de ese horario (o en un día que no se atiende) sale el mensaje de ausencia.
+  openFrom           String   @default("09:00") @map("open_from")
+  openTo             String   @default("18:00") @map("open_to")
+  openDays           Json     @default("[1,2,3,4,5]") @map("open_days")
+  moderationEnabled  Boolean  @default(false) @map("moderation_enabled")
+  moderationWords    Json     @default("[]") @map("moderation_words") // palabras o frases: el comentario que las tenga se oculta
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("instagram_settings")
 }
 
 enum InstagramConnectionStatus {

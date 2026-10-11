@@ -279,7 +279,7 @@ describe('InstagramPublicacionesService (unit)', () => {
   it('el historial se pide solo de ese negocio', async () => {
     const { svc, prisma } = armar();
     await svc.listar(BIZ);
-    expect(prisma.instagramPost.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, take: 30 }));
+    expect(prisma.instagramPost.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { businessId: BIZ }, take: 60 }));
   });
 });
 

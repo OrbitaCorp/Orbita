@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { describeError } from '../common/utils/describe-error.util';
+import { analizarRendimiento, type RendimientoDeLaCuenta, type MedioDeInstagram } from './instagram-rendimiento';
 import { InstagramService, SCOPE_ESTADISTICAS } from './instagram.service';
 
 // Estadísticas del kit de difusión: cuánto alcanzó y se interactuó con la cuenta en los últimos 7 o 28 días,
@@ -62,6 +63,7 @@ export interface ResumenDeEstadisticas {
 export class InstagramEstadisticasService {
   private readonly logger = new Logger(InstagramEstadisticasService.name);
   private readonly cache = new Map<string, { vence: number; valor: ResumenDeEstadisticas }>();
+  private readonly cacheRendimiento = new Map<string, { vence: number; valor: RendimientoDeLaCuenta }>();
 
   constructor(private readonly instagram: InstagramService) {}
 
@@ -126,6 +128,24 @@ export class InstagramEstadisticasService {
       destacadas,
     };
     this.cache.set(clave, { vence: Date.now() + CACHE_MS, valor });
+    return valor;
+  }
+
+  /**
+   * Qué tipo de publicación y qué momento le funciona mejor a la cuenta, con sus últimas 50 publicaciones
+   * (cualquiera, no solo las que se subieron desde Órbita). Ver instagram-rendimiento.ts.
+   */
+  async rendimiento(businessId: string): Promise<RendimientoDeLaCuenta> {
+    const guardado = this.cacheRendimiento.get(businessId);
+    if (guardado && guardado.vence > Date.now()) return guardado.valor;
+    const r = await this.instagram.graph<{ data?: MedioDeInstagram[] }>(businessId, SCOPE_ESTADISTICAS, '{ig}/media', {
+      query: {
+        fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count',
+        limit: '50',
+      },
+    });
+    const valor = analizarRendimiento(r.data ?? []);
+    this.cacheRendimiento.set(businessId, { vence: Date.now() + CACHE_MS * 3, valor });
     return valor;
   }
 

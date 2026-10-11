@@ -13,6 +13,12 @@ import { InstagramService } from '../instagram/instagram.service';
 // cuando el cliente escribe, se apaga cuando el staff abre la conversación o
 // contesta. No hay un flag simétrico para "el cliente no leyó la respuesta"
 // — el schema no lo tiene, y el storefront no necesita ese detalle todavía.
+// Para el módulo Mensajes: se saltea la charla que es SOLO de Instagram (esas se atienden en Difusión → Mensajes).
+// Una charla vacía o con algún mensaje de otro canal (tienda, WhatsApp) sí va.
+const SIN_SOLO_INSTAGRAM = {
+  OR: [{ messages: { none: {} } }, { messages: { some: { channel: { not: 'INSTAGRAM' as const } } } }],
+};
+
 type MensajeRow = { id: string; sender: string; text: string; orderId: string | null; channel: string; deliveryStatus: string | null; createdAt: Date };
 
 @Injectable()
@@ -51,8 +57,9 @@ export class ConversationsService {
 
   async findAllForBusiness(businessId: string) {
     const rows = await this.prisma.conversation.findMany({
-      // Las charlas de Instagram se atienden en Difusión → Mensajes, no acá (por ahora).
-      where: { businessId, customer: { instagramId: null } },
+      // Las charlas de Instagram se atienden en Difusión → Mensajes, no acá (por ahora). Una charla de alguien que
+      // también escribió por la tienda o WhatsApp sí se ve acá, con esos mensajes.
+      where: { businessId, ...SIN_SOLO_INSTAGRAM },
       orderBy: { updatedAt: 'desc' },
       include: {
         customer: { select: { firstName: true, lastName: true, avatarUrl: true, email: true } },
@@ -162,7 +169,7 @@ export class ConversationsService {
 
   async unreadCount(businessId: string) {
     // Sin las de Instagram: tienen su propio contador en Difusión.
-    const count = await this.prisma.conversation.count({ where: { businessId, isUnread: true, customer: { instagramId: null } } });
+    const count = await this.prisma.conversation.count({ where: { businessId, isUnread: true, ...SIN_SOLO_INSTAGRAM } });
     return { count };
   }
 

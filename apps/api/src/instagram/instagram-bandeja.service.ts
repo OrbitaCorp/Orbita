@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InstagramMediosService } from './instagram-medios.service';
@@ -37,6 +37,19 @@ export interface CharlaVista {
   puedeResponderHasta: string | null;
 }
 
+export interface FichaDelCliente {
+  id: string;
+  nombre: string;
+  email: string | null;
+  telefono: string | null;
+  desde: string;
+  pedidos: {
+    cantidad: number;
+    total: number;
+    ultimos: { id: string; numero: number; estado: string; total: number; fecha: string }[];
+  };
+}
+
 export interface MensajeVista {
   id: string;
   de: 'cliente' | 'negocio';
@@ -72,7 +85,7 @@ export class InstagramBandejaService {
   /** Las charlas de Instagram del negocio, la más reciente primero. */
   async listar(businessId: string): Promise<CharlaVista[]> {
     const filas = await this.prisma.conversation.findMany({
-      where: { businessId, isArchived: false, customer: { instagramId: { not: null }, deletedAt: null } },
+      where: { businessId, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null } },
       orderBy: { updatedAt: 'desc' },
       take: MAX_CHARLAS,
       select: {
@@ -111,7 +124,7 @@ export class InstagramBandejaService {
 
   async noLeidas(businessId: string): Promise<{ count: number }> {
     const count = await this.prisma.conversation.count({
-      where: { businessId, isUnread: true, isArchived: false, customer: { instagramId: { not: null }, deletedAt: null } },
+      where: { businessId, isUnread: true, isArchived: false, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null }, deletedAt: null } },
     });
     return { count };
   }
@@ -178,19 +191,129 @@ export class InstagramBandejaService {
   /** Marcar la charla como sin leer (para volver a ella después) o como leída. */
   async marcarLeida(businessId: string, conversationId: string, leida: boolean): Promise<{ ok: true }> {
     const r = await this.prisma.conversation.updateMany({
-      where: { id: conversationId, businessId, customer: { instagramId: { not: null } } },
+      where: { id: conversationId, businessId, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null } } },
       data: { isUnread: !leida },
     });
     if (r.count === 0) throw new NotFoundException('Conversación no encontrada');
     return { ok: true };
   }
 
+  /**
+   * Manda la ficha de un producto: su foto y, en otro mensaje, el nombre, el precio y el enlace corto a la tienda
+   * (en los mensajes directos los enlaces sí se pueden tocar). Si el producto no tiene foto, sale solo el texto.
+   */
+  async enviarProducto(businessId: string, conversationId: string, productId: string): Promise<MensajeVista[]> {
+    const conv = await this.charla(businessId, conversationId);
+    const igsid = conv.customer.instagramId as string;
+    const producto = await this.prisma.product.findFirst({
+      where: { id: productId, businessId, status: 'PUBLISHED' },
+      select: {
+        id: true, name: true, basePrice: true,
+        business: { select: { subdomain: true } },
+        images: { orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }], take: 1, select: { url: true } },
+      },
+    });
+    if (!producto) throw new NotFoundException('Producto no encontrado');
+
+    const precio = Number(producto.basePrice) > 0 ? `\n$${Number(producto.basePrice).toLocaleString('es-AR')}` : '';
+    const texto = `${producto.name}${precio}\nhttps://${producto.business.subdomain}.orbita.site/p/${producto.id.slice(0, 8)}`;
+
+    const creados: MensajeVista[] = [];
+    const foto = producto.images[0]?.url;
+    if (foto) {
+      const url = await this.medios.fotoDeProductoParaMensaje(businessId, foto);
+      const externalId = await this.instagram.enviarImagen(businessId, conversationId, igsid, url);
+      creados.push(await this.guardarSaliente(conversationId, { text: '[Imagen]', externalId, attachments: [{ tipo: 'image', url }] }));
+    }
+    const externalId = await this.instagram.enviarTexto(businessId, conversationId, igsid, texto);
+    creados.push(await this.guardarSaliente(conversationId, { text: texto, externalId }));
+    await this.prisma.conversation.updateMany({ where: { id: conversationId, businessId }, data: { isUnread: false, updatedAt: new Date() } });
+    return creados;
+  }
+
+  /** Lo que se sabe de la persona de una charla: sus datos y sus pedidos, para pasar de la charla a la venta. */
+  async cliente(businessId: string, conversationId: string): Promise<FichaDelCliente> {
+    const conv = await this.charla(businessId, conversationId);
+    const c = await this.prisma.customer.findFirst({
+      where: { id: conv.customerId, businessId },
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true },
+    });
+    if (!c) throw new NotFoundException('Cliente no encontrado');
+    const pedidosDelCliente = { businessId, customerId: c.id, status: { not: 'CANCELLED' as const } };
+    const [resumen, ultimos] = await Promise.all([
+      this.prisma.order.aggregate({ where: pedidosDelCliente, _count: { _all: true }, _sum: { total: true } }),
+      this.prisma.order.findMany({
+        where: { businessId, customerId: c.id },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: { id: true, orderNumber: true, status: true, total: true, createdAt: true },
+      }),
+    ]);
+    return {
+      id: c.id,
+      nombre: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ''}`,
+      email: c.email,
+      telefono: c.phone,
+      desde: c.createdAt.toISOString(),
+      pedidos: {
+        cantidad: resumen._count._all,
+        total: Number(resumen._sum.total ?? 0),
+        ultimos: ultimos.map((o) => ({ id: o.id, numero: o.orderNumber, estado: o.status, total: Number(o.total), fecha: o.createdAt.toISOString() })),
+      },
+    };
+  }
+
+  /**
+   * Une la persona de Instagram con un cliente que el negocio ya tenía (el que compró en la tienda, por ejemplo):
+   * el cliente existente pasa a tener su cuenta de Instagram, la charla se suma a la suya y el cliente "Instagram
+   * 1234" que se había creado solo se da de baja. Los pedidos que tuviera ese cliente pasan al existente.
+   */
+  async vincular(businessId: string, conversationId: string, clienteId: string): Promise<{ conversationId: string }> {
+    const conv = await this.charla(businessId, conversationId);
+    const igsid = conv.customer.instagramId as string;
+    if (clienteId === conv.customerId) throw new BadRequestException('Elegí un cliente distinto.');
+    const destino = await this.prisma.customer.findFirst({ where: { id: clienteId, businessId, deletedAt: null }, select: { id: true, instagramId: true } });
+    if (!destino) throw new NotFoundException('Cliente no encontrado');
+    if (destino.instagramId) throw new ConflictException('Ese cliente ya tiene otra cuenta de Instagram vinculada.');
+
+    const charlaDestino = await this.prisma.conversation.findFirst({ where: { businessId, customerId: destino.id }, select: { id: true } });
+    const final = await this.prisma.$transaction(async (tx) => {
+      // Primero se libera el id de Instagram (es único por negocio) y se da de baja el cliente automático.
+      await tx.customer.updateMany({ where: { id: conv.customerId, businessId }, data: { instagramId: null, deletedAt: new Date() } });
+      await tx.order.updateMany({ where: { businessId, customerId: conv.customerId }, data: { customerId: destino.id } });
+      await tx.customer.updateMany({ where: { id: destino.id, businessId }, data: { instagramId: igsid } });
+      if (charlaDestino) {
+        await tx.message.updateMany({ where: { conversationId: conv.id }, data: { conversationId: charlaDestino.id } });
+        await tx.conversation.deleteMany({ where: { id: conv.id, businessId } });
+        await tx.conversation.updateMany({ where: { id: charlaDestino.id, businessId }, data: { isUnread: conv.isUnread, updatedAt: new Date() } });
+        return charlaDestino.id;
+      }
+      await tx.conversation.updateMany({ where: { id: conv.id, businessId }, data: { customerId: destino.id } });
+      return conv.id;
+    });
+    return { conversationId: final };
+  }
+
   // ── Internos ────────────────────────────────────────────────────────────────
+
+  private async guardarSaliente(
+    conversationId: string,
+    d: { text: string; externalId: string; attachments?: { tipo: string; url: string }[] },
+  ): Promise<MensajeVista> {
+    const m = await this.prisma.message.create({
+      data: {
+        conversationId, sender: 'STORE', text: d.text, channel: 'INSTAGRAM', externalId: d.externalId, deliveryStatus: 'sent',
+        ...(d.attachments ? { attachments: d.attachments } : {}),
+      },
+      select: { id: true, sender: true, text: true, attachments: true, deliveryStatus: true, createdAt: true },
+    });
+    return this.aVista(m);
+  }
 
   private async charla(businessId: string, conversationId: string) {
     const conv = await this.prisma.conversation.findFirst({
-      where: { id: conversationId, businessId, customer: { instagramId: { not: null } } },
-      select: { id: true, isUnread: true, customer: { select: { instagramId: true } } },
+      where: { id: conversationId, businessId, messages: { some: { channel: 'INSTAGRAM' } }, customer: { instagramId: { not: null } } },
+      select: { id: true, isUnread: true, customerId: true, customer: { select: { instagramId: true } } },
     });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
     return conv;

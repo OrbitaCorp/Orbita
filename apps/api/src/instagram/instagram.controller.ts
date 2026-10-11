@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Patch, Post, Put, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
@@ -10,12 +10,14 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
-import { MarcarLeidaDto, ResponderMensajeDto } from './dto/bandeja-instagram.dto';
+import { EnviarProductoDto, MarcarLeidaDto, ResponderMensajeDto, VincularClienteDto } from './dto/bandeja-instagram.dto';
+import { AjustesInstagramDto, BorradorPublicacionDto, ProgramarPublicacionDto } from './dto/programacion-instagram.dto';
 import { RedactarTextoDto, SugerirRespuestaDto } from './dto/orbi-instagram.dto';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
 import { CrearPublicacionDto, SubirVideoDto } from './dto/crear-publicacion.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
+import { InstagramAjustesService } from './instagram-ajustes.service';
 import { InstagramBandejaService } from './instagram-bandeja.service';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramEstadisticasService } from './instagram-estadisticas.service';
@@ -46,6 +48,7 @@ export class InstagramController {
     private readonly estadisticasSvc: InstagramEstadisticasService,
     private readonly bandeja: InstagramBandejaService,
     private readonly orbi: InstagramOrbiService,
+    private readonly ajustes: InstagramAjustesService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -88,11 +91,121 @@ export class InstagramController {
     return this.bandeja.responder(businessId, id, dto.texto, file);
   }
 
+  // Mandar la ficha de un producto (su foto y el enlace corto de la tienda).
+  @Post('inbox/:id/product')
+  @FullModeOnly()
+  async enviarProducto(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: EnviarProductoDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.enviarProducto(businessId, id, dto.productId);
+  }
+
+  // Los datos y los pedidos de la persona de la charla.
+  @Get('inbox/:id/customer')
+  @FullModeOnly()
+  async clienteDeCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.cliente(businessId, id);
+  }
+
+  // Unir esta persona con un cliente que ya existía.
+  @Post('inbox/:id/link')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async vincularCliente(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: VincularClienteDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.vincular(businessId, id, dto.customerId);
+  }
+
   @Patch('inbox/:id')
   @FullModeOnly()
   async marcarCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: MarcarLeidaDto) {
     const { businessId } = assertMemberContext(ctx);
     return this.bandeja.marcarLeida(businessId, id, dto.leida);
+  }
+
+  // Programar una publicación: sale sola a la hora elegida.
+  @Post('posts/schedule')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async programar(@CurrentBusiness() ctx: AuthContext, @Body() dto: ProgramarPublicacionDto) {
+    const { businessId, memberId } = assertMemberContext(ctx);
+    const fecha = new Date(dto.programarPara);
+    if (Number.isNaN(fecha.getTime())) throw new BadRequestException('La fecha no es válida.');
+    return this.publicaciones.programar(businessId, memberId, dto, fecha);
+  }
+
+  // Guardar una publicación a medias.
+  @Post('posts/draft')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async guardarBorrador(@CurrentBusiness() ctx: AuthContext, @Body() dto: BorradorPublicacionDto) {
+    const { businessId, memberId } = assertMemberContext(ctx);
+    return this.publicaciones.guardarBorrador(businessId, memberId, dto);
+  }
+
+  // Una programada vuelve a borrador.
+  @Post('posts/:id/unschedule')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async desprogramar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.publicaciones.pasarABorrador(businessId, id);
+  }
+
+  // Borra un borrador o una programada.
+  @Delete('posts/:id')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async descartar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.publicaciones.descartar(businessId, id);
+  }
+
+  // Lo publicado y lo programado de un mes (?mes=2026-10), para el calendario.
+  @Get('posts/calendar')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async calendario(@CurrentBusiness() ctx: AuthContext, @Query('mes') mes?: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(mes ?? '');
+    if (!m) throw new BadRequestException('El mes tiene que tener la forma 2026-10.');
+    // El mes empieza a la medianoche de Argentina (UTC−3).
+    const desde = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1, 3));
+    const hasta = new Date(Date.UTC(Number(m[1]), Number(m[2]), 1, 3));
+    return this.publicaciones.calendario(businessId, desde, hasta);
+  }
+
+  // Publicaciones ya armadas por Orbi a partir de las métricas.
+  @Get('orbi/sugeridas')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
+  async orbiSugeridas(@CurrentBusiness() ctx: AuthContext, @Query('refrescar') refrescar?: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.orbi.sugerirPublicaciones(businessId, refrescar === '1');
+  }
+
+  // Ajustes: respuestas automáticas de mensajes y moderación de comentarios.
+  @Get('settings')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async ajustesDelNegocio(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.ajustes.obtener(businessId);
+  }
+
+  @Put('settings')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async guardarAjustes(@CurrentBusiness() ctx: AuthContext, @Body() dto: AjustesInstagramDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.ajustes.guardar(businessId, dto);
   }
 
   // Ideas de qué publicar (productos de la tienda que todavía no se mostraron en Instagram).
@@ -225,6 +338,16 @@ export class InstagramController {
     const { businessId } = assertMemberContext(ctx);
     await this.instagram.asegurarHabilitado(businessId);
     return this.estadisticasSvc.resumen(businessId, dias === '28' ? 28 : 7);
+  }
+
+  // Qué tipo de publicación y qué momento funciona mejor en la cuenta (Difusión → Estadísticas).
+  @Get('insights/rendimiento')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async rendimiento(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.estadisticasSvc.rendimiento(businessId);
   }
 
   @Get('connection')

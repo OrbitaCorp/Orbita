@@ -203,6 +203,60 @@ export class InstagramMediosService {
     return { tipo: 'image', url: listo.url, temporales: [ruta, listo.ruta], miniatura };
   }
 
+  /** Dirección pública para mostrar un elemento en una vista previa (la foto del producto, o la subida). */
+  vistaDe(businessId: string, item: ItemDePublicacion): string {
+    return item.origen === 'producto' ? item.ref : this.urlPublica(this.rutaPropia(businessId, item.ref));
+  }
+
+  /**
+   * Comprobación barata de un elemento SIN procesarlo (para programar o guardar un borrador): que la foto sea de
+   * un producto de ESTE negocio, o que la subida sea de su carpeta. El archivo se prepara recién al publicar.
+   */
+  async validar(businessId: string, item: ItemDePublicacion): Promise<void> {
+    if (item.origen === 'producto') {
+      if (item.tipo !== 'image') throw new BadRequestException('Las fotos de un producto son solo fotos.');
+      const foto = await this.prisma.productImage.findFirst({ where: { url: item.ref, product: { businessId } }, select: { id: true } });
+      if (!foto) throw new UnprocessableEntityException('Una de las fotos ya no está en tu catálogo. Volvé a elegirla.');
+      return;
+    }
+    this.rutaPropia(businessId, item.ref);
+  }
+
+  /** Borra las subidas (solo las de este negocio) de una lista de elementos: al descartar un borrador o una programada. */
+  async limpiarSubidas(businessId: string, items: ItemDePublicacion[]): Promise<void> {
+    const rutas = items.flatMap((i) => {
+      if (i.origen !== 'subida') return [];
+      try {
+        return [this.rutaPropia(businessId, i.ref)];
+      } catch {
+        return [];
+      }
+    });
+    await this.limpiar(rutas);
+  }
+
+  /** La foto de un producto del catálogo, lista para mandarla por mensaje directo (JPEG, guardada con la charla). */
+  async fotoDeProductoParaMensaje(businessId: string, url: string): Promise<string> {
+    const foto = await this.prisma.productImage.findFirst({ where: { url, product: { businessId } }, select: { id: true } });
+    if (!foto) throw new UnprocessableEntityException('Esa foto ya no está en tu catálogo.');
+    const original = await this.descargarPublica(url);
+    let jpeg: Buffer;
+    try {
+      jpeg = await sharp(original, ENTRADA_IMAGEN)
+        .rotate()
+        .flatten({ background: '#ffffff' })
+        .resize(LADO_MAX_SUBIDA, LADO_MAX_SUBIDA, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+    } catch {
+      throw new UnprocessableEntityException('La foto del producto no se pudo preparar.');
+    }
+    await this.asegurarBucket();
+    const ruta = `${businessId}/mensajes/${randomUUID()}.jpg`;
+    await this.subir(ruta, jpeg, 'image/jpeg');
+    return this.urlPublica(ruta);
+  }
+
   /** Borra archivos temporales. Nunca tira: un archivo que quedó de más no justifica romper nada. */
   async limpiar(rutas: string[]): Promise<void> {
     if (rutas.length === 0) return;

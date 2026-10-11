@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import { describeError } from '../common/utils/describe-error.util';
+import { InstagramAjustesService, tienePalabraProhibida } from './instagram-ajustes.service';
 import { InstagramService, SCOPE_COMENTAR } from './instagram.service';
 
 // Comentarios del kit de difusión: leer los comentarios de las últimas publicaciones del negocio,
@@ -10,6 +12,8 @@ import { InstagramService, SCOPE_COMENTAR } from './instagram.service';
 
 const MAX_PUBLICACIONES = 8;
 const MAX_COMENTARIOS_POR_PUBLICACION = 30;
+// Tope de comentarios que se ocultan solos en una pasada: un negocio con una palabra mal elegida no vacía todo de golpe.
+const MAX_OCULTOS_POR_PASADA = 25;
 // Los ids de Instagram son numéricos: se comprueba antes de armar una ruta con ellos.
 const ID_DE_INSTAGRAM = /^\d{5,30}$/;
 
@@ -64,15 +68,24 @@ const aRespuesta = (r: IgRespuesta): RespuestaDeComentario => ({
 
 @Injectable()
 export class InstagramComentariosService {
-  constructor(private readonly instagram: InstagramService) {}
+  private readonly logger = new Logger(InstagramComentariosService.name);
+
+  constructor(
+    private readonly instagram: InstagramService,
+    // Opcional: la moderación automática (las palabras a ocultar).
+    @Optional() private readonly ajustes?: InstagramAjustesService,
+  ) {}
 
   private idValido(id: string): string {
     if (!ID_DE_INSTAGRAM.test(id)) throw new BadRequestException('Comentario inválido');
     return id;
   }
 
-  /** Los comentarios de las últimas publicaciones que tienen alguno, de la más nueva a la más vieja. */
-  async listar(businessId: string): Promise<{ publicaciones: PublicacionConComentarios[] }> {
+  /**
+   * Los comentarios de las últimas publicaciones que tienen alguno, de la más nueva a la más vieja. Si el negocio
+   * prendió la moderación, los que tengan alguna de sus palabras se ocultan en el momento (se pueden volver a mostrar).
+   */
+  async listar(businessId: string): Promise<{ publicaciones: PublicacionConComentarios[]; ocultadosAutomaticamente: number }> {
     const medios = await this.instagram.graph<{ data?: IgMedia[] }>(businessId, SCOPE_COMENTAR, '{ig}/media', {
       query: { fields: 'id,caption,media_url,thumbnail_url,permalink,timestamp,comments_count', limit: String(MAX_PUBLICACIONES) },
     });
@@ -115,7 +128,50 @@ export class InstagramComentariosService {
         comentarios,
       });
     });
-    return { publicaciones };
+    const ocultadosAutomaticamente = await this.moderar(businessId, publicaciones);
+    return { publicaciones, ocultadosAutomaticamente };
+  }
+
+  /** Oculta los comentarios con palabras prohibidas que todavía están a la vista. Mejor esfuerzo: nunca rompe la lista. */
+  private async moderar(businessId: string, publicaciones: PublicacionConComentarios[]): Promise<number> {
+    if (!this.ajustes) return 0;
+    try {
+      const { moderacion } = await this.ajustes.obtener(businessId);
+      if (!moderacion.activa || moderacion.palabras.length === 0) return 0;
+      const aOcultar = publicaciones
+        .flatMap((p) => p.comentarios)
+        .filter((c) => !c.oculto && tienePalabraProhibida(c.texto, moderacion.palabras))
+        .slice(0, MAX_OCULTOS_POR_PASADA);
+      const resultados = await Promise.allSettled(aOcultar.map((c) => this.ocultar(businessId, c.id, true)));
+      let ocultados = 0;
+      resultados.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          aOcultar[i].oculto = true;
+          ocultados++;
+        } else {
+          this.logger.warn(`No se pudo ocultar el comentario ${aOcultar[i].id}: ${describeError(r.reason)}`);
+        }
+      });
+      return ocultados;
+    } catch (e) {
+      this.logger.warn(`Moderación de comentarios (negocio ${businessId}): ${describeError(e)}`);
+      return 0;
+    }
+  }
+
+  /** Disparo periódico: modera los negocios que tienen la moderación prendida, sin que nadie abra la pantalla. */
+  async moderarTodos(): Promise<{ negocios: number; ocultados: number }> {
+    if (!this.ajustes) return { negocios: 0, ocultados: 0 };
+    const negocios = await this.ajustes.negociosConModeracion();
+    let ocultados = 0;
+    for (const { businessId } of negocios) {
+      try {
+        ocultados += (await this.listar(businessId)).ocultadosAutomaticamente;
+      } catch (e) {
+        this.logger.warn(`No se pudo moderar los comentarios del negocio ${businessId}: ${describeError(e)}`);
+      }
+    }
+    return { negocios: negocios.length, ocultados };
   }
 
   async responder(businessId: string, comentarioId: string, texto: string): Promise<{ id: string }> {

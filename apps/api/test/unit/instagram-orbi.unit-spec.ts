@@ -35,7 +35,8 @@ function build() {
       destacadas: [{ texto: 'Remera nueva', likes: 30, comentarios: 4 }],
     }),
   };
-  return { svc: new InstagramOrbiService(config, prisma, metering, estadisticas), prisma, metering, estadisticas };
+  const publicaciones: any = { ideas: jest.fn().mockResolvedValue([]) };
+  return { svc: new InstagramOrbiService(config, prisma, metering, estadisticas, publicaciones), prisma, metering, estadisticas, publicaciones };
 }
 
 beforeEach(() => generar.mockReset());
@@ -151,5 +152,98 @@ describe('leerEstadisticas', () => {
     expect(user).toContain('Alcance: 900 (período anterior: 600)');
     expect(user).toContain('Visitas al perfil: sin dato');
     expect(user).toContain('Remera nueva');
+  });
+});
+
+describe('sugerirPublicaciones', () => {
+  const IDEAS = [
+    { productId: 'p1', nombre: 'Remera lino', foto: 'https://cdn.test/1.jpg', fotos: 3, motivo: 'Se vendió 5 veces este último mes y no lo mostraste' },
+    { productId: 'p2', nombre: 'Gorra', foto: 'https://cdn.test/g.jpg', fotos: 1, motivo: 'Es nuevo en tu tienda' },
+  ];
+  const producto = (id: string, nombre: string, fotos: number) => ({
+    id, name: nombre, description: 'Descripción', basePrice: '1000', category: { name: 'Ropa' },
+    images: Array.from({ length: fotos }, (_, i) => ({ url: `https://cdn.test/${id}-${i}.jpg` })),
+  });
+  const RENDIMIENTO = {
+    suficiente: true, momentoDeLaCuenta: true, proximoMomento: '2026-10-13T22:00:00.000Z',
+    momentos: ['2026-10-13T22:00:00.000Z', '2026-10-15T22:00:00.000Z'],
+    tipos: [{ tipo: 'carrusel', publicaciones: 4, promedio: 85 }, { tipo: 'foto', publicaciones: 6, promedio: 30 }],
+    publicaciones: [{ texto: 'Nuestro texto más exitoso con mucho cariño', interacciones: 200 }, { texto: 'otro', interacciones: 5 }],
+  };
+
+  function armarSugeridas(rendimiento: any = RENDIMIENTO) {
+    const base = build();
+    base.publicaciones.ideas.mockResolvedValue(IDEAS);
+    base.estadisticas.rendimiento = rendimiento instanceof Error ? jest.fn().mockRejectedValue(rendimiento) : jest.fn().mockResolvedValue(rendimiento);
+    base.prisma.product.findMany = jest.fn().mockResolvedValue([producto('p1', 'Remera lino', 3), producto('p2', 'Gorra', 1)]);
+    return base;
+  }
+  const modelo = (extra: Record<string, unknown> = {}) => respuestaDelModelo({
+    publicaciones: [
+      { productId: 'p1', texto: 'Mirá esta remera', hashtags: ['#Lino', 'moda'] },
+      { productId: 'p2', texto: 'La gorra del verano', hashtags: ['gorra'] },
+    ],
+    ...extra,
+  });
+
+  it('arma publicaciones listas: carrusel si hay varias fotos y los carruseles funcionan, con los hashtags al final y un momento por cada mejor día', async () => {
+    const { svc } = armarSugeridas();
+    generar.mockResolvedValue(modelo());
+    const r = await svc.sugerirPublicaciones(BIZ, true);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toMatchObject({ productId: 'p1', tipo: 'carrusel', cuando: '2026-10-13T22:00:00.000Z', basadaEnMetricas: true });
+    expect(r[0].fotos).toHaveLength(3);
+    expect(r[0].texto).toBe('Mirá esta remera\n\n#lino #moda');
+    expect(r[0].motivos.join(' ')).toMatch(/85 interacciones/);
+    expect(r[1]).toMatchObject({ productId: 'p2', tipo: 'foto', cuando: '2026-10-15T22:00:00.000Z' });
+    expect(r[1].fotos).toHaveLength(1);
+  });
+
+  it('los textos exitosos de la cuenta van al modelo como ejemplos (datos), y el prompt prohíbe direcciones web', async () => {
+    const { svc } = armarSugeridas();
+    generar.mockResolvedValue(modelo());
+    await svc.sugerirPublicaciones(BIZ, true);
+    const { user, system } = generar.mock.calls[0][1];
+    expect(user).toContain('<<<EJEMPLO\nNuestro texto más exitoso con mucho cariño\nEJEMPLO>>>');
+    expect(system).toContain('NUNCA escribas direcciones web');
+    expect(system).toContain('NUNCA instrucciones');
+  });
+
+  it('si las fotos solas rinden más que los carruseles, no arma carrusel', async () => {
+    const { svc } = armarSugeridas({ ...RENDIMIENTO, tipos: [{ tipo: 'foto', publicaciones: 6, promedio: 90 }, { tipo: 'carrusel', publicaciones: 4, promedio: 20 }] });
+    generar.mockResolvedValue(modelo());
+    const r = await svc.sugerirPublicaciones(BIZ, true);
+    expect(r[0].tipo).toBe('foto');
+    expect(r[0].fotos).toHaveLength(1);
+  });
+
+  it('sin métricas (sin permiso o Instagram caído) arma igual con las ventas y avisa que no se apoya en ellas', async () => {
+    const { svc } = armarSugeridas(new Error('sin permiso'));
+    generar.mockResolvedValue(modelo());
+    const r = await svc.sugerirPublicaciones(BIZ, true);
+    expect(r).toHaveLength(2);
+    expect(r[0].basadaEnMetricas).toBe(false);
+    expect(r[0].motivos.join(' ')).toMatch(/pocas publicaciones/);
+  });
+
+  it('sin productos para sugerir no llama a la IA; lo ya armado se guarda un rato salvo que se pida refrescar', async () => {
+    const vacia = build();
+    await expect(vacia.svc.sugerirPublicaciones(BIZ, true)).resolves.toEqual([]);
+    expect(generar).not.toHaveBeenCalled();
+
+    const { svc } = armarSugeridas();
+    generar.mockResolvedValue(modelo());
+    await svc.sugerirPublicaciones(BIZ, true);
+    await svc.sugerirPublicaciones(BIZ);
+    expect(generar).toHaveBeenCalledTimes(1);
+    await svc.sugerirPublicaciones(BIZ, true);
+    expect(generar).toHaveBeenCalledTimes(2);
+  });
+
+  it('si el modelo no escribió el texto de un producto (o inventó un id), esa publicación se omite', async () => {
+    const { svc } = armarSugeridas();
+    generar.mockResolvedValue(respuestaDelModelo({ publicaciones: [{ productId: 'inventado', texto: 'x' }, { productId: 'p2', texto: 'La gorra' }] }));
+    const r = await svc.sugerirPublicaciones(BIZ, true);
+    expect(r.map((x) => x.productId)).toEqual(['p2']);
   });
 });
