@@ -1642,24 +1642,46 @@ model InstagramConnection {
 }
 
 // Publicación hecha en Instagram desde Difusión → Publicaciones: queda el historial (con el enlace a
-// la publicación) de lo que Órbita subió en nombre del negocio. Solo se guarda lo que salió: si falla,
-// no queda fila. No lleva FK al producto (se puede borrar después): el nombre queda de copia.
+// la publicación) de lo que Órbita subió en nombre del negocio. Puede ser una foto, un carrusel de
+// varias fotos y videos, o un video; de un producto o de archivos subidos desde la computadora.
+//
+// Instagram procesa los videos en su tiempo, más de lo que aguanta una llamada HTTP, así que la
+// publicación nace en PROCESSING con los contenedores ya creados en Instagram y el panel la sigue
+// llamando (continuar) hasta que pasa a PUBLISHED o FAILED. PUBLISHING es el instante de publicar: evita
+// que dos llamadas seguidas la publiquen dos veces. No lleva FK al producto (se puede borrar después):
+// el nombre queda de copia.
 model InstagramPost {
-  id          String   @id @default(uuid())
-  businessId  String   @map("business_id")
-  productId   String?  @map("product_id")
-  productName String   @map("product_name")
-  memberId    String?  @map("member_id") // quién la publicó
-  caption     String
-  imageUrl    String   @map("image_url") // la foto del producto que se usó (para la miniatura del historial)
-  igMediaId   String   @unique @map("ig_media_id")
-  permalink   String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id                String              @id @default(uuid())
+  businessId        String              @map("business_id")
+  productId         String?             @map("product_id")
+  productName       String?             @map("product_name")
+  memberId          String?             @map("member_id") // quién la publicó
+  caption           String
+  status            InstagramPostStatus @default(PUBLISHED)
+  kind              String              @default("IMAGE") // IMAGE | CAROUSEL | VIDEO
+  media             Json                @default("[]") // [{ tipo: 'image' | 'video', url }] lo que se mandó, en orden
+  imageUrl          String?             @map("image_url") // miniatura para el historial: la primera foto
+  childContainerIds Json                @default("[]") @map("child_container_ids") // contenedores de cada elemento del carrusel
+  containerId       String?             @map("container_id") // el contenedor que se publica
+  tempPaths         Json                @default("[]") @map("temp_paths") // archivos temporales del almacenamiento a borrar al terminar
+  error             String?
+  igMediaId         String?             @unique @map("ig_media_id")
+  permalink         String?
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at")
 
   business Business @relation(fields: [businessId], references: [id])
 
   @@index([businessId, createdAt])
+  @@index([businessId, status])
   @@map("instagram_posts")
+}
+
+enum InstagramPostStatus {
+  PROCESSING
+  PUBLISHING
+  PUBLISHED
+  FAILED
 }
 
 enum InstagramConnectionStatus {

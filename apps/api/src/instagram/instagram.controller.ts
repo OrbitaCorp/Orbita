@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -8,12 +9,14 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
-import { PublicarInstagramDto } from './dto/publicar-instagram.dto';
+import { CrearPublicacionDto, SubirVideoDto } from './dto/crear-publicacion.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramEstadisticasService } from './instagram-estadisticas.service';
+import { InstagramMediosService } from './instagram-medios.service';
 import { InstagramPublicacionesService } from './instagram-publicaciones.service';
 import { InstagramService } from './instagram.service';
 
@@ -34,6 +37,7 @@ export class InstagramController {
   constructor(
     private readonly instagram: InstagramService,
     private readonly publicaciones: InstagramPublicacionesService,
+    private readonly medios: InstagramMediosService,
     private readonly comentariosSvc: InstagramComentariosService,
     private readonly estadisticasSvc: InstagramEstadisticasService,
     config: ConfigService,
@@ -56,9 +60,41 @@ export class InstagramController {
   @Post('posts')
   @FullModeOnly()
   @Roles('owner', 'admin')
-  async publicar(@CurrentBusiness() ctx: AuthContext, @Body() dto: PublicarInstagramDto) {
+  async publicar(@CurrentBusiness() ctx: AuthContext, @Body() dto: CrearPublicacionDto) {
     const { businessId, memberId } = assertMemberContext(ctx);
-    return this.publicaciones.publicarProducto(businessId, memberId, dto.productId, dto.caption);
+    return this.publicaciones.crear(businessId, memberId, dto);
+  }
+
+  // Un video (o una foto grande) tarda en procesarse en Instagram: el panel vuelve a llamar acá cada pocos
+  // segundos hasta que la publicación queda publicada o falla.
+  @Post('posts/:id/continuar')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async continuar(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.publicaciones.continuar(businessId, id);
+  }
+
+  // Foto subida desde la computadora (para sumar a una publicación).
+  @Post('media/foto')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  async subirFoto(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.medios.subirFoto(businessId, file);
+  }
+
+  // Dirección firmada para que el navegador suba un video directo al almacenamiento.
+  @Post('media/video')
+  @FullModeOnly()
+  @Roles('owner', 'admin')
+  async prepararVideo(@CurrentBusiness() ctx: AuthContext, @Body() dto: SubirVideoDto) {
+    const { businessId } = assertMemberContext(ctx);
+    await this.instagram.asegurarHabilitado(businessId);
+    return this.medios.prepararVideo(businessId, dto.tipo, dto.bytes);
   }
 
   // Comentarios de las últimas publicaciones (Difusión → Comentarios).
