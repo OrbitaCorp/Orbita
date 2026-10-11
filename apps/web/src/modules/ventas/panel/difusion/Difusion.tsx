@@ -25,7 +25,7 @@ const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: R
   mensajes: {
     titulo: 'Mensajes',
     texto: 'Leé y respondé los mensajes directos de tu Instagram, con fotos, en una bandeja como la de la app.',
-    ilustracion: <IlustracionComentarios />,
+    ilustracion: <IlustracionMensajes />,
   },
   publicaciones: {
     titulo: 'Publicaciones',
@@ -34,7 +34,7 @@ const FUNCIONES: Record<Funcion, { titulo: string; texto: string; ilustracion: R
   },
   comentarios: {
     titulo: 'Comentarios',
-    texto: 'Leé y respondé los comentarios de tus publicaciones desde acá, junto con tus mensajes.',
+    texto: 'Leé y respondé los comentarios de tus publicaciones, y ocultá los que no querés a la vista.',
     ilustracion: <IlustracionComentarios />,
   },
   estadisticas: {
@@ -195,12 +195,32 @@ function IlustracionPublicacion() {
   )
 }
 
+// Bandeja de mensajes: lista de conversaciones a la izquierda y un chat con una foto a la derecha.
+function IlustracionMensajes() {
+  return (
+    <div className="dif-mock dif-mock-mensajes">
+      <div className="dif-mock-lista">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`dif-mock-fila${i === 0 ? ' dif-mock-fila-activa' : ''}`}><span className="dif-avatar" /><span className="dif-linea" style={{ width: '60%' }} /></div>
+        ))}
+      </div>
+      <div className="dif-mock-chat">
+        <span className="dif-burbuja" style={{ width: '70%' }}><span className="dif-linea" style={{ width: '80%' }} /><span className="dif-linea" style={{ width: '45%' }} /></span>
+        <span className="dif-mock-foto"><span className="dif-sol" /><span className="dif-monte" /></span>
+        <span className="dif-burbuja dif-burbuja-propia" style={{ width: '55%', alignSelf: 'flex-end' }}><span className="dif-linea" style={{ width: '75%' }} /></span>
+      </div>
+    </div>
+  )
+}
+
+// Comentarios: una publicación arriba y, abajo, los comentarios con su respuesta sangrada.
 function IlustracionComentarios() {
   return (
     <div className="dif-mock dif-mock-comentarios">
-      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-burbuja" style={{ width: '62%' }}><span className="dif-linea" style={{ width: '80%' }} /><span className="dif-linea" style={{ width: '55%' }} /></span></div>
-      <div className="dif-mock-fila dif-mock-der"><span className="dif-burbuja dif-burbuja-propia" style={{ width: '54%' }}><span className="dif-linea" style={{ width: '75%' }} /></span></div>
-      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-burbuja" style={{ width: '48%' }}><span className="dif-linea" style={{ width: '70%' }} /></span></div>
+      <div className="dif-mock-fila dif-mock-publicacion"><span className="dif-mock-miniatura" /><span className="dif-mock-textos"><span className="dif-linea" style={{ width: '70%' }} /><span className="dif-linea" style={{ width: '40%' }} /></span></div>
+      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-mock-textos"><span className="dif-linea" style={{ width: '85%' }} /><span className="dif-linea" style={{ width: '50%' }} /></span><span className="dif-corazon" /></div>
+      <div className="dif-mock-fila dif-mock-respuesta"><span className="dif-avatar dif-avatar-chico" /><span className="dif-mock-textos"><span className="dif-linea" style={{ width: '75%' }} /></span></div>
+      <div className="dif-mock-fila"><span className="dif-avatar" /><span className="dif-mock-textos"><span className="dif-linea" style={{ width: '65%' }} /></span><span className="dif-corazon" /></div>
     </div>
   )
 }
@@ -234,7 +254,7 @@ const CSS = `
 .dif-tramo-actual { background: var(--color-primary); }
 .dif-avance-texto { margin-left: 6px; font-size: 12px; color: var(--color-muted); }
 
-.dif-grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
+.dif-grilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
 .dif-funcion { display: flex; flex-direction: column; padding: 14px 14px 18px; }
 .dif-ilustracion { position: relative; aspect-ratio: 16 / 10; margin-bottom: 16px; overflow: hidden; border-radius: 12px; background: var(--color-surface-alt); border: 1px solid var(--color-border); }
 .dif-funcion-titulo { margin: 0 6px 6px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--color-text); }
@@ -256,7 +276,22 @@ const CSS = `
 .dif-sol { position: absolute; top: 16%; right: 14%; width: 15px; height: 15px; border-radius: 50%; background: var(--color-surface); }
 .dif-monte { position: absolute; left: -12%; bottom: -34%; width: 124%; height: 62%; border-radius: 50%; background: var(--color-muted); opacity: 0.24; }
 
-.dif-mock-comentarios { flex-direction: column; justify-content: center; gap: 9px; }
+.dif-mock-comentarios { flex-direction: column; justify-content: center; gap: 8px; }
+.dif-mock-comentarios .dif-mock-fila { width: 100%; }
+.dif-mock-publicacion { padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
+.dif-mock-miniatura { width: 26px; height: 26px; flex-shrink: 0; border-radius: 6px; background: linear-gradient(135deg, var(--color-border), var(--color-surface)); }
+.dif-mock-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.dif-mock-respuesta { padding-left: 30px; }
+.dif-avatar-chico { width: 16px; height: 16px; }
+.dif-corazon { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50%; background: var(--color-border); }
+
+.dif-mock-mensajes { gap: 12px; padding: 12px; }
+.dif-mock-lista { width: 34%; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; padding-right: 10px; border-right: 1px solid var(--color-border); }
+.dif-mock-lista .dif-mock-fila { padding: 5px; border-radius: 8px; }
+.dif-mock-lista .dif-avatar { width: 18px; height: 18px; }
+.dif-mock-fila-activa { background: var(--color-surface); border: 1px solid var(--color-border); }
+.dif-mock-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 7px; }
+.dif-mock-foto { position: relative; width: 46%; height: 34%; overflow: hidden; border-radius: 10px; background: linear-gradient(135deg, var(--color-border), var(--color-surface)); }
 .dif-burbuja { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-radius: 10px 10px 10px 3px; background: var(--color-surface); border: 1px solid var(--color-border); }
 .dif-burbuja-propia { border-radius: 10px 10px 3px 10px; background: var(--color-border); border-color: transparent; }
 .dif-burbuja-propia .dif-linea { background: var(--color-surface); }
@@ -267,6 +302,7 @@ const CSS = `
 .dif-barra-top { background: var(--color-muted); opacity: 0.55; }
 
 @media (max-width: 640px) {
+  .dif-grilla { grid-template-columns: minmax(0, 1fr); }
   .dif-pagina { padding: 16px 14px 48px; }
   .dif-estado { flex-wrap: wrap; }
   .dif-estado-texto { flex-basis: calc(100% - 64px); }
