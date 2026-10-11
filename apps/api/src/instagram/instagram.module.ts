@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InstagramAdminController } from './instagram-admin.controller';
+import { InstagramBandejaService } from './instagram-bandeja.service';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramController } from './instagram.controller';
 import { InstagramMediosService } from './instagram-medios.service';
@@ -10,7 +11,7 @@ import { InstagramService } from './instagram.service';
 
 @Module({
   controllers: [InstagramController, InstagramWebhookController, InstagramAdminController],
-  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService],
+  providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService],
   exports: [InstagramService], // ConversationsService responde por Instagram; el cron renueva los tokens
 })
 export class InstagramModule {}

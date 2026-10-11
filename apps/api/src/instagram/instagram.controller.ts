@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Logger, Param, Patch, Post, Query, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -10,10 +10,12 @@ import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { describeError } from '../common/utils/describe-error.util';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
+import { MarcarLeidaDto, ResponderMensajeDto } from './dto/bandeja-instagram.dto';
 import { ConectarInstagramDto } from './dto/conectar-instagram.dto';
 import { OcultarComentarioDto, ResponderComentarioDto } from './dto/comentarios-instagram.dto';
 import { CrearPublicacionDto, SubirVideoDto } from './dto/crear-publicacion.dto';
 import { SolicitarAccesoDto } from './dto/solicitar-acceso.dto';
+import { InstagramBandejaService } from './instagram-bandeja.service';
 import { InstagramComentariosService } from './instagram-comentarios.service';
 import { InstagramEstadisticasService } from './instagram-estadisticas.service';
 import { InstagramMediosService } from './instagram-medios.service';
@@ -40,9 +42,54 @@ export class InstagramController {
     private readonly medios: InstagramMediosService,
     private readonly comentariosSvc: InstagramComentariosService,
     private readonly estadisticasSvc: InstagramEstadisticasService,
+    private readonly bandeja: InstagramBandejaService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+  }
+
+  // Bandeja de mensajes directos (Difusión → Mensajes). A diferencia de conectar y publicar, atender los
+  // mensajes lo puede hacer todo el equipo, igual que en el módulo de Mensajes.
+  @Get('inbox')
+  @FullModeOnly()
+  async charlas(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.listar(businessId);
+  }
+
+  @Get('inbox/unread-count')
+  @FullModeOnly()
+  async noLeidas(@CurrentBusiness() ctx: AuthContext) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.noLeidas(businessId);
+  }
+
+  @Get('inbox/:id/messages')
+  @FullModeOnly()
+  async mensajesDeCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.mensajes(businessId, id);
+  }
+
+  // Texto, foto (campo `file`) o las dos cosas.
+  @Post('inbox/:id/messages')
+  @FullModeOnly()
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
+  async responderCharla(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: ResponderMensajeDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.responder(businessId, id, dto.texto, file);
+  }
+
+  @Patch('inbox/:id')
+  @FullModeOnly()
+  async marcarCharla(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: MarcarLeidaDto) {
+    const { businessId } = assertMemberContext(ctx);
+    return this.bandeja.marcarLeida(businessId, id, dto.leida);
   }
 
   // Historial de lo publicado desde Órbita (Difusión → Publicaciones).

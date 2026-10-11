@@ -1600,6 +1600,7 @@ model Message {
   channel        MessageChannel @default(STOREFRONT) // por dónde entró/salió: el chat de la tienda o WhatsApp
   externalId     String?       @unique @map("external_id") // id del mensaje en Meta (wamid): idempotencia del webhook y cruce con los estados
   deliveryStatus String?       @map("delivery_status") // solo WhatsApp saliente: sent | delivered | read | failed
+  attachments    Json? // Instagram: [{ tipo: image|video|audio|file, url }] — archivos que llegaron o se mandaron con el mensaje
   createdAt      DateTime      @default(now()) @map("created_at") // timestamp real (antes string display)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

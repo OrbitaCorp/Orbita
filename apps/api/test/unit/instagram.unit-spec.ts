@@ -200,6 +200,30 @@ describe('InstagramService (unit)', () => {
       );
     });
 
+    it('una imagen del cliente se guarda como adjunto, bajada al almacenamiento propio', async () => {
+      const medios: any = { guardarImagenEntrante: jest.fn().mockResolvedValue('https://almacen/mensajes/a.jpg') };
+      const { prisma } = build();
+      const svc = new InstagramService(prisma, config(), undefined, medios);
+      const msg = { sender: { id: IGSID }, recipient: { id: IG_CUENTA }, timestamp: 1790000000000, message: { mid: 'mid.IMG', attachments: [{ type: 'image', payload: { url: 'https://scontent.cdninstagram.com/x.jpg' } }] } };
+      await svc.procesarWebhook(evento(msg));
+
+      expect(medios.guardarImagenEntrante).toHaveBeenCalledWith(BIZ, 'https://scontent.cdninstagram.com/x.jpg');
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ text: '[Imagen]', attachments: [{ tipo: 'image', url: 'https://almacen/mensajes/a.jpg' }] }),
+      });
+    });
+
+    it('si no se pudo guardar la imagen, queda con la dirección que dio Instagram', async () => {
+      const medios: any = { guardarImagenEntrante: jest.fn().mockResolvedValue(null) };
+      const { prisma } = build();
+      const svc = new InstagramService(prisma, config(), undefined, medios);
+      const msg = { sender: { id: IGSID }, recipient: { id: IG_CUENTA }, timestamp: 1790000000000, message: { mid: 'mid.IMG2', attachments: [{ type: 'image', payload: { url: 'https://scontent.cdninstagram.com/y.jpg' } }] } };
+      await svc.procesarWebhook(evento(msg));
+      expect(prisma.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ attachments: [{ tipo: 'image', url: 'https://scontent.cdninstagram.com/y.jpg' }] }),
+      });
+    });
+
     it('resuelve el negocio por la cuenta del evento: una cuenta sin conexión activa se ignora', async () => {
       const { svc, prisma } = build();
       prisma.instagramConnection.findUnique.mockResolvedValue({ businessId: BIZ, status: 'DISCONNECTED' });

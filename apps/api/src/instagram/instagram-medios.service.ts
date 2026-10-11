@@ -20,6 +20,8 @@ export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const TIPOS_FOTO = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const TIPOS_VIDEO: Record<string, string> = { 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
 const MAX_BYTES_DESCARGA = 25 * 1024 * 1024;
+// De dónde se aceptan las imágenes que llegan por mensaje directo (las direcciones las da Instagram).
+const HOSTS_DE_INSTAGRAM = ['fbsbx.com', 'cdninstagram.com', 'fbcdn.net', 'instagram.com'];
 const LADO_MAX_SUBIDA = 2048;
 const LADO_MINIATURA = 320;
 
@@ -90,12 +92,60 @@ export class InstagramMediosService {
 
   /** Una foto subida desde la computadora: se endereza, se achica y se guarda como JPEG. */
   async subirFoto(businessId: string, archivo: Express.Multer.File | undefined): Promise<ArchivoSubido> {
+    const jpeg = await this.fotoAJpeg(archivo);
+    await this.asegurarBucket();
+    const ruta = `${businessId}/subidas/${randomUUID()}.jpg`;
+    await this.subir(ruta, jpeg, 'image/jpeg');
+    return { ref: ruta, tipo: 'image', url: this.urlPublica(ruta) };
+  }
+
+  /**
+   * La foto que el dueño manda por un mensaje directo: misma preparación, pero queda guardada (es parte de la
+   * charla y se vuelve a mostrar), no es un temporal de una publicación.
+   */
+  async subirFotoDeMensaje(businessId: string, archivo: Express.Multer.File | undefined): Promise<string> {
+    const jpeg = await this.fotoAJpeg(archivo);
+    await this.asegurarBucket();
+    const ruta = `${businessId}/mensajes/${randomUUID()}.jpg`;
+    await this.subir(ruta, jpeg, 'image/jpeg');
+    return this.urlPublica(ruta);
+  }
+
+  /**
+   * Una imagen que mandó un cliente por mensaje directo. La dirección que da Instagram vence, así que se baja y
+   * se guarda. Mejor esfuerzo: si falla devuelve null y el mensaje se guarda igual (con la dirección original).
+   */
+  async guardarImagenEntrante(businessId: string, url: string): Promise<string | null> {
+    try {
+      const destino = new URL(url);
+      const host = destino.hostname.toLowerCase();
+      if (destino.protocol !== 'https:' || !HOSTS_DE_INSTAGRAM.some((h) => host === h || host.endsWith(`.${h}`))) return null;
+      const res = await fetch(destino, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return null;
+      const original = Buffer.from(await res.arrayBuffer());
+      if (original.length > MAX_BYTES_DESCARGA) return null;
+      const jpeg = await sharp(original, ENTRADA_IMAGEN)
+        .rotate()
+        .resize(LADO_MAX_SUBIDA, LADO_MAX_SUBIDA, { fit: 'inside', withoutEnlargement: true })
+        .flatten({ background: '#ffffff' })
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+      await this.asegurarBucket();
+      const ruta = `${businessId}/mensajes/${randomUUID()}.jpg`;
+      await this.subir(ruta, jpeg, 'image/jpeg');
+      return this.urlPublica(ruta);
+    } catch (e) {
+      this.logger.warn(`No se pudo guardar una imagen recibida por Instagram: ${describeError(e)}`);
+      return null;
+    }
+  }
+
+  private async fotoAJpeg(archivo: Express.Multer.File | undefined): Promise<Buffer> {
     if (!archivo) throw new BadRequestException('Falta la foto.');
     if (!TIPOS_FOTO.has(archivo.mimetype)) throw new BadRequestException('Subí una foto JPG, PNG o WebP.');
     if (archivo.size > MAX_IMAGEN_BYTES) throw new BadRequestException('La foto pesa más de 10 MB.');
-    let jpeg: Buffer;
     try {
-      jpeg = await sharp(archivo.buffer, ENTRADA_IMAGEN)
+      return await sharp(archivo.buffer, ENTRADA_IMAGEN)
         .rotate()
         .resize(LADO_MAX_SUBIDA, LADO_MAX_SUBIDA, { fit: 'inside', withoutEnlargement: true })
         .flatten({ background: '#ffffff' })
@@ -104,10 +154,6 @@ export class InstagramMediosService {
     } catch {
       throw new BadRequestException('El archivo no es una foto válida o es demasiado grande.');
     }
-    await this.asegurarBucket();
-    const ruta = `${businessId}/subidas/${randomUUID()}.jpg`;
-    await this.subir(ruta, jpeg, 'image/jpeg');
-    return { ref: ruta, tipo: 'image', url: this.urlPublica(ruta) };
   }
 
   /** Dirección firmada para que el navegador suba un video directo al almacenamiento. */

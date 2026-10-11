@@ -51,7 +51,8 @@ export class ConversationsService {
 
   async findAllForBusiness(businessId: string) {
     const rows = await this.prisma.conversation.findMany({
-      where: { businessId },
+      // Las charlas de Instagram se atienden en Difusión → Mensajes, no acá (por ahora).
+      where: { businessId, customer: { instagramId: null } },
       orderBy: { updatedAt: 'desc' },
       include: {
         customer: { select: { firstName: true, lastName: true, avatarUrl: true, email: true } },
@@ -160,7 +161,8 @@ export class ConversationsService {
   }
 
   async unreadCount(businessId: string) {
-    const count = await this.prisma.conversation.count({ where: { businessId, isUnread: true } });
+    // Sin las de Instagram: tienen su propio contador en Difusión.
+    const count = await this.prisma.conversation.count({ where: { businessId, isUnread: true, customer: { instagramId: null } } });
     return { count };
   }
 

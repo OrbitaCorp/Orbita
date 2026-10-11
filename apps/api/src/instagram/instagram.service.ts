@@ -17,6 +17,7 @@ import { describeError } from '../common/utils/describe-error.util';
 import { escaparHtml } from '../common/utils/html';
 import { MailService } from '../mail/mail.service';
 import { PANTALLAS_DE_RETORNO, type PantallaDeRetorno } from './dto/conectar-instagram.dto';
+import { InstagramMediosService } from './instagram-medios.service';
 
 // Instagram (mensajes directos) dentro de la bandeja de Mensajes.
 //
@@ -73,6 +74,7 @@ interface StatePayload {
 
 interface IgAttachment {
   type?: string;
+  payload?: { url?: string };
 }
 interface IgMessage {
   mid?: string;
@@ -126,6 +128,8 @@ export class InstagramService {
     private readonly config: ConfigService,
     // Opcional: solo avisa los pedidos de acceso anticipado.
     @Optional() private readonly mail?: MailService,
+    // Opcional: guarda las imágenes que llegan por mensaje directo (la dirección de Instagram vence).
+    @Optional() private readonly medios?: InstagramMediosService,
   ) {}
 
   // Las credenciales se leen al usarlas y no al arrancar: la API sigue
@@ -645,6 +649,22 @@ export class InstagramService {
     }
   }
 
+  // Los archivos que vinieron con el mensaje. Las imágenes se guardan en el almacenamiento propio; el resto
+  // (video, audio) conserva la dirección que dio Instagram, que sirve un rato.
+  private async adjuntosDe(businessId: string, msg: IgMessage): Promise<{ tipo: string; url: string }[]> {
+    const salida: { tipo: string; url: string }[] = [];
+    for (const a of msg.attachments ?? []) {
+      const url = a.payload?.url;
+      if (!a.type || !url) continue;
+      if (a.type === 'image') {
+        salida.push({ tipo: 'image', url: (await this.medios?.guardarImagenEntrante(businessId, url)) ?? url });
+      } else if (a.type === 'video' || a.type === 'audio' || a.type === 'file') {
+        salida.push({ tipo: a.type, url });
+      }
+    }
+    return salida;
+  }
+
   private textoDe(msg: IgMessage): string | null {
     if (msg.is_deleted) return null;
     if (msg.text?.trim()) return msg.text.trim();
@@ -685,9 +705,13 @@ export class InstagramService {
       (await this.prisma.conversation.create({ data: { businessId: conexion.businessId, customerId, isUnread: !eco }, select: { id: true } }));
 
     const creado = m.timestamp ? new Date(m.timestamp > 1e12 ? m.timestamp : m.timestamp * 1000) : new Date();
+    const adjuntos = await this.adjuntosDe(conexion.businessId, msg);
     await this.prisma.$transaction([
       this.prisma.message.create({
-        data: { conversationId: conv.id, sender: eco ? 'STORE' : 'CUSTOMER', text: texto, channel: 'INSTAGRAM', externalId: msg.mid, createdAt: creado },
+        data: {
+          conversationId: conv.id, sender: eco ? 'STORE' : 'CUSTOMER', text: texto, channel: 'INSTAGRAM', externalId: msg.mid, createdAt: creado,
+          ...(adjuntos.length > 0 ? { attachments: adjuntos } : {}),
+        },
       }),
       this.prisma.conversation.update({
         where: { id: conv.id },
@@ -762,6 +786,15 @@ export class InstagramService {
     if (Buffer.byteLength(texto, 'utf8') > MAX_BYTES_TEXTO) {
       throw new BadRequestException('El mensaje es demasiado largo para Instagram (máximo 1000 caracteres).');
     }
+    return this.enviarCarga(businessId, conversationId, igsid, { text: texto });
+  }
+
+  /** Manda una imagen (de una dirección pública) por mensaje directo; mismas reglas de plazo que el texto. */
+  async enviarImagen(businessId: string, conversationId: string, igsid: string, url: string): Promise<string> {
+    return this.enviarCarga(businessId, conversationId, igsid, { attachment: { type: 'image', payload: { url } } });
+  }
+
+  private async enviarCarga(businessId: string, conversationId: string, igsid: string, mensaje: Record<string, unknown>): Promise<string> {
     const ultimo = await this.prisma.message.findFirst({
       where: { conversationId, channel: 'INSTAGRAM', sender: 'CUSTOMER' },
       orderBy: { createdAt: 'desc' },
@@ -779,7 +812,7 @@ export class InstagramService {
       const res = await this.llamar<{ message_id?: string }>(`https://graph.instagram.com/${this.version}/${cred.ig_user_id}/messages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${cred.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient: { id: igsid }, message: { text: texto } }),
+        body: JSON.stringify({ recipient: { id: igsid }, message: mensaje }),
       });
       if (!res.message_id) throw new BadGatewayException('Instagram no confirmó el envío');
       return res.message_id;
@@ -789,7 +822,7 @@ export class InstagramService {
       // que el panel pida volver a conectar.
       if (e instanceof InstagramApiError && (e.code === 190 || e.tipo === 'OAuthException')) {
         await this.prisma.instagramConnection.update({ where: { businessId }, data: { status: 'DISCONNECTED', accessToken: '' } });
-        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Mensajes.');
+        throw new UnprocessableEntityException('Instagram ya no acepta la conexión de esta cuenta. Volvé a conectarla desde Difusión.');
       }
       throw e;
     }
