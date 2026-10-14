@@ -3,7 +3,7 @@ import { MAX_CUENTAS_POR_LOTE } from '../prospeccion.meta';
 import { ProspeccionService } from '../prospeccion.service';
 import type { Evaluacion } from '../prospeccion.criterio';
 import { TutorialesService } from '../../videos/tutoriales.service';
-import { FORMATOS_VIDEO, MAX_BYTES_TUTORIAL, MAX_BYTES_VIDEO, VideosService } from '../../videos/videos.service';
+import { FORMATOS_VIDEO, VideosService } from '../../videos/videos.service';
 
 // Conector MCP de la Prospección: lo que Claude puede hacer una vez que un superadmin lo autorizó. Es solo el
 // protocolo (JSON-RPC 2.0 sobre HTTP, "Streamable HTTP" sin sesión): la autenticación la resuelve el controlador.
@@ -143,7 +143,7 @@ export const HERRAMIENTAS: Herramienta[] = [
   },
   {
     name: 'videos_pedir_subida',
-    description: `Reserva un lugar en la cola y devuelve videoId y una dirección firmada (uploadUrl, vale 10 minutos para empezar) donde subir el mp4 con un PUT y el encabezado Content-Type: video/mp4. tipo MARKETING (por defecto, para usar afuera: máximo ${MAX_BYTES_VIDEO / 1024 / 1024} MB) o TUTORIAL (interno: máximo ${MAX_BYTES_TUTORIAL / 1024 / 1024} MB). Después hay que llamar a videos_registrar.`,
+    description: 'Reserva un lugar en la cola y devuelve videoId y una dirección firmada (uploadUrl, vale 10 minutos para empezar) donde subir el mp4 con un PUT y el encabezado Content-Type: video/mp4. tipo MARKETING (por defecto, para usar afuera) o TUTORIAL (interno). No hay tope de peso. Después hay que llamar a videos_registrar.',
     inputSchema: {
       type: 'object',
       properties: {

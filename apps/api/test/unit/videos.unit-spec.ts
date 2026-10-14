@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { MAX_BYTES_TUTORIAL, MAX_BYTES_VIDEO, MAX_EN_COLA, VideosService } from '../../src/marketing/videos/videos.service';
+import { MAX_EN_COLA, VideosService } from '../../src/marketing/videos/videos.service';
 
 // La cola de videos de Marketing con la base y R2 simulados. Cubre el ciclo de vida (reservar → subir → registrar → aprobar /
 // rechazar), los dos tipos (marketing y tutorial), la regla de aprobación según quién subió el video, los comentarios, las
@@ -96,12 +96,22 @@ describe('subir y registrar', () => {
     expect(ctx.filas[0].expiraAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('un tutorial arranca horizontal y admite archivos más grandes; un reel no', async () => {
+  it('un tutorial arranca horizontal', async () => {
     const ctx = armar();
-    await ctx.svc.pedirSubida('cto', MAX_BYTES_TUTORIAL, 'TUTORIAL');
+    await ctx.svc.pedirSubida('cto', 1000, 'TUTORIAL');
     expect(ctx.filas[0]).toMatchObject({ tipo: 'TUTORIAL', formato: 'HORIZONTAL_16_9' });
-    await expect(ctx.svc.pedirSubida('cto', MAX_BYTES_VIDEO + 1)).rejects.toBeInstanceOf(BadRequestException);
-    await expect(ctx.svc.pedirSubida('cto', MAX_BYTES_TUTORIAL + 1, 'TUTORIAL')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('no hay tope de peso, ni en marketing ni en tutoriales: se reserva y se registra un archivo enorme (la columna se acota)', async () => {
+    const ctx = armar({ tamanio: 3_000_000_000 });
+    for (const tipo of ['MARKETING', 'TUTORIAL'] as const) {
+      const id = await reservado(ctx, 'cto', tipo);
+      const v = await ctx.svc.registrar('cto', { videoId: id, titulo: `Grande ${tipo}` });
+      expect(v.estado).toBe('PENDIENTE');
+      expect(v.bytes).toBe(2_147_483_647);
+    }
+    expect(ctx.r2.eliminar).not.toHaveBeenCalled();
+    await expect(ctx.svc.pedirSubida('cto', 9_000_000_000_000)).resolves.toBeDefined();
   });
 
   it.each([[0], [-5], ['x'], [undefined]])('un tamaño inválido (%s) se rechaza antes de reservar nada', async (bytes) => {
@@ -146,16 +156,12 @@ describe('subir y registrar', () => {
     expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('cto', 'tanda', 'TUTORIAL');
   });
 
-  it('un archivo vacío o más grande que el tope de su tipo se descarta (archivo y registro)', async () => {
-    for (const tamanio of [0, MAX_BYTES_VIDEO + 1]) {
-      const ctx = armar({ tamanio });
-      const id = await reservado(ctx);
-      await expect(ctx.svc.registrar('ceo', { videoId: id, titulo: 'x' })).rejects.toBeInstanceOf(BadRequestException);
-      expect(ctx.r2.eliminar).toHaveBeenCalledTimes(1);
-      expect(ctx.filas).toHaveLength(0);
-    }
-    const tutorial = armar({ tamanio: MAX_BYTES_VIDEO + 1 });
-    await expect(nuevo(tutorial, 'cto', { tipo: 'TUTORIAL' })).resolves.toBeDefined();
+  it('un archivo vacío se descarta (archivo y registro)', async () => {
+    const ctx = armar({ tamanio: 0 });
+    const id = await reservado(ctx);
+    await expect(ctx.svc.registrar('ceo', { videoId: id, titulo: 'x' })).rejects.toBeInstanceOf(BadRequestException);
+    expect(ctx.r2.eliminar).toHaveBeenCalledTimes(1);
+    expect(ctx.filas).toHaveLength(0);
   });
 
   it('nadie puede registrar la subida de otra persona ni registrar dos veces', async () => {

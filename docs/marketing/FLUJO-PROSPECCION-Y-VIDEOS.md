@@ -40,6 +40,8 @@ en el panel (el mismo login con Google y segundo factor del superadmin). Con ese
 - **Videos:** ver la cola, leer un video con sus comentarios (para mejorarlo), pedir dónde subir uno, registrarlo (también como mejora de otro) y avisar al equipo por correo cuando termina la tanda (el texto del correo es fijo).
 - **Tutoriales:** ver la lista de lo que hay y lo que falta, y marcar el estado de cada uno.
 
+**Producir videos** necesita, además del conector, **Claude Code en la computadora de quien los genera, con el repo de videos clonado** (trae la skill `videos-cola` y las herramientas); para buscar clientes, comentar o leer videos alcanza con el chat de Claude. El panel lo explica en el bloque «Conectá tu Claude a Órbita».
+
 Quién puede conectarlo: un **superadmin activo** con correo `@orbita-corp.com` o `@orbita.site`. Se vuelve a verificar
 **en cada llamada**: si alguien deja de ser superadmin o se desactiva, su Claude pierde el acceso en el momento.
 Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección → «Desconectar Claude».
@@ -66,7 +68,7 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
    La cantidad la define quien lo pide, no el panel.
 2. **Claude los produce en la computadora de esa persona:** guion con jueces de calidad, voz, edición con HyperFrames sobre la demo
    pública (nada de datos reales) y render. En una PC con placa de video, un reel de ~40 s tarda poco más de 1 minuto.
-3. **Controles automáticos** del mp4: formato, duración, peso, volumen del audio, silencios, tramos en negro e imagen congelada.
+3. **Controles automáticos** del mp4: formato, duración, volumen del audio, silencios, tramos en negro e imagen congelada.
    Los videos que fallan lo básico no se suben.
 4. **Se sube directo a Cloudflare R2** con una dirección firmada de 10 minutos y se **registra en la cola** con su guion, su texto
    sugerido y el resultado de los controles.

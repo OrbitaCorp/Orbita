@@ -478,8 +478,9 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
 `20261014190000_marketing_videos_comentarios`, todas con RLS).
 
 - **Dos tipos que no se mezclan** (pestañas del panel): **MARKETING** (se usa afuera; se puede pasar como borrador a TikTok o
-  Instagram; tope 50 MB, el de Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; tope
-  250 MB; vence a los 30 días; puede cubrir un ítem de la lista de tutoriales).
+  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; vence a los 30 días; puede cubrir un ítem
+  de la lista de tutoriales). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
+  vía de Instagram (50 MB, del bucket de la cuenta): un video más pesado se descarga y se sube a mano a Instagram.
 - **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE → APROBADO (queda como registro, con su archivo, sin vencer) → PUBLICADO (se
   pasó a un borrador). **Rechazar borra el archivo de R2, el registro y sus comentarios.**
 - **Quién aprueba depende de QUIÉN LO SUBIÓ** (`politica-aprobacion.ts`, con tests). Es interno: el panel solo ofrece «Aprobar» a quien

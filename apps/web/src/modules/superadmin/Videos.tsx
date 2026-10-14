@@ -39,8 +39,8 @@ export function instruccionDeMejora(v: Pick<VideoDeCola, 'id' | 'titulo' | 'tipo
     `Mejorá el video «${v.titulo}» (id ${v.id}) de la cola de Órbita, con el conector de Órbita.`,
     '1. Leelo con videos_obtener: el guion, el texto sugerido, los controles y los comentarios del equipo.',
     '2. Armá una versión mejorada que atienda esos comentarios y conserve lo que funciona. Si algo no queda claro, preguntame antes de producir.',
-    `3. Producila con la skill ${v.tipo === 'TUTORIAL' ? 'videos-multiagente' : 'videos-cola'}, subila con videos_pedir_subida (tipo ${v.tipo}) y registrala con videos_registrar indicando mejora_de ${v.id}. El original no se toca.`,
-    '4. Al terminar llamá a videos_avisar. No publiques nada: lo revisa el equipo.',
+    `3. Si podés producir el video (Claude Code con la carpeta del repo de videos abierta), producilo con la skill ${v.tipo === 'TUTORIAL' ? 'videos-multiagente' : 'videos-cola'}, subilo con videos_pedir_subida (tipo ${v.tipo}) y registralo con videos_registrar indicando mejora_de ${v.id}; el original no se toca. Si estás en el chat web y no podés renderizar, no inventes: escribí el guion y el texto sugerido mejorados y decime que los pegue en Claude Code, dentro de la carpeta del repo de videos.`,
+    '4. Si registraste un video nuevo, llamá a videos_avisar al terminar. No publiques nada: lo revisa el equipo.',
   ].join('\n')
 }
 
@@ -201,6 +201,7 @@ function ConectarParaMejorar({ v, setAviso, onCerrar }: { v: VideoDeCola; setAvi
           <button type="button" onClick={() => copiar(URL_CONECTOR, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>
         </div>
         <p style={{ margin: 0 }}>Claude te va a mandar a una pantalla del panel para que lo autorices. Después volvé y tocá «Mejorar con Claude» otra vez.</p>
+        <p style={{ margin: 0 }}>En el chat de Claude puede leer el video y proponer el guion mejorado; para <b>producir</b> el video nuevo hace falta Claude Code en tu computadora, con el repo de videos clonado (el comando está en el bloque «Conectá tu Claude a Órbita», arriba).</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', paddingTop: 4 }}>
           <button type="button" onClick={() => copiar(instruccionDeMejora(v), 'La instrucción')} className="ds-hover" style={btnGhostSm}>Copiar la instrucción</button>
           <button type="button" onClick={abrir} className="ds-hover" style={btnGhostSm}>Abrir Claude igual</button>
@@ -215,7 +216,10 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
   v: VideoDeCola; puedeEditar: boolean; ocupado: string | null; tituloOriginal: string | null; setAviso: (a: Aviso) => void; onCambio: () => void
   onAprobar: () => void; onRechazar: () => void; onDescargar: () => void; onMejorar: () => void; onTiktok: () => void; onInstagram: () => void
 }) {
-  const e = ESTADO[v.estado]
+  // Un video propio que está pendiente y que esta persona NO puede aprobar es de alguien que no es socio (por ejemplo, marketing):
+  // lo tiene que aprobar la dirección. (Los socios sí pueden aprobar el suyo.) No se dice quién ni cuántos: solo que lo aprueba la dirección.
+  const esperaDireccion = v.estado === 'PENDIENTE' && !!v.esTuyo && !v.puedeAprobar && !v.yaAprobaste
+  const e = esperaDireccion ? { texto: 'Esperando a la dirección', tono: 'amber' as const } : ESTADO[v.estado]
   const vence = v.estado === 'PENDIENTE' ? diasPara(v.expiraAt) : null
   const fallas = v.controles.filter((c) => !c.ok)
   const aprobado = v.estado !== 'PENDIENTE'
@@ -245,6 +249,12 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
           {vence !== null && <> · se borra solo {vence === 0 ? 'hoy' : `en ${vence} ${vence === 1 ? 'día' : 'días'}`} si nadie lo aprueba</>}
           {v.mejoraDeId && tituloOriginal && <> · mejora de «{tituloOriginal}»</>}
         </div>
+
+        {esperaDireccion && (
+          <div role="status" style={{ fontSize: 13, color: 'var(--chip-warning-fg)', background: 'var(--color-warning-bg)', padding: '10px 14px', borderRadius: 10, lineHeight: 1.55 }}>
+            <b>Este video lo tiene que aprobar la dirección de Órbita</b> antes de usarse. Mientras tanto el equipo lo puede ver y dejarte comentarios, y cuando esté aprobado va a figurar como «Aprobado».
+          </div>
+        )}
 
         {v.controles.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} aria-label="Controles de calidad">
@@ -279,7 +289,7 @@ function TarjetaDeVideo({ v, puedeEditar, ocupado, tituloOriginal, setAviso, onC
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
           {v.puedeAprobar && boton(`a-${v.id}`, 'Aprobar', 'Aprobando…', onAprobar, true)}
           {v.yaAprobaste && <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Tu aprobación quedó registrada</span>}
-          {v.puedeRechazar && boton(`r-${v.id}`, 'Rechazar y borrar', 'Borrando…', onRechazar)}
+          {v.puedeRechazar && boton(`r-${v.id}`, v.esTuyo ? 'Descartar mi video' : 'Rechazar y borrar', 'Borrando…', onRechazar)}
           {boton(`m-${v.id}`, 'Mejorar con Claude', 'Abriendo…', onMejorar)}
           {boton(`d-${v.id}`, 'Descargar', 'Preparando…', onDescargar)}
           {aprobado && v.tipo === 'MARKETING' && (

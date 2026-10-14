@@ -35,11 +35,8 @@ export type EstadoVideo = (typeof ESTADOS_VIDEO)[number];
 
 export const FORMATOS_VIDEO = ['REEL_9_16', 'CUADRADO', 'HORIZONTAL_16_9'] as const;
 
-/** Instagram acepta videos de hasta este tamaño por el camino que usa Órbita (ver instagram-medios.service.ts). */
-export const MAX_BYTES_VIDEO = 50 * 1024 * 1024;
-/** Un tutorial es interno (no va a Instagram) y dura más: tiene más margen. */
-export const MAX_BYTES_TUTORIAL = 250 * 1024 * 1024;
-export const maxBytesDe = (tipo: TipoVideo) => (tipo === 'TUTORIAL' ? MAX_BYTES_TUTORIAL : MAX_BYTES_VIDEO);
+/** Sin tope de peso: ni marketing ni tutoriales. La columna `bytes` es un Int de Postgres y solo se muestra, así que se acota. */
+const MAX_BYTES_REGISTRADOS = 2_147_483_647;
 const maxSegundosDe = (tipo: TipoVideo) => (tipo === 'TUTORIAL' ? 3600 : 600);
 /** Tope de videos esperando revisión de cada tipo: evita llenar el almacenamiento si algo se descontrola. */
 export const MAX_EN_COLA = 20;
@@ -122,8 +119,6 @@ export class VideosService {
     const tipo = this.tipoValido(tipoPedido);
     const n = Number(bytes);
     if (!Number.isFinite(n) || n <= 0) throw new BadRequestException('Falta el tamaño del video en bytes');
-    const tope = maxBytesDe(tipo);
-    if (n > tope) throw new BadRequestException(`El video pesa más de ${tope / 1024 / 1024} MB: bajale el bitrate`);
     await this.purgarVencidos();
     const enCola = await this.prisma.marketingVideo.count({ where: { tipo, estado: { in: ['SUBIENDO', 'PENDIENTE'] } } });
     if (enCola >= MAX_EN_COLA) {
@@ -134,7 +129,7 @@ export class VideosService {
     const video = await this.prisma.marketingVideo.create({
       data: {
         creadoPor: adminId, titulo: 'Subiendo…', tipo, formato: tipo === 'TUTORIAL' ? 'HORIZONTAL_16_9' : 'REEL_9_16',
-        ruta, bytes: Math.trunc(n), estado: 'SUBIENDO', expiraAt: minutos(MINUTOS_SUBIENDO),
+        ruta, bytes: Math.min(Math.trunc(n), MAX_BYTES_REGISTRADOS), estado: 'SUBIENDO', expiraAt: minutos(MINUTOS_SUBIENDO),
       },
       select: { id: true },
     });
@@ -173,12 +168,11 @@ export class VideosService {
       mejoraDeId = original.id;
     }
 
-    const tope = maxBytesDe(tipo);
     const tam = await this.r2.tamanioDe(video.ruta);
     if (tam === null) throw new BadRequestException('El archivo todavía no está en el almacenamiento: subilo con la dirección que te di y volvé a registrar');
-    if (tam === 0 || tam > tope) {
+    if (tam === 0) {
       await this.descartar(video.id, video.ruta, null);
-      throw new BadRequestException(tam === 0 ? 'El archivo subido está vacío' : `El video pesa más de ${tope / 1024 / 1024} MB: se descartó, generalo de nuevo más liviano`);
+      throw new BadRequestException('El archivo subido está vacío');
     }
 
     const actualizado = await this.prisma.marketingVideo.update({
@@ -189,7 +183,7 @@ export class VideosService {
         guion: limpio(e.guion, 8000),
         caption: limpio(e.caption, 2200),
         duracionSeg: duracion,
-        bytes: tam,
+        bytes: Math.min(tam, MAX_BYTES_REGISTRADOS),
         tutorialId,
         mejoraDeId,
         controles: this.controles(e.controles) as unknown as Prisma.InputJsonValue,

@@ -65,6 +65,13 @@ describe('publicar un video de la cola', () => {
     expect(ctx.videos.anotarPublicacion).toHaveBeenCalledWith('admin-1', 'v-1', 'instagram', 'ig-5');
   });
 
+  it('Instagram: un archivo de más de 50 MB no se pasa por esta vía y avisa cómo seguir (la cola no tiene tope)', async () => {
+    const ctx = armar();
+    global.fetch = jest.fn(async () => new Response(new Uint8Array(50 * 1024 * 1024 + 1))) as never;
+    await expect(ctx.svc.enBorradorDeInstagram('admin-1', 'v-1')).rejects.toThrow('subilo a mano');
+    expect(ctx.medios.subirVideoDelServidor).not.toHaveBeenCalled();
+  });
+
   it('Instagram: un texto escrito a mano reemplaza al sugerido, y si no se puede leer el video avisa', async () => {
     const ctx = armar();
     global.fetch = jest.fn(async () => new Response(new Uint8Array([1]))) as never;
