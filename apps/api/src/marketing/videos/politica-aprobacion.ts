@@ -13,35 +13,48 @@ import { ConfigService } from '@nestjs/config';
 //       – Alcanza con la aprobación del CEO (tiene la responsabilidad de marketing y de estrategia).
 //       – Los otros dos (CTO y CPO) también pueden aprobar, pero entonces tienen que aprobar LOS DOS.
 //
-// Nadie aprueba lo que subió otra persona fuera de esos caminos. Quien subió un video siempre puede descartarlo.
+// Cada socio tiene un ROL (CEO, CTO, CPO) y un rol puede tener VARIOS correos (por ejemplo, ceo@orbita-corp.com y ceo@orbita.site):
+// son la misma persona. Por eso «el mismo» se decide por rol: con una cuenta no se aprueba lo que subió la otra cuenta del mismo
+// rol, y las dos cuentas de un rol cuentan como una sola aprobación.
+// Quien subió un video siempre puede descartarlo.
 
 export interface Persona {
   id: string;
   email: string;
 }
 
-/** La dirección de Órbita, en orden: la primera es el CEO y las demás, los otros dos (CTO y CPO). Correos en minúscula. */
+/**
+ * La dirección de Órbita: una lista de ROLES en orden, y cada rol con sus correos (en minúscula). El primer rol es el CEO y los
+ * demás, «los otros dos» (CTO y CPO).
+ */
 export interface Reglas {
-  direccion: string[];
+  direccion: string[][];
 }
 
-export const DIRECCION_POR_DEFECTO = 'ceo@orbita-corp.com,cto@orbita-corp.com,cpo@orbita-corp.com';
+export const DIRECCION_POR_DEFECTO = [
+  'ceo@orbita-corp.com|ceo@orbita.site',
+  'cto@orbita-corp.com|cto@orbita.site',
+  'cpo@orbita-corp.com|cpo@orbita.site',
+].join(',');
 
+/**
+ * MARKETING_DIRECCION: los roles separados por coma, y los correos de cada rol separados por «|». Por ejemplo
+ * `ceo@a.com|ceo@b.com,cto@a.com|cto@b.com,cpo@a.com|cpo@b.com` (el primero es el CEO).
+ */
 export function reglasDeConfig(config: Pick<ConfigService, 'get'>): Reglas {
   const direccion = (config.get<string>('MARKETING_DIRECCION') ?? DIRECCION_POR_DEFECTO)
     .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+    .map((rol) => rol.split('|').map((e) => e.trim().toLowerCase()).filter(Boolean))
+    .filter((rol) => rol.length > 0);
   return { direccion };
 }
 
 const mismo = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
-export const esDireccion = (email: string, r: Reglas) => r.direccion.some((d) => mismo(d, email));
-export const esCeo = (email: string, r: Reglas) => r.direccion.length > 0 && mismo(r.direccion[0], email);
-
-/** Los correos de «los otros dos» (todo lo que no es el CEO). */
-const otros = (r: Reglas) => r.direccion.slice(1);
+/** El número de rol de ese correo (0 = CEO), o -1 si no es de la dirección. */
+export const rolDe = (email: string, r: Reglas): number => r.direccion.findIndex((correos) => correos.some((c) => mismo(c, email)));
+export const esDireccion = (email: string, r: Reglas) => rolDe(email, r) >= 0;
+export const esCeo = (email: string, r: Reglas) => rolDe(email, r) === 0;
 
 interface Contexto {
   /** Quién lo subió (null si esa cuenta ya no existe). */
@@ -51,14 +64,21 @@ interface Contexto {
   reglas: Reglas;
 }
 
-const esElCreador = (c: Contexto, p: Persona) => !!c.creador && c.creador.id === p.id;
+/** ¿Es la misma persona? La misma cuenta, o dos cuentas del mismo rol de la dirección. */
+function mismaPersona(a: Persona, b: Persona, r: Reglas): boolean {
+  if (a.id === b.id) return true;
+  const rol = rolDe(a.email, r);
+  return rol >= 0 && rol === rolDe(b.email, r);
+}
+
+const esElCreador = (c: Contexto, p: Persona) => !!c.creador && mismaPersona(c.creador, p, c.reglas);
 
 /** Lo subió un socio: es un video «de la casa» y se verifica a sí mismo. */
 const loSubioUnSocio = (c: Contexto) => !!c.creador && esDireccion(c.creador.email, c.reglas);
 
-/** ¿Puede esta persona aprobar este video ahora? (False si ya aprobó.) */
+/** ¿Puede esta persona aprobar este video ahora? (False si ya aprobó ella o su otra cuenta.) */
 export function puedeAprobar(c: Contexto, quien: Persona): boolean {
-  if (c.aprobaron.some((p) => p.id === quien.id)) return false;
+  if (c.aprobaron.some((p) => mismaPersona(p, quien, c.reglas))) return false;
   if (loSubioUnSocio(c)) return esElCreador(c, quien);
   return esDireccion(quien.email, c.reglas) && !esElCreador(c, quien);
 }
@@ -66,11 +86,11 @@ export function puedeAprobar(c: Contexto, quien: Persona): boolean {
 /** ¿Ya hay las aprobaciones que hacen falta? */
 export function aprobacionCompleta(c: Contexto): boolean {
   if (loSubioUnSocio(c)) return c.aprobaron.some((p) => esElCreador(c, p));
-  // Lo subió alguien que no es socio: la aprobación del propio creador nunca cuenta.
-  const v = c.aprobaron.filter((p) => !esElCreador(c, p));
-  const porElCeo = v.some((p) => esCeo(p.email, c.reglas));
-  const resto = otros(c.reglas);
-  const porLosOtrosDos = resto.length > 0 && resto.every((e) => v.some((p) => mismo(p.email, e)));
+  // Lo subió alguien que no es socio: la aprobación del propio creador nunca cuenta. Se cuentan ROLES, no cuentas.
+  const roles = new Set(c.aprobaron.filter((p) => !esElCreador(c, p)).map((p) => rolDe(p.email, c.reglas)).filter((r) => r >= 0));
+  const porElCeo = roles.has(0);
+  const resto = c.reglas.direccion.map((_, i) => i).filter((i) => i > 0);
+  const porLosOtrosDos = resto.length > 0 && resto.every((i) => roles.has(i));
   return porElCeo || porLosOtrosDos;
 }
 

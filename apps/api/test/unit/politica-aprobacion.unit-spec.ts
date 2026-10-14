@@ -1,4 +1,4 @@
-import { aprobacionCompleta, puedeAprobar, puedeRechazar, reglasDeConfig, type Persona } from '../../src/marketing/videos/politica-aprobacion';
+import { aprobacionCompleta, puedeAprobar, puedeRechazar, reglasDeConfig, rolDe, type Persona } from '../../src/marketing/videos/politica-aprobacion';
 
 // La política de aprobación de la cola de videos, completa: quién aprueba, cuándo alcanza y quién rechaza.
 // Es lógica interna (el panel no la muestra): acá se prueba cada combinación. Depende de quién subió el video.
@@ -11,12 +11,52 @@ const reglas = reglasDeConfig({ get: () => undefined });
 
 const video = (creador: Persona | null, aprobaron: Persona[] = []) => ({ creador, aprobaron, reglas });
 
+// El mismo rol tiene dos cuentas: la de orbita-corp.com y la de orbita.site (son la misma persona).
+const ceo2: Persona = { id: 'ceo2', email: 'ceo@orbita.site' };
+const cto2: Persona = { id: 'cto2', email: 'cto@orbita.site' };
+const cpo2: Persona = { id: 'cpo2', email: 'CPO@orbita.site' };
+
 describe('configuración', () => {
-  it('por defecto la dirección es CEO, CTO y CPO, en ese orden y en minúscula', () => {
-    expect(reglas.direccion).toEqual(['ceo@orbita-corp.com', 'cto@orbita-corp.com', 'cpo@orbita-corp.com']);
+  it('por defecto la dirección son tres roles (CEO, CTO y CPO, en ese orden), cada uno con sus dos correos', () => {
+    expect(reglas.direccion).toEqual([
+      ['ceo@orbita-corp.com', 'ceo@orbita.site'],
+      ['cto@orbita-corp.com', 'cto@orbita.site'],
+      ['cpo@orbita-corp.com', 'cpo@orbita.site'],
+    ]);
   });
-  it('MARKETING_DIRECCION la cambia (con espacios y mayúsculas)', () => {
-    expect(reglasDeConfig({ get: () => ' Uno@x.com , dos@x.com ' }).direccion).toEqual(['uno@x.com', 'dos@x.com']);
+  it('MARKETING_DIRECCION la cambia: roles separados por coma, correos de cada rol por «|», con espacios y mayúsculas', () => {
+    expect(reglasDeConfig({ get: () => ' Uno@x.com | uno@y.com , dos@x.com ' }).direccion).toEqual([['uno@x.com', 'uno@y.com'], ['dos@x.com']]);
+  });
+  it('rolDe reconoce los dos correos de cada rol y nada más', () => {
+    expect([rolDe('ceo@orbita.site', reglas), rolDe('CTO@orbita-corp.com', reglas), rolDe('cpo@orbita.site', reglas), rolDe('milagros@orbita.site', reglas)]).toEqual([0, 1, 2, -1]);
+  });
+});
+
+describe('un socio con dos cuentas es una sola persona', () => {
+  it('con una cuenta no se aprueba lo que subió la otra cuenta de otro rol, pero sí lo que subió la otra cuenta del mismo rol', () => {
+    expect(puedeAprobar(video(ceo), ceo2)).toBe(true); // misma persona
+    expect(puedeAprobar(video(ceo), cto2)).toBe(false); // otro socio
+    expect(puedeAprobar(video(cto2), cto)).toBe(true);
+    expect(puedeAprobar(video(cto2), cpo2)).toBe(false);
+  });
+  it('lo que sube un socio con una cuenta lo cierra él mismo con la otra', () => {
+    expect(aprobacionCompleta(video(ceo, [ceo2]))).toBe(true);
+    expect(aprobacionCompleta(video(cto2, [cto]))).toBe(true);
+  });
+  it('no aprueba dos veces: ni con la otra cuenta', () => {
+    expect(puedeAprobar(video(milagros, [ceo]), ceo2)).toBe(false);
+    expect(puedeAprobar(video(cto, [cto2]), cto)).toBe(false);
+  });
+  it('lo de Milagros: el CEO con cualquiera de sus cuentas alcanza; el CTO y el CPO tienen que ser los dos roles, no dos cuentas del mismo', () => {
+    expect(aprobacionCompleta(video(milagros, [ceo2]))).toBe(true);
+    expect(aprobacionCompleta(video(milagros, [cto, cto2]))).toBe(false);
+    expect(aprobacionCompleta(video(milagros, [cto, cpo2]))).toBe(true);
+    expect(aprobacionCompleta(video(milagros, [cto2, cpo]))).toBe(true);
+  });
+  it('rechazar: un socio descarta lo suyo con cualquiera de sus cuentas, y ningún otro socio', () => {
+    expect(puedeRechazar(video(cto), cto2)).toBe(true);
+    expect(puedeRechazar(video(cto), ceo2)).toBe(false);
+    expect(puedeRechazar(video(milagros), cpo2)).toBe(true);
   });
 });
 
@@ -81,7 +121,7 @@ describe('casos borde', () => {
     expect(puedeAprobar(video(null), milagros)).toBe(false);
   });
   it('con una dirección de una sola persona, solo ella cierra lo de Milagros', () => {
-    const sola = { ...video(milagros, [ceo]), reglas: { direccion: ['ceo@orbita-corp.com'] } };
+    const sola = { ...video(milagros, [ceo]), reglas: { direccion: [['ceo@orbita-corp.com']] } };
     expect(aprobacionCompleta(sola)).toBe(true);
     expect(aprobacionCompleta({ ...sola, aprobaron: [] })).toBe(false);
   });

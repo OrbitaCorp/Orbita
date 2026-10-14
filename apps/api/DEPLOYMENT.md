@@ -488,9 +488,12 @@ Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_
     rechaza el video de otro socio.**
   - Lo sube **cualquier otra persona** (por ejemplo, Milagros, de marketing): lo aprueba la dirección. Alcanza con el CEO; el
     CTO y el CPO también pueden, pero entonces tienen que aprobar los dos. Quien lo subió nunca aprueba el suyo.
-  - Quién es «la dirección»: `MARKETING_DIRECCION` (correos separados por coma; el primero es el CEO). Por defecto
-    `ceo@orbita-corp.com,cto@orbita-corp.com,cpo@orbita-corp.com`. **Si en producción usan otros correos, hay que fijarla en
-    `deploy/env-vars.yaml`: si no coincide, nadie puede aprobar lo de Milagros** (falla del lado seguro).
+  - Quién es «la dirección» (`MARKETING_DIRECCION`): una lista de ROLES separados por coma (el primero es el CEO) y los correos de
+    cada rol separados por `|`, porque cada socio tiene dos cuentas y son la misma persona. Por defecto
+    `ceo@orbita-corp.com|ceo@orbita.site,cto@orbita-corp.com|cto@orbita.site,cpo@orbita-corp.com|cpo@orbita.site`. Con una cuenta no se
+    aprueba lo que subió la otra del mismo rol, y las dos cuentas de un rol cuentan como una sola aprobación. **Si en producción
+    usan otros correos, hay que fijarla en `deploy/env-vars.yaml`: si no coincide, nadie puede aprobar lo de Milagros** (falla del
+    lado seguro).
 - **Comentarios** (`/platform/marketing/videos/:id/comentarios`): cualquiera del equipo puede opinar sobre cualquier video en todas
   sus fases (para aprobar, aprobado, pasado a borrador) y borrar los suyos.
 - **Mejorar un video:** el botón «Mejorar con Claude» abre Claude con el video si la persona tiene el conector
