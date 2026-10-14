@@ -37,7 +37,7 @@ personalizado», dirección `https://api.orbita.site/api/v1/mcp`) y lo autoriza 
 en el panel (el mismo login con Google y segundo factor del superadmin). Con ese único conector, su Claude puede:
 
 - **Prospección:** leer el criterio, consultar cuentas, leer lotes y guardar análisis.
-- **Videos:** ver la cola, pedir dónde subir un video y registrarlo.
+- **Videos:** ver la cola, pedir dónde subir un video, registrarlo y avisar al equipo por correo cuando termina la tanda (el texto del correo es fijo).
 
 Quién puede conectarlo: un **superadmin activo** con correo `@orbita-corp.com` o `@orbita.site`. Se vuelve a verificar
 **en cada llamada**: si alguien deja de ser superadmin o se desactiva, su Claude pierde el acceso en el momento.
@@ -69,13 +69,14 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
    tramos en negro e imagen congelada. Los videos que fallan lo básico no se suben.
 4. **Se sube directo a Cloudflare R2** con una dirección firmada de 10 minutos y se **registra en la cola** con su guion,
    su texto sugerido y el resultado de los controles.
-5. **Una persona lo aprueba o lo rechaza** en Superadmin → Marketing → Videos, mirándolo en el reproductor:
+5. **Le llega un correo al equipo** (superadmins con correo `@orbita.site` u `@orbita-corp.com`): «Hay N videos para aprobar», con los títulos y un botón al panel. Sale **uno por tanda**, no uno por video.
+6. **Una persona lo aprueba o lo rechaza** en Superadmin → Marketing → Videos, mirándolo en el reproductor:
    - **Rechazar** borra el archivo y el registro.
    - Un pendiente que **nadie revisa en 7 días se borra solo**.
    - **Aprobar** lo deja como **registro** (con su archivo) y habilita **descargarlo** o **pasarlo como borrador** a TikTok
      (a los borradores de la cuenta, para terminarlo en la app) o a Instagram (como borrador en Publicaciones, donde se
      programa o se publica).
-6. Al terminarlo en TikTok, **marcar el contenido como generado con IA** (TikTok lo pide).
+7. Al terminarlo en TikTok, **marcar el contenido como generado con IA** (TikTok lo pide).
 
 ## Controles y límites (lo que lo hace seguro)
 

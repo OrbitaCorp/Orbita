@@ -207,7 +207,7 @@ export type ProspeccionConsulta = {
   resumen: { usuario: string; puntaje: number | null; nivel: ProspectoNivel; subrubro: string | null; estado: ProspectoEstado }[]
   aviso: string | null
 }
-export type McpSolicitud = { cliente: string; retorno: string; permiso: string; dominios: string[]; usuario: string }
+export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
 
 export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO'
 export type VideoControl = { nombre: string; ok: boolean; detalle: string }

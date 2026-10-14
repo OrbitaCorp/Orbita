@@ -34,7 +34,9 @@ export class InventoryService {
 
     const where: Prisma.VariantStockWhereInput = {
       branchId,
+      // showStock: las variantes de una vidriera con el stock en blanco no tienen inventario que mostrar.
       variant: {
+        showStock: true,
         product: {
           businessId,
           deletedAt: null,

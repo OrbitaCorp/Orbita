@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../../r2/r2.service';
+import { VideosAvisoService } from './videos-aviso.service';
 
 // Marketing → cola de videos para aprobar.
 //
@@ -59,6 +60,7 @@ export class VideosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly r2: R2Service,
+    private readonly aviso: VideosAvisoService,
   ) {}
 
   /** Borra los que vencieron (pendientes sin revisar y subidas que nunca se confirmaron). Mejor esfuerzo. */
@@ -133,7 +135,14 @@ export class VideosService {
       },
     });
     await this.registrarLog(adminId, 'video_registrar', actualizado.id, { titulo, formato, bytes: tam });
+    // Un correo al equipo (mejor esfuerzo, uno por tanda): hay un video para aprobar.
+    await this.aviso.avisar(adminId, 'registro');
     return this.vista(actualizado);
+  }
+
+  /** Al terminar de subir una tanda: avisa por correo si quedó algún video pendiente sin anunciar. */
+  avisarTanda(adminId: string) {
+    return this.aviso.avisar(adminId, 'tanda');
   }
 
   private controles(crudo: unknown): ControlDeCalidad[] {

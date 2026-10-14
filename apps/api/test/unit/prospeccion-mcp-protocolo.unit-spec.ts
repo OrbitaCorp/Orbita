@@ -20,6 +20,7 @@ function armar() {
     listar: jest.fn().mockResolvedValue([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, createdAt: new Date('2026-10-14T00:00:00Z') }]),
     pedirSubida: jest.fn().mockResolvedValue({ videoId: 'v-2', uploadUrl: 'https://r2.example/put', tipo: 'video/mp4', venceEnMin: 10 }),
     registrar: jest.fn().mockResolvedValue({ id: 'v-2', estado: 'PENDIENTE' }),
+    avisarTanda: jest.fn().mockResolvedValue({ enviados: 2, pendientes: 3 }),
   };
   return { svc, videos, mcp: new McpProspeccion(svc as never, videos as never) };
 }
@@ -57,7 +58,7 @@ describe('herramientas', () => {
     expect(HERRAMIENTAS.map((h) => h.name)).toEqual([
       'prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos',
       'prospeccion_consultar_cuentas', 'prospeccion_obtener_lote', 'prospeccion_guardar_analisis',
-      'videos_listar', 'videos_pedir_subida', 'videos_registrar',
+      'videos_listar', 'videos_pedir_subida', 'videos_registrar', 'videos_avisar',
     ]);
     for (const h of HERRAMIENTAS) {
       expect(h.name).not.toMatch(/enviar|mandar|borrar|eliminar|contactar|publicar/);
@@ -73,7 +74,7 @@ describe('herramientas', () => {
 
   it('tools/list las devuelve', async () => {
     const { mcp } = armar();
-    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(9);
+    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(10);
   });
 
   it('consultar y guardar usan al superadmin que autorizó, no un dato que mande Claude', async () => {
@@ -92,6 +93,16 @@ describe('herramientas', () => {
     expect(videos.registrar).toHaveBeenCalledWith('admin-1', expect.objectContaining({ videoId: 'v-2', titulo: 'Mi reel', caption: 'hola', duracionSeg: 30, formato: undefined }));
     const lista = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'videos_listar', arguments: {} }), CTX)));
     expect(lista).toEqual([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, creado: '2026-10-14T00:00:00.000Z' }]);
+  });
+
+  it('videos_avisar manda el aviso de fin de tanda como el superadmin que autorizó y no recibe texto libre', async () => {
+    const { mcp, videos } = armar();
+    const r = await mcp.manejar(rpc('tools/call', { name: 'videos_avisar', arguments: { adminId: 'otro', asunto: 'hola', texto: 'libre' } }), CTX)
+    expect(videos.avisarTanda).toHaveBeenCalledWith('admin-1')
+    expect(JSON.parse(texto(r))).toEqual({ enviados: 2, pendientes: 3 })
+    const herramienta = HERRAMIENTAS.find((h) => h.name === 'videos_avisar')!
+    expect(herramienta.inputSchema.properties).toEqual({})
+    expect(herramienta.inputSchema.additionalProperties).toBe(false)
   });
 
   it('obtener lote pasa los filtros y listar prospectos resume lo que devuelve', async () => {

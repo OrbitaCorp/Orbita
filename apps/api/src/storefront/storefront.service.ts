@@ -106,6 +106,20 @@ function varianteRepresentativa<V extends { id: string; price: Prisma.Decimal; i
   return variants.find((v) => v.isDefault) ?? variants.find((v) => v.stock.some((s) => s.quantity > 0)) ?? variants[0];
 }
 
+// Stock opcional en la VIDRERIA (business.mode = SHOWCASE): una variante con showStock=false es una que el negocio no
+// cargó, así que no se maneja inventario de ella. Para que TODO lo que depende del stock (qué productos se listan, cuál es
+// la variante representativa, "en stock", "últimas unidades", qué combinaciones se tachan) la trate como disponible sin
+// tocar cada cuenta, se le pone un stock "sin límite" y sin mínimo, y se marca `stockVisible: false` para que la ficha no
+// escriba ninguna cantidad. En una tienda con checkout no hace nada: el stock siempre es real y se ve.
+const STOCK_SIN_CARGAR = 1_000_000;
+export function stockDeVidriera<V extends { showStock: boolean; stock: { quantity: number; stockMin: number }[] }>(
+  v: V,
+  vidriera: boolean,
+): V & { stockVisible: boolean } {
+  if (!vidriera || v.showStock) return { ...v, stockVisible: true };
+  return { ...v, stockVisible: false, stock: [{ quantity: STOCK_SIN_CARGAR, stockMin: 0 }] };
+}
+
 // (RBT-613) Aplica el resultado de un descuento AUTOMÁTICO (si hay) al par
 // price/comparePrice que el resto del storefront ya sabe mostrar (tachado +
 // badge de "oferta" — ver `enOferta`/`toProducto()` en el frontend). Sin
@@ -611,7 +625,7 @@ export class StorefrontService {
     // búsqueda/precio/estado) y se filtra/ordena/pagina en memoria — mismo
     // criterio de trade-off que ya usa ReportsService.products() para catálogos
     // de este tamaño (un negocio chico/mediano, no miles de productos).
-    const candidatos = await this.prisma.product.findMany({
+    const candidatosBrutos = await this.prisma.product.findMany({
       where,
       include: {
         category: { select: { name: true } },
@@ -638,7 +652,7 @@ export class StorefrontService {
           // por algún dato corrupto (ver Jira), la más vieja es la real.
           orderBy: { createdAt: 'asc' },
           select: {
-            id: true, price: true, isDefault: true,
+            id: true, price: true, isDefault: true, showStock: true,
             stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } },
             // Para el filtro por talle/color/etc. (ver optionValues del DTO,
             // más abajo) — qué ProductOptionValue trae CADA variante.
@@ -649,6 +663,8 @@ export class StorefrontService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    const vidriera = business.mode === 'SHOWCASE';
+    const candidatos = candidatosBrutos.map((p) => ({ ...p, variants: p.variants.map((v) => stockDeVidriera(v, vidriera)) }));
 
     // (RBT-613) Descuentos automáticos para toda la página candidata, en UNA
     // sola pasada — mismo criterio de "negocio chico, no miles de productos"
@@ -917,7 +933,7 @@ export class StorefrontService {
     const business = await this.resolveTiendaAbierta(slug);
     const branch = await this.sucursalDeVenta(business.id);
 
-    const product = await this.prisma.product.findFirst({
+    const productoBruto = await this.prisma.product.findFirst({
       where: { id, businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
       include: {
         category: { select: { id: true, name: true } },
@@ -936,7 +952,9 @@ export class StorefrontService {
         images: { orderBy: { position: 'asc' } },
       },
     });
-    if (!product) throw new NotFoundException('Producto no encontrado');
+    if (!productoBruto) throw new NotFoundException('Producto no encontrado');
+    const vidriera = business.mode === 'SHOWCASE';
+    const product = { ...productoBruto, variants: productoBruto.variants.map((v) => stockDeVidriera(v, vidriera)) };
 
     // (RBT-613) Un ítem por CADA variante activa (no solo la representativa —
     // el cliente puede elegir cualquiera) más el ítem sintético a nivel padre
@@ -1040,6 +1058,8 @@ export class StorefrontService {
           isDefault: v.isDefault,
           optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
           inStock: qty > 0,
+          // false = el negocio (vidriera) no cargó el stock: la ficha no escribe ninguna cantidad ni "Sin stock".
+          stockVisible: v.stockVisible,
           // lowStock usa el mismo umbral (stockMin) que ya alerta en el panel
           // — toggle "Insignia de stock bajo" de Apariencia.
           lowStock: qty > 0 && qty <= min,

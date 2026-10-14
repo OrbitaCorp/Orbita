@@ -391,6 +391,8 @@ export default function ProductoDetalle() {
     .map(m => ({ key: m.key, label: m.label, pct: m.pct as number }))
     .sort((a, b) => b.pct - a.pct)
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+  // Vidriera: si el negocio dejó el stock en blanco no se escribe ninguna cantidad ni "Sin stock" (ver stockVisible en la API).
+  const mostrarStock = varianteSeleccionada ? varianteSeleccionada.stockVisible !== false : producto.variants.some(v => v.stockVisible !== false)
   // "Negro · Talle L" a partir de la selección real — mismo criterio que ya
   // usa agregarAlCarrito() más abajo, pero acá arriba para que lo pueda usar
   // también el mensaje de WhatsApp sin duplicar el cálculo.
@@ -898,7 +900,7 @@ export default function ProductoDetalle() {
               <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 Esa combinación no está disponible
               </div>
-            ) : (
+            ) : !mostrarStock ? null : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', flexShrink: 0 }} />
                 {!enStock

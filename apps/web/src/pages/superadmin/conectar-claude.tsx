@@ -29,6 +29,14 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
   const [datos, setDatos] = useState<McpSolicitud | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState<'aprobar' | 'cancelar' | null>(null)
+  // Después de decidir se muestra un resultado en Órbita y, un instante más tarde, se vuelve a Claude (no un salto en seco).
+  const [hecho, setHecho] = useState<{ aprobo: boolean; redirect: string } | null>(null)
+
+  useEffect(() => {
+    if (!hecho) return
+    const t = window.setTimeout(() => window.location.assign(hecho.redirect), 2200)
+    return () => window.clearTimeout(t)
+  }, [hecho])
 
   useEffect(() => {
     if (!listo) return
@@ -49,7 +57,7 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
     try {
       const { redirect } = await platformApi.mcpResolver(req, decision)
       olvidarConexionPendiente()
-      window.location.href = redirect
+      setHecho({ aprobo: decision === 'aprobar', redirect })
     } catch (e) {
       olvidarConexionPendiente()
       setError(e instanceof Error ? e.message : 'No se pudo completar la conexión')
@@ -65,7 +73,22 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
           Conectar Claude a Órbita
         </h1>
 
-        {error ? (
+        {hecho ? (
+          <>
+            <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
+                {hecho.aprobo ? 'Listo: Claude quedó conectado a Órbita' : 'Conexión cancelada'}
+              </div>
+              <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                {hecho.aprobo
+                  ? 'Ya podés pedirle a tu Claude que genere videos para la cola de aprobación o que analice cuentas. Todo lo que haga queda para que lo revise una persona.'
+                  : 'No se conectó nada. Podés volver a intentarlo desde Claude cuando quieras.'}
+              </p>
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)' }}>Volviendo a Claude…</p>
+            </div>
+            <a href={hecho.redirect} style={{ ...btnPrimary, textDecoration: 'none', alignSelf: 'flex-start' }}>Volver a Claude ahora</a>
+          </>
+        ) : error ? (
           <>
             <div role="alert" style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 13.5, lineHeight: 1.55 }}>{error}</div>
             <a href="/superadmin?seccion=marketing" style={{ ...btnGhost, textDecoration: 'none', alignSelf: 'flex-start' }}>Volver al panel</a>
@@ -80,7 +103,9 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
             </p>
             <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6, borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)', padding: '14px 0' }}>
               <div style={{ color: 'var(--color-text)', fontWeight: 600, marginBottom: 6 }}>Qué podrá hacer</div>
-              {datos.permiso}.
+              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {datos.permisos.map((p) => <li key={p}>{p}</li>)}
+              </ul>
               <div style={{ marginTop: 10, color: 'var(--color-muted)' }}>
                 No puede enviar mensajes, contactar a nadie, publicar ni borrar datos: todo mensaje y todo video lo revisa y lo aprueba una persona.
                 El acceso se puede cortar cuando quieras desde Marketing → «Desconectar Claude».

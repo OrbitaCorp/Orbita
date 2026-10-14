@@ -1873,6 +1873,8 @@ export type ApiProductRow = {
   status: ProductStatus
   isFeatured: boolean
   totalStock: number
+  /** false = ninguna variante tiene el stock cargado (vidriera): el panel muestra "—" y no lo cuenta como "sin stock". */
+  showStock?: boolean
   variantCount: number
   primaryImageUrl: string | null
   // Todas las fotos del producto, la que se ve por default primero — para el
@@ -1967,6 +1969,8 @@ export type ApiProductFull = {
     comparePrice: number | null
     isDefault: boolean
     isActive: boolean
+    /** false = el negocio (vidriera) dejó el stock en blanco: no se muestra en la tienda. */
+    showStock?: boolean
     optionValues: { optionValueId: string; value: string }[]
     stock: { branchId: string; quantity: number; stockMin: number }[]
   }[]
@@ -2004,6 +2008,8 @@ export type UpsertProductInput = {
     stockMin?: number
     // false = esta combinación no se ofrece (se conserva igual, no se borra).
     isActive?: boolean
+    // Solo en una vidriera: false = el stock quedó en blanco y la tienda no lo muestra (sin initialStock).
+    showStock?: boolean
   }[]
 }
 

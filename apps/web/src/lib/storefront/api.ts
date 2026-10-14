@@ -467,6 +467,9 @@ export type StorefrontProductDetail = {
     optionValues: { optionValueId: string; value: string }[]
     inStock: boolean
     lowStock: boolean
+    // false = el negocio (vidriera) no cargó el stock de esta variante: la ficha no escribe ninguna cantidad ni
+    // "Sin stock". Ausente (API anterior) = se muestra, como siempre.
+    stockVisible?: boolean
     // Techo público del stock real (nunca el inventario completo — ver
     // storefront.service.ts) y también el tope real para el carrito: nunca
     // se puede agregar más que esto de una variante.

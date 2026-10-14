@@ -358,6 +358,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // por fila era lo más tedioso. El precio no tiene fila propia: el "Precio"
     // de arriba ya se copia a todas las filas (ver cambiarPrecio).
     const [stockMasivo, setStockMasivo] = useState('')
+    // Vidriera digital (modo SHOWCASE): el stock es OPCIONAL. En blanco = la tienda no muestra unidades, "Sin stock" ni
+    // "Últimas unidades"; con un número = se muestra en la ficha. En una tienda con checkout sigue siendo obligatorio.
+    const [vidriera, setVidriera] = useState(false)
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     // valor de opción (ej. "S") → id real de ese OptionValue — se arma una
@@ -477,7 +480,15 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     useEffect(() => {
         let vigente = true
         panelGetBusiness()
-            .then(b => { if (vigente) setSpecsSugeridas(specsDelNegocio(b.subrubros)) })
+            .then(b => {
+                if (!vigente) return
+                setSpecsSugeridas(specsDelNegocio(b.subrubros))
+                if (b.mode === 'SHOWCASE') {
+                    setVidriera(true)
+                    // Alta nueva en una vidriera: el stock arranca vacío (opcional) y no en 0.
+                    if (!editando) setProd(p => (p.stock === '0' ? { ...p, stock: '' } : p))
+                }
+            })
             .catch(() => { /* sin negocio, el formulario queda como siempre */ })
         panelGetVariantHistory()
             .then(h => { if (vigente) setHistorialVariantes(h) })
@@ -586,7 +597,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     precio: String(Math.round(Number(p.basePrice))),
                     costo: p.cost != null ? String(Math.round(Number(p.cost))) : '',
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
-                    stock: String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
+                    stock: p.variants[0]?.showStock === false ? '' : String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
                     stockMinimo: String(p.variants[0]?.stock[0]?.stockMin ?? 5),
                     tieneVariantes: conVariantes,
                     tiposVariante: conVariantes
@@ -607,7 +618,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             id: v.id,
                             sku: v.sku ?? '',
                             precio: String(Math.round(Number(v.price))),
-                            stock: String(v.stock.reduce((s, st) => s + st.quantity, 0)),
+                            stock: v.showStock === false ? '' : String(v.stock.reduce((s, st) => s + st.quantity, 0)),
                             stockMin: String(v.stock[0]?.stockMin ?? 0),
                             activa: v.isActive,
                         }))
@@ -704,7 +715,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     valores: c.valores,
                     sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
                     precio: precioHeredado || prod.precio || '0',
-                    stock: '0',
+                    stock: vidriera ? '' : '0',
                     stockMin: prod.stockMinimo || '0',
                     activa: true,
                 }
@@ -1404,13 +1415,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             ? tiposValidos.map(tp => ({ name: tp.nombre.trim(), values: tp.opciones, isVisual: opcionVisual?.id === tp.id }))
             : undefined
 
+        // Vidriera con el stock en blanco: no hay un número que mandar, la variante queda "sin stock cargado" y la tienda no
+        // lo muestra. Con un número (aunque sea 0) se manda y se refleja en la ficha. Fuera de la vidriera nada cambia.
+        const stockDeLaVariante = (valor: string): Pick<UpsertProductInput['variants'][number], 'initialStock' | 'showStock'> =>
+            vidriera && valor.trim() === ''
+                ? { showStock: false }
+                : { initialStock: Number(valor) || 0, ...(vidriera ? { showStock: true } : {}) }
+
         const variants: UpsertProductInput['variants'] = prod.tieneVariantes
             ? filas.map(f => ({
                 ...(f.id ? { id: f.id } : {}),
                 sku: f.sku || undefined,
                 price: Number(f.precio) || precio,
                 optionValues: f.valores,
-                initialStock: Number(f.stock) || 0,
+                ...stockDeLaVariante(f.stock),
                 stockMin: Number(f.stockMin) || 0,
                 isActive: f.activa,
             }))
@@ -1426,7 +1444,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 sku: prod.sku || undefined,
                 price: precio,
                 optionValues: [],
-                initialStock: Number(prod.stock) || 0,
+                ...stockDeLaVariante(prod.stock),
                 stockMin: Number(prod.stockMinimo) || 0,
             }]
 
@@ -1500,7 +1518,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // Toast, no banner fijo — es una validación disparada por la acción
         // de guardar (mismo criterio que el resto del sistema, ej. el chequeo
         // de envío en PedidoNuevo.tsx), no un error persistente de la pantalla.
-        if (estado === 'PUBLISHED' && stockTotal <= 0) {
+        if (estado === 'PUBLISHED' && !vidriera && stockTotal <= 0) {
             onToast('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
@@ -1771,7 +1789,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }
         if (valoresConFotoDuplicada.length > 0) f.push({ id: 'pn-variantes', texto: 'una sola foto por valor' })
         if (fondosEnCurso > 0) f.push({ id: 'pn-fotos', texto: 'que termine de aplicarse el fondo de las fotos' })
-        if (estado === 'PUBLISHED' && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
+        if (estado === 'PUBLISHED' && !vidriera && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
         return f
     }
     const faltasVisibles = intento ? faltantes(intento) : []
@@ -1957,6 +1975,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             fotosPorValor={fotosPorValorPreview}
             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
             stockTotal={stockTotal}
+            sinStockCargado={vidriera && !(prod.tieneVariantes ? filas.some(f => f.activa && f.stock.trim() !== '') : prod.stock.trim() !== '')}
             urlsConFondoIA={urlsConFondoIA}
             urlsEnProceso={urlsEnProceso}
         />
@@ -2285,7 +2304,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <PField label="Stock" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} />
+                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} />
+                                            )}
+                                            {vidriera && (
+                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                                    Si lo dejás vacío, la ficha no muestra stock. Si escribís una cantidad, se ve en la ficha.
+                                                </div>
                                             )}
                                             {hayFalta('pn-stock') && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 4 }}>Para publicar necesitás stock</div>}
                                         </div>
@@ -3112,7 +3136,7 @@ function hueDeTexto(s: string): number {
 
 function PreviewProducto({
     nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
-    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, urlsConFondoIA, urlsEnProceso,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal, sinStockCargado, urlsConFondoIA, urlsEnProceso,
 }: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string
@@ -3124,6 +3148,8 @@ function PreviewProducto({
     nombreOpcionVisual?: string
     fotosPorValor: { valor: string; url?: string }[]
     variantes: TipoVariante[]; stockTotal: number
+    /** Vidriera con el stock en blanco: la vista previa no escribe "Sin stock". */
+    sinStockCargado?: boolean
     // URLs con fondo compuesto por "Fondo con IA" — esas se muestran con
     // object-fit:cover (llenan el cuadro), el resto sigue en contain. Ver
     // comentario largo más abajo, sigue aplicando a las fotos comunes.
@@ -3289,9 +3315,9 @@ function PreviewProducto({
                         </div>
                     </div>
                 ))}
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border)', fontSize: 11, color: stockTotal > 0 ? 'var(--color-muted)' : 'var(--color-error)' }}>
+                {!sinStockCargado && <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--color-border)', fontSize: 11, color: stockTotal > 0 ? 'var(--color-muted)' : 'var(--color-error)' }}>
                     {stockTotal > 0 ? `${stockTotal} unidades disponibles` : 'Sin stock'}
-                </div>
+                </div>}
             </div>
         </div>
     )
