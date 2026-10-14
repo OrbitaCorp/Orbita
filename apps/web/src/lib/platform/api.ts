@@ -209,6 +209,15 @@ export type ProspeccionConsulta = {
 }
 export type McpSolicitud = { cliente: string; retorno: string; permiso: string; dominios: string[]; usuario: string }
 
+export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO'
+export type VideoControl = { nombre: string; ok: boolean; detalle: string }
+export type VideoDeCola = {
+  id: string; titulo: string; formato: 'REEL_9_16' | 'CUADRADO' | 'HORIZONTAL_16_9'; guion: string; caption: string
+  duracionSeg: number | null; bytes: number; estado: VideoEstado; controles: VideoControl[]; url: string
+  aprobadoAt: string | null; publicaciones: { destino: 'tiktok' | 'instagram'; id: string; fecha: string }[]
+  expiraAt: string | null; createdAt: string
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
@@ -1167,6 +1176,13 @@ export const platformApi = {
   mcpSolicitud: (req: string) => getJSONConMensaje<McpSolicitud>(`/platform/mcp/solicitud?req=${encodeURIComponent(req)}`),
   mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
   mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),
+  // Cola de videos que genera el equipo con su Claude (apps/api/src/marketing/videos).
+  videosCola: () => getJSONConMensaje<VideoDeCola[]>('/platform/marketing/videos'),
+  videoAprobar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/aprobar`, 'POST'),
+  videoRechazar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/rechazar`, 'POST'),
+  videoDescarga: (id: string) => getJSONConMensaje<{ url: string; nombre: string }>(`/platform/marketing/videos/${id}/descarga`),
+  videoATiktok: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/tiktok-borrador`, 'POST'),
+  videoAInstagram: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/instagram-borrador`, 'POST', {}),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

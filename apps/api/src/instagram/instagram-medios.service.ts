@@ -172,6 +172,19 @@ export class InstagramMediosService {
     return { ref: ruta, tipo: 'video', url: this.urlPublica(ruta), subida: { url: data.signedUrl, token: data.token } };
   }
 
+  /**
+   * Un video que ya tiene el servidor (por ejemplo, de la cola de videos de Marketing): se guarda en la carpeta del
+   * negocio como si lo hubiera subido el panel, y después se publica con `origen: 'subida'`.
+   */
+  async subirVideoDelServidor(businessId: string, datos: Buffer): Promise<ArchivoSubido> {
+    if (datos.length === 0) throw new BadRequestException('El video está vacío.');
+    if (datos.length > MAX_VIDEO_BYTES) throw new BadRequestException(`El video pesa más de ${MAX_VIDEO_BYTES / 1024 / 1024} MB.`);
+    await this.asegurarBucket();
+    const ruta = `${businessId}/subidas/${randomUUID()}.mp4`;
+    await this.subir(ruta, datos, 'video/mp4');
+    return { ref: ruta, tipo: 'video', url: this.urlPublica(ruta) };
+  }
+
   // ── Dejar cada archivo listo para Instagram ────────────────────────────────
 
   async resolver(businessId: string, item: ItemDePublicacion, formato: FormatoDeFoto, conMiniatura: boolean): Promise<ItemResuelto> {

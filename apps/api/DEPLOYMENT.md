@@ -467,6 +467,26 @@ Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `m
 `20261014130000_marketing_prospeccion_rls`. Son solo aditivas (tablas nuevas): se aplican en producción con
 `./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`.
 
+### Cola de videos (Marketing → Videos)
+
+Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos»); Claude los hace en su computadora
+(HyperFrames, repo `Orbita-Videos`) y por el conector: `videos_pedir_subida` (reserva un lugar y devuelve una dirección
+firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja en la cola con
+su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube. Código en
+`src/marketing/videos/`, tabla `marketing_videos` (migración `20261014140000_marketing_videos`, con RLS).
+
+- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE (vence a los 7 días si nadie lo revisa) → APROBADO (queda como registro,
+  con su archivo, sin vencer) → PUBLICADO (se pasó a un borrador). **Rechazar borra el archivo de R2 y el registro.**
+- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados
+  conservan su archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video; tope 50 MB por video, que es el de
+  Instagram).
+- **Tope de la cola:** 20 videos entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
+- **Pasar a TikTok / Instagram:** siempre como BORRADOR y solo por una persona (nada se publica solo). TikTok: borradores
+  de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones, desde donde
+  se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
+- Usa las variables de R2 que ya existen (`R2_*`, `R2_PUBLIC_URL`); no hay secretos nuevos.
+- Migración aditiva (una tabla nueva): `./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`, como siempre.
+
 Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
 con `https://api.orbita.site/api/v1/mcp/prospeccion`. Requiere un plan de Claude que permita conectores personalizados.
 

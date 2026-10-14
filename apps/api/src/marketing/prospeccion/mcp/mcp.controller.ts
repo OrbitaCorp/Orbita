@@ -4,6 +4,7 @@ import { Public } from '../../../common/decorators/public.decorator';
 import { PlatformAdminGuard } from '../../../common/guards/platform-admin.guard';
 import { SoloSuperadmin } from '../../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../../common/types/auth-context.type';
+import { VideosService } from '../../videos/videos.service';
 import { ProspeccionService } from '../prospeccion.service';
 import { McpProspeccion } from './mcp-prospeccion';
 import { AccesoDenegadoError, McpOauthService, OAuthError } from './mcp-oauth.service';
@@ -157,8 +158,9 @@ export class McpController {
   constructor(
     private readonly oauth: McpOauthService,
     prospeccion: ProspeccionService,
+    videos: VideosService,
   ) {
-    this.protocolo = new McpProspeccion(prospeccion);
+    this.protocolo = new McpProspeccion(prospeccion, videos);
   }
 
   private sinToken(res: Respuesta, motivo?: string) {

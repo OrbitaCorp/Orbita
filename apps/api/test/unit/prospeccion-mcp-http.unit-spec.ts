@@ -10,6 +10,7 @@ import { AuthGuard } from '../../src/common/guards/auth.guard';
 import { McpConsentimientoController, McpController, McpDescubrimientoController, McpOauthController } from '../../src/marketing/prospeccion/mcp/mcp.controller';
 import { AccesoDenegadoError, McpOauthService } from '../../src/marketing/prospeccion/mcp/mcp-oauth.service';
 import { ProspeccionService } from '../../src/marketing/prospeccion/prospeccion.service';
+import { VideosService } from '../../src/marketing/videos/videos.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 // La capa HTTP del conector MCP, con Nest de verdad (rutas, prefijo api/v1, guard global de autenticación, filtro de
@@ -54,6 +55,7 @@ describe('conector MCP por HTTP', () => {
       providers: [
         McpOauthService,
         { provide: ProspeccionService, useValue: prospeccion },
+        { provide: VideosService, useValue: {} },
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: (k: string) => env[k], getOrThrow: (k: string) => env[k] } },
         { provide: AuthService, useValue: { verifyToken: () => { throw new Error('token inválido'); } } },
@@ -156,9 +158,9 @@ describe('conector MCP por HTTP', () => {
 
       const auth = { Authorization: `Bearer ${tok.body.access_token}` };
       const ini = await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }).expect(200);
-      expect(ini.body.result.serverInfo.name).toBe('orbita-prospeccion');
+      expect(ini.body.result.serverInfo.name).toBe('orbita-marketing');
       const lista = await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', id: 2, method: 'tools/list' }).expect(200);
-      expect(lista.body.result.tools).toHaveLength(6);
+      expect(lista.body.result.tools).toHaveLength(9);
       await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', method: 'notifications/initialized' }).expect(202);
       const lote = await http().post('/api/v1/mcp/prospeccion').set(auth).send([{ jsonrpc: '2.0', id: 3, method: 'ping' }, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'prospeccion_criterio' } }]).expect(200);
       expect(lote.body.map((r: { id: number }) => r.id)).toEqual([3, 4]);

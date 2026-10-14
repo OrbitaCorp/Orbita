@@ -28,7 +28,7 @@ const num = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleStr
 
 function instruccionParaClaude(loteId: string) {
   return [
-    `Analizá el lote ${loteId} de la Prospección de Órbita con el conector «Órbita Prospección».`,
+    `Analizá el lote ${loteId} de la Prospección de Órbita con el conector de Órbita.`,
     '1. Leé el criterio (prospeccion_criterio) y el lote (prospeccion_obtener_lote), empezando por los niveles A y B, de a 10 cuentas.',
     '2. Para cada cuenta decidí el subrubro, si vende productos, por dónde vende, qué señales de dolor tiene, el nivel final y por qué, y escribí un mensaje corto y humano, sin promesas que no estén en la guía.',
     '3. Guardá el análisis con prospeccion_guardar_analisis.',
@@ -41,7 +41,7 @@ function instruccionParaClaude(loteId: string) {
 function instruccionDeBusqueda(zona: string, rubros: string, semilla: string[]) {
   const conSemilla = semilla.length > 0
   return [
-    'Buscame tiendas de Instagram para la Prospección de Órbita, con el conector «Órbita Prospección».',
+    'Buscame tiendas de Instagram para la Prospección de Órbita, con el conector de Órbita.',
     zona ? `Zona: ${zona}.` : 'Zona: la de las cuentas de partida.',
     rubros ? `Rubros: ${rubros}.` : 'Rubros: los que Órbita ya soporta (leélos con prospeccion_criterio).',
     '1. Leé el criterio con prospeccion_criterio: dice a qué tipo de negocio le sirve Órbita y cómo se puntúa.',
@@ -163,7 +163,7 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
           <details style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
             <summary style={{ cursor: 'pointer', color: 'var(--color-text)', fontWeight: 600 }}>Primera vez: conectar Claude</summary>
             <div style={{ marginTop: 8 }}>
-              En Claude: Configuración → Conectores → «Agregar conector personalizado», con esta dirección. Claude abre una pantalla del panel para que lo autorices con tu cuenta de la organización. Es una vez por persona.
+              En Claude: Configuración → Conectores → «Agregar conector personalizado» (podés llamarlo «Órbita»), con esta dirección. Claude abre una pantalla del panel para que lo autorices con tu cuenta de la organización. Es una vez por persona y un solo conector sirve para la prospección y para los videos.
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
                 <code style={{ padding: '7px 10px', borderRadius: 8, background: 'var(--color-surface-alt)', color: 'var(--color-text)', fontSize: 12.5, overflowWrap: 'anywhere' }}>{URL_CONECTOR}</code>
                 <button type="button" onClick={() => copiar(URL_CONECTOR, setAviso, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>

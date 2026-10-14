@@ -131,7 +131,7 @@ export class McpOauthService {
       authorization_servers: [this.base],
       bearer_methods_supported: ['header'],
       scopes_supported: [PERMISO_MCP],
-      resource_name: 'Órbita — Prospección',
+      resource_name: 'Órbita — Marketing',
     };
   }
 
@@ -217,7 +217,7 @@ export class McpOauthService {
     } catch {
       /* el host solo se muestra */
     }
-    return { cliente: s.nom, retorno: host, permiso: 'Prospección de Marketing: leer lotes de cuentas y guardar análisis', dominios: this.dominiosPermitidos };
+    return { cliente: s.nom, retorno: host, permiso: 'Marketing: leer lotes de cuentas y guardar análisis de prospección, y dejar videos en la cola de aprobación', dominios: this.dominiosPermitidos };
   }
 
   /** Un superadmin activo con correo de la organización. Si no, no hay acceso. */

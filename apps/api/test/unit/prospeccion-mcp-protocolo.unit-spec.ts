@@ -16,7 +16,12 @@ function armar() {
     obtenerLoteParaClaude: jest.fn().mockResolvedValue({ lote: 'l-1' }),
     guardarAnalisis: jest.fn().mockResolvedValue({ guardadas: 1 }),
   };
-  return { svc, mcp: new McpProspeccion(svc as never) };
+  const videos = {
+    listar: jest.fn().mockResolvedValue([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, createdAt: new Date('2026-10-14T00:00:00Z') }]),
+    pedirSubida: jest.fn().mockResolvedValue({ videoId: 'v-2', uploadUrl: 'https://r2.example/put', tipo: 'video/mp4', venceEnMin: 10 }),
+    registrar: jest.fn().mockResolvedValue({ id: 'v-2', estado: 'PENDIENTE' }),
+  };
+  return { svc, videos, mcp: new McpProspeccion(svc as never, videos as never) };
 }
 
 const rpc = (method: string, params?: unknown, id: number | null = 1) => ({ jsonrpc: '2.0', id, method, params });
@@ -48,10 +53,11 @@ describe('protocolo', () => {
 });
 
 describe('herramientas', () => {
-  it('son las 6 de la prospección y ninguna envía, contacta ni borra', () => {
+  it('son las 6 de la prospección y las 3 de los videos, y ninguna envía, contacta, publica ni borra', () => {
     expect(HERRAMIENTAS.map((h) => h.name)).toEqual([
       'prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos',
       'prospeccion_consultar_cuentas', 'prospeccion_obtener_lote', 'prospeccion_guardar_analisis',
+      'videos_listar', 'videos_pedir_subida', 'videos_registrar',
     ]);
     for (const h of HERRAMIENTAS) {
       expect(h.name).not.toMatch(/enviar|mandar|borrar|eliminar|contactar|publicar/);
@@ -62,12 +68,12 @@ describe('herramientas', () => {
 
   it('las de solo lectura lo declaran, así Claude no pide confirmación de más', () => {
     const lectura = HERRAMIENTAS.filter((h) => h.annotations.readOnlyHint === true).map((h) => h.name);
-    expect(lectura).toEqual(['prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos', 'prospeccion_obtener_lote']);
+    expect(lectura).toEqual(['prospeccion_criterio', 'prospeccion_listar_lotes', 'prospeccion_listar_prospectos', 'prospeccion_obtener_lote', 'videos_listar']);
   });
 
   it('tools/list las devuelve', async () => {
     const { mcp } = armar();
-    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(6);
+    expect(((await mcp.manejar(rpc('tools/list'), CTX)) as any).result.tools).toHaveLength(9);
   });
 
   it('consultar y guardar usan al superadmin que autorizó, no un dato que mande Claude', async () => {
@@ -76,6 +82,16 @@ describe('herramientas', () => {
     expect(svc.consultar).toHaveBeenCalledWith('admin-1', ['a', 'b']);
     await mcp.manejar(rpc('tools/call', { name: 'prospeccion_guardar_analisis', arguments: { lote: 'l-1', analisis: [{ usuario: 'a' }], adminId: 'otro' } }), CTX);
     expect(svc.guardarAnalisis).toHaveBeenCalledWith('admin-1', 'l-1', [{ usuario: 'a' }]);
+  });
+
+  it('los videos se piden y se registran como el superadmin que autorizó, y el listado no trae la dirección interna', async () => {
+    const { mcp, videos } = armar();
+    await mcp.manejar(rpc('tools/call', { name: 'videos_pedir_subida', arguments: { bytes: 1234, adminId: 'otro' } }), CTX);
+    expect(videos.pedirSubida).toHaveBeenCalledWith('admin-1', 1234);
+    await mcp.manejar(rpc('tools/call', { name: 'videos_registrar', arguments: { video: 'v-2', titulo: 'Mi reel', caption: 'hola', duracionSeg: 30, controles: [{ nombre: 'audio', ok: true }], adminId: 'otro' } }), CTX);
+    expect(videos.registrar).toHaveBeenCalledWith('admin-1', expect.objectContaining({ videoId: 'v-2', titulo: 'Mi reel', caption: 'hola', duracionSeg: 30, formato: undefined }));
+    const lista = JSON.parse(texto(await mcp.manejar(rpc('tools/call', { name: 'videos_listar', arguments: {} }), CTX)));
+    expect(lista).toEqual([{ id: 'v-1', titulo: 'Reel', formato: 'REEL_9_16', estado: 'PENDIENTE', duracionSeg: 30, creado: '2026-10-14T00:00:00.000Z' }]);
   });
 
   it('obtener lote pasa los filtros y listar prospectos resume lo que devuelve', async () => {

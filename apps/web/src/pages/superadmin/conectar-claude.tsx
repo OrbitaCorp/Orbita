@@ -82,7 +82,7 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
               <div style={{ color: 'var(--color-text)', fontWeight: 600, marginBottom: 6 }}>Qué podrá hacer</div>
               {datos.permiso}.
               <div style={{ marginTop: 10, color: 'var(--color-muted)' }}>
-                No puede enviar mensajes, contactar a nadie ni borrar datos: todo mensaje lo revisa y lo envía una persona.
+                No puede enviar mensajes, contactar a nadie, publicar ni borrar datos: todo mensaje y todo video lo revisa y lo aprueba una persona.
                 El acceso se puede cortar cuando quieras desde Marketing → Prospección → «Desconectar Claude».
               </div>
             </div>
