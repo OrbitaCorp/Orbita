@@ -137,10 +137,12 @@ Son palancas posibles, no promesas de resultados:
 
 ## Estado actual (2026-10-14)
 
-- ✅ Prospección y conector en producción (consulta de cuentas, criterio, análisis, panel).
-- ✅ Cola de videos en producción (registro, aprobar, rechazar, descargar, borradores en TikTok e Instagram).
-- ✅ Herramientas de la skill `videos-cola` (preparar, medir calidad, subir) con tests.
-- ⏳ **Falta probar de punta a punta con un Claude real:** agregar el conector, generar un video y verlo en la cola (todavía no se hizo).
+- ✅ Prospección y conector único en producción (consulta de cuentas, criterio, análisis, panel).
+- ✅ Cola de videos en producción: pestañas Marketing y Tutoriales, comentarios, «Mejorar con Claude», aprobación según quién subió el video, descarga y borradores en TikTok e Instagram.
+- ✅ Lista de 39 tutoriales (2 hechos, 37 por hacer) que el Claude de cada persona lee y actualiza por el conector.
+- ✅ Probado en producción: un Claude conectado subió y registró un video en la cola, y leyó la lista de tutoriales y el detalle del video.
+- ✅ Herramientas de la skill `videos-cola` (preparar, medir calidad, subir; también para tutoriales) con tests. La rama está subida al repo de videos; falta abrir el pull request.
+- ⏳ **Sin probar de punta a punta:** el correo al equipo con un video real, y un comentario y una mejora pedidos desde el panel con un Claude conectado.
 - ⏳ Verificar que el token de Meta de producción (usuario del sistema) acepta las consultas.
 - ⏳ Revisión de Meta (Instagram) y auditoría de TikTok: hasta entonces, los permisos de publicación son limitados.
 - ⏳ Elegir la voz y las pistas de música aprobadas para los reels automáticos.
