@@ -79,9 +79,24 @@ export class InstagramBandejaService {
   }
 
   /**
+   * La dirección del login de Instagram para conectar (o renovar) la cuenta de la empresa. El administrador de la
+   * plataforma no es miembro del negocio de la empresa, así que NO pasa por su panel: la autorización la dio el
+   * guard del super panel y al terminar el login se vuelve a Marketing. Queda anotado quién la pidió.
+   */
+  async conectar(adminId: string) {
+    if (!this.instagram) throw new ServiceUnavailableException('Instagram no está disponible');
+    const businessId = await this.negocioId();
+    await this.instagram.asegurarHabilitado(businessId);
+    await this.prisma.platformAdminLog
+      .create({ data: { adminId, action: 'instagram_connect', targetType: 'marketing_instagram', targetId: businessId } })
+      .catch(() => undefined); // es un registro: no puede impedir la conexión
+    return { url: this.instagram.urlDeAutorizacionEmpresa(businessId) };
+  }
+
+  /**
    * Desconecta la cuenta de Instagram de la empresa: se deja de recibir mensajes y se borra el token (lo mismo que
    * hace el dueño de un negocio desde su panel). Los mensajes que ya llegaron se conservan. Para volver a conectarla
-   * hay que iniciar sesión de nuevo desde la bandeja del negocio. Queda anotado quién lo hizo.
+   * se usa "Conectar la cuenta" de Marketing. Queda anotado quién lo hizo.
    */
   async desconectar(adminId: string) {
     if (!this.instagram) throw new ServiceUnavailableException('Instagram no está disponible');

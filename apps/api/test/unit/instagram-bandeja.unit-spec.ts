@@ -19,7 +19,11 @@ function armar(over: { negocio?: object | null; conversacion?: object | null; fi
     getMessages: jest.fn().mockResolvedValue([{ id: 'm-1', text: 'hola' }]),
     sendMessage: jest.fn().mockResolvedValue({ id: 'm-2', text: 'hola, gracias' }),
   };
-  const instagram = { desconectar: jest.fn().mockResolvedValue({ connected: false }) };
+  const instagram = {
+    desconectar: jest.fn().mockResolvedValue({ connected: false }),
+    asegurarHabilitado: jest.fn().mockResolvedValue(undefined),
+    urlDeAutorizacionEmpresa: jest.fn().mockReturnValue('https://www.instagram.com/oauth/authorize?state=x'),
+  };
   const config = { get: (k: string) => (k === 'MARKETING_NEGOCIO' ? undefined : undefined) };
   return { svc: new InstagramBandejaService(prisma as any, config as any, conversations as any, instagram as any), prisma, conversations, instagram };
 }
@@ -123,5 +127,38 @@ describe('mensajes y respuestas', () => {
     await expect(svc.responder('c-1', { text: 'hola, gracias', orderId: '3b8f6a58-1a2b-4c3d-8e9f-0a1b2c3d4e5f' })).resolves.toMatchObject({ id: 'm-2' });
     // Nunca se menciona un pedido desde acá: es la cuenta de la empresa, no la atención de un comercio.
     expect(conversations.sendMessage).toHaveBeenCalledWith('b-orbita', 'c-1', { text: 'hola, gracias' });
+  });
+});
+
+describe('conectar', () => {
+  it('devuelve la dirección del login de Instagram para el negocio de la empresa, sin pasar por su panel', async () => {
+    const { svc, instagram } = armar();
+    expect(await svc.conectar('admin-1')).toEqual({ url: 'https://www.instagram.com/oauth/authorize?state=x' });
+    expect(instagram.asegurarHabilitado).toHaveBeenCalledWith('b-orbita');
+    expect(instagram.urlDeAutorizacionEmpresa).toHaveBeenCalledWith('b-orbita');
+  });
+
+  it('queda anotado quién la pidió', async () => {
+    const { svc, prisma } = armar();
+    await svc.conectar('admin-1');
+    expect(prisma.platformAdminLog.create).toHaveBeenCalledWith({ data: { adminId: 'admin-1', action: 'instagram_connect', targetType: 'marketing_instagram', targetId: 'b-orbita' } });
+  });
+
+  it('si Instagram no está habilitado para el negocio de la empresa, no da ninguna dirección', async () => {
+    const { svc, instagram } = armar();
+    instagram.asegurarHabilitado.mockRejectedValue(new Error('no habilitado'));
+    await expect(svc.conectar('admin-1')).rejects.toThrow('no habilitado');
+    expect(instagram.urlDeAutorizacionEmpresa).not.toHaveBeenCalled();
+  });
+
+  it('sin el negocio de la empresa falla con NotFound', async () => {
+    const { svc } = armar({ negocio: null });
+    await expect(svc.conectar('admin-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('un fallo al anotar el registro no impide conectar', async () => {
+    const { svc, prisma } = armar();
+    prisma.platformAdminLog.create.mockRejectedValue(new Error('db'));
+    await expect(svc.conectar('admin-1')).resolves.toHaveProperty('url');
   });
 });

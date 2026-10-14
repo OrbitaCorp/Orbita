@@ -18,7 +18,13 @@ interface RequestWithAdmin {
 export class InstagramBandejaController {
   constructor(private readonly bandeja: InstagramBandejaService) {}
 
-  // Desconectar la cuenta de la empresa (se vuelve a conectar desde la bandeja del negocio).
+  // La dirección del login de Instagram: el super panel redirige ahí al superadmin, sin pasar por el panel del negocio.
+  @Post('connect')
+  conectar(@Req() req: RequestWithAdmin) {
+    return this.bandeja.conectar(req.user.adminId);
+  }
+
+  // Desconectar la cuenta de la empresa (se vuelve a conectar con `connect`).
   @Delete('connection')
   desconectar(@Req() req: RequestWithAdmin) {
     return this.bandeja.desconectar(req.user.adminId);

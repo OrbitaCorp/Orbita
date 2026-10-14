@@ -69,6 +69,10 @@ interface StatePayload {
   seccion?: PantallaDeRetorno;
   // 'kit' = además del permiso de mensajes, pide los del kit de difusión (publicar, comentarios y estadísticas).
   permisos?: 'kit';
+  // 'superadmin' = la conexión la inició un administrador de la plataforma desde Marketing (la cuenta de la
+  // empresa): al terminar se vuelve al super panel y no al panel de ningún negocio. Solo lo fija
+  // `urlDeAutorizacionEmpresa`; ningún cuerpo de petición llega a este campo.
+  destino?: 'superadmin';
   nonce: string;
   exp: number;
 }
@@ -320,13 +324,14 @@ export class InstagramService {
   // El callback es público (vuelve desde Instagram sin sesión), así que el
   // negocio que inició la conexión viaja en un `state` firmado con JWT_SECRET:
   // no se puede inventar. Mismo patrón que Mercado Pago.
-  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit'): string {
+  private firmarState(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit', destino?: 'superadmin'): string {
     const payload: StatePayload = {
       businessId,
       ...(memberId ? { memberId } : {}),
       ...(origen && this.esOrigenDePanel(origen) ? { origen } : {}),
       ...(seccion && PANTALLAS_DE_RETORNO.includes(seccion) ? { seccion } : {}),
       ...(permisos === 'kit' ? { permisos } : {}),
+      ...(destino === 'superadmin' ? { destino } : {}),
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,
     };
@@ -368,7 +373,9 @@ export class InstagramService {
    * Dirección del panel de Mensajes del negocio para volver tras el login de Instagram. En un host de la
    * tienda (negocio.orbita.site) las rutas del panel no llevan el subdominio; en el apex sí.
    */
-  urlDeRetorno(subdomain: string, origen?: string, seccion: PantallaDeRetorno = 'mensajes'): string {
+  urlDeRetorno(subdomain: string, origen?: string, seccion: PantallaDeRetorno = 'mensajes', destino?: 'superadmin'): string {
+    // La cuenta de la empresa se conecta desde Marketing, en el super panel (que vive en el apex): se vuelve ahí.
+    if (destino === 'superadmin') return `${this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001'}/superadmin?seccion=marketing`;
     const base = origen && this.esOrigenDePanel(origen) ? origen : (this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001');
     const enHostDeLaTienda = new URL(base).hostname.startsWith(`${subdomain}.`);
     const pantalla = PANTALLAS_DE_RETORNO.includes(seccion) ? seccion : 'mensajes';
@@ -384,21 +391,21 @@ export class InstagramService {
    */
   async retornoDelState(state: string | undefined): Promise<string | undefined> {
     try {
-      const { businessId, origen, seccion } = this.verificarState(state);
+      const { businessId, origen, seccion, destino } = this.verificarState(state);
       const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
-      return negocio ? this.urlDeRetorno(negocio.subdomain, origen, seccion) : undefined;
+      return negocio ? this.urlDeRetorno(negocio.subdomain, origen, seccion, destino) : undefined;
     } catch {
       return undefined;
     }
   }
 
-  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit'): string {
+  urlDeAutorizacion(businessId: string, memberId?: string, origen?: string, seccion?: PantallaDeRetorno, permisos?: 'kit', destino?: 'superadmin'): string {
     const params = new URLSearchParams({
       client_id: this.requerida('INSTAGRAM_APP_ID'),
       redirect_uri: this.redirectUri,
       response_type: 'code',
       scope: this.permisosPedidos(permisos, seccion),
-      state: this.firmarState(businessId, memberId, origen, seccion, permisos),
+      state: this.firmarState(businessId, memberId, origen, seccion, permisos, destino),
       // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
       // cuenta (Meta lo recomienda sobre todo en celulares).
       force_reauth: 'true',
@@ -406,9 +413,19 @@ export class InstagramService {
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
   }
 
+  /**
+   * La conexión de la cuenta de la EMPRESA, iniciada por un administrador de la plataforma desde Marketing. La
+   * cuenta queda guardada en el negocio de la empresa (los mensajes y los webhooks son por negocio), pero quien
+   * conecta no necesita ser miembro de ese negocio ni iniciar sesión en su panel: la autorización la da el guard
+   * del super panel y al terminar se vuelve a Marketing.
+   */
+  urlDeAutorizacionEmpresa(businessId: string, permisos?: 'kit'): string {
+    return this.urlDeAutorizacion(businessId, undefined, undefined, undefined, permisos, 'superadmin');
+  }
+
   /** Vuelta del login: cambia el code por el token, lo guarda cifrado y suscribe el webhook. */
   async manejarCallback(code: string, state: string | undefined): Promise<{ businessId: string; subdomain: string; suscripta: boolean; retorno: string }> {
-    const { businessId, origen, seccion, permisos } = this.verificarState(state);
+    const { businessId, origen, seccion, permisos, destino } = this.verificarState(state);
     await this.asegurarHabilitado(businessId);
 
     const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
@@ -489,7 +506,7 @@ export class InstagramService {
       suscripta = false;
       this.logger.warn(`No se pudo suscribir la cuenta de Instagram al webhook (negocio ${businessId}): ${describeError(e)}`);
     }
-    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen, seccion) };
+    return { businessId, subdomain: negocio.subdomain, suscripta, retorno: this.urlDeRetorno(negocio.subdomain, origen, seccion, destino) };
   }
 
   async estado(businessId: string) {

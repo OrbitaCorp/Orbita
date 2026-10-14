@@ -11,8 +11,8 @@ import {
 // Marketing: los canales de la empresa para llegar a más gente (TikTok, Instagram y WhatsApp).
 // Arriba, una tarjeta por canal con su estado; abajo, el detalle del canal elegido.
 //
-// TikTok es el único que se maneja desde acá: se conecta la cuenta de la empresa y se publican videos. Instagram y
-// WhatsApp se conectan por negocio desde su bandeja de mensajes: esta pantalla muestra su estado y qué falta.
+// TikTok e Instagram se manejan desde acá: se conecta la cuenta de la empresa (sin pasar por el panel de ningún negocio)
+// y se contestan o publican mensajes. WhatsApp se conecta por negocio desde su bandeja de mensajes: acá se ve su estado.
 //
 // Publicar en TikTok:
 // La pantalla de publicar sigue las reglas de TikTok para la Content Posting API (es lo que revisan
@@ -66,6 +66,15 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
     if (r) { setCanal('tiktok'); void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true }) }
   }, [router.query.tiktok]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Instagram vuelve igual: el login se inicia desde acá y termina en esta pantalla, sin pasar por el panel de ningún negocio.
+  useEffect(() => {
+    const r = router.query.ig
+    if (r === 'conectado') setAviso({ variant: 'success', title: 'Cuenta de Instagram conectada' })
+    else if (r === 'sin-suscripcion') setAviso({ variant: 'error', title: 'Instagram quedó conectada, pero sin recibir mensajes', description: 'No se pudo suscribir la cuenta a los mensajes. Probá "Renovar la conexión".' })
+    else if (r === 'error') setAviso({ variant: 'error', title: 'No se pudo conectar Instagram', description: 'Probá de nuevo. Mientras la app de Meta esté en modo de pruebas, la cuenta tiene que tener un rol en la app (por ejemplo, evaluador).' })
+    if (r) { setCanal('instagram'); setTickCanales((n) => n + 1); void router.replace('/superadmin?seccion=marketing', undefined, { shallow: true }) }
+  }, [router.query.ig]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Qué dice cada tarjeta de un vistazo. El estado siempre va en palabras: el color solo lo acompaña.
   const estadoTiktok: Estado = !tiktok ? { texto: cargandoTiktok ? 'Cargando…' : 'No disponible', tono: 'gray' }
     : !tiktok.configurado ? { texto: 'Sin configurar', tono: 'gray' }
@@ -104,7 +113,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       </div>
 
       {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
-      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} />}
+      {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} setAviso={setAviso} />}
       {canal === 'whatsapp' && <PanelWhatsapp />}
 
       {confirmar === 'tiktok' && (
@@ -124,7 +133,7 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       {confirmar === 'instagram' && (
         <ConfirmModal
           title="Desconectar la cuenta de Instagram"
-          body="Se deja de recibir mensajes de esta cuenta en Órbita y se borra el acceso guardado. Los mensajes que ya llegaron se conservan. Para volver a conectarla hay que iniciar sesión de nuevo desde la bandeja de mensajes del negocio."
+          body="Se deja de recibir mensajes de esta cuenta en Órbita y se borra el acceso guardado. Los mensajes que ya llegaron se conservan. Para volver a conectarla se usa «Conectar la cuenta» de esta pantalla."
           confirmLabel="Desconectar"
           onCancel={() => setConfirmar(null)}
           onConfirm={async () => {
@@ -219,7 +228,6 @@ function Fila({ titulo, detalle, estado, ultimo }: { titulo: string; detalle: st
   )
 }
 
-const enlaceBoton: React.CSSProperties = { ...btnGhostSm, textDecoration: 'none', height: 34 }
 
 // ─── TikTok ─────────────────────────────────────────────────────────────────────
 
@@ -280,11 +288,24 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar
 
 // ─── Instagram ──────────────────────────────────────────────────────────────────
 
-function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void; onDesconectar: () => void }) {
+function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void; onDesconectar: () => void; setAviso: (a: Aviso) => void }) {
+  const [conectando, setConectando] = useState(false)
   if (!canales) return <Card title="Instagram"><Loader /></Card>
   const { instagram: ig, negocio } = canales
-  // Reconectar la cuenta (si venció el acceso) se hace desde la bandeja del negocio al que está atada.
-  const bandeja = negocio ? `https://${negocio.subdominio}.orbita.site/admin/ventas/mensajes` : null
+
+  // Conectar o renovar es de la empresa: el login de Instagram se inicia desde acá y vuelve a esta pantalla. Antes se
+  // mandaba al panel del negocio al que está atada la cuenta, y el super admin no tiene sesión ahí (cada negocio
+  // tiene sus propias credenciales) — caía en el login.
+  const conectar = async () => {
+    setConectando(true)
+    try {
+      const { url } = await platformApi.igConectar()
+      window.location.href = url
+    } catch {
+      setAviso({ variant: 'error', title: 'No se pudo iniciar la conexión', description: 'Revisá que Instagram esté habilitado para el negocio de la empresa y que los secretos de la app de Meta estén cargados.' })
+      setConectando(false)
+    }
+  }
 
   return (
     <>
@@ -293,8 +314,10 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar }: { canale
         subtitle="La cuenta de la empresa conectada a Órbita"
         action={(
           <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {bandeja && (!ig.conectado || ig.diasRestantes < 10) && (
-              <a href={bandeja} target="_blank" rel="noreferrer" className="ds-hover" style={enlaceBoton}>{ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}</a>
+            {negocio && puedeVer && (!ig.conectado || ig.diasRestantes < 10) && (
+              <button type="button" onClick={conectar} disabled={conectando} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>
+                {conectando ? 'Abriendo Instagram…' : ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}
+              </button>
             )}
             {ig.conectado && puedeVer && <button type="button" onClick={onDesconectar} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Desconectar</button>}
           </span>
@@ -311,7 +334,7 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar }: { canale
             </Dato>
           </div>
         ) : (
-          <Empty text={negocio ? 'Todavía no hay una cuenta de Instagram conectada. Se conecta desde la bandeja de mensajes del negocio de la empresa.' : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
+          <Empty text={negocio ? 'Todavía no hay una cuenta de Instagram conectada. Se conecta con el botón de arriba, iniciando sesión con la cuenta de Instagram de la empresa.' : 'No se encontró el negocio al que van conectadas las cuentas de la empresa.'} />
         )}
       </Card>
 

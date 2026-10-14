@@ -419,6 +419,22 @@ describe('InstagramService (unit)', () => {
       expect(await retornoPara('http://localhost:3001', { NODE_ENV: 'production', FRONTEND_URL: 'https://orbita.site' })).toBe('https://orbita.site/admin/mitienda/ventas/mensajes');
     });
 
+    // La cuenta de la empresa la conecta un administrador de la plataforma desde Marketing: no es miembro del negocio
+    // ni tiene sesión en su panel, así que al terminar se vuelve al super panel (en el apex), no al panel del negocio.
+    it('la conexión de la empresa vuelve al super panel, en Marketing, y no al panel del negocio', async () => {
+      const { svc } = build({}, { FRONTEND_URL: 'https://orbita.site', NODE_ENV: 'production' });
+      const state = new URL(svc.urlDeAutorizacionEmpresa(BIZ)).searchParams.get('state') ?? undefined;
+      expect(await svc.retornoDelState(state)).toBe('https://orbita.site/superadmin?seccion=marketing');
+    });
+
+    it('el destino "superadmin" solo lo fija la conexión de la empresa: la del panel de un negocio sigue volviendo a su panel', async () => {
+      const { svc } = build({}, {});
+      const normal = new URL(svc.urlDeAutorizacion(BIZ, 'm-1', 'http://mitienda.orbita.local:3001')).searchParams.get('state') ?? '';
+      expect(JSON.parse(Buffer.from(normal.split('.')[0], 'base64url').toString()).destino).toBeUndefined();
+      const empresa = new URL(svc.urlDeAutorizacionEmpresa(BIZ)).searchParams.get('state') ?? '';
+      expect(JSON.parse(Buffer.from(empresa.split('.')[0], 'base64url').toString())).toMatchObject({ businessId: BIZ, destino: 'superadmin' });
+    });
+
     it('vuelve a la pantalla desde la que se pidió la conexión (Mensajes por defecto, o Difusión)', async () => {
       const volver = async (seccion?: 'mensajes' | 'difusion' | 'publicaciones') => {
         const { svc } = build({}, {});

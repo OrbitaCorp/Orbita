@@ -5,9 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 // Los canales de la EMPRESA (Instagram y WhatsApp) para la pantalla Marketing del super panel.
 //
 // Órbita no tiene un negocio propio: sus cuentas están conectadas al negocio de prueba del equipo
-// (hoy `negocio`), porque Instagram y WhatsApp se conectan por negocio, desde su bandeja de mensajes.
-// Este servicio solo LEE ese estado para mostrarlo en un solo lugar; conectar o desconectar sigue
-// siendo desde esa bandeja. Cuál es el negocio se puede cambiar con MARKETING_NEGOCIO (subdominio).
+// (hoy `negocio`), porque Instagram y WhatsApp se guardan por negocio (mensajes y webhooks son por negocio). Instagram se conecta y desconecta desde el super panel; WhatsApp todavía desde la bandeja de mensajes.
+// Este servicio solo LEE ese estado para mostrarlo en un solo lugar (conectar Instagram: instagram-bandeja.service).
+// Cuál es el negocio se puede cambiar con MARKETING_NEGOCIO (subdominio).
 // TikTok no pasa por acá: es una conexión de la empresa, no de un negocio (ver marketing/tiktok/).
 
 const NEGOCIO_POR_DEFECTO = 'negocio';
