@@ -2466,6 +2466,9 @@ model PlatformAdmin {
   // Cargo con el que firma las respuestas de Soporte ("CEO", "CTO"...). Es
   // texto libre y opcional: sin cargo, el negocio ve "Soporte de Órbita".
   jobTitle              String?           @map("job_title")
+  // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal que genera el superadmin y,
+  // además del correo de la cuenta, el código del segundo factor. Opcional.
+  personalEmail         String?           @map("personal_email")
   isActive              Boolean           @default(true) @map("is_active")
   // Credenciales propias (auth password + Google). A diferencia de member/customer,
   // el email es ÚNICO GLOBAL: un super admin no está scopeado a ningún negocio.

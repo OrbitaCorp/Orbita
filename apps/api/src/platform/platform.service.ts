@@ -4,15 +4,21 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
+import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
+import { tempPasswordHoras, vencimientoContrasenaTemporal } from '../common/utils/contrasena-temporal';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
@@ -21,6 +27,9 @@ import { SubscriptionsService, type PlanKey } from '../subscriptions/subscriptio
 import { PlatformAdminLogService } from './platform-admin-log.service';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Mismo alfabeto que las temporales de Equipo: sin 0/O, 1/l/I, que se confunden al copiarlas de un mail.
+const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 
 // Servicio del super panel (plataforma). Todo cross-tenant: NO filtra por
 // businessId — es la vista de Órbita sobre TODOS los negocios. Protegido por
@@ -814,7 +823,9 @@ export class PlatformService {
       email: a.email,
       role: a.role,
       jobTitle: a.jobTitle,
+      personalEmail: a.personalEmail,
       isActive: a.isActive,
+      hasTempPassword: a.hasTempPassword,
       hasPassword: !!a.passwordHash,
       hasGoogle: !!a.googleId,
       lastAccessAt: a.lastAccessAt,
@@ -829,12 +840,103 @@ export class PlatformService {
     // Sin password: el nuevo admin entra con Google (se vincula en el 1er login)
     // o vía reset de contraseña cuando ese flujo exista (ver PENDIENTES).
     const admin = await this.prisma.platformAdmin.create({
-      data: { name: dto.name, email: dto.email, role: dto.role, jobTitle: cargoDe(dto), isActive: true },
+      data: { name: dto.name, email: dto.email, role: dto.role, jobTitle: cargoDe(dto), personalEmail: correoPersonalDe(dto), isActive: true },
     });
     await this.prisma.platformAdminLog.create({
       data: { adminId: actingAdminId, action: 'create_admin', targetType: 'platform_admin', targetId: admin.id, details: { email: dto.email, role: dto.role } },
     });
     return { id: admin.id, name: admin.name, email: admin.email, role: admin.role, jobTitle: admin.jobTitle, isActive: admin.isActive };
+  }
+
+  // Restablecer la contraseña de otro admin de plataforma: se genera una temporal, se guarda cifrada (argon2id)
+  // con vencimiento, se cierran sus sesiones y se manda por mail a su correo personal junto con el correo de la
+  // cuenta. NO vuelve en la respuesta: la ve solo quien recibe el mail. Al entrar con ella el panel le obliga a
+  // elegir una propia (hasTempPassword). Solo SUPERADMIN (lo exige el controller); la propia se cambia desde
+  // "Cambiar mi contraseña" y no por acá, porque cerraría la sesión desde la que se está operando.
+  async resetAdminPassword(actingAdminId: string, id: string, dto: ResetAdminPasswordDto) {
+    if (actingAdminId === id) {
+      throw new ForbiddenException('Tu propia contraseña la cambiás desde tu sesión, no desde acá.');
+    }
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Admin no encontrado');
+    if (!admin.isActive) throw new BadRequestException('Esa cuenta está desactivada: no se le puede restablecer la contraseña.');
+
+    const destino = correoPersonalDe(dto) ?? admin.personalEmail;
+    if (!destino) throw new BadRequestException('Cargá el correo personal de esta persona para poder mandarle la contraseña.');
+
+    const tempPassword = this.genTempPassword();
+    const passwordHash = await argon2.hash(tempPassword, { type: argon2.argon2id });
+    await this.prisma.platformAdmin.update({
+      where: { id },
+      data: {
+        passwordHash,
+        hasTempPassword: true,
+        tempPasswordExpiresAt: vencimientoContrasenaTemporal(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        personalEmail: destino,
+      },
+    });
+    // La contraseña vieja ya no vale: las sesiones abiertas con ella tampoco.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: id, userType: 'PLATFORM_ADMIN', revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    const frontend = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    const enviado = await this.mail.sendPlatformAdminTempPassword(destino, {
+      name: admin.name,
+      email: admin.email,
+      tempPassword,
+      tempPasswordHoras: tempPasswordHoras(),
+      loginUrl: `${frontend}/login`,
+    });
+    if (!enviado) {
+      // La contraseña ya cambió pero nadie la recibió: se avisa para repetir el restablecimiento (la nueva reemplaza a esta).
+      throw new ServiceUnavailableException('No se pudo enviar el mail con la contraseña. Probá restablecerla de nuevo en un rato.');
+    }
+
+    await this.prisma.platformAdminLog.create({
+      data: { adminId: actingAdminId, action: 'reset_admin_password', targetType: 'platform_admin', targetId: id, details: { enviadoA: enmascararCorreo(destino) } },
+    });
+    return { ok: true, enviadoA: enmascararCorreo(destino) };
+  }
+
+  // Un admin cambia su propia contraseña (típicamente la temporal con la que entró). Pide la actual como
+  // verificación. No cierra otras sesiones: el restablecimiento ya las cerró y el panel no puede decir cuál es la actual.
+  async changeOwnPassword(adminId: string, dto: ChangeOwnPasswordDto) {
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { id: adminId } });
+    if (!admin) throw new NotFoundException('Admin no encontrado');
+    if (!admin.passwordHash) {
+      throw new BadRequestException('Tu cuenta entra con Google y todavía no tiene una contraseña propia.');
+    }
+    if (!(await argon2.verify(admin.passwordHash, dto.currentPassword))) {
+      throw new BadRequestException('La contraseña actual no es correcta.');
+    }
+    const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
+    await this.prisma.platformAdmin.update({
+      where: { id: adminId },
+      data: { passwordHash, hasTempPassword: false, tempPasswordExpiresAt: null, failedLoginAttempts: 0, lockedUntil: null },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: { adminId, action: 'change_own_password', targetType: 'platform_admin', targetId: adminId },
+    });
+    // Aviso de seguridad, best-effort: la contraseña ya se cambió y el flujo no se rompe si el mail falla.
+    for (const to of new Set([admin.email, admin.personalEmail].filter((c): c is string => !!c))) {
+      try {
+        await this.mail.sendPasswordChanged(to, { storeName: 'Órbita' });
+      } catch (e) {
+        this.logger.warn(`No se pudo avisar el cambio de contraseña del admin ${adminId}: ${e}`);
+      }
+    }
+    return { message: 'Contraseña actualizada' };
+  }
+
+  private genTempPassword(): string {
+    const bytes = randomBytes(12);
+    let out = '';
+    for (let i = 0; i < 12; i++) out += TEMP_PASSWORD_CHARS[bytes[i] % TEMP_PASSWORD_CHARS.length];
+    return out;
   }
 
   async updateAdmin(actingAdminId: string, id: string, dto: UpsertPlatformAdminDto) {
@@ -843,7 +945,8 @@ export class PlatformService {
 
     const updated = await this.prisma.platformAdmin.update({
       where: { id },
-      data: { name: dto.name, role: dto.role, jobTitle: cargoDe(dto) },
+      // personalEmail ausente = no se toca; vacío = se borra.
+      data: { name: dto.name, role: dto.role, jobTitle: cargoDe(dto), ...(dto.personalEmail !== undefined ? { personalEmail: correoPersonalDe(dto) } : {}) },
     });
     await this.prisma.platformAdminLog.create({
       data: { adminId: actingAdminId, action: 'update_admin', targetType: 'platform_admin', targetId: id, details: { role: dto.role } },
@@ -1421,4 +1524,16 @@ export class PlatformService {
 function cargoDe(dto: UpsertPlatformAdminDto): string | null {
   const c = dto.jobTitle?.trim();
   return c ? c : null;
+}
+
+// El correo personal se guarda recortado y en minúsculas; vacío o ausente = null.
+function correoPersonalDe(dto: { personalEmail?: string }): string | null {
+  const c = dto.personalEmail?.trim().toLowerCase();
+  return c ? c : null;
+}
+
+// "mililucchi2017@gmail.com" → "mi***@gmail.com": el log y la respuesta no repiten el correo entero.
+function enmascararCorreo(correo: string): string {
+  const [local, dominio] = correo.split('@');
+  return `${local.slice(0, 2)}***@${dominio}`;
 }

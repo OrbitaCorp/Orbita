@@ -39,7 +39,7 @@ import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, Range
 const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
 
 export function SuperAdminDashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, marcarContrasenaPropia } = useAuth()
   const router = useRouter()
   // La sección vive en la URL (?seccion=negocios), no en un useState: así cada
   // sección queda enlazable, el botón "atrás" del navegador funciona, y el
@@ -89,6 +89,11 @@ export function SuperAdminDashboard() {
   if (!user || user.type !== 'platform_admin') return null
 
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
+
+  // Entró con la contraseña temporal que le generó un superadmin: no puede usar el panel hasta elegir una propia.
+  if (user.admin.hasTempPassword) {
+    return <ElegirContrasena email={user.admin.email} onListo={marcarContrasenaPropia} onSalir={cerrarSesion} />
+  }
 
   return (
     <SuperAdminShell
@@ -493,6 +498,8 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [editando, setEditando] = useState<AdminRow | 'nuevo' | null>(null)
   const [desactivando, setDesactivando] = useState<AdminRow | null>(null)
+  const [restableciendo, setRestableciendo] = useState<AdminRow | null>(null)
+  const [aviso, setAviso] = useState('')
   const { data, error } = useFetch(() => platformApi.admins(), [reloadKey])
   const recargar = () => setReloadKey((k) => k + 1)
 
@@ -510,6 +517,11 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
           </button>
         }
       />
+      {aviso && (
+        <div role="status" style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-success-bg)', color: 'var(--chip-success-fg)', fontSize: 13.5, fontWeight: 600 }}>
+          {aviso}
+        </div>
+      )}
       <Card noPad>
         <Table
           head={['Nombre', 'Cargo', 'Email', 'Rol', 'Cómo entra', 'Último acceso', 'Estado', 'Acciones']}
@@ -524,15 +536,21 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
               a.jobTitle
                 ? <span key="c" style={{ color: 'var(--color-body)' }}>{a.jobTitle}</span>
                 : <span key="c" style={{ color: 'var(--color-subtle)' }}>Sin cargo</span>,
-              <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
+              <span key="e" style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ color: 'var(--color-body)' }}>{a.email}</span>
+                {a.personalEmail && <span style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Personal: {a.personalEmail}</span>}
+              </span>,
               <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
               <span key="acc" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                {[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || 'Todavía no configuró'}
+                {[a.hasPassword && (a.hasTempPassword ? 'Contraseña temporal' : 'Contraseña'), a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || 'Todavía no configuró'}
               </span>,
               a.lastAccessAt ? date(a.lastAccessAt) : <span key="la" style={{ color: 'var(--color-subtle)' }}>Nunca entró</span>,
               <Chip key="st" text={a.isActive ? 'Activo' : 'Inactivo'} tone={a.isActive ? 'green' : 'gray'} dot />,
               <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button onClick={() => setEditando(a)} className="ds-hover" style={btnGhostSm}>Editar</button>
+                {a.isActive && a.id !== currentAdminId && (
+                  <button onClick={() => { setAviso(''); setRestableciendo(a) }} className="ds-hover" style={btnGhostSm}>Restablecer contraseña</button>
+                )}
                 {a.isActive && a.id !== currentAdminId && (
                   <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>Desactivar</button>
                 )}
@@ -547,6 +565,17 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
           admin={editando === 'nuevo' ? null : editando}
           onClose={() => setEditando(null)}
           onSaved={() => { setEditando(null); recargar() }}
+        />
+      )}
+      {restableciendo && (
+        <RestablecerContrasenaModal
+          admin={restableciendo}
+          onClose={() => setRestableciendo(null)}
+          onEnviado={(enviadoA) => {
+            setAviso(`Le mandamos a ${restableciendo.name} el correo de la cuenta y una contraseña temporal a ${enviadoA}.`)
+            setRestableciendo(null)
+            recargar()
+          }}
         />
       )}
       {desactivando && (
@@ -571,6 +600,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
   const [email, setEmail] = useState(admin?.email ?? '')
   const [role, setRole] = useState<PlatformAdminRole>(admin?.role ?? 'OPERATOR')
   const [jobTitle, setJobTitle] = useState(admin?.jobTitle ?? '')
+  const [personalEmail, setPersonalEmail] = useState(admin?.personalEmail ?? '')
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
@@ -583,7 +613,7 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
     }
     setGuardando(true)
     try {
-      const input = { name: name.trim(), email: email.trim(), role, jobTitle: jobTitle.trim() }
+      const input = { name: name.trim(), email: email.trim(), role, jobTitle: jobTitle.trim(), personalEmail: personalEmail.trim() }
       if (admin) await platformApi.updateAdmin(admin.id, input)
       else await platformApi.createAdmin(input)
       onSaved()
@@ -610,6 +640,9 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
           {/* El backend no soporta cambiar el email de un admin existente. */}
           <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!admin} className="ds-field" style={{ ...inputStyle, opacity: admin ? 0.6 : 1 }} />
         </Field>
+        <Field label="Correo personal (opcional)" hint="A este correo (Gmail, etc.) viaja la contraseña temporal cuando la restablecés, y también el código de acceso al panel, además del correo de la cuenta.">
+          <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} placeholder="nombre@gmail.com" autoComplete="off" className="ds-field" style={inputStyle} />
+        </Field>
         <Field label="Rol">
           <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
@@ -618,12 +651,104 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
         </Field>
         {!admin && (
           <p style={{ margin: 0, fontSize: 12, color: 'var(--color-muted)' }}>
-            Sin contraseña inicial: entra vinculando su cuenta de Google en el primer login, o pedís que resetee la contraseña.
+            Sin contraseña inicial: entra vinculando su cuenta de Google en el primer login, o la creás después con "Restablecer contraseña" (le llega por mail).
           </p>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
           <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
           <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+// Restablecer la contraseña de otro admin: se genera una temporal y se le manda por mail a su correo personal, junto con
+// el correo de la cuenta. La contraseña no se muestra acá: la ve solo quien recibe el mail.
+function RestablecerContrasenaModal({ admin, onClose, onEnviado }: { admin: AdminRow; onClose: () => void; onEnviado: (enviadoA: string) => void }) {
+  const [personalEmail, setPersonalEmail] = useState(admin.personalEmail ?? '')
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!personalEmail.trim()) {
+      setError('Escribí el correo personal de esta persona.')
+      return
+    }
+    setEnviando(true)
+    try {
+      const res = await platformApi.resetAdminPassword(admin.id, personalEmail.trim())
+      onEnviado(res.enviadoA)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo restablecer la contraseña.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose} title={`Restablecer la contraseña de ${admin.name}`}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {error && <ErrorBox msg={error} />}
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55 }}>
+          Le generamos una contraseña temporal y se la mandamos por mail junto con su correo de la cuenta (<strong>{admin.email}</strong>). Al entrar, el panel le pide elegir una propia. La temporal vence a las 72 horas y cierra sus sesiones abiertas.
+        </p>
+        <Field label="Correo personal al que se envía" hint="Se guarda en su cuenta: también recibe ahí el código de acceso al panel.">
+          <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} placeholder="nombre@gmail.com" autoComplete="off" autoFocus className="ds-field" style={inputStyle} />
+        </Field>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
+          <button type="submit" disabled={enviando} className="ds-hover" style={btnPrimary}>{enviando ? 'Enviando…' : 'Enviar contraseña'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+// Pantalla que reemplaza al panel mientras el admin tiene una contraseña temporal: "Contraseña actual" es la temporal.
+function ElegirContrasena({ email, onListo, onSalir }: { email: string; onListo: () => void; onSalir: () => void }) {
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (nueva.length < 8) { setError('La contraseña nueva tiene que tener al menos 8 caracteres.'); return }
+    if (nueva !== confirmar) { setError('Las contraseñas nuevas no coinciden.'); return }
+    if (nueva === actual) { setError('Elegí una contraseña distinta de la temporal.'); return }
+    setGuardando(true)
+    try {
+      await platformApi.changeOwnPassword(actual, nueva)
+      onListo()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar la contraseña. Intentá de nuevo.')
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <ModalShell title="Elegí tu contraseña" onClose={onSalir} cerrarAlClickAfuera={false}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <p style={{ margin: 0, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.55 }}>
+          Entraste con una contraseña temporal ({email}). Elegí una propia para seguir usando el panel: en &quot;Contraseña actual&quot; va la temporal que te mandamos por mail.
+        </p>
+        {error && <ErrorBox msg={error} />}
+        <Field label="Contraseña actual (la temporal)">
+          <input type="password" value={actual} onChange={(e) => setActual(e.target.value)} autoComplete="current-password" autoFocus className="ds-field" style={inputStyle} />
+        </Field>
+        <Field label="Contraseña nueva">
+          <input type="password" value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Mínimo 8 caracteres" autoComplete="new-password" className="ds-field" style={inputStyle} />
+        </Field>
+        <Field label="Repetí la contraseña nueva">
+          <input type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} autoComplete="new-password" className="ds-field" style={inputStyle} />
+        </Field>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button type="button" onClick={onSalir} className="ds-hover" style={btnGhost}>Cerrar sesión</button>
+          <button type="submit" disabled={guardando || !actual || !nueva || !confirmar} className="ds-hover" style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar contraseña'}</button>
         </div>
       </form>
     </ModalShell>

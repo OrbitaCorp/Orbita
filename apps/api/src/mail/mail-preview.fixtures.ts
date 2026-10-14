@@ -315,6 +315,15 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { code: '773102', expiresIn: '10 minutos' },
   },
   {
+    id: 'platform-admin-temp-password',
+    label: 'Contraseña temporal (admin de plataforma)',
+    group: 'Plataforma',
+    template: 'platform-admin-temp-password',
+    isPlatform: true,
+    subject: 'Tu acceso al panel de plataforma de Órbita',
+    data: { name: 'Milagros', email: 'milagros@orbita.site', tempPassword: 'Km7xQp3Wd9Zt', tempPasswordHoras: 72, loginUrl: 'https://orbita.site/login' },
+  },
+  {
     id: 'orbi-mantenimiento',
     label: 'Orbi en mantenimiento (aviso a admins)',
     group: 'Plataforma',

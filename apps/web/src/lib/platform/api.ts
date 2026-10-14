@@ -620,8 +620,12 @@ export interface AdminRow {
   email: string
   role: PlatformAdminRole
   jobTitle: string | null
+  // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal y, además del de la cuenta, el código de acceso.
+  personalEmail: string | null
   isActive: boolean
   hasPassword: boolean
+  // Tiene una contraseña temporal sin cambiar (todavía no eligió una propia).
+  hasTempPassword: boolean
   hasGoogle: boolean
   lastAccessAt: string | null
   createdAt: string
@@ -632,6 +636,8 @@ export interface UpsertAdminInput {
   email: string
   role: PlatformAdminRole
   jobTitle?: string
+  // Ausente = no se toca; vacío = se borra.
+  personalEmail?: string
 }
 
 export interface LogRow {
@@ -1209,6 +1215,12 @@ export const platformApi = {
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
   updateAdmin: (id: string, input: UpsertAdminInput) => sendJSON<{ id: string }>(`/platform/admins/${id}`, 'PUT', input),
   removeAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}`, 'DELETE'),
+  // Genera una contraseña temporal y se la manda por mail al correo personal (no vuelve en la respuesta).
+  resetAdminPassword: (id: string, personalEmail?: string) =>
+    sendJSON<{ ok: true; enviadoA: string }>(`/platform/admins/${id}/reset-password`, 'POST', personalEmail ? { personalEmail } : {}),
+  // El admin logueado cambia su propia contraseña (la temporal con la que entró, por una propia).
+  changeOwnPassword: (currentPassword: string, newPassword: string) =>
+    sendJSON<{ message: string }>('/platform/me/change-password', 'POST', { currentPassword, newPassword }),
 
   logs: (params: { adminId?: string; action?: string; businessId?: string; page?: number; limit?: number } = {}) => {
     const qs = new URLSearchParams()
