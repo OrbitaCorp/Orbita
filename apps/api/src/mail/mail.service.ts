@@ -217,6 +217,8 @@ export class MailService {
     // Dominio comprado por vencer: lo avisa Órbita, que es quien lo gestiona.
     'domain-expiring-soon',
     'platform-admin-login-code',
+    // Contraseña temporal de un admin de plataforma (la genera el superadmin desde Admins).
+    'platform-admin-temp-password',
     // Aviso a los admins de plataforma: Orbi pasó a mantenimiento.
     'orbi-mantenimiento',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
@@ -1415,6 +1417,15 @@ export class MailService {
 
   async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
     await this.sendOrLog(to, 'Tu código de acceso a Órbita', 'platform-admin-login-code', data);
+  }
+
+  // Contraseña temporal de un admin de plataforma: viaja a su correo personal junto con el correo de la
+  // cuenta (con el que inicia sesión). Vence a las `tempPasswordHoras` y al entrar el panel le pide elegir una propia.
+  async sendPlatformAdminTempPassword(
+    to: string,
+    data: { name: string; email: string; tempPassword: string; tempPasswordHoras: number; loginUrl: string },
+  ): Promise<boolean> {
+    return this.sendOrLog(to, 'Tu acceso al panel de plataforma de Órbita', 'platform-admin-temp-password', data);
   }
 
   // ── Testeo (panel de plataforma → Testeo, RBT-607) ────────────────────

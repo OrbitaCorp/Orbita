@@ -710,7 +710,7 @@ export class OrdersService {
         },
       },
       include: {
-        product: { select: { name: true } },
+        product: { select: { name: true, byOrder: true } },
         optionValues: { include: { optionValue: true } },
       },
     });
@@ -720,6 +720,16 @@ export class OrdersService {
         throw new NotFoundException('Alguno de los productos elegidos no existe en tu negocio.');
       }
     }
+
+    // Un producto "por pedido" no se vende por el checkout de la tienda: solo se consulta por WhatsApp. Un pedido que arma
+    // el dueño a mano sí puede llevarlo (lo carga él, sabe lo que hace), pero sin controlar ni descontar stock.
+    const porPedido = variants.filter((v) => v.product.byOrder);
+    if (opts?.publicCheckout && porPedido.length > 0) {
+      throw new UnprocessableEntityException(
+        `"${porPedido[0].product.name}" se hace por pedido: no se compra desde la tienda, consultalo por WhatsApp.`,
+      );
+    }
+    const idsPorPedido = new Set(porPedido.map((v) => v.id));
 
     // Validación de stock (tarjeta "Crear pedido manual"): si el producto tiene
     // stock cargado en la sucursal, no se puede pedir más de lo que hay. Si NO
@@ -739,6 +749,7 @@ export class OrdersService {
     }
     const faltantes: string[] = [];
     for (const [variantId, cantidad] of pedidoPorVariante) {
+      if (idsPorPedido.has(variantId)) continue; // no lleva stock
       const disponible = stockDe.get(variantId);
       if (disponible !== undefined && disponible < cantidad) {
         const v = porId.get(variantId)!;
@@ -1383,7 +1394,14 @@ export class OrdersService {
     // de "pendiente" a cualquier estado comprometido. Pendiente → enviado (o
     // → entregado) descuenta acá igual que pendiente → confirmado; un salto
     // que arranca DESPUÉS de pendiente ya lo descontó en su momento.
-    const renglonesConStock = order.items.filter((it) => !it.isConcept);
+    // Los productos "por pedido" no llevan stock: ni se descuenta al confirmar ni se repone al cancelar.
+    const idsPorPedido = new Set(
+      (await this.prisma.productVariant.findMany({
+        where: { id: { in: order.items.map((it) => it.variantId) }, product: { byOrder: true } },
+        select: { id: true },
+      })).map((v) => v.id),
+    );
+    const renglonesConStock = order.items.filter((it) => !it.isConcept && !idsPorPedido.has(it.variantId));
     const descuentaStock = order.status === 'PENDING' && nuevo !== 'CANCELLED';
 
     await this.prisma.$transaction(async (tx) => {

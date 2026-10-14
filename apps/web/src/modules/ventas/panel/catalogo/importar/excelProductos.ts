@@ -27,7 +27,7 @@ export const COLUMNAS = [
     { clave: 'categoria', titulo: 'Categoría', ancho: 22, obligatoria: true, ayuda: 'Elegila de la lista o escribí una nueva: si no existe, se crea sola.' },
     { clave: 'precio', titulo: 'Precio', ancho: 14, obligatoria: true, ayuda: 'Precio de venta, sin signo $. Ej: 15000. Si tiene variantes, todas arrancan con este precio.' },
     { clave: 'costo', titulo: 'Costo', ancho: 12, obligatoria: false, ayuda: 'Opcional. Lo que te cuesta a vos; solo vos lo ves.' },
-    { clave: 'stock', titulo: 'Stock', ancho: 10, obligatoria: false, ayuda: 'Unidades disponibles. Si tiene variantes, es el stock de CADA variante. Vacío = 0.' },
+    { clave: 'stock', titulo: 'Stock', ancho: 10, obligatoria: false, ayuda: 'Unidades disponibles. Si tiene variantes, es el stock de CADA variante. Vacío = 0 (en una vidriera, vacío = no se muestra stock).' },
     { clave: 'descripcion', titulo: 'Descripción', ancho: 44, obligatoria: false, ayuda: 'Opcional. Lo que se lee en la ficha del producto.' },
     { clave: 'variante1', titulo: 'Variante 1', ancho: 16, obligatoria: false, ayuda: 'Opcional. Qué se puede elegir del producto. Ej: Color' },
     { clave: 'valores1', titulo: 'Valores 1', ancho: 26, obligatoria: false, ayuda: 'Los valores de esa variante, separados por coma. Ej: Rojo, Azul, Negro' },
@@ -128,6 +128,8 @@ export interface ProductoImportable {
     /** "Color: Rojo, Azul · Talle: S, M" — para mostrar en la revisión. */
     resumenVariantes: string
     stockTotal: number
+    /** Vidriera con la celda de stock vacía: no se carga stock y la tienda no lo muestra (la revisión escribe "—"). */
+    sinStock?: boolean
     precio: number
     publicado: boolean
     /** Todo menos categoryId, que se resuelve recién al importar (puede haber que crearla). */
@@ -149,8 +151,13 @@ const ES_VISUAL = /^(color|colores|diseno|disenos|modelo|estampa|estampado|motiv
 
 const ESTADOS: Record<string, boolean> = { publicado: true, publicada: true, activo: true, si: true, borrador: false, oculto: false, no: false, '': false }
 
-/** Valida las filas ya leídas del Excel y arma un producto por fila. Pura: no toca el archivo ni la API. */
-export function armarProductos(filas: FilaCruda[]): Lectura {
+/**
+ * Valida las filas ya leídas del Excel y arma un producto por fila. Pura: no toca el archivo ni la API.
+ * `vidriera` (modo SHOWCASE): el stock es opcional — una celda vacía deja el stock sin cargar (la tienda no lo muestra) y no
+ * impide publicar. En una tienda con checkout, vacío = 0 y para publicar hace falta stock, como siempre.
+ */
+export function armarProductos(filas: FilaCruda[], opciones: { vidriera?: boolean } = {}): Lectura {
+    const vidriera = opciones.vidriera === true
     const errores: ErrorFila[] = []
     const productos: ProductoImportable[] = []
     const categorias = new Map<string, string>()
@@ -185,6 +192,7 @@ export function armarProductos(filas: FilaCruda[]): Lectura {
         if (stock != null && (Number.isNaN(stock) || stock < 0 || !Number.isInteger(stock))) error('Stock', 'El stock tiene que ser un número entero, sin decimales ni negativos.')
         else if (stock != null && stock > MAX_STOCK) error('Stock', 'El stock es demasiado alto.')
         const stockOk = stock != null && !Number.isNaN(stock) ? stock : 0
+        const sinStock = vidriera && stock == null
 
         const descripcion = texto(f.descripcion)
         if (descripcion.length > MAX_DESCRIPCION) error('Descripción', `La descripción no puede tener más de ${MAX_DESCRIPCION} caracteres.`)
@@ -221,7 +229,7 @@ export function armarProductos(filas: FilaCruda[]): Lectura {
 
         const stockTotal = stockOk * combinaciones.length
         // Misma regla del alta manual: "Para publicar necesitás stock".
-        if (publicado && stockTotal <= 0) error('Estado', 'Para publicarlo tiene que tener stock. Cargale stock o dejalo como Borrador.')
+        if (publicado && !vidriera && stockTotal <= 0) error('Estado', 'Para publicarlo tiene que tener stock. Cargale stock o dejalo como Borrador.')
 
         if (errores.length > antes) continue // con errores no se arma: se corrige el archivo y se vuelve a subir
 
@@ -230,7 +238,11 @@ export function armarProductos(filas: FilaCruda[]): Lectura {
         const skuBase = skuLibre(skuDeNombre(nombre), skusUsados)
         const variants: UpsertProductInput['variants'] = combinaciones.map(optionValues => {
             const sufijo = optionValues.map(skuDeValor).filter(Boolean).join('-')
-            return { sku: sufijo ? skuLibre(`${skuBase}-${sufijo}`, skusUsados) : skuBase, price: precio!, optionValues, initialStock: stockOk, stockMin: STOCK_MINIMO }
+            return {
+                sku: sufijo ? skuLibre(`${skuBase}-${sufijo}`, skusUsados) : skuBase, price: precio!, optionValues,
+                ...(sinStock ? { showStock: false } : { initialStock: stockOk, ...(vidriera ? { showStock: true } : {}) }),
+                stockMin: STOCK_MINIMO,
+            }
         })
         // A lo sumo una variante lleva fotos por valor: la primera que sea "de aspecto".
         const visual = opciones.findIndex(o => ES_VISUAL.test(plano(o.name)))
@@ -239,7 +251,7 @@ export function armarProductos(filas: FilaCruda[]): Lectura {
             clave, nombre, categoria: categorias.get(plano(categoria))!, fila: f.fila,
             cantVariantes: opciones.length ? variants.length : 0,
             resumenVariantes: opciones.map(o => `${o.name}: ${o.values.join(', ')}`).join(' · '),
-            stockTotal, precio: precio!, publicado,
+            stockTotal, ...(sinStock ? { sinStock: true } : {}), precio: precio!, publicado,
             input: {
                 name: nombre,
                 ...(descripcion ? { description: descripcion } : {}),

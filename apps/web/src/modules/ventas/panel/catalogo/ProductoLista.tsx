@@ -190,8 +190,14 @@ function ProductoMobileCardSkeleton() {
 // que necesita accionar.
 function estadoVisual(p: ApiProductRow): EstadoProducto {
     if (p.status === 'DRAFT') return 'borrador'
-    return p.totalStock === 0 ? 'sin_stock' : 'publicado'
+    return sinStock(p) ? 'sin_stock' : 'publicado'
 }
+
+// Vidriera: un producto con el stock en blanco (showStock false) no está "sin stock", simplemente no lo cargó.
+function sinStock(p: ApiProductRow): boolean {
+    return p.showStock !== false && p.totalStock === 0
+}
+const textoStock = (p: ApiProductRow): string => (p.showStock === false ? '—' : String(p.totalStock))
 
 // Miniatura: usa la imagen real si el producto tiene una; si no, el placeholder
 // de color que ya usaba el panel (derivado del id para que sea estable). Si
@@ -258,7 +264,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
     const menuRef = useRef<HTMLDivElement>(null)
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
-    const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
+    const stockCol = sinStock(p) ? 'var(--color-error)' : 'var(--color-muted)'
     const bloqueada = !!upload || !!editando
 
     function anterior(e: React.MouseEvent) {
@@ -512,7 +518,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                         className="prod-stock-btn"
                         style={{ background: 'none', border: 'none', borderBottom: '1.5px dashed currentColor', padding: '0 0 1px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
                     >
-                        {p.totalStock} u.
+                        {p.showStock === false ? '—' : `${p.totalStock} u.`}
                     </button>
                 </div>
                 {p.variantCount > 1 && (
@@ -624,7 +630,7 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 // ─── Card mobile ─────────────────────────────────────────────────────────────
 
 function ProductoCard({ p, upload, editando, onEditar, onEditarStock, onPublicar, publicando }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void; onEditarStock: () => void; onPublicar?: () => void; publicando?: boolean }) {
-    const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
+    const stockCol = sinStock(p) ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
         <div className="prod-mobile-card" data-disabled={bloqueada || undefined} onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, opacity: upload ? 0.85 : 1 }}>
@@ -668,7 +674,7 @@ function ProductoCard({ p, upload, editando, onEditar, onEditarStock, onPublicar
                     style={{ background: 'var(--color-surface)', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', textAlign: 'left' }}
                 >
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Stock</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', borderBottom: '1.5px dashed currentColor', width: 'fit-content', paddingBottom: 1 }}>{p.totalStock}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', borderBottom: '1.5px dashed currentColor', width: 'fit-content', paddingBottom: 1 }}>{textoStock(p)}</div>
                 </button>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, color: 'var(--color-muted)', marginBottom: 2 }}>Variantes</div>
@@ -1076,10 +1082,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
     async function publicarRapido(p: ApiProductRow) {
         if (publicandoId) return
-        if (p.totalStock <= 0) {
-            onToast('No podés publicar un producto sin stock. Cargá stock inicial primero.')
-            return
-        }
+        // El backend es quien valida: en una vidriera publicar no exige stock, en una tienda completa sí.
         setPublicandoId(p.id)
         try {
             await panelUpdateProductStatus(p.id, 'PUBLISHED')
@@ -1426,7 +1429,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 ))}
 
                 {filas.map((p, i) => {
-                    const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
+                    const stockCol = sinStock(p) ? 'var(--color-error)' : 'var(--color-success)'
                     const editandoFila = editsPorId.get(p.id)
                     const creadoPorOrbi = createdProductIds.has(p.id)
                     return (
@@ -1449,7 +1452,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 className="prod-stock-btn"
                                 style={{ background: 'none', border: 'none', borderBottom: '1.5px dashed currentColor', padding: '0 0 1px', justifySelf: 'end', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace' }}
                             >
-                                {p.totalStock}
+                                {textoStock(p)}
                             </button>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
                             {editandoFila ? (

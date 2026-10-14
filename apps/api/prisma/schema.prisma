@@ -844,6 +844,10 @@ model Product {
   // Estrella en la grilla del panel (no en el wizard de creación) — alimenta la
   // sección "Destacados" del storefront público. No confundir con `status`.
   isFeatured    Boolean       @default(false) @map("is_featured")
+  // "Se hace por pedido": no lleva stock. Se muestra en la tienda aunque no haya unidades, pero con la ficha de vidriera:
+  // sin carrito ni compra, solo "Consultar por WhatsApp". Al guardarlo, todas sus variantes quedan con showStock=false
+  // (así las alertas, el inventario y los reportes de stock lo ignoran) y nunca se descuenta ni se repone stock.
+  byOrder       Boolean       @default(false) @map("by_order")
   inventoryType String        @default("standard") @map("inventory_type") // standard | serialized | fractional | batch | simple
   // "Fondo con IA" (modo premium, ver ImageStudioService): qué motor generativo
   // usar. flat (plano — indumentaria, la mayoría del catálogo) va a Gemini;
@@ -952,6 +956,10 @@ model ProductVariant {
   // eso es quantity:0 con isActive:true (temporal); esto es una decisión del
   // dueño de no ofrecer esa combinación (puede revertirse sin perder nada).
   isActive     Boolean  @default(true) @map("is_active")
+  // Solo cuenta en una VIDRIERA (business.mode = SHOWCASE): false = el negocio no cargó stock de esta variante, así que
+  // la tienda no muestra unidades, ni "Sin stock", ni "Últimas unidades", y no deshabilita la combinación. En una
+  // tienda con checkout el stock es obligatorio y este campo se ignora (siempre se muestra).
+  showStock    Boolean  @default(true) @map("show_stock")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -2462,6 +2470,9 @@ model PlatformAdmin {
   // Cargo con el que firma las respuestas de Soporte ("CEO", "CTO"...). Es
   // texto libre y opcional: sin cargo, el negocio ve "Soporte de Órbita".
   jobTitle              String?           @map("job_title")
+  // Correo personal (Gmail, etc.): a donde viaja la contraseña temporal que genera el superadmin y,
+  // además del correo de la cuenta, el código del segundo factor. Opcional.
+  personalEmail         String?           @map("personal_email")
   isActive              Boolean           @default(true) @map("is_active")
   // Credenciales propias (auth password + Google). A diferencia de member/customer,
   // el email es ÚNICO GLOBAL: un super admin no está scopeado a ningún negocio.

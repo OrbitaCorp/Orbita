@@ -480,6 +480,11 @@ su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni 
 - **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados
   conservan su archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video; tope 50 MB por video, que es el de
   Instagram).
+- **Aviso por correo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins ACTIVOS con correo
+  `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`): «Hay N videos para aprobar», con los títulos y un botón al panel.
+  Sale **uno por tanda**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de
+  tanda) que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`); no
+  hay tabla nueva. Es mejor esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
 - **Tope de la cola:** 20 videos entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
 - **Pasar a TikTok / Instagram:** siempre como BORRADOR y solo por una persona (nada se publica solo). TikTok: borradores
   de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones, desde donde

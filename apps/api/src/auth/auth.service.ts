@@ -1106,6 +1106,7 @@ export class AuthService implements OnModuleInit {
     name: string;
     email: string;
     role: string;
+    hasTempPassword?: boolean;
   }, deviceInfo?: DeviceInfo): Promise<PlatformAdminAuthResponse> {
     const token = this.signToken({ sub: admin.id, type: 'platform_admin' });
     const refreshToken = await this.createRefreshToken(admin.id, 'PLATFORM_ADMIN', null, deviceInfo);
@@ -1113,7 +1114,7 @@ export class AuthService implements OnModuleInit {
       type: 'platform_admin',
       token,
       refreshToken,
-      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, hasTempPassword: admin.hasTempPassword ?? false },
     };
   }
 
@@ -1135,24 +1136,33 @@ export class AuthService implements OnModuleInit {
    * mail, o la sesión directa si el atajo de desarrollo está activo.
    */
   private async segundoFactorOSesion(
-    admin: { id: string; name: string; email: string; role: string },
+    admin: { id: string; name: string; email: string; role: string; personalEmail?: string | null; hasTempPassword?: boolean },
     deviceInfo?: DeviceInfo,
   ): Promise<PlatformAdminMfaChallenge | PlatformAdminAuthResponse> {
     if (this.omitirSegundoFactorEnDesarrollo) {
       this.logger.warn(`PLATFORM_ADMIN_SIN_CODIGO activo: ${admin.email} entra al super panel sin código (solo desarrollo)`);
       return this.buildPlatformAdminResponse(admin, deviceInfo);
     }
-    await this.issuePlatformAdminLoginCode(admin.id, admin.email, deviceInfo);
+    await this.issuePlatformAdminLoginCode(admin.id, admin.email, deviceInfo, admin.personalEmail);
     return { type: 'platform_admin_mfa_required', email: admin.email };
   }
 
-  private async issuePlatformAdminLoginCode(adminId: string, email: string, deviceInfo?: DeviceInfo): Promise<void> {
+  private async issuePlatformAdminLoginCode(adminId: string, email: string, deviceInfo?: DeviceInfo, personalEmail?: string | null): Promise<void> {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     const codeHash = this.hashToken(code);
     const creado = await this.prisma.platformAdminLoginCode.create({
       data: { adminId, codeHash, expiresAt: new Date(Date.now() + PLATFORM_ADMIN_CODE_TTL_MS) },
     });
     await this.mail.sendPlatformAdminLoginCode(email, { code, expiresIn: '10 minutos' });
+    // Si la cuenta tiene un correo personal, el mismo código viaja también ahí (quien no tiene a mano el correo
+    // de la cuenta puede entrar igual). Best-effort: el envío principal ya salió y no se repite por esto.
+    if (personalEmail && personalEmail.toLowerCase() !== email.toLowerCase()) {
+      try {
+        await this.mail.sendPlatformAdminLoginCode(personalEmail, { code, expiresIn: '10 minutos' });
+      } catch (e) {
+        this.logger.warn(`No se pudo mandar el código de acceso al correo personal del admin ${adminId}: ${e}`);
+      }
+    }
     // Recién después del mail: si Resend tira, el código no llegó a nadie y
     // no hay "enviado" que registrar. Va el id de la fila, nunca el código.
     await this.adminLog?.segundoFactor({ adminId, resultado: 'enviado', codeId: creado.id, ...deviceInfo });
@@ -1319,7 +1329,7 @@ export class AuthService implements OnModuleInit {
 
       return {
         type: 'platform_admin',
-        admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+        admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, hasTempPassword: admin.hasTempPassword },
       };
     }
 

@@ -103,6 +103,7 @@ export class ReportsService {
             id: true,
             sku: true,
             price: true,
+            showStock: true,
             stock: { select: { quantity: true, stockMin: true } },
             // Para poder distinguir en el listado de stock crítico qué talle o
             // color es el que se está quedando sin unidades.
@@ -161,7 +162,7 @@ export class ReportsService {
             const minimo = v.stock[0]?.stockMin ?? 0;
             return { v, cantidad, minimo };
           })
-          .filter(({ cantidad, minimo }) => minimo > 0 && cantidad <= minimo)
+          .filter(({ v, cantidad, minimo }) => v.showStock && minimo > 0 && cantidad <= minimo)
           .map(({ v, cantidad, minimo }) => ({
             productId: p.id,
             productName: p.name,
@@ -899,7 +900,7 @@ export class ReportsService {
       this.prisma.variantStock.findMany({
         where: {
           stockMin: { gt: 0 },
-          variant: { isActive: true, product: { businessId, deletedAt: null, status: 'PUBLISHED' } },
+          variant: { isActive: true, showStock: true, product: { businessId, deletedAt: null, status: 'PUBLISHED' } },
         },
         select: { quantity: true, stockMin: true },
       }),

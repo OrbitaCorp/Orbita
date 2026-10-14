@@ -1,3 +1,4 @@
+import { dominiosDelEquipo } from '../../../common/utils/dominios-equipo';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
@@ -21,7 +22,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 // como hash SHA-256. Las claves de firma se derivan de JWT_SECRET con una etiqueta distinta para cada uso, así un
 // token de este conector nunca sirve como sesión del panel ni al revés.
 
-export const PERMISO_MCP = 'prospeccion';
+export const PERMISO_MCP = 'marketing';
+// Lo que se le muestra a la persona antes de autorizar (pantalla conectar-claude del panel): un solo conector, dos usos.
+export const PERMISOS_MOSTRADOS = [
+  'Videos: crear videos y dejarlos en la cola de preparación, para que una persona los apruebe antes de usarlos.',
+  'Prospección: consultar cuentas de Instagram y guardar su análisis y un borrador de mensaje.',
+];
 const CODIGO_TTL_MS = 10 * 60_000;
 const SOLICITUD_TTL = '10m';
 const ACCESO_TTL_S = 3600;
@@ -110,10 +116,7 @@ export class McpOauthService {
     return this.config.get<string>('MCP_CONSENT_URL') ?? 'https://orbita.site/superadmin/conectar-claude';
   }
   get dominiosPermitidos(): string[] {
-    return (this.config.get<string>('MCP_DOMINIOS_PERMITIDOS') ?? 'orbita-corp.com,orbita.site')
-      .split(',')
-      .map((d) => d.trim().toLowerCase())
-      .filter(Boolean);
+    return dominiosDelEquipo(this.config);
   }
   private get retornosExtra(): string[] {
     return (this.config.get<string>('MCP_RETORNOS_EXTRA') ?? '').split(',').map((d) => d.trim()).filter(Boolean);
@@ -217,7 +220,7 @@ export class McpOauthService {
     } catch {
       /* el host solo se muestra */
     }
-    return { cliente: s.nom, retorno: host, permiso: 'Marketing de Órbita: consultar cuentas y guardar análisis (prospección) y dejar videos en la cola de aprobación', dominios: this.dominiosPermitidos };
+    return { cliente: s.nom, retorno: host, permisos: PERMISOS_MOSTRADOS, dominios: this.dominiosPermitidos };
   }
 
   /** Un superadmin activo con correo de la organización. Si no, no hay acceso. */

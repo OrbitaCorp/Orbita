@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
 import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
@@ -9,6 +10,8 @@ import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
+import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
@@ -224,6 +227,21 @@ export class PlatformController {
   @SoloSuperadmin()
   updateAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpsertPlatformAdminDto) {
     return this.platformService.updateAdmin(req.user.adminId, id, dto);
+  }
+
+  // Genera una contraseña temporal y se la manda por mail al correo personal de ese admin (con el correo de la cuenta).
+  @Post('admins/:id/reset-password')
+  @SoloSuperadmin()
+  @Throttle({ default: { limit: 10, ttl: 900_000 } })
+  resetAdminPassword(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: ResetAdminPasswordDto) {
+    return this.platformService.resetAdminPassword(req.user.adminId, id, dto);
+  }
+
+  // Cualquier admin cambia SU contraseña (la actual como verificación). Es la salida de la contraseña temporal.
+  @Post('me/change-password')
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  changeOwnPassword(@Req() req: RequestWithAdmin, @Body() dto: ChangeOwnPasswordDto) {
+    return this.platformService.changeOwnPassword(req.user.adminId, dto);
   }
 
   @Delete('admins/:id')

@@ -35,7 +35,8 @@ function armar(opciones: { tamanio?: number | null } = {}) {
     eliminar: jest.fn(async (_ruta: string) => undefined),
     publicUrlDe: (ruta: string) => `https://pub.r2.dev/${ruta}`,
   };
-  return { svc: new VideosService(prisma as never, r2 as never), prisma, r2, filas };
+  const aviso = { avisar: jest.fn(async (_admin: string, _motivo: string) => ({ enviados: 1, pendientes: 1 })) };
+  return { svc: new VideosService(prisma as never, r2 as never, aviso as never), prisma, r2, aviso, filas };
 }
 
 const subido = async (ctx: ReturnType<typeof armar>, admin = 'admin-1') => {
@@ -79,6 +80,20 @@ describe('cola de videos', () => {
     expect(dias).toBeGreaterThan(6.9);
     expect(dias).toBeLessThan(7.1);
   });
+
+  it('registrar avisa al equipo por correo; un video que no se registra no avisa; y la tanda se avisa aparte', async () => {
+    const ctx = armar()
+    const id = await subido(ctx)
+    expect(ctx.aviso.avisar).not.toHaveBeenCalled()
+    await ctx.svc.registrar('admin-1', { videoId: id, titulo: 'x' })
+    expect(ctx.aviso.avisar).toHaveBeenCalledWith('admin-1', 'registro')
+    await ctx.svc.avisarTanda('admin-1')
+    expect(ctx.aviso.avisar).toHaveBeenLastCalledWith('admin-1', 'tanda')
+    const sinArchivo = armar({ tamanio: null })
+    const id2 = await subido(sinArchivo)
+    await expect(sinArchivo.svc.registrar('admin-1', { videoId: id2, titulo: 'x' })).rejects.toBeInstanceOf(BadRequestException)
+    expect(sinArchivo.aviso.avisar).not.toHaveBeenCalled()
+  })
 
   it('si el archivo no llegó a subirse, registrar avisa y la reserva sigue', async () => {
     const ctx = armar({ tamanio: null });

@@ -190,7 +190,7 @@ describe('canje del código y tokens', () => {
     const c = await conectar();
     expect(c.vuelta.searchParams.get('state')).toBe('abc');
     const t = await canje(c);
-    expect(t).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'prospeccion' });
+    expect(t).toMatchObject({ token_type: 'Bearer', expires_in: 3600, scope: 'marketing' });
     expect(t.refresh_token).toBeTruthy();
     await expect(c.svc.verificarAcceso(t.access_token)).resolves.toEqual({ adminId: 'admin-1', email: 'mateo@orbita-corp.com' });
   });

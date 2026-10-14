@@ -42,7 +42,9 @@ export type AuthUser =
   | {
       // Super admin de plataforma: identidad cross-tenant, sin `business`.
       type: 'platform_admin'
-      admin: { id: string; name: string; email: string; role: string }
+      // hasTempPassword: entró con la contraseña temporal que le generó un superadmin desde Admins; el panel le
+      // obliga a elegir una propia antes de usarlo. Opcional: una API vieja no lo manda.
+      admin: { id: string; name: string; email: string; role: string; hasTempPassword?: boolean }
     }
 
 // Segundo factor del login de platform admin (RBT-647): la contraseña (o
@@ -75,6 +77,8 @@ interface AuthContextValue {
   // Perfil.tsx justo después de subir una foto nueva, para que el header (que
   // lee el avatar de acá, no de /me) la refleje al toque, sin recargar.
   updateAvatar: (avatarUrl: string | null) => void
+  // El admin de plataforma ya eligió una contraseña propia: saca la marca de temporal en memoria (sin volver a loguear).
+  marcarContrasenaPropia: () => void
   forgotPassword: (email: string) => Promise<void>
   verifyResetCode: (email: string, code: string) => Promise<void>
   resetPassword: (email: string, code: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
@@ -218,6 +222,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev?.type === 'customer' ? { ...prev, customer: { ...prev.customer, avatarUrl } } : prev))
   }, [])
 
+  const marcarContrasenaPropia = useCallback((): void => {
+    setUser((prev) => (prev?.type === 'platform_admin' ? { ...prev, admin: { ...prev.admin, hasTempPassword: false } } : prev))
+  }, [])
+
   const logout = useCallback(async (): Promise<void> => {
     // El chat de Orbi (y su stream en curso) es de quien se va. Hoy el logout
     // del panel recarga la página, pero el POS comparte terminal entre
@@ -292,7 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, verifyPlatformAdminCode, register, logout, updateAvatar, forgotPassword, verifyResetCode, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, verifyPlatformAdminCode, register, logout, updateAvatar, marcarContrasenaPropia, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )
