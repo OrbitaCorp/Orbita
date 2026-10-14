@@ -85,7 +85,7 @@ function AutorizarKit({ permiso, usuario }: { permiso: PermisoDelKit; usuario: s
   return (
     <Aviso
       titulo="Falta un permiso de Instagram"
-      texto={`Tu cuenta${usuario ? ` @${usuario}` : ''} está conectada, pero todavía no le diste permiso a Órbita para ${TEXTOS[permiso].paraAutorizar}. Vas a iniciar sesión de nuevo en Instagram y volvés acá. Órbita solo publica y responde lo que vos confirmás.`}
+      texto={`Tu cuenta${usuario ? ` @${usuario}` : ''} está conectada, pero todavía no le diste permiso a Órbita para ${TEXTOS[permiso].paraAutorizar}. Instagram te va a pedir que confirmes los permisos y volvés acá. Órbita solo publica y responde lo que vos confirmás.`}
       boton="Autorizar"
       cargando={trabajando}
       error={error}

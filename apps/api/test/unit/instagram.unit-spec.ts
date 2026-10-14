@@ -111,6 +111,14 @@ describe('InstagramService (unit)', () => {
   });
 
   describe('login de Instagram', () => {
+    // Con force_reauth Instagram pedía el login de nuevo aunque el navegador ya tuviera la sesión abierta, y mucha
+    // gente no se acordaba de la contraseña. Sin él, usa la sesión y solo pide confirmar los permisos.
+    it('no fuerza volver a iniciar sesión: usa la cuenta de Instagram que el navegador ya tiene abierta', () => {
+      const { svc } = build();
+      expect(new URL(svc.urlDeAutorizacion(BIZ, 'mem-1')).searchParams.has('force_reauth')).toBe(false);
+      expect(new URL(svc.urlDeAutorizacionEmpresa(BIZ, 'kit')).searchParams.has('force_reauth')).toBe(false);
+    });
+
     it('la dirección de autorización lleva los permisos, la redirección y un state firmado', () => {
       const { svc } = build();
       const url = new URL(svc.urlDeAutorizacion(BIZ, 'mem-1'));

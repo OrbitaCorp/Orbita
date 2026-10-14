@@ -406,9 +406,10 @@ export class InstagramService {
       response_type: 'code',
       scope: this.permisosPedidos(permisos, seccion),
       state: this.firmarState(businessId, memberId, origen, seccion, permisos, destino),
-      // Si el navegador ya tiene una sesión de Instagram abierta, obliga a elegir la
-      // cuenta (Meta lo recomienda sobre todo en celulares).
-      force_reauth: 'true',
+      // SIN force_reauth: si el navegador ya tiene una sesión de Instagram abierta, Instagram la usa y solo pide
+      // confirmar los permisos ("Continuar como @usuario"), sin volver a pedir la contraseña. Antes se forzaba el
+      // login de nuevo y mucha gente no se acordaba de la contraseña. Con la cuenta equivocada abierta, esa misma
+      // pantalla ofrece cambiar de cuenta.
     });
     return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
   }
