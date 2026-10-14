@@ -5,7 +5,7 @@ import { platformApi, type McpSolicitud } from '@/lib/platform/api'
 import { guardarConexionPendiente, olvidarConexionPendiente } from '@/lib/platform/conexionClaude'
 import { OrbitLogo, btnGhost, btnPrimary } from '@/modules/superadmin/ui'
 
-// Pantalla donde un superadmin autoriza que SU Claude se conecte a la Prospección de Marketing.
+// Pantalla donde un superadmin autoriza que SU Claude se conecte a Órbita (Marketing: prospección y videos, con un solo conector).
 //
 // Claude abre `api.orbita.site/api/v1/mcp/oauth/authorize`, la API valida el pedido y manda a la persona acá con `req`
 // (la solicitud firmada). Acá se ve a qué se está dando acceso y se aprueba o se cancela; la API devuelve la dirección
@@ -62,7 +62,7 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
       <div style={{ width: '100%', maxWidth: 460, border: '1px solid var(--color-border)', borderRadius: 16, background: 'var(--color-bg)', boxShadow: 'var(--shadow-card)', padding: '28px 28px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <OrbitLogo />
         <h1 style={{ margin: 0, fontSize: 21, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
-          Conectar Claude a la Prospección
+          Conectar Claude a Órbita
         </h1>
 
         {error ? (
@@ -83,7 +83,7 @@ function Consentimiento({ req, listo }: { req: string; listo: boolean }) {
               {datos.permiso}.
               <div style={{ marginTop: 10, color: 'var(--color-muted)' }}>
                 No puede enviar mensajes, contactar a nadie, publicar ni borrar datos: todo mensaje y todo video lo revisa y lo aprueba una persona.
-                El acceso se puede cortar cuando quieras desde Marketing → Prospección → «Desconectar Claude».
+                El acceso se puede cortar cuando quieras desde Marketing → «Desconectar Claude».
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

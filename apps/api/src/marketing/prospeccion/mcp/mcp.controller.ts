@@ -37,7 +37,7 @@ function errorOauth(res: Respuesta, e: OAuthError) {
 export class McpDescubrimientoController {
   constructor(private readonly oauth: McpOauthService) {}
 
-  @Get('.well-known/oauth-protected-resource/api/v1/mcp/prospeccion')
+  @Get('.well-known/oauth-protected-resource/api/v1/mcp')
   recurso() {
     return this.oauth.metadataRecurso();
   }
@@ -151,7 +151,7 @@ export class McpConsentimientoController {
 
 @Public()
 @SkipThrottle()
-@Controller('mcp/prospeccion')
+@Controller('mcp')
 export class McpController {
   private readonly protocolo: McpProspeccion;
 

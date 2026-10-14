@@ -68,7 +68,7 @@ describe('conector MCP por HTTP', () => {
       exclude: [
         { path: '.well-known/oauth-authorization-server', method: RequestMethod.GET },
         { path: '.well-known/oauth-protected-resource', method: RequestMethod.GET },
-        { path: '.well-known/oauth-protected-resource/api/v1/mcp/prospeccion', method: RequestMethod.GET },
+        { path: '.well-known/oauth-protected-resource/api/v1/mcp', method: RequestMethod.GET },
       ],
     });
     app.useGlobalFilters(new HttpExceptionFilter());
@@ -86,8 +86,8 @@ describe('conector MCP por HTTP', () => {
     it('las metadata están en la raíz del dominio, sin autenticación', async () => {
       const as = await http().get('/.well-known/oauth-authorization-server').expect(200);
       expect(as.body).toMatchObject({ issuer: 'https://api.orbita.site', code_challenge_methods_supported: ['S256'] });
-      const rec = await http().get('/.well-known/oauth-protected-resource/api/v1/mcp/prospeccion').expect(200);
-      expect(rec.body).toMatchObject({ resource: 'https://api.orbita.site/api/v1/mcp/prospeccion', authorization_servers: ['https://api.orbita.site'] });
+      const rec = await http().get('/.well-known/oauth-protected-resource/api/v1/mcp').expect(200);
+      expect(rec.body).toMatchObject({ resource: 'https://api.orbita.site/api/v1/mcp', authorization_servers: ['https://api.orbita.site'] });
       await http().get('/.well-known/oauth-protected-resource').expect(200);
     });
     it('y NO cuelgan de api/v1', async () => {
@@ -97,17 +97,17 @@ describe('conector MCP por HTTP', () => {
 
   describe('sin autenticación', () => {
     it('el conector responde 401 con el encabezado que le dice a Claude dónde está la metadata', async () => {
-      const r = await http().post('/api/v1/mcp/prospeccion').send({ jsonrpc: '2.0', id: 1, method: 'ping' }).expect(401);
-      expect(r.headers['www-authenticate']).toContain('resource_metadata="https://api.orbita.site/.well-known/oauth-protected-resource/api/v1/mcp/prospeccion"');
+      const r = await http().post('/api/v1/mcp').send({ jsonrpc: '2.0', id: 1, method: 'ping' }).expect(401);
+      expect(r.headers['www-authenticate']).toContain('resource_metadata="https://api.orbita.site/.well-known/oauth-protected-resource/api/v1/mcp"');
     });
     it('un token inválido también es 401 y lo marca como invalid_token', async () => {
-      const r = await http().post('/api/v1/mcp/prospeccion').set('Authorization', 'Bearer basura').send({ jsonrpc: '2.0', id: 1, method: 'ping' }).expect(401);
+      const r = await http().post('/api/v1/mcp').set('Authorization', 'Bearer basura').send({ jsonrpc: '2.0', id: 1, method: 'ping' }).expect(401);
       expect(r.headers['www-authenticate']).toContain('invalid_token');
     });
     it('GET y DELETE responden 405: no hay canal de eventos ni sesiones', async () => {
-      const g = await http().get('/api/v1/mcp/prospeccion').expect(405);
+      const g = await http().get('/api/v1/mcp').expect(405);
       expect(g.headers.allow).toBe('POST');
-      await http().delete('/api/v1/mcp/prospeccion').expect(405);
+      await http().delete('/api/v1/mcp').expect(405);
     });
     it('las rutas de consentimiento del panel exigen sesión de superadmin', async () => {
       await http().get('/api/v1/platform/mcp/solicitud?req=x').expect(401);
@@ -145,7 +145,7 @@ describe('conector MCP por HTTP', () => {
       const { body: c } = await http().post('/api/v1/mcp/oauth/register').send({ redirect_uris: [CLAUDE], client_name: 'Claude' });
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
-      const red = await http().get('/api/v1/mcp/oauth/authorize').query({ response_type: 'code', client_id: c.client_id, redirect_uri: CLAUDE, code_challenge: challenge, code_challenge_method: 'S256', state: 'st', resource: 'https://api.orbita.site/api/v1/mcp/prospeccion' }).expect(302);
+      const red = await http().get('/api/v1/mcp/oauth/authorize').query({ response_type: 'code', client_id: c.client_id, redirect_uri: CLAUDE, code_challenge: challenge, code_challenge_method: 'S256', state: 'st', resource: 'https://api.orbita.site/api/v1/mcp' }).expect(302);
       const req = new URL(red.headers.location).searchParams.get('req')!;
       // La persona aprueba en el panel (esa llamada lleva su sesión; acá se invoca el servicio que ejecuta):
       const { redirect } = await oauth.resolverSolicitud('admin-1', req, 'aprobar');
@@ -157,12 +157,12 @@ describe('conector MCP por HTTP', () => {
       expect(tok.body).toMatchObject({ token_type: 'Bearer', expires_in: 3600 });
 
       const auth = { Authorization: `Bearer ${tok.body.access_token}` };
-      const ini = await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }).expect(200);
+      const ini = await http().post('/api/v1/mcp').set(auth).send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }).expect(200);
       expect(ini.body.result.serverInfo.name).toBe('orbita-marketing');
-      const lista = await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', id: 2, method: 'tools/list' }).expect(200);
+      const lista = await http().post('/api/v1/mcp').set(auth).send({ jsonrpc: '2.0', id: 2, method: 'tools/list' }).expect(200);
       expect(lista.body.result.tools).toHaveLength(9);
-      await http().post('/api/v1/mcp/prospeccion').set(auth).send({ jsonrpc: '2.0', method: 'notifications/initialized' }).expect(202);
-      const lote = await http().post('/api/v1/mcp/prospeccion').set(auth).send([{ jsonrpc: '2.0', id: 3, method: 'ping' }, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'prospeccion_criterio' } }]).expect(200);
+      await http().post('/api/v1/mcp').set(auth).send({ jsonrpc: '2.0', method: 'notifications/initialized' }).expect(202);
+      const lote = await http().post('/api/v1/mcp').set(auth).send([{ jsonrpc: '2.0', id: 3, method: 'ping' }, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'prospeccion_criterio' } }]).expect(200);
       expect(lote.body.map((r: { id: number }) => r.id)).toEqual([3, 4]);
       expect(prospeccion.criterio).toHaveBeenCalled();
 

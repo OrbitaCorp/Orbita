@@ -7,6 +7,7 @@ import { InstagramComentarios, InstagramEstadisticas, InstagramPublicaciones } f
 import { TiktokContenido } from './TiktokContenido'
 import { PanelProspeccion } from './Prospeccion'
 import { PanelVideos } from './Videos'
+import { ConectarClaude } from './ConectarClaude'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
@@ -107,6 +108,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       `}</style>
 
       <PageHeader title="Marketing" subtitle="Los canales de la empresa para llegar a más gente: conexión, publicaciones y mensajes" />
+
+      <ConectarClaude puedeEditar={puedePublicar} setAviso={setAviso} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
         <CanalTarjeta nombre="TikTok" para="Videos de la marca y sus números" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />

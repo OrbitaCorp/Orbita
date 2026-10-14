@@ -101,10 +101,10 @@ export class McpOauthService {
     return (this.config.get<string>('MCP_PUBLIC_URL') ?? 'https://api.orbita.site').replace(/\/$/, '');
   }
   get urlMcp(): string {
-    return `${this.base}/api/v1/mcp/prospeccion`;
+    return `${this.base}/api/v1/mcp`;
   }
   get urlMetadataRecurso(): string {
-    return `${this.base}/.well-known/oauth-protected-resource/api/v1/mcp/prospeccion`;
+    return `${this.base}/.well-known/oauth-protected-resource/api/v1/mcp`;
   }
   private get urlConsentimiento(): string {
     return this.config.get<string>('MCP_CONSENT_URL') ?? 'https://orbita.site/superadmin/conectar-claude';
@@ -217,7 +217,7 @@ export class McpOauthService {
     } catch {
       /* el host solo se muestra */
     }
-    return { cliente: s.nom, retorno: host, permiso: 'Marketing: leer lotes de cuentas y guardar análisis de prospección, y dejar videos en la cola de aprobación', dominios: this.dominiosPermitidos };
+    return { cliente: s.nom, retorno: host, permiso: 'Marketing de Órbita: consultar cuentas y guardar análisis (prospección) y dejar videos en la cola de aprobación', dominios: this.dominiosPermitidos };
   }
 
   /** Un superadmin activo con correo de la organización. Si no, no hay acceso. */

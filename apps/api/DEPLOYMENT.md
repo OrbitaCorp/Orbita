@@ -434,7 +434,7 @@ de la API sigue igual.
 Qué hace (código en `src/marketing/prospeccion/`): Superadmin → Marketing → Prospección consulta cuentas
 profesionales de Instagram con Business Discovery (API de Meta), las puntúa con el criterio de cliente ideal y las
 guarda en lotes. Cada superadmin analiza los lotes con SU propio Claude, por un **conector MCP remoto** que vive en
-esta misma API (`/api/v1/mcp/prospeccion`, OAuth 2.1 con PKCE; metadata en `/.well-known/oauth-*`, que llega a la API
+esta misma API (`/api/v1/mcp`, OAuth 2.1 con PKCE; metadata en `/.well-known/oauth-*`, que llega a la API
 porque Firebase Hosting reescribe `**` a Cloud Run). No hay clave de Anthropic ni nada local. Claude lee lotes y guarda
 análisis; **no tiene ninguna herramienta que envíe, contacte o borre**: los mensajes los manda una persona.
 
@@ -488,7 +488,7 @@ su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni 
 - Migración aditiva (una tabla nueva): `./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`, como siempre.
 
 Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
-con `https://api.orbita.site/api/v1/mcp/prospeccion`. Requiere un plan de Claude que permita conectores personalizados.
+con `https://api.orbita.site/api/v1/mcp`. Requiere un plan de Claude que permita conectores personalizados.
 
 ## Ver logs
 

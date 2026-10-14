@@ -127,7 +127,7 @@ async function bootstrap(): Promise<void> {
     exclude: [
       { path: '.well-known/oauth-authorization-server', method: RequestMethod.GET },
       { path: '.well-known/oauth-protected-resource', method: RequestMethod.GET },
-      { path: '.well-known/oauth-protected-resource/api/v1/mcp/prospeccion', method: RequestMethod.GET },
+      { path: '.well-known/oauth-protected-resource/api/v1/mcp', method: RequestMethod.GET },
     ],
   });
   app.useGlobalPipes(

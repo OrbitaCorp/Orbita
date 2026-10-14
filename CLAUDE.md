@@ -175,7 +175,7 @@ viejo. Detalle en `.claude/rules/manual.md`.
 ## Prospección y videos automatizados (Superadmin → Marketing)
 
 Dos herramientas del superadmin que usan **el Claude que paga cada persona** (sin clave de API) por **un solo conector
-MCP** (`apps/api/src/marketing/prospeccion/mcp/`, dirección `https://api.orbita.site/api/v1/mcp/prospeccion`): la
+MCP** (`apps/api/src/marketing/prospeccion/mcp/`, dirección `https://api.orbita.site/api/v1/mcp`): la
 **prospección** de tiendas de Instagram (consulta por la API de Meta, puntaje, análisis y borradores de mensaje) y la
 **cola de videos** (reels generados en la PC de quien los pide, aprobados en el panel y pasados como borrador a TikTok o
 Instagram). **Nada se envía ni se publica solo**: siempre hay una persona al final. Para qué sirven, cómo funcionan,

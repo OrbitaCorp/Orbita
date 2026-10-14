@@ -8,7 +8,7 @@ import { AccesoDenegadoError, McpOauthService, OAuthError, retornoPermitido } fr
 
 const SECRETO = 'x'.repeat(40);
 const CLAUDE = 'https://claude.ai/api/mcp/auth_callback';
-const MCP = 'https://api.orbita.site/api/v1/mcp/prospeccion';
+const MCP = 'https://api.orbita.site/api/v1/mcp';
 
 type Fila = Record<string, any>;
 // En una base real una columna sin valor es null, no undefined.
@@ -89,7 +89,7 @@ describe('metadata de descubrimiento', () => {
   it('el recurso protegido apunta a este servidor y la dirección de metadata es la del conector', () => {
     const { svc } = armar();
     expect(svc.metadataRecurso()).toMatchObject({ resource: MCP, authorization_servers: ['https://api.orbita.site'] });
-    expect(svc.urlMetadataRecurso).toBe('https://api.orbita.site/.well-known/oauth-protected-resource/api/v1/mcp/prospeccion');
+    expect(svc.urlMetadataRecurso).toBe('https://api.orbita.site/.well-known/oauth-protected-resource/api/v1/mcp');
   });
 });
 

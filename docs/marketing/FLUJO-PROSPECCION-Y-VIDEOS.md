@@ -33,7 +33,7 @@ una máquina. Es una condición de diseño, no una configuración: el conector n
 ## Un solo conector, dos usos
 
 Cada persona agrega **una vez** el conector de Órbita a su Claude (Configuración → Conectores → «Agregar conector
-personalizado», dirección `https://api.orbita.site/api/v1/mcp/prospeccion`) y lo autoriza con su cuenta de la organización
+personalizado», dirección `https://api.orbita.site/api/v1/mcp`) y lo autoriza con su cuenta de la organización
 en el panel (el mismo login con Google y segundo factor del superadmin). Con ese único conector, su Claude puede:
 
 - **Prospección:** leer el criterio, consultar cuentas, leer lotes y guardar análisis.

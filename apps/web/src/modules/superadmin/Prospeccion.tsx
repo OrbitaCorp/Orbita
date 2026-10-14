@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { platformApi, type Prospecto, type ProspectoEstado, type ProspectoNivel } from '@/lib/platform/api'
 import type { ToastVariant } from '@/design-system/components/Toast'
-import { useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, ConfirmModal, dateTime, btnGhost, btnGhostSm, btnPrimary, inputStyle } from './ui'
+import { useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, dateTime, btnGhost, btnGhostSm, btnPrimary, inputStyle } from './ui'
 
 // Marketing → Prospección: se consultan cuentas de Instagram (API de Meta, solo cuentas profesionales), el sistema las
 // puntúa con el criterio de cliente ideal y cada superadmin pide a SU Claude que las analice y redacte un mensaje.
@@ -10,7 +10,6 @@ import { useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, ConfirmModal, dat
 
 type Aviso = { variant: ToastVariant; title: string; description?: string }
 
-const URL_CONECTOR = 'https://api.orbita.site/api/v1/mcp/prospeccion'
 const MAX_CUENTAS = 20
 
 const ESTADOS: { id: ProspectoEstado; texto: string }[] = [
@@ -79,7 +78,6 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
   const [texto, setTexto] = useState('')
   const [consultando, setConsultando] = useState(false)
   const [elegido, setElegido] = useState<string | null>(null)
-  const [desconectar, setDesconectar] = useState(false)
   const [zona, setZona] = useState('Puerto Iguazú y localidades cercanas de Misiones (Argentina)')
   const [rubros, setRubros] = useState('')
 
@@ -160,22 +158,6 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
               : 'Claude busca tiendas de la zona en la web pública, las consulta por Meta y las analiza.'}
             {' '}Cuando termine, el lote aparece abajo en «Lotes» (tocá «Actualizar» si no está). La búsqueda web tiene que estar activada en tu cuenta de Claude: Instagram no tiene un buscador que Órbita pueda consultar. Solo entran cuentas profesionales (de empresa o creador).
           </p>
-          <details style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
-            <summary style={{ cursor: 'pointer', color: 'var(--color-text)', fontWeight: 600 }}>Primera vez: conectar Claude</summary>
-            <div style={{ marginTop: 8 }}>
-              En Claude: Configuración → Conectores → «Agregar conector personalizado» (podés llamarlo «Órbita»), con esta dirección. Claude abre una pantalla del panel para que lo autorices con tu cuenta de la organización. Es una vez por persona y un solo conector sirve para la prospección y para los videos.
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-                <code style={{ padding: '7px 10px', borderRadius: 8, background: 'var(--color-surface-alt)', color: 'var(--color-text)', fontSize: 12.5, overflowWrap: 'anywhere' }}>{URL_CONECTOR}</code>
-                <button type="button" onClick={() => copiar(URL_CONECTOR, setAviso, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>
-              </div>
-              {puedeEditar && (
-                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, maxWidth: 520 }}>El acceso de Claude dura hasta que lo cortes. Desconectar cierra todos los Claude conectados con tu usuario.</span>
-                  <button type="button" onClick={() => setDesconectar(true)} className="ds-hover" style={btnGhostSm}>Desconectar Claude</button>
-                </div>
-              )}
-            </div>
-          </details>
         </div>
       </Card>
 
@@ -241,20 +223,6 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
       )}
 
       {prospecto && <DetalleProspecto key={prospecto.id} p={prospecto} puedeEditar={puedeEditar} onCambiar={(c) => cambiar(prospecto, c)} setAviso={setAviso} />}
-
-      {desconectar && (
-        <ConfirmModal
-          title="Desconectar Claude"
-          body="Se corta el acceso de todos los Claude conectados con tu usuario. El análisis ya guardado no se toca. Para volver a usarlo hay que autorizar la conexión otra vez desde Claude."
-          confirmLabel="Desconectar"
-          onCancel={() => setDesconectar(false)}
-          onConfirm={async () => {
-            const r = await platformApi.mcpDesconectar()
-            setDesconectar(false)
-            setAviso({ variant: 'success', title: r.revocados ? 'Claude desconectado' : 'No había conexiones activas' })
-          }}
-        />
-      )}
     </>
   )
 }
