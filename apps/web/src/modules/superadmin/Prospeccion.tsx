@@ -36,6 +36,28 @@ function instruccionParaClaude(loteId: string) {
   ].join('\n')
 }
 
+// Claude busca las cuentas con su propia búsqueda web (páginas públicas, sin entrar a Instagram) y las valida con la
+// herramienta del conector, que las consulta por la API de Meta. Instagram no tiene un buscador que pueda consultar Órbita.
+function instruccionDeBusqueda(zona: string, rubros: string, semilla: string[]) {
+  const conSemilla = semilla.length > 0
+  return [
+    'Buscame tiendas de Instagram para la Prospección de Órbita, con el conector «Órbita Prospección».',
+    zona ? `Zona: ${zona}.` : 'Zona: la de las cuentas de partida.',
+    rubros ? `Rubros: ${rubros}.` : 'Rubros: los que Órbita ya soporta (leélos con prospeccion_criterio).',
+    '1. Leé el criterio con prospeccion_criterio: dice a qué tipo de negocio le sirve Órbita y cómo se puntúa.',
+    conSemilla
+      ? `2. Cuentas de partida: ${semilla.join(', ')}. Consultalas primero con prospeccion_consultar_cuentas. Mirá qué tienen en común (rubro, zona, tamaño, cómo venden) y qué tan bien encajan.`
+      : '2. Con tu búsqueda web, encontrá usuarios de Instagram de negocios que vendan productos en esa zona (con búsquedas como «tienda de ropa Puerto Iguazú Instagram»).',
+    conSemilla
+      ? '3. Con tu búsqueda web, encontrá otras cuentas parecidas: mismo rubro y zona, o competidores y tiendas de la zona que aparezcan en páginas públicas.'
+      : '3. Revisá que cada usuario lo hayas visto escrito en una página.',
+    'Usá solo páginas públicas: no inicies sesión en Instagram ni intentes sacar listas de seguidores. No inventes usuarios.',
+    `4. Mandá los usuarios nuevos (hasta 20 por vez) a prospeccion_consultar_cuentas. Las cuentas personales, privadas o inexistentes vienen sin datos: descartalas.`,
+    '5. Leé cada lote con prospeccion_obtener_lote (primero las de nivel A y B, de a 10), analizalas y guardá el análisis con prospeccion_guardar_analisis, con un mensaje corto y humano, sin promesas que no estén en la guía.',
+    'Contame al final cuántas cuentas encontraste, cuántas sirvieron y el id del lote. No envíes ni contactes a nadie: los mensajes los revisa y los manda una persona.',
+  ].join('\n')
+}
+
 const copiar = async (texto: string, setAviso: (a: Aviso) => void, que: string) => {
   try {
     await navigator.clipboard.writeText(texto)
@@ -58,8 +80,11 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
   const [consultando, setConsultando] = useState(false)
   const [elegido, setElegido] = useState<string | null>(null)
   const [desconectar, setDesconectar] = useState(false)
+  const [zona, setZona] = useState('Puerto Iguazú y localidades cercanas de Misiones (Argentina)')
+  const [rubros, setRubros] = useState('')
 
   const cuentas = texto.split(/[\s,;]+/).filter(Boolean)
+  const puedeBuscar = cuentas.length <= MAX_CUENTAS && (zona.trim().length > 0 || cuentas.length > 0)
   const consultar = async () => {
     setConsultando(true)
     try {
@@ -93,23 +118,64 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
 
   return (
     <>
-      <Card title="Cuentas a consultar" subtitle={`Pegá usuarios o direcciones de perfil de Instagram, hasta ${MAX_CUENTAS} por vez. Solo se ven las cuentas profesionales (de empresa o creador).`}>
+      <Card title="Buscar y analizar con Claude" subtitle="Podés dejar que Claude busque tiendas solo, partir de cuentas que vos conocés, o usar las dos cosas. Vos solo revisás y mandás los mensajes.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <textarea
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder={'@tienda_uno\nhttps://www.instagram.com/tienda_dos/'}
-            aria-label="Cuentas de Instagram"
-            style={{ ...inputStyle, height: 'auto', minHeight: 96, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }}
-          />
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" onClick={consultar} disabled={!puedeEditar || consultando || cuentas.length === 0 || cuentas.length > MAX_CUENTAS} style={{ ...btnPrimary, opacity: !cuentas.length || cuentas.length > MAX_CUENTAS || consultando ? 0.6 : 1 }}>
-              {consultando ? 'Consultando…' : 'Consultar cuentas'}
-            </button>
-            <span style={{ fontSize: 12.5, color: cuentas.length > MAX_CUENTAS ? 'var(--color-error)' : 'var(--color-muted)' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: 'var(--color-muted)' }}>
+            {`Cuentas que ya conocés (opcional, hasta ${MAX_CUENTAS}): usuarios o direcciones de perfil de Instagram`}
+            <textarea
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder={'@tienda_uno\nhttps://www.instagram.com/tienda_dos/'}
+              style={{ ...inputStyle, height: 'auto', minHeight: 80, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }}
+            />
+            <span style={{ color: cuentas.length > MAX_CUENTAS ? 'var(--color-error)' : 'var(--color-muted)' }}>
               {cuentas.length} {cuentas.length === 1 ? 'cuenta' : 'cuentas'}{cuentas.length > MAX_CUENTAS ? `: el máximo es ${MAX_CUENTAS}` : ''}
             </span>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: 'var(--color-muted)' }}>
+            Zona
+            <input value={zona} onChange={(e) => setZona(e.target.value)} maxLength={200} style={{ ...inputStyle, width: '100%' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, color: 'var(--color-muted)' }}>
+            Rubros (opcional: si lo dejás vacío, Claude prueba con los que Órbita ya soporta)
+            <input value={rubros} onChange={(e) => setRubros(e.target.value)} maxLength={200} placeholder="indumentaria, calzado, regalería…" style={{ ...inputStyle, width: '100%' }} />
+          </label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={!puedeBuscar}
+              onClick={() => window.open(`https://claude.ai/new?q=${encodeURIComponent(instruccionDeBusqueda(zona.trim(), rubros.trim(), cuentas))}`, '_blank', 'noopener')}
+              style={{ ...btnPrimary, opacity: puedeBuscar ? 1 : 0.6 }}
+            >{cuentas.length ? 'Abrir Claude: analizar y buscar parecidas' : 'Abrir Claude y buscar tiendas'}</button>
+            <button type="button" disabled={!puedeBuscar} onClick={() => copiar(instruccionDeBusqueda(zona.trim(), rubros.trim(), cuentas), setAviso, 'La instrucción')} className="ds-hover" style={{ ...btnGhost, opacity: puedeBuscar ? 1 : 0.6 }}>Copiar la instrucción</button>
+            {cuentas.length > 0 && (
+              <button type="button" onClick={consultar} disabled={!puedeEditar || consultando || cuentas.length > MAX_CUENTAS} className="ds-hover" style={{ ...btnGhost, opacity: consultando || cuentas.length > MAX_CUENTAS ? 0.6 : 1 }}>
+                {consultando ? 'Consultando…' : 'Solo consultar estas cuentas'}
+              </button>
+            )}
           </div>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.55 }}>
+            {cuentas.length
+              ? 'Claude consulta primero tus cuentas, mira qué tienen en común (rubro, zona, forma de vender) y busca otras parecidas en la web pública. «Solo consultar» las guarda como un lote sin usar a Claude; después podés analizarlo desde el lote.'
+              : 'Claude busca tiendas de la zona en la web pública, las consulta por Meta y las analiza.'}
+            {' '}Cuando termine, el lote aparece abajo en «Lotes» (tocá «Actualizar» si no está). La búsqueda web tiene que estar activada en tu cuenta de Claude: Instagram no tiene un buscador que Órbita pueda consultar. Solo entran cuentas profesionales (de empresa o creador).
+          </p>
+          <details style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--color-text)', fontWeight: 600 }}>Primera vez: conectar Claude</summary>
+            <div style={{ marginTop: 8 }}>
+              En Claude: Configuración → Conectores → «Agregar conector personalizado», con esta dirección. Claude abre una pantalla del panel para que lo autorices con tu cuenta de la organización. Es una vez por persona.
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                <code style={{ padding: '7px 10px', borderRadius: 8, background: 'var(--color-surface-alt)', color: 'var(--color-text)', fontSize: 12.5, overflowWrap: 'anywhere' }}>{URL_CONECTOR}</code>
+                <button type="button" onClick={() => copiar(URL_CONECTOR, setAviso, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>
+              </div>
+              {puedeEditar && (
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, maxWidth: 520 }}>El acceso de Claude dura hasta que lo cortes. Desconectar cierra todos los Claude conectados con tu usuario.</span>
+                  <button type="button" onClick={() => setDesconectar(true)} className="ds-hover" style={btnGhostSm}>Desconectar Claude</button>
+                </div>
+              )}
+            </div>
+          </details>
         </div>
       </Card>
 
@@ -138,7 +204,12 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
         <Card
           title="Cuentas del lote"
           subtitle={lote ? `Criterio del ${lote.versionCriterio}` : undefined}
-          action={<button type="button" onClick={() => setTickLote((n) => n + 1)} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Actualizar</button>}
+          action={(
+            <span style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => window.open(`https://claude.ai/new?q=${encodeURIComponent(instruccionParaClaude(loteId))}`, '_blank', 'noopener')} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Analizar este lote con Claude</button>
+              <button type="button" onClick={() => setTickLote((n) => n + 1)} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>Actualizar</button>
+            </span>
+          )}
         >
           {cargandoLote ? <Loader /> : errorLote || !lote ? <ErrorBox msg="No se pudo leer el lote." /> : (
             <>
@@ -170,37 +241,6 @@ export function PanelProspeccion({ puedeEditar, setAviso }: { puedeEditar: boole
       )}
 
       {prospecto && <DetalleProspecto key={prospecto.id} p={prospecto} puedeEditar={puedeEditar} onCambiar={(c) => cambiar(prospecto, c)} setAviso={setAviso} />}
-
-      <Card title="Analizar con Claude" subtitle="Cada persona usa su propio Claude: no hay clave de API ni nada que instalar">
-        <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6 }}>
-          <li>
-            Una sola vez, en Claude: Configuración → Conectores → «Agregar conector personalizado», con esta dirección. Claude va a abrir esta pantalla del panel para que lo autorices con tu cuenta de la organización.
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-              <code style={{ padding: '7px 10px', borderRadius: 8, background: 'var(--color-surface-alt)', color: 'var(--color-text)', fontSize: 12.5, overflowWrap: 'anywhere' }}>{URL_CONECTOR}</code>
-              <button type="button" onClick={() => copiar(URL_CONECTOR, setAviso, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>
-            </div>
-          </li>
-          <li>
-            Elegí un lote arriba y abrí Claude con la instrucción lista. Si no se completa sola, copiala y pegala en una conversación nueva.
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              <button
-                type="button"
-                disabled={!loteId}
-                onClick={() => loteId && window.open(`https://claude.ai/new?q=${encodeURIComponent(instruccionParaClaude(loteId))}`, '_blank', 'noopener')}
-                style={{ ...btnPrimary, opacity: loteId ? 1 : 0.6 }}
-              >Abrir Claude con este lote</button>
-              <button type="button" disabled={!loteId} onClick={() => loteId && copiar(instruccionParaClaude(loteId), setAviso, 'La instrucción')} className="ds-hover" style={{ ...btnGhost, opacity: loteId ? 1 : 0.6 }}>Copiar la instrucción</button>
-            </div>
-          </li>
-          <li>Cuando Claude termine, tocá «Actualizar» en el lote: vas a ver el análisis y el mensaje sugerido de cada cuenta. Revisalo y mandalo vos desde Instagram.</li>
-        </ol>
-        {puedeEditar && (
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.5, maxWidth: 520 }}>El acceso de Claude dura hasta que lo cortes. Desconectar cierra todos los Claude conectados con tu usuario.</span>
-            <button type="button" onClick={() => setDesconectar(true)} className="ds-hover" style={btnGhostSm}>Desconectar Claude</button>
-          </div>
-        )}
-      </Card>
 
       {desconectar && (
         <ConfirmModal
