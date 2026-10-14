@@ -16,6 +16,6 @@ import { InstagramService } from './instagram.service';
   imports: [CostsModule],
   controllers: [InstagramController, InstagramWebhookController, InstagramAdminController],
   providers: [InstagramService, InstagramPublicacionesService, InstagramMediosService, InstagramComentariosService, InstagramEstadisticasService, InstagramBandejaService, InstagramOrbiService, InstagramAjustesService],
-  exports: [InstagramService, InstagramPublicacionesService, InstagramComentariosService], // ConversationsService responde por Instagram; el cron renueva los tokens
+  exports: [InstagramService, InstagramPublicacionesService, InstagramComentariosService, InstagramMediosService, InstagramEstadisticasService], // ConversationsService responde por Instagram; el cron renueva los tokens; el super panel (Marketing) usa el resto
 })
 export class InstagramModule {}

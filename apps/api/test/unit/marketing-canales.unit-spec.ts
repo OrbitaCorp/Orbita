@@ -54,7 +54,17 @@ describe('canales de la empresa', () => {
     const { svc } = armar({ ig: { username: 'orbita.site', status: 'ACTIVE', tokenExpiresAt: new Date('2026-12-06T21:53:38Z') } });
     const r = await svc.canales(AHORA);
     expect(r.negocio).toEqual({ nombre: 'alexadner messi', subdominio: 'negocio' });
-    expect(r.instagram).toEqual({ conectado: true, usuario: 'orbita.site', venceEl: new Date('2026-12-06T21:53:38Z'), diasRestantes: 59, mensajesSinLeer: 0 });
+    expect(r.instagram).toEqual({ conectado: true, usuario: 'orbita.site', venceEl: new Date('2026-12-06T21:53:38Z'), diasRestantes: 59, mensajesSinLeer: 0, permisos: { publicar: false, comentarios: false, estadisticas: false } });
+  });
+
+  it('informa qué permisos del kit de difusión concedió la cuenta: sin ellos el super panel pide volver a conectar', async () => {
+    const fecha = new Date('2026-12-06T21:53:38Z');
+    const solo = armar({ ig: { username: 'orbita.site', status: 'ACTIVE', tokenExpiresAt: fecha, scopes: 'instagram_business_basic,instagram_business_manage_messages' } });
+    expect((await solo.svc.canales(AHORA)).instagram).toMatchObject({ permisos: { publicar: false, comentarios: false, estadisticas: false } });
+    const kit = armar({
+      ig: { username: 'orbita.site', status: 'ACTIVE', tokenExpiresAt: fecha, scopes: 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights' },
+    });
+    expect((await kit.svc.canales(AHORA)).instagram).toMatchObject({ permisos: { publicar: true, comentarios: true, estadisticas: true } });
   });
 
   it('cuenta las conversaciones de Instagram sin leer del negocio (no las archivadas)', async () => {

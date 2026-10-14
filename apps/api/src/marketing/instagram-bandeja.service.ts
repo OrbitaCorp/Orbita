@@ -90,7 +90,7 @@ export class InstagramBandejaService {
     await this.prisma.platformAdminLog
       .create({ data: { adminId, action: 'instagram_connect', targetType: 'marketing_instagram', targetId: businessId } })
       .catch(() => undefined); // es un registro: no puede impedir la conexión
-    return { url: this.instagram.urlDeAutorizacionEmpresa(businessId) };
+    return { url: this.instagram.urlDeAutorizacionEmpresa(businessId, 'kit') };
   }
 
   /**

@@ -418,6 +418,14 @@ que no hace falta verificar ningún dominio. Hay dos formas de mandarlos: **publ
 **enviar a borradores** (el video llega a la cuenta y una persona lo termina en la app de TikTok). Los permisos
 que se piden al conectar salen de `TIKTOK_SCOPES` (por defecto los tres) y tienen que coincidir con los de la app.
 
+**Ver los videos de la cuenta y sus números** (Marketing → TikTok → Videos de la cuenta) pide dos permisos más:
+`video.list` (los videos, con vistas, me gusta, comentarios y compartidos) y `user.info.stats` (seguidores y totales).
+Se activan en la app de TikTok (developers.tiktok.com → Products → Display API / Login Kit → Scopes), se suman a
+`TIKTOK_SCOPES` en `deploy/env-vars.yaml` (`user.info.basic,video.publish,video.upload,video.list,user.info.stats`),
+se despliega y se vuelve a conectar la cuenta desde Marketing. Mientras no estén, la pantalla muestra qué permiso
+falta en vez de fallar. Los **comentarios** de los videos no se pueden leer ni contestar: la API de TikTok solo da
+su cantidad.
+
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 

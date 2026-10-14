@@ -3,6 +3,8 @@ import { useRouter } from 'next/router'
 import { platformApi, type MarketingCanales, type TiktokCreador, type TiktokEstado, type TiktokPublicacion } from '@/lib/platform/api'
 import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import { InstagramBandeja } from './InstagramBandeja'
+import { InstagramComentarios, InstagramEstadisticas, InstagramPublicaciones } from './InstagramContenido'
+import { TiktokContenido } from './TiktokContenido'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
@@ -107,8 +109,8 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
       <AnuncioSandbox />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-        <CanalTarjeta nombre="TikTok" para="Videos de la marca" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
-        <CanalTarjeta nombre="Instagram" para="Mensajes directos y, más adelante, publicaciones" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
+        <CanalTarjeta nombre="TikTok" para="Videos de la marca y sus números" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
+        <CanalTarjeta nombre="Instagram" para="Mensajes, publicaciones, comentarios y estadísticas" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
         <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
       </div>
 
@@ -281,6 +283,7 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar
 
       {estado.conectado && <Publicar puedePublicar={puedePublicar} onPublicado={onCambio} setAviso={setAviso} />}
       {estado.conectado && <Publicaciones refrescar={refrescar} />}
+      {estado.conectado && <TiktokContenido refrescar={refrescar} />}
 
     </>
   )
@@ -288,10 +291,21 @@ function PanelTiktok({ estado, puedePublicar, refrescar, onCambio, onDesconectar
 
 // ─── Instagram ──────────────────────────────────────────────────────────────────
 
+type VistaInstagram = 'mensajes' | 'publicaciones' | 'comentarios' | 'estadisticas'
+const VISTAS_INSTAGRAM: { id: VistaInstagram; texto: string }[] = [
+  { id: 'mensajes', texto: 'Mensajes' },
+  { id: 'publicaciones', texto: 'Publicaciones' },
+  { id: 'comentarios', texto: 'Comentarios' },
+  { id: 'estadisticas', texto: 'Estadísticas' },
+]
+
 function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }: { canales: MarketingCanales | null; puedeVer: boolean; onCambio: () => void; onDesconectar: () => void; setAviso: (a: Aviso) => void }) {
   const [conectando, setConectando] = useState(false)
+  const [vista, setVista] = useState<VistaInstagram>('mensajes')
   if (!canales) return <Card title="Instagram"><Loader /></Card>
   const { instagram: ig, negocio } = canales
+  // Sin los permisos del kit (publicar, comentarios y estadísticas) esas pestañas no pueden leer nada: hay que volver a conectar.
+  const faltaKit = ig.conectado && !(ig.permisos.publicar && ig.permisos.comentarios && ig.permisos.estadisticas)
 
   // Conectar o renovar es de la empresa: el login de Instagram se inicia desde acá y vuelve a esta pantalla. Antes se
   // mandaba al panel del negocio al que está atada la cuenta, y el super admin no tiene sesión ahí (cada negocio
@@ -314,7 +328,7 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }
         subtitle="La cuenta de la empresa conectada a Órbita"
         action={(
           <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            {negocio && puedeVer && (!ig.conectado || ig.diasRestantes < 10) && (
+            {negocio && puedeVer && (!ig.conectado || ig.diasRestantes < 10 || faltaKit) && (
               <button type="button" onClick={conectar} disabled={conectando} className="ds-hover" style={{ ...btnGhostSm, height: 34 }}>
                 {conectando ? 'Abriendo Instagram…' : ig.conectado ? 'Renovar la conexión' : 'Conectar la cuenta'}
               </button>
@@ -338,7 +352,28 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }
         )}
       </Card>
 
-      {ig.conectado && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
+      {ig.conectado && faltaKit && puedeVer && (
+        <div role="status" style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12.5, lineHeight: 1.55 }}>
+          A la cuenta le faltan permisos para {[!ig.permisos.publicar && 'publicar', !ig.permisos.comentarios && 'ver y contestar comentarios', !ig.permisos.estadisticas && 'ver las estadísticas'].filter(Boolean).join(', ')}.
+          Tocá «Renovar la conexión» y aceptá todos los permisos que pide Instagram. Mientras la app de Meta esté en modo de pruebas, la cuenta tiene que tener un rol en la app.
+        </div>
+      )}
+
+      {ig.conectado && (
+        <div role="tablist" aria-label="Instagram" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {VISTAS_INSTAGRAM.map((v) => (
+            <button
+              key={v.id} type="button" role="tab" aria-selected={vista === v.id} onClick={() => setVista(v.id)}
+              style={{ ...btnGhostSm, height: 36, padding: '0 16px', fontSize: 13, ...(vista === v.id ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)', background: 'var(--color-primary-bg)' } : {}) }}
+            >{v.texto}</button>
+          ))}
+        </div>
+      )}
+
+      {ig.conectado && vista === 'mensajes' && <InstagramBandeja permitido={puedeVer} onCambio={onCambio} />}
+      {ig.conectado && vista === 'publicaciones' && <InstagramPublicaciones puedePublicar={puedeVer} permisoDePublicar={ig.permisos.publicar} setAviso={setAviso} />}
+      {ig.conectado && vista === 'comentarios' && <InstagramComentarios puedePublicar={puedeVer} setAviso={setAviso} />}
+      {ig.conectado && vista === 'estadisticas' && <InstagramEstadisticas />}
 
 
       <Card title="Qué se puede hacer" subtitle="Lo que está disponible hoy y lo que depende de la revisión de Meta">
@@ -349,13 +384,13 @@ function PanelInstagram({ canales, puedeVer, onCambio, onDesconectar, setAviso }
         />
         <Fila
           titulo="Publicar fotos y Reels"
-          detalle="Necesita el permiso de publicación de Instagram, que Meta da después de revisar la app."
-          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+          detalle="Pestaña Publicaciones. Para cuentas sin rol en la app de Meta hace falta el permiso de publicación, que Meta da después de revisar la app."
+          estado={ig.conectado ? (ig.permisos.publicar ? { texto: 'Disponible', tono: 'green' } : { texto: 'Falta el permiso', tono: 'amber' }) : { texto: 'Sin conectar', tono: 'gray' }}
         />
         <Fila
           titulo="Métricas de la cuenta"
-          detalle="Alcance, seguidores e interacciones. Depende de la misma revisión."
-          estado={{ texto: 'Pendiente de Meta', tono: 'amber' }}
+          detalle="Pestañas Comentarios y Estadísticas: alcance, seguidores, interacciones y qué publicar y cuándo. Depende de la misma revisión para cuentas sin rol."
+          estado={ig.conectado ? (ig.permisos.estadisticas && ig.permisos.comentarios ? { texto: 'Disponible', tono: 'green' } : { texto: 'Falta el permiso', tono: 'amber' }) : { texto: 'Sin conectar', tono: 'gray' }}
           ultimo
         />
       </Card>

@@ -4,6 +4,7 @@
 // así que no se manda X-Business-Slug.
 
 import { authedFetch } from '@/lib/auth/authClient'
+import type { InstagramArchivoSubido, InstagramEstadisticas, InstagramItemPublicacion, InstagramPublicacion, InstagramPublicacionComentada, InstagramRendimiento } from '@/lib/api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -84,8 +85,54 @@ export type InstagramPedido = {
 // Instagram y WhatsApp de la empresa: se leen del negocio al que están conectados (ver apps/api/src/marketing/canales.service.ts).
 export type MarketingCanales = {
   negocio: { nombre: string; subdominio: string } | null
-  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: string; diasRestantes: number; mensajesSinLeer: number }
+  instagram:
+    | { conectado: false }
+    | {
+        conectado: true; usuario: string | null; venceEl: string; diasRestantes: number; mensajesSinLeer: number
+        /** Los permisos del kit de difusión que concedió la cuenta: sin ellos hay que volver a conectarla. */
+        permisos: { publicar: boolean; comentarios: boolean; estadisticas: boolean }
+      }
   whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean }
+}
+// Lo que se manda para publicar o programar en la cuenta de la empresa: de 1 a 10 elementos (varios forman un carrusel).
+export type IgPublicacionInput = { caption: string; formato: 'cuadrado' | 'vertical'; items: InstagramItemPublicacion[] }
+// Todo lo publicado en la cuenta de Instagram de la empresa, con sus números (ver instagram-contenido.service.ts).
+// null = Instagram no dio ese número para esa publicación.
+export type IgPublicacionDeLaCuenta = {
+  id: string
+  tipo: 'foto' | 'video' | 'carrusel'
+  reel: boolean
+  texto: string
+  imagen: string | null
+  enlace: string | null
+  fecha: string | null
+  likes: number
+  comentarios: number
+  vistas: number | null
+  alcance: number | null
+  guardados: number | null
+  compartidos: number | null
+}
+// Los videos de la cuenta de TikTok de la empresa y sus números (ver tiktok.service.ts, contenidoDeLaCuenta).
+export type TiktokVideo = {
+  id: string
+  titulo: string
+  portada: string | null
+  enlace: string | null
+  fecha: string | null
+  duracionSeg: number
+  vistas: number
+  likes: number
+  comentarios: number
+  compartidos: number
+}
+export type TiktokContenido = {
+  /** null = a la conexión le falta el permiso `video.list`. */
+  videos: TiktokVideo[] | null
+  /** null = a la conexión le falta el permiso `user.info.stats`. */
+  perfil: { seguidores: number; siguiendo: number; likes: number; videos: number } | null
+  /** Los permisos de TikTok que la conexión no tiene. */
+  faltan: string[]
 }
 // La bandeja de mensajes directos de Instagram de la empresa (ver apps/api/src/marketing/instagram-bandeja.service.ts).
 export type IgConversacion = {
@@ -139,6 +186,18 @@ async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
   return (await res.json()) as T
+}
+
+// Igual que getJSON, pero el error lleva el motivo que dio el servidor (por ejemplo "Falta autorizar los comentarios:
+// volvé a conectar Instagram"), que la pantalla muestra tal cual en vez de un "Platform API 403".
+async function getJSONConMensaje<T>(path: string): Promise<T> {
+  const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const msg = (data as { message?: string | string[] } | null)?.message
+    throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? `Platform API ${res.status}`))
+  }
+  return data as T
 }
 
 async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
@@ -1019,6 +1078,48 @@ export const platformApi = {
   igConversaciones: () => getJSON<IgConversacion[]>('/platform/marketing/instagram/conversations'),
   igMensajes: (id: string) => getJSON<IgMensaje[]>(`/platform/marketing/instagram/conversations/${id}/messages`),
   igConectar: () => sendJSON<{ url: string }>('/platform/marketing/instagram/connect', 'POST'),
+  // Contenido de la cuenta: publicaciones, comentarios y estadísticas (mismas formas que Difusión en el panel de un negocio).
+  igPublicacionesDeLaCuenta: () => getJSONConMensaje<IgPublicacionDeLaCuenta[]>('/platform/marketing/instagram/posts/account'),
+  igPublicacionesDeOrbita: () => getJSONConMensaje<InstagramPublicacion[]>('/platform/marketing/instagram/posts'),
+  igPublicar: (input: IgPublicacionInput) => sendJSON<InstagramPublicacion>('/platform/marketing/instagram/posts', 'POST', input),
+  igProgramar: (input: IgPublicacionInput & { programarPara: string }) => sendJSON<InstagramPublicacion>('/platform/marketing/instagram/posts/schedule', 'POST', input),
+  igContinuarPublicacion: (id: string) => sendJSON<InstagramPublicacion>(`/platform/marketing/instagram/posts/${id}/continuar`, 'POST'),
+  igDescartarPublicacion: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/instagram/posts/${id}`, 'DELETE'),
+  igSubirFoto: async (file: File): Promise<InstagramArchivoSubido> => {
+    const form = new FormData()
+    form.append('file', file, file.name)
+    const res = await authedFetch(`${API_BASE}/platform/marketing/instagram/media/foto`, { method: 'POST', body: form })
+    const data = (await res.json().catch(() => null)) as (InstagramArchivoSubido & { message?: string | string[] }) | null
+    if (!res.ok || !data?.ref) {
+      const msg = data?.message
+      throw new PlatformApiError(res.status, Array.isArray(msg) ? msg.join('. ') : (msg ?? 'No se pudo subir la foto.'))
+    }
+    return data
+  },
+  // El video no pasa por la API (pesa demasiado): se pide una dirección firmada y el navegador lo sube directo al almacenamiento.
+  igSubirVideo: async (file: File, onProgreso?: (porcentaje: number) => void): Promise<InstagramArchivoSubido> => {
+    const tipo = file.type || (file.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+    const prep = await sendJSON<InstagramArchivoSubido & { subida: { url: string; token: string } }>('/platform/marketing/instagram/media/video', 'POST', { tipo, bytes: file.size })
+    await new Promise<void>((resolve, reject) => {
+      const form = new FormData()
+      form.append('cacheControl', '3600')
+      form.append('', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', prep.subida.url)
+      xhr.setRequestHeader('x-upsert', 'false')
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgreso?.(Math.round((e.loaded / e.total) * 100)) }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new PlatformApiError(xhr.status, 'No se pudo subir el video. Probá de nuevo.')))
+      xhr.onerror = () => reject(new PlatformApiError(0, 'Se cortó la subida del video. Revisá tu conexión y probá de nuevo.'))
+      xhr.send(form)
+    })
+    return { ref: prep.ref, tipo: 'video', url: prep.url }
+  },
+  igComentarios: () => getJSONConMensaje<{ publicaciones: InstagramPublicacionComentada[]; ocultadosAutomaticamente?: number }>('/platform/marketing/instagram/comments'),
+  igResponderComentario: (id: string, texto: string) => sendJSON<{ id: string }>(`/platform/marketing/instagram/comments/${id}/reply`, 'POST', { texto }),
+  igOcultarComentario: (id: string, oculto: boolean) => sendJSON<{ id: string; oculto: boolean }>(`/platform/marketing/instagram/comments/${id}/hide`, 'POST', { oculto }),
+  igEstadisticas: (dias: 7 | 28) => getJSONConMensaje<InstagramEstadisticas>(`/platform/marketing/instagram/insights?dias=${dias}`),
+  igRendimiento: () => getJSONConMensaje<InstagramRendimiento>('/platform/marketing/instagram/insights/rendimiento'),
+  tiktokContenido: () => getJSONConMensaje<TiktokContenido>('/platform/marketing/tiktok/content'),
   igDesconectar: () => sendJSON<{ connected: false }>('/platform/marketing/instagram/connection', 'DELETE'),
   igResponder: (id: string, text: string) => sendJSON<IgMensaje>(`/platform/marketing/instagram/conversations/${id}/messages`, 'POST', { text }),
   tiktokUrlDeSubida: (mimetype: string) => sendJSON<{ uploadUrl: string; publicUrl: string }>('/platform/marketing/tiktok/video-upload-url', 'POST', { mimetype }),

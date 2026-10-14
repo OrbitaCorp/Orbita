@@ -53,6 +53,13 @@ export class TiktokController {
     return this.tiktok.urlDeSubida(dto.mimetype);
   }
 
+  // Lo que ya está publicado en la cuenta, con sus números (vistas, me gusta, comentarios, compartidos).
+  @Get('content')
+  @SoloSuperadmin()
+  contenido(@Query('limit') limit?: string) {
+    return this.tiktok.contenidoDeLaCuenta(limit ? Number(limit) || 20 : 20);
+  }
+
   @Get('posts')
   publicaciones(@Query('limit') limit?: string) {
     return this.tiktok.publicaciones(limit ? Number(limit) || 20 : 20);

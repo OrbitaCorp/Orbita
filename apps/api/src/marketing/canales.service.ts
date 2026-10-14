@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { SCOPE_COMENTAR, SCOPE_ESTADISTICAS, SCOPE_PUBLICAR } from '../instagram/instagram.service';
 
 // Los canales de la EMPRESA (Instagram y WhatsApp) para la pantalla Marketing del super panel.
 //
@@ -21,7 +22,7 @@ export function esNumeroDePrueba(numero: string | null | undefined): boolean {
 export type CanalesEmpresa = {
   /** El negocio al que están conectadas las cuentas. null = no existe (cambió el subdominio o se borró). */
   negocio: { nombre: string; subdominio: string } | null;
-  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: Date; diasRestantes: number; mensajesSinLeer: number };
+  instagram: { conectado: false } | { conectado: true; usuario: string | null; venceEl: Date; diasRestantes: number; mensajesSinLeer: number; permisos: { publicar: boolean; comentarios: boolean; estadisticas: boolean } };
   whatsapp: { conectado: false } | { conectado: true; numero: string | null; dePrueba: boolean };
 };
 
@@ -41,7 +42,7 @@ export class CanalesService {
     if (!negocio) return { negocio: null, instagram: { conectado: false }, whatsapp: { conectado: false } };
 
     const [ig, wa] = await Promise.all([
-      this.prisma.instagramConnection.findUnique({ where: { businessId: negocio.id }, select: { username: true, status: true, tokenExpiresAt: true } }),
+      this.prisma.instagramConnection.findUnique({ where: { businessId: negocio.id }, select: { username: true, status: true, tokenExpiresAt: true, scopes: true } }),
       this.prisma.whatsappConnection.findUnique({ where: { businessId: negocio.id }, select: { status: true, displayPhone: true } }),
     ]);
 
@@ -54,11 +55,24 @@ export class CanalesService {
     return {
       negocio: { nombre: negocio.name, subdominio: negocio.subdomain },
       instagram: ig && instagramActivo
-        ? { conectado: true, usuario: ig.username, venceEl: ig.tokenExpiresAt, diasRestantes: Math.max(0, Math.ceil((ig.tokenExpiresAt.getTime() - ahora.getTime()) / DIA_MS)), mensajesSinLeer: sinLeer }
+        ? { conectado: true, usuario: ig.username, venceEl: ig.tokenExpiresAt, diasRestantes: Math.max(0, Math.ceil((ig.tokenExpiresAt.getTime() - ahora.getTime()) / DIA_MS)), mensajesSinLeer: sinLeer, permisos: permisosDe(ig.scopes) }
         : { conectado: false },
       whatsapp: wa && wa.status === 'ACTIVE'
         ? { conectado: true, numero: wa.displayPhone, dePrueba: esNumeroDePrueba(wa.displayPhone) }
         : { conectado: false },
     };
   }
+}
+
+/**
+ * Qué permisos del kit de difusión concedió la persona al conectar: sin ellos no se puede publicar, ver los
+ * comentarios ni las estadísticas, y el super panel pide volver a conectar la cuenta.
+ */
+function permisosDe(scopes: string | null | undefined) {
+  const dados = (scopes ?? '').split(',').map((s) => s.trim());
+  return {
+    publicar: dados.includes(SCOPE_PUBLICAR),
+    comentarios: dados.includes(SCOPE_COMENTAR),
+    estadisticas: dados.includes(SCOPE_ESTADISTICAS),
+  };
 }

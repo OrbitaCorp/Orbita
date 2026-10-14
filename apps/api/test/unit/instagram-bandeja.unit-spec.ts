@@ -135,7 +135,7 @@ describe('conectar', () => {
     const { svc, instagram } = armar();
     expect(await svc.conectar('admin-1')).toEqual({ url: 'https://www.instagram.com/oauth/authorize?state=x' });
     expect(instagram.asegurarHabilitado).toHaveBeenCalledWith('b-orbita');
-    expect(instagram.urlDeAutorizacionEmpresa).toHaveBeenCalledWith('b-orbita');
+    expect(instagram.urlDeAutorizacionEmpresa).toHaveBeenCalledWith('b-orbita', 'kit'); // pide también publicar, comentarios y estadísticas
   });
 
   it('queda anotado quién la pidió', async () => {

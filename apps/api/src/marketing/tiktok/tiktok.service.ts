@@ -62,6 +62,30 @@ export type InfoDelCreador = {
   duracionMaximaSeg: number;
 };
 
+export type VideoDeTiktok = {
+  id: string;
+  titulo: string;
+  portada: string | null;
+  enlace: string | null;
+  fecha: string | null;
+  duracionSeg: number;
+  vistas: number;
+  likes: number;
+  comentarios: number;
+  compartidos: number;
+};
+
+export type PerfilDeTiktok = { seguidores: number; siguiendo: number; likes: number; videos: number };
+
+export type ContenidoDeTiktok = {
+  /** null = a la conexión le falta el permiso `video.list` (ver `faltan`). */
+  videos: VideoDeTiktok[] | null;
+  /** null = a la conexión le falta el permiso `user.info.stats` (ver `faltan`). */
+  perfil: PerfilDeTiktok | null;
+  /** Los permisos de TikTok que la conexión no tiene: hay que activarlos en la app de TikTok y volver a conectar. */
+  faltan: string[];
+};
+
 /**
  * Cómo se parte un video para subirlo: TikTok pide trozos de entre 5 y 64 MB y la cantidad de
  * trozos es `floor(tamaño / trozo)`; el último absorbe lo que sobra. Un video de menos de 5 MB
@@ -337,6 +361,56 @@ export class TiktokService {
       stitchDeshabilitado: !!d.stitch_disabled,
       duracionMaximaSeg: d.max_video_post_duration_sec ?? 0,
     };
+  }
+
+  /**
+   * Lo que ya está publicado en la cuenta y sus números: los videos con vistas, me gusta, comentarios y
+   * compartidos, y el total de la cuenta (seguidores, me gusta, videos). Cada parte pide su permiso a TikTok
+   * (`video.list` y `user.info.stats`): si la conexión no lo tiene, esa parte viene en `faltan` en vez de
+   * fallar, y el super panel explica que hay que activarlo en la app de TikTok y volver a conectar.
+   *
+   * TikTok NO da acceso a los comentarios de los videos con esta API (solo a los números): no hay forma de
+   * leerlos ni contestarlos desde acá.
+   */
+  async contenidoDeLaCuenta(limite = 20): Promise<ContenidoDeTiktok> {
+    const v = await this.tokenVigente();
+    if (!v) throw new BadRequestException('TikTok no está conectado');
+    const cuenta = await this.prisma.marketingTiktokAccount.findFirst({ orderBy: { createdAt: 'asc' }, select: { scopes: true } });
+    const permisos = (cuenta?.scopes ?? '').split(',').map((s) => s.trim());
+    const faltan: string[] = [];
+
+    const leerVideos = async (): Promise<VideoDeTiktok[] | null> => {
+      if (!permisos.includes('video.list')) { faltan.push('video.list'); return null; }
+      const campos = 'id,title,video_description,cover_image_url,share_url,create_time,duration,like_count,comment_count,share_count,view_count';
+      const r = await this.llamarApi<{ data?: { videos?: Record<string, string | number>[] } }>(
+        'POST', `${TIKTOK}/v2/video/list/?fields=${campos}`, v.token, { max_count: Math.min(Math.max(limite, 1), 20) },
+      ).catch((e: unknown) => this.traducir(e));
+      return (r.data?.videos ?? []).map((x) => ({
+        id: String(x.id),
+        titulo: String(x.title || x.video_description || ''),
+        portada: x.cover_image_url ? String(x.cover_image_url) : null,
+        enlace: x.share_url ? String(x.share_url) : null,
+        fecha: x.create_time ? new Date(Number(x.create_time) * 1000).toISOString() : null,
+        duracionSeg: Number(x.duration ?? 0),
+        vistas: Number(x.view_count ?? 0),
+        likes: Number(x.like_count ?? 0),
+        comentarios: Number(x.comment_count ?? 0),
+        compartidos: Number(x.share_count ?? 0),
+      }));
+    };
+
+    const leerPerfil = async (): Promise<PerfilDeTiktok | null> => {
+      if (!permisos.includes('user.info.stats')) { faltan.push('user.info.stats'); return null; }
+      const r = await this.llamarApi<{ data?: { user?: Record<string, string | number> } }>(
+        'GET', `${TIKTOK}/v2/user/info/?fields=display_name,follower_count,following_count,likes_count,video_count`, v.token,
+      ).catch((e: unknown) => this.traducir(e));
+      const u = r.data?.user;
+      if (!u) return null;
+      return { seguidores: Number(u.follower_count ?? 0), siguiendo: Number(u.following_count ?? 0), likes: Number(u.likes_count ?? 0), videos: Number(u.video_count ?? 0) };
+    };
+
+    const [videos, perfil] = await Promise.all([leerVideos(), leerPerfil()]);
+    return { videos, perfil, faltan };
   }
 
   /** Mensajes entendibles para los rechazos más comunes de TikTok. */
