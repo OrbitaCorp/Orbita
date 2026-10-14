@@ -468,6 +468,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Si el mismo producto viene en talles o colores, se cargan como **variantes**: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.' },
                 { tipo: 'parrafo', texto: 'El **orden de los valores** (S, M, L…) es el que ven tus clientes en la tienda. Para cambiarlo no hace falta borrar y volver a cargar: arrastrá cada valor a su lugar (en el celular, mantenelo apretado un instante y movelo). Con el teclado, usá las flechas izquierda y derecha.' },
                 { tipo: 'parrafo', texto: 'También podés definir un **stock mínimo**: cuando un producto baja de ahí, dispara la alerta de "stock crítico" en el Inicio y, si lo activaste, el aviso por la campana o por mail.' },
+                { tipo: 'parrafo', texto: 'Si tu tienda es una **vidriera digital** (sin carrito ni compra online), el **stock es opcional**: si lo dejás vacío, la ficha del producto no muestra unidades, ni "Sin stock", ni "Últimas unidades", y el producto se puede publicar igual. Si escribís una cantidad, se ve en la ficha. Es lo mismo en la importación por Excel (celda de stock vacía) y en la edición rápida de stock.' },
             ],
         },
         {

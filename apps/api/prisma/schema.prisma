@@ -952,6 +952,10 @@ model ProductVariant {
   // eso es quantity:0 con isActive:true (temporal); esto es una decisión del
   // dueño de no ofrecer esa combinación (puede revertirse sin perder nada).
   isActive     Boolean  @default(true) @map("is_active")
+  // Solo cuenta en una VIDRIERA (business.mode = SHOWCASE): false = el negocio no cargó stock de esta variante, así que
+  // la tienda no muestra unidades, ni "Sin stock", ni "Últimas unidades", y no deshabilita la combinación. En una
+  // tienda con checkout el stock es obligatorio y este campo se ignora (siempre se muestra).
+  showStock    Boolean  @default(true) @map("show_stock")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

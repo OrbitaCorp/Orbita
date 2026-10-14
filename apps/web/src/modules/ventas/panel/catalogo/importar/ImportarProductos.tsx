@@ -24,7 +24,7 @@ import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
 import {
-    ApiError, panelCreateCategory, panelCreateProduct, panelGetCategoriesFlat, panelUploadProductImage,
+    ApiError, panelCreateCategory, panelCreateProduct, panelGetBusiness, panelGetCategoriesFlat, panelUploadProductImage,
     type ApiCategory,
 } from '@/lib/api'
 import {
@@ -171,6 +171,8 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
     onImportado: () => void
 }) {
     const [paso, setPaso] = useState<Paso>('archivo')
+    // Vidriera digital: el stock es opcional (celda vacía = la tienda no lo muestra).
+    const [vidriera, setVidriera] = useState(false)
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
     const [bajando, setBajando] = useState(false)
     const [leyendo, setLeyendo] = useState(false)
@@ -190,6 +192,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- se lee al abrir: sessionStorage no existe en el servidor
         setPendientes(leerSesion())
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
+        panelGetBusiness().then(b => setVidriera(b.mode === 'SHOWCASE')).catch(() => setVidriera(false))
     }, [abierto])
 
     const guardar = (lista: Importado[]) => { setImportados(lista); guardarSesion(lista) }
@@ -226,7 +229,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
         if (!/\.xlsx$/i.test(archivo.name)) { setErrorArchivo('El archivo tiene que ser un Excel (.xlsx). Si lo tenés en otro formato, abrilo y usá "Guardar como → Libro de Excel".'); return }
         setLeyendo(true)
         try {
-            const r = armarProductos(await leerExcel(archivo))
+            const r = armarProductos(await leerExcel(archivo), { vidriera })
             setNombreArchivo(archivo.name)
             setLectura(r)
             setPaso('revision')
@@ -479,7 +482,7 @@ export function ImportarProductos({ abierto, onCerrar, onImportado }: {
                                                             : <span style={{ color: 'var(--color-subtle)' }}>sin variantes</span>}
                                                     </td>
                                                     <td className="num">{fmtMoney(p.precio)}</td>
-                                                    <td className="num">{p.stockTotal}</td>
+                                                    <td className="num">{p.sinStock ? '—' : p.stockTotal}</td>
                                                     <td><span className="imp-chip" data-tono={p.publicado ? 'ok' : undefined}>{p.publicado ? 'Publicado' : 'Borrador'}</span></td>
                                                 </tr>
                                             ))}

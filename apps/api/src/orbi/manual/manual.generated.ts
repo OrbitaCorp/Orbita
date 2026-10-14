@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "4d5bfe87d88cb271",
+  "version": "64fd7795253fefc7",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -269,7 +269,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "variantes",
       "capitulo": "Productos",
       "titulo": "Variantes y stock",
-      "texto": "Si el mismo producto viene en talles o colores, se cargan como variantes: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.\n\nEl orden de los valores (S, M, L…) es el que ven tus clientes en la tienda. Para cambiarlo no hace falta borrar y volver a cargar: arrastrá cada valor a su lugar (en el celular, mantenelo apretado un instante y movelo). Con el teclado, usá las flechas izquierda y derecha.\n\nTambién podés definir un stock mínimo: cuando un producto baja de ahí, dispara la alerta de \"stock crítico\" en el Inicio y, si lo activaste, el aviso por la campana o por mail.",
+      "texto": "Si el mismo producto viene en talles o colores, se cargan como variantes: es un solo producto en la tienda, con sus opciones adentro, y cada variante lleva su propio stock.\n\nEl orden de los valores (S, M, L…) es el que ven tus clientes en la tienda. Para cambiarlo no hace falta borrar y volver a cargar: arrastrá cada valor a su lugar (en el celular, mantenelo apretado un instante y movelo). Con el teclado, usá las flechas izquierda y derecha.\n\nTambién podés definir un stock mínimo: cuando un producto baja de ahí, dispara la alerta de \"stock crítico\" en el Inicio y, si lo activaste, el aviso por la campana o por mail.\n\nSi tu tienda es una vidriera digital (sin carrito ni compra online), el stock es opcional: si lo dejás vacío, la ficha del producto no muestra unidades, ni \"Sin stock\", ni \"Últimas unidades\", y el producto se puede publicar igual. Si escribís una cantidad, se ve en la ficha. Es lo mismo en la importación por Excel (celda de stock vacía) y en la edición rápida de stock.",
       "destino": {
         "seccion": "catalogo",
         "label": "Ir a Productos"

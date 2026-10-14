@@ -22,7 +22,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import {
-    panelGetProductFull, panelUpdateProduct, ApiError,
+    panelGetProductFull, panelUpdateProduct, panelGetBusiness, ApiError,
     type ApiProductFull, type UpsertProductInput,
 } from '@/lib/api'
 
@@ -33,7 +33,9 @@ function etiquetaVariante(v: ApiProductFull['variants'][number]): string {
 // Mismo criterio que ProductoNuevo.tsx armarPayload(): se manda SIEMPRE la
 // lista completa de variantes (no solo las que cambiaron) para que ninguna
 // se interprete como "ya no va" del lado del backend.
-function paraGuardar(full: ApiProductFull, stockPorVariante: Map<string, number>): UpsertProductInput {
+// `stockPorVariante`: el número de cada variante, o null = en blanco (solo en una vidriera, donde el stock es opcional: la
+// variante queda "sin stock cargado" y la tienda no lo muestra). `vidriera` false = nada cambia respecto de siempre.
+function paraGuardar(full: ApiProductFull, stockPorVariante: Map<string, number | null>, vidriera: boolean): UpsertProductInput {
     return {
         name: full.name,
         description: full.description ?? undefined,
@@ -54,7 +56,11 @@ function paraGuardar(full: ApiProductFull, stockPorVariante: Map<string, number>
             price: v.price,
             comparePrice: v.comparePrice ?? undefined,
             optionValues: v.optionValues.map(ov => ov.value),
-            initialStock: stockPorVariante.get(v.id) ?? (v.stock[0]?.quantity ?? 0),
+            ...((): Pick<UpsertProductInput['variants'][number], 'initialStock' | 'showStock'> => {
+                const valor = stockPorVariante.get(v.id)
+                if (vidriera && valor === null) return { showStock: false }
+                return { initialStock: valor ?? (v.stock[0]?.quantity ?? 0), ...(vidriera ? { showStock: true } : {}) }
+            })(),
             stockMin: v.stock[0]?.stockMin ?? 0,
             isActive: v.isActive,
         })),
@@ -74,6 +80,7 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
     const [error, setError] = useState('')
     const [valores, setValores] = useState<Record<string, string>>({})
     const [guardando, setGuardando] = useState(false)
+    const [vidriera, setVidriera] = useState(false)
 
     useEffect(() => {
         let vivo = true
@@ -81,10 +88,12 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
             .then(p => {
                 if (!vivo) return
                 setFull(p)
-                setValores(Object.fromEntries(p.variants.map(v => [v.id, String(v.stock[0]?.quantity ?? 0)])))
+                setValores(Object.fromEntries(p.variants.map(v => [v.id, v.showStock === false ? '' : String(v.stock[0]?.quantity ?? 0)])))
             })
             .catch(e => { if (vivo) setError(e instanceof ApiError ? e.message : 'No se pudo cargar el producto') })
             .finally(() => { if (vivo) setCargando(false) })
+        // Vidriera: el stock es opcional, en blanco = no se muestra. Sin esto (o si falla) el modal queda como siempre.
+        panelGetBusiness().then(b => { if (vivo) setVidriera(b.mode === 'SHOWCASE') }).catch(() => {})
         return () => { vivo = false }
     }, [productoId])
 
@@ -97,8 +106,10 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
         if (!full) return
         setGuardando(true)
         try {
-            const stockPorVariante = new Map(full.variants.map(v => [v.id, Number(valores[v.id]) || 0]))
-            await panelUpdateProduct(full.id, paraGuardar(full, stockPorVariante))
+            const stockPorVariante = new Map<string, number | null>(
+                full.variants.map(v => [v.id, vidriera && (valores[v.id] ?? '').trim() === '' ? null : Number(valores[v.id]) || 0]),
+            )
+            await panelUpdateProduct(full.id, paraGuardar(full, stockPorVariante, vidriera))
             onGuardado(`Stock de "${full.name}" actualizado`)
             onClose()
         } catch (e) {
@@ -153,6 +164,7 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
                                 type="text"
                                 inputMode="numeric"
                                 value={valores[v.id] ?? ''}
+                                placeholder={vidriera ? 'Opcional' : undefined}
                                 onChange={e => {
                                     const limpio = e.target.value.replace(/\D/g, '')
                                     setValores(prev => ({ ...prev, [v.id]: limpio }))

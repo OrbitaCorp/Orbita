@@ -155,3 +155,39 @@ describe('plantilla', () => {
         expect(r.productos[0]).toMatchObject({ nombre: 'Remera lisa', cantVariantes: 2, stockTotal: 16, precio: 15000, publicado: true })
     }, 30_000)
 })
+
+describe('armarProductos en una vidriera (el stock es opcional)', () => {
+    const base = { nombre: 'Gorra', categoria: 'Accesorios', precio: 9500, estado: 'Publicado' }
+
+    it('con la celda de stock vacía no se carga stock, no impide publicar y se marca "sin stock cargado"', () => {
+        const r = armarProductos([fila(2, base)], { vidriera: true })
+        expect(r.errores).toEqual([])
+        expect(r.productos[0].sinStock).toBe(true)
+        expect(r.productos[0].publicado).toBe(true)
+        const v = r.productos[0].input.variants[0]
+        expect(v.showStock).toBe(false)
+        expect(v.initialStock).toBeUndefined()
+    })
+
+    it('con un número se carga y se muestra (también un 0 escrito a propósito)', () => {
+        const con = armarProductos([fila(2, { ...base, stock: 8 })], { vidriera: true }).productos[0]
+        expect(con.sinStock).toBeUndefined()
+        expect(con.input.variants[0]).toMatchObject({ initialStock: 8, showStock: true })
+        const cero = armarProductos([fila(2, { ...base, stock: 0 })], { vidriera: true }).productos[0]
+        expect(cero.input.variants[0]).toMatchObject({ initialStock: 0, showStock: true })
+    })
+
+    it('con variantes, cada combinación queda sin stock cargado', () => {
+        const r = armarProductos([fila(2, { ...base, variante1: 'Talle', valores1: 'S, M' })], { vidriera: true })
+        expect(r.productos[0].input.variants.map((v) => v.showStock)).toEqual([false, false])
+    })
+
+    it('en una tienda con checkout nada cambia: vacío = 0 y para publicar hace falta stock', () => {
+        const r = armarProductos([fila(2, base)])
+        expect(r.productos).toHaveLength(0)
+        expect(r.errores[0].mensaje).toMatch(/tiene que tener stock/)
+        const borrador = armarProductos([fila(2, { ...base, estado: 'Borrador' })]).productos[0]
+        expect(borrador.input.variants[0]).toMatchObject({ initialStock: 0 })
+        expect(borrador.input.variants[0].showStock).toBeUndefined()
+    })
+})
