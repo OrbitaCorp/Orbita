@@ -172,6 +172,17 @@ Si tocás una pantalla del panel, actualizá su tema en
 `pnpm test` de `apps/web` falla si el manual nombra un botón que no existe o si el artefacto quedó
 viejo. Detalle en `.claude/rules/manual.md`.
 
+## Prospección y videos automatizados (Superadmin → Marketing)
+
+Dos herramientas del superadmin que usan **el Claude que paga cada persona** (sin clave de API) por **un solo conector
+MCP** (`apps/api/src/marketing/prospeccion/mcp/`, dirección `https://api.orbita.site/api/v1/mcp/prospeccion`): la
+**prospección** de tiendas de Instagram (consulta por la API de Meta, puntaje, análisis y borradores de mensaje) y la
+**cola de videos** (reels generados en la PC de quien los pide, aprobados en el panel y pasados como borrador a TikTok o
+Instagram). **Nada se envía ni se publica solo**: siempre hay una persona al final. Para qué sirven, cómo funcionan,
+costos y controles: [`docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md`](docs/marketing/FLUJO-PROSPECCION-Y-VIDEOS.md). Cómo se
+despliega: `apps/api/DEPLOYMENT.md` (secciones «Prospección» y «Cola de videos»). Si tocás esa API, el conector o las
+pantallas, mantené el documento al día.
+
 ## Skill de UI/UX: ui-ux-pro-max
 
 Para **cualquier** tarea de diseño o UI/UX en `apps/web/` — crear, mejorar, revisar o
