@@ -13,9 +13,6 @@ import { ConfirmModal, useFetch } from './ui'
 type Aviso = { variant: ToastVariant; title: string; description?: string }
 
 export const URL_CONECTOR = 'https://api.orbita.site/api/v1/mcp'
-// Producir videos necesita la skill y las herramientas, en Claude Code en la computadora de quien los genera. Se instalan como plugin
-// (repo Gisterkuk/Orbita-Videos, carpeta .claude-plugin): trae las skills, los agentes y el conector, sin clonar nada ni tener el repo de Órbita.
-export const COMANDOS_PLUGIN = ['claude plugin marketplace add Gisterkuk/Orbita-Videos', 'claude plugin install orbita-videos@orbita-videos']
 
 const BLANCO = '#ffffff'
 const AZUL_OSCURO = '#1e3a8a'
@@ -102,15 +99,9 @@ export function ConectarClaude({ puedeEditar, setAviso }: { puedeEditar: boolean
               <button type="button" onClick={() => copiar(URL_CONECTOR, 'La dirección')} className="cl-btn cl-btn-borde" style={{ height: 40, padding: '0 16px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.7)', background: 'transparent', color: BLANCO, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Copiar dirección</button>
               <button type="button" onClick={() => { setManual(null); setTick((n) => n + 1) }} className="cl-btn cl-btn-borde" style={{ height: 40, padding: '0 16px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.7)', background: 'transparent', color: BLANCO, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Ya lo conecté: verificar</button>
             </div>
-            <div style={{ paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.22)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
-                <b>Para generar videos</b> hace falta, además, <b>Claude Code</b> en tu computadora. Instalá el plugin de videos (trae la skill, los agentes y este mismo conector; no hay que clonar nada) con estos dos comandos, en una terminal. Después, en Claude Code, escribí <b>/mcp</b>, elegí <b>orbita</b> y <b>Authenticate</b>, y pedile «generame 3 videos». Para buscar clientes, comentar o leer videos alcanza con el chat de Claude.
-              </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <code style={{ flex: '1 1 280px', minWidth: 0, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,.92)', color: AZUL_OSCURO, fontSize: 12.5, fontWeight: 600, overflowWrap: 'anywhere', whiteSpace: 'pre-line' }}>{COMANDOS_PLUGIN.join('\n')}</code>
-                <button type="button" onClick={() => copiar(COMANDOS_PLUGIN.join('\n'), 'Los comandos')} className="cl-btn cl-btn-borde" style={{ height: 38, padding: '0 14px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.7)', background: 'transparent', color: BLANCO, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Copiar comandos</button>
-              </div>
-            </div>
+            <p style={{ margin: 0, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.22)', fontSize: 13.5, lineHeight: 1.55 }}>
+              <b>Para generar videos</b> usá el mismo conector desde <b>Claude Code</b> en tu computadora (aparece solo si entrás con la misma cuenta) y pedile «generame 3 videos». La primera vez Claude baja solo las herramientas de videos y te pide permiso. Para buscar clientes, comentar o leer videos alcanza con el chat de Claude.
+            </p>
             <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(255,255,255,.85)', lineHeight: 1.5 }}>
               Pueden conectarlo los superadmins con correo del equipo (@orbita.site o @orbita-corp.com). Claude no puede enviar mensajes, publicar ni aprobar: eso siempre lo hace una persona.
             </p>

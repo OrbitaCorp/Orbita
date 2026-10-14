@@ -39,7 +39,7 @@ export function instruccionDeMejora(v: Pick<VideoDeCola, 'id' | 'titulo' | 'tipo
     `Mejorá el video «${v.titulo}» (id ${v.id}) de la cola de Órbita, con el conector de Órbita.`,
     '1. Leelo con videos_obtener: el guion, el texto sugerido, los controles y los comentarios del equipo.',
     '2. Armá una versión mejorada que atienda esos comentarios y conserve lo que funciona. Si algo no queda claro, preguntame antes de producir.',
-    `3. Si podés producir el video (Claude Code con el plugin orbita-videos instalado), producilo con la skill ${v.tipo === 'TUTORIAL' ? 'videos-multiagente' : 'videos-cola'}, subilo con videos_pedir_subida (tipo ${v.tipo}) y registralo con videos_registrar indicando mejora_de ${v.id}; el original no se toca. Si estás en el chat web y no podés renderizar, no inventes: escribí el guion y el texto sugerido mejorados y decime que los pegue en Claude Code, con el plugin orbita-videos instalado.`,
+    `3. Si podés producir el video (Claude Code en la computadora; si no tenés las herramientas de videos, bajalas como indican las instrucciones del conector), producilo con la skill ${v.tipo === 'TUTORIAL' ? 'videos-multiagente' : 'videos-cola'}, subilo con videos_pedir_subida (tipo ${v.tipo}) y registralo con videos_registrar indicando mejora_de ${v.id}; el original no se toca. Si estás en el chat web y no podés renderizar, no inventes: escribí el guion y el texto sugerido mejorados y decime que los pegue en Claude Code, con el conector de Órbita.`,
     '4. Si registraste un video nuevo, llamá a videos_avisar al terminar. No publiques nada: lo revisa el equipo.',
   ].join('\n')
 }
@@ -201,7 +201,7 @@ function ConectarParaMejorar({ v, setAviso, onCerrar }: { v: VideoDeCola; setAvi
           <button type="button" onClick={() => copiar(URL_CONECTOR, 'La dirección')} className="ds-hover" style={btnGhostSm}>Copiar</button>
         </div>
         <p style={{ margin: 0 }}>Claude te va a mandar a una pantalla del panel para que lo autorices. Después volvé y tocá «Mejorar con Claude» otra vez.</p>
-        <p style={{ margin: 0 }}>En el chat de Claude puede leer el video y proponer el guion mejorado; para <b>producir</b> el video nuevo hace falta Claude Code en tu computadora con el plugin de videos instalado (los dos comandos están en el bloque «Conectá tu Claude a Órbita», arriba).</p>
+        <p style={{ margin: 0 }}>En el chat de Claude puede leer el video y proponer el guion mejorado; para <b>producir</b> el video nuevo hace falta Claude Code en tu computadora con este mismo conector (Claude baja solo las herramientas de videos la primera vez).</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', paddingTop: 4 }}>
           <button type="button" onClick={() => copiar(instruccionDeMejora(v), 'La instrucción')} className="ds-hover" style={btnGhostSm}>Copiar la instrucción</button>
           <button type="button" onClick={abrir} className="ds-hover" style={btnGhostSm}>Abrir Claude igual</button>
