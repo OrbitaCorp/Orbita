@@ -13,7 +13,7 @@ import { SetMetadata } from '@nestjs/common';
 // (DemoIaInterceptor la consume). Una ruta de IA nueva sin el decorador
 // queda cerrada para la demo por defecto.
 
-export type FuncionDemoIa = 'orbi-producto' | 'fondo-ia' | 'quitar-fondo' | 'orbi-chat' | 'fotos-web' | 'foto-web';
+export type FuncionDemoIa = 'orbi-producto' | 'fondo-ia' | 'quitar-fondo' | 'fotos-web' | 'foto-web';
 
 // 'fotos-web' y 'foto-web' no son IA, pero cuestan igual: la búsqueda paga
 // Serper/Tavily y la descarga baja una URL cualquiera desde el servidor. En la
@@ -24,7 +24,6 @@ export const FUNCIONES_DEMO_IA: Record<FuncionDemoIa, { nombre: string; limiteSe
   'orbi-producto': { nombre: 'Redactar con Orbi', limiteSemanal: 3, unidad: 'pruebas' },
   'fondo-ia': { nombre: 'Fondo con IA', limiteSemanal: 2, unidad: 'pruebas' },
   'quitar-fondo': { nombre: 'Quitar fondo', limiteSemanal: 3, unidad: 'pruebas' },
-  'orbi-chat': { nombre: 'el chat con Orbi', limiteSemanal: 10, unidad: 'mensajes' },
   'fotos-web': { nombre: 'la búsqueda de fotos en la web', limiteSemanal: 10, unidad: 'búsquedas' },
   'foto-web': { nombre: 'agregar fotos de la web', limiteSemanal: 20, unidad: 'fotos' },
 };
@@ -41,7 +40,7 @@ export function mensajeLimiteDemo(funcion: FuncionDemoIa): string {
 }
 
 // El tope diario POR NEGOCIO que ya tiene cada función (100 ayudas de texto,
-// 30 imágenes, 300 mensajes a Orbi) en la demo lo comparten todos los
+// 30 imágenes) en la demo lo comparten todos los
 // visitantes. Su mensaje normal ("llegaste al máximo por hoy") le haría creer
 // al visitante que así funciona su tienda: se reemplaza por este.
 export const MENSAJE_CUPO_GLOBAL_DEMO =

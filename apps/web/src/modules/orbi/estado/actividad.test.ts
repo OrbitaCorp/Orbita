@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VENCE_EN_MS, destinosDe, duracion, esConsulta, filaDe, resumenDelResultado, resumenPlegado, vistaDeTarjeta } from './actividad'
+import { TITULO_ACCION_DEMO } from '@/lib/demo/orbiPresets'
 import type { OrbiAction } from '@/components/orbi/types'
 
 const T0 = Date.UTC(2026, 9, 2, 17, 32) // 14:32 en Argentina
@@ -99,5 +100,10 @@ describe('tarjeta de aprobación', () => {
     expect(vistaDeTarjeta({ ...pendiente, status: 'rejected' }, T0)).toMatchObject({ chip: 'Cancelado', pie: 'No se hizo ningún cambio.', atenuada: true })
     expect(vistaDeTarjeta({ ...pendiente, status: 'error', titulo: 'No se aplicó', result: 'El pedido ya estaba enviado' }, T0)).toMatchObject({ chip: 'No se aplicó', tono: 'error' })
     expect(vistaDeTarjeta({ ...pendiente, status: 'unknown' }, T0)).toMatchObject({ reintentable: true, tono: 'duda' })
+  })
+
+  it('en la demo, Confirmar no aplica nada y no se ve como una falla', () => {
+    const v = vistaDeTarjeta({ ...pendiente, status: 'error', titulo: TITULO_ACCION_DEMO, result: 'En la demo no se guarda nada' }, T0)
+    expect(v).toMatchObject({ chip: TITULO_ACCION_DEMO, tono: 'neutro', pie: 'En la demo no se guarda nada', confirmable: false })
   })
 })

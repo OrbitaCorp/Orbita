@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, ConflictException, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
@@ -33,8 +33,7 @@ import { costoDelTurno } from './turno/costo-del-turno';
 import { caracteresDelContexto, proveedorDelTurno, totalesDelConsumo, type CaracteresDelContexto } from './turno/ficha-del-turno';
 import { clasificarError } from './salud/clasificar-error';
 import { esFueraDeAlcance } from './prompts/alcance';
-import { DemoIa } from '../demo/demo-ia';
-import { DemoIaInterceptor } from '../demo/demo-ia.interceptor';
+import { DEMO_SOLO_LECTURA } from '../common/guards/demo.guard';
 
 // Topes de costo (auditoría interna 10/09, ítem api.orbi; hallazgo MEDIO del
 // 04/09 "sin tope de gasto de IA"). Cada mensaje son una o varias llamadas
@@ -47,18 +46,14 @@ const MENSAJE_NO_DISPONIBLE = 'Esa acción ya no está disponible. Pedísela a O
 const MENSAJE_APLICANDO = 'Esa acción se está aplicando. Esperá unos segundos.';
 const MENSAJE_YA_APLICADA = 'Esa acción ya se aplicó: no se puede cancelar.';
 
-// Lo que Orbi tiene que saber cuando lo usa un visitante de la demo pública
-// (miembro readOnly, ver demo/demo-ia.ts). Va al final del contexto de la
-// conversación (no en el system, que es fijo para la caché de Gemini), así
-// pisa cualquier invitación del prompt normal a hacer cambios.
-export const PROMPT_DEMO = [
-  'IMPORTANTE — DEMO PÚBLICA DE ÓRBITA.',
-  'Estás hablando con un visitante que prueba la tienda DEMO de Órbita (Nébula Tech). No es el dueño: los datos de esta tienda son ficticios, cargados para mostrar cómo funciona Órbita.',
-  'Dejá claro que es una demo cuando venga al caso (por ejemplo, la primera vez que respondas o si pregunta por "su" tienda).',
-  'Respondé breve y concreto. Podés contar lo que muestran los datos de esta tienda demo y explicar cómo se usa Órbita.',
-  'En la demo no podés crear, editar ni borrar nada. Si te piden un cambio, explicá en pocos pasos cómo se hace desde el panel y aclarales que en la demo no se aplica.',
-  'No inventes precios, planes, límites ni detalles internos de la plataforma. Si no sabés algo, decí que lo pueden consultar con el equipo de Órbita.',
-].join('\n');
+// El chat de Orbi NO está abierto al visitante de la demo pública (miembro
+// readOnly, ver demo/demo-ia.ts): cada mensaje son llamadas pagas al modelo y
+// cualquiera con el token anónimo de la demo podía gastarlas. La demo del
+// panel muestra respuestas prearmadas que se arman en el navegador
+// (web: lib/demo/orbiPresets.ts) y nunca llega acá; esto es la puerta del
+// servidor para quien le pegue a la API directo.
+export const MENSAJE_ORBI_DEMO =
+  'En la demo de Órbita, Orbi responde preguntas de ejemplo desde el panel. El chat libre se activa en tu propia tienda.';
 
 /**
  * Lo que se le manda al modelo de la conversación guardada. Sin los mensajes
@@ -206,8 +201,6 @@ export class OrbiController {
   @Post('chat')
   @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @DemoIa('orbi-chat') // prueba de la demo pública, ver demo/demo-ia.ts
-  @UseInterceptors(DemoIaInterceptor)
   async chat(
     @Body() dto: OrbiChatDto,
     @Res() res: Response,
@@ -225,6 +218,13 @@ export class OrbiController {
     // casualidad, no una defensa. El panel es de los miembros.
     if (user.type !== 'member') {
       throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
+    }
+
+    // El visitante de la demo no habla con el modelo: ni gasta cupo ni abre el
+    // stream. DemoGuard ya lo frena antes (esta ruta no lleva @DemoIa); esto
+    // lo deja explícito y no depende del orden de los guards.
+    if (user.readOnly === true) {
+      throw new ForbiddenException({ error: DEMO_SOLO_LECTURA, message: MENSAJE_ORBI_DEMO });
     }
 
     // El id de este mensaje en orbi_turns: nace acá para que también lo tenga
@@ -258,48 +258,43 @@ export class OrbiController {
 
     // Cupo mensual (spec 2026-10-03): solo frena con ORBI_CUPO_BLOQUEA=true;
     // apagado, motivoDeBloqueo devuelve null y esto no hace nada. Antes de la
-    // cuota diaria, para que un mensaje rechazado no la gaste. La demo no: su
-    // miembro readOnly lo comparten todos los visitantes.
-    if (user.readOnly !== true) {
-      const agotado = await this.cupoOrbi.motivoDeBloqueo(user.businessId, user.memberId);
-      if (agotado) {
-        void this.orbiTurns.registrar({
-          id: turnId,
-          businessId: user.businessId,
-          memberId: user.memberId,
-          conversationId: null,
-          latencyMs: 0,
-          rounds: 0,
-          toolsUsed: [],
-          actionsProposed: 0,
-          writesRejected: 0,
-          status: 'quota',
-          // Lo distingue del tope diario en los números del superadmin.
-          errorCategory: 'cupo_mensual',
-        });
-        throw new HttpException(agotado === 'negocio' ? MENSAJE_CUPO_NEGOCIO : MENSAJE_CUPO_MIEMBRO, HttpStatus.TOO_MANY_REQUESTS);
-      }
+    // cuota diaria, para que un mensaje rechazado no la gaste.
+    const agotado = await this.cupoOrbi.motivoDeBloqueo(user.businessId, user.memberId);
+    if (agotado) {
+      void this.orbiTurns.registrar({
+        id: turnId,
+        businessId: user.businessId,
+        memberId: user.memberId,
+        conversationId: null,
+        latencyMs: 0,
+        rounds: 0,
+        toolsUsed: [],
+        actionsProposed: 0,
+        writesRejected: 0,
+        status: 'quota',
+        // Lo distingue del tope diario en los números del superadmin.
+        errorCategory: 'cupo_mensual',
+      });
+      throw new HttpException(agotado === 'negocio' ? MENSAJE_CUPO_NEGOCIO : MENSAJE_CUPO_MIEMBRO, HttpStatus.TOO_MANY_REQUESTS);
     }
 
     // Antes de abrir el stream, para que llegue como un 429 normal.
     if (!(await this.cuota.consumir(`orbi-panel:${user.businessId}`, TURNOS_DIA_NEGOCIO))) {
       // Queda registrado: cuántos mensajes se rechazan por día es un dato del
-      // uso. La demo no (comparte negocio y miembro, ver el finally).
-      if (user.readOnly !== true) {
-        void this.orbiTurns.registrar({
-          id: turnId,
-          businessId: user.businessId,
-          memberId: user.memberId,
-          conversationId: null,
-          latencyMs: 0,
-          rounds: 0,
-          toolsUsed: [],
-          actionsProposed: 0,
-          writesRejected: 0,
-          status: 'quota',
-          errorCategory: 'tope_diario',
-        });
-      }
+      // uso.
+      void this.orbiTurns.registrar({
+        id: turnId,
+        businessId: user.businessId,
+        memberId: user.memberId,
+        conversationId: null,
+        latencyMs: 0,
+        rounds: 0,
+        toolsUsed: [],
+        actionsProposed: 0,
+        writesRejected: 0,
+        status: 'quota',
+        errorCategory: 'tope_diario',
+      });
       throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -319,14 +314,7 @@ export class OrbiController {
     const progreso = nuevoProgresoDelTurno();
     let estado: EstadoDelTurno = 'ok';
 
-    // Visitante de la demo: todos comparten el mismo miembro readOnly, así que
-    // su conversación NO se guarda (si no, cada visitante vería el chat de
-    // los anteriores), no ve las herramientas que modifican datos y el
-    // prompt le dice que es una demo.
-    const esDemo = user.readOnly === true;
-
-    // La conversación del turno: solo existe en el panel y fuera de la demo,
-    // y siempre es propia (verificada o recién creada). El id del body nunca
+    // La conversación del turno: solo existe en el panel, y siempre es propia (verificada o recién creada). El id del body nunca
     // se usa tal cual. Es también la única que puede quedar guardada en una
     // acción pendiente (ahí va la nota de confirmar o cancelar). Afuera del
     // try porque el metering y la telemetría del finally la usan.
@@ -339,7 +327,7 @@ export class OrbiController {
     try {
       let history: LlmMessage[] = [];
 
-      if (dto.context.surface === OrbiSurface.PANEL && !esDemo) {
+      if (dto.context.surface === OrbiSurface.PANEL) {
         // Spec §3.3. El id viene del cliente: se verifica que sea de ESTE
         // negocio y de ESTA persona antes de leerla o escribirle nada (ver
         // ConversationService#propia). Si no lo es, o no existe, se arranca una
@@ -376,7 +364,7 @@ export class OrbiController {
       // cambia va como primer mensaje: así entra en la caché implícita de
       // Gemini (ver ContextBuilderService#armarPrompt y mensajesDelTurno).
       const prompt = await this.contextBuilder.armarPrompt(dto, permisos);
-      const contexto = esDemo ? [prompt.contexto, PROMPT_DEMO].filter(Boolean).join('\n\n') : prompt.contexto;
+      const { contexto } = prompt;
       const messages = mensajesDelTurno({ sistema: prompt.sistema, contexto, historial: history, mensaje: dto.message });
 
       // Los permisos salen del JWT, NO de dto.context.permissions. El front
@@ -394,7 +382,7 @@ export class OrbiController {
       // por parámetro (ver el test del catálogo): el modelo no tiene forma de
       // nombrar otro negocio ni siquiera si se lo piden. El aislamiento no
       // depende de que Orbi se porte bien.
-      const tools = this.toolRegistry.getTools(dto.context.surface, permisos, dto.context.stepName, { soloLectura: esDemo });
+      const tools = this.toolRegistry.getTools(dto.context.surface, permisos, dto.context.stepName);
       const modelo = this.modeloPara(dto.context.surface);
       const toolCtx: ToolExecutionContext = {
         businessId: user.businessId,
@@ -414,7 +402,7 @@ export class OrbiController {
         modelo,
         toolCtx,
         stepName: dto.context.stepName,
-        soloLectura: esDemo,
+        soloLectura: false,
         signal: corte.signal,
         crearPendiente: ({ call, resumen }) => this.pendingActions.crear({
           tool: call.name,
@@ -469,55 +457,50 @@ export class OrbiController {
       res.end();
 
       // Un mensaje que falló por nuestra culpa o la del proveedor no gasta el
-      // cupo del día. Sin await y fuera de la demo (que no cuenta cupo propio).
-      if (estado === 'error' && !esDemo) void this.cuota.devolver(`orbi-panel:${user.businessId}`);
+      // cupo del día. Sin await.
+      if (estado === 'error') void this.cuota.devolver(`orbi-panel:${user.businessId}`);
 
-      // La demo no se registra: todos sus visitantes comparten negocio y
-      // miembro, y sus turnos se mezclarían con las métricas de uso real del
-      // negocio. El metering de arriba sí: ese consumo se paga igual.
-      if (!esDemo) {
-        // Sin await: la telemetría no puede demorar ni romper el cierre del
-        // stream. registrar() nunca lanza. En un turno cancelado los tokens son
-        // un piso: la llamada cortada se factura igual y su `usage` no llegó.
-        const totales = totalesDelConsumo(progreso.consumo);
-        // Sin consumo informado (ni del modelo ni de las tools) el costo queda
-        // sin dato, como los tokens: un 0 se promediaría como un turno gratis.
-        const sinConsumo = progreso.consumo.size === 0 && progreso.consumoDeTools.size === 0;
-        const costo = sinConsumo ? undefined : costoDelTurno(progreso.consumo, progreso.consumoDeTools, new Date());
-        void this.orbiTurns.registrar({
-          id: turnId,
-          businessId: user.businessId,
-          memberId: user.memberId,
-          conversationId: conversacionVerificada,
-          // El front del panel manda siempre module 'ventas' y la pantalla en
-          // section: se guarda el módulo ya resuelto (el mismo que eligió el
-          // prompt), si no todos los turnos quedaban como 'ventas'.
-          module: resolverModuloDelPanel(dto.context.module, dto.context.section).modulo ?? dto.context.module,
-          model: progreso.modeloReportado ?? this.modeloPara(dto.context.surface),
-          // undefined y no 0 si el proveedor no informó consumo.
-          promptTokens: totales.promptTokens || undefined,
-          completionTokens: totales.completionTokens || undefined,
-          provider: proveedorDelTurno(progreso.consumo),
-          cachedTokens: totales.cachedTokens || undefined,
-          thinkingTokens: totales.thinkingTokens || undefined,
-          costUsd: costo?.costUsd,
-          toolsCostUsd: costo?.toolsCostUsd,
-          credits: costo?.credits,
-          ttftMs: progreso.ttftMs,
-          errorCategory,
-          section: dto.context.section,
-          contextChars,
-          steps: progreso.pasos,
-          writesRejected: progreso.escriturasRechazadas,
-          latencyMs: Date.now() - arrancoEn,
-          rounds: progreso.llamadasAlModelo,
-          toolsUsed: progreso.toolsPedidas,
-          actionsProposed: progreso.propuestas,
-          // Sale del texto que vio la persona: la frase fija de prompts/alcance.ts.
-          outOfScope: esFueraDeAlcance(progreso.texto),
-          status: estado,
-        });
-      }
+      // Sin await: la telemetría no puede demorar ni romper el cierre del
+      // stream. registrar() nunca lanza. En un turno cancelado los tokens son
+      // un piso: la llamada cortada se factura igual y su `usage` no llegó.
+      const totales = totalesDelConsumo(progreso.consumo);
+      // Sin consumo informado (ni del modelo ni de las tools) el costo queda
+      // sin dato, como los tokens: un 0 se promediaría como un turno gratis.
+      const sinConsumo = progreso.consumo.size === 0 && progreso.consumoDeTools.size === 0;
+      const costo = sinConsumo ? undefined : costoDelTurno(progreso.consumo, progreso.consumoDeTools, new Date());
+      void this.orbiTurns.registrar({
+        id: turnId,
+        businessId: user.businessId,
+        memberId: user.memberId,
+        conversationId: conversacionVerificada,
+        // El front del panel manda siempre module 'ventas' y la pantalla en
+        // section: se guarda el módulo ya resuelto (el mismo que eligió el
+        // prompt), si no todos los turnos quedaban como 'ventas'.
+        module: resolverModuloDelPanel(dto.context.module, dto.context.section).modulo ?? dto.context.module,
+        model: progreso.modeloReportado ?? this.modeloPara(dto.context.surface),
+        // undefined y no 0 si el proveedor no informó consumo.
+        promptTokens: totales.promptTokens || undefined,
+        completionTokens: totales.completionTokens || undefined,
+        provider: proveedorDelTurno(progreso.consumo),
+        cachedTokens: totales.cachedTokens || undefined,
+        thinkingTokens: totales.thinkingTokens || undefined,
+        costUsd: costo?.costUsd,
+        toolsCostUsd: costo?.toolsCostUsd,
+        credits: costo?.credits,
+        ttftMs: progreso.ttftMs,
+        errorCategory,
+        section: dto.context.section,
+        contextChars,
+        steps: progreso.pasos,
+        writesRejected: progreso.escriturasRechazadas,
+        latencyMs: Date.now() - arrancoEn,
+        rounds: progreso.llamadasAlModelo,
+        toolsUsed: progreso.toolsPedidas,
+        actionsProposed: progreso.propuestas,
+        // Sale del texto que vio la persona: la frase fija de prompts/alcance.ts.
+        outOfScope: esFueraDeAlcance(progreso.texto),
+        status: estado,
+      });
     }
   }
 

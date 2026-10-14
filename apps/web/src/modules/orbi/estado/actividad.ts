@@ -4,6 +4,7 @@
 // mide en el navegador. Funciones puras: las piezas solo las dibujan.
 import type { OrbiAction } from '@/components/orbi/types'
 import { esNavegacion, esTarjetaDeAccion } from '@/components/orbi/sesionOrbi'
+import { TITULO_ACCION_DEMO } from '@/lib/demo/orbiPresets'
 
 /** Las tarjetas vencen a los 10 minutos (TTL_MS de PendingActionService). */
 export const VENCE_EN_MS = 10 * 60 * 1000
@@ -165,7 +166,8 @@ export function vistaDeTarjeta(a: OrbiAction, ahora: number): VistaDeTarjeta {
     case 'rejected':
       return { ...base, chip: 'Cancelado', tono: 'neutro', hora: a.fin !== undefined ? hora(a.fin) : undefined, pie: a.nota ?? 'No se hizo ningún cambio.', atenuada: true }
     case 'error':
-      return { ...base, chip: a.titulo ?? 'No se pudo', tono: 'error', pie: a.result }
+      // En la demo "Confirmar" no aplica nada: no es una falla, se ve neutro.
+      return { ...base, chip: a.titulo ?? 'No se pudo', tono: a.titulo === TITULO_ACCION_DEMO ? 'neutro' : 'error', pie: a.result, atenuada: a.titulo === TITULO_ACCION_DEMO }
     case 'unknown':
       return { ...base, chip: 'No sé si se aplicó', tono: 'duda', pie: a.result, reintentable: true }
   }
