@@ -331,6 +331,12 @@ export class McpOauthService {
     return { adminId: admin.id, email: admin.email };
   }
 
+  /** ¿Tiene esta persona algún Claude conectado ahora (un token de renovación vigente)? */
+  async estaConectado(adminId: string): Promise<boolean> {
+    const n = await this.prisma.marketingMcpRefresh.count({ where: { adminId, revocadoAt: null, expiraAt: { gt: new Date() } } });
+    return n > 0;
+  }
+
   /** Desconecta todos los Claude de un superadmin (o de todos, si no se pasa adminId). */
   async revocarTodo(adminId?: string) {
     const r = await this.prisma.marketingMcpRefresh.updateMany({ where: { revocadoAt: null, ...(adminId ? { adminId } : {}) }, data: { revocadoAt: new Date() } });

@@ -3569,46 +3569,93 @@ model MarketingMcpRefresh {
 // rechaza (se borra el archivo y el registro). Un pendiente que nadie revisa vence a los 7 días y se borra solo.
 // `estado`: SUBIENDO | PENDIENTE | APROBADO | PUBLICADO (lo rechazado no queda).
 model MarketingVideo {
-  id            String    @id @default(uuid())
+  id            String                     @id @default(uuid())
   /**
    * El superadmin cuyo Claude lo generó.
    */
-  creadoPor     String?   @map("creado_por")
+  creadoPor     String?                    @map("creado_por")
   titulo        String
   /**
    * REEL_9_16 | CUADRADO | HORIZONTAL_16_9
    */
   formato       String
-  guion         String    @default("")
+  guion         String                     @default("")
   /**
    * Texto sugerido para acompañar la publicación (con hashtags).
    */
-  caption       String    @default("")
-  duracionSeg   Int?      @map("duracion_seg")
-  bytes         Int       @default(0)
+  caption       String                     @default("")
+  duracionSeg   Int?                       @map("duracion_seg")
+  bytes         Int                        @default(0)
   /**
    * Clave del archivo en R2.
    */
-  ruta          String    @unique
-  estado        String    @default("SUBIENDO")
+  ruta          String                     @unique
+  estado        String                     @default("SUBIENDO")
   /**
    * Resultado de los controles de calidad automáticos: [{ nombre, ok, detalle }]
    */
-  controles     Json      @default("[]")
-  aprobadoPor   String?   @map("aprobado_por")
-  aprobadoAt    DateTime? @map("aprobado_at")
+  controles     Json                       @default("[]")
+  /// MARKETING (necesita la aprobación de la dirección) | TUTORIAL (interno: solo lo aprueba quien lo creó).
+  tipo          String                     @default("MARKETING")
+  /// Quiénes aprobaron: [{ adminId, fecha }]. La política (marketing/videos/politica-aprobacion.ts) decide cuándo alcanza.
+  /// Es interno: ni el panel ni el conector muestran quién aprobó.
+  aprobaciones  Json                       @default("[]")
+  /// El tutorial de la lista (marketing_tutoriales) que cubre este video, si es un tutorial.
+  tutorialId    String?                    @map("tutorial_id")
+  /// Si este video es una mejora de otro de la cola (se pide con «Mejorar con Claude»), el video que mejora.
+  mejoraDeId    String?                    @map("mejora_de_id")
+  comentarios   MarketingVideoComentario[]
+  aprobadoPor   String?                    @map("aprobado_por")
+  aprobadoAt    DateTime?                  @map("aprobado_at")
   /**
    * Dónde se publicó: [{ destino: 'tiktok' | 'instagram', id, fecha }]
    */
-  publicaciones Json      @default("[]")
+  publicaciones Json                       @default("[]")
   /**
    * Hasta cuándo vive sin que nadie lo apruebe (null una vez aprobado).
    */
-  expiraAt      DateTime? @map("expira_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  expiraAt      DateTime?                  @map("expira_at")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
 
   @@index([estado, createdAt])
   @@index([expiraAt])
   @@map("marketing_videos")
+}
+
+// ─── Marketing de Órbita: lista de tutoriales (qué hay y qué falta) ───────────────
+// La lista de tutoriales del panel y de la tienda que el equipo va a ir produciendo. La actualiza el Claude de cada
+// persona por el conector (tutoriales_listar / tutoriales_actualizar) y también se puede corregir desde el panel.
+// `estado`: FALTA | EN_PROCESO | EN_REVISION (hay un video en la cola esperando) | HECHO.
+model MarketingTutorial {
+  id             String   @id @default(uuid())
+  grupo          String
+  grupoOrden     Int      @map("grupo_orden")
+  orden          Int
+  titulo         String   @unique
+  estado         String   @default("FALTA")
+  /// Los de «Para mostrarle a tu cliente»: sirven también como promo.
+  opcional       Boolean  @default(false)
+  prioridadAlta  Boolean  @default(false) @map("prioridad_alta")
+  notas          String?
+  actualizadoPor String?  @map("actualizado_por")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([grupoOrden, orden])
+  @@map("marketing_tutoriales")
+}
+
+// Comentarios sobre un video de la cola: cualquiera del equipo puede opinar, en todas sus fases (para aprobar, aprobado,
+// pasado a borrador). Se borran junto con el video. Sirven también para que Claude sepa qué mejorar (videos_obtener).
+model MarketingVideoComentario {
+  id        String         @id @default(uuid())
+  videoId   String         @map("video_id")
+  video     MarketingVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  adminId   String         @map("admin_id")
+  texto     String
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  @@index([videoId, createdAt])
+  @@map("marketing_video_comentarios")
 }

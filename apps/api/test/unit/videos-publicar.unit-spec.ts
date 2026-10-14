@@ -3,8 +3,8 @@ import { VideosPublicarService } from '../../src/marketing/videos/videos-publica
 
 // Publicar un video aprobado de la cola: solo si está aprobado, con los servicios de TikTok e Instagram simulados.
 
-function armar(estado = 'APROBADO') {
-  const video = { id: 'v-1', estado, ruta: 'marketing/videos/a.mp4', caption: 'texto sugerido #orbita' };
+function armar(estado = 'APROBADO', tipo = 'MARKETING') {
+  const video = { id: 'v-1', estado, tipo, ruta: 'marketing/videos/a.mp4', caption: 'texto sugerido #orbita' };
   const videos = {
     obtener: jest.fn(async () => video),
     urlPublica: jest.fn((r: string) => `https://pub.r2.dev/${r}`),
@@ -31,6 +31,14 @@ describe('publicar un video de la cola', () => {
       expect(ctx.publicaciones.guardarBorrador).not.toHaveBeenCalled();
     }
   });
+
+  it('un tutorial es interno: no se pasa a TikTok ni a Instagram, aunque esté aprobado', async () => {
+    const ctx = armar('APROBADO', 'TUTORIAL')
+    await expect(ctx.svc.enBorradoresDeTiktok('admin-1', 'v-1')).rejects.toBeInstanceOf(ConflictException)
+    await expect(ctx.svc.enBorradorDeInstagram('admin-1', 'v-1')).rejects.toBeInstanceOf(ConflictException)
+    expect(ctx.tiktok.enviarABorradores).not.toHaveBeenCalled()
+    expect(ctx.publicaciones.guardarBorrador).not.toHaveBeenCalled()
+  })
 
   it('TikTok: manda la dirección pública a los borradores y anota la publicación', async () => {
     const ctx = armar();

@@ -24,6 +24,7 @@ export class VideosPublicarService {
 
   private async aprobado(id: string) {
     const v = await this.videos.obtener(id);
+    if (v.tipo !== 'MARKETING') throw new ConflictException('Los tutoriales son internos: no se pasan a TikTok ni a Instagram');
     if (v.estado !== 'APROBADO' && v.estado !== 'PUBLICADO') throw new ConflictException('Primero hay que aprobar el video');
     return v;
   }

@@ -37,7 +37,8 @@ personalizado», dirección `https://api.orbita.site/api/v1/mcp`) y lo autoriza 
 en el panel (el mismo login con Google y segundo factor del superadmin). Con ese único conector, su Claude puede:
 
 - **Prospección:** leer el criterio, consultar cuentas, leer lotes y guardar análisis.
-- **Videos:** ver la cola, pedir dónde subir un video, registrarlo y avisar al equipo por correo cuando termina la tanda (el texto del correo es fijo).
+- **Videos:** ver la cola, leer un video con sus comentarios (para mejorarlo), pedir dónde subir uno, registrarlo (también como mejora de otro) y avisar al equipo por correo cuando termina la tanda (el texto del correo es fijo).
+- **Tutoriales:** ver la lista de lo que hay y lo que falta, y marcar el estado de cada uno.
 
 Quién puede conectarlo: un **superadmin activo** con correo `@orbita-corp.com` o `@orbita.site`. Se vuelve a verificar
 **en cada llamada**: si alguien deja de ser superadmin o se desactiva, su Claude pierde el acceso en el momento.
@@ -61,26 +62,41 @@ Cualquiera puede cortar sus propias conexiones desde Marketing → Prospección 
 
 ## Cómo funcionan los videos
 
-1. **La persona le pide a su Claude** algo como «generame 3 videos» (skill `videos-cola`). La cantidad la define quien lo
-   pide, no el panel.
-2. **Claude los produce en la computadora de esa persona:** guion con jueces de calidad, voz, edición con HyperFrames
-   sobre la demo pública (nada de datos reales) y render. En una PC con placa de video, un reel de ~40 s tarda poco más de 1 minuto.
-3. **Controles automáticos** del mp4: formato (1080×1920), duración, peso (máx. 50 MB), volumen del audio, silencios,
-   tramos en negro e imagen congelada. Los videos que fallan lo básico no se suben.
-4. **Se sube directo a Cloudflare R2** con una dirección firmada de 10 minutos y se **registra en la cola** con su guion,
-   su texto sugerido y el resultado de los controles.
-5. **Le llega un correo al equipo** (superadmins con correo `@orbita.site` u `@orbita-corp.com`): «Hay N videos para aprobar», con los títulos y un botón al panel. Sale **uno por tanda**, no uno por video.
-6. **Una persona lo aprueba o lo rechaza** en Superadmin → Marketing → Videos, mirándolo en el reproductor:
-   - **Rechazar** borra el archivo y el registro.
-   - Un pendiente que **nadie revisa en 7 días se borra solo**.
-   - **Aprobar** lo deja como **registro** (con su archivo) y habilita **descargarlo** o **pasarlo como borrador** a TikTok
-     (a los borradores de la cuenta, para terminarlo en la app) o a Instagram (como borrador en Publicaciones, donde se
-     programa o se publica).
-7. Al terminarlo en TikTok, **marcar el contenido como generado con IA** (TikTok lo pide).
+1. **La persona le pide a su Claude** algo como «generame 3 videos» (skill `videos-cola`) o «hacé el tutorial de Atender un pedido».
+   La cantidad la define quien lo pide, no el panel.
+2. **Claude los produce en la computadora de esa persona:** guion con jueces de calidad, voz, edición con HyperFrames sobre la demo
+   pública (nada de datos reales) y render. En una PC con placa de video, un reel de ~40 s tarda poco más de 1 minuto.
+3. **Controles automáticos** del mp4: formato, duración, peso, volumen del audio, silencios, tramos en negro e imagen congelada.
+   Los videos que fallan lo básico no se suben.
+4. **Se sube directo a Cloudflare R2** con una dirección firmada de 10 minutos y se **registra en la cola** con su guion, su texto
+   sugerido y el resultado de los controles.
+5. **Le llega un correo a todo el equipo** (superadmins con correo `@orbita.site` u `@orbita-corp.com`, también a su correo
+   personal): «Hay N videos nuevos para ver y comentar». Sale **uno por tanda**, no uno por video.
+6. **El equipo los ve en Superadmin → Marketing → Videos**, en dos pestañas que no se mezclan: **Marketing** y **Tutoriales**.
+   - **Cualquiera puede comentar** cualquier video en todas sus fases (para aprobar, aprobado, pasado a borrador).
+   - **Cualquiera puede pedir una mejora:** «Mejorar con Claude» abre Claude con ese video y sus comentarios (si la persona tiene el
+     conector; si no, le explica cómo conectarlo). La versión mejorada entra a la cola como un video nuevo; el original no se toca.
+     Sirve también para videos ya aprobados.
+7. **Aprobar:** cada video lo aprueba quien lo subió, para verificar lo que hizo su Claude (los socios no aprueban el video de otro
+   socio). Lo que sube Milagros, de marketing, lo aprueba la dirección. El panel solo muestra «Aprobar» a quien corresponde.
+   - **Rechazar** borra el archivo, el registro y sus comentarios. Un pendiente que **nadie aprueba se borra solo** (7 días los de
+     marketing, 30 los tutoriales).
+   - Un video de marketing **aprobado** queda como **registro** (con su archivo) y habilita **descargarlo** o **pasarlo como borrador**
+     a TikTok (a los borradores de la cuenta) o a Instagram (como borrador en Publicaciones, donde se programa o se publica).
+   - Los **tutoriales** son internos: no se pasan a redes.
+8. Al terminarlo en TikTok, **marcar el contenido como generado con IA** (TikTok lo pide).
+
+### La lista de tutoriales
+
+Hay una lista de los tutoriales del panel y la tienda con **qué hay y qué falta** (39 en total, agrupados: Arrancar, Catálogo, Vender día
+a día, Vender más, Que tu tienda se vea bien, Equipo y cuenta, Paquete Avanzado y los opcionales para mostrarle al cliente). La
+actualiza el Claude de cada persona por el conector: marca «en proceso» al empezar uno, y al registrar su video queda «en revisión»
+y, cuando se aprueba, «hecho». También se corrige a mano desde el panel (Marketing → Videos → Tutoriales).
 
 ## Controles y límites (lo que lo hace seguro)
 
 - **No hay envío ni publicación automáticos.** Siempre hay una persona en el último paso.
+- **Aprobación por quién lo subió:** los socios se aprueban a sí mismos y ninguno aprueba el video de otro; lo de marketing (Milagros) lo aprueba la dirección. El conector no puede aprobar ni decide quién aprueba.
 - **Acceso acotado y revocable:** solo superadmins de la organización, verificado en cada llamada; cada persona puede desconectar.
 - **Cola con tope:** 20 videos esperando revisión; con más, no se generan nuevos hasta revisar. Evita llenar el almacenamiento si algo se descontrola.
 - **Todo queda registrado:** cada consulta, análisis, registro, aprobación, rechazo y envío a borradores queda en el registro de acciones del panel, con quién lo hizo.
