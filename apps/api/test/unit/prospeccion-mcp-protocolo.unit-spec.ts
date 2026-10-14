@@ -40,6 +40,8 @@ describe('protocolo', () => {
     expect(r.result.protocolVersion).toBe('2025-03-26');
     expect(r.result.capabilities).toEqual({ tools: { listChanged: false } });
     expect(r.result.instructions).toMatch(/Nunca envíes mensajes/);
+    expect(r.result.instructions).toMatch(/ELEVEN_KEY/); // la voz es ElevenLabs
+    expect(r.result.instructions).not.toMatch(/Gemini/);
     expect(r.result.instructions).toMatch(/ffmpeg -version/); // revisar los requisitos de la PC antes de producir
     expect(r.result.instructions).toMatch(/git pull/); // cómo bajar la skill de videos si no está
     expect(((await mcp.manejar(rpc('initialize', { protocolVersion: '1999-01-01' }), CTX)) as any).result.protocolVersion).toBe('2025-06-18');
