@@ -470,7 +470,7 @@ Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `m
 ### Cola de videos (Marketing → Videos)
 
 Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos» o «hacé el tutorial de Atender un pedido»);
-Claude los hace en su computadora (HyperFrames, repo `Orbita-Videos`) y por el conector: `videos_pedir_subida` (reserva un lugar y
+Claude los hace en su computadora (HyperFrames; skills y agentes en el repo `Orbita-Videos`, que se instala como plugin de Claude Code: `claude plugin marketplace add Gisterkuk/Orbita-Videos` y `claude plugin install orbita-videos@orbita-videos`) y por el conector: `videos_pedir_subida` (reserva un lugar y
 devuelve una dirección firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja
 en la cola con su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube.
 Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_comentarios` y `marketing_tutoriales`

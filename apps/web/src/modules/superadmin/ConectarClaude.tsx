@@ -13,8 +13,9 @@ import { ConfirmModal, useFetch } from './ui'
 type Aviso = { variant: ToastVariant; title: string; description?: string }
 
 export const URL_CONECTOR = 'https://api.orbita.site/api/v1/mcp'
-// Producir videos necesita la skill y las herramientas del repo de videos, en Claude Code en la computadora de quien los genera.
-export const URL_REPO_VIDEOS = 'https://github.com/Gisterkuk/Orbita-Videos.git'
+// Producir videos necesita la skill y las herramientas, en Claude Code en la computadora de quien los genera. Se instalan como plugin
+// (repo Gisterkuk/Orbita-Videos, carpeta .claude-plugin): trae las skills, los agentes y el conector, sin clonar nada ni tener el repo de Órbita.
+export const COMANDOS_PLUGIN = ['claude plugin marketplace add Gisterkuk/Orbita-Videos', 'claude plugin install orbita-videos@orbita-videos']
 
 const BLANCO = '#ffffff'
 const AZUL_OSCURO = '#1e3a8a'
@@ -103,11 +104,11 @@ export function ConectarClaude({ puedeEditar, setAviso }: { puedeEditar: boolean
             </div>
             <div style={{ paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.22)', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
-                <b>Para generar videos</b> hace falta, además, <b>Claude Code</b> en tu computadora con el repo de videos (trae la skill y las herramientas): clonalo, abrí esa carpeta con Claude Code y pedile «generame 3 videos». Para buscar clientes, comentar o leer videos alcanza con el chat de Claude.
+                <b>Para generar videos</b> hace falta, además, <b>Claude Code</b> en tu computadora. Instalá el plugin de videos (trae la skill, los agentes y este mismo conector; no hay que clonar nada) con estos dos comandos, en una terminal. Después, en Claude Code, escribí <b>/mcp</b>, elegí <b>orbita</b> y <b>Authenticate</b>, y pedile «generame 3 videos». Para buscar clientes, comentar o leer videos alcanza con el chat de Claude.
               </div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <code style={{ flex: '1 1 280px', minWidth: 0, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,.92)', color: AZUL_OSCURO, fontSize: 12.5, fontWeight: 600, overflowWrap: 'anywhere' }}>git clone {URL_REPO_VIDEOS}</code>
-                <button type="button" onClick={() => copiar(`git clone ${URL_REPO_VIDEOS}`, 'El comando')} className="cl-btn cl-btn-borde" style={{ height: 38, padding: '0 14px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.7)', background: 'transparent', color: BLANCO, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Copiar comando</button>
+                <code style={{ flex: '1 1 280px', minWidth: 0, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,.92)', color: AZUL_OSCURO, fontSize: 12.5, fontWeight: 600, overflowWrap: 'anywhere', whiteSpace: 'pre-line' }}>{COMANDOS_PLUGIN.join('\n')}</code>
+                <button type="button" onClick={() => copiar(COMANDOS_PLUGIN.join('\n'), 'Los comandos')} className="cl-btn cl-btn-borde" style={{ height: 38, padding: '0 14px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,.7)', background: 'transparent', color: BLANCO, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Copiar comandos</button>
               </div>
             </div>
             <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(255,255,255,.85)', lineHeight: 1.5 }}>
