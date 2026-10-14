@@ -3470,3 +3470,84 @@ model MarketingTiktokPost {
   @@index([accountId, createdAt])
   @@map("marketing_tiktok_posts")
 }
+
+// ─── Marketing de Órbita: Prospección ────────────────────────────────────────
+// Negocios de Instagram a los que vale la pena escribirles, con el criterio de cliente ideal
+// (marketing/prospeccion/prospeccion.criterio.ts). Es solo lectura de datos PÚBLICOS de cuentas
+// profesionales, por la API oficial de Meta (Business Discovery): nada se envía ni se toca.
+//
+// Un prospecto es único por usuario de Instagram: si una cuenta se consulta de nuevo, se actualizan
+// sus datos y su puntaje, pero su estado, responsable y notas se conservan (así dos personas no le
+// escriben al mismo negocio). Un lote es una tanda de consultas; el análisis (el que hace Claude)
+// se guarda en el prospecto.
+model MarketingProspecto {
+  id               String    @id @default(uuid())
+  usuario          String    @unique // usuario de Instagram en minúsculas, sin @
+  datos            Json // lo público que devolvió Meta, resumido: bio, enlace, métricas, últimas publicaciones
+  evaluacion       Json // puntaje por palabras clave: { puntaje, nivel, accion, motivo, subrubro, partes }
+  analisis         Json? // lo que cargó Claude: subrubro, señales, nivel final, ángulo y mensaje sugerido
+  analizadoPor     String?   @map("analizado_por") // adminId
+  analizadoAt      DateTime? @map("analizado_at")
+  // NUEVO | CONTACTADO | RESPONDIO | DEMO | CLIENTE | DESCARTADO | NO_CONTACTAR
+  estado           String    @default("NUEVO")
+  responsableId    String?   @map("responsable_id") // adminId
+  notas            String?
+  ultimaConsultaAt DateTime  @default(now()) @map("ultima_consulta_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([estado])
+  @@index([ultimaConsultaAt])
+  @@map("marketing_prospectos")
+}
+
+model MarketingProspeccionLote {
+  id              String   @id @default(uuid())
+  creadoPor       String?  @map("creado_por") // adminId
+  usuarios        String[] // las cuentas que devolvieron datos
+  sinDatos        Json     @default("[]") @map("sin_datos") // [{ usuario, motivo }]: personales, privadas o inexistentes
+  versionCriterio String   @map("version_criterio")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("marketing_prospeccion_lotes")
+}
+
+// ─── Marketing de Órbita: conector MCP de la Prospección ─────────────────────
+// Claude (el de cada superadmin) se conecta a la Prospección por un conector MCP remoto. Para eso la API actúa de
+// servidor OAuth 2.1 (código + PKCE) con una sola regla: el que autoriza es un superadmin de Órbita, con correo del
+// dominio de la organización, y aprueba desde el panel (que ya tiene login con Google y segundo factor).
+// Los clientes se registran solos (registro dinámico) pero NO se guardan: el client_id va firmado y lleva adentro
+// sus direcciones de retorno. Acá solo se guarda lo que tiene que ser de un solo uso. Nada de esto se guarda en
+// claro: los códigos y los tokens de renovación van como hash SHA-256.
+model MarketingMcpCodigo {
+  id            String    @id @default(uuid())
+  codigoHash    String    @unique @map("codigo_hash")
+  adminId       String    @map("admin_id")
+  clientId      String    @map("client_id")
+  redirectUri   String    @map("redirect_uri")
+  codeChallenge String    @map("code_challenge")
+  expiraAt      DateTime  @map("expira_at")
+  usadoAt       DateTime? @map("usado_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([expiraAt])
+  @@map("marketing_mcp_codigos")
+}
+
+model MarketingMcpRefresh {
+  id          String    @id @default(uuid())
+  tokenHash   String    @unique @map("token_hash")
+  // Todos los tokens que salen de la misma autorización comparten familia: si alguien reusa uno ya rotado, se
+  // revoca la familia entera.
+  familiaId   String    @map("familia_id")
+  adminId     String    @map("admin_id")
+  clientId    String    @map("client_id")
+  expiraAt    DateTime  @map("expira_at")
+  revocadoAt  DateTime? @map("revocado_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([familiaId])
+  @@map("marketing_mcp_refresh")
+}

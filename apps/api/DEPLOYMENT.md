@@ -429,6 +429,47 @@ su cantidad.
 Sin los tres secretos cargados, la pantalla de Marketing avisa que TikTok no está configurado y el resto
 de la API sigue igual.
 
+## Prospección: consulta de cuentas de Instagram y conector de Claude
+
+Qué hace (código en `src/marketing/prospeccion/`): Superadmin → Marketing → Prospección consulta cuentas
+profesionales de Instagram con Business Discovery (API de Meta), las puntúa con el criterio de cliente ideal y las
+guarda en lotes. Cada superadmin analiza los lotes con SU propio Claude, por un **conector MCP remoto** que vive en
+esta misma API (`/api/v1/mcp/prospeccion`, OAuth 2.1 con PKCE; metadata en `/.well-known/oauth-*`, que llega a la API
+porque Firebase Hosting reescribe `**` a Cloud Run). No hay clave de Anthropic ni nada local. Claude lee lotes y guarda
+análisis; **no tiene ninguna herramienta que envíe, contacte o borre**: los mensajes los manda una persona.
+
+Acceso: solo un superadmin activo con correo de `orbita-corp.com` u `orbita.site`
+(`MCP_DOMINIOS_PERMITIDOS`), verificado en CADA llamada del conector, no solo al conectar. La persona autoriza en
+`orbita.site/superadmin/conectar-claude` (reusa el login con Google y 2FA del panel). Los tokens del conector se firman
+con claves derivadas de `JWT_SECRET` con una etiqueta propia, así que no sirven como sesión del panel. «Desconectar
+Claude» (Prospección) revoca todos los Claude de esa persona. Rotar `JWT_SECRET` desconecta a todos.
+
+**Secreto `META_PROSPECCION_TOKEN`** (cargado el 14/10/2026, ya está en `SECRETS=` de `deploy.sh`). Business Discovery necesita un token de USUARIO de Facebook con
+`instagram_basic`, `pages_show_list`, `pages_read_engagement` e `instagram_manage_insights` (los de Instagram Login no
+sirven: devuelven «nonexisting field (business_discovery)»). Los de usuario normales duran 1–2 h, así que en producción
+se usa el de un **usuario del sistema** (Meta Business Suite → Configuración → Usuarios del sistema → generar token,
+sin vencimiento, con la app de Órbita y esos 4 permisos; activos: la página de Órbita, la cuenta de Instagram y la app):
+
+```bash
+printf '%s' 'TOKEN' | gcloud secrets create META_PROSPECCION_TOKEN --data-file=- --project orbita-api-corp
+```
+
+Si hay que rotarlo: `gcloud secrets versions add META_PROSPECCION_TOKEN --data-file=...` y redesplegar. Sin el secreto,
+consultar cuentas responde un error claro y lo demás (conector, lotes ya guardados) sigue andando.
+
+Variables opcionales (no sensibles, ya tienen valor por defecto; solo se ponen en `deploy/env-vars.yaml` para cambiarlas):
+`MCP_PUBLIC_URL` (`https://api.orbita.site`), `MCP_CONSENT_URL` (`https://orbita.site/superadmin/conectar-claude`),
+`MCP_DOMINIOS_PERMITIDOS` (`orbita-corp.com,orbita.site`), `MCP_RETORNOS_EXTRA` (direcciones de retorno extra, p. ej. otro
+cliente MCP), `META_PROSPECCION_IG_ID` y `META_PROSPECCION_GRAPH_VERSION` (`v23.0`).
+
+Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `marketing_mcp_codigos` y
+`marketing_mcp_refresh`, todas con RLS): `20261014110000_marketing_prospeccion`, `20261014120000_marketing_mcp_oauth` y
+`20261014130000_marketing_prospeccion_rls`. Son solo aditivas (tablas nuevas): se aplican en producción con
+`./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`.
+
+Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
+con `https://api.orbita.site/api/v1/mcp/prospeccion`. Requiere un plan de Claude que permita conectores personalizados.
+
 ## Ver logs
 
 ```bash

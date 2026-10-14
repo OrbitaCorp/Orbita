@@ -5,6 +5,7 @@ import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import { InstagramBandeja } from './InstagramBandeja'
 import { InstagramComentarios, InstagramEstadisticas, InstagramPublicaciones } from './InstagramContenido'
 import { TiktokContenido } from './TiktokContenido'
+import { PanelProspeccion } from './Prospeccion'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader, ConfirmModal, dateTime,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
@@ -45,7 +46,7 @@ const URL_MARCA = 'https://www.tiktok.com/legal/page/global/bc-policy/en'
 
 const textarea: React.CSSProperties = { ...inputStyle, height: 'auto', minHeight: 96, padding: '11px 13px', lineHeight: 1.5, resize: 'vertical', width: '100%' }
 
-type Canal = 'tiktok' | 'instagram' | 'whatsapp'
+type Canal = 'tiktok' | 'instagram' | 'whatsapp' | 'prospeccion'
 type Tono = 'green' | 'amber' | 'gray'
 type Estado = { texto: string; tono: Tono }
 
@@ -110,11 +111,13 @@ export function TabMarketing({ puedePublicar }: { puedePublicar: boolean }) {
         <CanalTarjeta nombre="TikTok" para="Videos de la marca y sus números" estado={estadoTiktok} linea={lineaTiktok} activo={canal === 'tiktok'} onElegir={() => setCanal('tiktok')} onDesconectar={puedePublicar && tiktok?.conectado ? () => setConfirmar('tiktok') : undefined} />
         <CanalTarjeta nombre="Instagram" para="Mensajes, publicaciones, comentarios y estadísticas" estado={estadoInstagram} linea={lineaInstagram} activo={canal === 'instagram'} onElegir={() => setCanal('instagram')} onDesconectar={puedePublicar && ig?.conectado ? () => setConfirmar('instagram') : undefined} />
         <CanalTarjeta nombre="WhatsApp" para="Atención por mensajes a clientes y contactos" estado={estadoWhatsapp} linea={lineaWhatsapp} activo={canal === 'whatsapp'} onElegir={() => setCanal('whatsapp')} />
+        <CanalTarjeta nombre="Prospección" para="Encontrar tiendas de Instagram que podrían usar Órbita" estado={{ texto: 'Herramienta interna', tono: 'gray' }} linea="Se analiza con tu Claude" activo={canal === 'prospeccion'} onElegir={() => setCanal('prospeccion')} />
       </div>
 
       {canal === 'tiktok' && <PanelTiktok estado={tiktok} puedePublicar={puedePublicar} refrescar={tick} onCambio={() => setTick((n) => n + 1)} onDesconectar={() => setConfirmar('tiktok')} setAviso={setAviso} />}
       {canal === 'instagram' && <PanelInstagram canales={canales} puedeVer={puedePublicar} onCambio={() => setTickCanales((n) => n + 1)} onDesconectar={() => setConfirmar('instagram')} setAviso={setAviso} />}
       {canal === 'whatsapp' && <PanelWhatsapp />}
+      {canal === 'prospeccion' && <PanelProspeccion puedeEditar={puedePublicar} setAviso={setAviso} />}
 
       {confirmar === 'tiktok' && (
         <ConfirmModal

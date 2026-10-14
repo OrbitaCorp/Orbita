@@ -182,6 +182,33 @@ export type TiktokPublicar = {
   isAigc?: boolean
 }
 
+// ─── Marketing → Prospección (apps/api/src/marketing/prospeccion) ──────────────
+export type ProspectoNivel = 'A' | 'B' | 'C' | 'D' | '—'
+export type ProspectoEstado = 'NUEVO' | 'CONTACTADO' | 'RESPONDIO' | 'DEMO' | 'CLIENTE' | 'DESCARTADO' | 'NO_CONTACTAR'
+export type ProspectoEvaluacion = { puntaje: number | null; nivel: ProspectoNivel; accion: string; motivo: string; subrubro: string | null; partes: Record<string, number> }
+export type ProspectoDatos = {
+  usuario: string; nombre: string | null; bio: string; web: string | null; enlace: string
+  seguidores: number; publicaciones: number; postsPorSemana: number | null; diasDesdeUltimo: number | null; engagementPct: number | null; local: boolean
+}
+export type ProspectoAnalisis = {
+  usuario: string; subrubro: string; confianza: 'alta' | 'media' | 'baja'; vende_productos: boolean | null; canal_venta: string
+  senales_dolor: string[]; nivel_final: 'A' | 'B' | 'C' | 'D'; motivo: string; angulo: string; mensaje_sugerido: string
+}
+export type Prospecto = {
+  id: string; usuario: string; datos: ProspectoDatos; evaluacion: ProspectoEvaluacion; analisis: ProspectoAnalisis | null
+  analizadoAt: string | null; estado: ProspectoEstado; notas: string | null; ultimaConsultaAt: string
+}
+export type ProspeccionLote = { id: string; createdAt: string; creadoPor: string; cuentas: number; sinDatos: number; niveles: Record<string, number>; analizadas: number }
+export type ProspeccionLoteDetalle = { id: string; createdAt: string; versionCriterio: string; sinDatos: { usuario: string; motivo: string }[]; prospectos: Prospecto[] }
+export type ProspeccionConsulta = {
+  lote: { id: string; createdAt: string }
+  conDatos: number
+  sinDatos: { usuario: string; motivo: string }[]
+  resumen: { usuario: string; puntaje: number | null; nivel: ProspectoNivel; subrubro: string | null; estado: ProspectoEstado }[]
+  aviso: string | null
+}
+export type McpSolicitud = { cliente: string; retorno: string; permiso: string; dominios: string[]; usuario: string }
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, { method: 'GET' })
   if (!res.ok) throw new PlatformApiError(res.status, `Platform API ${res.status}`)
@@ -200,7 +227,7 @@ async function getJSONConMensaje<T>(path: string): Promise<T> {
   return data as T
 }
 
-async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
+async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
   const res = await authedFetch(`${API_BASE}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -1131,6 +1158,15 @@ export const platformApi = {
   tiktokBorrador: (videoUrl: string) => sendJSON<{ id: string; publishId: string; status: string }>('/platform/marketing/tiktok/posts/draft', 'POST', { videoUrl }),
   tiktokEstadoPublicacion: (publishId: string) => getJSON<TiktokPublicacion>(`/platform/marketing/tiktok/posts/${publishId}`),
   tiktokDesconectar: () => sendJSON<{ ok: true }>('/platform/marketing/tiktok', 'DELETE'),
+  // Prospección: las cuentas se consultan por la API de Meta y se guardan en un lote; el análisis lo hace el Claude de
+  // cada superadmin por el conector MCP. Las rutas de "mcp" son la pantalla de consentimiento y el botón Desconectar.
+  prospeccionLotes: () => getJSONConMensaje<ProspeccionLote[]>('/platform/marketing/prospeccion/lotes'),
+  prospeccionLote: (id: string) => getJSONConMensaje<ProspeccionLoteDetalle>(`/platform/marketing/prospeccion/lotes/${id}`),
+  prospeccionConsultar: (usuarios: string[]) => sendJSON<ProspeccionConsulta>('/platform/marketing/prospeccion/lotes', 'POST', { usuarios }),
+  prospeccionActualizar: (id: string, cambios: { estado?: ProspectoEstado; notas?: string }) => sendJSON<Prospecto>(`/platform/marketing/prospeccion/prospectos/${id}`, 'PATCH', cambios),
+  mcpSolicitud: (req: string) => getJSONConMensaje<McpSolicitud>(`/platform/mcp/solicitud?req=${encodeURIComponent(req)}`),
+  mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
+  mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

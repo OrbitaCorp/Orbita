@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -121,7 +121,15 @@ async function bootstrap(): Promise<void> {
   );
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  app.setGlobalPrefix('api/v1');
+  // Las direcciones de descubrimiento del conector MCP (RFC 9728 y RFC 8414) tienen que estar en la raíz del dominio,
+  // fuera de api/v1: ahí las busca Claude. Ver marketing/prospeccion/mcp/.
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: '.well-known/oauth-authorization-server', method: RequestMethod.GET },
+      { path: '.well-known/oauth-protected-resource', method: RequestMethod.GET },
+      { path: '.well-known/oauth-protected-resource/api/v1/mcp/prospeccion', method: RequestMethod.GET },
+    ],
+  });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );
