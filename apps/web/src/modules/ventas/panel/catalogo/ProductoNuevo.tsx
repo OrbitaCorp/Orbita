@@ -136,6 +136,8 @@ interface ProdForm {
     nombre: string; descripcion: string; categoriaId: string; tags: string[]; estado: ProductStatus
     precio: string; costo: string; sku: string
     stock: string; stockMinimo: string
+    /** "Se hace por pedido": sin stock; en la tienda se ve pero solo se consulta por WhatsApp (sin carrito ni compra). */
+    porPedido: boolean
     // "Fondo con IA" premium: flat (plano) o volume (con volumen) — ver
     // ImageStudioService.generatePremiumBackground(). Se sugiere solo según
     // la categoría al elegirla por primera vez (ver sugerirPhotoType), el
@@ -229,7 +231,7 @@ function sugerirPhotoType(nombreCategoria: string): 'flat' | 'volume' {
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
     precio: '', costo: '', sku: '',
-    stock: '0', stockMinimo: '5',
+    stock: '0', stockMinimo: '5', porPedido: false,
     photoType: 'flat',
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: [], sugeridos: ['S', 'M', 'L', 'XL'], habituales: ['S', 'M', 'L', 'XL'] }],
@@ -599,6 +601,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
                     stock: p.variants[0]?.showStock === false ? '' : String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
                     stockMinimo: String(p.variants[0]?.stock[0]?.stockMin ?? 5),
+                    porPedido: p.byOrder === true,
                     tieneVariantes: conVariantes,
                     tiposVariante: conVariantes
                         ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value), esVisual: o.isVisual }))
@@ -1418,7 +1421,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // Vidriera con el stock en blanco: no hay un número que mandar, la variante queda "sin stock cargado" y la tienda no
         // lo muestra. Con un número (aunque sea 0) se manda y se refleja en la ficha. Fuera de la vidriera nada cambia.
         const stockDeLaVariante = (valor: string): Pick<UpsertProductInput['variants'][number], 'initialStock' | 'showStock'> =>
-            vidriera && valor.trim() === ''
+            prod.porPedido
+                ? {} // por pedido: no lleva stock, no se manda ninguno (el servidor deja las variantes sin stock cargado)
+                : vidriera && valor.trim() === ''
                 ? { showStock: false }
                 : { initialStock: Number(valor) || 0, ...(vidriera ? { showStock: true } : {}) }
 
@@ -1462,6 +1467,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: estado,
             photoType: prod.photoType,
+            byOrder: prod.porPedido,
             ...(tagIds.length > 0 ? { tagIds } : {}),
             specs,
             videoUrl: prod.videoUrl.trim() || undefined,
@@ -1518,7 +1524,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // Toast, no banner fijo — es una validación disparada por la acción
         // de guardar (mismo criterio que el resto del sistema, ej. el chequeo
         // de envío en PedidoNuevo.tsx), no un error persistente de la pantalla.
-        if (estado === 'PUBLISHED' && !vidriera && stockTotal <= 0) {
+        if (estado === 'PUBLISHED' && !vidriera && !prod.porPedido && stockTotal <= 0) {
             onToast('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
@@ -1789,7 +1795,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         }
         if (valoresConFotoDuplicada.length > 0) f.push({ id: 'pn-variantes', texto: 'una sola foto por valor' })
         if (fondosEnCurso > 0) f.push({ id: 'pn-fotos', texto: 'que termine de aplicarse el fondo de las fotos' })
-        if (estado === 'PUBLISHED' && !vidriera && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
+        if (estado === 'PUBLISHED' && !vidriera && !prod.porPedido && stockTotal <= 0) f.push({ id: 'pn-stock', texto: 'el stock (o guardalo como borrador)' })
         return f
     }
     const faltasVisibles = intento ? faltantes(intento) : []
@@ -1975,7 +1981,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             fotosPorValor={fotosPorValorPreview}
             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
             stockTotal={stockTotal}
-            sinStockCargado={vidriera && !(prod.tieneVariantes ? filas.some(f => f.activa && f.stock.trim() !== '') : prod.stock.trim() !== '')}
+            sinStockCargado={prod.porPedido || vidriera && !(prod.tieneVariantes ? filas.some(f => f.activa && f.stock.trim() !== '') : prod.stock.trim() !== '')}
             urlsConFondoIA={urlsConFondoIA}
             urlsEnProceso={urlsEnProceso}
         />
@@ -2300,11 +2306,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 <div>
                                                     <label style={lbl}>Stock</label>
                                                     <div style={{ height: 40, display: 'flex', alignItems: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
-                                                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, marginRight: 6 }}>{stockTotal}</span> en total, por variante
+                                                        {prod.porPedido
+                                                            ? <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>Por pedido</span>
+                                                            : <><span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', fontWeight: 600, marginRight: 6 }}>{stockTotal}</span> en total, por variante</>}
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} />
+                                                <PField label={vidriera ? 'Stock (opcional)' : 'Stock'} value={prod.porPedido ? '' : prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono error={hayFalta('pn-stock')} disabled={prod.porPedido} placeholder={prod.porPedido ? 'Por pedido' : undefined} />
+                                            )}
+                                            {/* En una vidriera nada se compra online y el stock ya es opcional: la casilla no aplica. */}
+                                            {!vidriera && (
+                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.4 }}>
+                                                    <input
+                                                        type="checkbox" checked={prod.porPedido} style={{ marginTop: 2 }}
+                                                        onChange={e => { set('porPedido', e.target.checked); setStockMasivo('') }}
+                                                    />
+                                                    <span>
+                                                        <strong style={{ color: 'var(--color-text)', fontWeight: 600 }}>Se hace por pedido</strong>
+                                                        {' '}— sin stock. Se muestra en tu tienda pero no se puede comprar: el cliente te consulta por WhatsApp.
+                                                    </span>
+                                                </label>
                                             )}
                                             {vidriera && (
                                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
@@ -2575,6 +2596,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     )}
                                                                 </div>
                                                                 <GrillaStock
+                                                                    deshabilitado={prod.porPedido}
                                                                     tipos={tiposValidos}
                                                                     filas={filas}
                                                                     onStock={(clave, valor) => setFilas(prev => prev.map(f => f.clave === clave ? { ...f, stock: valor.replace(/\D/g, '') } : f))}
@@ -2600,6 +2622,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                         onChange={e => cambiarStockMasivo(e.target.value)}
                                                                         placeholder="0"
                                                                         aria-label="Stock para todas las variantes"
+                                                                        disabled={prod.porPedido}
                                                                         style={celdaGrande}
                                                                     />
                                                                     <span />
@@ -2620,8 +2643,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                                     <input
                                                                         className="ds-field"
                                                                         inputMode="numeric"
-                                                                        value={f.stock}
-                                                                        disabled={!f.activa}
+                                                                        value={prod.porPedido ? '' : f.stock}
+                                                                        disabled={!f.activa || prod.porPedido}
                                                                         onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))}
                                                                         aria-label={`Stock de ${f.clave}`}
                                                                         style={celdaGrande}
@@ -4081,8 +4104,8 @@ function InterruptorVariantes({ on, onChange }: { on: boolean; onChange: (v: boo
 // menos en columnas. Enter/flecha abajo pasa a la celda de abajo (y, al final de
 // la columna, a la siguiente); Tab recorre la fila. Al enfocar una celda se
 // selecciona su contenido, así escribir reemplaza el 0.
-function GrillaStock({ tipos, filas, onStock }: {
-    tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void
+function GrillaStock({ tipos, filas, onStock, deshabilitado }: {
+    tipos: TipoVariante[]; filas: FilaVariante[]; onStock: (clave: string, valor: string) => void; deshabilitado?: boolean
 }) {
     const ref = useRef<HTMLDivElement>(null)
     const [ri, ci] = tipos[0].opciones.length >= tipos[1].opciones.length ? [0, 1] : [1, 0]
@@ -4135,8 +4158,8 @@ function GrillaStock({ tipos, filas, onStock }: {
                                                 className="ds-field"
                                                 data-celda={`${i}-${j}`}
                                                 inputMode="numeric"
-                                                value={f.stock}
-                                                disabled={!f.activa}
+                                                value={deshabilitado ? '' : f.stock}
+                                                disabled={!f.activa || deshabilitado}
                                                 title={f.activa ? undefined : 'No se ofrece — activala en "Precio y stock"'}
                                                 aria-label={`Stock de ${f.clave}`}
                                                 onChange={e => onStock(f.clave, e.target.value)}
@@ -4344,9 +4367,9 @@ function InputPrecio({
     )
 }
 
-function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles, error }: {
+function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big, miles, error, disabled }: {
     label: ReactNode; value: string; onChange: (v: string) => void; placeholder?: string
-    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean; error?: boolean
+    prefix?: string; mono?: boolean; h?: number; big?: boolean; miles?: boolean; error?: boolean; disabled?: boolean
 }) {
     return (
         <div>
@@ -4362,7 +4385,7 @@ function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big
                         style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)' }}
                     />
                 ) : (
-                    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
+                    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
                 )}
             </div>
         </div>

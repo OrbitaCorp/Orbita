@@ -101,6 +101,8 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
     // la validación del PUT (categoryId es obligatorio ahí) — se avisa acá en
     // vez de dejar que el guardado tire un error genérico.
     const sinCategoria = full !== null && !full.categoryId
+    // "Se hace por pedido": no lleva stock. Se cambia desde el producto (casilla junto al stock), no desde acá.
+    const porPedido = full?.byOrder === true
 
     async function guardar() {
         if (!full) return
@@ -128,7 +130,7 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
             footer={!cargando && !error && full ? (
                 <>
                     <Button variant="outline" onClick={onClose} disabled={guardando}>Cancelar</Button>
-                    <Button variant="primary" onClick={() => void guardar()} disabled={guardando || sinCategoria}>
+                    <Button variant="primary" onClick={() => void guardar()} disabled={guardando || sinCategoria || porPedido}>
                         {guardando ? 'Guardando…' : 'Guardar'}
                     </Button>
                 </>
@@ -151,7 +153,12 @@ export function StockRapidoModal({ productoId, productoNombre, onClose, onGuarda
                             Este producto no tiene categoría asignada — abrí &quot;Editar&quot; para poder guardar cambios.
                         </div>
                     )}
-                    {full.variants.map(v => (
+                    {porPedido && (
+                        <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--color-surface-alt)', color: 'var(--color-body)', fontSize: 12.5, marginBottom: 6 }}>
+                            Este producto se hace por pedido: no lleva stock. Para cambiarlo, abrí &quot;Editar&quot; y destildá &quot;Se hace por pedido&quot;.
+                        </div>
+                    )}
+                    {!porPedido && full.variants.map(v => (
                         <div key={v.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0' }}>
                             <span style={{ fontSize: 13, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{etiquetaVariante(v)}</span>

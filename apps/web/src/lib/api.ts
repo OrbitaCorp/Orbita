@@ -1873,8 +1873,10 @@ export type ApiProductRow = {
   status: ProductStatus
   isFeatured: boolean
   totalStock: number
-  /** false = ninguna variante tiene el stock cargado (vidriera): el panel muestra "—" y no lo cuenta como "sin stock". */
+  /** false = ninguna variante tiene el stock cargado (vidriera o "por pedido"): el panel muestra "—" y no lo cuenta como "sin stock". */
   showStock?: boolean
+  /** "Se hace por pedido": sin stock, se muestra en la tienda y solo se consulta por WhatsApp. */
+  byOrder?: boolean
   variantCount: number
   primaryImageUrl: string | null
   // Todas las fotos del producto, la que se ve por default primero — para el
@@ -1952,6 +1954,8 @@ export type ApiProductFull = {
   // "Fondo con IA" premium: flat (plano) usa Gemini, volume (con volumen)
   // usa Workers AI — ver ImageStudioService.generatePremiumBackground().
   photoType: 'flat' | 'volume'
+  /** "Se hace por pedido": sin stock, se muestra en la tienda y solo se consulta por WhatsApp. */
+  byOrder?: boolean
   // Ficha técnica opcional ("RAM" -> "16GB") — [] = el producto no tiene,
   // el detalle del storefront no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -1992,6 +1996,8 @@ export type UpsertProductInput = {
   cost?: number
   status?: ProductStatus
   photoType?: 'flat' | 'volume'
+  // "Se hace por pedido" (sin stock, solo consulta por WhatsApp). Omitido en una edición = no cambia.
+  byOrder?: boolean
   tagIds?: string[]
   specs?: { label: string; value: string }[]
   videoUrl?: string

@@ -844,6 +844,10 @@ model Product {
   // Estrella en la grilla del panel (no en el wizard de creación) — alimenta la
   // sección "Destacados" del storefront público. No confundir con `status`.
   isFeatured    Boolean       @default(false) @map("is_featured")
+  // "Se hace por pedido": no lleva stock. Se muestra en la tienda aunque no haya unidades, pero con la ficha de vidriera:
+  // sin carrito ni compra, solo "Consultar por WhatsApp". Al guardarlo, todas sus variantes quedan con showStock=false
+  // (así las alertas, el inventario y los reportes de stock lo ignoran) y nunca se descuenta ni se repone stock.
+  byOrder       Boolean       @default(false) @map("by_order")
   inventoryType String        @default("standard") @map("inventory_type") // standard | serialized | fractional | batch | simple
   // "Fondo con IA" (modo premium, ver ImageStudioService): qué motor generativo
   // usar. flat (plano — indumentaria, la mayoría del catálogo) va a Gemini;

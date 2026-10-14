@@ -151,6 +151,7 @@ export class ProductsService {
         totalStock: p.variants.reduce((sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0), 0),
         // false = ninguna variante tiene el stock cargado (vidriera): el panel muestra "—" en vez de "0".
         showStock: p.variants.some((v) => v.showStock),
+        byOrder: p.byOrder,
         variantCount: p.variants.length,
         primaryImageUrl: pickPrimaryImageUrl(p.images),
         // Todas las fotos (no solo la principal), en el mismo orden de
@@ -184,7 +185,8 @@ export class ProductsService {
     this.validateNoDuplicateVariants(dto);
     this.validatePricing(dto);
     const vidriera = await this.esVidriera(businessId);
-    this.validateStockOnPublish(dto, undefined, vidriera);
+    const porPedido = dto.byOrder === true;
+    this.validateStockOnPublish(dto, undefined, vidriera || porPedido);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
 
@@ -207,6 +209,7 @@ export class ProductsService {
           specs: dto.specs ? (dto.specs.map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue) : undefined,
           videoUrl: dto.videoUrl || null,
           photoType: dto.photoType ?? 'flat',
+          byOrder: porPedido,
         },
       });
 
@@ -253,7 +256,7 @@ export class ProductsService {
               comparePrice: v.comparePrice ?? null,
               isDefault: isSingleDefault,
               isActive: v.isActive ?? true,
-              showStock: vidriera ? (v.showStock ?? true) : true,
+              showStock: porPedido ? false : vidriera ? (v.showStock ?? true) : true,
             },
           });
           await Promise.all([
@@ -266,7 +269,7 @@ export class ProductsService {
               data: {
                 variantId: variant.id,
                 branchId: defaultBranch.id,
-                quantity: v.showStock === false && vidriera ? 0 : (v.initialStock ?? 0),
+                quantity: porPedido || (v.showStock === false && vidriera) ? 0 : (v.initialStock ?? 0),
                 stockMin: v.stockMin ?? 0,
               },
             }),
@@ -311,7 +314,9 @@ export class ProductsService {
     this.validateNoDuplicateVariants(dto);
     this.validatePricing(dto);
     const vidriera = await this.esVidriera(businessId);
-    this.validateStockOnPublish(dto, existing, vidriera);
+    // Un PUT que no menciona byOrder (el stock rápido, Orbi…) lo deja como estaba.
+    const porPedido = dto.byOrder ?? existing.byOrder;
+    this.validateStockOnPublish(dto, existing, vidriera || porPedido);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
     const existingVariantIds = new Set(existing.variants.map((v) => v.id));
@@ -369,6 +374,7 @@ export class ProductsService {
           specs: (dto.specs ?? []).map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue,
           videoUrl: dto.videoUrl || null,
           photoType: dto.photoType ?? undefined,
+          byOrder: dto.byOrder ?? undefined,
         },
       });
       if (count === 0) throw new NotFoundException('Producto no encontrado');
@@ -420,11 +426,12 @@ export class ProductsService {
               where: { id: v.id },
               data: {
                 sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null, isActive: v.isActive ?? true,
-                ...(vidriera && v.showStock !== undefined ? { showStock: v.showStock } : {}),
+                // Por pedido = nunca muestra stock; una tienda con checkout normal lo vuelve a mostrar (por si se destildó).
+                ...(porPedido ? { showStock: false } : vidriera ? (v.showStock !== undefined ? { showStock: v.showStock } : {}) : { showStock: true }),
               },
             });
             // Vidriera con el stock en blanco: no se toca la cantidad (no hay un número que ajustar).
-            if (!(vidriera && v.showStock === false)) {
+            if (!porPedido && !(vidriera && v.showStock === false)) {
               await this.syncStock(tx, {
                 businessId,
                 memberId,
@@ -446,7 +453,7 @@ export class ProductsService {
               comparePrice: v.comparePrice ?? null,
               isDefault: false,
               isActive: v.isActive ?? true,
-              showStock: vidriera ? (v.showStock ?? true) : true,
+              showStock: porPedido ? false : vidriera ? (v.showStock ?? true) : true,
             },
           });
           await Promise.all([
@@ -459,7 +466,7 @@ export class ProductsService {
               data: {
                 variantId: variant.id,
                 branchId: defaultBranch.id,
-                quantity: v.showStock === false && vidriera ? 0 : (v.initialStock ?? 0),
+                quantity: porPedido || (v.showStock === false && vidriera) ? 0 : (v.initialStock ?? 0),
                 stockMin: v.stockMin ?? 0,
               },
             }),
@@ -649,6 +656,7 @@ export class ProductsService {
           basePrice: original.basePrice,
           comparePrice: original.comparePrice,
           cost: original.cost,
+          byOrder: original.byOrder,
           status: 'DRAFT',
         },
       });
@@ -993,7 +1001,7 @@ export class ProductsService {
     if (!product) throw new NotFoundException('Producto no encontrado');
 
     // Una vidriera no maneja inventario: publicar no exige stock (ver ProductVariant.showStock).
-    if (dto.status === 'PUBLISHED' && !(await this.esVidriera(businessId))) {
+    if (dto.status === 'PUBLISHED' && !product.byOrder && !(await this.esVidriera(businessId))) {
       const totalStock = product.variants.reduce(
         (sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0),
         0,
@@ -1149,6 +1157,7 @@ export class ProductsService {
       status: p.status,
       isFeatured: p.isFeatured,
       photoType: p.photoType,
+      byOrder: p.byOrder,
       specs: normalizarSpecs(p.specs),
       videoUrl: p.videoUrl,
       contentBlocks: normalizarBloques(p.contentBlocks),

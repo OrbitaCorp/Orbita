@@ -664,7 +664,8 @@ export class StorefrontService {
       orderBy: { createdAt: 'desc' },
     });
     const vidriera = business.mode === 'SHOWCASE';
-    const candidatos = candidatosBrutos.map((p) => ({ ...p, variants: p.variants.map((v) => stockDeVidriera(v, vidriera)) }));
+    // Un producto "por pedido" se trata como en la vidriera: disponible, sin cantidad ni "Sin stock". Lo que cambia es que no se compra.
+    const candidatos = candidatosBrutos.map((p) => ({ ...p, variants: p.variants.map((v) => stockDeVidriera(v, vidriera || p.byOrder)) }));
 
     // (RBT-613) Descuentos automáticos para toda la página candidata, en UNA
     // sola pasada — mismo criterio de "negocio chico, no miles de productos"
@@ -893,6 +894,8 @@ export class StorefrontService {
           images: orderedImageUrls(p.images),
           variantOptions,
           isFeatured: p.isFeatured,
+          // true = "se hace por pedido": se ve en la tienda pero solo se consulta por WhatsApp (sin carrito ni compra).
+          byOrder: p.byOrder,
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),
           promoLabel: promoLabelsPorClave.get(claveDescuento(p))?.label ?? null,
@@ -954,7 +957,7 @@ export class StorefrontService {
     });
     if (!productoBruto) throw new NotFoundException('Producto no encontrado');
     const vidriera = business.mode === 'SHOWCASE';
-    const product = { ...productoBruto, variants: productoBruto.variants.map((v) => stockDeVidriera(v, vidriera)) };
+    const product = { ...productoBruto, variants: productoBruto.variants.map((v) => stockDeVidriera(v, vidriera || productoBruto.byOrder)) };
 
     // (RBT-613) Un ítem por CADA variante activa (no solo la representativa —
     // el cliente puede elegir cualquiera) más el ítem sintético a nivel padre
@@ -1017,6 +1020,8 @@ export class StorefrontService {
       description: product.description,
       categoryId: product.categoryId,
       categoryName: product.category?.name ?? null,
+      // true = "se hace por pedido": la ficha no deja comprar ni agregar al carrito, solo consultar por WhatsApp.
+      byOrder: product.byOrder,
       // Sin `cost`: es información privada de margen, no debe salir por una
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
       price,

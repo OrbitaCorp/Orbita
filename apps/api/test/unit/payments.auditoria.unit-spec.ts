@@ -18,6 +18,8 @@ function pedidos(status: 'PENDING' | 'CONFIRMED') {
     stockMovement: { create: jest.fn() },
   };
   const prisma = {
+    // Los productos "por pedido" no llevan stock: el servicio pregunta cuáles de los renglones lo son (acá, ninguno).
+    productVariant: { findMany: jest.fn().mockResolvedValue([]) },
     order: {
       findFirst: jest.fn().mockResolvedValue({
         id: 'o-1', orderNumber: 7, businessId: BIZ, branchId: 'b-1', channel: 'ONLINE', status, total: 1000, customerId: null,
