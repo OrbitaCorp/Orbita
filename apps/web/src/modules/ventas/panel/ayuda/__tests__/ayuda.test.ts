@@ -97,7 +97,7 @@ describe('primeros pasos', () => {
 })
 
 describe('sugerencias', () => {
-    const base = { cumplidas: [] as string[], sabe: [] as string[], posponer: {}, ultima: 0, ahora: 10 * INTERVALO_MS, claveActual: 'dashboard' }
+    const base = { cumplidas: [] as string[], sabe: [] as string[], posponer: {}, ultima: 0, silenciadoHasta: 0, ahora: 40 * INTERVALO_MS, claveActual: 'dashboard' }
 
     it('cada sugerencia lleva a un tutorial que existe y los ids no se repiten', () => {
         const ids = SUGERENCIAS.map(s => s.id)
@@ -128,6 +128,12 @@ describe('sugerencias', () => {
     it('de vez en cuando: no sugiere si hubo otra hace poco', () => {
         expect(elegirSugerencia({ ...base, ultima: base.ahora - 1000 })).toBeNull()
         expect(elegirSugerencia({ ...base, ultima: base.ahora - INTERVALO_MS })).not.toBeNull()
+    })
+
+    it('una por día como mucho, y si las descarta seguidas se callan todas un tiempo', () => {
+        expect(INTERVALO_MS).toBe(24 * 60 * 60 * 1000)
+        expect(elegirSugerencia({ ...base, silenciadoHasta: base.ahora + 1 })).toBeNull()
+        expect(elegirSugerencia({ ...base, silenciadoHasta: base.ahora - 1 })).not.toBeNull()
     })
 
     it('con todo hecho no queda nada que sugerir', () => {
@@ -175,5 +181,6 @@ describe('quién puede usar el modo prueba', () => {
         // Sin la marca, la tienda de pruebas todavía no arrancó sola.
         expect(parsear('{"prueba":"listo"}').pruebaElegida).toBe(false)
         expect(parsear('{"pruebaElegida":true}').pruebaElegida).toBe(true)
+        expect(parsear('{"descartadasSeguidas":2,"silenciadoHasta":"x"}')).toMatchObject({ descartadasSeguidas: 2, silenciadoHasta: 0 })
     })
 })

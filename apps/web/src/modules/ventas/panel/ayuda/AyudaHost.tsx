@@ -30,11 +30,12 @@ import {
     COPY_PASO, NOMBRES_DE_PASOS, SECCION_DEL_PASO, decidirPrimerosPasos, pasoInicial, type VistaPrimerosPasos,
 } from './primerosPasos'
 import {
-    ESPERA_INICIAL_MS, POSPONER_IGNORADA_MS, POSPONER_SUGERENCIA_MS, claveDeSugerencia, elegirSugerencia,
+    DESCARTADAS_PARA_SILENCIAR, ESPERA_INICIAL_MS, POSPONER_IGNORADA_MS, POSPONER_SUGERENCIA_MS, SILENCIO_MS,
+    claveDeSugerencia, elegirSugerencia,
     type Sugerencia,
 } from './sugerencias'
 import { ESTADO_AYUDA_VACIO, POSPONER_MS, guardarAyuda, leerAyuda, type EstadoAyuda } from './almacen'
-import { EstilosAyuda, SugerenciaFlotante, Tarjeta } from './piezas'
+import { AvisoChico, EstilosAyuda, Tarjeta } from './piezas'
 import HojaTutorial from './HojaTutorial'
 import Foco from './Foco'
 
@@ -240,6 +241,7 @@ export default function AyudaHost() {
             if (!a) return
             const elegida = elegirSugerencia({
                 cumplidas, sabe: a.sabe, posponer: a.posponer, ultima: a.prueba ? 0 : a.ultimaSugerencia,
+                silenciadoHasta: a.prueba ? 0 : a.silenciadoHasta,
                 ahora: Date.now(), claveActual: clave,
             })
             if (!elegida) return
@@ -254,6 +256,19 @@ export default function AyudaHost() {
 
     const posponerSugerencia = (s: Sugerencia, ms: number) =>
         actualizarAyuda(a => ({ ...a, posponer: { ...a.posponer, [s.id]: Date.now() + ms } }))
+    // Contestó (sí sé / no, mostrame): vuelve a contar desde cero las que dejó pasar.
+    const respondida = () => actualizarAyuda(a => ({ ...a, descartadasSeguidas: 0 }))
+    // La cerró o la ignoró. Con varias seguidas se entiende que no las quiere: se callan todas un tiempo.
+    const descartada = (s: Sugerencia, ms: number) => actualizarAyuda(a => {
+        const seguidas = a.descartadasSeguidas + 1
+        const silenciar = seguidas >= DESCARTADAS_PARA_SILENCIAR
+        return {
+            ...a,
+            posponer: { ...a.posponer, [s.id]: Date.now() + ms },
+            descartadasSeguidas: silenciar ? 0 : seguidas,
+            silenciadoHasta: silenciar ? Date.now() + SILENCIO_MS : a.silenciadoHasta,
+        }
+    })
 
     if (!esMember || !ayuda) return null
 
@@ -361,13 +376,15 @@ export default function AyudaHost() {
         <>
             <EstilosAyuda />
             {avisoVisible && modulo && (
-                <div role="region" aria-label="Tutorial del módulo" className="ayu-sug">
-                    <div className="ayu-sug-titulo">¿Querés ver cómo funciona {modulo.titulo}?</div>
-                    <div className="ayu-sug-botones">
-                        <button type="button" onClick={() => setHojaAbierta(true)} className="ayu-btn ayu-btn-prim">Ver tutorial</button>
-                        <button type="button" onClick={() => setAvisoCerrado(true)} className="ayu-btn ayu-btn-sec">Ahora no</button>
-                    </div>
-                </div>
+                <AvisoChico
+                    region="Tutorial del módulo"
+                    texto={`¿Querés ver cómo funciona ${modulo.titulo}?`}
+                    principal="Ver tutorial"
+                    onPrincipal={() => setHojaAbierta(true)}
+                    secundaria="Ahora no"
+                    onSecundaria={() => setAvisoCerrado(true)}
+                    onCerrar={() => setAvisoCerrado(true)}
+                />
             )}
             {ayudaAbierta && (
                 <HojaTutorial
@@ -377,14 +394,19 @@ export default function AyudaHost() {
                 />
             )}
             {sugerenciaVisible && (
-                <SugerenciaFlotante
-                    accion={sugerenciaVisible.accion}
-                    onSabe={() => {
+                <AvisoChico
+                    region="Sugerencia de tutorial"
+                    texto={`¿Ya sabés ${sugerenciaVisible.accion}?`}
+                    principal="No, mostrame"
+                    onPrincipal={() => { respondida(); setConfirmando(sugerenciaVisible); setSugerencia(null) }}
+                    secundaria="Sí, ya sé"
+                    onSecundaria={() => {
+                        respondida()
                         actualizarAyuda(a => ({ ...a, sabe: [...a.sabe, sugerenciaVisible.id] }))
                         setSugerencia(null)
                     }}
-                    onNoSabe={() => { setConfirmando(sugerenciaVisible); setSugerencia(null) }}
-                    onExpira={() => { posponerSugerencia(sugerenciaVisible, POSPONER_IGNORADA_MS); setSugerencia(null) }}
+                    onCerrar={() => { descartada(sugerenciaVisible, POSPONER_SUGERENCIA_MS); setSugerencia(null) }}
+                    onExpira={() => { descartada(sugerenciaVisible, POSPONER_IGNORADA_MS); setSugerencia(null) }}
                 />
             )}
             {confirmando && (

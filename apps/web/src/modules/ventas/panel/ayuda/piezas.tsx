@@ -77,20 +77,27 @@ export function Tarjeta(p: PropsTarjeta) {
     )
 }
 
-/** Sugerencia que entra de derecha a izquierda: arriba en el celular, abajo a la derecha en la compu. */
-export function SugerenciaFlotante(p: {
-    accion: string
-    onSabe: () => void
-    onNoSabe: () => void
+/** Aviso chico que entra de derecha a izquierda: arriba en el celular, abajo a la derecha en la compu. */
+export function AvisoChico(p: {
+    texto: string
+    /** Acción principal (en azul) y, opcional, la que dice "ya lo sé / ahora no" (en gris). */
+    principal: string
+    onPrincipal: () => void
+    secundaria?: string
+    onSecundaria?: () => void
+    /** La X: cierra sin contestar. */
+    onCerrar: () => void
     /** Se ignoró un rato: se va sola. */
-    onExpira: () => void
+    onExpira?: () => void
+    region: string
 }) {
     // Si nadie la toca, se retira sola; con el mouse encima espera.
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
     const { onExpira } = p
     const armar = () => {
+        if (!onExpira) return
         if (timer.current) clearTimeout(timer.current)
-        timer.current = setTimeout(onExpira, 25_000)
+        timer.current = setTimeout(onExpira, 20_000)
     }
     useEffect(() => {
         armar()
@@ -101,15 +108,21 @@ export function SugerenciaFlotante(p: {
         <div
             className="ayu-sug"
             role="region"
-            aria-label="Sugerencia de tutorial"
+            aria-label={p.region}
             onMouseEnter={() => { if (timer.current) clearTimeout(timer.current) }}
             onMouseLeave={armar}
         >
-            <div className="ayu-sug-titulo">¿Ya sabés {p.accion}?</div>
-            <div className="ayu-sug-texto">Si no, te mostramos cómo en un minuto.</div>
-            <div className="ayu-sug-botones">
-                <button type="button" onClick={p.onNoSabe} className="ayu-btn ayu-btn-prim">No, mostrame</button>
-                <button type="button" onClick={p.onSabe} className="ayu-btn ayu-btn-sec">Sí, ya sé</button>
+            <div className="ayu-sug-fila">
+                <div className="ayu-sug-titulo">{p.texto}</div>
+                <button type="button" onClick={p.onCerrar} aria-label="Cerrar" className="ayu-sug-x">
+                    <X size={14} strokeWidth={2} aria-hidden="true" />
+                </button>
+            </div>
+            <div className="ayu-sug-acciones">
+                <button type="button" onClick={p.onPrincipal} className="ayu-link">{p.principal}</button>
+                {p.secundaria && p.onSecundaria && (
+                    <button type="button" onClick={p.onSecundaria} className="ayu-link ayu-link-sec">{p.secundaria}</button>
+                )}
             </div>
         </div>
     )
@@ -169,16 +182,29 @@ const CSS_AYUDA = `
 .ayu-sug {
     position: fixed; z-index: 160; box-sizing: border-box;
     background: var(--color-bg); color: var(--color-text);
-    border: 1px solid var(--color-border-strong); border-radius: 16px; padding: 16px;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
-    animation: ayuDesliza 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    border: 1px solid var(--color-border); border-radius: 12px; padding: 10px 10px 8px 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    animation: ayuDesliza 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @media (max-width: 639px) { .ayu-sug { top: 68px; left: 12px; right: 12px; } }
-@media (min-width: 640px) { .ayu-sug { bottom: 20px; right: 20px; width: 360px; } }
-.ayu-sug-titulo { font-size: 15.5px; font-weight: 600; line-height: 1.4; }
-.ayu-sug-texto { margin-top: 3px; font-size: 13.5px; color: var(--color-muted); line-height: 1.5; }
-.ayu-sug-botones { display: flex; gap: 8px; margin-top: 14px; }
-.ayu-sug-botones .ayu-btn { min-height: 42px; padding: 0 14px; font-size: 14px; }
+@media (min-width: 640px) { .ayu-sug { bottom: 20px; right: 20px; width: 300px; } }
+.ayu-sug-fila { display: flex; align-items: flex-start; gap: 6px; }
+.ayu-sug-titulo { flex: 1; font-size: 13.5px; font-weight: 500; line-height: 1.45; padding-top: 3px; }
+.ayu-sug-x {
+    flex-shrink: 0; width: 28px; height: 28px; border: none; border-radius: 8px; background: none; cursor: pointer;
+    color: var(--color-muted); display: flex; align-items: center; justify-content: center;
+    transition: background-color 150ms ease, color 150ms ease;
+}
+.ayu-sug-x:hover { background: var(--color-surface-alt); color: var(--color-text); }
+.ayu-sug-acciones { display: flex; gap: 16px; padding: 0 4px 2px 0; }
+.ayu-link {
+    min-height: 32px; padding: 0; border: none; background: none; cursor: pointer; font-family: inherit;
+    font-size: 13px; font-weight: 600; color: var(--color-primary);
+}
+.ayu-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ayu-link-sec { font-weight: 500; color: var(--color-muted); }
+.ayu-link-sec:hover { color: var(--color-text); }
+.ayu-sug-x:focus-visible, .ayu-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
 
 @keyframes ayuVelo { from { opacity: 0 } to { opacity: 1 } }
 @keyframes ayuEntra { from { opacity: 0; transform: translateY(14px) scale(0.98) } to { opacity: 1; transform: none } }
