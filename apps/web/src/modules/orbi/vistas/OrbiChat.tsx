@@ -9,7 +9,9 @@ import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { PLACEHOLDER_EN_MANTENIMIENTO } from '@/components/orbi/types'
 import { useAuth } from '@/hooks/useAuth'
 import { esVisitanteDemo } from '@/lib/demo/modo'
+import { TEXTO_VACIO_DEMO, type PresetDemo } from '@/lib/demo/orbiPresets'
 import { Caja } from '../piezas/Caja'
+import { PreguntasDemo } from '../piezas/PreguntasDemo'
 import { Encabezado } from '../piezas/Encabezado'
 import { BurbujaPersona, MensajeDeOrbi } from '../piezas/Mensaje'
 import { useOrbiV2Contexto } from '../piezas/contexto'
@@ -42,7 +44,7 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
   const mantenimiento = useOrbiStore(st => st.mantenimiento)
   const abortar = useOrbiStore(st => st.abortar)
   const estadoPet = usePetEstado()
-  const { send } = useOrbiChat()
+  const { send, enviarPreset } = useOrbiChat()
   const contexto = useOrbiContext()
   const { user } = useAuth()
   const rol = user?.type === 'member' ? user.role : undefined
@@ -67,6 +69,14 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
     const ctx = conContexto && nombrePantalla ? contexto : { ...contexto, section: undefined }
     void send(texto, ctx)
   }, [titulo, messages.length, setTitulo, setBorrador, clave, conContexto, nombrePantalla, contexto, send])
+
+  // Demo pública: no hay texto libre. Se elige una pregunta y Orbi contesta con
+  // el texto prearmado, sin llamar a la API (ver lib/demo/orbiPresets.ts).
+  const demo = esVisitanteDemo()
+  const elegirPregunta = useCallback((preset: PresetDemo) => {
+    if (!titulo && !messages.length) setTitulo(tituloProvisorio(preset.pregunta))
+    void enviarPreset(preset)
+  }, [titulo, messages.length, setTitulo, enviarPreset])
 
   const reintentar = useCallback(() => {
     const ultimaPregunta = [...messages].reverse().find(m => m.role === 'user')
@@ -122,8 +132,8 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
         <div className={s.vacio}>
           <OrbiPet size={72} estado={estadoPet} onCosquillas={sinAviso} />
           <h2>Hola, soy Orbi</h2>
-          <p>Preguntame cómo se hace algo en el panel o pedime datos de tu tienda. Si te propongo un cambio, no pasa nada hasta que lo confirmes.</p>
-          {!mantenimiento && sugerencias.length > 0 && (
+          <p>{demo ? TEXTO_VACIO_DEMO : 'Preguntame cómo se hace algo en el panel o pedime datos de tu tienda. Si te propongo un cambio, no pasa nada hasta que lo confirmes.'}</p>
+          {!demo && !mantenimiento && sugerencias.length > 0 && (
             <div className={s.sugerencias} role="list" aria-label="Sugerencias">
               {sugerencias.map(t => (
                 <button key={t} type="button" role="listitem" className={`${s.sugerencia} ${s.foco}`} onClick={() => setBorrador(clave, t)}>
@@ -152,20 +162,23 @@ export function OrbiChat({ onExpandir, onSalir, onPestana, onCerrar, onAbrirManu
       <div className={s.pie}>
         <div className={s.pieLectura}>
           {mantenimiento && <OrbiAvisoMantenimiento mensaje={mantenimiento} onAbrirManual={onAbrirManual} />}
-          <Caja
-            texto={borrador}
-            onTexto={t => setBorrador(clave, t)}
-            onEnviar={enviar}
-            onDetener={abortar}
-            enVivo={isStreaming}
-            deshabilitado={mantenimiento !== null}
-            placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
-            contexto={conContexto ? nombrePantalla : undefined}
-            onQuitarContexto={() => setSinContextoEn(contexto.section)}
-            enfocar={vista !== 'hoja'}
-            // En la demo las conversaciones no se guardan: la línea sería falsa.
-            conAviso={!esVisitanteDemo()}
-          />
+          {demo ? (
+            <PreguntasDemo onElegir={elegirPregunta} deshabilitado={isStreaming} />
+          ) : (
+            <Caja
+              texto={borrador}
+              onTexto={t => setBorrador(clave, t)}
+              onEnviar={enviar}
+              onDetener={abortar}
+              enVivo={isStreaming}
+              deshabilitado={mantenimiento !== null}
+              placeholder={mantenimiento ? PLACEHOLDER_EN_MANTENIMIENTO : undefined}
+              contexto={conContexto ? nombrePantalla : undefined}
+              onQuitarContexto={() => setSinContextoEn(contexto.section)}
+              enfocar={vista !== 'hoja'}
+              conAviso
+            />
+          )}
         </div>
       </div>
     </>

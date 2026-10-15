@@ -27,6 +27,8 @@ function tabla() {
       return { count: hit.length };
     }),
     deleteMany: jest.fn(async () => ({ count: 0 })),
+    // Para saber si alguien tiene Claude conectado: filas de esa persona, sin revocar y que no vencieron.
+    count: jest.fn(async ({ where }: { where: Fila }) => filas.filter((f) => f.adminId === where.adminId && (f.revocadoAt ?? null) === null && f.expiraAt > where.expiraAt.gt).length),
   };
 }
 
@@ -255,6 +257,16 @@ describe('canje del código y tokens', () => {
     c.estado.admin = { ...c.estado.admin!, isActive: false } as never;
     await expect(c.svc.verificarAcceso(t.access_token)).rejects.toBeInstanceOf(AccesoDenegadoError);
     await expect(c.svc.token({ grant_type: 'refresh_token', client_id: c.cliente.client_id, refresh_token: t.refresh_token })).rejects.toMatchObject({ codigo: 'invalid_grant' });
+  });
+
+  it('estaConectado dice si la persona tiene un Claude conectado ahora: sí tras autorizar, no si es de otra persona ni tras desconectar', async () => {
+    const c = await conectar();
+    await expect(c.svc.estaConectado('admin-1')).resolves.toBe(false); // todavía no canjeó el código: no hay token de renovación
+    await canje(c);
+    await expect(c.svc.estaConectado('admin-1')).resolves.toBe(true);
+    await expect(c.svc.estaConectado('otra-persona')).resolves.toBe(false);
+    await c.svc.revocarTodo('admin-1');
+    await expect(c.svc.estaConectado('admin-1')).resolves.toBe(false);
   });
 
   it('revocarTodo desconecta todos los Claude del superadmin', async () => {

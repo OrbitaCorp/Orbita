@@ -36,14 +36,15 @@ const REGRABAR = process.env.ORBI_REGRABAR_TURNOS === '1';
 
 type Llamada = { name: string; arguments: Record<string, unknown> };
 type Grabado = { id: string; intento: number; corrida: string; toolCalls: Llamada[]; texto: string };
-type Forma = 'secuencial' | 'paralelo' | 'demo';
+type Forma = 'secuencial' | 'paralelo';
 
 // ─── El guion ────────────────────────────────────────────────────────────────
 
 /**
  * secuencial: una tool por vuelta, cada una con un preámbulo ("Voy a…") que
  * la persona no tiene que ver. paralelo: de a dos tools por vuelta (Gemini 3).
- * demo: como secuencial, con el visitante de la demo pública (solo lectura).
+ * (La forma "demo", con el visitante de la demo pública, se sacó cuando el chat
+ * de Orbi se cerró a la demo: ese visitante ya no llega al modelo.)
  */
 function guion(g: Grabado, forma: Forma): LlmEvent[][] {
   const tamanio = forma === 'paralelo' ? 2 : 1;
@@ -152,7 +153,7 @@ async function porElController(caso: CasoPanel, g: Grabado, forma: Forma, d: Neg
       context: { surface: OrbiSurface.PANEL, module: 'ventas', section: caso.pantalla, businessId: 'otro' },
     } as never,
     res as never,
-    { type: 'member', businessId: BUSINESS_ID, ...usuario, readOnly: forma === 'demo' } as never,
+    { type: 'member', businessId: BUSINESS_ID, ...usuario } as never,
   );
   return { sse: chunks.join(''), guardados, pendientes, turnos, medidos, alModelo: llm.recibidos };
 }
@@ -194,11 +195,11 @@ describe('turnos grabados: el loop del panel hace lo mismo que el 2026-10-01', (
         const caso = casos.get(r.id);
         if (!caso || !r.turno) continue;
         const g: Grabado = { id: r.id, intento: r.intento, corrida: corrida.archivo, toolCalls: r.turno.toolCalls ?? [], texto: r.turno.texto ?? '' };
-        const formas: Forma[] = i % 5 === 0 ? ['secuencial', 'paralelo', 'demo'] : ['secuencial', 'paralelo'];
+        const formas: Forma[] = ['secuencial', 'paralelo'];
         for (const forma of formas) {
           const clave = `${corrida.archivo}#${r.id}#${r.intento}#${forma}`;
           const controller = await porElController(caso, g, forma, d);
-          const evals = forma === 'demo' ? null : await porLasEvals(caso, g, forma, d);
+          const evals = await porLasEvals(caso, g, forma, d);
           actual[`${clave}#controller`] = huella(controller);
           if (evals) actual[`${clave}#evals`] = huella(evals);
           primeraSalida[`${clave}#controller`] = controller;

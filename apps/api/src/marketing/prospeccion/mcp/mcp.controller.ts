@@ -4,6 +4,7 @@ import { Public } from '../../../common/decorators/public.decorator';
 import { PlatformAdminGuard } from '../../../common/guards/platform-admin.guard';
 import { SoloSuperadmin } from '../../../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../../../common/types/auth-context.type';
+import { TutorialesService } from '../../videos/tutoriales.service';
 import { VideosService } from '../../videos/videos.service';
 import { ProspeccionService } from '../prospeccion.service';
 import { McpProspeccion } from './mcp-prospeccion';
@@ -140,6 +141,12 @@ export class McpConsentimientoController {
     return this.traducir(() => this.oauth.resolverSolicitud(req.user.adminId, body.req ?? '', body.decision === 'aprobar' ? 'aprobar' : 'cancelar'));
   }
 
+  // ¿Tengo Claude conectado? Lo usa el panel para decidir si «Mejorar con Claude» abre Claude o pide conectarlo primero.
+  @Get('estado')
+  async estado(@Req() req: RequestConAdmin) {
+    return { conectado: await this.oauth.estaConectado(req.user.adminId) };
+  }
+
   // Desconecta a Claude de TU cuenta en todos lados (los que se conectaron con tu usuario).
   @Delete('conexiones')
   desconectar(@Req() req: RequestConAdmin) {
@@ -159,8 +166,9 @@ export class McpController {
     private readonly oauth: McpOauthService,
     prospeccion: ProspeccionService,
     videos: VideosService,
+    tutoriales: TutorialesService,
   ) {
-    this.protocolo = new McpProspeccion(prospeccion, videos);
+    this.protocolo = new McpProspeccion(prospeccion, videos, tutoriales);
   }
 
   private sinToken(res: Respuesta, motivo?: string) {

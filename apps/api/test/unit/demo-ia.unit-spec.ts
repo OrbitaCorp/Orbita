@@ -8,7 +8,7 @@ import { DemoIaInterceptor } from '../../src/demo/demo-ia.interceptor';
 import { DemoIaService, semanaIso } from '../../src/demo/demo-ia.service';
 import { ProductsController } from '../../src/products/products.controller';
 import { ImageStudioController } from '../../src/image-studio/image-studio.controller';
-import { OrbiController, PROMPT_DEMO } from '../../src/orbi/orbi.controller';
+import { OrbiController } from '../../src/orbi/orbi.controller';
 import { ToolRegistryService } from '../../src/orbi/tools/tool-registry.service';
 
 const reflector = new Reflector();
@@ -19,7 +19,8 @@ describe('rutas abiertas a la demo', () => {
     expect(marca(ProductsController.prototype, 'aiScan')).toBe('orbi-producto');
     expect(marca(ProductsController.prototype, 'aiAssist')).toBe('orbi-producto');
     expect(marca(ProductsController.prototype, 'aiVariants')).toBe('orbi-producto');
-    expect(marca(OrbiController.prototype, 'chat')).toBe('orbi-chat');
+    // El chat libre de Orbi está cerrado a la demo: sus respuestas son prearmadas, en el navegador.
+    expect(marca(OrbiController.prototype, 'chat')).toBeUndefined();
     // Las fotos web que siguen al escaneo: buscarlas y bajar la elegida.
     expect(marca(ProductsController.prototype, 'suggestedImages')).toBe('fotos-web');
     expect(marca(ProductsController.prototype, 'proxyImage')).toBe('foto-web');
@@ -43,11 +44,6 @@ describe('rutas abiertas a la demo', () => {
     const nombres = (o?: { soloLectura?: boolean }) => registro.getTools('panel' as never, [], undefined, o).map((t) => t.name);
     expect(nombres()).toEqual(['listOrders', 'createCoupon']);
     expect(nombres({ soloLectura: true })).toEqual(['listOrders']);
-  });
-
-  it('el prompt de la demo le dice a Orbi que es una demo y que no aplica cambios', () => {
-    expect(PROMPT_DEMO).toMatch(/DEMO/);
-    expect(PROMPT_DEMO).toMatch(/no podés crear, editar ni borrar/);
   });
 });
 
@@ -86,7 +82,7 @@ describe('DemoIaService', () => {
 
   it('no guarda la IP en texto plano', async () => {
     const { svc, prisma } = servicio([{ count: 1 }]);
-    await svc.consumir(req as never, 'orbi-chat');
+    await svc.consumir(req as never, 'fondo-ia');
     const valores = (prisma.$queryRaw.mock.calls[0] as unknown[]).slice(1).map(String);
     expect(valores.some((v) => v.includes('203.0.113.7'))).toBe(false);
   });

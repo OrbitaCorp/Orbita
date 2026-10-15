@@ -3,8 +3,8 @@ import { VideosPublicarService } from '../../src/marketing/videos/videos-publica
 
 // Publicar un video aprobado de la cola: solo si está aprobado, con los servicios de TikTok e Instagram simulados.
 
-function armar(estado = 'APROBADO') {
-  const video = { id: 'v-1', estado, ruta: 'marketing/videos/a.mp4', caption: 'texto sugerido #orbita' };
+function armar(estado = 'APROBADO', tipo = 'MARKETING') {
+  const video = { id: 'v-1', estado, tipo, ruta: 'marketing/videos/a.mp4', caption: 'texto sugerido #orbita' };
   const videos = {
     obtener: jest.fn(async () => video),
     urlPublica: jest.fn((r: string) => `https://pub.r2.dev/${r}`),
@@ -32,6 +32,14 @@ describe('publicar un video de la cola', () => {
     }
   });
 
+  it('un tutorial es interno: no se pasa a TikTok ni a Instagram, aunque esté aprobado', async () => {
+    const ctx = armar('APROBADO', 'TUTORIAL')
+    await expect(ctx.svc.enBorradoresDeTiktok('admin-1', 'v-1')).rejects.toBeInstanceOf(ConflictException)
+    await expect(ctx.svc.enBorradorDeInstagram('admin-1', 'v-1')).rejects.toBeInstanceOf(ConflictException)
+    expect(ctx.tiktok.enviarABorradores).not.toHaveBeenCalled()
+    expect(ctx.publicaciones.guardarBorrador).not.toHaveBeenCalled()
+  })
+
   it('TikTok: manda la dirección pública a los borradores y anota la publicación', async () => {
     const ctx = armar();
     const r = await ctx.svc.enBorradoresDeTiktok('admin-1', 'v-1');
@@ -55,6 +63,13 @@ describe('publicar un video de la cola', () => {
       caption: 'texto sugerido #orbita', formato: 'vertical', items: [{ origen: 'subida', ref: 'neg-1/subidas/x.mp4', tipo: 'video' }],
     });
     expect(ctx.videos.anotarPublicacion).toHaveBeenCalledWith('admin-1', 'v-1', 'instagram', 'ig-5');
+  });
+
+  it('Instagram: un archivo de más de 50 MB no se pasa por esta vía y avisa cómo seguir (la cola no tiene tope)', async () => {
+    const ctx = armar();
+    global.fetch = jest.fn(async () => new Response(new Uint8Array(50 * 1024 * 1024 + 1))) as never;
+    await expect(ctx.svc.enBorradorDeInstagram('admin-1', 'v-1')).rejects.toThrow('subilo a mano');
+    expect(ctx.medios.subirVideoDelServidor).not.toHaveBeenCalled();
   });
 
   it('Instagram: un texto escrito a mano reemplaza al sugerido, y si no se puede leer el video avisa', async () => {

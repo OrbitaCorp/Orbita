@@ -210,12 +210,29 @@ export type ProspeccionConsulta = {
 export type McpSolicitud = { cliente: string; retorno: string; permisos: string[]; dominios: string[]; usuario: string }
 
 export type VideoEstado = 'PENDIENTE' | 'APROBADO' | 'PUBLICADO'
+export type VideoTipo = 'MARKETING' | 'TUTORIAL'
 export type VideoControl = { nombre: string; ok: boolean; detalle: string }
 export type VideoDeCola = {
-  id: string; titulo: string; formato: 'REEL_9_16' | 'CUADRADO' | 'HORIZONTAL_16_9'; guion: string; caption: string
+  id: string; tipo: VideoTipo; titulo: string; formato: 'REEL_9_16' | 'CUADRADO' | 'HORIZONTAL_16_9'; guion: string; caption: string
   duracionSeg: number | null; bytes: number; estado: VideoEstado; controles: VideoControl[]; url: string
+  tutorialId: string | null
+  /** Si es una versión mejorada de otro video de la cola, el original. */
+  mejoraDeId: string | null
+  comentarios: number
   aprobadoAt: string | null; publicaciones: { destino: 'tiktok' | 'instagram'; id: string; fecha: string }[]
   expiraAt: string | null; createdAt: string
+  /** Qué puede hacer QUIEN MIRA con este video (el servidor nunca dice quién aprobó ni qué falta). */
+  puedeAprobar?: boolean; puedeRechazar?: boolean; yaAprobaste?: boolean; esTuyo?: boolean
+}
+export type VideoComentario = { id: string; autor: string; texto: string; fecha: string; esTuyo: boolean }
+export type TutorialEstado = 'FALTA' | 'EN_PROCESO' | 'EN_REVISION' | 'HECHO'
+export type TutorialDeLaLista = {
+  id: string; grupo: string; titulo: string; estado: TutorialEstado; opcional: boolean; prioridadAlta: boolean
+  notas: string | null; videoId: string | null; updatedAt: string
+}
+export type TutorialesRespuesta = {
+  resumen: { total: number; hechos: number; enRevision: number; enProceso: number; faltan: number }
+  tutoriales: TutorialDeLaLista[]
 }
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -1183,12 +1200,21 @@ export const platformApi = {
   mcpResolver: (req: string, decision: 'aprobar' | 'cancelar') => sendJSON<{ redirect: string }>('/platform/mcp/resolver', 'POST', { req, decision }),
   mcpDesconectar: () => sendJSON<{ revocados: number }>('/platform/mcp/conexiones', 'DELETE'),
   // Cola de videos que genera el equipo con su Claude (apps/api/src/marketing/videos).
-  videosCola: () => getJSONConMensaje<VideoDeCola[]>('/platform/marketing/videos'),
+  videosCola: (tipo?: VideoTipo) => getJSONConMensaje<VideoDeCola[]>(`/platform/marketing/videos${tipo ? `?tipo=${tipo}` : ''}`),
   videoAprobar: (id: string) => sendJSON<VideoDeCola>(`/platform/marketing/videos/${id}/aprobar`, 'POST'),
   videoRechazar: (id: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/rechazar`, 'POST'),
   videoDescarga: (id: string) => getJSONConMensaje<{ url: string; nombre: string }>(`/platform/marketing/videos/${id}/descarga`),
   videoATiktok: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/tiktok-borrador`, 'POST'),
   videoAInstagram: (id: string) => sendJSON<{ video: VideoDeCola }>(`/platform/marketing/videos/${id}/instagram-borrador`, 'POST', {}),
+  // Comentarios de cualquiera del equipo sobre un video, en todas sus fases.
+  videoComentarios: (id: string) => getJSONConMensaje<VideoComentario[]>(`/platform/marketing/videos/${id}/comentarios`),
+  videoComentar: (id: string, texto: string) => sendJSON<VideoComentario>(`/platform/marketing/videos/${id}/comentarios`, 'POST', { texto }),
+  videoBorrarComentario: (id: string, comentarioId: string) => sendJSON<{ ok: true }>(`/platform/marketing/videos/${id}/comentarios/${comentarioId}`, 'DELETE'),
+  // La lista de tutoriales: qué hay y qué falta. La actualiza el Claude de cada persona; acá se mira y se corrige.
+  tutorialesLista: () => getJSONConMensaje<TutorialesRespuesta>('/platform/marketing/tutoriales'),
+  tutorialActualizar: (id: string, cambios: { estado?: Exclude<TutorialEstado, 'EN_REVISION'>; notas?: string }) => sendJSON<{ id: string; estado: TutorialEstado }>(`/platform/marketing/tutoriales/${id}`, 'PATCH', cambios),
+  // ¿Tengo un Claude conectado? Decide si «Mejorar con Claude» abre Claude o pide conectarlo primero.
+  mcpEstado: () => getJSONConMensaje<{ conectado: boolean }>('/platform/mcp/estado'),
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),

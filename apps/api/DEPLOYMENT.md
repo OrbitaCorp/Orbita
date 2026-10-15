@@ -469,28 +469,57 @@ Migraciones (3, tablas `marketing_prospectos`, `marketing_prospeccion_lotes`, `m
 
 ### Cola de videos (Marketing → Videos)
 
-Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos»); Claude los hace en su computadora
-(HyperFrames, repo `Orbita-Videos`) y por el conector: `videos_pedir_subida` (reserva un lugar y devuelve una dirección
-firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja en la cola con
-su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube. Código en
-`src/marketing/videos/`, tabla `marketing_videos` (migración `20261014140000_marketing_videos`, con RLS).
+Cada persona le pide a SU Claude, con el conector (por ejemplo «generame 3 videos» o «hacé el tutorial de Atender un pedido»);
+Claude los hace en su computadora (HyperFrames; skills y agentes en el repo público `Orbita-Videos`: las instrucciones del conector le dicen a Claude Code que lo clone en `~/orbita-videos/repo` la primera vez, avisando antes; también existe como plugin de Claude Code, opcional) y por el conector: `videos_pedir_subida` (reserva un lugar y
+devuelve una dirección firmada), sube el mp4 con un PUT directo a R2 (`marketing/videos/<uuid>.mp4`) y `videos_registrar` (lo deja
+en la cola con su guion, texto sugerido y controles de calidad). No hay pedidos en el panel ni se renderiza nada en la nube.
+Código en `src/marketing/videos/`; tablas `marketing_videos`, `marketing_video_comentarios` y `marketing_tutoriales`
+(migraciones `20261014140000_marketing_videos`, `20261014180000_marketing_videos_tipos_y_tutoriales` y
+`20261014190000_marketing_videos_comentarios`, todas con RLS).
 
-- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE (vence a los 7 días si nadie lo revisa) → APROBADO (queda como registro,
-  con su archivo, sin vencer) → PUBLICADO (se pasó a un borrador). **Rechazar borra el archivo de R2 y el registro.**
-- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados
-  conservan su archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video; tope 50 MB por video, que es el de
-  Instagram).
-- **Aviso por correo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins ACTIVOS con correo
-  `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`): «Hay N videos para aprobar», con los títulos y un botón al panel.
-  Sale **uno por tanda**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de
-  tanda) que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`); no
-  hay tabla nueva. Es mejor esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
-- **Tope de la cola:** 20 videos entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
-- **Pasar a TikTok / Instagram:** siempre como BORRADOR y solo por una persona (nada se publica solo). TikTok: borradores
-  de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones, desde donde
-  se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
+- **Dos tipos que no se mezclan** (pestañas del panel): **MARKETING** (se usa afuera; se puede pasar como borrador a TikTok o
+  Instagram; vence a los 7 días sin aprobar) y **TUTORIAL** (interno, no se pasa a redes; vence a los 30 días; puede cubrir un ítem
+  de la lista de tutoriales). **No hay tope de peso** en ninguno de los dos (R2 no lo pide); el único límite que queda es el de la
+  vía de Instagram (50 MB, del bucket de la cuenta): un video más pesado se descarga y se sube a mano a Instagram.
+- **Estados:** SUBIENDO (vence en 1 h) → PENDIENTE → APROBADO (queda como registro, con su archivo, sin vencer) → PUBLICADO (se
+  pasó a un borrador). **Rechazar borra el archivo de R2, el registro y sus comentarios.**
+- **Quién aprueba depende de QUIÉN LO SUBIÓ** (`politica-aprobacion.ts`, con tests). Es interno: el panel solo ofrece «Aprobar» a quien
+  puede y nunca muestra quién aprobó ni qué falta.
+  - Lo sube un **socio** (CEO, CTO o CPO): se aprueba a sí mismo, para verificar lo que hizo su Claude. **Ningún socio aprueba ni
+    rechaza el video de otro socio.**
+  - Lo sube **cualquier otra persona** (por ejemplo, Milagros, de marketing): lo aprueba la dirección. Alcanza con el CEO; el
+    CTO y el CPO también pueden, pero entonces tienen que aprobar los dos. Quien lo subió nunca aprueba el suyo.
+  - Quién es «la dirección» (`MARKETING_DIRECCION`): una lista de ROLES separados por coma (el primero es el CEO) y los correos de
+    cada rol separados por `|`, porque cada socio tiene dos cuentas y son la misma persona. Por defecto
+    `ceo@orbita-corp.com|ceo@orbita.site,cto@orbita-corp.com|cto@orbita.site,cpo@orbita-corp.com|cpo@orbita.site`. Con una cuenta no se
+    aprueba lo que subió la otra del mismo rol, y las dos cuentas de un rol cuentan como una sola aprobación. **Si en producción
+    usan otros correos, hay que fijarla en `deploy/env-vars.yaml`: si no coincide, nadie puede aprobar lo de Milagros** (falla del
+    lado seguro).
+- **Comentarios** (`/platform/marketing/videos/:id/comentarios`): cualquiera del equipo puede opinar sobre cualquier video en todas
+  sus fases (para aprobar, aprobado, pasado a borrador) y borrar los suyos.
+- **Mejorar un video:** el botón «Mejorar con Claude» abre Claude con el video si la persona tiene el conector
+  (`GET /platform/mcp/estado`); si no, le explica cómo conectarlo. Claude lee el video y los comentarios con `videos_obtener` y
+  registra la versión nueva con `videos_registrar` + `mejora_de`: queda como un video aparte que apunta al original, que no se toca
+  (sirve también para videos ya aprobados). La mejora se aprueba según quién la subió.
+- **Lista de tutoriales** (`marketing_tutoriales`, cargada en la migración con los 39 tutoriales definidos): estados FALTA,
+  EN_PROCESO, EN_REVISION, HECHO. La actualiza el Claude de cada persona (`tutoriales_listar` / `tutoriales_actualizar`); registrar el
+  video de un tutorial lo pasa a EN_REVISION y aprobarlo, a HECHO; rechazarlo o que venza lo devuelve a FALTA. También se corrige
+  desde el panel.
+- **Aviso por correo a TODO el equipo:** cuando entra un video, un correo (por Resend, con el diseño de Órbita) a los superadmins
+  ACTIVOS con correo `@orbita.site` u `@orbita-corp.com` (`MCP_DOMINIOS_PERMITIDOS`) y también a su correo personal si lo cargó:
+  «Hay N videos nuevos para ver y comentar», con los títulos y un botón al panel (el texto no habla de aprobaciones). Sale **uno por
+  tanda y por tipo**: no repite si ya salió otro hace menos de 10 minutos, y al terminar Claude llama a `videos_avisar` (fin de tanda),
+  que avisa solo si quedó algún pendiente sin anunciar. El último aviso se lee del registro de acciones (`video_aviso`). Es mejor
+  esfuerzo: si el correo falla, el video queda registrado igual. El botón usa `FRONTEND_URL`.
+- **Sin cron:** los vencidos se borran al listar la cola y al pedir una subida (`purgarVencidos`). Como los aprobados conservan su
+  archivo, el almacenamiento solo crece con ellos (≈ 20–40 MB por video de marketing).
+- **Tope de la cola:** 20 videos de cada tipo entre SUBIENDO y PENDIENTE; con más, `videos_pedir_subida` avisa que hay que revisar.
+- **Pasar a TikTok / Instagram** (solo marketing aprobado): siempre como BORRADOR y solo por una persona (nada se publica solo).
+  TikTok: borradores de la cuenta (la persona lo termina en la app). Instagram: borrador en Marketing → Instagram → Publicaciones,
+  desde donde se publica o se programa. El video se copia al almacenamiento de Instagram (bucket de la cuenta de la empresa).
 - Usa las variables de R2 que ya existen (`R2_*`, `R2_PUBLIC_URL`); no hay secretos nuevos.
-- Migración aditiva (una tabla nueva): `./deploy/prisma-prod.sh migrate deploy` antes de `deploy.sh`, como siempre.
+- Migraciones aditivas (columnas con valor por defecto y tablas nuevas): `./deploy/prisma-prod.sh migrate deploy` antes de
+  `deploy.sh`, como siempre. Los videos que ya existían quedan como MARKETING.
 
 Para agregar el conector en Claude (una vez por persona): Configuración → Conectores → «Agregar conector personalizado»
 con `https://api.orbita.site/api/v1/mcp`. Requiere un plan de Claude que permita conectores personalizados.
