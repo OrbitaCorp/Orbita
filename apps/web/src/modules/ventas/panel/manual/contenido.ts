@@ -116,7 +116,7 @@ export const CAPITULOS: Capitulo[] = [
                     { titulo: 'Definí cómo entregás', texto: 'Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.' },
                     { titulo: 'Publicá la tienda', texto: 'Inicio → botón [[Publicar tienda]], arriba a la derecha. Ahí recién estás online.' },
                 ] },
-                { tipo: 'nota', variante: 'tip', texto: 'Si preferís que te lleven de la mano, el tutorial de Primeros pasos hace exactamente esta lista con el cursor guiándote pantalla por pantalla. Aparece solo la primera vez, y cuando lo terminás se abre una segunda tanda que recorre el resto del panel.' },
+                { tipo: 'nota', variante: 'tip', texto: 'La primera vez que entrás al panel te guiamos para crear tu primera categoría y tu primer producto, que es el corazón de esta lista. Si preferís hacerlo por tu cuenta, tocá "Más tarde": no te lo vuelve a pedir hasta el día siguiente.' },
             ],
             ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
         },
@@ -1014,7 +1014,7 @@ export const CAPITULOS: Capitulo[] = [
 // ═══════════════════════════════════════════════════════════════════════════
 {
     id: 'ayuda', titulo: 'Si te trabás', Icon: LifeBuoy, ilustracion: 'orbi',
-    resumen: 'Orbi, el tutorial guiado y cómo escribirnos.',
+    resumen: 'Orbi, los tutoriales de cada módulo y cómo escribirnos.',
     temas: [
         {
             id: 'orbi', titulo: 'Preguntale a Orbi',
@@ -1034,10 +1034,10 @@ export const CAPITULOS: Capitulo[] = [
             ],
         },
         {
-            id: 'tutorial', titulo: 'El tutorial guiado',
+            id: 'tutorial', titulo: 'Los tutoriales de cada módulo',
             bloques: [
-                { tipo: 'parrafo', texto: 'Los **Primeros pasos** son la versión activa de este manual: en vez de contarte dónde está algo, te lleva hasta ahí con el cursor y te espera a que lo hagas.' },
-                { tipo: 'parrafo', texto: 'Tiene dos tandas: la primera son los siete pasos para salir a vender; la segunda recorre el resto del panel, agrupada en "Tu día a día", "La cara de tu tienda" y "Tu negocio". Se tildan solos a medida que vas cumpliendo.' },
+                { tipo: 'parrafo', texto: 'La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás "Ver tutorial", se abre una explicación corta, de a una pantalla por vez, con qué significa cada cosa y cómo se crea. Con "Ahora no" o "Omitir" la salteás sin perder nada.' },
+                { tipo: 'parrafo', texto: 'El tutorial no te mueve de pantalla ni te señala botones: solo explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y todo lo que dice también está en este manual.' },
             ],
             ir: { label: 'Ir al Inicio', seccion: 'dashboard' },
         },

@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "408801811a410ac2",
+  "version": "ef89ff5d5b372ad0",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -21,7 +21,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "siete-pasos",
       "capitulo": "Arranque",
       "titulo": "Los siete pasos para salir a vender",
-      "texto": "Este es el camino corto, en orden. Cada paso tiene su capítulo propio más abajo con el detalle completo.\n\n1. Confirmá tu email: Mi perfil → te mandamos un código de 6 números y lo pegás ahí. Es lo que nos deja devolverte la cuenta si alguna vez perdés el acceso. Tenés 7 días desde que creaste la tienda.\n2. Completá los datos del negocio: Configuración → Negocio: nombre, rubro y dirección. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.\n3. Elegí cómo cobrás: Configuración → Pagos: efectivo, transferencia o Mercado Pago. Conectar Mercado Pago (\"Conectar cuenta\") es opcional, pero conviene si querés que paguen con tarjeta desde la tienda. Son dos minutos y lo podés hacer más adelante.\n4. Armá tus categorías: Productos → Categorías. Con 2 a 6 alcanza. Hacelo ANTES del primer producto, así cada uno nace en su lugar y no queda todo en \"Sin categoría\".\n5. Cargá tu primer producto: Productos → \"Crear producto\": fotos, precio, stock y categoría. Es el paso que hace que la tienda exista.\n6. Definí cómo entregás: Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.\n7. Publicá la tienda: Inicio → botón \"Publicar tienda\", arriba a la derecha. Ahí recién estás online.\n\nConsejo: Si preferís que te lleven de la mano, el tutorial de Primeros pasos hace exactamente esta lista con el cursor guiándote pantalla por pantalla. Aparece solo la primera vez, y cuando lo terminás se abre una segunda tanda que recorre el resto del panel.",
+      "texto": "Este es el camino corto, en orden. Cada paso tiene su capítulo propio más abajo con el detalle completo.\n\n1. Confirmá tu email: Mi perfil → te mandamos un código de 6 números y lo pegás ahí. Es lo que nos deja devolverte la cuenta si alguna vez perdés el acceso. Tenés 7 días desde que creaste la tienda.\n2. Completá los datos del negocio: Configuración → Negocio: nombre, rubro y dirección. Es lo que ven tus clientes y lo que usa el envío para calcular distancias.\n3. Elegí cómo cobrás: Configuración → Pagos: efectivo, transferencia o Mercado Pago. Conectar Mercado Pago (\"Conectar cuenta\") es opcional, pero conviene si querés que paguen con tarjeta desde la tienda. Son dos minutos y lo podés hacer más adelante.\n4. Armá tus categorías: Productos → Categorías. Con 2 a 6 alcanza. Hacelo ANTES del primer producto, así cada uno nace en su lugar y no queda todo en \"Sin categoría\".\n5. Cargá tu primer producto: Productos → \"Crear producto\": fotos, precio, stock y categoría. Es el paso que hace que la tienda exista.\n6. Definí cómo entregás: Configuración → Envíos: envío a domicilio, retiro en el local, o los dos, con sus costos y zonas.\n7. Publicá la tienda: Inicio → botón \"Publicar tienda\", arriba a la derecha. Ahí recién estás online.\n\nConsejo: La primera vez que entrás al panel te guiamos para crear tu primera categoría y tu primer producto, que es el corazón de esta lista. Si preferís hacerlo por tu cuenta, tocá \"Más tarde\": no te lo vuelve a pedir hasta el día siguiente.",
       "destino": {
         "seccion": "dashboard",
         "label": "Ir al Inicio"
@@ -717,8 +717,8 @@ export const MANUAL_GENERADO: ManualGenerado = {
     {
       "id": "tutorial",
       "capitulo": "Si te trabás",
-      "titulo": "El tutorial guiado",
-      "texto": "Los Primeros pasos son la versión activa de este manual: en vez de contarte dónde está algo, te lleva hasta ahí con el cursor y te espera a que lo hagas.\n\nTiene dos tandas: la primera son los siete pasos para salir a vender; la segunda recorre el resto del panel, agrupada en \"Tu día a día\", \"La cara de tu tienda\" y \"Tu negocio\". Se tildan solos a medida que vas cumpliendo.",
+      "titulo": "Los tutoriales de cada módulo",
+      "texto": "La primera vez que entrás a un módulo (Productos, Pedidos, Clientes…) te preguntamos si querés ver cómo funciona. Si tocás \"Ver tutorial\", se abre una explicación corta, de a una pantalla por vez, con qué significa cada cosa y cómo se crea. Con \"Ahora no\" o \"Omitir\" la salteás sin perder nada.\n\nEl tutorial no te mueve de pantalla ni te señala botones: solo explica. Cada módulo lo ofrece una sola vez en cada dispositivo, y todo lo que dice también está en este manual.",
       "destino": {
         "seccion": "dashboard",
         "label": "Ir al Inicio"

@@ -6,9 +6,8 @@
 // y un "Ir a…" en cada tema que te deja parado en la pantalla que se está
 // explicando.
 //
-// Es el complemento del tutorial de Primeros pasos (tutoriales/), no su
-// reemplazo: el tutorial te lleva de la mano por las seis o siete cosas que
-// hay que hacer sí o sí; el manual explica TODO, incluido lo que se usa una
+// Es la fuente del tutorial de cada módulo (ayuda/): el tutorial muestra de a
+// una pantalla los temas más importantes de un módulo; el manual explica TODO, incluido lo que se usa una
 // vez cada tanto y justo ahí uno no se acuerda de dónde estaba.
 //
 // Se lee como un documento y no como un tablero: una sola columna de texto

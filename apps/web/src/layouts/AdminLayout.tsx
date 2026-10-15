@@ -8,7 +8,7 @@ import EmailVerificationBanner from './components/EmailVerificationBanner'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
-import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
+import AyudaHost from '@/modules/ventas/panel/ayuda/AyudaHost'
 import { SidebarModeProvider } from './SidebarModeContext'
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial'
 
@@ -116,6 +116,9 @@ function AdminShell({ children }: { children: ReactNode }) {
                 <Header onMenuClick={() => setSidebarOpen(o => !o)} />
                 <SubscriptionStatusBanner />
                 <EmailVerificationBanner />
+                {/* Primeros pasos (categoría + producto) y aviso de tutorial por
+                    módulo. La tira ocupa este lugar; modales y tarjeta son fixed. */}
+                <AyudaHost />
                 {/* El fondo vive en .admin-main (globals.css): en claro es el
                     surface plano de siempre; en oscuro suma un resplandor
                     ambiental sutil de marca — ver "Modo oscuro premium". */}
@@ -134,10 +137,6 @@ function AdminShell({ children }: { children: ReactNode }) {
                 vacío del Orbi del panel (bienvenida y sugerencias). */}
             <OrbiV2 />
 
-            {/* Tutorial de primeros pasos: arranca solo para todo negocio que
-                nunca lo tocó y vive en la base (businesses.tutorial) hasta que
-                se termina o se oculta (ver modules/ventas/panel/tutoriales/estado.ts). */}
-            <TutorialHost />
         </div>
     )
 }

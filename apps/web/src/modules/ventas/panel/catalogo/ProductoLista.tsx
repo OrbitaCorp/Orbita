@@ -1140,7 +1140,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const sinFiltros = !busqDebounced && fcat === 'todos' && fest === 'todos'
     const vacioInicial = (
         <OrbiPetVacio modulo="productos" titulo="Todavía no tenés productos" descripcion="Cargá el primero y lo vas a ver acá.">
-            <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+            <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo} data-ayuda="crear-producto">Crear producto</Button>
         </OrbiPetVacio>
     )
 
@@ -1227,7 +1227,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <Button variant="outline" icon={<Download size={15} />} onClick={() => void exportarExcel()} disabled={exportando || total === 0}>
                         {exportando ? 'Exportando…' : 'Exportar Excel'}
                     </Button>
-                    <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+                    <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo} data-ayuda="crear-producto">Crear producto</Button>
                 </div>
             </div>
 
