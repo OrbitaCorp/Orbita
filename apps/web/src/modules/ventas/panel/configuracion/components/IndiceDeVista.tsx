@@ -8,8 +8,8 @@
 // (layouts/components/Sidebar.tsx). Para darle índice a otra pantalla alcanza
 // con sumarla a INDICES: cada `id` es el id del elemento al que se scrollea.
 //
-// En celular no se muestra: la columna no entra y las secciones se recorren
-// con el scroll de siempre.
+// En celular no se muestra: la columna no entra. Las tarjetas de Apariencia
+// ahí son plegables y ellas mismas hacen de índice.
 
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
 import {
@@ -17,6 +17,7 @@ import {
     Image as ImageIcon, MessageCircle,
 } from 'lucide-react'
 import type { VistaConfig } from './ConfigTabs'
+import { EVENTO_TARJETA } from './apariencia/focoPreview'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>
 interface SeccionIndice { id: string; label: string; Icon: IconType }
@@ -144,6 +145,8 @@ export function IndiceDeVista({ vista }: { vista: VistaConfig }) {
                             className="ds-hover"
                             onClick={() => {
                                 document.getElementById(sec.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                                // La vista previa de Apariencia va a la parte de la tienda de esa tarjeta.
+                                window.dispatchEvent(new CustomEvent(EVENTO_TARJETA, { detail: sec.id }))
                             }}
                             style={{
                                 display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',

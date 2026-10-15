@@ -18,6 +18,7 @@ export function FloatingWhatsapp({ wpp, visible, message }: Props) {
     `}</style>
     <button
       className="orb-wpp-flotante"
+      data-ap-sec="whatsapp-flotante"
       onClick={() => openWpp(wpp, message?.trim() || 'Hola! Quería hacer una consulta.')}
       aria-label="Escribinos por WhatsApp"
       style={{

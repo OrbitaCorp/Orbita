@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "408801811a410ac2",
+  "version": "493b8fd44a6f477a",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -594,7 +594,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-apariencia",
       "capitulo": "Configuración",
       "titulo": "Apariencia",
-      "texto": "Cómo se ve tu tienda. Es la pantalla más larga de Configuración, con su propio índice de secciones:\n\n- Identidad de marca: logo y favicon.\n- Paleta de colores y Tipografía: los colores y la letra de toda tu tienda, incluida la escala de texto.\n- Diseño y layout: cómo se acomoda el contenido.\n- Banner con efecto parallax y Video en tu tienda: las piezas grandes de la portada.\n- Marcas con las que trabajás: los logos de tus proveedores o marcas.\n- ¿Qué ven tus clientes?: qué secciones se muestran y cuáles no.\n- Textos de tu tienda: los títulos y frases de la portada.\n- Barra de estadísticas y Pie de página.\n\nDato: Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.",
+      "texto": "Cómo se ve tu tienda. Es la pantalla más larga de Configuración, y se divide en secciones:\n\n- Identidad de marca: logo y favicon.\n- Paleta de colores y Tipografía: los colores y la letra de toda tu tienda, incluida la escala de texto.\n- Diseño y layout: cómo se acomoda el contenido.\n- Banner con efecto parallax y Video en tu tienda: las piezas grandes de la portada.\n- Marcas con las que trabajás: los logos de tus proveedores o marcas.\n- ¿Qué ven tus clientes?: qué secciones se muestran y cuáles no.\n- Textos de tu tienda: los títulos y frases de la portada.\n- Barra de estadísticas y Pie de página.\n\nCómo ver lo que cambiás:\n- En la computadora: Tu tienda aparece al lado del formulario, y se ve en vivo. Cuando tocás un campo (o entrás a una sección), la vista previa se desplaza hasta esa parte de la tienda y la marca un momento: así sabés qué estás cambiando. A la izquierda hay un índice para saltar entre secciones.\n- En el celular: Las secciones están plegadas: tocás una y se abre (de a una). La tienda no entra al lado del formulario, así que abajo hay una barra fija con \"Ver mi tienda\": abre tu tienda a pantalla completa, justo en la parte que estabas editando. Para seguir editando, cerrala con la X.\n- Guardar: Los cambios quedan sin publicar hasta que tocás \"Guardar cambios\". En el celular el botón está en la misma barra de abajo, junto a \"Descartar\", que vuelve todo a lo que ya estaba publicado.\n\nDato: Algunos ajustes no tienen una parte propia que marcar en la portada: los colores, la tipografía y el tamaño del texto cambian toda la tienda, así que la vista previa solo te lleva al inicio. Y las opiniones de clientes se ven en la ficha de cada producto, no en la portada.\n\nDato: Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.",
       "destino": {
         "seccion": "configuracion",
         "vista": "apariencia",

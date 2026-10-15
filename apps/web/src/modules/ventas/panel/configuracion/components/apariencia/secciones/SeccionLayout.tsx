@@ -21,7 +21,7 @@ import type { PropsSeccion } from '../utils'
     (mismo reporte): no tenía ningún efecto real, y no valía la
     pena construírselo — ver el comentario en apariencia.mapper.ts. */
 export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: PropsSeccion & {
-    actualizar: (fn: (p: Ap) => Ap) => void
+    actualizar: (fn: (p: Ap) => Ap, campo?: keyof Ap) => void
     enlaces: EnlacesHeader
     categorias: ApiCategory[]
 }) {
@@ -35,6 +35,9 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
 
     return (
         <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid} ayuda={AYUDA_SECCIONES.layout}>
+            {/* Tres zonas, cada una con su parte de la tienda: al entrar a una, la
+                vista previa va ahí (ver focoPreview.ts). */}
+            <div data-ap-foco="header">
             <FieldLabel>Estilo de header</FieldLabel>
             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
             <div style={{ marginBottom: 18 }}>
@@ -127,6 +130,8 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     </div>
                 </div>
             )}
+            </div>
+            <div data-ap-foco="estantes">
             <FieldLabel>Grilla de productos</FieldLabel>
             <div style={{ marginBottom: 18 }}>
                 <VisualPick
@@ -139,7 +144,7 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                             ...p,
                             layoutGrid: nuevoLayout,
                             maxNuevosIngresos: compatible ? p.maxNuevosIngresos : opts[0].valor,
-                        }))
+                        }), 'layoutGrid')
                     }}
                     options={[
                         { id: '3col', label: '3 columnas', svg: hline(<g>{[8, 26, 44].map(x => <rect key={x} x={x} y="10" width="14" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
@@ -149,6 +154,8 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                 />
             </div>
 
+            </div>
+            <div data-ap-foco="categorias">
             {/* Estilo de la sección "Comprá por categoría" del home
                 (ver SeccionCategorias en Inicio.tsx). Mosaico y
                 Tarjetas se ofrecen deshabilitados mientras ninguna
@@ -192,6 +199,7 @@ export function SeccionLayout({ ap, set, actualizar, enlaces, categorias }: Prop
                     onChange={ids => set('categoriasIds', ids)}
                 />
             )}
+            </div>
         </SecCard>
     )
 }

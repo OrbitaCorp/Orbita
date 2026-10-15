@@ -33,7 +33,7 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
     const slidersVisibles = heroMax ? ap.sliders.slice(0, heroMax) : ap.sliders
     return (
         <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette} ayuda={AYUDA_SECCIONES[soloContenido ? 'hero' : 'identidad']}>
-            {!soloContenido && (<>
+            {!soloContenido && (<div data-ap-foco="header">
                 <FieldLabel help="Aparece en el header, en la pestaña del navegador (favicon), emails y comprobantes">Logo de la tienda</FieldLabel>
                 <ImgUploader
                     value={ap.logo}
@@ -77,13 +77,14 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
                     </p>
                 )}
                 <Divider />
-            </>)}
+            </div>)}
             {/* Escaparate (heroPropio, sin rotación — ver heroNoRotativo más
                 arriba) muestra sus dos imágenes como posiciones fijas
                 (izquierda/derecha), nunca como un carrusel: el diseño de esa
                 maqueta no contempla slides rotando, así que ni el título ni
                 la ayuda pueden hablar de "sliders"/"carrusel" (pedido
                 explícito, con capturas de la maqueta original). */}
+            <div data-ap-foco="hero">
             <FieldLabel
                 ayuda={AYUDA_SECCIONES[heroNoRotativo ? 'slidersFijos' : 'sliders']}
                 help={heroNoRotativo
@@ -133,6 +134,7 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
                         <Plus size={14} strokeWidth={2} /> {heroNoRotativo ? 'Agregar imagen' : 'Agregar slide'}
                     </button>
                 )}
+            </div>
             </div>
         </SecCard>
     )
