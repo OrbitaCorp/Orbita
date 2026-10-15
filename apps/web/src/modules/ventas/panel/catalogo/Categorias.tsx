@@ -276,7 +276,7 @@ export default function Categorias() {
                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{countAll(arbol)} total</span>
                     )}
                 </div>
-                <Button variant="primary" icon={<Plus size={14} />} onClick={() => setModal({ parentId: null })}>Nueva categoría</Button>
+                <Button variant="primary" icon={<Plus size={14} />} onClick={() => setModal({ parentId: null })} data-ayuda="nueva-categoria">Nueva categoría</Button>
             </div>
 
             <div className="cat-grid">

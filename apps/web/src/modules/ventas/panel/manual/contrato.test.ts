@@ -33,7 +33,7 @@ function archivosDe(dir: string): string[] {
  * ellas adentro, el contrato pasaba con "Generar con Orbi" cuando el botón
  * dice "Redactar con Orbi"), los mocks y los prototipos de propuestas.
  */
-const NO_ES_PANTALLA = [/[\\/]manual[\\/]/, /[\\/]tutoriales[\\/]/, /[\\/]mock[\\/]/, /[\\/]propuestas[\\/]/]
+const NO_ES_PANTALLA = [/[\\/]manual[\\/]/, /[\\/]tutoriales[\\/]/, /[\\/]ayuda[\\/]/, /[\\/]mock[\\/]/, /[\\/]propuestas[\\/]/]
 
 /** Como se compara un texto: sin íconos de flecha o tilde, sin el "+" de adelante, espacios simples. */
 const normalizar = (t: string) => t.replace(/[→✓]/g, '').replace(/^\s*\+\s*/, '').replace(/\s+/g, ' ').trim()

@@ -41,7 +41,7 @@ import { CATEGORY_LAYOUT_MAX, type CategoryLayout } from '@/modules/ventas/panel
 // datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
-import { definicionPlantilla, plantillaReal } from './plantillaReal'
+import { definicionPlantilla, plantillaReal, slidesPorDefecto, degradeAutomatico } from './plantillaReal'
 import { EsqueletoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/esqueleto'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -358,10 +358,16 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
     // null: home clásico) — el prop del server solo tapa el instante ANTES
     // de que ese fetch responda, ver StorefrontChrome `homeTemplateSSR`.
     const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : __homeTemplate
-    const heroSlides = config?.appearance?.heroSlides ?? []
     // [] es válido: el dueño borró todas y no quiere barra (solo cae al default si no hay config).
     const stats = config?.appearance?.statsBar ?? STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
+    // Los que cargó el dueño. Sin ninguno la portada no se queda pelada: ve tres
+    // de por defecto, armados con sus categorías (ver slidesPorDefecto). Recién
+    // cuando llega la config: antes no se sabe si los tiene.
+    const heroSlidesPropios = config?.appearance?.heroSlides ?? []
+    const heroSlides = heroSlidesPropios.length > 0 || !config
+        ? heroSlidesPropios
+        : slidesPorDefecto(catsVisual, tienda.nombre, config.appearance?.tagline ?? undefined)
 
     // ── Tira de marcas ──
     // Se filtran las que quedaron sin nombre: el nombre es lo que se dibuja
@@ -798,7 +804,7 @@ export default function Inicio({ __homeTemplate = null, __storeMeta = null }: { 
                         categorias: catsVisual,
                         stats: (config?.appearance?.showStatsBar ?? true) ? stats : [],
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
-                        heroSlides,
+                        heroSlides: heroSlidesPropios,
                         transferPct,
                         // Para el pie: la raiz de la tienda (enlaces que
                         // navegan) y el contacto real (redes y horario).
@@ -1440,7 +1446,10 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                     ) : (
                                         // Botón sólido que toma el color primario de Apariencia
                                         // adaptando inteligentemente el texto con var(--color-on-primary)
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
+                                        // El slide por defecto no tiene foto, solo un degradé
+                                        // del primario: el botón en el mismo primario no se
+                                        // distinguiría, así que va blanco.
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: s.automatico ? '#fff' : 'var(--color-primary)', color: s.automatico ? '#0F172A' : 'var(--color-on-primary)', fontSize: 15.5, fontWeight: 700, border: textoOscuro ? '1px solid rgba(15,23,42,0.12)' : 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)', transition: 'background 150ms, color 150ms, transform 150ms' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
@@ -1527,7 +1536,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                 flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                 background: s.img
                                     ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
-                                    : HERO_GRADS[i % HERO_GRADS.length],
+                                    : s.automatico ? degradeAutomatico('var(--color-primary)', i) : HERO_GRADS[i % HERO_GRADS.length],
                                 backgroundSize: 'cover', backgroundPosition: 'center',
                             }}>
                                 {/* Textura de puntos — solo con el overlay

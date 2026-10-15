@@ -101,6 +101,13 @@ export function SeccionHero({ ap, set, soloContenido, heroMax, heroNoRotativo, h
                     solo {heroMax === 1 ? 'el primero se ve' : `los primeros ${heroMax} se ven`} en el home.
                 </div>
             )}
+            {slidersVisibles.length === 0 && (
+                // Los de por defecto no son de acá: no están guardados ni se
+                // editan. Se arman con las categorías (ver slidesPorDefecto).
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>
+                    Mientras no cargues ninguno, tu tienda muestra {heroNoRotativo ? 'imágenes' : 'sliders'} automáticos con tus categorías. Apenas cargues el primero, desaparecen.
+                </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
                 {slidersVisibles.map((s, i) => (
                     <SlideItem
