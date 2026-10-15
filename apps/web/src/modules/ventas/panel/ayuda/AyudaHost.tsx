@@ -25,7 +25,7 @@ import { useAuth } from '@/lib/auth/AuthContext'
 import { adminPath } from '@/lib/tenant'
 import { panelEstadoVerificacionEmail, panelGetTutorial } from '@/lib/api'
 import { ayudaDe, claveDeAyuda } from './modulos'
-import { ayudaNuevaHabilitada, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from './acceso'
+import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from './acceso'
 import {
     COPY_PASO, NOMBRES_DE_PASOS, SECCION_DEL_PASO, decidirPrimerosPasos, pasoInicial, type VistaPrimerosPasos,
 } from './primerosPasos'
@@ -46,13 +46,13 @@ const REVISAR_CADA_MS = 5000
 export default function AyudaHost() {
     const router = useRouter()
     const { user } = useAuth()
-    // Por ahora la ayuda nueva es solo de la tienda "negocio" (ver acceso.ts).
-    const habilitada = user?.type === 'member' && ayudaNuevaHabilitada(user.business.subdomain)
-    const esMember = habilitada
-    const negocioId = habilitada && user?.type === 'member' ? user.business.id : ''
+    const esMember = user?.type === 'member'
+    const negocioId = user?.type === 'member' ? user.business.id : ''
+    // El modo prueba (?ayuda=probar) es solo de la tienda "negocio" (ver acceso.ts).
+    const modoPruebaPermitido = user?.type === 'member' && puedeUsarModoPrueba(user.business.subdomain)
     // Mismo criterio que el tutorial anterior: configurar la tienda es cosa del
     // dueño (o de un admin); a un empleado no se le pide cargar el catálogo.
-    const esAdmin = habilitada && user?.type === 'member' && (user.role === 'owner' || user.role === 'admin')
+    const esAdmin = user?.type === 'member' && (user.role === 'owner' || user.role === 'admin')
 
     const [ayuda, setAyuda] = useState<EstadoAyuda | null>(null)
     // "Más tarde" vigente. Se calcula al leer lo guardado y al tocarlo (no en el
@@ -131,10 +131,10 @@ export default function AyudaHost() {
 
     // En el modo prueba (ver acceso.ts) se simula una tienda recién creada: no se
     // mira lo que hay en la base. Fuera de la prueba, lo que diga la API.
-    const cumplidas = ayuda?.prueba ? cumplidasSimuladas(ayuda.prueba) : cumplidasReales
+    const cumplidas = ayuda?.prueba && modoPruebaPermitido ? cumplidasSimuladas(ayuda.prueba) : cumplidasReales
 
     // ── Comandos de la dirección: ?ayuda=probar | reiniciar | salir ──
-    const comando = comandoDeQuery(router.query.ayuda)
+    const comando = modoPruebaPermitido ? comandoDeQuery(router.query.ayuda) : null
     useEffect(() => {
         if (!comando || !ayuda) return
         const { ayuda: _quitar, ...resto } = router.query

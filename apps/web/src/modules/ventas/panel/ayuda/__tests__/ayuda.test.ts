@@ -4,7 +4,7 @@ import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../secciones'
 import { AYUDA_POR_SECCION, ayudaDe, claveDeAyuda } from '../modulos'
 import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
-import { ayudaNuevaHabilitada, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
+import { puedeUsarModoPrueba, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 
 // El tutorial de cada módulo sale del manual: si un id de acá deja de existir
@@ -145,12 +145,12 @@ describe('lo que recuerda el dispositivo', () => {
     })
 })
 
-describe('quién ve la ayuda nueva', () => {
-    it('por ahora solo la tienda "negocio"', () => {
-        expect(ayudaNuevaHabilitada('negocio')).toBe(true)
-        expect(ayudaNuevaHabilitada('Negocio')).toBe(true)
+describe('quién puede usar el modo prueba', () => {
+    it('solo la tienda "negocio"', () => {
+        expect(puedeUsarModoPrueba('negocio')).toBe(true)
+        expect(puedeUsarModoPrueba('Negocio')).toBe(true)
         for (const otra of ['euge-joyas', 'negocio-2', 'minegocio', '', null, undefined]) {
-            expect(ayudaNuevaHabilitada(otra), String(otra)).toBe(false)
+            expect(puedeUsarModoPrueba(otra), String(otra)).toBe(false)
         }
     })
 

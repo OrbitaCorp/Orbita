@@ -20,7 +20,7 @@ export interface EstadoAyuda {
     posponer: Record<string, number>
     /** Cuándo apareció la última sugerencia (ms epoch). 0 = ninguna. */
     ultimaSugerencia: number
-    /** Modo prueba (solo en la tienda habilitada): en qué paso va la tienda "nueva" simulada. null = datos reales. */
+    /** Modo prueba (solo en la tienda "negocio", ver acceso.ts): en qué paso va la tienda "nueva" simulada. null = datos reales. */
     prueba: 'categoria' | 'producto' | 'listo' | null
 }
 
