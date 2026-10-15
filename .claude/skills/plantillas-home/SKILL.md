@@ -34,7 +34,7 @@ dueño decide cuáles se ven.
 | Bloque | Se prende y se carga en | Cuándo no se dibuja |
 |---|---|---|
 | Anuncio (fijo o cartelera) | Contenido → Textos de tu tienda | Apagado o sin texto |
-| Hero | Hero | Nunca: sin slides, uno neutro con el nombre del negocio |
+| Hero | Hero | Nunca: sin sliders propios, los de por defecto (§ Sliders por defecto) |
 | Oferta con cuenta regresiva | Avanzado → Oferta relámpago | Sin una activa |
 | Barra de estadísticas | Contenido → Barra de estadísticas | Apagada o sin ítems |
 | Categorías | Contenido → Sección de categorías | Apagada o sin categorías |
@@ -114,6 +114,29 @@ las recetas, al principio de `resto()` en las de bloque propio.
 Sigue afuera la cantidad de productos de "Nuevos ingresos": con plantilla cada
 fila es de un renglón.
 
+### Sliders por defecto
+
+Mientras el negocio no tenga **ningún** slider propio, la portada dibuja hasta
+tres armados al vuelo (`slidesPorDefecto()` en `plantillaReal.ts`): uno por
+categoría (las de más productos), con el nombre de la categoría de título, un
+texto genérico, un degradé del primario de la plantilla sin foto
+(`degradeAutomatico`) y el enlace a `/catalogo?cat=<slug>`. Con menos de tres
+categorías, tantos como haya (no se repite); sin categorías, uno de bienvenida
+con el nombre del negocio y su bajada, al catálogo.
+
+- **Virtuales**: no hay filas ni migración. Llevan `automatico: true`
+  (`StorefrontHeroSlide`) y se arman en el front: `Inicio.tsx` los usa para el
+  HeroCarousel del home clásico y de las plantillas sin `heroPropio`, y
+  `plantillaReal()` para las de `heroPropio`. A `plantillaReal` le llegan solo
+  los sliders del dueño (`heroSlidesPropios`): él decide el fallback.
+- **No pasan por el editor**: Apariencia y la pestaña Hero leen lo guardado, y
+  ahí solo dice que mientras no cargue ninguno hay automáticos. En cuanto
+  crea el primero, desaparecen solos.
+- Aplican igual en tienda (FULL) y vidriera (SHOWCASE): el texto no promete
+  nada ni habla de comprar.
+- El check (`sliders por defecto` en `plantillas.test.ts`) los revisa en cada
+  plantilla con `heroPropio`; el HeroCarousel clásico se cubre con la función.
+
 ### Nada de la maqueta en una tienda real
 
 La marca, la bajada, los productos, las categorías y el hero de muestra son
@@ -121,9 +144,8 @@ para la vitrina. `plantillaReal()` los pisa **siempre**, también cuando el
 negocio no cargó los suyos:
 
 - sin bajada, el pie no escribe ninguna (antes quedaba la de la maqueta);
-- sin slides, un **hero neutro** con el nombre del negocio, su bajada y un
-  botón al catálogo, sobre un degradé del primario de la plantilla
-  (`heroNeutro`). Sin hero no se deja: en varias es media portada;
+- sin sliders propios, los **sliders por defecto** (siguiente sección). Sin
+  hero no se deja: en varias es media portada;
 - un texto de muestra que solo tiene sentido en el rubro de la maqueta se
   calla con `afirmacion` (los maridajes de Bodega) o se cambia con
   `porDefectoReal`.

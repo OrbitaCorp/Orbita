@@ -864,6 +864,7 @@ export const CAPITULOS: Capitulo[] = [
                 { tipo: 'parrafo', texto: 'Cómo se ve tu tienda. Es la pantalla más larga de Configuración, con su propio índice de secciones:' },
                 { tipo: 'lista', items: [
                     '**Identidad de marca**: logo y favicon.',
+                    '**Sliders del hero**: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo.',
                     '**Paleta de colores** y **Tipografía**: los colores y la letra de toda tu tienda, incluida la escala de texto.',
                     '**Diseño y layout**: cómo se acomoda el contenido.',
                     '**Banner con efecto parallax** y **Video en tu tienda**: las piezas grandes de la portada.',
