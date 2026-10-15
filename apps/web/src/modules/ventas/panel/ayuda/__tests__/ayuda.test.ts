@@ -4,6 +4,7 @@ import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../secciones'
 import { AYUDA_POR_SECCION, ayudaDe, claveDeAyuda } from '../modulos'
 import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
+import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 
 // El tutorial de cada módulo sale del manual: si un id de acá deja de existir
 // allá, el aviso mostraría una hoja vacía (o ninguna) sin que nadie se entere.
@@ -27,11 +28,25 @@ describe('tutorial por módulo', () => {
         }
     })
 
-    it('Apariencia tiene su tutorial; las demás vistas usan el de Configuración', () => {
+    it('cada pantalla de Configuración tiene su tutorial (menos la zona peligrosa)', () => {
+        for (const v of VISTAS_DE_CONFIGURACION) {
+            if (v === 'peligro' || v === 'general') continue
+            expect(ayudaDe(claveDeAyuda('configuracion', v)), `configuracion/${v}`).not.toBeNull()
+        }
+    })
+
+    it('cada sección del panel tiene tutorial, salvo el manual y el Inicio de Orbi', () => {
+        for (const sec of SECCIONES_DEL_PANEL) {
+            if (sec === 'manual' || sec === 'configuracion') continue
+            expect(ayudaDe(claveDeAyuda(sec)), sec).not.toBeNull()
+        }
+    })
+
+    it('Configuración sin vista (o con la vieja "general") abre el tutorial de Negocio', () => {
+        expect(claveDeAyuda('configuracion')).toBe('configuracion/negocio')
+        expect(claveDeAyuda('configuracion', 'general')).toBe('configuracion/negocio')
         expect(claveDeAyuda('configuracion', 'apariencia')).toBe('configuracion/apariencia')
-        expect(claveDeAyuda('configuracion', 'pagos')).toBe('configuracion')
         expect(claveDeAyuda('catalogo', 'nuevo')).toBe('catalogo')
-        expect(ayudaDe('perfil')).toBeNull()
     })
 })
 
@@ -80,10 +95,51 @@ describe('primeros pasos', () => {
     })
 })
 
+describe('sugerencias', () => {
+    const base = { cumplidas: [] as string[], sabe: [] as string[], posponer: {}, ultima: 0, ahora: 10 * INTERVALO_MS, claveActual: 'dashboard' }
+
+    it('cada sugerencia lleva a un tutorial que existe y los ids no se repiten', () => {
+        const ids = SUGERENCIAS.map(s => s.id)
+        expect(new Set(ids).size).toBe(ids.length)
+        for (const s of SUGERENCIAS) expect(ayudaDe(claveDeSugerencia(s)), s.id).not.toBeNull()
+    })
+
+    it('sugiere primero lo que deja la tienda lista para vender', () => {
+        expect(elegirSugerencia(base)?.id).toBe('negocio')
+    })
+
+    it('nunca sugiere lo que ya hizo ni lo que dijo que ya sabe', () => {
+        const r = elegirSugerencia({ ...base, cumplidas: ['negocio', 'mp'], sabe: ['envios'] })
+        expect(r?.id).toBe('pedidos')
+    })
+
+    it('no sugiere el tutorial de la pantalla en que está parado', () => {
+        const r = elegirSugerencia({ ...base, cumplidas: ['negocio', 'mp', 'envios'], claveActual: 'pedidos' })
+        expect(r?.id).toBe('descuentos')
+    })
+
+    it('"Más tarde" calla esa sugerencia hasta la fecha, y pasa a la que sigue', () => {
+        const r = elegirSugerencia({ ...base, posponer: { negocio: base.ahora + 1 } })
+        expect(r?.id).toBe('mp')
+        expect(elegirSugerencia({ ...base, posponer: { negocio: base.ahora - 1 } })?.id).toBe('negocio')
+    })
+
+    it('de vez en cuando: no sugiere si hubo otra hace poco', () => {
+        expect(elegirSugerencia({ ...base, ultima: base.ahora - 1000 })).toBeNull()
+        expect(elegirSugerencia({ ...base, ultima: base.ahora - INTERVALO_MS })).not.toBeNull()
+    })
+
+    it('con todo hecho no queda nada que sugerir', () => {
+        expect(elegirSugerencia({ ...base, cumplidas: SUGERENCIAS.map(s => s.id) })).toBeNull()
+    })
+})
+
 describe('lo que recuerda el dispositivo', () => {
     it('un valor roto o ajeno vuelve al estado vacío', () => {
         expect(parsear(null)).toEqual(ESTADO_AYUDA_VACIO)
         expect(parsear('no es json')).toEqual(ESTADO_AYUDA_VACIO)
         expect(parsear('{"vistos":[1,"pedidos"],"enCurso":"si"}')).toEqual({ ...ESTADO_AYUDA_VACIO, vistos: ['pedidos'] })
+        expect(parsear('{"sabe":["mp",3],"posponer":{"a":5,"b":"x"},"ultimaSugerencia":"ayer"}'))
+            .toEqual({ ...ESTADO_AYUDA_VACIO, sabe: ['mp'], posponer: { a: 5 } })
     })
 })

@@ -19,16 +19,26 @@ export function pasoInicial(cumplidas: readonly string[]): PasoInicial {
 /** Sección del panel donde se hace cada paso. */
 export const SECCION_DEL_PASO = { categoria: 'categorias', producto: 'catalogo' } as const
 
+/** Los dos pasos de un solo flujo: "crear tu primer producto" empieza por la categoría. */
+export const NOMBRES_DE_PASOS = ['Categoría', 'Producto'] as const
+
 export const COPY_PASO = {
     categoria: {
         numero: 1,
-        titulo: 'Creá tu primera categoría',
-        texto: 'Las categorías ordenan tu tienda, por ejemplo "Remeras" o "Zapatillas". Con una alcanza para empezar.',
+        titulo: 'Creá tu primer producto',
+        texto: 'Empezamos por una categoría: es el lugar donde va a vivir, por ejemplo "Remeras" o "Zapatillas". Con una alcanza, y después sumás las que quieras.',
         boton: 'Crear categoría',
     },
     producto: {
         numero: 2,
-        titulo: 'Ahora cargá tu primer producto',
+        titulo: 'Ahora sí, tu primer producto',
+        texto: 'Poné el nombre, una foto, el precio y el stock. El resto lo podés completar después.',
+        boton: 'Crear producto',
+    },
+    /** Al volver de crear la categoría, que es justo cuando toca este paso. */
+    productoTrasCategoria: {
+        numero: 2,
+        titulo: '¡Categoría creada! Ahora tu producto',
         texto: 'Poné el nombre, una foto, el precio y el stock. El resto lo podés completar después.',
         boton: 'Crear producto',
     },

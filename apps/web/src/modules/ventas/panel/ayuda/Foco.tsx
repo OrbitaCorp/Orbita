@@ -89,7 +89,8 @@ export default function Foco({ objetivo, texto }: Props) {
     const left = Math.max(12, Math.min(cx - ancho / 2, window.innerWidth - ancho - 12))
 
     return (
-        <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 140, pointerEvents: 'none' }}>
+        <div aria-hidden="true" className="ayu-foco" style={{ position: 'fixed', inset: 0, zIndex: 140, pointerEvents: 'none' }}>
+            <style>{CSS_FOCO}</style>
             <div style={{
                 position: 'absolute', inset: 0,
                 background: `radial-gradient(circle at ${cx}px ${cy}px, rgba(15,23,42,0) ${radio}px, rgba(15,23,42,0.58) ${radio + 220}px)`,
@@ -101,11 +102,11 @@ export default function Foco({ objetivo, texto }: Props) {
             <div style={{
                 position: 'absolute',
                 top: caja.top - 4, left: caja.left - 4, width: caja.width + 8, height: caja.height + 8,
-                borderRadius: 12,
+                borderRadius: 12, transition: 'top 160ms ease, left 160ms ease, width 160ms ease, height 160ms ease',
                 boxShadow: '0 0 0 2px var(--color-primary), 0 0 26px 4px color-mix(in srgb, var(--color-primary) 45%, transparent)',
             }} />
             <div style={{
-                position: 'absolute', top, left, width: ancho, minHeight: ALTO_FRASE,
+                position: 'absolute', top, left, width: ancho, minHeight: ALTO_FRASE, transition: 'top 160ms ease, left 160ms ease',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
                 padding: '8px 12px', borderRadius: 10, boxSizing: 'border-box',
                 background: 'var(--color-bg)', color: 'var(--color-text)',
@@ -118,3 +119,10 @@ export default function Foco({ objetivo, texto }: Props) {
         </div>
     )
 }
+
+// Aparece con un fundido corto (no se mueve): el foco entra suave y se queda quieto.
+const CSS_FOCO = `
+.ayu-foco { animation: ayuFoco 280ms ease-out; }
+@keyframes ayuFoco { from { opacity: 0 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .ayu-foco { animation: none; } }
+`

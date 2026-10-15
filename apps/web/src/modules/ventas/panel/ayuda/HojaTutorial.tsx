@@ -124,16 +124,17 @@ const CSS_HOJA = `
     .ayu-fondo { align-items: center; padding: 24px; }
     .ayu-hoja { border-radius: 16px; max-height: 86dvh; }
 }
-@media (prefers-reduced-motion: reduce) { .ayu-hoja { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ayu-hoja { animation: none; } .ayu-pie button, .ayu-prim:hover { transition: none; transform: none; } }
 
 .ayu-barra { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px 20px; }
 .ayu-pasos { font-size: 13px; font-weight: 500; color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .ayu-omitir {
-    display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 8px;
-    border: none; background: none; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px;
+    border: none; border-radius: 8px; background: none; cursor: pointer; font-family: inherit;
     font-size: 13.5px; font-weight: 500; color: var(--color-muted);
+    transition: background-color 150ms ease, color 150ms ease;
 }
-.ayu-omitir:hover { color: var(--color-text); }
+.ayu-omitir:hover { background: var(--color-surface-alt); color: var(--color-text); }
 .ayu-progreso { height: 2px; background: var(--color-border); }
 .ayu-progreso > span { display: block; height: 100%; background: var(--color-primary); transition: width 200ms ease; }
 
@@ -151,9 +152,15 @@ const CSS_HOJA = `
 .ayu-pie button {
     min-height: 46px; padding: 0 20px; border-radius: 10px; cursor: pointer; font-family: inherit;
     font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 .ayu-sec { border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); }
+.ayu-sec:hover { background: var(--color-surface-alt); border-color: var(--color-border-strong); }
 .ayu-prim { flex: 1; max-width: 220px; border: none; background: var(--color-primary); color: #fff; margin-left: auto; }
+.ayu-prim:hover { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary) 38%, transparent); }
+.ayu-prim:active { transform: none; box-shadow: none; }
+.ayu-prim > svg { transition: transform 150ms ease; }
+.ayu-prim:hover > svg { transform: translateX(2px); }
 .ayu-fondo button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 .ayu-man .man-btn {
