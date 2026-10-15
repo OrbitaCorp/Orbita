@@ -25,6 +25,7 @@ import { useAuth } from '@/lib/auth/AuthContext'
 import { adminPath } from '@/lib/tenant'
 import { panelEstadoVerificacionEmail, panelGetTutorial } from '@/lib/api'
 import { ayudaDe, claveDeAyuda } from './modulos'
+import { ayudaNuevaHabilitada, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from './acceso'
 import {
     COPY_PASO, NOMBRES_DE_PASOS, SECCION_DEL_PASO, decidirPrimerosPasos, pasoInicial, type VistaPrimerosPasos,
 } from './primerosPasos'
@@ -45,17 +46,19 @@ const REVISAR_CADA_MS = 5000
 export default function AyudaHost() {
     const router = useRouter()
     const { user } = useAuth()
-    const esMember = user?.type === 'member'
-    const negocioId = user?.type === 'member' ? user.business.id : ''
+    // Por ahora la ayuda nueva es solo de la tienda "negocio" (ver acceso.ts).
+    const habilitada = user?.type === 'member' && ayudaNuevaHabilitada(user.business.subdomain)
+    const esMember = habilitada
+    const negocioId = habilitada && user?.type === 'member' ? user.business.id : ''
     // Mismo criterio que el tutorial anterior: configurar la tienda es cosa del
     // dueño (o de un admin); a un empleado no se le pide cargar el catálogo.
-    const esAdmin = user?.type === 'member' && (user.role === 'owner' || user.role === 'admin')
+    const esAdmin = habilitada && user?.type === 'member' && (user.role === 'owner' || user.role === 'admin')
 
     const [ayuda, setAyuda] = useState<EstadoAyuda | null>(null)
     // "Más tarde" vigente. Se calcula al leer lo guardado y al tocarlo (no en el
     // render: la hora no es parte del estado de la pantalla).
     const [pospuesto, setPospuesto] = useState(false)
-    const [cumplidas, setCumplidas] = useState<string[] | null>(null)
+    const [cumplidasReales, setCumplidasReales] = useState<string[] | null>(null)
     const [fallo, setFallo] = useState(false)
     const [hojaAbierta, setHojaAbierta] = useState(false)
     // Clave del tutorial cuyo aviso se está mostrando ahora (no se vuelve a ofrecer).
@@ -105,7 +108,7 @@ export default function AyudaHost() {
         if (!forzar && ahora - ultimaConsulta.current < 3000) return
         ultimaConsulta.current = ahora
         panelGetTutorial()
-            .then(r => { setCumplidas(r.cumplidas); setFallo(false) })
+            .then(r => { setCumplidasReales(r.cumplidas); setFallo(false) })
             // Sin respuesta no se muestra nada de los primeros pasos: mejor un
             // panel limpio que una tarjeta que pide algo que quizás ya está.
             .catch(() => setFallo(true))
@@ -125,6 +128,28 @@ export default function AyudaHost() {
             document.removeEventListener('visibilitychange', alVolver)
         }
     }, [consultar])
+
+    // En el modo prueba (ver acceso.ts) se simula una tienda recién creada: no se
+    // mira lo que hay en la base. Fuera de la prueba, lo que diga la API.
+    const cumplidas = ayuda?.prueba ? cumplidasSimuladas(ayuda.prueba) : cumplidasReales
+
+    // ── Comandos de la dirección: ?ayuda=probar | reiniciar | salir ──
+    const comando = comandoDeQuery(router.query.ayuda)
+    useEffect(() => {
+        if (!comando || !ayuda) return
+        const { ayuda: _quitar, ...resto } = router.query
+        void _quitar
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (comando === 'salir') actualizarAyuda(a => ({ ...a, prueba: null }))
+        else actualizarAyuda(a => ({ ...ESTADO_AYUDA_VACIO, prueba: comando === 'probar' ? 'categoria' : a.prueba }))
+        // Lo que estaba en pantalla de la vez anterior se descarta.
+        setPospuesto(false)
+        setAvisada(null); setAvisoCerrado(false); setHojaAbierta(false)
+        setSugerencia(null); setConfirmando(null); setPedida(null); setCorreoVerificado(null)
+        // La orden se consume: recargar la página no vuelve a reiniciar.
+        void router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [comando, !!ayuda])
 
     const primeros: VistaPrimerosPasos = !esAdmin || !ayuda
         ? { tipo: 'nada' }
@@ -166,8 +191,11 @@ export default function AyudaHost() {
         return () => { vigente = false; clearInterval(t); window.removeEventListener('focus', revisar) }
     }, [hayCierre, esperando])
 
+    // En la prueba el correo arranca "sin verificar" para poder ver ese paso; una
+    // vez que fue a Mi perfil (esperando) vale lo que diga el sistema.
+    const correoEf = ayuda?.prueba && !esperando ? false : correoVerificado
     // Con el producto creado y el correo verificado: qué sigue.
-    const eleccionVisible = correoVerificado === true && (hayCierre || esperando)
+    const eleccionVisible = correoEf === true && (hayCierre || esperando)
 
     const ir = useCallback((destino: string, query?: Record<string, string>) => {
         const qs = query ? `?${new URLSearchParams(query).toString()}` : ''
@@ -200,17 +228,18 @@ export default function AyudaHost() {
         && primeros.tipo === 'nada' && !eleccionVisible && !avisoVisible && !hojaAbierta && !confirmando
     useEffect(() => {
         if (!puedeSugerir || sugerencia || !cumplidas) return
+        // En la prueba no se espera 25 segundos ni se respeta el intervalo entre sugerencias.
         const t = setTimeout(() => {
             const a = ayudaRef.current
             if (!a) return
             const elegida = elegirSugerencia({
-                cumplidas, sabe: a.sabe, posponer: a.posponer, ultima: a.ultimaSugerencia,
+                cumplidas, sabe: a.sabe, posponer: a.posponer, ultima: a.prueba ? 0 : a.ultimaSugerencia,
                 ahora: Date.now(), claveActual: clave,
             })
             if (!elegida) return
             setSugerencia(elegida)
             actualizarAyuda(x => ({ ...x, ultimaSugerencia: Date.now() }))
-        }, ESPERA_INICIAL_MS)
+        }, ayudaRef.current?.prueba ? 4000 : ESPERA_INICIAL_MS)
         return () => clearTimeout(t)
     }, [puedeSugerir, sugerencia, cumplidas, clave, actualizarAyuda])
 
@@ -233,10 +262,26 @@ export default function AyudaHost() {
         return (
             <>
                 <div role="status" style={{
+                    display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     padding: '9px 16px', fontSize: 13.5, lineHeight: 1.45, color: 'var(--color-text)',
                     background: 'var(--color-surface-alt)', borderBottom: '1px solid var(--color-border)',
                 }}>
-                    {primeros.texto}
+                    <span style={{ flex: '1 1 240px' }}>{primeros.texto}</span>
+                    {/* Solo en el modo prueba: como la tienda es simulada, no hay un dato real
+                        que avise que terminó el paso, así que se avanza a mano. */}
+                    {ayuda.prueba && (
+                        <span style={{ display: 'inline-flex', gap: 6 }}>
+                            <EstilosAyuda />
+                            <button type="button" className="ayu-btn ayu-btn-sec" style={{ minHeight: 32, padding: '0 12px', fontSize: 13 }}
+                                onClick={() => actualizarAyuda(a => ({ ...a, prueba: a.prueba ? siguientePasoDePrueba(a.prueba) : null }))}>
+                                Ya lo hice (prueba)
+                            </button>
+                            <button type="button" className="ayu-btn ayu-btn-txt" style={{ minHeight: 32, padding: '0 10px', fontSize: 13 }}
+                                onClick={() => actualizarAyuda(a => ({ ...a, prueba: null }))}>
+                                Salir de la prueba
+                            </button>
+                        </span>
+                    )}
                 </div>
                 {foco && <Foco key={foco.objetivo} objetivo={foco.objetivo} texto={foco.texto} />}
             </>
@@ -285,7 +330,7 @@ export default function AyudaHost() {
     if (primeros.tipo === 'listo') {
         // Hasta saber si el correo está verificado no se muestra nada: evita un
         // parpadeo del cierre equivocado.
-        if (correoVerificado === null) return null
+        if (correoEf === null) return null
         const cerrar = () => actualizarAyuda(a => ({ ...a, enCurso: false }))
         return (
             <>

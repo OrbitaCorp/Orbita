@@ -20,11 +20,13 @@ export interface EstadoAyuda {
     posponer: Record<string, number>
     /** Cuándo apareció la última sugerencia (ms epoch). 0 = ninguna. */
     ultimaSugerencia: number
+    /** Modo prueba (solo en la tienda habilitada): en qué paso va la tienda "nueva" simulada. null = datos reales. */
+    prueba: 'categoria' | 'producto' | 'listo' | null
 }
 
 export const ESTADO_AYUDA_VACIO: EstadoAyuda = {
     vistos: [], pospuestoHasta: 0, enCurso: false, esperaCorreo: false,
-    sabe: [], posponer: {}, ultimaSugerencia: 0,
+    sabe: [], posponer: {}, ultimaSugerencia: 0, prueba: null,
 }
 
 /** "Más tarde" calla los primeros pasos un día. */
@@ -50,6 +52,7 @@ export function parsear(crudo: string | null): EstadoAyuda {
             sabe: Array.isArray(o?.sabe) ? o.sabe.filter((x): x is string => typeof x === 'string') : [],
             posponer: soloNumeros(o?.posponer),
             ultimaSugerencia: typeof o?.ultimaSugerencia === 'number' ? o.ultimaSugerencia : 0,
+            prueba: o?.prueba === 'categoria' || o?.prueba === 'producto' || o?.prueba === 'listo' ? o.prueba : null,
         }
     } catch {
         return ESTADO_AYUDA_VACIO

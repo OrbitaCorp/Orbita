@@ -4,6 +4,7 @@ import { SECCIONES_DEL_PANEL, VISTAS_DE_CONFIGURACION } from '../../secciones'
 import { AYUDA_POR_SECCION, ayudaDe, claveDeAyuda } from '../modulos'
 import { decidirPrimerosPasos, pasoInicial } from '../primerosPasos'
 import { ESTADO_AYUDA_VACIO, parsear } from '../almacen'
+import { ayudaNuevaHabilitada, comandoDeQuery, cumplidasSimuladas, siguientePasoDePrueba } from '../acceso'
 import { INTERVALO_MS, SUGERENCIAS, claveDeSugerencia, elegirSugerencia } from '../sugerencias'
 
 // El tutorial de cada módulo sale del manual: si un id de acá deja de existir
@@ -141,5 +142,35 @@ describe('lo que recuerda el dispositivo', () => {
         expect(parsear('{"vistos":[1,"pedidos"],"enCurso":"si"}')).toEqual({ ...ESTADO_AYUDA_VACIO, vistos: ['pedidos'] })
         expect(parsear('{"sabe":["mp",3],"posponer":{"a":5,"b":"x"},"ultimaSugerencia":"ayer"}'))
             .toEqual({ ...ESTADO_AYUDA_VACIO, sabe: ['mp'], posponer: { a: 5 } })
+    })
+})
+
+describe('quién ve la ayuda nueva', () => {
+    it('por ahora solo la tienda "negocio"', () => {
+        expect(ayudaNuevaHabilitada('negocio')).toBe(true)
+        expect(ayudaNuevaHabilitada('Negocio')).toBe(true)
+        for (const otra of ['euge-joyas', 'negocio-2', 'minegocio', '', null, undefined]) {
+            expect(ayudaNuevaHabilitada(otra), String(otra)).toBe(false)
+        }
+    })
+
+    it('solo se entienden los tres comandos de la dirección', () => {
+        expect(comandoDeQuery('probar')).toBe('probar')
+        expect(comandoDeQuery('reiniciar')).toBe('reiniciar')
+        expect(comandoDeQuery('salir')).toBe('salir')
+        for (const raro of ['PROBAR', 'borrar', '', undefined, ['probar']]) expect(comandoDeQuery(raro)).toBeNull()
+    })
+
+    it('la tienda simulada avanza de categoría a producto a listo, como lo haría la API', () => {
+        expect(pasoInicial(cumplidasSimuladas('categoria'))).toBe('categoria')
+        expect(pasoInicial(cumplidasSimuladas('producto'))).toBe('producto')
+        expect(pasoInicial(cumplidasSimuladas('listo'))).toBe('listo')
+        expect(siguientePasoDePrueba('categoria')).toBe('producto')
+        expect(siguientePasoDePrueba('producto')).toBe('listo')
+    })
+
+    it('lo guardado con prueba se lee; un valor inventado, no', () => {
+        expect(parsear('{"prueba":"producto"}').prueba).toBe('producto')
+        expect(parsear('{"prueba":"otro"}').prueba).toBeNull()
     })
 })
