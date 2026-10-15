@@ -82,11 +82,17 @@ export default function AyudaHost() {
     // Lo recordado en este dispositivo (solo en el cliente).
     useEffect(() => {
         if (!negocioId) return
-        const guardado = leerAyuda(negocioId)
+        let guardado = leerAyuda(negocioId)
+        // La tienda de pruebas arranca SOLA como si fuera nueva (la primera vez en
+        // cada navegador), para ver el flujo sin tener que armar la dirección.
+        if (modoPruebaPermitido && !guardado.pruebaElegida) {
+            guardado = { ...ESTADO_AYUDA_VACIO, prueba: 'categoria', pruebaElegida: true }
+            guardarAyuda(negocioId, guardado)
+        }
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setAyuda(guardado)
         setPospuesto(guardado.pospuestoHasta > Date.now())
-    }, [negocioId])
+    }, [negocioId, modoPruebaPermitido])
 
     const actualizarAyuda = useCallback((cambio: (a: EstadoAyuda) => EstadoAyuda) => {
         setAyuda(prev => {
@@ -140,8 +146,8 @@ export default function AyudaHost() {
         const { ayuda: _quitar, ...resto } = router.query
         void _quitar
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (comando === 'salir') actualizarAyuda(a => ({ ...a, prueba: null }))
-        else actualizarAyuda(a => ({ ...ESTADO_AYUDA_VACIO, prueba: comando === 'probar' ? 'categoria' : a.prueba }))
+        if (comando === 'salir') actualizarAyuda(a => ({ ...a, prueba: null, pruebaElegida: true }))
+        else actualizarAyuda(a => ({ ...ESTADO_AYUDA_VACIO, pruebaElegida: true, prueba: comando === 'probar' ? 'categoria' : a.prueba }))
         // Lo que estaba en pantalla de la vez anterior se descarta.
         setPospuesto(false)
         setAvisada(null); setAvisoCerrado(false); setHojaAbierta(false)

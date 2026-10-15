@@ -22,11 +22,13 @@ export interface EstadoAyuda {
     ultimaSugerencia: number
     /** Modo prueba (solo en la tienda "negocio", ver acceso.ts): en qué paso va la tienda "nueva" simulada. null = datos reales. */
     prueba: 'categoria' | 'producto' | 'listo' | null
+    /** La tienda de pruebas ya arrancó (sola) o eligió en el modo prueba: no se vuelve a activar de oficio. */
+    pruebaElegida: boolean
 }
 
 export const ESTADO_AYUDA_VACIO: EstadoAyuda = {
     vistos: [], pospuestoHasta: 0, enCurso: false, esperaCorreo: false,
-    sabe: [], posponer: {}, ultimaSugerencia: 0, prueba: null,
+    sabe: [], posponer: {}, ultimaSugerencia: 0, prueba: null, pruebaElegida: false,
 }
 
 /** "Más tarde" calla los primeros pasos un día. */
@@ -53,6 +55,7 @@ export function parsear(crudo: string | null): EstadoAyuda {
             posponer: soloNumeros(o?.posponer),
             ultimaSugerencia: typeof o?.ultimaSugerencia === 'number' ? o.ultimaSugerencia : 0,
             prueba: o?.prueba === 'categoria' || o?.prueba === 'producto' || o?.prueba === 'listo' ? o.prueba : null,
+            pruebaElegida: o?.pruebaElegida === true,
         }
     } catch {
         return ESTADO_AYUDA_VACIO

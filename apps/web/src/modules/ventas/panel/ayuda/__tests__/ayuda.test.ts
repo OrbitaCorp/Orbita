@@ -172,5 +172,8 @@ describe('quién puede usar el modo prueba', () => {
     it('lo guardado con prueba se lee; un valor inventado, no', () => {
         expect(parsear('{"prueba":"producto"}').prueba).toBe('producto')
         expect(parsear('{"prueba":"otro"}').prueba).toBeNull()
+        // Sin la marca, la tienda de pruebas todavía no arrancó sola.
+        expect(parsear('{"prueba":"listo"}').pruebaElegida).toBe(false)
+        expect(parsear('{"pruebaElegida":true}').pruebaElegida).toBe(true)
     })
 })

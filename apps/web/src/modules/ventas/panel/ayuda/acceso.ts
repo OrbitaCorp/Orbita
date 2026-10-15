@@ -7,7 +7,8 @@
 //
 // El MODO PRUEBA, en cambio, es solo de la tienda "negocio": simula una tienda
 // recién creada (solo en ese navegador y sin tocar datos) para poder ver el flujo
-// del primer producto en una tienda que ya tiene todo. Se maneja con la dirección:
+// del primer producto en una tienda que ya tiene todo. ARRANCA SOLO la primera vez
+// que se entra a esa tienda desde un navegador, y se maneja con la dirección:
 //   ?ayuda=probar     arranca la prueba desde cero (tienda "nueva")
 //   ?ayuda=reiniciar  vuelve a mostrar avisos y sugerencias (sin cambiar la prueba)
 //   ?ayuda=salir      sale de la prueba y vuelve a lo real
