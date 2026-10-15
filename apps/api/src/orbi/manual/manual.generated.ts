@@ -9,7 +9,7 @@
 import type { ManualGenerado } from './manual.types';
 
 export const MANUAL_GENERADO: ManualGenerado = {
-  "version": "408801811a410ac2",
+  "version": "4ff46dbd5c9b2481",
   "temas": [
     {
       "id": "panel-y-tienda",
@@ -594,7 +594,7 @@ export const MANUAL_GENERADO: ManualGenerado = {
       "id": "cfg-apariencia",
       "capitulo": "Configuración",
       "titulo": "Apariencia",
-      "texto": "Cómo se ve tu tienda. Es la pantalla más larga de Configuración, con su propio índice de secciones:\n\n- Identidad de marca: logo y favicon.\n- Paleta de colores y Tipografía: los colores y la letra de toda tu tienda, incluida la escala de texto.\n- Diseño y layout: cómo se acomoda el contenido.\n- Banner con efecto parallax y Video en tu tienda: las piezas grandes de la portada.\n- Marcas con las que trabajás: los logos de tus proveedores o marcas.\n- ¿Qué ven tus clientes?: qué secciones se muestran y cuáles no.\n- Textos de tu tienda: los títulos y frases de la portada.\n- Barra de estadísticas y Pie de página.\n\nDato: Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.",
+      "texto": "Cómo se ve tu tienda. Es la pantalla más larga de Configuración, con su propio índice de secciones:\n\n- Identidad de marca: logo y favicon.\n- Sliders del hero: el carrusel de arriba de tu portada. Si no cargás ninguno, tu tienda muestra hasta tres automáticos, uno por categoría, con un texto genérico y un fondo de color; no se editan, y desaparecen apenas cargás el primero tuyo.\n- Paleta de colores y Tipografía: los colores y la letra de toda tu tienda, incluida la escala de texto.\n- Diseño y layout: cómo se acomoda el contenido.\n- Banner con efecto parallax y Video en tu tienda: las piezas grandes de la portada.\n- Marcas con las que trabajás: los logos de tus proveedores o marcas.\n- ¿Qué ven tus clientes?: qué secciones se muestran y cuáles no.\n- Textos de tu tienda: los títulos y frases de la portada.\n- Barra de estadísticas y Pie de página.\n\nDato: Si activaste una plantilla de Home (paquete Avanzado), la Apariencia clásica queda bloqueada: la portada la manda la plantilla. Se puede volver a la apariencia original desde la galería de plantillas.",
       "destino": {
         "seccion": "configuracion",
         "vista": "apariencia",

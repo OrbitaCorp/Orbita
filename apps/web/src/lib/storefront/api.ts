@@ -38,6 +38,9 @@ async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T
 export type StorefrontHeroSlide = {
   id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
   imageStyle?: string; imagePosition?: string; imageOverlay?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
+  // Solo del front: el slide lo armó la tienda sola (ver slidesPorDefecto en
+  // plantillaReal.ts), no está guardado. La API nunca lo manda.
+  automatico?: boolean
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }
